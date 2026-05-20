@@ -116,54 +116,22 @@
     </div>
   </div>
 
-  <!-- ── Recent Scout ── -->
-  <details class="card" style="margin-bottom:1rem;">
-    <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
-      🔍 Letzte Scout-Anfragen ({{ scout_stats.recent | length }})
-    </summary>
-    <div style="margin-top:1rem;">
-    {% if scout_stats.recent %}
-    <div style="overflow-x:auto;">
-    <table class="table">
-      <thead>
-        <tr><th>Spieler</th><th>Dorf</th><th>Koords</th><th>Zeit</th><th>Info</th><th>Erstellt</th></tr>
-      </thead>
-      <tbody>
-        {% for ch in scout_stats.recent %}
-        <tr>
-          <td>{{ ch.player }}</td>
-          <td>{{ ch.village }}</td>
-          <td><code>{{ ch.coordinates }}</code></td>
-          <td>{{ ch.scout_time }}</td>
-          <td>{{ ch.additional_info or '—' }}</td>
-          <td class="mono small">{{ ch.created_at[:16] }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-    {% else %}
-    <p class="empty">Noch keine Scout-Anfragen.</p>
-    {% endif %}
-    </div>
-  </details>
-
-  <!-- ── Res-Push Details ── -->
-  {% if res_stats.top_contributors %}
+  <!-- ── Scout: Wer hat Anfragen gestellt ── -->
+  {% if scout_requesters %}
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;">🪖 Top Res-Push Contributers</h2>
+    <h2 style="margin-top:0;">📋 Scout-Anfragen nach Mitglied</h2>
     <table class="table">
-      <thead><tr><th>#</th><th>Nutzer</th><th>Beiträge</th><th>Gesamt gesendet</th></tr></thead>
+      <thead><tr><th>#</th><th>Mitglied</th><th>Anfragen gestellt</th></tr></thead>
       <tbody>
-        {% for row in res_stats.top_contributors %}
+        {% set max_req = scout_requesters[0].cnt if scout_requesters else 1 %}
+        {% for row in scout_requesters %}
         <tr>
           <td class="mono small">{{ loop.index }}</td>
-          <td>{{ row.user_name }}</td>
-          <td>{{ row.cnt }}</td>
+          <td><strong>{{ row.name }}</strong></td>
           <td>
             <div style="display:flex; align-items:center; gap:0.5rem;">
-              <div style="background:#f59e0b; height:6px; border-radius:3px; width:{{ [(row.total_sent or 0) // 500, 120] | min }}px;"></div>
-              <strong>{{ row.total_sent or 0 }}</strong>
+              <div style="background:#3b82f6; height:6px; border-radius:3px; width:{{ [row.cnt * 120 // max_req, 120] | min }}px;"></div>
+              <strong>{{ row.cnt }}</strong>
             </div>
           </td>
         </tr>
@@ -173,28 +141,90 @@
   </div>
   {% endif %}
 
+  <!-- ── Recent Scout ── -->
   <details class="card" style="margin-bottom:1rem;">
     <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
-      🪖 Letzte Res-Push Anfragen ({{ res_stats.recent | length }})
+      🔍 Letzte Scout-Anfragen ({{ scout_stats.recent | length }})
     </summary>
     <div style="margin-top:1rem; overflow-x:auto;">
-    {% if res_stats.recent %}
+    {% if scout_stats.recent %}
     <table class="table">
       <thead>
-        <tr><th>Nutzer</th><th>Dorf</th><th>Ressource</th><th>Menge</th><th>Status</th><th>Erstellt</th></tr>
+        <tr><th>Angefragt von</th><th>Ziel-Spieler</th><th>Dorf</th><th>Koords</th><th>Zeit</th><th>Erstellt</th></tr>
       </thead>
       <tbody>
-        {% for r in res_stats.recent %}
+        {% for ch in scout_stats.recent %}
         <tr>
-          <td>{{ r.user_name }}</td>
-          <td>{{ r.village_name or '—' }}</td>
-          <td>{{ r.resource_type or '—' }}</td>
-          <td>{{ r.amount or '—' }}</td>
+          <td>{{ ch.requested_by_name or '—' }}</td>
+          <td>{{ ch.player }}</td>
+          <td>{{ ch.village }}</td>
+          <td><code>{{ ch.coordinates }}</code></td>
+          <td>{{ ch.scout_time }}</td>
+          <td class="mono small">{{ ch.created_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Noch keine Scout-Anfragen.</p>
+    {% endif %}
+    </div>
+  </details>
+
+  <!-- ── Res-Push: Beiträger-Rangliste ── -->
+  {% if res_leaderboard %}
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">🪖 Res-Push Rangliste</h2>
+    <table class="table">
+      <thead>
+        <tr><th>#</th><th>Mitglied</th><th>Beiträge</th><th>Gesamt Menge</th><th>Zuletzt aktiv</th></tr>
+      </thead>
+      <tbody>
+        {% set max_amount = res_leaderboard[0].total_amount if res_leaderboard else 1 %}
+        {% for row in res_leaderboard %}
+        <tr>
+          <td class="mono small">
+            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+          </td>
+          <td><strong>{{ row.user_name }}</strong></td>
+          <td>{{ row.contributions }}×</td>
           <td>
-            {% if r.status == 'accepted' %}<span class="badge badge-ok">✅ Active</span>
-            {% elif r.status == 'rejected' %}<span class="badge" style="background:rgba(220,50,50,.15);color:#e05555;">❌ Rejected</span>
-            {% elif r.status == 'inactive' %}<span class="badge" style="background:rgba(100,100,100,.15);color:#888;">— Inactive</span>
-            {% else %}<span class="badge badge-warn">⏳ {{ r.status }}</span>{% endif %}
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div style="background:#f59e0b; height:6px; border-radius:3px; width:{{ [(row.total_amount or 0) * 120 // [max_amount, 1] | max, 120] | min }}px;"></div>
+              <strong>{{ '{:,}'.format(row.total_amount or 0) }}</strong>
+            </div>
+          </td>
+          <td class="mono small">{{ row.last_active[:16] if row.last_active else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ── Res-Push: Einzelne Beiträge ── -->
+  <details class="card" style="margin-bottom:1rem;">
+    <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
+      🪖 Beitrags-Details ({{ res_contrib_details | length }})
+    </summary>
+    <div style="margin-top:1rem; overflow-x:auto;">
+    {% if res_contrib_details %}
+    <table class="table">
+      <thead>
+        <tr><th>Mitglied</th><th>Menge</th><th>Für Spieler</th><th>Koords</th><th>Push-Höhe</th><th>Req-Status</th><th>Datum</th></tr>
+      </thead>
+      <tbody>
+        {% for r in res_contrib_details %}
+        <tr>
+          <td><strong>{{ r.user_name }}</strong></td>
+          <td><strong>{{ r.amount }}</strong></td>
+          <td>{{ r.player_name }}</td>
+          <td><code>{{ r.coordinates }}</code></td>
+          <td>{{ r.push_height }}</td>
+          <td>
+            {% if r.status == 'accepted' %}<span class="badge badge-ok" style="font-size:0.7rem;">✅</span>
+            {% elif r.status == 'rejected' %}<span class="badge" style="background:rgba(220,50,50,.15);color:#e05555;font-size:0.7rem;">❌</span>
+            {% else %}<span class="badge badge-warn" style="font-size:0.7rem;">⏳</span>{% endif %}
           </td>
           <td class="mono small">{{ r.created_at[:16] }}</td>
         </tr>
@@ -202,7 +232,7 @@
       </tbody>
     </table>
     {% else %}
-    <p class="empty">Noch keine Anfragen.</p>
+    <p class="empty">Noch keine Beiträge erfasst.</p>
     {% endif %}
     </div>
   </details>
@@ -238,6 +268,59 @@
             {% endif %}
             {% if poll.status == 'active' %}<span class="badge badge-ok" style="font-size:0.7rem; margin-top:3px; display:inline-block;">🟢 Aktiv</span>
             {% else %}<span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;font-size:0.7rem;margin-top:3px;display:inline-block;">🔒 Closed</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Poll-Teilnahmequote ── -->
+  {% if poll_participation %}
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">📅 Umfragen-Teilnahme pro Mitglied</h2>
+    <p class="hint">Basiert auf {{ poll_participation[0].total_polls }} Umfrage(n) insgesamt.</p>
+    <div style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Mitglied</th>
+          <th>Teilgenommen</th>
+          <th>Quote</th>
+          <th style="color:#4caf82;">✅ Dabei</th>
+          <th style="color:#c89b00;">⏰ Vielleicht</th>
+          <th style="color:#e05555;">❌ Nicht</th>
+          <th>Verteilung</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in poll_participation %}
+        {% set pct = (row.responded * 100 // row.total_polls) if row.total_polls > 0 else 0 %}
+        {% set total_resp = row.available + row.maybe + row.unavailable %}
+        <tr>
+          <td><strong>{{ row.user_name }}</strong></td>
+          <td>{{ row.responded }} / {{ row.total_polls }}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div style="background:var(--border); border-radius:3px; height:6px; width:80px; overflow:hidden;">
+                <div style="background:{% if pct >= 80 %}#4caf82{% elif pct >= 50 %}#c89b00{% else %}#e05555{% endif %}; height:100%; width:{{ pct }}%;"></div>
+              </div>
+              <span style="font-weight:700; color:{% if pct >= 80 %}#4caf82{% elif pct >= 50 %}#c89b00{% else %}#e05555{% endif %};">{{ pct }}%</span>
+            </div>
+          </td>
+          <td style="color:#4caf82; font-weight:600;">{{ row.available }}</td>
+          <td style="color:#c89b00; font-weight:600;">{{ row.maybe }}</td>
+          <td style="color:#e05555; font-weight:600;">{{ row.unavailable }}</td>
+          <td>
+            {% if total_resp > 0 %}
+            <div style="display:flex; gap:2px; height:8px; border-radius:4px; overflow:hidden; min-width:70px;">
+              {% if row.available %}<div style="background:#4caf82; flex:{{ row.available }};"></div>{% endif %}
+              {% if row.maybe %}<div style="background:#c89b00; flex:{{ row.maybe }};"></div>{% endif %}
+              {% if row.unavailable %}<div style="background:#e05555; flex:{{ row.unavailable }};"></div>{% endif %}
+            </div>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

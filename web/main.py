@@ -561,6 +561,10 @@ async def guild_stats(request: Request, guild_id: str):
         p["count_available"]   = sum(1 for r in responses if r["response"] == "available")
         p["count_maybe"]       = sum(1 for r in responses if r["response"] == "maybe")
         p["count_unavailable"] = sum(1 for r in responses if r["response"] == "unavailable")
+    poll_participation  = await database.get_poll_participation_stats(guild_id)
+    res_leaderboard     = await database.get_res_contribution_leaderboard(guild_id)
+    res_contrib_details = await database.get_res_contribution_details(guild_id)
+    scout_requesters    = await database.get_scout_requester_stats(guild_id)
     token = os.environ.get("DISCORD_TOKEN", "")
     discord_guild = None
     async with httpx.AsyncClient() as client:
@@ -572,6 +576,10 @@ async def guild_stats(request: Request, guild_id: str):
         "request": request, "guild": guild,
         "scout_stats": scout_stats, "res_stats": res_stats, "polls": polls,
         "discord_guild": discord_guild,
+        "poll_participation": poll_participation,
+        "res_leaderboard": res_leaderboard,
+        "res_contrib_details": res_contrib_details,
+        "scout_requesters": scout_requesters,
     })
 
 

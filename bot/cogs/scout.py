@@ -200,6 +200,8 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             player=self.player.value, coordinates=self.coordinates.value,
             village=self.village.value, scout_time=self.time.value,
             additional_info=self.additional_info.value or "",
+            requested_by_id=str(interaction.user.id),
+            requested_by_name=interaction.user.display_name,
         )
 
         embed = discord.Embed(title="📡 Scout Request", color=discord.Color.blurple())

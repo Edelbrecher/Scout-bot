@@ -107,6 +107,13 @@ async def init_db():
         except Exception:
             pass
 
+        for col in ["requested_by_id TEXT", "requested_by_name TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS availability_polls (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -349,6 +356,84 @@ async def get_res_requests(guild_id: str) -> list[dict]:
             (guild_id,),
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_poll_participation_stats(guild_id: str) -> list[dict]:
+    """Per-user participation rate across all polls in the guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT
+                pr.user_name,
+                COUNT(DISTINCT pr.poll_id)                                        AS responded,
+                SUM(CASE WHEN pr.response = 'available'   THEN 1 ELSE 0 END)     AS available,
+                SUM(CASE WHEN pr.response = 'maybe'       THEN 1 ELSE 0 END)     AS maybe,
+                SUM(CASE WHEN pr.response = 'unavailable' THEN 1 ELSE 0 END)     AS unavailable,
+                (SELECT COUNT(*) FROM availability_polls WHERE guild_id = ?)      AS total_polls
+            FROM poll_responses pr
+            JOIN availability_polls ap ON ap.id = pr.poll_id
+            WHERE ap.guild_id = ?
+            GROUP BY pr.user_id, pr.user_name
+            ORDER BY responded DESC, available DESC
+        """, (guild_id, guild_id)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_res_contribution_leaderboard(guild_id: str) -> list[dict]:
+    """Per-user contribution totals across all res-push requests."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT
+                rc.user_name,
+                COUNT(*)                                      AS contributions,
+                SUM(CAST(REPLACE(rc.amount, ',', '') AS INTEGER)) AS total_amount,
+                MAX(rc.created_at)                            AS last_active
+            FROM res_contributions rc
+            JOIN res_requests rr ON rr.id = rc.request_id
+            WHERE rr.guild_id = ?
+            GROUP BY rc.user_id, rc.user_name
+            ORDER BY total_amount DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_res_contribution_details(guild_id: str) -> list[dict]:
+    """Recent individual contributions with request context."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT
+                rc.user_name, rc.amount, rc.created_at,
+                rr.player_name, rr.coordinates, rr.push_height, rr.status
+            FROM res_contributions rc
+            JOIN res_requests rr ON rr.id = rc.request_id
+            WHERE rr.guild_id = ?
+            ORDER BY rc.created_at DESC
+            LIMIT 50
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_scout_requester_stats(guild_id: str) -> list[dict]:
+    """Who submitted the most scout requests (needs requested_by_name column)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Only works if the column exists (added by migration below)
+        try:
+            async with db.execute("""
+                SELECT
+                    requested_by_name AS name,
+                    COUNT(*) AS cnt
+                FROM scout_channels
+                WHERE guild_id = ? AND requested_by_name IS NOT NULL AND requested_by_name != ''
+                GROUP BY requested_by_name
+                ORDER BY cnt DESC
+                LIMIT 20
+            """, (guild_id,)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            return []
 
 
 async def get_res_contributions_for_guild(guild_id: str) -> list[dict]:

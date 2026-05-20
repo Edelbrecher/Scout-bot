@@ -169,15 +169,26 @@ async def add_scout_channel(
     village: str,
     scout_time: str,
     additional_info: str,
+    requested_by_id: str = "",
+    requested_by_name: str = "",
 ):
     async with aiosqlite.connect(DB_PATH) as db:
+        # Ensure columns exist (migration guard)
+        for col in ["requested_by_id TEXT", "requested_by_name TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
         await db.execute("""
             INSERT OR IGNORE INTO scout_channels
-                (channel_id, guild_id, created_at, player, coordinates, village, scout_time, additional_info)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (channel_id, guild_id, created_at, player, coordinates, village,
+                 scout_time, additional_info, requested_by_id, requested_by_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             channel_id, guild_id, datetime.utcnow().isoformat(),
             player, coordinates, village, scout_time, additional_info,
+            requested_by_id, requested_by_name,
         ))
         await db.commit()
 
