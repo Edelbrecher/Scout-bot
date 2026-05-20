@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}TD Scouter{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  {% if request.cookies.get("scouter_session") %}
+  <nav class="navbar">
+    <span class="nav-brand">📡 TD Scouter</span>
+    <div class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

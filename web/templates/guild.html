@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ guild.guild_name }} · TD Scouter{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link">← Dashboard</a>
+    <h1>🏰 {{ guild.guild_name }}</h1>
+    <p class="subtitle">Server ID: {{ guild.guild_id }}</p>
+  </div>
+
+  {% if saved %}
+  <div class="alert alert-success">✅ Settings saved successfully.</div>
+  {% endif %}
+
+  <div class="grid-2">
+    <!-- Config Form -->
+    <div class="card">
+      <h2>Configuration</h2>
+      <p class="hint">Copy IDs from Discord: right-click a channel/category → <strong>Copy ID</strong> (Developer Mode must be on).</p>
+
+      <form method="post" action="/guild/{{ guild.guild_id }}">
+        <div class="form-group">
+          <label for="category_id">Scout Category ID</label>
+          <p class="field-hint">New scout channels will be created inside this category.</p>
+          <input
+            type="text"
+            id="category_id"
+            name="category_id"
+            value="{{ guild.category_id or '' }}"
+            placeholder="e.g. 1234567890123456789"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="archive_channel_id">Archive Channel ID</label>
+          <p class="field-hint">All images posted in scout channels are copied here.</p>
+          <input
+            type="text"
+            id="archive_channel_id"
+            name="archive_channel_id"
+            value="{{ guild.archive_channel_id or '' }}"
+            placeholder="e.g. 1234567890123456789"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="allowed_role_ids">Allowed Role IDs</label>
+          <p class="field-hint">
+            Roles that can see and write in scout channels. Comma-separated.<br>
+            Right-click a role in Discord → <strong>Copy ID</strong>.
+          </p>
+          <input
+            type="text"
+            id="allowed_role_ids"
+            name="allowed_role_ids"
+            value="{{ guild.allowed_role_ids or '' }}"
+            placeholder="e.g. 111122223333, 444455556666"
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+      </form>
+    </div>
+
+    <!-- Status -->
+    <div class="card">
+      <h2>Status</h2>
+      <ul class="status-list">
+        <li>
+          <span class="status-label">Category</span>
+          {% if guild.category_id %}
+          <span class="badge badge-ok">✅ {{ guild.category_id }}</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Not set</span>
+          {% endif %}
+        </li>
+        <li>
+          <span class="status-label">Archive Channel</span>
+          {% if guild.archive_channel_id %}
+          <span class="badge badge-ok">✅ {{ guild.archive_channel_id }}</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Not set</span>
+          {% endif %}
+        </li>
+        <li>
+          <span class="status-label">Scout Button</span>
+          {% if guild.button_message_id %}
+          <span class="badge badge-ok">✅ Active (msg {{ guild.button_message_id }})</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Not posted yet</span>
+          {% endif %}
+        </li>
+      </ul>
+
+      {% if guild.category_id and guild.archive_channel_id and not guild.button_message_id %}
+      <div class="hint mt-1">
+        Config looks good! Now go to Discord and run <code>/setup-scout</code> in the channel where the button should appear.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Scout Channels -->
+  <div class="card mt-1">
+    <h2>Scout Channels ({{ scout_channels|length }})</h2>
+    {% if scout_channels %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Village</th>
+          <th>Coordinates</th>
+          <th>Time</th>
+          <th>Additional Info</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ch in scout_channels %}
+        <tr>
+          <td>{{ ch.player }}</td>
+          <td>{{ ch.village }}</td>
+          <td><code>{{ ch.coordinates }}</code></td>
+          <td>{{ ch.scout_time }}</td>
+          <td>{{ ch.additional_info or '—' }}</td>
+          <td class="mono small">{{ ch.created_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No scout channels created yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

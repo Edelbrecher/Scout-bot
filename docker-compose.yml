@@ -1,0 +1,17 @@
+services:
+  bot:
+    build: ./bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    depends_on: []
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data

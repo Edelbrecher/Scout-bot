@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · TD Scouter{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="subtitle">{{ guilds|length }} server(s) connected</p>
+    </div>
+    {% if invite_url %}
+    <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Invite Bot</a>
+    {% endif %}
+  </div>
+
+  {% if guilds %}
+  <div class="guild-grid">
+    {% for guild in guilds %}
+    <a href="/guild/{{ guild.guild_id }}" class="card guild-card">
+      <div class="guild-icon">🏰</div>
+      <div class="guild-info">
+        <h2>{{ guild.guild_name }}</h2>
+        <p class="guild-id">ID: {{ guild.guild_id }}</p>
+        <div class="guild-status">
+          {% if guild.category_id and guild.archive_channel_id %}
+          <span class="badge badge-ok">✅ Configured</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Needs setup</span>
+          {% endif %}
+          {% if guild.button_message_id %}
+          <span class="badge badge-ok">🔘 Button active</span>
+          {% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty-state">
+    <p>🤖 No servers found yet.</p>
+    <p>Invite the bot to a Discord server — it will appear here automatically.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

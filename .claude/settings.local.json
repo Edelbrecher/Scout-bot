@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(pip3 --version)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@162.55.165.13 \"echo connected && uname -a\")",
+      "Bash(ssh-keygen -R 162.55.165.13)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@162.55.165.13 \"echo connected\")",
+      "Bash(ls ~/.ssh/*.pub 2>/dev/null || echo \"no public key found\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/Main-Vserver root@162.55.165.13 \"echo connected && uname -a\")",
+      "Bash(ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/Main-Vserver root@162.55.165.13 \"echo connected\")",
+      "Bash(python3 -c ' *)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/Main-Vserver root@162.55.165.13 \"echo connected && uname -a\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/Main-Vserver root@162.55.165.13 \"uname -a && echo OK\")",
+      "Bash(ssh-keygen -R 178.105.153.238)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/Main-Vserver root@178.105.153.238 \"echo connected && uname -a\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/hetzner_new root@178.105.153.238 \"echo connected && uname -a\")",
+      "Bash(ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/hetzner_new root@178.105.153.238)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/hetzner_new root@178.105.153.238 \"echo connected && uname -a && cat /root/.ssh/authorized_keys\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/hetzner_new root@178.105.153.238 \"echo CONNECTED && uname -a\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o IdentityAgent=none -i '~/.ssh/hetzner_new' root@178.105.153.238 ' *)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/hetzner_new root@178.105.153.238 \"mkdir -p /opt/td-scouter/data\")",
+      "Bash(rsync -avz -e 'ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o IdentityAgent=none -i /Users/maximilianfrischholz/.ssh/hetzner_new' /Applications/Claude-Code/TD-Scouter/ root@178.105.153.238:/opt/td-scouter/ --exclude=.env)"
+    ]
+  }
+}

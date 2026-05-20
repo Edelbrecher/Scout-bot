@@ -1,0 +1,111 @@
+import aiosqlite
+from pathlib import Path
+from datetime import datetime
+
+DB_PATH = Path("/app/data/scouter.db")
+
+
+async def init_db():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS guild_configs (
+                guild_id            TEXT PRIMARY KEY,
+                guild_name          TEXT NOT NULL,
+                scout_channel_id    TEXT,
+                category_id         TEXT,
+                archive_channel_id  TEXT,
+                button_message_id   TEXT,
+                allowed_role_ids    TEXT
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scout_channels (
+                channel_id      TEXT PRIMARY KEY,
+                guild_id        TEXT NOT NULL,
+                created_at      TEXT NOT NULL,
+                player          TEXT,
+                coordinates     TEXT,
+                village         TEXT,
+                scout_time      TEXT,
+                additional_info TEXT
+            )
+        """)
+        await db.commit()
+
+    # Migrate: add allowed_role_ids column to existing DBs
+    async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN allowed_role_ids TEXT")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
+
+
+async def get_guild_config(guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def upsert_guild_name(guild_id: str, guild_name: str):
+    """Register a guild without overwriting existing config."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO guild_configs (guild_id, guild_name)
+            VALUES (?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET guild_name = excluded.guild_name
+        """, (guild_id, guild_name))
+        await db.commit()
+
+
+async def update_button_message_id(guild_id: str, message_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET button_message_id = ?, scout_channel_id = COALESCE(scout_channel_id, scout_channel_id)
+            WHERE guild_id = ?
+        """, (message_id, guild_id))
+        await db.commit()
+
+
+async def update_scout_channel_and_button(guild_id: str, scout_channel_id: str, button_message_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET scout_channel_id = ?, button_message_id = ?
+            WHERE guild_id = ?
+        """, (scout_channel_id, button_message_id, guild_id))
+        await db.commit()
+
+
+async def add_scout_channel(
+    channel_id: str,
+    guild_id: str,
+    player: str,
+    coordinates: str,
+    village: str,
+    scout_time: str,
+    additional_info: str,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT OR IGNORE INTO scout_channels
+                (channel_id, guild_id, created_at, player, coordinates, village, scout_time, additional_info)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            channel_id, guild_id, datetime.utcnow().isoformat(),
+            player, coordinates, village, scout_time, additional_info,
+        ))
+        await db.commit()
+
+
+async def is_scout_channel(channel_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT 1 FROM scout_channels WHERE channel_id = ?", (channel_id,)
+        ) as cursor:
+            return await cursor.fetchone() is not None
