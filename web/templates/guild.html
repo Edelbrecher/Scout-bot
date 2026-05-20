@@ -207,18 +207,28 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
     const role  = btn.dataset.role;
     const field = btn.dataset.field;
     btn.disabled = true;
+    btn.style.opacity = '0.5';
     const form = new FormData();
     form.append('field', field);
-    const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {method:'POST', body: form});
-    if (res.ok) {
-      const data = await res.json();
-      btn.textContent = data.added ? '✅' : '○';
-      btn.classList.toggle('active', data.added);
-      btn.title = data.added
-        ? (field === 'allowed_role_ids' ? 'Remove from Scout' : 'Remove from Res-Answer')
-        : (field === 'allowed_role_ids' ? 'Add to Scout' : 'Add to Res-Answer');
+    try {
+      const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {method:'POST', body: form});
+      if (res.ok) {
+        const data = await res.json();
+        const active = data.added;
+        btn.innerHTML = active ? '✅' : '○';
+        btn.classList.toggle('active', active);
+        btn.dataset.active = active ? '1' : '0';
+        btn.title = active
+          ? (field === 'allowed_role_ids' ? 'Remove from Scout' : 'Remove from Res-Answer')
+          : (field === 'allowed_role_ids' ? 'Add to Scout' : 'Add to Res-Answer');
+      } else {
+        console.error('Toggle failed:', res.status);
+      }
+    } catch(e) {
+      console.error('Toggle error:', e);
     }
     btn.disabled = false;
+    btn.style.opacity = '';
   });
 });
 </script>
