@@ -201,6 +201,8 @@ class AttackReportView(discord.ui.View):
 class AttacksCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # Register globally so any message with custom_id="report_attack" is handled
+        bot.add_view(AttackReportView(alert_channel_id=""))
 
     @commands.Cog.listener()
     async def on_ready(self):
