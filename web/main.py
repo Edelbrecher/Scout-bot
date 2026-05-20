@@ -1,4 +1,5 @@
 import os
+import asyncio
 import base64
 from contextlib import asynccontextmanager
 from urllib.parse import urlencode
@@ -561,6 +562,30 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
         return RedirectResponse("/login")
     await database.set_res_request_status_by_id(request_id, "accepted")
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
+async def _close_scout_channel_after_delay(channel_id: str, token: str, delay: int = 120):
+    await asyncio.sleep(delay)
+    async with httpx.AsyncClient() as client:
+        await client.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers={"Authorization": f"Bot {token}"})
+    await database.delete_scout_channel(channel_id)
+
+
+@app.post("/guild/{guild_id}/scout-channels/{channel_id}/close")
+async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
+    session = get_session(request)
+    if not session or not can_access_guild(session, guild_id):
+        return RedirectResponse("/login")
+    token = os.environ.get("DISCORD_TOKEN", "")
+    # Post closing message in the channel
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json={"content": "🔒 Scout channel closed via dashboard. Channel will be deleted in 2 minutes."},
+        )
+    asyncio.create_task(_close_scout_channel_after_delay(channel_id, token, delay=120))
+    return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")

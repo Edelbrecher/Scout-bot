@@ -236,6 +236,7 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
           <th>Time</th>
           <th>Additional Info</th>
           <th>Created</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -247,6 +248,12 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
           <td>{{ ch.scout_time }}</td>
           <td>{{ ch.additional_info or '—' }}</td>
           <td class="mono small">{{ ch.created_at[:16] }}</td>
+          <td>
+            <form method="post" action="/guild/{{ guild.guild_id }}/scout-channels/{{ ch.channel_id }}/close"
+                  onsubmit="return confirm('Close this scout channel? It will be deleted in 2 minutes.')">
+              <button type="submit" class="btn-action btn-action-err" title="Close channel">🔒 Close</button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

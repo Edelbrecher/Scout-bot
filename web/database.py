@@ -397,6 +397,12 @@ async def get_res_request_by_id_web(request_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def delete_scout_channel(channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM scout_channels WHERE channel_id = ?", (channel_id,))
+        await db.commit()
+
+
 _ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids"}
 
 async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
