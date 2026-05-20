@@ -148,31 +148,48 @@
   <!-- Roles -->
   <div class="card mt-1">
     <h2>Server Roles ({{ roles|length }})</h2>
+    <p class="hint">Toggle which roles can access each part of the system. Changes take effect immediately.</p>
     {% if roles %}
+    {% set scout_roles = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+    {% set res_roles   = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
     <table class="table">
       <thead>
         <tr>
-          <th>Position</th>
-          <th>Role Name</th>
+          <th>Role</th>
           <th>Role ID</th>
-          <th>Color</th>
-          <th>Members can mention</th>
+          <th title="Access to scout-archive and new scout channels">📁 Scout<br><small>Archive + Channels</small></th>
+          <th title="Can accept/reject/hold res-push requests in res-answer">🪖 Res-Answer<br><small>Accept / Reject</small></th>
         </tr>
       </thead>
       <tbody>
         {% for role in roles %}
         {% if role.name != '@everyone' %}
         <tr>
-          <td class="mono small">{{ role.position }}</td>
           <td>
             {% if role.color %}
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;"></span>
             {% endif %}
-            {{ role.name }}
+            <strong>{{ role.name }}</strong>
           </td>
-          <td><code style="user-select:all;">{{ role.id }}</code></td>
-          <td>{% if role.color %}#{{ '%06x' % role.color }}{% else %}—{% endif %}</td>
-          <td>{% if role.mentionable %}✅{% else %}—{% endif %}</td>
+          <td><code style="user-select:all; font-size:0.78rem;">{{ role.id }}</code></td>
+          <td style="text-align:center;">
+            <button
+              class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}"
+              data-role="{{ role.id }}"
+              data-field="allowed_role_ids"
+              title="{{ 'Remove from Scout' if role.id in scout_roles else 'Add to Scout' }}"
+            >{{ '✅' if role.id in scout_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button
+              class="role-toggle {% if role.id in res_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}"
+              data-role="{{ role.id }}"
+              data-field="res_manager_role_ids"
+              title="{{ 'Remove from Res-Answer' if role.id in res_roles else 'Add to Res-Answer' }}"
+            >{{ '✅' if role.id in res_roles else '○' }}</button>
+          </td>
         </tr>
         {% endif %}
         {% endfor %}
@@ -182,6 +199,29 @@
     <p class="empty">Roles could not be loaded.</p>
     {% endif %}
   </div>
+
+<script>
+document.querySelectorAll('.role-toggle').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const guild = btn.dataset.guild;
+    const role  = btn.dataset.role;
+    const field = btn.dataset.field;
+    btn.disabled = true;
+    const form = new FormData();
+    form.append('field', field);
+    const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {method:'POST', body: form});
+    if (res.ok) {
+      const data = await res.json();
+      btn.textContent = data.added ? '✅' : '○';
+      btn.classList.toggle('active', data.added);
+      btn.title = data.added
+        ? (field === 'allowed_role_ids' ? 'Remove from Scout' : 'Remove from Res-Answer')
+        : (field === 'allowed_role_ids' ? 'Add to Scout' : 'Add to Res-Answer');
+    }
+    btn.disabled = false;
+  });
+});
+</script>
 
   <!-- Scout Channels -->
   <div class="card mt-1">

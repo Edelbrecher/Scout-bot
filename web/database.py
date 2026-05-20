@@ -395,3 +395,25 @@ async def get_res_request_by_id_web(request_id: int) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids"}
+
+async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
+    """Toggle role_id in field. Returns True=added, False=removed."""
+    if field not in _ALLOWED_ROLE_FIELDS:
+        raise ValueError(f"Invalid field: {field}")
+    guild = await get_guild(guild_id)
+    current = (guild or {}).get(field) or ""
+    role_ids = {r.strip() for r in current.split(",") if r.strip()}
+    if role_id in role_ids:
+        role_ids.discard(role_id)
+        added = False
+    else:
+        role_ids.add(role_id)
+        added = True
+    new_value = ",".join(sorted(role_ids)) or None
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(f"UPDATE guild_configs SET {field} = ? WHERE guild_id = ?", (new_value, guild_id))
+        await db.commit()
+    return added

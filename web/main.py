@@ -7,7 +7,7 @@ import httpx
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -306,6 +306,22 @@ async def guild_save(
     if archive_channel_id.strip():
         await _sync_archive_permissions(guild_id, archive_channel_id.strip(), normalized_roles)
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/roles/{role_id}/toggle")
+async def toggle_role(request: Request, guild_id: str, role_id: str, field: str = Form(...)):
+    session = get_session(request)
+    if not session or not can_access_guild(session, guild_id):
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    if field not in {"allowed_role_ids", "res_manager_role_ids"}:
+        return JSONResponse({"error": "invalid field"}, status_code=400)
+    added = await database.toggle_role_in_field(guild_id, role_id, field)
+    # Sync archive channel permissions when scout roles change
+    if field == "allowed_role_ids":
+        guild = await database.get_guild(guild_id)
+        if guild and guild.get("archive_channel_id"):
+            await _sync_archive_permissions(guild_id, guild["archive_channel_id"], guild.get("allowed_role_ids") or "")
+    return JSONResponse({"added": added})
 
 
 @app.post("/guild/{guild_id}/reset-scout")
