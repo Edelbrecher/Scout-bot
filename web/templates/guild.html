@@ -226,6 +226,18 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
         btn.title = active
           ? (field === 'allowed_role_ids' ? 'Remove from Scout' : 'Remove from Res-Answer')
           : (field === 'allowed_role_ids' ? 'Add to Scout' : 'Add to Res-Answer');
+        // Update the config input field live
+        const inputEl = document.getElementById(field === 'allowed_role_ids' ? 'allowed_role_ids' : 'res_manager_role_ids');
+        if (inputEl) {
+          const current = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
+          if (active) {
+            if (!current.includes(role)) current.push(role);
+          } else {
+            const idx = current.indexOf(role);
+            if (idx !== -1) current.splice(idx, 1);
+          }
+          inputEl.value = current.join(', ');
+        }
       } else {
         console.error('Toggle failed:', res.status, text);
       }
