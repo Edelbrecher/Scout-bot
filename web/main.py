@@ -1127,18 +1127,18 @@ async def guild_timer(request: Request, guild_id: str):
 async def guild_map(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    if session.get("type") != "admin":
-        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
     err = _require_guild(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    is_admin = session.get("type") == "admin"
     scouted = await database.get_scouted_coordinates(guild_id)
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
         "scouted": scouted,
+        "is_admin": is_admin,
     })
 
 
@@ -1146,8 +1146,6 @@ async def guild_map(request: Request, guild_id: str):
 async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    if session.get("type") != "admin":
-        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
     err = _require_guild(session, guild_id)
     if err: return err
     # Validate: must be https://....travian.com or similar
@@ -1163,8 +1161,6 @@ async def guild_map_data(request: Request, guild_id: str):
     """Proxy Travian map.sql to avoid CORS issues."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
-    if session.get("type") != "admin":
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     guild = await database.get_guild(guild_id)

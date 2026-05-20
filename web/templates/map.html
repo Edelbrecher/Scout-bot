@@ -3,37 +3,76 @@
 
 {% block content %}
 <div class="container">
-  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
       <h1>🗺️ Travian Karte</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
-  </div>
-
-  <!-- Server selector -->
-  <div class="card" style="margin-bottom:1rem;">
-    <h2>Travian Server</h2>
-    <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
-      <div class="form-group" style="margin:0; flex:1; min-width:280px;">
-        <label for="server_url">Server URL</label>
+    {% if is_admin %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.5rem;">
+      <div class="form-group" style="margin:0; min-width:300px;">
+        <label for="server_url" style="font-size:0.8rem;">Travian Server URL</label>
         <input type="url" id="server_url" name="server_url"
           value="{{ guild.tw_world or '' }}"
           placeholder="https://ts2.x1.europe.travian.com"
           style="width:100%;" />
-        <p class="field-hint">Vollständige URL deines Travian-Servers, z.B. <code>https://ts2.x1.europe.travian.com</code></p>
       </div>
-      <button type="submit" class="btn btn-primary" style="margin-bottom:1.4rem;">💾 Speichern & Laden</button>
+      <button type="submit" class="btn btn-primary" style="margin-bottom:1.4rem;">💾 Speichern</button>
     </form>
+    {% endif %}
   </div>
 
-  {% if guild.tw_world %}
+  {% if not guild.tw_world %}
+  <div class="card"><p class="empty">{% if is_admin %}Bitte zuerst einen Travian-Server oben eintragen.{% else %}Kein Travian-Server konfiguriert. Bitte einen Admin fragen.{% endif %}</p></div>
+  {% else %}
+
+  <!-- Search & Filter bar -->
+  <div class="card" style="margin-bottom:0.75rem; padding:0.75rem 1rem;">
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+      <!-- Player search -->
+      <div style="flex:1; min-width:180px;">
+        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">👤 Spieler suchen</label>
+        <input type="text" id="searchPlayer" placeholder="Spielername…"
+          style="width:100%; padding:0.4rem 0.6rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85rem;" />
+      </div>
+      <!-- Alliance search -->
+      <div style="flex:1; min-width:180px;">
+        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">🛡️ Allianz suchen</label>
+        <input type="text" id="searchAlliance" placeholder="Allianzname…"
+          style="width:100%; padding:0.4rem 0.6rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85rem;" />
+      </div>
+      <!-- Coord jump -->
+      <div style="min-width:140px;">
+        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">📍 Koordinaten</label>
+        <div style="display:flex; gap:4px;">
+          <input type="number" id="jumpX" placeholder="X" style="width:60px; padding:0.4rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85rem;" />
+          <input type="number" id="jumpY" placeholder="Y" style="width:60px; padding:0.4rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85rem;" />
+          <button onclick="jumpToCoords()" class="btn btn-secondary" style="padding:0.4rem 0.6rem; font-size:0.8rem;">Go</button>
+        </div>
+      </div>
+      <!-- Reset -->
+      <div style="align-self:flex-end;">
+        <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.4rem 0.75rem; font-size:0.8rem;">✕ Reset</button>
+      </div>
+    </div>
+    <!-- Results counter -->
+    <div id="searchResults" style="margin-top:0.5rem; font-size:0.8rem; color:var(--text-muted); display:none;"></div>
+    <!-- Player village list -->
+    <div id="playerList" style="margin-top:0.5rem; display:none; max-height:140px; overflow-y:auto; border-top:1px solid var(--border); padding-top:0.5rem;"></div>
+  </div>
+
   <!-- Legend -->
-  <div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:0.75rem; font-size:0.85rem; align-items:center;">
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#334155;margin-right:4px;"></span>Dorf</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3a2a0a;margin-right:4px;"></span>Natars</span>
+  <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:0.5rem; font-size:0.82rem; align-items:center;">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#c0392b;margin-right:4px;"></span>Römer</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7f8c8d;margin-right:4px;"></span>Teutonen</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#27ae60;margin-right:4px;"></span>Gallier</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e67e22;margin-right:4px;"></span>Ägypter</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8e44ad;margin-right:4px;"></span>Hunnen</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#16a085;margin-right:4px;"></span>Spartaner</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e05555;margin-right:4px;"></span>Gescoutet ({{ scouted|length }})</span>
-    <span style="color:var(--text-muted);">Aktiver Server: <strong style="color:var(--text);">{{ guild.tw_world }}</strong></span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f1c40f;margin-right:4px;"></span>Highlight</span>
+    <span style="color:var(--text-muted); margin-left:auto;">{{ guild.tw_world }}</span>
   </div>
 
   <!-- Map canvas -->
@@ -41,33 +80,29 @@
     <canvas id="mapCanvas" style="display:block; width:100%; cursor:crosshair;"></canvas>
     <div id="mapTooltip" style="
       position:absolute; background:var(--bg-card); border:1px solid var(--border);
-      padding:0.4rem 0.75rem; border-radius:6px; font-size:0.8rem; pointer-events:none;
-      display:none; z-index:10; white-space:nowrap; max-width:300px;
+      padding:0.5rem 0.85rem; border-radius:6px; font-size:0.8rem; pointer-events:none;
+      display:none; z-index:10; white-space:nowrap; max-width:320px; line-height:1.6;
     "></div>
     <div id="mapStatus" style="
       position:absolute; top:10px; left:10px;
-      background:rgba(0,0,0,.7); padding:0.3rem 0.75rem;
-      border-radius:4px; font-size:0.8rem; color:#ccc;
+      background:rgba(0,0,0,.75); padding:0.3rem 0.75rem;
+      border-radius:4px; font-size:0.78rem; color:#ccc;
     ">Lade Kartendaten…</div>
-    <!-- Coord display -->
     <div id="coordDisplay" style="
       position:absolute; bottom:10px; right:10px;
       background:rgba(0,0,0,.7); padding:0.25rem 0.6rem;
       border-radius:4px; font-size:0.75rem; color:#888; font-family:monospace;
     ">—|—</div>
   </div>
-  <p class="hint" style="margin-top:0.5rem;">Scroll zum Zoomen · Klick+Ziehen zum Verschieben · Hover für Details</p>
-  {% else %}
-  <div class="card"><p class="empty">Bitte zuerst einen Travian-Server eintragen.</p></div>
+  <p class="hint" style="margin-top:0.4rem;">Scroll = Zoom · Klick+Ziehen = Verschieben · Hover = Details</p>
   {% endif %}
 </div>
 
 {% if guild.tw_world %}
 <script>
-const GUILD_ID   = {{ guild.guild_id | tojson }};
+const GUILD_ID    = {{ guild.guild_id | tojson }};
 const SCOUTED_RAW = {{ scouted | tojson }};
 
-// Parse scouted coordinates "xxx|yyy" into a lookup map
 const scoutedMap = new Map();
 for (const s of SCOUTED_RAW) {
   const m = (s.coordinates || "").match(/(-?\d+)\|(-?\d+)/);
@@ -80,9 +115,8 @@ const tooltip  = document.getElementById("mapTooltip");
 const statusEl = document.getElementById("mapStatus");
 const coordEl  = document.getElementById("coordDisplay");
 
-// Travian tribe colors
 const TRIBE_COLOR = {
-  0: "#1a2a1a",  // empty / wilderness / oasis (override below)
+  0: "#1a2a1a",
   1: "#c0392b",  // Romans
   2: "#7f8c8d",  // Teutons
   3: "#27ae60",  // Gauls
@@ -90,19 +124,23 @@ const TRIBE_COLOR = {
   5: "#8e44ad",  // Huns
   6: "#16a085",  // Spartans
 };
+const TRIBE_NAME = { 0:"?", 1:"Römer", 2:"Teutonen", 3:"Gallier", 4:"Ägypter", 5:"Hunnen", 6:"Spartaner" };
 
-let villages = [];  // {x, y, name, tribe, pop, isOasis, isCapital, player, alliance}
-let mapSize  = 400; // will be detected from data
-let scale    = 1;
-let offsetX  = 0;
-let offsetY  = 0;
-let dragging = false, lastMX = 0, lastMY = 0;
+let villages   = [];
+let mapSize    = 400;
+let scale      = 1;
+let offsetX    = 0;
+let offsetY    = 0;
+let dragging   = false, lastMX = 0, lastMY = 0;
+let highlighted = new Set(); // keys "x|y" that should be highlighted
+let highlightedPlayer = "";
+let highlightedAlliance = "";
 
-// Travian uses centered coords: 0|0 is center, range -mapSize..+mapSize
 function worldToCanvas(wx, wy) {
-  const cx = canvas.width  / 2 + offsetX + wx * scale;
-  const cy = canvas.height / 2 + offsetY - wy * scale; // Y-Achse invertieren: +y = Norden = oben
-  return [cx, cy];
+  return [
+    canvas.width  / 2 + offsetX + wx * scale,
+    canvas.height / 2 + offsetY - wy * scale,
+  ];
 }
 function canvasToWorld(cx, cy) {
   return [
@@ -117,7 +155,7 @@ function draw() {
   ctx.fillStyle = "#0d1117";
   ctx.fillRect(0, 0, W, H);
 
-  // Grid every 100 coords
+  // Grid
   ctx.strokeStyle = "#1a2535";
   ctx.lineWidth = 1;
   const step = 100;
@@ -131,29 +169,50 @@ function draw() {
   }
 
   // Center crosshair
-  {
-    const [cx, cy] = worldToCanvas(0, 0);
-    ctx.strokeStyle = "#2a3a4a";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 8, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy + 8); ctx.stroke();
-  }
+  const [cx0, cy0] = worldToCanvas(0, 0);
+  ctx.strokeStyle = "#2a3a4a";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx0 - 10, cy0); ctx.lineTo(cx0 + 10, cy0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx0, cy0 - 10); ctx.lineTo(cx0, cy0 + 10); ctx.stroke();
 
   const dotR = Math.max(1, scale * 0.45);
+  const hasFilter = highlighted.size > 0;
 
   for (const v of villages) {
     const [cx, cy] = worldToCanvas(v.x, v.y);
     if (cx < -5 || cy < -5 || cx > W + 5 || cy > H + 5) continue;
 
-    const key      = `${v.x}|${v.y}`;
+    const key       = `${v.x}|${v.y}`;
     const isScouted = scoutedMap.has(key);
+    const isHL      = highlighted.has(key);
+    const dim       = hasFilter && !isHL && !isScouted;
 
-    if (isScouted) {
+    if (dim) {
+      ctx.globalAlpha = 0.15;
+    } else {
+      ctx.globalAlpha = 1;
+    }
+
+    if (isHL) {
+      // Highlighted village (player/alliance search)
+      ctx.fillStyle = "#f1c40f";
+      const r = Math.max(3, dotR * 2.2);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (!dim) {
+        ctx.strokeStyle = "rgba(241,196,15,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (isScouted) {
       ctx.fillStyle = "#e05555";
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(3, dotR * 2), 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(224,85,85,0.4)";
+      ctx.strokeStyle = "rgba(224,85,85,0.35)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(5, dotR * 3.5), 0, Math.PI * 2);
@@ -166,8 +225,9 @@ function draw() {
       ctx.fillRect(cx - dotR, cy - dotR, dotR * 2, dotR * 2);
     }
   }
+  ctx.globalAlpha = 1;
 
-  // Coord labels when zoomed in enough
+  // Coord labels when zoomed
   if (scale > 0.4) {
     ctx.fillStyle = "#2a3a4a";
     ctx.font = `${Math.max(9, Math.min(14, scale * 5))}px monospace`;
@@ -178,7 +238,116 @@ function draw() {
   }
 }
 
-// Mouse events
+// ── Search ────────────────────────────────────────────────────────────────────
+
+function doSearch() {
+  const pQuery = document.getElementById("searchPlayer").value.trim().toLowerCase();
+  const aQuery = document.getElementById("searchAlliance").value.trim().toLowerCase();
+
+  highlighted.clear();
+  highlightedPlayer   = pQuery;
+  highlightedAlliance = aQuery;
+
+  const resultsEl = document.getElementById("searchResults");
+  const listEl    = document.getElementById("playerList");
+
+  if (!pQuery && !aQuery) {
+    resultsEl.style.display = "none";
+    listEl.style.display    = "none";
+    draw();
+    return;
+  }
+
+  const matches = villages.filter(v => {
+    const p = (v.player   || "").toLowerCase();
+    const a = (v.alliance || "").toLowerCase();
+    const pOk = !pQuery || p.includes(pQuery);
+    const aOk = !aQuery || a.includes(aQuery);
+    return pOk && aOk;
+  });
+
+  for (const v of matches) highlighted.add(`${v.x}|${v.y}`);
+
+  resultsEl.style.display = "block";
+  resultsEl.textContent   = `${matches.length} Dörfer gefunden${matches.length ? " — klicke auf einen Namen um hinzuzoomen" : ""}`;
+
+  // Group by player for list
+  if (pQuery && matches.length) {
+    const byPlayer = {};
+    for (const v of matches) {
+      const key = v.player || "?";
+      if (!byPlayer[key]) byPlayer[key] = [];
+      byPlayer[key].push(v);
+    }
+    let html = "";
+    for (const [player, vils] of Object.entries(byPlayer).slice(0, 30)) {
+      html += `<div style="display:flex; align-items:center; gap:0.5rem; padding:0.2rem 0; border-bottom:1px solid var(--border); font-size:0.8rem;">
+        <button onclick="focusPlayer('${player.replace(/'/g,"\\'")}', ${vils[0].x}, ${vils[0].y})"
+          style="background:none; border:none; color:var(--accent); cursor:pointer; text-align:left; padding:0; font-size:0.82rem; font-weight:600;">
+          👤 ${player}
+        </button>
+        <span style="color:var(--text-muted);">${vils.length} Dörfer · ${vils[0].alliance ? "["+vils[0].alliance+"]" : ""}</span>
+        <span style="margin-left:auto; color:var(--text-muted); font-size:0.75rem;">${vils[0].x}|${vils[0].y}</span>
+      </div>`;
+    }
+    listEl.innerHTML = html;
+    listEl.style.display = "block";
+  } else {
+    listEl.style.display = "none";
+  }
+
+  draw();
+
+  // Auto-center on first match
+  if (matches.length === 1 || (matches.length > 0 && matches.length <= 5)) {
+    const avgX = matches.reduce((s,v) => s + v.x, 0) / matches.length;
+    const avgY = matches.reduce((s,v) => s + v.y, 0) / matches.length;
+    panTo(avgX, avgY, Math.min(8, 400 / Math.max(1, matches.length)));
+  }
+}
+
+function focusPlayer(name, x, y) {
+  panTo(x, y, 6);
+}
+
+function clearSearch() {
+  document.getElementById("searchPlayer").value   = "";
+  document.getElementById("searchAlliance").value = "";
+  document.getElementById("searchResults").style.display = "none";
+  document.getElementById("playerList").style.display    = "none";
+  highlighted.clear();
+  draw();
+}
+
+function jumpToCoords() {
+  const x = parseInt(document.getElementById("jumpX").value);
+  const y = parseInt(document.getElementById("jumpY").value);
+  if (!isNaN(x) && !isNaN(y)) panTo(x, y, 8);
+}
+
+function panTo(wx, wy, newScale) {
+  if (newScale) scale = newScale;
+  offsetX = 0;
+  offsetY = 0;
+  // Center the world point
+  offsetX = -(wx * scale);
+  offsetY =  (wy * scale);
+  draw();
+}
+
+// Debounce search input
+let searchTimer;
+function scheduleSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(doSearch, 300);
+}
+document.getElementById("searchPlayer").addEventListener("input", scheduleSearch);
+document.getElementById("searchAlliance").addEventListener("input", scheduleSearch);
+document.getElementById("jumpX").addEventListener("keydown", e => e.key === "Enter" && jumpToCoords());
+document.getElementById("jumpY").addEventListener("keydown", e => e.key === "Enter" && jumpToCoords());
+
+// ── Mouse events ──────────────────────────────────────────────────────────────
+
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
   const rect   = canvas.getBoundingClientRect();
@@ -188,11 +357,14 @@ canvas.addEventListener("wheel", e => {
   offsetX = mx - canvas.width  / 2 - (mx - canvas.width  / 2 - offsetX) * factor;
   offsetY = my - canvas.height / 2 - (my - canvas.height / 2 - offsetY) * factor;
   scale  *= factor;
-  scale   = Math.max(0.05, Math.min(30, scale));
+  scale   = Math.max(0.05, Math.min(40, scale));
   draw();
 }, { passive: false });
 
-canvas.addEventListener("mousedown", e => { dragging = true; lastMX = e.clientX; lastMY = e.clientY; canvas.style.cursor = "grabbing"; });
+canvas.addEventListener("mousedown", e => {
+  dragging = true; lastMX = e.clientX; lastMY = e.clientY;
+  canvas.style.cursor = "grabbing";
+});
 window.addEventListener("mouseup",   () => { dragging = false; canvas.style.cursor = "crosshair"; });
 window.addEventListener("mousemove", e => {
   const rect = canvas.getBoundingClientRect();
@@ -209,52 +381,52 @@ window.addEventListener("mousemove", e => {
   const [wx, wy] = canvasToWorld(cx, cy).map(Math.round);
   coordEl.textContent = `${wx}|${wy}`;
 
-  // Nearest village tooltip
+  // Tooltip: find nearest village
   let best = null, bestD = Infinity;
   for (const v of villages) {
     const [vx, vy] = worldToCanvas(v.x, v.y);
     const d = Math.hypot(cx - vx, cy - vy);
-    if (d < 10 && d < bestD) { bestD = d; best = v; }
+    if (d < 12 && d < bestD) { bestD = d; best = v; }
   }
 
   if (best) {
-    const sc = scoutedMap.get(`${best.x}|${best.y}`);
+    const sc  = scoutedMap.get(`${best.x}|${best.y}`);
+    const isHL = highlighted.has(`${best.x}|${best.y}`);
     let tip = `<strong>${best.x}|${best.y}</strong> — ${best.name || "?"}`;
     if (best.player)   tip += `<br>👤 ${best.player}`;
-    if (best.alliance) tip += ` [${best.alliance}]`;
-    if (best.pop)      tip += `<br>🏘️ ${best.pop} Einwohner`;
-    if (sc)            tip += `<br>🔴 Gescoutet: ${sc.player} / ${sc.village}`;
+    if (best.alliance) tip += ` <span style="color:var(--text-muted);">[${best.alliance}]</span>`;
+    if (best.tribe)    tip += `<br>⚔️ ${TRIBE_NAME[best.tribe] || "?"}`;
+    if (best.pop)      tip += ` · 🏘️ ${best.pop}`;
+    if (best.isCapital) tip += ` · 👑 Hauptstadt`;
+    if (sc)            tip += `<br><span style="color:#e05555;">🔴 Scout: ${sc.player} / ${sc.village}</span>`;
+    if (isHL)          tip += `<br><span style="color:#f1c40f;">★ Markiert</span>`;
     tooltip.innerHTML = tip;
     tooltip.style.display = "block";
     const tx = e.clientX - rect.left + 14;
     const ty = e.clientY - rect.top  - 10;
-    tooltip.style.left = `${Math.min(tx, rect.width - 220)}px`;
-    tooltip.style.top  = `${ty}px`;
+    tooltip.style.left = `${Math.min(tx, rect.width - 240)}px`;
+    tooltip.style.top  = `${Math.max(4, ty)}px`;
   } else {
     tooltip.style.display = "none";
   }
 });
 
-// Parse Travian map.sql
-// Format: INSERT INTO `x_world` VALUES(x,y,tid,n,tribe,vid,pop,region,isCapital,aId,pName,aName,...);
-// Parse a single SQL VALUES tuple, handling quoted strings and NULLs
+// ── Parser ────────────────────────────────────────────────────────────────────
+
 function parseTuple(s) {
   const vals = [];
   let i = 0;
   while (i < s.length) {
     while (i < s.length && s[i] === ' ') i++;
     if (s[i] === "'") {
-      // Quoted string — find closing quote (not preceded by backslash)
-      let j = i + 1;
-      let str = '';
+      let j = i + 1, str = '';
       while (j < s.length) {
         if (s[j] === "'" && s[j-1] !== '\\') break;
         str += s[j++];
       }
-      vals.push(str.replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"'));
+      vals.push(str.replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&quot;/g,'"'));
       i = j + 1;
     } else {
-      // Unquoted value (number, NULL, TRUE, FALSE)
       let j = i;
       while (j < s.length && s[j] !== ',') j++;
       vals.push(s.slice(i, j).trim());
@@ -266,72 +438,55 @@ function parseTuple(s) {
   return vals;
 }
 
-// Auto-detect column layout from the first parsed row.
-// Travian Legends map.sql has two common formats:
-//   Format A (13 cols): x, y, tid, tribe, vid, 'name', pop, 'player', pid, 'alliance', aid, wonder, isCapital
-//   Format B (14 cols): x, y, tid, n, tribe, vid, 'name', pop, 'player', pid, 'alliance', aid, wonder, isCapital
-// In both, x=v[0] and y=v[1].
-// Sometimes vid appears before x,y: vid, x, y, ... — we detect this when v[0] > 1000.
 function detectLayout(v) {
-  // If v[0] and v[1] look like valid Travian coordinates (small integers), use them
   const a = +v[0], b = +v[1];
   if (Math.abs(a) <= 800 && Math.abs(b) <= 800 && Number.isInteger(a) && Number.isInteger(b)) {
-    // Determine if there's an extra 'n' field between tid and tribe
-    // Format A: v[3]=tribe (1-6 or 0), v[4]=vid (large)
-    // Format B: v[3]=n (0-11), v[4]=tribe (1-6 or 0), v[5]=vid (large)
-    const tribeA = +v[3]; // tribe in format A
-    const tribeB = +v[4]; // tribe in format B
-    // tribe values are 0-6; if v[3] > 10 it's not a tribe → format B
+    const tribeA = +v[3];
+    const tribeB = +v[4];
     const offset = (tribeA > 10 || (tribeB >= 0 && tribeB <= 6 && +v[5] > 1000)) ? 1 : 0;
-    return { xIdx: 0, yIdx: 1, tribeIdx: 3 + offset, nameIdx: 5 + offset, popIdx: 6 + offset,
-             playerIdx: 7 + offset, allianceIdx: 9 + offset, capitalIdx: 12 + offset };
+    return { xIdx:0, yIdx:1, tribeIdx:3+offset, nameIdx:5+offset, popIdx:6+offset,
+             playerIdx:7+offset, allianceIdx:9+offset, capitalIdx:12+offset };
   }
-  // v[0] is likely a large vid — try x=v[1], y=v[2]
-  const offset = 1;
-  return { xIdx: 1, yIdx: 2, tribeIdx: 3 + offset, nameIdx: 5 + offset, popIdx: 6 + offset,
-           playerIdx: 7 + offset, allianceIdx: 9 + offset, capitalIdx: 12 + offset };
+  return { xIdx:1, yIdx:2, tribeIdx:4, nameIdx:6, popIdx:7, playerIdx:8, allianceIdx:10, capitalIdx:13 };
 }
 
 function parseSql(text) {
   const rows = [];
-  let maxCoord = 0;
-  let layout = null;
+  let maxCoord = 0, layout = null;
   for (const line of text.split('\n')) {
     const m = line.match(/VALUES\s*\((.+)\);?\s*$/i);
     if (!m) continue;
     const v = parseTuple(m[1]);
-    if (v.length < 13) continue;
+    if (v.length < 8) continue;
     if (!layout) layout = detectLayout(v);
     const { xIdx, yIdx, tribeIdx, nameIdx, popIdx, playerIdx, allianceIdx, capitalIdx } = layout;
-    if (capitalIdx >= v.length) continue;
-    const x         = +v[xIdx];
-    const y         = +v[yIdx];
-    const tribe     = +v[tribeIdx];
-    const name      = v[nameIdx] || '';
-    const pop       = +v[popIdx] || 0;
-    const player    = v[playerIdx] || null;
-    const alliance  = v[allianceIdx] || null;
-    const isCapital = v[capitalIdx] === 'TRUE' || v[capitalIdx] === '1';
-    // Natars: tribe 3 (T4) or tribe 5 (TL) — detect by player being empty
-    const isNatar   = tribe === 3 || tribe === 5 || (!player && tribe > 0);
-    if (Math.abs(x) <= 800) { if (Math.abs(x) > maxCoord) maxCoord = Math.abs(x); }
-    if (Math.abs(y) <= 800) { if (Math.abs(y) > maxCoord) maxCoord = Math.abs(y); }
-    rows.push({ x, y, name, tribe, pop, isNatar, isCapital, player: player || null, alliance: alliance || null });
+    const x = +v[xIdx], y = +v[yIdx];
+    if (isNaN(x) || isNaN(y)) continue;
+    const tribe     = +v[tribeIdx] || 0;
+    const name      = v[nameIdx]   || '';
+    const pop       = +v[popIdx]   || 0;
+    const player    = v[playerIdx] && v[playerIdx] !== 'NULL' ? v[playerIdx] : null;
+    const alliance  = v[allianceIdx] && v[allianceIdx] !== 'NULL' ? v[allianceIdx] : null;
+    const isCapital = capitalIdx < v.length && (v[capitalIdx] === 'TRUE' || v[capitalIdx] === '1');
+    const isNatar   = !player && tribe > 0;
+    if (Math.abs(x) <= 800 && Math.abs(x) > maxCoord) maxCoord = Math.abs(x);
+    if (Math.abs(y) <= 800 && Math.abs(y) > maxCoord) maxCoord = Math.abs(y);
+    rows.push({ x, y, name, tribe, pop, isNatar, isCapital, player, alliance });
   }
   return { rows, maxCoord: maxCoord || 400 };
 }
 
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 function fitMap() {
-  const W = canvas.width, H = canvas.height;
-  scale   = Math.min(W, H) / (mapSize * 2 + 10) * 0.92;
-  offsetX = 0;
-  offsetY = 0;
+  scale = Math.min(canvas.width, canvas.height) / (mapSize * 2 + 10) * 0.92;
+  offsetX = 0; offsetY = 0;
 }
 
 function resize() {
   const rect = canvas.parentElement.getBoundingClientRect();
   canvas.width  = rect.width;
-  canvas.height = Math.min(rect.width * 0.8, window.innerHeight * 0.75);
+  canvas.height = Math.min(rect.width * 0.8, window.innerHeight * 0.78);
   draw();
 }
 
@@ -354,7 +509,7 @@ async function loadMap() {
   }
 }
 
-window.addEventListener("resize", () => { resize(); });
+window.addEventListener("resize", resize);
 resize();
 loadMap();
 </script>
