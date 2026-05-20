@@ -13,7 +13,11 @@
       <a href="/guild/{{ guild.guild_id }}/scout"   class="btn btn-secondary">🔍 Scout</a>
       <a href="/guild/{{ guild.guild_id }}/res-push" class="btn btn-secondary">🪖 Res-Push</a>
       <a href="/guild/{{ guild.guild_id }}/polls"    class="btn btn-secondary">📅 Polls</a>
-      <a href="/guild/{{ guild.guild_id }}/map"      class="btn btn-secondary">🗺️ Map</a>
+      {% if is_admin %}
+      <a href="/guild/{{ guild.guild_id }}/map" class="btn btn-secondary">🗺️ Map</a>
+      {% else %}
+      <span class="btn btn-secondary" style="opacity:0.35; cursor:not-allowed;" title="Nur für Admins">🗺️ Map</span>
+      {% endif %}
       <a href="/guild/{{ guild.guild_id }}/timer"    class="btn btn-secondary">⏱️ Timer</a>
       <a href="/guild/{{ guild.guild_id }}/stats"    class="btn btn-secondary">📊 Statistics</a>
     </div>
