@@ -22,6 +22,7 @@
     <!-- Config -->
     <div class="card">
       <h2>Konfiguration</h2>
+      <p class="hint">Copy IDs from Discord: right-click a channel/category → <strong>Copy ID</strong> (Developer Mode must be on).</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/polls/config">
         <div class="form-group">
           <label for="poll_channel_id">Umfrage-Channel ID</label>
@@ -32,34 +33,70 @@
         </div>
         <button type="submit" class="btn btn-primary">Speichern</button>
       </form>
-    </div>
 
-    <!-- Create poll -->
-    <div class="card">
-      <h2>Neue Umfrage erstellen</h2>
-      {% if guild.poll_channel_id %}
-      <form method="post" action="/guild/{{ guild.guild_id }}/polls/create">
-        <div class="form-group">
-          <label for="title">Titel</label>
-          <input type="text" id="title" name="title" required maxlength="100"
-            placeholder="z.B. Angriff auf Sektor 7" />
-        </div>
-        <div class="form-group">
-          <label for="description">Beschreibung <span style="color:var(--text-muted)">(optional)</span></label>
-          <input type="text" id="description" name="description" maxlength="500"
-            placeholder="z.B. Koordinaten 150|50, bringt Def mit" />
-        </div>
-        <div class="form-group">
-          <label for="event_datetime">Datum & Uhrzeit (UTC)</label>
-          <input type="datetime-local" id="event_datetime" name="event_datetime" required />
-        </div>
-        <button type="submit" class="btn btn-primary">📤 Umfrage posten</button>
+      <hr style="margin:1.5rem 0;">
+      {% if not guild.poll_channel_id %}
+      <h3>1-Click Auto Setup</h3>
+      <p class="hint">Bot erstellt automatisch eine Kategorie <strong>Umfragen</strong> und den Channel <strong>#umfragen</strong>.</p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/polls/auto-setup">
+        <button type="submit" class="btn btn-primary">⚡ Auto Setup</button>
       </form>
       {% else %}
-      <p class="hint">Erst Channel konfigurieren.</p>
+      <h3>Reset Setup</h3>
+      <p class="hint">Channel ID aus der Datenbank entfernen. Löscht nichts in Discord.</p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/polls/reset" onsubmit="return confirm('Umfrage-Konfiguration zurücksetzen?')">
+        <button type="submit" class="btn btn-danger">🔄 Reset</button>
+      </form>
       {% endif %}
     </div>
+
+    <!-- Status -->
+    <div class="card">
+      <h2>Status</h2>
+      <ul class="status-list">
+        <li>
+          <span class="status-label">Umfrage-Channel</span>
+          {% if guild.poll_channel_id %}
+          <span class="badge badge-ok">✅ {{ guild.poll_channel_id }}</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Nicht konfiguriert</span>
+          {% endif %}
+        </li>
+        <li>
+          <span class="status-label">Aktive Umfragen</span>
+          {% set active_count = polls | selectattr('status', 'eq', 'active') | list | length %}
+          <span class="badge {% if active_count > 0 %}badge-ok{% else %}badge-warn{% endif %}">
+            {{ active_count }} aktiv
+          </span>
+        </li>
+      </ul>
+    </div>
   </div>
+
+  <!-- Create poll -->
+  {% if guild.poll_channel_id %}
+  <div class="card mt-1">
+    <h2>Neue Umfrage erstellen</h2>
+    <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end; flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;">
+        <label for="title">Titel</label>
+        <input type="text" id="title" name="title" required maxlength="100"
+          placeholder="z.B. Angriff auf Sektor 7" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label for="description">Beschreibung <span style="color:var(--text-muted)">(optional)</span></label>
+        <input type="text" id="description" name="description" maxlength="500"
+          placeholder="z.B. Koordinaten 150|50, bringt Def mit" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label for="event_datetime">Datum & Uhrzeit (UTC)</label>
+        <input type="datetime-local" id="event_datetime" name="event_datetime" required />
+      </div>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">📤 Umfrage posten</button>
+    </form>
+  </div>
+  {% endif %}
+
 
   <!-- Poll list -->
   {% for poll in polls %}

@@ -809,6 +809,40 @@ async def polls_create(
     return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/polls/auto-setup")
+async def polls_auto_setup(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    token = os.environ.get("DISCORD_TOKEN", "")
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    async with httpx.AsyncClient() as client:
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "Umfragen", "type": 4})
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/polls?error=category_{r.status_code}", status_code=303)
+        category_id = r.json()["id"]
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "umfragen", "type": 0, "parent_id": category_id})
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/polls?error=channel_{r.status_code}", status_code=303)
+        poll_channel_id = r.json()["id"]
+    await database.update_poll_channel(guild_id, poll_channel_id)
+    return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/polls/reset")
+async def polls_reset(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.update_poll_channel(guild_id, "")
+    return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+
+
 @app.post("/guild/{guild_id}/polls/{poll_id}/close")
 async def polls_close(request: Request, guild_id: str, poll_id: int):
     session, err = _require_session(request)
