@@ -117,7 +117,26 @@ async def init_db():
                 UNIQUE(poll_id, user_id)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS attack_reports (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                reporter_id     TEXT NOT NULL,
+                reporter_name   TEXT NOT NULL,
+                raw_text        TEXT NOT NULL,
+                attacks_json    TEXT NOT NULL,
+                created_at      TEXT NOT NULL
+            )
+        """)
         await db.commit()
+
+        # Attack system migrations
+        for col in ["attack_channel_id TEXT", "attack_button_message_id TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
 
 
 async def get_guild_config(guild_id: str) -> dict | None:
@@ -321,6 +340,43 @@ async def get_poll(poll_id: int) -> dict | None:
         async with db.execute("SELECT * FROM availability_polls WHERE id = ?", (poll_id,)) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def save_attack_report(
+    guild_id: str,
+    reporter_id: str,
+    reporter_name: str,
+    raw_text: str,
+    attacks_json_str: str,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            INSERT INTO attack_reports
+                (guild_id, reporter_id, reporter_name, raw_text, attacks_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (guild_id, reporter_id, reporter_name, raw_text, attacks_json_str,
+              datetime.utcnow().isoformat()))
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def get_attack_channel(guild_id: str) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT attack_channel_id FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def set_attack_channel(guild_id: str, channel_id: str, message_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET attack_channel_id = ?, attack_button_message_id = ?
+            WHERE guild_id = ?
+        """, (channel_id, message_id, guild_id))
+        await db.commit()
 
 
 async def upsert_poll_response(poll_id: int, user_id: str, user_name: str, response: str):

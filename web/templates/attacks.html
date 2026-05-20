@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Angriff-Detection · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>⚔️ Angriff-Detection</h1>
+      <p class="subtitle">{{ guild.guild_name }}</p>
+    </div>
+  </div>
+
+  {% if saved %}
+  <div class="alert alert-success">✅ Einstellungen gespeichert.</div>
+  {% endif %}
+
+  <!-- Config + Status -->
+  <div class="grid-2">
+    <!-- Config -->
+    <div class="card">
+      <h2>Konfiguration</h2>
+      <p class="hint">Copy ID from Discord: right-click a channel → <strong>Copy ID</strong> (Developer Mode must be on).</p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/attacks/config">
+        <div class="form-group">
+          <label for="attack_channel_id">Alarm-Kanal ID</label>
+          <p class="field-hint">Channel wo Angriff-Meldungen gepostet werden.</p>
+          <input type="text" id="attack_channel_id" name="attack_channel_id"
+            value="{{ guild.attack_channel_id or '' }}"
+            placeholder="z.B. 1234567890123456789" />
+        </div>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+      </form>
+
+      <hr style="margin:1.5rem 0;">
+      {% if not guild.attack_channel_id %}
+      <h3>1-Click Auto Setup</h3>
+      <p class="hint">Bot erstellt automatisch eine Kategorie <strong>Angriff-Detection</strong> und den Channel <strong>#angriff-alarm</strong> mit dem Melde-Button.</p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/attacks/auto-setup">
+        <button type="submit" class="btn btn-primary">⚡ Auto Setup</button>
+      </form>
+      {% else %}
+      <h3>Reset Setup</h3>
+      <p class="hint">Channel ID aus der Datenbank entfernen. Löscht nichts in Discord.</p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/attacks/reset"
+            onsubmit="return confirm('Angriff-Konfiguration zurücksetzen?')">
+        <button type="submit" class="btn btn-danger">🔄 Reset</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <!-- Status -->
+    <div class="card">
+      <h2>Status</h2>
+      <ul class="status-list">
+        <li>
+          <span class="status-label">Alarm-Kanal</span>
+          {% if guild.attack_channel_id %}
+          <span class="badge badge-ok">✅ {{ guild.attack_channel_id }}</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Nicht konfiguriert</span>
+          {% endif %}
+        </li>
+        <li>
+          <span class="status-label">Melde-Button</span>
+          {% if guild.attack_button_message_id %}
+          <span class="badge badge-ok">✅ Aktiv</span>
+          {% else %}
+          <span class="badge badge-warn">⚠️ Kein Button</span>
+          {% endif %}
+        </li>
+        <li>
+          <span class="status-label">Gesamt-Meldungen</span>
+          <span class="badge">{{ attack_stats.total_reports }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- KPI row -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem; margin-bottom:1.25rem;">
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ attack_stats.total_reports }}</div>
+      <div class="stat-label">Total Meldungen</div>
+    </div>
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ attack_stats.top_attackers | length }}</div>
+      <div class="stat-label">Einzigartige Angreifer</div>
+    </div>
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:1.1rem;">
+        {% if attack_stats.recent_attacks %}
+        {{ attack_stats.recent_attacks[0].created_at[:16].replace('T', ' ') }}
+        {% else %}
+        —
+        {% endif %}
+      </div>
+      <div class="stat-label">Letzte Meldung</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2>Angriffe nach Uhrzeit (UTC)</h2>
+    <canvas id="chartHours" height="80"></canvas>
+  </div>
+
+  <!-- Top Angreifer -->
+  {% if attack_stats.top_attackers %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2>Top Angreifer</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Rang</th>
+          <th>Angreifer</th>
+          <th>Meldungen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for atk in attack_stats.top_attackers %}
+        <tr>
+          <td><strong>#{{ loop.index }}</strong></td>
+          <td>{{ atk.name }}</td>
+          <td>{{ atk.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Recent reports -->
+  <div class="card">
+    <h2>Letzte Meldungen</h2>
+    {% if attack_reports %}
+    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+      {% for report in attack_reports %}
+      {% set attacks = report.attacks_json | from_json %}
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+          <div>
+            <strong>{{ report.reporter_name }}</strong>
+            <span style="color:var(--text-muted); font-size:0.85rem; margin-left:0.5rem;">
+              {{ report.created_at[:16].replace('T', ' ') }} UTC
+            </span>
+            <span style="color:var(--text-muted); font-size:0.8rem; margin-left:0.5rem;">#{{ report.id }}</span>
+          </div>
+          {% if is_admin %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/attacks/delete/{{ report.id }}"
+                onsubmit="return confirm('Meldung löschen?')" style="margin:0;">
+            <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.6rem; font-size:0.8rem;">🗑 Löschen</button>
+          </form>
+          {% endif %}
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem;">
+          {% for atk in attacks %}
+          <span style="background:rgba(231,76,60,0.15); border:1px solid rgba(231,76,60,0.35); border-radius:4px; padding:0.2rem 0.5rem; font-size:0.8rem;">
+            {% if atk.wave %}Welle {{ atk.wave }} · {% endif %}
+            <strong>{{ atk.attacker }}</strong>
+            {% if atk.coords %} · {{ atk.coords }}{% endif %}
+            {% if atk.arrival %} · {{ atk.arrival }}{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Noch keine Angriffs-Meldungen vorhanden.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+  const hours = {{ attack_stats.attacks_by_hour | tojson }};
+  const labels = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0') + ':00');
+  const ctx = document.getElementById('chartHours');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Meldungen',
+        data: hours,
+        backgroundColor: 'rgba(231,76,60,0.6)',
+        borderColor: 'rgba(231,76,60,1)',
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} Meldung(en)` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', stepSize: 1, precision: 0 }, beginAtZero: true }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

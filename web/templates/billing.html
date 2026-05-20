@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Abonnement · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+    <h1>💳 Abonnement</h1>
+    <p class="subtitle">{{ guild.guild_name }}</p>
+  </div>
+
+  {% if saved %}
+  <div class="alert alert-success">✅ Abonnement aktiviert. Danke!</div>
+  {% endif %}
+  {% if error == 'cancelled' %}
+  <div class="alert alert-error">❌ Zahlung abgebrochen.</div>
+  {% elif error == 'no_subscription' %}
+  <div class="alert alert-error">❌ Kein aktives Abonnement gefunden.</div>
+  {% elif error == 'stripe_not_configured' %}
+  <div class="alert alert-error">❌ Zahlungssystem noch nicht konfiguriert.</div>
+  {% elif error %}
+  <div class="alert alert-error">❌ Fehler: {{ error }}</div>
+  {% endif %}
+
+  <!-- Current status -->
+  <div class="card">
+    <h2>Aktueller Status</h2>
+    <ul class="status-list">
+      <li>
+        <span class="status-label">Plan</span>
+        {% set status = guild.subscription_status or 'free' %}
+        {% if status == 'trialing' %}
+          <span class="badge badge-ok">🎉 7-Tage Testphase aktiv</span>
+        {% elif status == 'active' %}
+          <span class="badge badge-ok">✅ Aktiv · {{ 'Jährlich' if guild.subscription_plan == 'annual' else 'Monatlich' }}</span>
+        {% elif status == 'past_due' %}
+          <span class="badge badge-warn">⚠️ Zahlung überfällig</span>
+        {% elif status == 'cancelled' %}
+          <span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;">🔒 Gekündigt</span>
+        {% else %}
+          <span class="badge badge-warn">🆓 Kostenlos</span>
+        {% endif %}
+      </li>
+      {% if guild.subscription_expires_at %}
+      <li>
+        <span class="status-label">Läuft bis</span>
+        <span class="badge">{{ guild.subscription_expires_at[:10] }}</span>
+      </li>
+      {% endif %}
+    </ul>
+
+    {% if guild.stripe_customer_id and status in ('active', 'past_due') %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal" style="margin-top:1rem;">
+      <button type="submit" class="btn btn-secondary">🔧 Abo verwalten &amp; kündigen</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not stripe_configured %}
+  <div class="card mt-1">
+    <p class="hint">⚙️ Das Zahlungssystem ist noch nicht eingerichtet. Bitte die Stripe-Konfiguration in der <code>.env</code>-Datei hinterlegen.</p>
+  </div>
+  {% else %}
+
+  <!-- Plan cards -->
+  {% set status = guild.subscription_status or 'free' %}
+  {% if status != 'active' %}
+  <div class="grid-2 mt-1">
+
+    <!-- Monthly -->
+    <div class="card" style="border:2px solid var(--border); position:relative;">
+      <h2 style="margin-bottom:0.25rem;">📅 Monatlich</h2>
+      <p class="hint" style="margin:0 0 1rem;">Flexibel · monatlich kündbar</p>
+      <div style="font-size:2.5rem; font-weight:800; color:var(--accent);">€6,99
+        <span style="font-size:1rem; font-weight:400; color:var(--text-muted);">/ Monat</span>
+      </div>
+      <ul style="margin:1rem 0; padding-left:1.2rem; color:var(--text-muted); font-size:0.9rem; line-height:1.8;">
+        <li>Scout-System</li>
+        <li>Res-Push-System</li>
+        <li>Verfügbarkeits-Umfragen</li>
+        <li>Statistiken &amp; Charts</li>
+        <li>Gutschein-Codes einlösbar</li>
+      </ul>
+      <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout">
+        <input type="hidden" name="plan" value="monthly">
+        <button type="submit" class="btn btn-primary" style="width:100%;">Jetzt starten</button>
+      </form>
+    </div>
+
+    <!-- Annual -->
+    <div class="card" style="border:2px solid var(--accent); position:relative;">
+      <div style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--accent); color:#fff; padding:2px 14px; border-radius:12px; font-size:0.78rem; font-weight:700; white-space:nowrap;">🔥 Beliebt · 41% sparen</div>
+      <h2 style="margin-bottom:0.25rem;">📆 Jährlich</h2>
+      <p class="hint" style="margin:0 0 1rem;">Im Voraus · günstigster Preis</p>
+      <div style="font-size:2.5rem; font-weight:800; color:var(--accent);">€49,99
+        <span style="font-size:1rem; font-weight:400; color:var(--text-muted);">/ Jahr</span>
+      </div>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem;">≈ €4,17 pro Monat</p>
+      <ul style="margin:1rem 0; padding-left:1.2rem; color:var(--text-muted); font-size:0.9rem; line-height:1.8;">
+        <li>Alles aus dem Monatsplan</li>
+        <li>Günstigster Preis</li>
+        <li>Gutschein-Codes einlösbar</li>
+      </ul>
+      <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout">
+        <input type="hidden" name="plan" value="annual">
+        <button type="submit" class="btn btn-primary" style="width:100%;">Jetzt starten</button>
+      </form>
+    </div>
+
+  </div>
+
+  <div class="card mt-1" style="text-align:center; background:rgba(var(--accent-rgb),.05);">
+    <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
+      🎟️ Hast du einen Gutschein-Code? Einfach beim Checkout eingeben — Stripe akzeptiert ihn automatisch.<br>
+      🔒 Sichere Zahlung via Stripe · Keine Kreditkartendaten auf unseren Servern · Jederzeit kündbar.
+    </p>
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+{% endblock %}

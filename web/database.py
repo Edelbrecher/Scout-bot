@@ -114,6 +114,34 @@ async def init_db():
             except Exception:
                 pass
 
+        for col in [
+            "stripe_customer_id TEXT",
+            "stripe_subscription_id TEXT",
+            "subscription_status TEXT DEFAULT 'free'",
+            "subscription_plan TEXT",
+            "subscription_expires_at TEXT",
+            "attack_channel_id TEXT",
+            "attack_button_message_id TEXT",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS attack_reports (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                reporter_id     TEXT NOT NULL,
+                reporter_name   TEXT NOT NULL,
+                raw_text        TEXT NOT NULL,
+                attacks_json    TEXT NOT NULL,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS availability_polls (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -657,4 +685,125 @@ async def delete_poll(poll_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM poll_responses WHERE poll_id = ?", (poll_id,))
         await db.execute("DELETE FROM availability_polls WHERE id = ?", (poll_id,))
+        await db.commit()
+
+
+async def get_guild_by_stripe_customer(stripe_customer_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_configs WHERE stripe_customer_id = ?", (stripe_customer_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def update_subscription(
+    guild_id: str,
+    stripe_customer_id: str,
+    stripe_subscription_id: str,
+    status: str,
+    plan: str,
+    expires_at: str | None,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs SET
+                stripe_customer_id      = ?,
+                stripe_subscription_id  = ?,
+                subscription_status     = ?,
+                subscription_plan       = ?,
+                subscription_expires_at = ?
+            WHERE guild_id = ?
+        """, (stripe_customer_id, stripe_subscription_id, status, plan, expires_at, guild_id))
+        await db.commit()
+
+
+async def set_subscription_status(guild_id: str, status: str, expires_at: str | None = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET subscription_status = ?, subscription_expires_at = ? WHERE guild_id = ?",
+            (status, expires_at, guild_id),
+        )
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Attack reports
+# ---------------------------------------------------------------------------
+
+async def get_attack_reports(guild_id: str, limit: int = 50) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM attack_reports WHERE guild_id = ? ORDER BY created_at DESC LIMIT ?",
+            (guild_id, limit),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_attack_stats(guild_id: str) -> dict:
+    import json as _json
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        async with db.execute(
+            "SELECT COUNT(*) as total FROM attack_reports WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            total_reports = row["total"] if row else 0
+
+        async with db.execute(
+            "SELECT * FROM attack_reports WHERE guild_id = ? ORDER BY created_at DESC",
+            (guild_id,),
+        ) as cur:
+            all_reports = [dict(r) for r in await cur.fetchall()]
+
+    # Aggregate from JSON
+    attacker_counts: dict[str, int] = {}
+    hours = [0] * 24
+    for report in all_reports:
+        try:
+            attacks = _json.loads(report["attacks_json"])
+        except Exception:
+            attacks = []
+        for atk in attacks:
+            name = (atk.get("attacker") or "").strip()
+            if name:
+                attacker_counts[name] = attacker_counts.get(name, 0) + 1
+        # Hour from created_at ISO string "2026-05-21T14:32:15.123456"
+        try:
+            hour = int(report["created_at"][11:13])
+            hours[hour] += 1
+        except Exception:
+            pass
+
+    top_attackers = sorted(
+        [{"name": k, "count": v} for k, v in attacker_counts.items()],
+        key=lambda x: -x["count"],
+    )[:10]
+
+    recent_attacks = all_reports[:10]
+
+    return {
+        "total_reports": total_reports,
+        "top_attackers": top_attackers,
+        "attacks_by_hour": hours,
+        "recent_attacks": recent_attacks,
+    }
+
+
+async def set_attack_channel_web(guild_id: str, attack_channel_id: str, attack_button_message_id: str = ""):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET attack_channel_id = ?, attack_button_message_id = ? WHERE guild_id = ?",
+            (attack_channel_id or None, attack_button_message_id or None, guild_id),
+        )
+        await db.commit()
+
+
+async def delete_attack_report(report_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM attack_reports WHERE id = ?", (report_id,))
         await db.commit()

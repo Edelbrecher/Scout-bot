@@ -9,10 +9,12 @@ from contextlib import asynccontextmanager
 from urllib.parse import urlencode
 
 import httpx
+import stripe
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi import Request as StarletteRequest
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -33,6 +35,12 @@ DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost/
 
 PERM_ADMINISTRATOR = 0x8
 PERM_MANAGE_GUILD = 0x20
+
+STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_MONTHLY   = os.environ.get("STRIPE_PRICE_MONTHLY", "")
+STRIPE_PRICE_ANNUAL    = os.environ.get("STRIPE_PRICE_ANNUAL", "")
 
 # Discord snowflake: 17-20 digit numeric string
 SNOWFLAKE_RE = re.compile(r"^\d{17,20}$")
@@ -78,10 +86,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: cdn.discordapp.com; "
-            "font-src 'self';"
+            "font-src 'self'; "
+            "frame-src https://js.stripe.com https://hooks.stripe.com; "
+            "connect-src 'self' https://api.stripe.com;"
         )
         return response
 
@@ -189,6 +199,9 @@ def _get_username(request: Request) -> str:
     return session.get("username", "") if session else ""
 
 templates.env.globals["get_username"] = _get_username
+
+import json as _json
+templates.env.filters["from_json"] = lambda s: _json.loads(s) if s else []
 
 
 # ---------------------------------------------------------------------------
@@ -1094,3 +1107,303 @@ async def res_request_remove(request: Request, guild_id: str, request_id: int):
             await client.delete(f"https://discord.com/api/v10/channels/{req['push_channel_id']}", headers={"Authorization": f"Bot {bot_token}"})
     await database.delete_res_request(request_id)
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Billing routes
+# ---------------------------------------------------------------------------
+
+def _stripe_client():
+    if not STRIPE_SECRET_KEY:
+        return None
+    stripe.api_key = STRIPE_SECRET_KEY
+    return stripe
+
+
+@app.get("/guild/{guild_id}/billing")
+async def billing_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    is_admin = session.get("type") == "admin"
+    stripe_configured = bool(STRIPE_SECRET_KEY and STRIPE_PRICE_MONTHLY and STRIPE_PRICE_ANNUAL)
+    return templates.TemplateResponse("billing.html", {
+        "request": request,
+        "guild": guild,
+        "is_admin": is_admin,
+        "stripe_pk": STRIPE_PUBLISHABLE_KEY,
+        "stripe_configured": stripe_configured,
+        "saved": request.query_params.get("saved"),
+        "error": request.query_params.get("error"),
+    })
+
+
+@app.post("/guild/{guild_id}/billing/checkout")
+async def billing_checkout(request: Request, guild_id: str, plan: str = Form(...)):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=stripe_not_configured", status_code=303)
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    price_id = STRIPE_PRICE_MONTHLY if plan == "monthly" else STRIPE_PRICE_ANNUAL
+    if not price_id:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=price_not_configured", status_code=303)
+
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+    customer_id = guild.get("stripe_customer_id") or None
+
+    checkout_kwargs = dict(
+        mode="subscription",
+        line_items=[{"price": price_id, "quantity": 1}],
+        allow_promotion_codes=True,
+        subscription_data={"trial_period_days": 7},
+        success_url=f"{base_url}/guild/{guild_id}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base_url}/guild/{guild_id}/billing?error=cancelled",
+        metadata={"guild_id": guild_id},
+    )
+    if customer_id:
+        checkout_kwargs["customer"] = customer_id
+    else:
+        checkout_kwargs["customer_creation"] = "always"
+
+    checkout_session = s.checkout.Session.create(**checkout_kwargs)
+    return RedirectResponse(checkout_session.url, status_code=303)
+
+
+@app.get("/guild/{guild_id}/billing/success")
+async def billing_success(request: Request, guild_id: str, session_id: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    s = _stripe_client()
+    if not s or not session_id:
+        return RedirectResponse(f"/guild/{guild_id}/billing", status_code=303)
+
+    try:
+        checkout = s.checkout.Session.retrieve(session_id, expand=["subscription"])
+        if checkout.metadata.get("guild_id") != guild_id:
+            return RedirectResponse(f"/guild/{guild_id}/billing?error=invalid", status_code=303)
+        sub = checkout.subscription
+        plan = "annual" if sub.items.data[0].price.recurring.interval == "year" else "monthly"
+        import datetime
+        expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
+        await database.update_subscription(
+            guild_id=guild_id,
+            stripe_customer_id=checkout.customer,
+            stripe_subscription_id=sub.id,
+            status="active",
+            plan=plan,
+            expires_at=expires_at,
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(f"/guild/{guild_id}/billing?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/billing/portal")
+async def billing_portal(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=stripe_not_configured", status_code=303)
+    guild = await database.get_guild(guild_id)
+    customer_id = (guild or {}).get("stripe_customer_id")
+    if not customer_id:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=no_subscription", status_code=303)
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+    portal = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=f"{base_url}/guild/{guild_id}/billing",
+    )
+    return RedirectResponse(portal.url, status_code=303)
+
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    if not STRIPE_WEBHOOK_SECRET:
+        return Response(status_code=400)
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except stripe.error.SignatureVerificationError:
+        return Response(status_code=400)
+
+    obj = event["data"]["object"]
+
+    if event["type"] in ("customer.subscription.updated", "customer.subscription.created"):
+        customer_id = obj.get("customer")
+        guild = await database.get_guild_by_stripe_customer(customer_id)
+        if guild:
+            status = obj.get("status", "inactive")  # active, trialing, past_due, etc.
+            interval = obj.get("items", {}).get("data", [{}])[0].get("price", {}).get("recurring", {}).get("interval", "month")
+            plan = "annual" if interval == "year" else "monthly"
+            import datetime
+            expires_at = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
+            await database.update_subscription(
+                guild_id=guild["guild_id"],
+                stripe_customer_id=customer_id,
+                stripe_subscription_id=obj["id"],
+                status=status,
+                plan=plan,
+                expires_at=expires_at,
+            )
+
+    elif event["type"] == "customer.subscription.deleted":
+        customer_id = obj.get("customer")
+        guild = await database.get_guild_by_stripe_customer(customer_id)
+        if guild:
+            await database.set_subscription_status(guild["guild_id"], "cancelled")
+
+    elif event["type"] == "invoice.payment_failed":
+        customer_id = obj.get("customer")
+        guild = await database.get_guild_by_stripe_customer(customer_id)
+        if guild:
+            await database.set_subscription_status(guild["guild_id"], "past_due")
+
+
+# ---------------------------------------------------------------------------
+# Routes — Attacks
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/attacks", response_class=HTMLResponse)
+async def attacks_page(request: Request, guild_id: str, saved: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    is_admin = session.get("type") == "admin"
+    attack_reports = await database.get_attack_reports(guild_id, limit=50)
+    attack_stats = await database.get_attack_stats(guild_id)
+    return templates.TemplateResponse(
+        "attacks.html",
+        {
+            "request": request,
+            "guild": guild,
+            "saved": saved,
+            "is_admin": is_admin,
+            "attack_reports": attack_reports,
+            "attack_stats": attack_stats,
+        },
+    )
+
+
+@app.post("/guild/{guild_id}/attacks/config")
+async def attacks_config_save(
+    request: Request,
+    guild_id: str,
+    attack_channel_id: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    attack_channel_id = sanitize_snowflake(attack_channel_id)
+    await database.set_attack_channel_web(guild_id, attack_channel_id)
+    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/attacks/delete/{report_id}")
+async def attacks_delete(request: Request, guild_id: str, report_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
+    await database.delete_attack_report(report_id)
+    return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
+
+
+@app.post("/guild/{guild_id}/attacks/auto-setup")
+async def attacks_auto_setup(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient() as client:
+        # Category
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "Angriff-Detection", "type": 4},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/attacks?error=category_{r.status_code}", status_code=303)
+        category_id = r.json()["id"]
+
+        # Alert channel — hidden by default
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={
+                "name": "angriff-alarm",
+                "type": 0,
+                "parent_id": category_id,
+                "permission_overwrites": [
+                    {"id": guild_id, "type": 0, "allow": "0", "deny": "1024"},
+                ],
+            },
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/attacks?error=channel_{r.status_code}", status_code=303)
+        channel_id = r.json()["id"]
+
+        # Post the persistent button message
+        button_payload = {
+            "content": "## ⚔️ Angriff melden\nWenn du einen Angriff siehst: klicke den Button, öffne deinen **Truppenplatz** in Travian, markiere alles (`Strg+A`), kopiere (`Strg+C`) und füge es in das Eingabefeld ein.",
+            "components": [{
+                "type": 1,
+                "components": [{
+                    "type": 2,
+                    "style": 4,
+                    "label": "⚔️ Angriff melden",
+                    "custom_id": "report_attack",
+                }]
+            }]
+        }
+        r = await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers=headers,
+            json=button_payload,
+        )
+        message_id = r.json().get("id", "") if r.status_code in (200, 201) else ""
+
+    await database.set_attack_channel_web(guild_id, channel_id, message_id)
+    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/attacks/reset")
+async def attacks_reset(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.set_attack_channel_web(guild_id, "", "")
+    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
