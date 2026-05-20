@@ -242,3 +242,13 @@ async def update_res_button(guild_id: str, res_request_channel_id: str, res_butt
             WHERE guild_id = ?
         """, (res_request_channel_id, res_button_message_id, guild_id))
         await db.commit()
+
+
+async def get_scout_channel_info(channel_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM scout_channels WHERE channel_id = ?", (channel_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None

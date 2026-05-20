@@ -37,11 +37,22 @@ class Archiver(commands.Cog):
         if not archive_channel:
             return
 
-        embed = discord.Embed(
-            description=f"📁 From {message.channel.mention} · by {message.author.mention}",
-            color=discord.Color.green(),
-        )
-        embed.set_footer(text=f"Jump to original → {message.jump_url}")
+        scout = await database.get_scout_channel_info(str(message.channel.id))
+
+        embed = discord.Embed(color=discord.Color.green())
+        if scout:
+            embed.title = "📁 Scout Archive"
+            embed.add_field(name="Player", value=scout["player"] or "—", inline=True)
+            embed.add_field(name="Village", value=scout["village"] or "—", inline=True)
+            embed.add_field(name="Coordinates", value=scout["coordinates"] or "—", inline=True)
+            embed.add_field(name="Scout Time", value=scout["scout_time"] or "—", inline=True)
+            if scout.get("additional_info"):
+                embed.add_field(name="Additional Info", value=scout["additional_info"], inline=False)
+            embed.add_field(name="Posted by", value=message.author.mention, inline=True)
+            embed.add_field(name="Channel", value=message.channel.mention, inline=True)
+        else:
+            embed.description = f"📁 From {message.channel.mention} · by {message.author.mention}"
+        embed.set_footer(text=f"Requested {scout['created_at'][:16] if scout else ''} · Jump → {message.jump_url}")
 
         files = []
         for attachment in images:
