@@ -31,7 +31,7 @@
   <!-- Legend -->
   <div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:0.75rem; font-size:0.85rem; align-items:center;">
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#334155;margin-right:4px;"></span>Dorf</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2d6a2d;margin-right:4px;"></span>Oase</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3a2a0a;margin-right:4px;"></span>Natars</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e05555;margin-right:4px;"></span>Gescoutet ({{ scouted|length }})</span>
     <span style="color:var(--text-muted);">Aktiver Server: <strong style="color:var(--text);">{{ guild.tw_world }}</strong></span>
   </div>
@@ -153,14 +153,13 @@ function draw() {
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(3, dotR * 2), 0, Math.PI * 2);
       ctx.fill();
-      // Pulse ring
       ctx.strokeStyle = "rgba(224,85,85,0.4)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(5, dotR * 3.5), 0, Math.PI * 2);
       ctx.stroke();
-    } else if (v.isOasis) {
-      ctx.fillStyle = "#1a4a1a";
+    } else if (v.isNatar) {
+      ctx.fillStyle = "#3a2a0a";
       ctx.fillRect(cx - dotR, cy - dotR, dotR * 2, dotR * 2);
     } else {
       ctx.fillStyle = TRIBE_COLOR[v.tribe] || "#334155";
@@ -238,25 +237,61 @@ window.addEventListener("mousemove", e => {
 
 // Parse Travian map.sql
 // Format: INSERT INTO `x_world` VALUES(x,y,tid,n,tribe,vid,pop,region,isCapital,aId,pName,aName,...);
+// Parse a single SQL VALUES tuple, handling quoted strings and NULLs
+function parseTuple(s) {
+  const vals = [];
+  let i = 0;
+  while (i < s.length) {
+    while (i < s.length && s[i] === ' ') i++;
+    if (s[i] === "'") {
+      // Quoted string — find closing quote (not preceded by backslash)
+      let j = i + 1;
+      let str = '';
+      while (j < s.length) {
+        if (s[j] === "'" && s[j-1] !== '\\') break;
+        str += s[j++];
+      }
+      vals.push(str.replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"'));
+      i = j + 1;
+    } else {
+      // Unquoted value (number, NULL, TRUE, FALSE)
+      let j = i;
+      while (j < s.length && s[j] !== ',') j++;
+      vals.push(s.slice(i, j).trim());
+      i = j;
+    }
+    while (i < s.length && s[i] === ' ') i++;
+    if (s[i] === ',') i++;
+  }
+  return vals;
+}
+
+// Real Travian Legends map.sql format:
+// VALUES (x, y, tid, tribe, villageId, 'name', pop, 'owner', ownerId, 'allianceTag', allianceId, wonder, isCapital, ...)
 function parseSql(text) {
   const rows = [];
   let maxCoord = 0;
-  // Match all VALUE tuples
-  const re = /\((-?\d+),(-?\d+),(\d+),([^,]*),(\d+),(\d+),(\d+),(\d*),(\d+),(\d+),([^,)]*),([^,)]*)/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const x = +m[1], y = +m[2];
-    const tid    = +m[3];   // 0=empty,1=village,2=wasteland,3=oasis,4-6=rich oases
-    const name   = decodeURIComponent(m[4].replace(/\+/g, " "));
-    const tribe  = +m[5];
-    const pop    = +m[7];
-    const isCapital = m[9] === "1";
-    const player = decodeURIComponent(m[11].replace(/\+/g, " ")) || null;
-    const alliance = decodeURIComponent(m[12].replace(/\+/g, " ")) || null;
-    const isOasis = tid >= 3;
+  for (const line of text.split('\n')) {
+    const m = line.match(/VALUES\s*\((.+)\);?\s*$/);
+    if (!m) continue;
+    const v = parseTuple(m[1]);
+    if (v.length < 13) continue;
+    const x     = +v[0];
+    const y     = +v[1];
+    // v[2] = tid (landscape type, ignored for now)
+    const tribe = +v[3];
+    // v[4] = villageId
+    const name  = v[5] || '';
+    const pop   = +v[6] || 0;
+    const player    = v[7] || null;
+    // v[8] = ownerId
+    const alliance  = v[9] || null;
+    const isCapital = v[12] === 'TRUE';
+    // Natars (tribe 5) and empty owners = special; all are shown as villages
+    const isNatar = tribe === 5;
     if (Math.abs(x) > maxCoord) maxCoord = Math.abs(x);
     if (Math.abs(y) > maxCoord) maxCoord = Math.abs(y);
-    rows.push({ x, y, name, tribe, pop, isOasis, isCapital, player, alliance });
+    rows.push({ x, y, name, tribe, pop, isNatar, isCapital, player: player || null, alliance: alliance || null });
   }
   return { rows, maxCoord: maxCoord || 400 };
 }
@@ -284,9 +319,9 @@ async function loadMap() {
     const { rows, maxCoord } = parseSql(json.data);
     villages = rows;
     mapSize  = maxCoord;
-    const vCount = villages.filter(v => !v.isOasis).length;
-    const oCount = villages.filter(v =>  v.isOasis).length;
-    statusEl.textContent = `${vCount.toLocaleString()} Dörfer · ${oCount.toLocaleString()} Oasen · ${scoutedMap.size} gescoutet`;
+    const nCount = villages.filter(v => v.isNatar).length;
+    const vCount = villages.length - nCount;
+    statusEl.textContent = `${vCount.toLocaleString()} Dörfer · ${nCount.toLocaleString()} Natars · ${scoutedMap.size} gescoutet`;
     fitMap();
     draw();
   } catch(e) {
