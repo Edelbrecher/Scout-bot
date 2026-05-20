@@ -95,6 +95,12 @@ async def init_db():
         except Exception:
             pass
 
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN tw_world TEXT")
+            await db.commit()
+        except Exception:
+            pass
+
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
     password = os.environ.get("ADMIN_PASSWORD", "changeme")
@@ -161,6 +167,23 @@ async def update_guild_config(
         """, (category_id or None, archive_channel_id or None, allowed_role_ids or None,
               scout_channel_id, guild_id))
         await db.commit()
+
+
+async def update_tw_world(guild_id: str, tw_world: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE guild_configs SET tw_world = ? WHERE guild_id = ?", (tw_world or None, guild_id))
+        await db.commit()
+
+
+async def get_scouted_coordinates(guild_id: str) -> list[dict]:
+    """Return list of {coordinates, player, village} from scout_channels."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT coordinates, player, village FROM scout_channels WHERE guild_id = ? AND coordinates IS NOT NULL",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def update_button_message(guild_id: str, scout_channel_id: str, button_message_id: str):

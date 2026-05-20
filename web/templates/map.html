@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}Map · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>🗺️ Karte</h1>
+      <p class="subtitle">{{ guild.guild_name }}</p>
+    </div>
+  </div>
+
+  <!-- World selector -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2>Server auswählen</h2>
+    <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+      <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+        <label for="tw_server">Server</label>
+        <select id="tw_server" name="tw_server" style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+          <option value="de">🇩🇪 die-staemme.de</option>
+          <option value="en">🇬🇧 tribalwars.net</option>
+          <option value="pl">🇵🇱 plemiona.pl</option>
+          <option value="nl">🇳🇱 tribalwars.nl</option>
+          <option value="fr">🇫🇷 guerretribale.fr</option>
+          <option value="it">🇮🇹 tribals.it</option>
+          <option value="br">🇧🇷 tribalwars.com.br</option>
+          <option value="us">🇺🇸 tribalwars.us</option>
+          <option value="ru">🇷🇺 voyna-klanow.ru</option>
+          <option value="tr">🇹🇷 klanlar.org</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0; flex:1; min-width:140px;">
+        <label for="tw_number">Weltnummer</label>
+        <input type="number" id="tw_number" name="tw_number" min="1" max="9999"
+          value="{{ (guild.tw_world or 'de200')[2:] or '200' }}"
+          placeholder="z.B. 200"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-bottom:0;">💾 Speichern & Laden</button>
+    </form>
+
+    {% if guild.tw_world %}
+    <p class="hint" style="margin-top:0.75rem;">Aktuelle Welt: <strong>{{ guild.tw_world }}</strong></p>
+    {% endif %}
+  </div>
+
+  <!-- Legend -->
+  <div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:0.75rem; font-size:0.85rem;">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#555;margin-right:4px;"></span>Alle Dörfer</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e05555;margin-right:4px;"></span>Gescoutet ({{ scouted|length }})</span>
+  </div>
+
+  <!-- Map canvas -->
+  <div style="position:relative; background:#1a1a2e; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+    <canvas id="mapCanvas" style="display:block; width:100%; cursor:crosshair;"></canvas>
+    <div id="mapTooltip" style="
+      position:absolute; background:var(--bg-card); border:1px solid var(--border);
+      padding:0.4rem 0.7rem; border-radius:6px; font-size:0.8rem; pointer-events:none;
+      display:none; z-index:10; white-space:nowrap;
+    "></div>
+    <div id="mapStatus" style="position:absolute;top:10px;left:10px;background:rgba(0,0,0,.6);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.8rem;color:#ccc;">
+      {% if guild.tw_world %}Lade Kartendaten…{% else %}Bitte Welt auswählen.{% endif %}
+    </div>
+  </div>
+
+  <p class="hint" style="margin-top:0.5rem;">Scroll zum Zoomen · Klick+Ziehen zum Verschieben · Hover für Dorfinfos</p>
+</div>
+
+<script>
+const GUILD_ID   = "{{ guild.guild_id }}";
+const TW_WORLD   = "{{ guild.tw_world or '' }}";
+const SCOUTED_RAW = {{ scouted | tojson }};
+
+// Parse scouted coordinates into a Set for fast lookup
+const scoutedMap = new Map(); // "x|y" -> {player, village}
+for (const s of SCOUTED_RAW) {
+  const m = (s.coordinates || "").match(/(\d+)\|(\d+)/);
+  if (m) scoutedMap.set(`${m[1]}|${m[2]}`, s);
+}
+
+const canvas  = document.getElementById("mapCanvas");
+const ctx     = canvas.getContext("2d");
+const tooltip = document.getElementById("mapTooltip");
+const status  = document.getElementById("mapStatus");
+
+// Map state
+let villages = [];   // [{x,y,name,player_id,points}]
+let scale    = 1;
+let offsetX  = 0;
+let offsetY  = 0;
+let dragging = false;
+let lastMX   = 0, lastMY = 0;
+const WORLD_SIZE = 1000;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const size = Math.min(rect.width, window.innerHeight * 0.75);
+  canvas.width  = rect.width;
+  canvas.height = size;
+  draw();
+}
+
+function worldToCanvas(wx, wy) {
+  return [
+    offsetX + wx * scale,
+    offsetY + wy * scale,
+  ];
+}
+
+function canvasToWorld(cx, cy) {
+  return [
+    (cx - offsetX) / scale,
+    (cy - offsetY) / scale,
+  ];
+}
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = "#0d1117";
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines every 100 coords
+  ctx.strokeStyle = "#1e2a3a";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    const [x0, y0] = worldToCanvas(i * 100, 0);
+    const [x1, y1] = worldToCanvas(i * 100, WORLD_SIZE);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    const [ax, ay] = worldToCanvas(0, i * 100);
+    const [bx, by] = worldToCanvas(WORLD_SIZE, i * 100);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  }
+
+  // Villages
+  const dotSize = Math.max(1, scale * 0.8);
+  for (const v of villages) {
+    const [cx, cy] = worldToCanvas(v.x, v.y);
+    if (cx < -5 || cy < -5 || cx > W + 5 || cy > H + 5) continue;
+    const key = `${v.x}|${v.y}`;
+    const isScouted = scoutedMap.has(key);
+    ctx.fillStyle = isScouted ? "#e05555" : "#334155";
+    ctx.beginPath();
+    ctx.arc(cx, cy, isScouted ? Math.max(2.5, dotSize * 1.5) : Math.max(1, dotSize), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Coordinate labels at grid intersections when zoomed in
+  if (scale > 0.3) {
+    ctx.fillStyle = "#4a5568";
+    ctx.font = `${Math.max(9, scale * 6)}px monospace`;
+    for (let i = 1; i < 10; i++) {
+      const [cx, cy] = worldToCanvas(i * 100, i * 100);
+      ctx.fillText(`${i*100}|${i*100}`, cx + 3, cy - 3);
+    }
+  }
+}
+
+// Zoom
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const rect   = canvas.getBoundingClientRect();
+  const mx     = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my     = (e.clientY - rect.top)  * (canvas.height / rect.height);
+  const factor = e.deltaY < 0 ? 1.15 : 0.87;
+  offsetX = mx - (mx - offsetX) * factor;
+  offsetY = my - (my - offsetY) * factor;
+  scale  *= factor;
+  scale   = Math.max(0.05, Math.min(20, scale));
+  draw();
+}, { passive: false });
+
+// Drag
+canvas.addEventListener("mousedown", e => { dragging = true; lastMX = e.clientX; lastMY = e.clientY; });
+window.addEventListener("mouseup",   () => { dragging = false; });
+window.addEventListener("mousemove", e => {
+  if (dragging) {
+    offsetX += e.clientX - lastMX;
+    offsetY += e.clientY - lastMY;
+    lastMX = e.clientX; lastMY = e.clientY;
+    draw();
+  }
+  // Tooltip
+  const rect = canvas.getBoundingClientRect();
+  const cx   = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const cy   = (e.clientY - rect.top)  * (canvas.height / rect.height);
+  const [wx, wy] = canvasToWorld(cx, cy).map(Math.round);
+  const key  = `${wx}|${wy}`;
+  // Find nearest village within 5px
+  let found = null;
+  let best  = Infinity;
+  for (const v of villages) {
+    const [vx, vy] = worldToCanvas(v.x, v.y);
+    const d = Math.hypot(cx - vx, cy - vy);
+    if (d < 8 && d < best) { best = d; found = v; }
+  }
+  if (found) {
+    const sc  = scoutedMap.get(`${found.x}|${found.y}`);
+    const tip = sc
+      ? `🔴 ${found.x}|${found.y} — ${sc.player} / ${sc.village}`
+      : `⬛ ${found.x}|${found.y} — ${decodeURIComponent(found.name).replace(/\+/g,' ')} (${found.points} Pts)`;
+    tooltip.textContent = tip;
+    tooltip.style.display = "block";
+    tooltip.style.left = `${e.clientX - rect.left + 12}px`;
+    tooltip.style.top  = `${e.clientY - rect.top  - 10}px`;
+  } else {
+    tooltip.style.display = "none";
+  }
+});
+
+function fitMap() {
+  const W = canvas.width, H = canvas.height;
+  scale   = Math.min(W, H) / WORLD_SIZE;
+  offsetX = (W - WORLD_SIZE * scale) / 2;
+  offsetY = (H - WORLD_SIZE * scale) / 2;
+}
+
+async function loadMap() {
+  if (!TW_WORLD) { status.textContent = "Bitte Welt auswählen."; return; }
+  status.textContent = `Lade ${TW_WORLD}…`;
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/map/data?world=${TW_WORLD}`);
+    const json = await r.json();
+    if (!r.ok) { status.textContent = `Fehler: ${json.error}`; return; }
+    villages = [];
+    for (const line of json.data.trim().split("\n")) {
+      const [id, name, x, y, player_id, points] = line.split(",");
+      if (x && y) villages.push({ x: +x, y: +y, name, player_id, points: +points });
+    }
+    status.textContent = `${villages.length.toLocaleString()} Dörfer · ${scoutedMap.size} gescoutet`;
+    fitMap();
+    draw();
+  } catch(e) {
+    status.textContent = `Fehler: ${e.message}`;
+  }
+}
+
+// Build world string from form on submit
+document.querySelector("form").addEventListener("submit", function(e) {
+  e.preventDefault();
+  const server = document.getElementById("tw_server").value;
+  const number = document.getElementById("tw_number").value;
+  const world  = server + number;
+  // Submit with hidden input
+  const input  = document.createElement("input");
+  input.type   = "hidden";
+  input.name   = "tw_world";
+  input.value  = world;
+  this.appendChild(input);
+  this.submit();
+});
+
+// Pre-select saved server in dropdown
+if (TW_WORLD) {
+  const prefix = TW_WORLD.match(/^[a-z]+/)?.[0] || "de";
+  const sel = document.getElementById("tw_server");
+  for (const opt of sel.options) { if (opt.value === prefix) { opt.selected = true; break; } }
+}
+
+window.addEventListener("resize", resize);
+resize();
+loadMap();
+</script>
+{% endblock %}

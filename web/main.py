@@ -726,6 +726,81 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
+@app.get("/guild/{guild_id}/map", response_class=HTMLResponse)
+async def guild_map(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    scouted = await database.get_scouted_coordinates(guild_id)
+    return templates.TemplateResponse("map.html", {
+        "request": request,
+        "guild": guild,
+        "scouted": scouted,
+    })
+
+
+@app.post("/guild/{guild_id}/map/world")
+async def guild_map_set_world(request: Request, guild_id: str, tw_world: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    # Validate world format: letters + digits only, e.g. de200, en120
+    if tw_world and not re.match(r"^[a-z]{2,4}\d{1,4}$", tw_world.strip().lower()):
+        return RedirectResponse(f"/guild/{guild_id}/map?error=invalid_world", status_code=303)
+    await database.update_tw_world(guild_id, tw_world.strip().lower())
+    return RedirectResponse(f"/guild/{guild_id}/map", status_code=303)
+
+
+@app.get("/guild/{guild_id}/map/data")
+async def guild_map_data(request: Request, guild_id: str, world: str = ""):
+    """Proxy TW village data to avoid CORS issues."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    if not world or not re.match(r"^[a-z]{2,4}\d{1,4}$", world):
+        return JSONResponse({"error": "invalid world"}, status_code=400)
+
+    # Determine domain from world prefix
+    domain_map = {
+        "de": "die-staemme.de",
+        "en": "tribalwars.net",
+        "pl": "plemiona.pl",
+        "nl": "tribalwars.nl",
+        "fr": "guerretribale.fr",
+        "it": "tribals.it",
+        "cs": "divokekmeny.cz",
+        "ru": "voyna-klanow.ru",
+        "br": "tribalwars.com.br",
+        "pt": "tribalwars.com.pt",
+        "ro": "triburile.ro",
+        "hu": "klanhaboru.hu",
+        "tr": "klanlar.org",
+        "gr": "fylespolemou.gr",
+        "sk": "divoke-kmene.sk",
+        "us": "tribalwars.us",
+    }
+    prefix = re.match(r"^([a-z]+)", world).group(1)
+    domain = domain_map.get(prefix)
+    if not domain:
+        return JSONResponse({"error": "unknown server"}, status_code=400)
+
+    url = f"https://{world}.{domain}/map/village.txt"
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(url)
+            if r.status_code != 200:
+                return JSONResponse({"error": f"TW returned {r.status_code}"}, status_code=502)
+            return JSONResponse({"data": r.text})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")
 async def res_request_remove(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
