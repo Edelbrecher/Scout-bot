@@ -266,31 +266,56 @@ function parseTuple(s) {
   return vals;
 }
 
-// Real Travian Legends map.sql format:
-// VALUES (x, y, tid, tribe, villageId, 'name', pop, 'owner', ownerId, 'allianceTag', allianceId, wonder, isCapital, ...)
+// Auto-detect column layout from the first parsed row.
+// Travian Legends map.sql has two common formats:
+//   Format A (13 cols): x, y, tid, tribe, vid, 'name', pop, 'player', pid, 'alliance', aid, wonder, isCapital
+//   Format B (14 cols): x, y, tid, n, tribe, vid, 'name', pop, 'player', pid, 'alliance', aid, wonder, isCapital
+// In both, x=v[0] and y=v[1].
+// Sometimes vid appears before x,y: vid, x, y, ... — we detect this when v[0] > 1000.
+function detectLayout(v) {
+  // If v[0] and v[1] look like valid Travian coordinates (small integers), use them
+  const a = +v[0], b = +v[1];
+  if (Math.abs(a) <= 800 && Math.abs(b) <= 800 && Number.isInteger(a) && Number.isInteger(b)) {
+    // Determine if there's an extra 'n' field between tid and tribe
+    // Format A: v[3]=tribe (1-6 or 0), v[4]=vid (large)
+    // Format B: v[3]=n (0-11), v[4]=tribe (1-6 or 0), v[5]=vid (large)
+    const tribeA = +v[3]; // tribe in format A
+    const tribeB = +v[4]; // tribe in format B
+    // tribe values are 0-6; if v[3] > 10 it's not a tribe → format B
+    const offset = (tribeA > 10 || (tribeB >= 0 && tribeB <= 6 && +v[5] > 1000)) ? 1 : 0;
+    return { xIdx: 0, yIdx: 1, tribeIdx: 3 + offset, nameIdx: 5 + offset, popIdx: 6 + offset,
+             playerIdx: 7 + offset, allianceIdx: 9 + offset, capitalIdx: 12 + offset };
+  }
+  // v[0] is likely a large vid — try x=v[1], y=v[2]
+  const offset = 1;
+  return { xIdx: 1, yIdx: 2, tribeIdx: 3 + offset, nameIdx: 5 + offset, popIdx: 6 + offset,
+           playerIdx: 7 + offset, allianceIdx: 9 + offset, capitalIdx: 12 + offset };
+}
+
 function parseSql(text) {
   const rows = [];
   let maxCoord = 0;
+  let layout = null;
   for (const line of text.split('\n')) {
-    const m = line.match(/VALUES\s*\((.+)\);?\s*$/);
+    const m = line.match(/VALUES\s*\((.+)\);?\s*$/i);
     if (!m) continue;
     const v = parseTuple(m[1]);
     if (v.length < 13) continue;
-    const x     = +v[0];
-    const y     = +v[1];
-    // v[2] = tid (landscape type, ignored for now)
-    const tribe = +v[3];
-    // v[4] = villageId
-    const name  = v[5] || '';
-    const pop   = +v[6] || 0;
-    const player    = v[7] || null;
-    // v[8] = ownerId
-    const alliance  = v[9] || null;
-    const isCapital = v[12] === 'TRUE';
-    // Natars (tribe 5) and empty owners = special; all are shown as villages
-    const isNatar = tribe === 5;
-    if (Math.abs(x) > maxCoord) maxCoord = Math.abs(x);
-    if (Math.abs(y) > maxCoord) maxCoord = Math.abs(y);
+    if (!layout) layout = detectLayout(v);
+    const { xIdx, yIdx, tribeIdx, nameIdx, popIdx, playerIdx, allianceIdx, capitalIdx } = layout;
+    if (capitalIdx >= v.length) continue;
+    const x         = +v[xIdx];
+    const y         = +v[yIdx];
+    const tribe     = +v[tribeIdx];
+    const name      = v[nameIdx] || '';
+    const pop       = +v[popIdx] || 0;
+    const player    = v[playerIdx] || null;
+    const alliance  = v[allianceIdx] || null;
+    const isCapital = v[capitalIdx] === 'TRUE' || v[capitalIdx] === '1';
+    // Natars: tribe 3 (T4) or tribe 5 (TL) — detect by player being empty
+    const isNatar   = tribe === 3 || tribe === 5 || (!player && tribe > 0);
+    if (Math.abs(x) <= 800) { if (Math.abs(x) > maxCoord) maxCoord = Math.abs(x); }
+    if (Math.abs(y) <= 800) { if (Math.abs(y) > maxCoord) maxCoord = Math.abs(y); }
     rows.push({ x, y, name, tribe, pop, isNatar, isCapital, player: player || null, alliance: alliance || null });
   }
   return { rows, maxCoord: maxCoord || 400 };

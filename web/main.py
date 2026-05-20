@@ -555,6 +555,11 @@ async def guild_stats(request: Request, guild_id: str):
     scout_stats = await database.get_guild_stats(guild_id)
     res_stats = await database.get_res_stats(guild_id)
     polls = await database.get_polls(guild_id)
+    for p in polls:
+        responses = await database.get_poll_responses(p["id"])
+        p["count_available"]   = sum(1 for r in responses if r["response"] == "available")
+        p["count_maybe"]       = sum(1 for r in responses if r["response"] == "maybe")
+        p["count_unavailable"] = sum(1 for r in responses if r["response"] == "unavailable")
     token = os.environ.get("DISCORD_TOKEN", "")
     discord_guild = None
     async with httpx.AsyncClient() as client:
