@@ -18,6 +18,11 @@
   {% if saved %}
   <div class="alert alert-success">✅ Settings saved successfully.</div>
   {% endif %}
+  {% if request.query_params.get('error') == 'discord_403' %}
+  <div class="alert alert-error">❌ Discord returned 403 Forbidden — the bot has no permission to post in that channel. Make sure the bot has <strong>Send Messages</strong> permission there.</div>
+  {% elif request.query_params.get('error') %}
+  <div class="alert alert-error">❌ Error: {{ request.query_params.get('error') }}</div>
+  {% endif %}
 
   <div class="grid-2">
     <!-- Config Form -->
