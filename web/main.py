@@ -150,6 +150,111 @@ async def guild_save(
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/auto-setup")
+async def auto_setup(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient() as client:
+        # 1. Create category
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "Scout", "type": 4},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}?error=category_{r.status_code}", status_code=303)
+        category_id = r.json()["id"]
+
+        # 2. Create scout-requests channel inside category
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "scout-requests", "type": 0, "parent_id": category_id},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}?error=scout_ch_{r.status_code}", status_code=303)
+        scout_channel_id = r.json()["id"]
+
+        # 3. Create scout-archive channel inside category
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "scout-archive", "type": 0, "parent_id": category_id},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}?error=archive_ch_{r.status_code}", status_code=303)
+        archive_channel_id = r.json()["id"]
+
+        # 4. Post scout request button
+        payload = {
+            "embeds": [{
+                "title": "📡 Scout Request",
+                "description": "Click the button below to submit a scout request.\nFill in the coordinates, player, village and time.",
+                "color": 5793266,
+            }],
+            "components": [{
+                "type": 1,
+                "components": [{
+                    "type": 2, "style": 1,
+                    "label": "Scout Request",
+                    "emoji": {"name": "🔍"},
+                    "custom_id": "persistent:scout_request",
+                }]
+            }]
+        }
+        r = await client.post(
+            f"https://discord.com/api/v10/channels/{scout_channel_id}/messages",
+            headers=headers,
+            json=payload,
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}?error=button_{r.status_code}", status_code=303)
+        button_message_id = r.json()["id"]
+
+    await database.auto_setup_guild(
+        guild_id=guild_id,
+        category_id=category_id,
+        scout_channel_id=scout_channel_id,
+        archive_channel_id=archive_channel_id,
+        button_message_id=button_message_id,
+    )
+    return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/stats", response_class=HTMLResponse)
+async def guild_stats(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+
+    stats = await database.get_guild_stats(guild_id)
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    discord_guild = None
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"https://discord.com/api/v10/guilds/{guild_id}?with_counts=true",
+            headers={"Authorization": f"Bot {token}"},
+        )
+        if r.status_code == 200:
+            discord_guild = r.json()
+
+    return templates.TemplateResponse(
+        "stats.html",
+        {"request": request, "guild": guild, "stats": stats, "discord_guild": discord_guild},
+    )
+
+
 @app.post("/guild/{guild_id}/post-button")
 async def post_button(request: Request, guild_id: str):
     if not get_session_user(request):

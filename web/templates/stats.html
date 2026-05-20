@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Stats · {{ guild.guild_name }} · TD Scouter{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>📊 Statistics</h1>
+      <p class="subtitle">{{ guild.guild_name }}</p>
+    </div>
+  </div>
+
+  <!-- Discord info -->
+  {% if discord_guild %}
+  <div class="card">
+    <h2>Server Info</h2>
+    <ul class="status-list">
+      <li><span class="status-label">Name</span><span>{{ discord_guild.name }}</span></li>
+      <li><span class="status-label">Members</span><span>{{ discord_guild.approximate_member_count }}</span></li>
+      <li><span class="status-label">Online</span><span>{{ discord_guild.approximate_presence_count }}</span></li>
+      <li><span class="status-label">Boost Level</span><span>{{ discord_guild.premium_tier }}</span></li>
+      <li><span class="status-label">Boosts</span><span>{{ discord_guild.premium_subscription_count or 0 }}</span></li>
+      <li><span class="status-label">Channels</span><span>{{ discord_guild.channels|length if discord_guild.channels else '—' }}</span></li>
+      <li><span class="status-label">Roles</span><span>{{ discord_guild.roles|length if discord_guild.roles else '—' }}</span></li>
+      <li><span class="status-label">Region</span><span>{{ discord_guild.preferred_locale }}</span></li>
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Scout counts -->
+  <div class="grid-3 mt-1">
+    <div class="card text-center">
+      <div class="stat-number">{{ stats.total }}</div>
+      <div class="stat-label">Total Requests</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-number">{{ stats.last7 }}</div>
+      <div class="stat-label">Last 7 Days</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-number">{{ stats.today }}</div>
+      <div class="stat-label">Today</div>
+    </div>
+  </div>
+
+  <div class="grid-2 mt-1">
+    <!-- Top players -->
+    <div class="card">
+      <h2>Top Scouted Players</h2>
+      {% if stats.top_players %}
+      <table class="table">
+        <thead><tr><th>#</th><th>Player</th><th>Requests</th></tr></thead>
+        <tbody>
+          {% for row in stats.top_players %}
+          <tr>
+            <td class="mono small">{{ loop.index }}</td>
+            <td>{{ row.player }}</td>
+            <td><strong>{{ row.cnt }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No data yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Top coordinates -->
+    <div class="card">
+      <h2>Top Coordinates</h2>
+      {% if stats.top_coords %}
+      <table class="table">
+        <thead><tr><th>#</th><th>Coordinates</th><th>Requests</th></tr></thead>
+        <tbody>
+          {% for row in stats.top_coords %}
+          <tr>
+            <td class="mono small">{{ loop.index }}</td>
+            <td><code>{{ row.coordinates }}</code></td>
+            <td><strong>{{ row.cnt }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No data yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent requests -->
+  <div class="card mt-1">
+    <h2>Recent Requests</h2>
+    {% if stats.recent %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Village</th>
+          <th>Coordinates</th>
+          <th>Time</th>
+          <th>Additional Info</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ch in stats.recent %}
+        <tr>
+          <td>{{ ch.player }}</td>
+          <td>{{ ch.village }}</td>
+          <td><code>{{ ch.coordinates }}</code></td>
+          <td>{{ ch.scout_time }}</td>
+          <td>{{ ch.additional_info or '—' }}</td>
+          <td class="mono small">{{ ch.created_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No scout requests yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

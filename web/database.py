@@ -125,6 +125,74 @@ async def update_button_message(guild_id: str, scout_channel_id: str, button_mes
         await db.commit()
 
 
+async def auto_setup_guild(
+    guild_id: str,
+    category_id: str,
+    scout_channel_id: str,
+    archive_channel_id: str,
+    button_message_id: str,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET category_id = ?, scout_channel_id = ?, archive_channel_id = ?, button_message_id = ?
+            WHERE guild_id = ?
+        """, (category_id, scout_channel_id, archive_channel_id, button_message_id, guild_id))
+        await db.commit()
+
+
+async def get_guild_stats(guild_id: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        async with db.execute(
+            "SELECT COUNT(*) as total FROM scout_channels WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            total = row["total"] if row else 0
+
+        async with db.execute(
+            "SELECT COUNT(*) as total FROM scout_channels WHERE guild_id = ? AND date(created_at) = date('now')",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            today = row["total"] if row else 0
+
+        async with db.execute(
+            "SELECT COUNT(*) as total FROM scout_channels WHERE guild_id = ? AND created_at >= datetime('now', '-7 days')",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            last7 = row["total"] if row else 0
+
+        async with db.execute(
+            "SELECT player, COUNT(*) as cnt FROM scout_channels WHERE guild_id = ? GROUP BY player ORDER BY cnt DESC LIMIT 10",
+            (guild_id,),
+        ) as cur:
+            top_players = [dict(r) for r in await cur.fetchall()]
+
+        async with db.execute(
+            "SELECT coordinates, COUNT(*) as cnt FROM scout_channels WHERE guild_id = ? GROUP BY coordinates ORDER BY cnt DESC LIMIT 10",
+            (guild_id,),
+        ) as cur:
+            top_coords = [dict(r) for r in await cur.fetchall()]
+
+        async with db.execute(
+            "SELECT * FROM scout_channels WHERE guild_id = ? ORDER BY created_at DESC LIMIT 10",
+            (guild_id,),
+        ) as cur:
+            recent = [dict(r) for r in await cur.fetchall()]
+
+    return {
+        "total": total,
+        "today": today,
+        "last7": last7,
+        "top_players": top_players,
+        "top_coords": top_coords,
+        "recent": recent,
+    }
+
+
 async def get_scout_channels(guild_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
