@@ -297,3 +297,16 @@ input:focus { border-color: var(--primary); }
 .btn-secondary:hover { background: var(--border); }
 
 .badge-err { background: rgba(220,50,50,.15); color: #e05555; }
+
+.btn-danger {
+  background: rgba(220,50,50,.85);
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+}
+.btn-danger:hover { background: rgba(200,30,30,.9); }

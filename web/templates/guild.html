@@ -91,12 +91,18 @@
       </form>
       {% endif %}
 
-      {% if not guild.category_id or not guild.archive_channel_id or not guild.scout_channel_id %}
       <hr style="margin:1.5rem 0;">
+      {% if not guild.category_id or not guild.archive_channel_id or not guild.scout_channel_id %}
       <h3>1-Click Auto Setup</h3>
       <p class="hint">Let the bot create the Scout category, scout-requests channel, and scout-archive channel automatically — then post the button.</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/auto-setup">
         <button type="submit" class="btn btn-primary">⚡ Auto Setup</button>
+      </form>
+      {% else %}
+      <h3>Reset Setup</h3>
+      <p class="hint">Clear all Scout channel IDs from the database so you can run Auto Setup again. This does <strong>not</strong> delete channels in Discord.</p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/reset-scout" onsubmit="return confirm('Reset Scout configuration?')">
+        <button type="submit" class="btn btn-danger">🔄 Reset Scout Setup</button>
       </form>
       {% endif %}
     </div>

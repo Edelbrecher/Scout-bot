@@ -341,3 +341,25 @@ async def get_res_stats(guild_id: str) -> dict:
         "recent": recent,
         "top_contributors": top_contributors,
     }
+
+
+async def reset_scout_config(guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET scout_channel_id = NULL, category_id = NULL,
+                archive_channel_id = NULL, button_message_id = NULL
+            WHERE guild_id = ?
+        """, (guild_id,))
+        await db.commit()
+
+
+async def reset_res_config(guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET res_request_channel_id = NULL, res_answer_channel_id = NULL,
+                res_push_channel_id = NULL, res_button_message_id = NULL
+            WHERE guild_id = ?
+        """, (guild_id,))
+        await db.commit()

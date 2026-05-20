@@ -345,6 +345,22 @@ async def res_push_stats(request: Request, guild_id: str):
     )
 
 
+@app.post("/guild/{guild_id}/reset-scout")
+async def reset_scout(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    await database.reset_scout_config(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/reset")
+async def reset_res_push(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    await database.reset_res_config(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
 @app.post("/guild/{guild_id}/auto-setup")
 async def auto_setup(request: Request, guild_id: str):
     if not get_session_user(request):
