@@ -122,9 +122,20 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard")
     scout_channels = await database.get_scout_channels(guild_id)
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    roles = []
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"https://discord.com/api/v10/guilds/{guild_id}/roles",
+            headers={"Authorization": f"Bot {token}"},
+        )
+        if r.status_code == 200:
+            roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
+
     return templates.TemplateResponse(
         "guild.html",
-        {"request": request, "guild": guild, "scout_channels": scout_channels, "saved": saved},
+        {"request": request, "guild": guild, "scout_channels": scout_channels, "saved": saved, "roles": roles},
     )
 
 

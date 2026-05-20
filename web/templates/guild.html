@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ guild.guild_name }} · TD Scouter{% endblock %}
+{% block title %}{{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -132,6 +132,44 @@
       </div>
       {% endif %}
     </div>
+  </div>
+
+  <!-- Roles -->
+  <div class="card mt-1">
+    <h2>Server Roles ({{ roles|length }})</h2>
+    {% if roles %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Position</th>
+          <th>Role Name</th>
+          <th>Role ID</th>
+          <th>Color</th>
+          <th>Members can mention</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for role in roles %}
+        {% if role.name != '@everyone' %}
+        <tr>
+          <td class="mono small">{{ role.position }}</td>
+          <td>
+            {% if role.color %}
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;"></span>
+            {% endif %}
+            {{ role.name }}
+          </td>
+          <td><code style="user-select:all;">{{ role.id }}</code></td>
+          <td>{% if role.color %}#{{ '%06x' % role.color }}{% else %}—{% endif %}</td>
+          <td>{% if role.mentionable %}✅{% else %}—{% endif %}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Roles could not be loaded.</p>
+    {% endif %}
   </div>
 
   <!-- Scout Channels -->
