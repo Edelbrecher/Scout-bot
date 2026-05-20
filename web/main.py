@@ -701,7 +701,16 @@ async def res_auto_setup(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{guild_id}/res-push?error=req_ch_{r.status_code}", status_code=303)
         res_request_channel_id = r.json()["id"]
 
-        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "res-answer", "type": 0, "parent_id": category_id})
+        # res-answer is manager-only: deny @everyone, allow manager roles
+        res_answer_overwrites = [{"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL}]
+        for rid in (guild.get("res_manager_role_ids") or "").split(","):
+            rid = rid.strip()
+            if rid:
+                res_answer_overwrites.append({"id": rid, "type": 0, "allow": VIEW_CHANNEL, "deny": "0"})
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={
+            "name": "res-answer", "type": 0, "parent_id": category_id,
+            "permission_overwrites": res_answer_overwrites,
+        })
         if r.status_code not in (200, 201):
             return RedirectResponse(f"/guild/{guild_id}/res-push?error=ans_ch_{r.status_code}", status_code=303)
         res_answer_channel_id = r.json()["id"]

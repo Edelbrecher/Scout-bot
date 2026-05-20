@@ -282,14 +282,20 @@ class ResAnswerView(discord.ui.View):
 
         await interaction.response.defer()
 
-        # Build permission overwrites for the push channel
+        # Build permission overwrites for the push channel.
+        # Default role is explicitly denied so the channel is private even if
+        # the category is visible to everyone.
         overwrites = {
-            interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.guild.me: discord.PermissionOverwrite(
                 view_channel=True, send_messages=True, embed_links=True,
                 manage_channels=True, manage_messages=True,
             ),
         }
+        # Give the requester access so they can see their own push channel
+        overwrites[interaction.user] = discord.PermissionOverwrite(
+            view_channel=True, send_messages=True,
+        )
         # Give manager roles explicit access
         for role_id_str in (config.get("res_manager_role_ids") or "").split(","):
             role_id_str = role_id_str.strip()
