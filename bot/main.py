@@ -22,6 +22,7 @@ class ScouterBot(commands.Bot):
         await database.init_db()
         await self.load_extension("cogs.scout")
         await self.load_extension("cogs.archiver")
+        await self.load_extension("cogs.res_push")
         await self.tree.sync()
         print("Slash commands synced.")
 

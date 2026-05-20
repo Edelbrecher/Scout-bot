@@ -10,12 +10,18 @@ async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS guild_configs (
-                guild_id            TEXT PRIMARY KEY,
-                guild_name          TEXT NOT NULL,
-                scout_channel_id    TEXT,
-                category_id         TEXT,
-                archive_channel_id  TEXT,
-                button_message_id   TEXT
+                guild_id                TEXT PRIMARY KEY,
+                guild_name              TEXT NOT NULL,
+                scout_channel_id        TEXT,
+                category_id             TEXT,
+                archive_channel_id      TEXT,
+                button_message_id       TEXT,
+                allowed_role_ids        TEXT,
+                res_request_channel_id  TEXT,
+                res_answer_channel_id   TEXT,
+                res_push_channel_id     TEXT,
+                res_manager_role_ids    TEXT,
+                res_button_message_id   TEXT
             )
         """)
         await db.execute("""
@@ -39,13 +45,48 @@ async def init_db():
         """)
         await db.commit()
 
-    # Migrate: add allowed_role_ids column to existing DBs
+    # Migrations
     async with aiosqlite.connect(DB_PATH) as db:
-        try:
-            await db.execute("ALTER TABLE guild_configs ADD COLUMN allowed_role_ids TEXT")
-            await db.commit()
-        except Exception:
-            pass  # Column already exists
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS res_requests (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id          TEXT NOT NULL,
+                answer_message_id TEXT,
+                push_message_id   TEXT,
+                user_id           TEXT NOT NULL,
+                user_name         TEXT NOT NULL,
+                player_name       TEXT NOT NULL,
+                coordinates       TEXT NOT NULL,
+                push_height       TEXT NOT NULL,
+                reason            TEXT,
+                status            TEXT DEFAULT 'pending',
+                created_at        TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS res_contributions (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id  INTEGER NOT NULL,
+                user_id     TEXT NOT NULL,
+                user_name   TEXT NOT NULL,
+                amount      TEXT NOT NULL,
+                created_at  TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+        for col in [
+            "allowed_role_ids TEXT",
+            "res_request_channel_id TEXT",
+            "res_answer_channel_id TEXT",
+            "res_push_channel_id TEXT",
+            "res_manager_role_ids TEXT",
+            "res_button_message_id TEXT",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -202,3 +243,101 @@ async def get_scout_channels(guild_id: str) -> list[dict]:
         ) as cursor:
             rows = await cursor.fetchall()
             return [dict(r) for r in rows]
+
+
+async def update_res_config(
+    guild_id: str,
+    res_request_channel_id: str,
+    res_answer_channel_id: str,
+    res_push_channel_id: str,
+    res_manager_role_ids: str,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET res_request_channel_id = ?,
+                res_answer_channel_id  = ?,
+                res_push_channel_id    = ?,
+                res_manager_role_ids   = ?
+            WHERE guild_id = ?
+        """, (
+            res_request_channel_id or None,
+            res_answer_channel_id or None,
+            res_push_channel_id or None,
+            res_manager_role_ids or None,
+            guild_id,
+        ))
+        await db.commit()
+
+
+async def update_res_button(guild_id: str, res_request_channel_id: str, res_button_message_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET res_request_channel_id = ?, res_button_message_id = ?
+            WHERE guild_id = ?
+        """, (res_request_channel_id, res_button_message_id, guild_id))
+        await db.commit()
+
+
+async def get_res_requests(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM res_requests WHERE guild_id = ? ORDER BY created_at DESC",
+            (guild_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_res_contributions_for_guild(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT rc.*, rr.player_name, rr.coordinates, rr.push_height
+            FROM res_contributions rc
+            JOIN res_requests rr ON rc.request_id = rr.id
+            WHERE rr.guild_id = ?
+            ORDER BY rc.created_at DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_res_stats(guild_id: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        async with db.execute(
+            "SELECT COUNT(*) as total FROM res_requests WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            total = (await cur.fetchone())["total"]
+
+        async with db.execute(
+            "SELECT status, COUNT(*) as cnt FROM res_requests WHERE guild_id = ? GROUP BY status",
+            (guild_id,),
+        ) as cur:
+            by_status = {r["status"]: r["cnt"] for r in await cur.fetchall()}
+
+        async with db.execute(
+            "SELECT * FROM res_requests WHERE guild_id = ? ORDER BY created_at DESC LIMIT 20",
+            (guild_id,),
+        ) as cur:
+            recent = [dict(r) for r in await cur.fetchall()]
+
+        async with db.execute("""
+            SELECT rc.user_name, COUNT(*) as cnt, SUM(CAST(rc.amount AS INTEGER)) as total_sent
+            FROM res_contributions rc
+            JOIN res_requests rr ON rc.request_id = rr.id
+            WHERE rr.guild_id = ?
+            GROUP BY rc.user_id, rc.user_name
+            ORDER BY total_sent DESC
+            LIMIT 10
+        """, (guild_id,)) as cur:
+            top_contributors = [dict(r) for r in await cur.fetchall()]
+
+    return {
+        "total": total,
+        "by_status": by_status,
+        "recent": recent,
+        "top_contributors": top_contributors,
+    }

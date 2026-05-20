@@ -150,6 +150,100 @@ async def guild_save(
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
+@app.get("/guild/{guild_id}/res-push", response_class=HTMLResponse)
+async def res_push_page(request: Request, guild_id: str, saved: str = ""):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    res_requests = await database.get_res_requests(guild_id)
+    return templates.TemplateResponse(
+        "res_push.html",
+        {"request": request, "guild": guild, "res_requests": res_requests, "saved": saved},
+    )
+
+
+@app.post("/guild/{guild_id}/res-push")
+async def res_push_save(
+    request: Request,
+    guild_id: str,
+    res_request_channel_id: str = Form(""),
+    res_answer_channel_id: str = Form(""),
+    res_push_channel_id: str = Form(""),
+    res_manager_role_ids: str = Form(""),
+):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    normalized = ",".join(r.strip() for r in res_manager_role_ids.split(",") if r.strip())
+    await database.update_res_config(
+        guild_id=guild_id,
+        res_request_channel_id=res_request_channel_id.strip(),
+        res_answer_channel_id=res_answer_channel_id.strip(),
+        res_push_channel_id=res_push_channel_id.strip(),
+        res_manager_role_ids=normalized,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/post-button")
+async def res_post_button(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("res_request_channel_id"):
+        return RedirectResponse(f"/guild/{guild_id}/res-push?error=no_channel", status_code=303)
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    channel_id = guild["res_request_channel_id"]
+
+    payload = {
+        "embeds": [{
+            "title": "🪖 Res-Push Request",
+            "description": "Click the button below to submit a resource push request.",
+            "color": 5793266,
+        }],
+        "components": [{
+            "type": 1,
+            "components": [{
+                "type": 2, "style": 1,
+                "label": "Res Request",
+                "emoji": {"name": "🪖"},
+                "custom_id": "persistent:res_request",
+            }]
+        }]
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json=payload,
+        )
+
+    if resp.status_code in (200, 201):
+        msg_id = resp.json().get("id", "")
+        await database.update_res_button(guild_id, channel_id, msg_id)
+        return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    else:
+        return RedirectResponse(f"/guild/{guild_id}/res-push?error=discord_{resp.status_code}", status_code=303)
+
+
+@app.get("/guild/{guild_id}/res-push/stats", response_class=HTMLResponse)
+async def res_push_stats(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    stats = await database.get_res_stats(guild_id)
+    return templates.TemplateResponse(
+        "res_push_stats.html",
+        {"request": request, "guild": guild, "stats": stats},
+    )
+
+
 @app.post("/guild/{guild_id}/auto-setup")
 async def auto_setup(request: Request, guild_id: str):
     if not get_session_user(request):

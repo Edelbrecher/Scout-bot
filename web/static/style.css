@@ -295,3 +295,5 @@ input:focus { border-color: var(--primary); }
   display: inline-block;
 }
 .btn-secondary:hover { background: var(--border); }
+
+.badge-err { background: rgba(220,50,50,.15); color: #e05555; }
