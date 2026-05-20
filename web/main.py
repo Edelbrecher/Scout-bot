@@ -1358,7 +1358,17 @@ async def attacks_auto_setup(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{guild_id}/attacks?error=category_{r.status_code}", status_code=303)
         category_id = r.json()["id"]
 
-        # Alert channel — hidden by default
+        # Get bot's own user ID
+        me = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
+        bot_id = me.json().get("id", "")
+
+        # Alert channel — hidden from @everyone, bot has full access
+        overwrites = [
+            {"id": guild_id, "type": 0, "allow": "0", "deny": "1024"},
+        ]
+        if bot_id:
+            overwrites.append({"id": bot_id, "type": 1, "allow": "52224", "deny": "0"})  # view+send+embed
+
         r = await client.post(
             f"https://discord.com/api/v10/guilds/{guild_id}/channels",
             headers=headers,
@@ -1366,9 +1376,7 @@ async def attacks_auto_setup(request: Request, guild_id: str):
                 "name": "angriff-alarm",
                 "type": 0,
                 "parent_id": category_id,
-                "permission_overwrites": [
-                    {"id": guild_id, "type": 0, "allow": "0", "deny": "1024"},
-                ],
+                "permission_overwrites": overwrites,
             },
         )
         if r.status_code not in (200, 201):
