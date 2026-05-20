@@ -17,4 +17,5 @@ jobs:
           script: |
             cd /opt/td-scouter
             git pull origin main
-            docker compose up --build --force-recreate -d
+            docker compose down --remove-orphans
+            docker compose up --build -d
