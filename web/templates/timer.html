@@ -9,8 +9,31 @@
       <h1>⏱️ Timer & Erinnerungen</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <button id="btnSound" class="btn btn-secondary" title="Sound an/aus">🔔 Sound an</button>
+    <button id="btnSound" class="btn btn-secondary" title="Sound an/aus">🔔 Sound an</button>
+  </div>
+
+  <!-- ── Travian Profil ── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">🏰 Mein Travian-Profil</h2>
+    <p class="hint">Wird lokal gespeichert. Ermöglicht direkte Links zu deinem Versammlungsplatz.</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+      <div class="form-group" style="margin:0;">
+        <label>Travian-Name</label>
+        <input type="text" id="travianName" placeholder="z.B. MaxMuster" maxlength="40"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Server-URL</label>
+        <input type="url" id="travianWorld" placeholder="https://ts2.x1.europe.travian.com"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+    </div>
+    <div style="margin-top:0.75rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      <button id="btnSaveProfile" class="btn btn-primary">💾 Speichern</button>
+      <span id="profileLink" style="display:none;">
+        <a id="rallyLink" href="#" target="_blank" class="btn btn-secondary">⚔️ Zum Versammlungsplatz</a>
+      </span>
+      <span id="profileSaved" style="color:#4caf82; font-size:0.85rem; display:none;">✅ Gespeichert</span>
     </div>
   </div>
 
@@ -38,61 +61,64 @@
       </div>
     </div>
 
-    <!-- Countdown Display -->
     <div id="farmDisplay" style="display:none; margin-top:1.25rem; text-align:center;">
       <div id="farmCountdown" style="font-size:3.5rem; font-weight:800; font-family:monospace; color:var(--text); line-height:1;">00:00</div>
       <div style="color:var(--text-muted); font-size:0.85rem; margin-top:0.25rem;">bis zur nächsten Farmliste</div>
-      <!-- Progress bar -->
       <div style="background:var(--border); border-radius:4px; height:6px; margin-top:0.75rem; overflow:hidden;">
         <div id="farmProgress" style="height:100%; background:#3b82f6; border-radius:4px; transition:width 1s linear; width:100%;"></div>
+      </div>
+      <div style="margin-top:0.75rem;">
+        <a id="farmRallyBtn" href="#" target="_blank" class="btn btn-secondary" style="font-size:0.85rem; display:none;">⚔️ Zum Versammlungsplatz</a>
       </div>
     </div>
   </div>
 
-  <!-- ── Custom Timers ── -->
+  <!-- ── Erinnerungen ── -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;">⏰ Erinnerungen</h2>
-    <p class="hint">Füge individuelle Timer hinzu — z.B. "Truppen wegschicken", "Gebäude fertig", "Angriff in 10 min".</p>
+    <h2 style="margin-top:0;">🔔 Erinnerungen</h2>
+    <p class="hint">Trage Datum und Uhrzeit ein, wann du erinnert werden möchtest — z.B. wenn Truppen ankommen oder ein Gebäude fertig ist.</p>
 
-    <form id="addTimerForm" style="display:grid; grid-template-columns:2fr 1fr auto; gap:0.75rem; align-items:end; margin-bottom:1.25rem;">
+    <form id="addTimerForm" style="display:grid; grid-template-columns:2fr 1fr auto auto; gap:0.75rem; align-items:end; margin-bottom:1.25rem; flex-wrap:wrap;">
       <div class="form-group" style="margin:0;">
         <label>Bezeichnung</label>
         <input type="text" id="timerLabel" placeholder="z.B. Truppen wegschicken" maxlength="60"
           style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
       <div class="form-group" style="margin:0;">
-        <label>Dauer</label>
-        <div style="display:flex; gap:0.4rem;">
-          <input type="number" id="timerH" placeholder="Std" min="0" max="23" value="0"
-            style="flex:1; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
-          <input type="number" id="timerM" placeholder="Min" min="0" max="59" value="5"
-            style="flex:1; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
-          <input type="number" id="timerS" placeholder="Sek" min="0" max="59" value="0"
-            style="flex:1; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
-        </div>
+        <label>Datum &amp; Uhrzeit</label>
+        <input type="datetime-local" id="timerAt"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
-      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">+ Hinzufügen</button>
+      <div class="form-group" style="margin:0;">
+        <label title="Link zum Versammlungsplatz beim Alarm anzeigen">⚔️ Rally-Link</label>
+        <select id="timerRally"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+          <option value="0">Nein</option>
+          <option value="1">Ja</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap; margin-bottom:0;">+ Hinzufügen</button>
     </form>
 
     <div id="timerList" style="display:flex; flex-direction:column; gap:0.6rem;">
-      <p class="empty" id="timerEmpty">Noch keine Timer. Füge oben einen hinzu.</p>
+      <p class="empty" id="timerEmpty">Noch keine Erinnerungen. Füge oben eine hinzu.</p>
     </div>
   </div>
 
   <!-- ── Sound Test ── -->
   <div class="card">
     <h2 style="margin-top:0;">🎵 Sound-Test</h2>
-    <p class="hint">Teste die akustischen Signale, die beim Ablauf eines Timers abgespielt werden.</p>
+    <p class="hint">Teste die akustischen Signale.</p>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-      <button class="btn btn-secondary" onclick="playBeep('warn')">⚠️ Warnton</button>
-      <button class="btn btn-secondary" onclick="playBeep('alert')">🔔 Alert</button>
-      <button class="btn btn-secondary" onclick="playBeep('done')">✅ Fertig</button>
+      <button class="btn btn-secondary" onclick="playBeep('warn')">⚠️ Warnton (30 s vorher)</button>
+      <button class="btn btn-secondary" onclick="playBeep('alert')">🔔 Farmlist-Alert</button>
+      <button class="btn btn-secondary" onclick="playBeep('done')">✅ Erinnerung fällig</button>
     </div>
   </div>
 </div>
 
 <script>
-// ── Audio Engine ──────────────────────────────────────────────────────────────
+// ── Audio ─────────────────────────────────────────────────────────────────────
 let audioCtx = null;
 let soundEnabled = true;
 
@@ -101,71 +127,107 @@ function getAudioCtx() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-
-function playTone(freq, duration, type = 'sine', vol = 0.4) {
+function playTone(freq, dur, type = 'sine', vol = 0.4) {
   if (!soundEnabled) return;
-  const ctx  = getAudioCtx();
-  const osc  = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
   osc.type = type;
   osc.frequency.setValueAtTime(freq, ctx.currentTime);
   gain.gain.setValueAtTime(vol, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + duration);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur);
 }
-
 function playBeep(type) {
   if (type === 'warn') {
-    // Two short beeps
     playTone(880, 0.15, 'square', 0.3);
-    setTimeout(() => playTone(880, 0.15, 'square', 0.3), 200);
+    setTimeout(() => playTone(880, 0.15, 'square', 0.3), 220);
   } else if (type === 'alert') {
-    // Rising alert
     playTone(440, 0.2, 'sine', 0.35);
     setTimeout(() => playTone(660, 0.2, 'sine', 0.35), 220);
     setTimeout(() => playTone(880, 0.35, 'sine', 0.4), 440);
   } else if (type === 'done') {
-    // Success chord
     playTone(523, 0.15, 'sine', 0.3);
-    setTimeout(() => playTone(659, 0.15, 'sine', 0.3), 120);
-    setTimeout(() => playTone(784, 0.4,  'sine', 0.4), 240);
+    setTimeout(() => playTone(659, 0.15, 'sine', 0.3), 130);
+    setTimeout(() => playTone(784, 0.4, 'sine', 0.4), 260);
   }
 }
 
-// Sound toggle
-const btnSound = document.getElementById('btnSound');
-btnSound.addEventListener('click', () => {
+document.getElementById('btnSound').addEventListener('click', function() {
   soundEnabled = !soundEnabled;
-  btnSound.textContent = soundEnabled ? '🔔 Sound an' : '🔕 Sound aus';
-  btnSound.classList.toggle('btn-secondary', true);
+  this.textContent = soundEnabled ? '🔔 Sound an' : '🔕 Sound aus';
 });
 
-// ── Farmlist Timer ────────────────────────────────────────────────────────────
-let farmTimer   = null;
-let farmEnds    = null;
-let farmTotal   = 0;
-let warnFired   = false;
+// ── Browser Notifications ─────────────────────────────────────────────────────
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+function showNotification(title, body) {
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body });
+  }
+}
 
-const farmDisplay    = document.getElementById('farmDisplay');
-const farmCountdown  = document.getElementById('farmCountdown');
-const farmProgress   = document.getElementById('farmProgress');
-const farmBadge      = document.getElementById('farmBadge');
-const btnFarmStart   = document.getElementById('btnFarmStart');
-const btnFarmStop    = document.getElementById('btnFarmStop');
+// ── Travian Profil ────────────────────────────────────────────────────────────
+const nameEl  = document.getElementById('travianName');
+const worldEl = document.getElementById('travianWorld');
+const rallyLink    = document.getElementById('rallyLink');
+const farmRallyBtn = document.getElementById('farmRallyBtn');
+const profileLink  = document.getElementById('profileLink');
+const profileSaved = document.getElementById('profileSaved');
+
+function rallyUrl(world) {
+  if (!world) return null;
+  const base = world.replace(/\/$/, '');
+  return base + '/build.php?id=39';
+}
+
+function loadProfile() {
+  nameEl.value  = localStorage.getItem('travianName')  || '';
+  worldEl.value = localStorage.getItem('travianWorld') || '';
+  updateRallyLinks();
+}
+
+function updateRallyLinks() {
+  const url = rallyUrl(worldEl.value.trim());
+  if (url) {
+    rallyLink.href = url;
+    profileLink.style.display = 'inline';
+    farmRallyBtn.href = url;
+    farmRallyBtn.style.display = 'inline-block';
+  } else {
+    profileLink.style.display = 'none';
+    farmRallyBtn.style.display = 'none';
+  }
+}
+
+document.getElementById('btnSaveProfile').addEventListener('click', () => {
+  getAudioCtx();
+  localStorage.setItem('travianName',  nameEl.value.trim());
+  localStorage.setItem('travianWorld', worldEl.value.trim());
+  updateRallyLinks();
+  profileSaved.style.display = 'inline';
+  setTimeout(() => profileSaved.style.display = 'none', 2000);
+});
+
+loadProfile();
+
+// ── Farmlist Timer ────────────────────────────────────────────────────────────
+let farmTimer = null, farmEnds = null, farmTotal = 0, warnFired = false;
+
+const farmDisplay   = document.getElementById('farmDisplay');
+const farmCountdown = document.getElementById('farmCountdown');
+const farmProgress  = document.getElementById('farmProgress');
+const farmBadge     = document.getElementById('farmBadge');
+const btnFarmStart  = document.getElementById('btnFarmStart');
+const btnFarmStop   = document.getElementById('btnFarmStop');
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
 function farmTick() {
-  const now  = Date.now();
-  const left = Math.max(0, farmEnds - now);
+  const left = Math.max(0, farmEnds - Date.now());
   const secs = Math.ceil(left / 1000);
-  const m    = Math.floor(secs / 60);
-  const s    = secs % 60;
-  farmCountdown.textContent = `${pad(m)}:${pad(s)}`;
-
+  farmCountdown.textContent = `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`;
   const pct = (left / farmTotal) * 100;
   farmProgress.style.width = pct + '%';
   farmProgress.style.background = pct < 15 ? '#e05555' : pct < 30 ? '#c89b00' : '#3b82f6';
@@ -175,26 +237,21 @@ function farmTick() {
     warnFired = true;
     farmCountdown.style.color = '#c89b00';
     playBeep('warn');
-    showNotification('🌾 Farmlist bald!', `Noch ${secs} Sekunden bis zur nächsten Farmliste.`);
+    showNotification('🌾 Farmlist bald!', `Noch ${secs} Sekunden.`);
   }
-
   if (left <= 0) {
     playBeep('alert');
     showNotification('🌾 Farmlist jetzt!', 'Zeit, die Farmliste zu schicken!');
-    farmCountdown.textContent = '00:00';
     farmCountdown.style.color = '#e05555';
-    // Auto-restart
-    setTimeout(() => {
-      if (farmTimer) startFarm();
-    }, 1500);
+    setTimeout(() => { if (farmTimer) startFarm(); }, 1500);
   }
 }
 
 function startFarm() {
-  const mins  = parseInt(document.getElementById('farmInterval').value) || 20;
-  farmTotal   = mins * 60 * 1000;
-  farmEnds    = Date.now() + farmTotal;
-  warnFired   = false;
+  const mins = parseInt(document.getElementById('farmInterval').value) || 20;
+  farmTotal = mins * 60 * 1000;
+  farmEnds  = Date.now() + farmTotal;
+  warnFired = false;
   farmCountdown.style.color = 'var(--text)';
   farmDisplay.style.display = 'block';
   farmBadge.style.display   = 'inline';
@@ -205,137 +262,143 @@ function startFarm() {
   farmTimer = setInterval(farmTick, 500);
 }
 
-btnFarmStart.addEventListener('click', () => {
-  getAudioCtx(); // unlock audio on user gesture
-  startFarm();
-});
+btnFarmStart.addEventListener('click', () => { getAudioCtx(); startFarm(); });
 btnFarmStop.addEventListener('click', () => {
-  clearInterval(farmTimer);
-  farmTimer = null;
+  clearInterval(farmTimer); farmTimer = null;
   farmDisplay.style.display = 'none';
   farmBadge.style.display   = 'none';
   btnFarmStart.disabled = false;
   btnFarmStop.disabled  = true;
 });
 
-// ── Custom Timers ─────────────────────────────────────────────────────────────
-let customTimers = [];
+// ── Custom Reminders ──────────────────────────────────────────────────────────
+let reminders = [];
 
-function renderTimers() {
+// Pre-fill datetime-local to now + 5 min
+(function() {
+  const d = new Date(Date.now() + 5 * 60000);
+  const local = new Date(d - d.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 16);
+  document.getElementById('timerAt').value = local;
+})();
+
+function renderReminders() {
   const list  = document.getElementById('timerList');
   const empty = document.getElementById('timerEmpty');
-  // Remove old timer cards
-  list.querySelectorAll('.timer-card').forEach(el => el.remove());
+  list.querySelectorAll('.rem-card').forEach(el => el.remove());
 
-  if (customTimers.length === 0) {
-    empty.style.display = 'block';
-    return;
-  }
+  if (reminders.length === 0) { empty.style.display = 'block'; return; }
   empty.style.display = 'none';
 
-  for (const t of customTimers) {
-    const card = document.createElement('div');
-    card.className = 'timer-card';
-    card.dataset.id = t.id;
-    card.style.cssText = 'display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.9rem; background:var(--bg); border:1px solid var(--border); border-radius:8px;';
+  for (const r of reminders) {
+    const left = r.at - Date.now();
+    const done = left <= 0;
+    const warn = !done && left <= 30000;
+    const secs = Math.max(0, Math.ceil(left / 1000));
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    const leftStr = done ? 'Fällig!' : h > 0
+      ? `${pad(h)}:${pad(m)}:${pad(s)}`
+      : `${pad(m)}:${pad(s)}`;
 
+    const targetStr = new Date(r.at).toLocaleString('de-DE', {
+      day:'2-digit', month:'2-digit', year:'numeric',
+      hour:'2-digit', minute:'2-digit'
+    });
+
+    const url = r.rally ? rallyUrl(worldEl.value.trim()) : null;
+    const linkHtml = url
+      ? `<a href="${url}" target="_blank" class="btn btn-secondary" style="font-size:0.78rem; padding:0.25rem 0.6rem; white-space:nowrap;">⚔️ Rally</a>`
+      : '';
+
+    const icon = done ? '✅' : warn ? '⚠️' : '🔔';
+    const color = done ? '#4caf82' : warn ? '#c89b00' : 'var(--text)';
+
+    const card = document.createElement('div');
+    card.className = 'rem-card';
+    card.style.cssText = 'display:flex; align-items:center; gap:0.75rem; padding:0.65rem 0.9rem; background:var(--bg); border:1px solid var(--border); border-radius:8px;';
     card.innerHTML = `
-      <div style="font-size:1.4rem;">${t.done ? '✅' : t.warn ? '⚠️' : '⏳'}</div>
+      <div style="font-size:1.3rem; flex-shrink:0;">${icon}</div>
       <div style="flex:1; min-width:0;">
-        <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(t.label)}</div>
-        <div class="timer-display" style="font-family:monospace; font-size:1.1rem; color:${t.done ? '#4caf82' : t.warn ? '#c89b00' : 'var(--text)'};">
-          ${formatLeft(t)}
-        </div>
+        <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(r.label)}</div>
+        <div style="font-size:0.78rem; color:var(--text-muted);">📅 ${targetStr}</div>
       </div>
-      <div style="background:var(--border); border-radius:4px; height:5px; width:100px; overflow:hidden; flex-shrink:0;">
-        <div style="height:100%; background:${t.done ? '#4caf82' : '#3b82f6'}; width:${timerPct(t)}%; transition:width 1s linear;"></div>
-      </div>
-      <button onclick="removeTimer('${t.id}')" class="btn-action btn-action-err" style="flex-shrink:0;">✕</button>
+      <div style="font-family:monospace; font-weight:700; font-size:1.05rem; color:${color}; flex-shrink:0;">${leftStr}</div>
+      ${linkHtml}
+      <button onclick="removeReminder('${r.id}')" class="btn-action btn-action-err" style="flex-shrink:0;">✕</button>
     `;
     list.appendChild(card);
   }
 }
 
-function formatLeft(t) {
-  if (t.done) return 'Fertig!';
-  const left = Math.max(0, t.ends - Date.now());
-  const s = Math.ceil(left / 1000);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
-}
-
-function timerPct(t) {
-  if (t.done) return 100;
-  const left = Math.max(0, t.ends - Date.now());
-  return Math.max(0, Math.min(100, (left / t.total) * 100));
-}
-
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function removeReminder(id) {
+  reminders = reminders.filter(r => r.id !== id);
+  saveReminders();
+  renderReminders();
+}
 
-function removeTimer(id) {
-  customTimers = customTimers.filter(t => t.id !== id);
-  renderTimers();
+function saveReminders() {
+  // Only save non-done reminders
+  localStorage.setItem('travianReminders', JSON.stringify(
+    reminders.filter(r => r.at > Date.now())
+  ));
+}
+function loadReminders() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('travianReminders') || '[]');
+    reminders = saved.filter(r => r.at > Date.now());
+  } catch { reminders = []; }
 }
 
 document.getElementById('addTimerForm').addEventListener('submit', e => {
   e.preventDefault();
   getAudioCtx();
-  const label = document.getElementById('timerLabel').value.trim() || 'Timer';
-  const h = parseInt(document.getElementById('timerH').value) || 0;
-  const m = parseInt(document.getElementById('timerM').value) || 0;
-  const s = parseInt(document.getElementById('timerS').value) || 0;
-  const totalMs = (h * 3600 + m * 60 + s) * 1000;
-  if (totalMs <= 0) return;
-
-  const timer = {
-    id:    Math.random().toString(36).slice(2),
-    label,
-    total: totalMs,
-    ends:  Date.now() + totalMs,
-    done:  false,
-    warn:  false,
-  };
-  customTimers.push(timer);
+  const label = document.getElementById('timerLabel').value.trim() || 'Erinnerung';
+  const atVal = document.getElementById('timerAt').value;
+  if (!atVal) return;
+  const at = new Date(atVal).getTime();
+  if (isNaN(at) || at <= Date.now()) {
+    alert('Bitte einen Zeitpunkt in der Zukunft wählen.');
+    return;
+  }
+  const rally = document.getElementById('timerRally').value === '1';
+  reminders.push({ id: Math.random().toString(36).slice(2), label, at, rally, warnFired: false });
+  reminders.sort((a, b) => a.at - b.at);
+  saveReminders();
+  renderReminders();
   document.getElementById('timerLabel').value = '';
-  renderTimers();
+  // advance datetime by same interval for convenience
+  const next = new Date(at);
+  document.getElementById('timerAt').value =
+    new Date(next - next.getTimezoneOffset() * 60000).toISOString().slice(0,16);
 });
 
-// Global tick for custom timers
+// Global tick
 setInterval(() => {
-  let changed = false;
-  for (const t of customTimers) {
-    if (t.done) continue;
-    const left = t.ends - Date.now();
-    if (!t.warn && left <= 30000 && left > 0) {
-      t.warn = true;
+  for (const r of reminders) {
+    if (r.done) continue;
+    const left = r.at - Date.now();
+    if (!r.warnFired && left <= 30000 && left > 0) {
+      r.warnFired = true;
       playBeep('warn');
-      showNotification(`⚠️ ${t.label}`, 'Noch 30 Sekunden!');
-      changed = true;
+      showNotification(`⚠️ ${r.label}`, 'Erinnerung in 30 Sekunden!');
     }
-    if (left <= 0 && !t.done) {
-      t.done = true;
+    if (left <= 0 && !r.done) {
+      r.done = true;
       playBeep('done');
-      showNotification(`✅ ${t.label}`, 'Zeit abgelaufen!');
-      changed = true;
+      const url = r.rally ? rallyUrl(worldEl.value.trim()) : null;
+      showNotification(`✅ ${r.label}`, url ? 'Jetzt zum Versammlungsplatz!' : 'Zeit!');
+      if (url) window.open(url, '_blank');
     }
   }
-  if (customTimers.length > 0) renderTimers();
+  renderReminders();
 }, 500);
 
-// ── Browser Notifications ─────────────────────────────────────────────────────
-let notifPermission = 'default';
-if ('Notification' in window) {
-  Notification.requestPermission().then(p => { notifPermission = p; });
-}
-
-function showNotification(title, body) {
-  if (notifPermission === 'granted') {
-    new Notification(title, { body, icon: '/static/favicon.ico' });
-  }
-}
+loadReminders();
+renderReminders();
 </script>
 {% endblock %}
