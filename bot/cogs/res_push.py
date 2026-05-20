@@ -260,16 +260,27 @@ class ResAnswerView(discord.ui.View):
             return
 
         config = await database.get_guild_config(str(interaction.guild.id))
-        if not config or not config.get("res_push_category_id"):
-            await interaction.response.send_message("⚠️ Res-Push category not configured.", ephemeral=True)
+        if not config:
+            await interaction.response.send_message("⚠️ Guild not configured.", ephemeral=True)
+            return
+
+        # Resolve category: prefer res_push_category_id, fall back to parent of res_push_channel_id
+        category = None
+        if config.get("res_push_category_id"):
+            category = interaction.guild.get_channel(int(config["res_push_category_id"]))
+        elif config.get("res_push_channel_id"):
+            ch = interaction.guild.get_channel(int(config["res_push_channel_id"]))
+            if ch and ch.category:
+                category = ch.category
+
+        if not category or not isinstance(category, discord.CategoryChannel):
+            await interaction.response.send_message(
+                "⚠️ Res-Push category not configured. Please reset and run Auto Setup in the dashboard.",
+                ephemeral=True,
+            )
             return
 
         await interaction.response.defer()
-
-        category = interaction.guild.get_channel(int(config["res_push_category_id"]))
-        if not category or not isinstance(category, discord.CategoryChannel):
-            await interaction.followup.send("⚠️ Res-Push category not found.", ephemeral=True)
-            return
 
         # Build permission overwrites for the push channel
         overwrites = {
