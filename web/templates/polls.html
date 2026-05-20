@@ -77,23 +77,62 @@
   {% if guild.poll_channel_id %}
   <div class="card mt-1">
     <h2>Neue Umfrage erstellen</h2>
-    <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end; flex-wrap:wrap;">
+    <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" id="pollForm" style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:1rem; align-items:end; flex-wrap:wrap;">
       <div class="form-group" style="margin:0;">
-        <label for="title">Titel</label>
+        <label for="title">Title</label>
         <input type="text" id="title" name="title" required maxlength="100"
-          placeholder="z.B. Angriff auf Sektor 7" />
+          placeholder="e.g. Attack on Sector 7" />
       </div>
       <div class="form-group" style="margin:0;">
-        <label for="description">Beschreibung <span style="color:var(--text-muted)">(optional)</span></label>
+        <label for="description">Description <span style="color:var(--text-muted)">(optional)</span></label>
         <input type="text" id="description" name="description" maxlength="500"
-          placeholder="z.B. Koordinaten 150|50, bringt Def mit" />
+          placeholder="e.g. coords 150|50, bring def" />
       </div>
+
+      <!-- Custom date/time picker -->
       <div class="form-group" style="margin:0;">
-        <label for="event_datetime">Datum & Uhrzeit (UTC)</label>
-        <input type="datetime-local" id="event_datetime" name="event_datetime" required />
+        <label>Date &amp; Time (UTC)</label>
+        <div style="display:flex; gap:0.4rem;">
+          <input type="date" id="pick_date" required
+            style="flex:1.8; min-width:0; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+          <select id="pick_hour"
+            style="flex:1; min-width:0; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+            {% for h in range(24) %}
+            <option value="{{ '%02d'|format(h) }}">{{ '%02d'|format(h) }}:00</option>
+            {% endfor %}
+          </select>
+          <select id="pick_min"
+            style="flex:0.8; min-width:0; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+            <option value="00">:00</option>
+            <option value="15">:15</option>
+            <option value="30">:30</option>
+            <option value="45">:45</option>
+          </select>
+        </div>
+        <!-- Hidden field submitted to server -->
+        <input type="hidden" id="event_datetime" name="event_datetime" />
       </div>
-      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">📤 Umfrage posten</button>
+
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap; margin-bottom:0;">📤 Post Poll</button>
     </form>
+
+    <script>
+    (function() {
+      // Pre-fill date to today
+      const today = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('pick_date').value =
+        `${today.getUTCFullYear()}-${pad(today.getUTCMonth()+1)}-${pad(today.getUTCDate())}`;
+
+      document.getElementById('pollForm').addEventListener('submit', function(e) {
+        const date = document.getElementById('pick_date').value;
+        const hour = document.getElementById('pick_hour').value;
+        const min  = document.getElementById('pick_min').value;
+        if (!date) { e.preventDefault(); return; }
+        document.getElementById('event_datetime').value = `${date}T${hour}:${min}`;
+      });
+    })();
+    </script>
   </div>
   {% endif %}
 
