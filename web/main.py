@@ -939,6 +939,18 @@ async def polls_delete(request: Request, guild_id: str, poll_id: int):
     return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
 
 
+@app.get("/guild/{guild_id}/timer", response_class=HTMLResponse)
+async def guild_timer(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    return templates.TemplateResponse("timer.html", {"request": request, "guild": guild})
+
+
 @app.get("/guild/{guild_id}/map", response_class=HTMLResponse)
 async def guild_map(request: Request, guild_id: str):
     session, err = _require_session(request)

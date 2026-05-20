@@ -11,87 +11,122 @@
     </div>
   </div>
 
-  <!-- Discord info -->
-  {% if discord_guild %}
-  <div class="card">
-    <h2>Server Info</h2>
-    <ul class="status-list">
-      <li><span class="status-label">Members</span><span>{{ discord_guild.approximate_member_count }}</span></li>
-      <li><span class="status-label">Online</span><span>{{ discord_guild.approximate_presence_count }}</span></li>
-      <li><span class="status-label">Boost Level</span><span>{{ discord_guild.premium_tier }}</span></li>
-      <li><span class="status-label">Boosts</span><span>{{ discord_guild.premium_subscription_count or 0 }}</span></li>
-      <li><span class="status-label">Region</span><span>{{ discord_guild.preferred_locale }}</span></li>
-    </ul>
+  <!-- ── KPI Row ── -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem; margin-bottom:1.25rem;">
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ scout_stats.total }}</div>
+      <div class="stat-label">Scout Requests</div>
+    </div>
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ scout_stats.last7 }}</div>
+      <div class="stat-label">Scout (7 Tage)</div>
+    </div>
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ res_stats.total }}</div>
+      <div class="stat-label">Res-Push Requests</div>
+    </div>
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem; color:#4caf82;">{{ res_stats.by_status.get('accepted', 0) }}</div>
+      <div class="stat-label">Res accepted</div>
+    </div>
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ polls | length }}</div>
+      <div class="stat-label">Umfragen total</div>
+    </div>
+    {% if discord_guild %}
+    <div class="card text-center" style="padding:1rem 0.5rem;">
+      <div class="stat-number" style="font-size:2rem;">{{ discord_guild.approximate_member_count }}</div>
+      <div class="stat-label">Mitglieder</div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 
-  <!-- ── Scout ── -->
-  <h2 style="margin:1.5rem 0 0.5rem;">🔍 Scout</h2>
-  <div class="grid-3">
-    <div class="card text-center">
-      <div class="stat-number">{{ scout_stats.total }}</div>
-      <div class="stat-label">Total Requests</div>
+  <!-- ── Charts Row ── -->
+  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+
+    <!-- Scout activity bar -->
+    <div class="card" style="padding:1rem;">
+      <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;">🔍 Scout Aktivität</h3>
+      <canvas id="chartScout" height="180"></canvas>
     </div>
-    <div class="card text-center">
-      <div class="stat-number">{{ scout_stats.last7 }}</div>
-      <div class="stat-label">Last 7 Days</div>
+
+    <!-- Res-Push status donut -->
+    <div class="card" style="padding:1rem;">
+      <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;">🪖 Res-Push Status</h3>
+      <canvas id="chartRes" height="180"></canvas>
     </div>
-    <div class="card text-center">
-      <div class="stat-number">{{ scout_stats.today }}</div>
-      <div class="stat-label">Today</div>
+
+    <!-- Poll responses bar -->
+    <div class="card" style="padding:1rem;">
+      <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;">📅 Umfragen (letzte 5)</h3>
+      <canvas id="chartPolls" height="180"></canvas>
     </div>
   </div>
 
-  <div class="grid-2 mt-1">
+  <!-- ── Scout Details ── -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
     <div class="card">
-      <h2>Top Scouted Players</h2>
+      <h2 style="margin-top:0;">Top gescoute Spieler</h2>
       {% if scout_stats.top_players %}
       <table class="table">
-        <thead><tr><th>#</th><th>Player</th><th>Requests</th></tr></thead>
+        <thead><tr><th>#</th><th>Spieler</th><th>Anfragen</th></tr></thead>
         <tbody>
           {% for row in scout_stats.top_players %}
           <tr>
             <td class="mono small">{{ loop.index }}</td>
             <td>{{ row.player }}</td>
-            <td><strong>{{ row.cnt }}</strong></td>
+            <td>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <div style="background:#3b82f6; height:6px; border-radius:3px; width:{{ [row.cnt * 12, 120] | min }}px;"></div>
+                <strong>{{ row.cnt }}</strong>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <p class="empty">No data yet.</p>
+      <p class="empty">Noch keine Daten.</p>
       {% endif %}
     </div>
 
     <div class="card">
-      <h2>Top Coordinates</h2>
+      <h2 style="margin-top:0;">Top Koordinaten</h2>
       {% if scout_stats.top_coords %}
       <table class="table">
-        <thead><tr><th>#</th><th>Coordinates</th><th>Requests</th></tr></thead>
+        <thead><tr><th>#</th><th>Koordinaten</th><th>Anfragen</th></tr></thead>
         <tbody>
           {% for row in scout_stats.top_coords %}
           <tr>
             <td class="mono small">{{ loop.index }}</td>
             <td><code>{{ row.coordinates }}</code></td>
-            <td><strong>{{ row.cnt }}</strong></td>
+            <td>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <div style="background:#8b5cf6; height:6px; border-radius:3px; width:{{ [row.cnt * 12, 120] | min }}px;"></div>
+                <strong>{{ row.cnt }}</strong>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <p class="empty">No data yet.</p>
+      <p class="empty">Noch keine Daten.</p>
       {% endif %}
     </div>
   </div>
 
-  <div class="card mt-1">
-    <h2>Recent Scout Requests</h2>
+  <!-- ── Recent Scout ── -->
+  <details class="card" style="margin-bottom:1rem;">
+    <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
+      🔍 Letzte Scout-Anfragen ({{ scout_stats.recent | length }})
+    </summary>
+    <div style="margin-top:1rem;">
     {% if scout_stats.recent %}
+    <div style="overflow-x:auto;">
     <table class="table">
       <thead>
-        <tr>
-          <th>Player</th><th>Village</th><th>Coordinates</th><th>Time</th><th>Additional Info</th><th>Created</th>
-        </tr>
+        <tr><th>Spieler</th><th>Dorf</th><th>Koords</th><th>Zeit</th><th>Info</th><th>Erstellt</th></tr>
       </thead>
       <tbody>
         {% for ch in scout_stats.recent %}
@@ -106,40 +141,31 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <p class="empty">No scout requests yet.</p>
+    <p class="empty">Noch keine Scout-Anfragen.</p>
     {% endif %}
-  </div>
+    </div>
+  </details>
 
-  <!-- ── Res-Push ── -->
-  <h2 style="margin:1.5rem 0 0.5rem;">🪖 Res-Push</h2>
-  <div class="grid-3">
-    <div class="card text-center">
-      <div class="stat-number">{{ res_stats.total }}</div>
-      <div class="stat-label">Total Requests</div>
-    </div>
-    <div class="card text-center">
-      <div class="stat-number">{{ res_stats.by_status.get('accepted', 0) }}</div>
-      <div class="stat-label">Accepted</div>
-    </div>
-    <div class="card text-center">
-      <div class="stat-number">{{ res_stats.by_status.get('rejected', 0) }}</div>
-      <div class="stat-label">Rejected</div>
-    </div>
-  </div>
-
+  <!-- ── Res-Push Details ── -->
   {% if res_stats.top_contributors %}
-  <div class="card mt-1">
-    <h2>Top Contributors</h2>
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">🪖 Top Res-Push Contributers</h2>
     <table class="table">
-      <thead><tr><th>#</th><th>User</th><th>Contributions</th><th>Total Sent</th></tr></thead>
+      <thead><tr><th>#</th><th>Nutzer</th><th>Beiträge</th><th>Gesamt gesendet</th></tr></thead>
       <tbody>
         {% for row in res_stats.top_contributors %}
         <tr>
           <td class="mono small">{{ loop.index }}</td>
           <td>{{ row.user_name }}</td>
           <td>{{ row.cnt }}</td>
-          <td><strong>{{ row.total_sent or 0 }}</strong></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div style="background:#f59e0b; height:6px; border-radius:3px; width:{{ [(row.total_sent or 0) // 500, 120] | min }}px;"></div>
+              <strong>{{ row.total_sent or 0 }}</strong>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -147,12 +173,15 @@
   </div>
   {% endif %}
 
-  <div class="card mt-1">
-    <h2>Recent Res-Push Requests</h2>
+  <details class="card" style="margin-bottom:1rem;">
+    <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
+      🪖 Letzte Res-Push Anfragen ({{ res_stats.recent | length }})
+    </summary>
+    <div style="margin-top:1rem; overflow-x:auto;">
     {% if res_stats.recent %}
     <table class="table">
       <thead>
-        <tr><th>User</th><th>Village</th><th>Resource</th><th>Amount</th><th>Status</th><th>Created</th></tr>
+        <tr><th>Nutzer</th><th>Dorf</th><th>Ressource</th><th>Menge</th><th>Status</th><th>Erstellt</th></tr>
       </thead>
       <tbody>
         {% for r in res_stats.recent %}
@@ -162,7 +191,7 @@
           <td>{{ r.resource_type or '—' }}</td>
           <td>{{ r.amount or '—' }}</td>
           <td>
-            {% if r.status == 'accepted' %}<span class="badge badge-ok">✅ Accepted</span>
+            {% if r.status == 'accepted' %}<span class="badge badge-ok">✅ Active</span>
             {% elif r.status == 'rejected' %}<span class="badge" style="background:rgba(220,50,50,.15);color:#e05555;">❌ Rejected</span>
             {% elif r.status == 'inactive' %}<span class="badge" style="background:rgba(100,100,100,.15);color:#888;">— Inactive</span>
             {% else %}<span class="badge badge-warn">⏳ {{ r.status }}</span>{% endif %}
@@ -173,56 +202,156 @@
       </tbody>
     </table>
     {% else %}
-    <p class="empty">No res-push requests yet.</p>
+    <p class="empty">Noch keine Anfragen.</p>
     {% endif %}
-  </div>
+    </div>
+  </details>
 
   <!-- ── Polls ── -->
-  <h2 style="margin:1.5rem 0 0.5rem;">📅 Polls</h2>
-  {% set active_polls  = polls | selectattr('status', 'eq', 'active')  | list %}
-  {% set closed_polls  = polls | selectattr('status', 'eq', 'closed')  | list %}
-  <div class="grid-3">
-    <div class="card text-center">
-      <div class="stat-number">{{ polls | length }}</div>
-      <div class="stat-label">Total Polls</div>
-    </div>
-    <div class="card text-center">
-      <div class="stat-number">{{ active_polls | length }}</div>
-      <div class="stat-label">Active</div>
-    </div>
-    <div class="card text-center">
-      <div class="stat-number">{{ closed_polls | length }}</div>
-      <div class="stat-label">Closed</div>
-    </div>
-  </div>
-
   {% if polls %}
-  <div class="card mt-1">
-    <h2>All Polls</h2>
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">📅 Alle Umfragen</h2>
+    <div style="overflow-x:auto;">
     <table class="table">
       <thead>
-        <tr><th>Title</th><th>Event Date (UTC)</th><th>✅ Available</th><th>⏰ Maybe</th><th>❌ Not available</th><th>Status</th></tr>
+        <tr><th>Titel</th><th>Event (UTC)</th><th style="color:#4caf82;">✅</th><th style="color:#c89b00;">⏰</th><th style="color:#e05555;">❌</th><th>Status</th></tr>
       </thead>
       <tbody>
         {% for poll in polls %}
+        {% set total = poll.count_available + poll.count_maybe + poll.count_unavailable %}
         <tr>
-          <td><strong>{{ poll.title }}</strong>{% if poll.description %}<br><span class="mono small">{{ poll.description }}</span>{% endif %}</td>
-          <td class="mono small">{{ poll.event_datetime.replace('T', ' ') }}</td>
-          <td style="color:#4caf82; font-weight:700;">{{ poll.count_available }}</td>
-          <td style="color:#c89b00; font-weight:700;">{{ poll.count_maybe }}</td>
-          <td style="color:#e05555; font-weight:700;">{{ poll.count_unavailable }}</td>
           <td>
-            {% if poll.status == 'active' %}<span class="badge badge-ok">🟢 Active</span>
-            {% else %}<span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;">🔒 Closed</span>{% endif %}
+            <strong>{{ poll.title }}</strong>
+            {% if poll.description %}<br><span class="mono small" style="color:var(--text-muted);">{{ poll.description }}</span>{% endif %}
+          </td>
+          <td class="mono small">{{ poll.event_datetime.replace('T', ' ') }}</td>
+          <td style="font-weight:700; color:#4caf82;">{{ poll.count_available }}</td>
+          <td style="font-weight:700; color:#c89b00;">{{ poll.count_maybe }}</td>
+          <td style="font-weight:700; color:#e05555;">{{ poll.count_unavailable }}</td>
+          <td>
+            {% if total > 0 %}
+            <div style="display:flex; gap:2px; height:10px; border-radius:5px; overflow:hidden; min-width:80px;">
+              {% if poll.count_available %}<div style="background:#4caf82; flex:{{ poll.count_available }};"></div>{% endif %}
+              {% if poll.count_maybe %}<div style="background:#c89b00; flex:{{ poll.count_maybe }};"></div>{% endif %}
+              {% if poll.count_unavailable %}<div style="background:#e05555; flex:{{ poll.count_unavailable }};"></div>{% endif %}
+            </div>
+            {% endif %}
+            {% if poll.status == 'active' %}<span class="badge badge-ok" style="font-size:0.7rem; margin-top:3px; display:inline-block;">🟢 Aktiv</span>
+            {% else %}<span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;font-size:0.7rem;margin-top:3px;display:inline-block;">🔒 Closed</span>{% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
-  {% else %}
-  <div class="card mt-1"><p class="empty">No polls created yet.</p></div>
   {% endif %}
 
+  <!-- Discord Server Info -->
+  {% if discord_guild %}
+  <details class="card">
+    <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">🏰 Discord Server Info</summary>
+    <div style="margin-top:1rem;">
+    <ul class="status-list">
+      <li><span class="status-label">Mitglieder</span><span>{{ discord_guild.approximate_member_count }}</span></li>
+      <li><span class="status-label">Online</span><span>{{ discord_guild.approximate_presence_count }}</span></li>
+      <li><span class="status-label">Boost Level</span><span>{{ discord_guild.premium_tier }}</span></li>
+      <li><span class="status-label">Boosts</span><span>{{ discord_guild.premium_subscription_count or 0 }}</span></li>
+      <li><span class="status-label">Region</span><span>{{ discord_guild.preferred_locale }}</span></li>
+    </ul>
+    </div>
+  </details>
+  {% endif %}
 </div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color = '#9ca3af';
+Chart.defaults.borderColor = '#1e293b';
+Chart.defaults.font.family = 'system-ui, sans-serif';
+
+// ── Scout activity (today / last 7d / total) ──
+new Chart(document.getElementById('chartScout'), {
+  type: 'bar',
+  data: {
+    labels: ['Heute', '7 Tage', 'Gesamt'],
+    datasets: [{
+      label: 'Anfragen',
+      data: [{{ scout_stats.today }}, {{ scout_stats.last7 }}, {{ scout_stats.total }}],
+      backgroundColor: ['#3b82f6aa', '#6366f1aa', '#8b5cf6aa'],
+      borderColor:     ['#3b82f6',   '#6366f1',   '#8b5cf6'],
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#1e293b' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ── Res-Push status donut ──
+const resByStatus = {{ res_stats.by_status | tojson }};
+const resLabels = Object.keys(resByStatus).length
+  ? Object.keys(resByStatus)
+  : ['Keine Daten'];
+const resData   = Object.keys(resByStatus).length
+  ? Object.values(resByStatus)
+  : [1];
+const resColors = {
+  accepted:  '#4caf82', rejected: '#e05555',
+  hold:      '#c89b00', inactive: '#4b5563',
+  pending:   '#6366f1', completed: '#22d3ee',
+};
+new Chart(document.getElementById('chartRes'), {
+  type: 'doughnut',
+  data: {
+    labels: resLabels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+    datasets: [{
+      data: resData,
+      backgroundColor: resLabels.map(l => resColors[l] || '#6b7280'),
+      borderWidth: 2,
+      borderColor: '#0d1117',
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } },
+    cutout: '65%',
+  }
+});
+
+// ── Polls bar (last 5) ──
+const pollsRaw = {{ polls[-5:] | tojson }};
+if (pollsRaw.length) {
+  new Chart(document.getElementById('chartPolls'), {
+    type: 'bar',
+    data: {
+      labels: pollsRaw.map(p => p.title.length > 12 ? p.title.slice(0,12)+'…' : p.title),
+      datasets: [
+        { label: '✅ Dabei',       data: pollsRaw.map(p => p.count_available),   backgroundColor: '#4caf8299', borderColor: '#4caf82', borderWidth:1, borderRadius:3 },
+        { label: '⏰ Vielleicht',  data: pollsRaw.map(p => p.count_maybe),       backgroundColor: '#c89b0099', borderColor: '#c89b00', borderWidth:1, borderRadius:3 },
+        { label: '❌ Nicht dabei', data: pollsRaw.map(p => p.count_unavailable), backgroundColor: '#e0555599', borderColor: '#e05555', borderWidth:1, borderRadius:3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } } },
+      scales: {
+        y: { beginAtZero: true, stacked: false, ticks: { stepSize: 1 }, grid: { color: '#1e293b' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('chartPolls').parentElement.innerHTML +=
+    '<p class="empty" style="text-align:center; margin-top:2rem;">Noch keine Umfragen.</p>';
+  document.getElementById('chartPolls').style.display = 'none';
+}
+</script>
 {% endblock %}

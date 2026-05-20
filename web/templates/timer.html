@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Timer · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>⏱️ Timer & Erinnerungen</h1>
+      <p class="subtitle">{{ guild.guild_name }}</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <button id="btnSound" class="btn btn-secondary" title="Sound an/aus">🔔 Sound an</button>
+    </div>
+  </div>
+
+  <!-- ── Farmlist-Timer ── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+      <h2 style="margin:0;">🌾 Farmlist-Timer</h2>
+      <span class="badge badge-warn" id="farmBadge" style="font-size:0.85rem; display:none;">⏳ läuft</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:0.75rem; align-items:end; flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;">
+        <label>Interval (Minuten)</label>
+        <input type="number" id="farmInterval" min="1" max="480" value="20"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Warnung vorher (Sekunden)</label>
+        <input type="number" id="farmWarn" min="0" max="300" value="30"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div style="display:flex; gap:0.5rem;">
+        <button id="btnFarmStart" class="btn btn-primary">▶ Start</button>
+        <button id="btnFarmStop" class="btn btn-secondary" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <!-- Countdown Display -->
+    <div id="farmDisplay" style="display:none; margin-top:1.25rem; text-align:center;">
+      <div id="farmCountdown" style="font-size:3.5rem; font-weight:800; font-family:monospace; color:var(--text); line-height:1;">00:00</div>
+      <div style="color:var(--text-muted); font-size:0.85rem; margin-top:0.25rem;">bis zur nächsten Farmliste</div>
+      <!-- Progress bar -->
+      <div style="background:var(--border); border-radius:4px; height:6px; margin-top:0.75rem; overflow:hidden;">
+        <div id="farmProgress" style="height:100%; background:#3b82f6; border-radius:4px; transition:width 1s linear; width:100%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Custom Timers ── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">⏰ Erinnerungen</h2>
+    <p class="hint">Füge individuelle Timer hinzu — z.B. "Truppen wegschicken", "Gebäude fertig", "Angriff in 10 min".</p>
+
+    <form id="addTimerForm" style="display:grid; grid-template-columns:2fr 1fr auto; gap:0.75rem; align-items:end; margin-bottom:1.25rem;">
+      <div class="form-group" style="margin:0;">
+        <label>Bezeichnung</label>
+        <input type="text" id="timerLabel" placeholder="z.B. Truppen wegschicken" maxlength="60"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Dauer</label>
+        <div style="display:flex; gap:0.4rem;">
+          <input type="number" id="timerH" placeholder="Std" min="0" max="23" value="0"
+            style="flex:1; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+          <input type="number" id="timerM" placeholder="Min" min="0" max="59" value="5"
+            style="flex:1; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+          <input type="number" id="timerS" placeholder="Sek" min="0" max="59" value="0"
+            style="flex:1; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">+ Hinzufügen</button>
+    </form>
+
+    <div id="timerList" style="display:flex; flex-direction:column; gap:0.6rem;">
+      <p class="empty" id="timerEmpty">Noch keine Timer. Füge oben einen hinzu.</p>
+    </div>
+  </div>
+
+  <!-- ── Sound Test ── -->
+  <div class="card">
+    <h2 style="margin-top:0;">🎵 Sound-Test</h2>
+    <p class="hint">Teste die akustischen Signale, die beim Ablauf eines Timers abgespielt werden.</p>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="playBeep('warn')">⚠️ Warnton</button>
+      <button class="btn btn-secondary" onclick="playBeep('alert')">🔔 Alert</button>
+      <button class="btn btn-secondary" onclick="playBeep('done')">✅ Fertig</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Audio Engine ──────────────────────────────────────────────────────────────
+let audioCtx = null;
+let soundEnabled = true;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, duration, type = 'sine', vol = 0.4) {
+  if (!soundEnabled) return;
+  const ctx  = getAudioCtx();
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ctx.currentTime);
+  gain.gain.setValueAtTime(vol, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+}
+
+function playBeep(type) {
+  if (type === 'warn') {
+    // Two short beeps
+    playTone(880, 0.15, 'square', 0.3);
+    setTimeout(() => playTone(880, 0.15, 'square', 0.3), 200);
+  } else if (type === 'alert') {
+    // Rising alert
+    playTone(440, 0.2, 'sine', 0.35);
+    setTimeout(() => playTone(660, 0.2, 'sine', 0.35), 220);
+    setTimeout(() => playTone(880, 0.35, 'sine', 0.4), 440);
+  } else if (type === 'done') {
+    // Success chord
+    playTone(523, 0.15, 'sine', 0.3);
+    setTimeout(() => playTone(659, 0.15, 'sine', 0.3), 120);
+    setTimeout(() => playTone(784, 0.4,  'sine', 0.4), 240);
+  }
+}
+
+// Sound toggle
+const btnSound = document.getElementById('btnSound');
+btnSound.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  btnSound.textContent = soundEnabled ? '🔔 Sound an' : '🔕 Sound aus';
+  btnSound.classList.toggle('btn-secondary', true);
+});
+
+// ── Farmlist Timer ────────────────────────────────────────────────────────────
+let farmTimer   = null;
+let farmEnds    = null;
+let farmTotal   = 0;
+let warnFired   = false;
+
+const farmDisplay    = document.getElementById('farmDisplay');
+const farmCountdown  = document.getElementById('farmCountdown');
+const farmProgress   = document.getElementById('farmProgress');
+const farmBadge      = document.getElementById('farmBadge');
+const btnFarmStart   = document.getElementById('btnFarmStart');
+const btnFarmStop    = document.getElementById('btnFarmStop');
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function farmTick() {
+  const now  = Date.now();
+  const left = Math.max(0, farmEnds - now);
+  const secs = Math.ceil(left / 1000);
+  const m    = Math.floor(secs / 60);
+  const s    = secs % 60;
+  farmCountdown.textContent = `${pad(m)}:${pad(s)}`;
+
+  const pct = (left / farmTotal) * 100;
+  farmProgress.style.width = pct + '%';
+  farmProgress.style.background = pct < 15 ? '#e05555' : pct < 30 ? '#c89b00' : '#3b82f6';
+
+  const warnSecs = parseInt(document.getElementById('farmWarn').value) || 30;
+  if (!warnFired && secs <= warnSecs && secs > 0) {
+    warnFired = true;
+    farmCountdown.style.color = '#c89b00';
+    playBeep('warn');
+    showNotification('🌾 Farmlist bald!', `Noch ${secs} Sekunden bis zur nächsten Farmliste.`);
+  }
+
+  if (left <= 0) {
+    playBeep('alert');
+    showNotification('🌾 Farmlist jetzt!', 'Zeit, die Farmliste zu schicken!');
+    farmCountdown.textContent = '00:00';
+    farmCountdown.style.color = '#e05555';
+    // Auto-restart
+    setTimeout(() => {
+      if (farmTimer) startFarm();
+    }, 1500);
+  }
+}
+
+function startFarm() {
+  const mins  = parseInt(document.getElementById('farmInterval').value) || 20;
+  farmTotal   = mins * 60 * 1000;
+  farmEnds    = Date.now() + farmTotal;
+  warnFired   = false;
+  farmCountdown.style.color = 'var(--text)';
+  farmDisplay.style.display = 'block';
+  farmBadge.style.display   = 'inline';
+  btnFarmStart.disabled = true;
+  btnFarmStop.disabled  = false;
+  if (farmTimer) clearInterval(farmTimer);
+  farmTick();
+  farmTimer = setInterval(farmTick, 500);
+}
+
+btnFarmStart.addEventListener('click', () => {
+  getAudioCtx(); // unlock audio on user gesture
+  startFarm();
+});
+btnFarmStop.addEventListener('click', () => {
+  clearInterval(farmTimer);
+  farmTimer = null;
+  farmDisplay.style.display = 'none';
+  farmBadge.style.display   = 'none';
+  btnFarmStart.disabled = false;
+  btnFarmStop.disabled  = true;
+});
+
+// ── Custom Timers ─────────────────────────────────────────────────────────────
+let customTimers = [];
+
+function renderTimers() {
+  const list  = document.getElementById('timerList');
+  const empty = document.getElementById('timerEmpty');
+  // Remove old timer cards
+  list.querySelectorAll('.timer-card').forEach(el => el.remove());
+
+  if (customTimers.length === 0) {
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  for (const t of customTimers) {
+    const card = document.createElement('div');
+    card.className = 'timer-card';
+    card.dataset.id = t.id;
+    card.style.cssText = 'display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.9rem; background:var(--bg); border:1px solid var(--border); border-radius:8px;';
+
+    card.innerHTML = `
+      <div style="font-size:1.4rem;">${t.done ? '✅' : t.warn ? '⚠️' : '⏳'}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(t.label)}</div>
+        <div class="timer-display" style="font-family:monospace; font-size:1.1rem; color:${t.done ? '#4caf82' : t.warn ? '#c89b00' : 'var(--text)'};">
+          ${formatLeft(t)}
+        </div>
+      </div>
+      <div style="background:var(--border); border-radius:4px; height:5px; width:100px; overflow:hidden; flex-shrink:0;">
+        <div style="height:100%; background:${t.done ? '#4caf82' : '#3b82f6'}; width:${timerPct(t)}%; transition:width 1s linear;"></div>
+      </div>
+      <button onclick="removeTimer('${t.id}')" class="btn-action btn-action-err" style="flex-shrink:0;">✕</button>
+    `;
+    list.appendChild(card);
+  }
+}
+
+function formatLeft(t) {
+  if (t.done) return 'Fertig!';
+  const left = Math.max(0, t.ends - Date.now());
+  const s = Math.ceil(left / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+}
+
+function timerPct(t) {
+  if (t.done) return 100;
+  const left = Math.max(0, t.ends - Date.now());
+  return Math.max(0, Math.min(100, (left / t.total) * 100));
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function removeTimer(id) {
+  customTimers = customTimers.filter(t => t.id !== id);
+  renderTimers();
+}
+
+document.getElementById('addTimerForm').addEventListener('submit', e => {
+  e.preventDefault();
+  getAudioCtx();
+  const label = document.getElementById('timerLabel').value.trim() || 'Timer';
+  const h = parseInt(document.getElementById('timerH').value) || 0;
+  const m = parseInt(document.getElementById('timerM').value) || 0;
+  const s = parseInt(document.getElementById('timerS').value) || 0;
+  const totalMs = (h * 3600 + m * 60 + s) * 1000;
+  if (totalMs <= 0) return;
+
+  const timer = {
+    id:    Math.random().toString(36).slice(2),
+    label,
+    total: totalMs,
+    ends:  Date.now() + totalMs,
+    done:  false,
+    warn:  false,
+  };
+  customTimers.push(timer);
+  document.getElementById('timerLabel').value = '';
+  renderTimers();
+});
+
+// Global tick for custom timers
+setInterval(() => {
+  let changed = false;
+  for (const t of customTimers) {
+    if (t.done) continue;
+    const left = t.ends - Date.now();
+    if (!t.warn && left <= 30000 && left > 0) {
+      t.warn = true;
+      playBeep('warn');
+      showNotification(`⚠️ ${t.label}`, 'Noch 30 Sekunden!');
+      changed = true;
+    }
+    if (left <= 0 && !t.done) {
+      t.done = true;
+      playBeep('done');
+      showNotification(`✅ ${t.label}`, 'Zeit abgelaufen!');
+      changed = true;
+    }
+  }
+  if (customTimers.length > 0) renderTimers();
+}, 500);
+
+// ── Browser Notifications ─────────────────────────────────────────────────────
+let notifPermission = 'default';
+if ('Notification' in window) {
+  Notification.requestPermission().then(p => { notifPermission = p; });
+}
+
+function showNotification(title, body) {
+  if (notifPermission === 'granted') {
+    new Notification(title, { body, icon: '/static/favicon.ico' });
+  }
+}
+</script>
+{% endblock %}
