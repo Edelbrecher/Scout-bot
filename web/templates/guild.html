@@ -211,18 +211,23 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
     const form = new FormData();
     form.append('field', field);
     try {
-      const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {method:'POST', body: form});
+      const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `field=${encodeURIComponent(field)}`
+      });
+      const text = await res.text();
+      console.log('Toggle response:', res.status, text);
       if (res.ok) {
-        const data = await res.json();
+        const data = JSON.parse(text);
         const active = data.added;
         btn.innerHTML = active ? '✅' : '○';
         btn.classList.toggle('active', active);
-        btn.dataset.active = active ? '1' : '0';
         btn.title = active
           ? (field === 'allowed_role_ids' ? 'Remove from Scout' : 'Remove from Res-Answer')
           : (field === 'allowed_role_ids' ? 'Add to Scout' : 'Add to Res-Answer');
       } else {
-        console.error('Toggle failed:', res.status);
+        console.error('Toggle failed:', res.status, text);
       }
     } catch(e) {
       console.error('Toggle error:', e);
