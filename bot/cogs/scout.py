@@ -174,6 +174,7 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
         # Build channel permissions
         overwrites: dict = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, embed_links=True, attach_files=True, manage_channels=True),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True),
         }
         for role_id_str in (config.get("allowed_role_ids") or "").split(","):
