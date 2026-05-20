@@ -890,6 +890,16 @@ async def get_latest_snapshot_time(guild_id: str) -> str | None:
             return row[0] if row else None
 
 
+async def prune_old_snapshots(guild_id: str, keep_days: int = 30):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            DELETE FROM map_snapshots
+            WHERE guild_id = ?
+              AND fetched_at < datetime('now', ? || ' days')
+        """, (guild_id, f"-{keep_days}"))
+        await db.commit()
+
+
 async def get_snapshot_count(guild_id: str) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(

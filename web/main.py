@@ -237,8 +237,10 @@ async def lifespan(app: FastAPI):
     await database.init_db()
 
     async def _snapshot_loop():
+        import datetime as _datetime
+        # Initial fetch on startup (after short delay to let app boot)
+        await asyncio.sleep(30)
         while True:
-            await asyncio.sleep(6 * 3600)
             guilds = await database.get_all_guilds()
             for g in guilds:
                 tw_world = (g.get("tw_world") or "").strip()
@@ -247,13 +249,15 @@ async def lifespan(app: FastAPI):
                 try:
                     latest = await database.get_latest_snapshot_time(g["guild_id"])
                     if latest:
-                        from datetime import datetime as _dt
-                        age_h = (_dt.utcnow() - _dt.fromisoformat(latest)).total_seconds() / 3600
+                        age_h = (_datetime.datetime.utcnow() - _datetime.datetime.fromisoformat(latest)).total_seconds() / 3600
                         if age_h < 6:
                             continue
                     await _fetch_and_save_snapshot(g["guild_id"], tw_world)
+                    # Keep only last 30 days of snapshots
+                    await database.prune_old_snapshots(g["guild_id"], keep_days=30)
                 except Exception:
-                    pass  # Don't crash the loop for one guild
+                    pass
+            await asyncio.sleep(6 * 3600)
 
     asyncio.create_task(_snapshot_loop())
     yield
