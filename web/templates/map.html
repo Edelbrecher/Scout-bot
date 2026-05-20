@@ -260,8 +260,19 @@ function draw() {
   const hasFilter = highlighted.size > 0;
   const tS = Math.max(1,scale);
 
+  // Label collision detection: track occupied screen regions
+  const labelRects = [];
+  function canPlaceLabel(lx, ly, w, h) {
+    for (const r of labelRects) {
+      if (lx < r[0]+r[2] && lx+w > r[0] && ly < r[1]+r[3] && ly+h > r[1]) return false;
+    }
+    labelRects.push([lx, ly, w, h]);
+    return true;
+  }
+
   ctx.save();
 
+  // Two passes: first draw all tiles, then draw labels on top
   for (const v of villages) {
     if (v.x<vx0||v.x>vx1||v.y<vy1||v.y>vy0) continue;
     const [cx,cy] = worldToCanvas(v.x,v.y);
@@ -294,34 +305,54 @@ function draw() {
         ctx.strokeRect(cx-r/2,cy-r/2,r,r);
       }
     }
-
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+  }
 
-    // Labels only when tiles are large enough to read (≥20px per tile)
-    if (scale >= 20 && !dim) {
-      const fontSize = Math.max(9, Math.min(13, scale * 0.6));
-      const lx = cx + tS * 0.55;
-      let ly = cy + fontSize * 0.4;
+  // Label pass — only when zoomed in enough, with collision detection
+  if (scale >= 8) {
+    const fontSize = Math.max(9, Math.min(13, scale * 0.55));
+    ctx.textBaseline = 'top';
+    for (const v of villages) {
+      if (v.x<vx0||v.x>vx1||v.y<vy1||v.y>vy0) continue;
+      const key = `${v.x}|${v.y}`;
+      const isHL  = highlighted.has(key);
+      const dim   = hasFilter && !isHL && !scoutMap.has(key);
+      if (dim) continue;
+
+      const [cx,cy] = worldToCanvas(v.x,v.y);
+      const lx = cx + Math.max(3, tS*0.55);
+      const ly = cy - fontSize * 0.5;
+
+      // Build label lines
+      const lines = [];
+      if (v.name)                    lines.push({text: v.name,              color:'rgba(255,255,255,0.93)', bold:true});
+      if (v.player && scale>=10)     lines.push({text: v.player,            color:'rgba(160,225,160,0.9)', bold:false});
+      if (v.alliance && scale>=13)   lines.push({text:`[${v.alliance}]`,    color:'rgba(160,195,255,0.85)', bold:false});
+      if (v.pop && scale>=20)        lines.push({text:`${v.pop.toLocaleString()}`, color:'rgba(210,210,100,0.8)', bold:false});
+
+      if (!lines.length) continue;
+
+      // Measure total bounding box
       ctx.font = `bold ${fontSize}px sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.93)';
-      if (v.name) { ctx.fillText(v.name, lx, ly); ly += fontSize + 1; }
-      if (v.player) {
-        ctx.font = `${fontSize-1}px sans-serif`;
-        ctx.fillStyle = 'rgba(160,225,160,0.88)';
-        ctx.fillText(v.player, lx, ly); ly += fontSize;
-      }
-      if (v.alliance) {
-        ctx.font = `${fontSize-1}px sans-serif`;
-        ctx.fillStyle = 'rgba(160,195,255,0.82)';
-        ctx.fillText(`[${v.alliance}]`, lx, ly); ly += fontSize;
-      }
-      if (v.pop && scale >= 30) {
-        ctx.font = `${fontSize-1}px monospace`;
-        ctx.fillStyle = 'rgba(210,210,100,0.75)';
-        ctx.fillText(`${v.pop.toLocaleString()}`, lx, ly);
+      const maxW = Math.max(...lines.map(l => ctx.measureText(l.text).width));
+      const totalH = lines.length * (fontSize + 1);
+
+      if (!canPlaceLabel(lx, ly, maxW + 4, totalH + 2)) continue;
+
+      // Draw background for readability
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(lx-1, ly-1, maxW+5, totalH+2);
+
+      let ty = ly;
+      for (const line of lines) {
+        ctx.font = `${line.bold?'bold ':''} ${fontSize}px sans-serif`;
+        ctx.fillStyle = line.color;
+        ctx.fillText(line.text, lx, ty);
+        ty += fontSize + 1;
       }
     }
+    ctx.textBaseline = 'alphabetic';
   }
 
   ctx.restore();
