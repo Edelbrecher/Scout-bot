@@ -232,18 +232,25 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(ax,ay-8); ctx.lineTo(ax,ay+8); ctx.stroke();
   }
 
-  // Grid labels
-  if (scale >= 5) {
+  // Coordinate axis labels — X values along top edge, Y values along left edge
+  if (scale >= 3) {
     const lStep = scale >= 14 ? 10 : scale >= 5 ? 50 : 100;
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = `${Math.max(8,Math.min(11,scale*2.5))}px monospace`;
+    const fSize = Math.max(8, Math.min(11, scale * 2));
+    ctx.font      = `${fSize}px monospace`;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     const [wx0]=canvasToWorld(0,0),[wx1]=canvasToWorld(W,0);
     const [,wy0]=canvasToWorld(0,H),[,wy1]=canvasToWorld(0,0);
+    // X labels along top
     for (let gx=Math.ceil(wx0/lStep)*lStep; gx<=wx1; gx+=lStep) {
-      for (let gy=Math.ceil(wy0/lStep)*lStep; gy<=wy1; gy+=lStep) {
-        const [cx,cy]=worldToCanvas(gx,gy);
-        ctx.fillText(`${gx}|${gy}`,cx+2,cy-2);
-      }
+      if (gx===0) continue;
+      const [cx]=worldToCanvas(gx,0);
+      ctx.fillText(`${gx}`, cx+2, fSize+2);
+    }
+    // Y labels along left
+    for (let gy=Math.ceil(wy0/lStep)*lStep; gy<=wy1; gy+=lStep) {
+      if (gy===0) continue;
+      const [,cy]=worldToCanvas(0,gy);
+      ctx.fillText(`${gy}`, 2, cy-2);
     }
   }
 
@@ -291,31 +298,26 @@ function draw() {
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
 
-    // Labels: village name + player + alliance
-    if (scale >= 4 && !dim) {
-      const fontSize = Math.max(8, Math.min(12, scale * 0.9));
-      const lx = cx + Math.max(3, tS * 0.55);
-      let ly = cy + fontSize * 0.35;
-      if (v.name) {
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.fillText(v.name, lx, ly);
-        ly += fontSize + 1;
+    // Labels only when tiles are large enough to read (≥20px per tile)
+    if (scale >= 20 && !dim) {
+      const fontSize = Math.max(9, Math.min(13, scale * 0.6));
+      const lx = cx + tS * 0.55;
+      let ly = cy + fontSize * 0.4;
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.93)';
+      if (v.name) { ctx.fillText(v.name, lx, ly); ly += fontSize + 1; }
+      if (v.player) {
+        ctx.font = `${fontSize-1}px sans-serif`;
+        ctx.fillStyle = 'rgba(160,225,160,0.88)';
+        ctx.fillText(v.player, lx, ly); ly += fontSize;
       }
-      if (v.player && scale >= 6) {
-        ctx.font = `${fontSize - 1}px sans-serif`;
-        ctx.fillStyle = 'rgba(160,220,160,0.88)';
-        ctx.fillText(v.player, lx, ly);
-        ly += fontSize;
+      if (v.alliance) {
+        ctx.font = `${fontSize-1}px sans-serif`;
+        ctx.fillStyle = 'rgba(160,195,255,0.82)';
+        ctx.fillText(`[${v.alliance}]`, lx, ly); ly += fontSize;
       }
-      if (v.alliance && scale >= 8) {
-        ctx.font = `${fontSize - 1}px sans-serif`;
-        ctx.fillStyle = 'rgba(160,190,255,0.82)';
-        ctx.fillText(`[${v.alliance}]`, lx, ly);
-        ly += fontSize;
-      }
-      if (v.pop && scale >= 12) {
-        ctx.font = `${fontSize - 1}px monospace`;
+      if (v.pop && scale >= 30) {
+        ctx.font = `${fontSize-1}px monospace`;
         ctx.fillStyle = 'rgba(210,210,100,0.75)';
         ctx.fillText(`${v.pop.toLocaleString()}`, lx, ly);
       }
