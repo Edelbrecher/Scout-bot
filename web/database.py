@@ -397,6 +397,14 @@ async def get_res_request_by_id_web(request_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def get_scout_channel_info(channel_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM scout_channels WHERE channel_id = ?", (channel_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
 async def delete_scout_channel(channel_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM scout_channels WHERE channel_id = ?", (channel_id,))

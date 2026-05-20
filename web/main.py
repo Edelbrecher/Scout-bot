@@ -1,6 +1,10 @@
 import os
 import asyncio
 import base64
+import re
+import secrets
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from urllib.parse import urlencode
 
@@ -12,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import database
 
@@ -29,6 +34,61 @@ DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost/
 PERM_ADMINISTRATOR = 0x8
 PERM_MANAGE_GUILD = 0x20
 
+# Discord snowflake: 17-20 digit numeric string
+SNOWFLAKE_RE = re.compile(r"^\d{17,20}$")
+
+def is_snowflake(value: str) -> bool:
+    return bool(SNOWFLAKE_RE.match(value.strip())) if value.strip() else True
+
+def sanitize_snowflake(value: str) -> str:
+    v = value.strip()
+    return v if SNOWFLAKE_RE.match(v) else ""
+
+def sanitize_snowflake_list(value: str) -> str:
+    parts = [p.strip() for p in value.split(",") if SNOWFLAKE_RE.match(p.strip())]
+    return ",".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter (in-memory, per IP)
+# ---------------------------------------------------------------------------
+
+_rate_store: dict[str, list[float]] = defaultdict(list)
+
+def _is_rate_limited(ip: str, limit: int = 10, window: int = 60) -> bool:
+    now = time.time()
+    hits = [t for t in _rate_store[ip] if now - t < window]
+    _rate_store[ip] = hits
+    if len(hits) >= limit:
+        return True
+    _rate_store[ip].append(now)
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Security headers middleware
+# ---------------------------------------------------------------------------
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: cdn.discordapp.com; "
+            "font-src 'self';"
+        )
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Client ID helper
+# ---------------------------------------------------------------------------
 
 def get_client_id() -> str:
     token = os.environ.get("DISCORD_TOKEN", "")
@@ -70,6 +130,23 @@ def can_access_guild(session: dict, guild_id: str) -> bool:
     return guild_id in session["guilds"]
 
 
+def _require_session(request: Request):
+    """Returns (session, error_response). error_response is set if auth fails."""
+    session = get_session(request)
+    if not session:
+        return None, RedirectResponse("/login", status_code=303)
+    return session, None
+
+
+def _require_guild(session: dict, guild_id: str):
+    """Returns error_response if guild access denied."""
+    if not SNOWFLAKE_RE.match(guild_id):
+        return RedirectResponse("/dashboard", status_code=303)
+    if not can_access_guild(session, guild_id):
+        return RedirectResponse("/dashboard", status_code=303)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -81,6 +158,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(SecurityHeadersMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -122,11 +200,22 @@ async def root(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = ""):
-    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+    # Generate OAuth state token and store in cookie
+    state = secrets.token_urlsafe(32)
+    response = templates.TemplateResponse("login.html", {"request": request, "error": error[:200]})
+    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax")
+    return response
 
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    ip = request.client.host if request.client else "unknown"
+    if _is_rate_limited(ip, limit=10, window=60):
+        return RedirectResponse("/login?error=Too+many+attempts.+Try+again+later.", status_code=303)
+    # Sanitize inputs
+    username = username.strip()[:64]
+    if not username or len(password) > 256:
+        return RedirectResponse("/login?error=Invalid+credentials", status_code=303)
     if await database.verify_password(username, password):
         token = create_session({"type": "admin", "uid": username, "username": username, "guilds": None})
         response = RedirectResponse("/dashboard", status_code=303)
@@ -136,28 +225,34 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
 
 @app.get("/auth/discord")
-async def auth_discord():
+async def auth_discord(request: Request):
     client_id = get_client_id()
     if not client_id or not DISCORD_CLIENT_SECRET:
         return RedirectResponse("/login?error=Discord+OAuth2+not+configured")
+    state = request.cookies.get("oauth_state", secrets.token_urlsafe(32))
     params = urlencode({
         "client_id": client_id,
         "redirect_uri": DISCORD_REDIRECT_URI,
         "response_type": "code",
         "scope": "identify guilds",
+        "state": state,
     })
     return RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
 
 
 @app.get("/auth/callback")
-async def auth_callback(request: Request, code: str = "", error: str = ""):
+async def auth_callback(request: Request, code: str = "", error: str = "", state: str = ""):
     if error or not code:
         return RedirectResponse("/login?error=Discord+authentication+cancelled")
+
+    # Validate OAuth state to prevent CSRF
+    expected_state = request.cookies.get("oauth_state", "")
+    if not expected_state or not secrets.compare_digest(expected_state, state):
+        return RedirectResponse("/login?error=Invalid+OAuth+state.+Please+try+again.")
 
     client_id = get_client_id()
 
     async with httpx.AsyncClient() as client:
-        # Exchange code for access token
         r = await client.post(
             "https://discord.com/api/oauth2/token",
             data={
@@ -170,26 +265,23 @@ async def auth_callback(request: Request, code: str = "", error: str = ""):
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         if r.status_code != 200:
-            import urllib.parse
-            detail = urllib.parse.quote(f"Token exchange failed: {r.status_code} {r.text[:200]}")
-            return RedirectResponse(f"/login?error={detail}")
+            return RedirectResponse("/login?error=Discord+authentication+failed.+Please+try+again.")
         access_token = r.json()["access_token"]
 
-        # Fetch Discord user
         user_r = await client.get(
             "https://discord.com/api/v10/users/@me",
             headers={"Authorization": f"Bearer {access_token}"},
         )
+        if user_r.status_code != 200:
+            return RedirectResponse("/login?error=Failed+to+fetch+user+info.")
         user = user_r.json()
 
-        # Fetch user's guilds
         guilds_r = await client.get(
             "https://discord.com/api/v10/users/@me/guilds",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         user_guilds = guilds_r.json() if guilds_r.status_code == 200 else []
 
-    # Intersect with guilds where the bot is present
     bot_guild_ids = {g["guild_id"] for g in await database.get_all_guilds()}
 
     accessible = [
@@ -217,6 +309,7 @@ async def auth_callback(request: Request, code: str = "", error: str = ""):
     token = create_session(session_data)
     response = RedirectResponse("/dashboard", status_code=303)
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    response.delete_cookie("oauth_state")
     return response
 
 
@@ -259,11 +352,10 @@ async def dashboard(request: Request):
 
 @app.get("/guild/{guild_id}", response_class=HTMLResponse)
 async def guild_page(request: Request, guild_id: str, saved: str = ""):
-    session = get_session(request)
-    if not session:
-        return RedirectResponse("/login")
-    if not can_access_guild(session, guild_id):
-        return RedirectResponse("/dashboard")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -294,32 +386,39 @@ async def guild_save(
     allowed_role_ids: str = Form(""),
     scout_channel_id: str = Form(""),
 ):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
-    normalized_roles = ",".join(r.strip() for r in allowed_role_ids.split(",") if r.strip())
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    category_id = sanitize_snowflake(category_id)
+    archive_channel_id = sanitize_snowflake(archive_channel_id)
+    scout_channel_id = sanitize_snowflake(scout_channel_id)
+    normalized_roles = sanitize_snowflake_list(allowed_role_ids)
+
     await database.update_guild_config(
         guild_id=guild_id,
-        category_id=category_id.strip(),
-        archive_channel_id=archive_channel_id.strip(),
+        category_id=category_id,
+        archive_channel_id=archive_channel_id,
         allowed_role_ids=normalized_roles,
-        scout_channel_id=scout_channel_id.strip(),
+        scout_channel_id=scout_channel_id,
     )
-    # Sync archive channel permissions whenever config is saved
-    if archive_channel_id.strip():
-        await _sync_archive_permissions(guild_id, archive_channel_id.strip(), normalized_roles)
+    if archive_channel_id:
+        await _sync_archive_permissions(guild_id, archive_channel_id, normalized_roles)
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/roles/{role_id}/toggle")
 async def toggle_role(request: Request, guild_id: str, role_id: str, field: str = Form(...)):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     if field not in {"allowed_role_ids", "res_manager_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
+    if not SNOWFLAKE_RE.match(role_id):
+        return JSONResponse({"error": "invalid role_id"}, status_code=400)
     added = await database.toggle_role_in_field(guild_id, role_id, field)
-    # Sync archive channel permissions when scout roles change
     if field == "allowed_role_ids":
         guild = await database.get_guild(guild_id)
         if guild and guild.get("archive_channel_id"):
@@ -329,27 +428,30 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
 
 @app.post("/guild/{guild_id}/reset-scout")
 async def reset_scout(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     await database.reset_scout_config(guild_id)
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/reset")
 async def reset_res_push(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     await database.reset_res_config(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/auto-setup")
 async def auto_setup(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
 
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -392,9 +494,10 @@ async def auto_setup(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/stats", response_class=HTMLResponse)
 async def guild_stats(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -412,9 +515,10 @@ async def guild_stats(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/post-button")
 async def post_button(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
 
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("scout_channel_id"):
@@ -442,9 +546,10 @@ async def post_button(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/res-push", response_class=HTMLResponse)
 async def res_push_page(request: Request, guild_id: str, saved: str = ""):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -467,19 +572,27 @@ async def res_push_save(
     res_push_category_id: str = Form(""),
     res_manager_role_ids: str = Form(""),
 ):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
-    normalized = ",".join(r.strip() for r in res_manager_role_ids.split(",") if r.strip())
-    await database.update_res_config(guild_id=guild_id, res_request_channel_id=res_request_channel_id.strip(), res_answer_channel_id=res_answer_channel_id.strip(), res_push_category_id=res_push_category_id.strip(), res_manager_role_ids=normalized)
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    await database.update_res_config(
+        guild_id=guild_id,
+        res_request_channel_id=sanitize_snowflake(res_request_channel_id),
+        res_answer_channel_id=sanitize_snowflake(res_answer_channel_id),
+        res_push_category_id=sanitize_snowflake(res_push_category_id),
+        res_manager_role_ids=sanitize_snowflake_list(res_manager_role_ids),
+    )
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/post-button")
 async def res_post_button(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("res_request_channel_id"):
         return RedirectResponse(f"/guild/{guild_id}/res-push?error=no_channel", status_code=303)
@@ -502,9 +615,10 @@ async def res_post_button(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/res-push/auto-setup")
 async def res_auto_setup(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -544,9 +658,10 @@ async def res_auto_setup(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/res-push/stats", response_class=HTMLResponse)
 async def res_push_stats(request: Request, guild_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -556,18 +671,27 @@ async def res_push_stats(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/inactive")
 async def res_request_inactive(request: Request, guild_id: str, request_id: int):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    # Verify the request belongs to this guild
+    req = await database.get_res_request_by_id_web(request_id)
+    if not req or req.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "inactive")
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/activate")
 async def res_request_activate(request: Request, guild_id: str, request_id: int):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    req = await database.get_res_request_by_id_web(request_id)
+    if not req or req.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "accepted")
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
@@ -581,11 +705,17 @@ async def _close_scout_channel_after_delay(channel_id: str, token: str, delay: i
 
 @app.post("/guild/{guild_id}/scout-channels/{channel_id}/close")
 async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if not SNOWFLAKE_RE.match(channel_id):
+        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+    # Verify the channel belongs to this guild
+    ch = await database.get_scout_channel_info(channel_id)
+    if not ch or ch.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
     token = os.environ.get("DISCORD_TOKEN", "")
-    # Post closing message in the channel
     async with httpx.AsyncClient() as client:
         await client.post(
             f"https://discord.com/api/v10/channels/{channel_id}/messages",
@@ -598,11 +728,14 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")
 async def res_request_remove(request: Request, guild_id: str, request_id: int):
-    session = get_session(request)
-    if not session or not can_access_guild(session, guild_id):
-        return RedirectResponse("/login")
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     req = await database.get_res_request_by_id_web(request_id)
-    if req and req.get("push_channel_id"):
+    if not req or req.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
+    if req.get("push_channel_id"):
         bot_token = os.environ.get("DISCORD_TOKEN", "")
         async with httpx.AsyncClient() as client:
             await client.delete(f"https://discord.com/api/v10/channels/{req['push_channel_id']}", headers={"Authorization": f"Bot {bot_token}"})
