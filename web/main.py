@@ -820,8 +820,9 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
         p["count_maybe"]       = sum(1 for r in responses if r["response"] == "maybe")
         p["count_unavailable"] = sum(1 for r in responses if r["response"] == "unavailable")
         p["responses"]         = responses
+    is_admin = session.get("type") == "admin"
     return templates.TemplateResponse("polls.html", {
-        "request": request, "guild": guild, "polls": polls, "saved": saved,
+        "request": request, "guild": guild, "polls": polls, "saved": saved, "is_admin": is_admin,
     })
 
 
@@ -951,6 +952,45 @@ async def polls_close(request: Request, guild_id: str, poll_id: int):
                     json={"embeds": [closed_embed], "components": []},
                 )
     return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/polls/{poll_id}/responses/edit")
+async def poll_response_edit(
+    request: Request, guild_id: str, poll_id: int,
+    user_id: str = Form(...), user_name: str = Form(...), response: str = Form(...),
+):
+    session, err = _require_session(request)
+    if err: return err
+    # Only admin session or guild owner can override closed poll responses
+    if session.get("type") != "admin":
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    err = _require_guild(session, guild_id)
+    if err: return err
+    poll = await database.get_poll(poll_id)
+    if not poll or poll.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    if response not in ("available", "maybe", "unavailable"):
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    await database.upsert_poll_response_admin(poll_id, user_id, user_name, response)
+    return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+
+
+@app.post("/guild/{guild_id}/polls/{poll_id}/responses/delete")
+async def poll_response_delete(
+    request: Request, guild_id: str, poll_id: int,
+    user_id: str = Form(...),
+):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    err = _require_guild(session, guild_id)
+    if err: return err
+    poll = await database.get_poll(poll_id)
+    if not poll or poll.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    await database.delete_poll_response(poll_id, user_id)
+    return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
 
 
 @app.post("/guild/{guild_id}/polls/{poll_id}/delete")

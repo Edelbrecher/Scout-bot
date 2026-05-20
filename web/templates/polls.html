@@ -188,41 +188,42 @@
       {% set maybe       = poll.responses | selectattr('response','eq','maybe')       | list %}
       {% set unavailable = poll.responses | selectattr('response','eq','unavailable') | list %}
 
-      {% if available %}
+      {% macro response_list(responses, color, label) %}
+      {% if responses %}
       <div>
-        <p style="font-weight:600; color:#4caf82; margin:0 0 0.4rem;">✅ Dabei</p>
-        {% for r in available %}
-        <div style="font-size:0.85rem; padding:0.2rem 0; border-bottom:1px solid var(--border);">
-          {{ r.user_name }}
-          <span style="color:var(--text-muted); font-size:0.75rem; float:right;">{{ r.responded_at[:16] }}</span>
+        <p style="font-weight:600; color:{{ color }}; margin:0 0 0.4rem;">{{ label }}</p>
+        {% for r in responses %}
+        <div style="font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:0.4rem;">
+          <span style="flex:1;">{{ r.user_name }}</span>
+          <span style="color:var(--text-muted); font-size:0.75rem;">{{ r.responded_at[:16] }}</span>
+          {% if is_admin %}
+          <!-- Admin: change response -->
+          <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/responses/edit" style="display:inline; margin:0;">
+            <input type="hidden" name="user_id"   value="{{ r.user_id }}">
+            <input type="hidden" name="user_name" value="{{ r.user_name }}">
+            <select name="response" onchange="this.form.submit()"
+              style="font-size:0.72rem; padding:1px 3px; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:4px; cursor:pointer;">
+              <option value="available"   {% if r.response == 'available'   %}selected{% endif %}>✅ Dabei</option>
+              <option value="maybe"       {% if r.response == 'maybe'       %}selected{% endif %}>⏰ Vielleicht</option>
+              <option value="unavailable" {% if r.response == 'unavailable' %}selected{% endif %}>❌ Nicht dabei</option>
+            </select>
+          </form>
+          <!-- Admin: remove response -->
+          <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/responses/delete"
+                style="display:inline; margin:0;" onsubmit="return confirm('Antwort von {{ r.user_name }} entfernen?')">
+            <input type="hidden" name="user_id" value="{{ r.user_id }}">
+            <button type="submit" style="background:none; border:none; cursor:pointer; color:#e05555; font-size:0.8rem; padding:0 2px;" title="Entfernen">✕</button>
+          </form>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
       {% endif %}
+      {% endmacro %}
 
-      {% if maybe %}
-      <div>
-        <p style="font-weight:600; color:#c89b00; margin:0 0 0.4rem;">⏰ Vielleicht</p>
-        {% for r in maybe %}
-        <div style="font-size:0.85rem; padding:0.2rem 0; border-bottom:1px solid var(--border);">
-          {{ r.user_name }}
-          <span style="color:var(--text-muted); font-size:0.75rem; float:right;">{{ r.responded_at[:16] }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      {% if unavailable %}
-      <div>
-        <p style="font-weight:600; color:#e05555; margin:0 0 0.4rem;">❌ Nicht dabei</p>
-        {% for r in unavailable %}
-        <div style="font-size:0.85rem; padding:0.2rem 0; border-bottom:1px solid var(--border);">
-          {{ r.user_name }}
-          <span style="color:var(--text-muted); font-size:0.75rem; float:right;">{{ r.responded_at[:16] }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
+      {{ response_list(available,   '#4caf82', '✅ Dabei') }}
+      {{ response_list(maybe,       '#c89b00', '⏰ Vielleicht') }}
+      {{ response_list(unavailable, '#e05555', '❌ Nicht dabei') }}
     </div>
     {% else %}
     <p class="empty" style="margin-top:0.5rem;">Noch keine Antworten.</p>

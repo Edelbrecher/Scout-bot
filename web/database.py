@@ -526,6 +526,28 @@ async def delete_res_request(request_id: int):
         await db.commit()
 
 
+async def upsert_poll_response_admin(poll_id: int, user_id: str, user_name: str, response: str):
+    """Admin override — works on open and closed polls."""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO poll_responses (poll_id, user_id, user_name, response, responded_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(poll_id, user_id) DO UPDATE SET
+                response=excluded.response, user_name=excluded.user_name, responded_at=excluded.responded_at
+        """, (poll_id, user_id, user_name, response, datetime.utcnow().isoformat()))
+        await db.commit()
+
+
+async def delete_poll_response(poll_id: int, user_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM poll_responses WHERE poll_id = ? AND user_id = ?",
+            (poll_id, user_id),
+        )
+        await db.commit()
+
+
 async def get_res_request_by_id_web(request_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
