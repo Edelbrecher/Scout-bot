@@ -102,13 +102,26 @@ async def update_guild_config(
     category_id: str,
     archive_channel_id: str,
     allowed_role_ids: str,
+    scout_channel_id: str = "",
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             UPDATE guild_configs
-            SET category_id = ?, archive_channel_id = ?, allowed_role_ids = ?
+            SET category_id = ?, archive_channel_id = ?, allowed_role_ids = ?,
+                scout_channel_id = COALESCE(NULLIF(?, ''), scout_channel_id)
             WHERE guild_id = ?
-        """, (category_id or None, archive_channel_id or None, allowed_role_ids or None, guild_id))
+        """, (category_id or None, archive_channel_id or None, allowed_role_ids or None,
+              scout_channel_id, guild_id))
+        await db.commit()
+
+
+async def update_button_message(guild_id: str, scout_channel_id: str, button_message_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE guild_configs
+            SET scout_channel_id = ?, button_message_id = ?
+            WHERE guild_id = ?
+        """, (scout_channel_id, button_message_id, guild_id))
         await db.commit()
 
 

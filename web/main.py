@@ -2,6 +2,8 @@ import os
 import base64
 from contextlib import asynccontextmanager
 
+import httpx
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -133,15 +135,60 @@ async def guild_save(
     category_id: str = Form(""),
     archive_channel_id: str = Form(""),
     allowed_role_ids: str = Form(""),
+    scout_channel_id: str = Form(""),
 ):
     if not get_session_user(request):
         return RedirectResponse("/login")
-    # Normalize role IDs: strip whitespace around each comma-separated value
     normalized_roles = ",".join(r.strip() for r in allowed_role_ids.split(",") if r.strip())
     await database.update_guild_config(
         guild_id=guild_id,
         category_id=category_id.strip(),
         archive_channel_id=archive_channel_id.strip(),
         allowed_role_ids=normalized_roles,
+        scout_channel_id=scout_channel_id.strip(),
     )
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/post-button")
+async def post_button(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("scout_channel_id"):
+        return RedirectResponse(f"/guild/{guild_id}?error=no_channel", status_code=303)
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    channel_id = guild["scout_channel_id"]
+
+    payload = {
+        "embeds": [{
+            "title": "📡 Scout Request",
+            "description": "Click the button below to submit a scout request.\nFill in the coordinates, player, village and time.",
+            "color": 5793266,
+        }],
+        "components": [{
+            "type": 1,
+            "components": [{
+                "type": 2, "style": 1,
+                "label": "Scout Request",
+                "emoji": {"name": "🔍"},
+                "custom_id": "persistent:scout_request",
+            }]
+        }]
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json=payload,
+        )
+
+    if resp.status_code == 200:
+        msg_id = resp.json().get("id", "")
+        await database.update_button_message(guild_id, channel_id, msg_id)
+        return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+    else:
+        return RedirectResponse(f"/guild/{guild_id}?error=discord_{resp.status_code}", status_code=303)

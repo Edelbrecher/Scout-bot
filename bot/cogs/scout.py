@@ -19,37 +19,78 @@ async def _delete_channel_after(channel: discord.TextChannel, delay: int = 120):
     except discord.NotFound:
         pass
     except Exception as e:
-        print(f"[archiver] Failed to delete channel {channel.id}: {e}")
+        print(f"[scout] Failed to delete channel {channel.id}: {e}")
 
 
-def _build_disabled_view(taken_by_label: str | None = None) -> discord.ui.View:
-    """Return a non-persistent view with all buttons disabled (final state)."""
+async def _do_close(interaction: discord.Interaction, label: str):
+    await interaction.message.edit(view=_all_disabled_view())
+    await interaction.response.send_message(
+        f"🔒 **{label}** by {interaction.user.mention}.\n"
+        "This channel will be **deleted in 2 minutes**."
+    )
+    asyncio.create_task(_delete_channel_after(interaction.channel, delay=120))
+
+
+def _all_disabled_view(taken_label: str = "Taken by") -> discord.ui.View:
+    """All buttons disabled — used as final state after cancel/close."""
     view = discord.ui.View(timeout=None)
-    view.add_item(discord.ui.Button(
-        label=taken_by_label or "Taken by",
-        style=discord.ButtonStyle.success,
-        disabled=True,
-    ))
-    view.add_item(discord.ui.Button(
-        label="Can't do this job",
-        style=discord.ButtonStyle.secondary,
-        disabled=True,
-    ))
-    view.add_item(discord.ui.Button(
-        label="Cancel",
-        style=discord.ButtonStyle.danger,
-        disabled=True,
-    ))
-    view.add_item(discord.ui.Button(
-        label="Close",
-        style=discord.ButtonStyle.secondary,
-        disabled=True,
-    ))
+    view.add_item(discord.ui.Button(label=taken_label, style=discord.ButtonStyle.success, disabled=True))
+    view.add_item(discord.ui.Button(label="Can't do this job", style=discord.ButtonStyle.secondary, disabled=True))
+    view.add_item(discord.ui.Button(label="Cancel", style=discord.ButtonStyle.danger, disabled=True))
+    view.add_item(discord.ui.Button(label="Close", style=discord.ButtonStyle.secondary, disabled=True))
     return view
 
 
 # ---------------------------------------------------------------------------
-# Action buttons — posted inside every new scout channel
+# View: job taken — "Can't do this job" still active to release
+# ---------------------------------------------------------------------------
+
+class ScoutTakenView(discord.ui.View):
+    """Shown after someone claims the job. Can still be released."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Taken by …",
+        style=discord.ButtonStyle.success,
+        disabled=True,
+        custom_id="persistent:scout_taken_label",
+    )
+    async def taken_label(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass  # disabled — never fires
+
+    @discord.ui.button(
+        label="Can't do this job",
+        style=discord.ButtonStyle.secondary,
+        custom_id="persistent:scout_release",
+    )
+    async def cant_do(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Release the job back to open."""
+        await interaction.message.edit(view=ScoutActionView())
+        await interaction.response.send_message(
+            f"↩️ {interaction.user.mention} can't do this job. The request is **open again**!"
+        )
+
+    @discord.ui.button(
+        label="Cancel",
+        style=discord.ButtonStyle.danger,
+        custom_id="persistent:scout_taken_cancel",
+    )
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await _do_close(interaction, "Scout request cancelled")
+
+    @discord.ui.button(
+        label="Close",
+        style=discord.ButtonStyle.secondary,
+        custom_id="persistent:scout_taken_close",
+    )
+    async def close_ch(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await _do_close(interaction, "Scout channel closed")
+
+
+# ---------------------------------------------------------------------------
+# View: initial action buttons
 # ---------------------------------------------------------------------------
 
 class ScoutActionView(discord.ui.View):
@@ -64,9 +105,9 @@ class ScoutActionView(discord.ui.View):
         custom_id="persistent:scout_taken",
     )
     async def taken_by(self, interaction: discord.Interaction, button: discord.ui.Button):
-        name = interaction.user.display_name
-        disabled = _build_disabled_view(taken_by_label=f"Taken by {name}")
-        await interaction.message.edit(view=disabled)
+        taken_view = ScoutTakenView()
+        taken_view.taken_label.label = f"Taken by {interaction.user.display_name}"
+        await interaction.message.edit(view=taken_view)
         await interaction.response.send_message(
             f"✋ **{interaction.user.mention}** has taken this scout job!"
         )
@@ -87,12 +128,7 @@ class ScoutActionView(discord.ui.View):
         custom_id="persistent:scout_cancel",
     )
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=_build_disabled_view())
-        await interaction.response.send_message(
-            f"🚫 Scout request **cancelled** by {interaction.user.mention}.\n"
-            "This channel will be automatically **deleted in 2 minutes**."
-        )
-        asyncio.create_task(_delete_channel_after(interaction.channel, delay=120))
+        await _do_close(interaction, "Scout request cancelled")
 
     @discord.ui.button(
         label="Close",
@@ -100,49 +136,21 @@ class ScoutActionView(discord.ui.View):
         custom_id="persistent:scout_close",
     )
     async def close_ch(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=_build_disabled_view())
-        await interaction.response.send_message(
-            f"🔒 Scout channel **closed** by {interaction.user.mention}.\n"
-            "This channel will be automatically **deleted in 2 minutes**."
-        )
-        asyncio.create_task(_delete_channel_after(interaction.channel, delay=120))
+        await _do_close(interaction, "Scout channel closed")
 
 
 # ---------------------------------------------------------------------------
-# Modal — submitted when user clicks "Scout Request"
+# Modal
 # ---------------------------------------------------------------------------
 
 class ScoutModal(discord.ui.Modal, title="Scout Request"):
-    coordinates = discord.ui.TextInput(
-        label="Coordinates",
-        placeholder="e.g. 500|500",
-        required=True,
-        max_length=50,
-    )
-    player = discord.ui.TextInput(
-        label="Player",
-        placeholder="Player name",
-        required=True,
-        max_length=100,
-    )
-    village = discord.ui.TextInput(
-        label="Village",
-        placeholder="Village name",
-        required=True,
-        max_length=100,
-    )
-    time = discord.ui.TextInput(
-        label="Time",
-        placeholder="e.g. 14:30 UTC",
-        required=True,
-        max_length=50,
-    )
+    coordinates = discord.ui.TextInput(label="Coordinates", placeholder="e.g. 500|500", required=True, max_length=50)
+    player = discord.ui.TextInput(label="Player", placeholder="Player name", required=True, max_length=100)
+    village = discord.ui.TextInput(label="Village", placeholder="Village name", required=True, max_length=100)
+    time = discord.ui.TextInput(label="Time", placeholder="e.g. 14:30 UTC", required=True, max_length=50)
     additional_info = discord.ui.TextInput(
-        label="Additional Info",
-        placeholder="Any additional information...",
-        required=False,
-        style=discord.TextStyle.paragraph,
-        max_length=500,
+        label="Additional Info", placeholder="Any additional information...",
+        required=False, style=discord.TextStyle.paragraph, max_length=500,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -160,62 +168,39 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
 
         category = guild.get_channel(int(config["category_id"]))
         if not category or not isinstance(category, discord.CategoryChannel):
-            await interaction.followup.send(
-                "⚠️ Configured category not found. Please check the bot settings.", ephemeral=True
-            )
+            await interaction.followup.send("⚠️ Configured category not found.", ephemeral=True)
             return
 
         # Build channel permissions
         overwrites: dict = {
-            # Creator can see and write
-            interaction.user: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                attach_files=True,
-            ),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True),
         }
-        # Add configured roles
-        raw_roles = (config.get("allowed_role_ids") or "").strip()
-        if raw_roles:
-            for role_id_str in raw_roles.split(","):
-                role_id_str = role_id_str.strip()
-                if not role_id_str:
-                    continue
-                role = guild.get_role(int(role_id_str))
-                if role:
-                    overwrites[role] = discord.PermissionOverwrite(
-                        view_channel=True,
-                        send_messages=True,
-                        attach_files=True,
-                    )
+        for role_id_str in (config.get("allowed_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = guild.get_role(int(role_id_str))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True)
 
-        # Build safe channel name
         safe_player = re.sub(r"[^a-z0-9]", "-", self.player.value.lower())
         safe_coords = self.coordinates.value.replace("|", "-").replace(" ", "")
         channel_name = f"scout-{safe_player}-{safe_coords}"[:100]
 
         new_channel = await guild.create_text_channel(
-            name=channel_name,
-            category=category,
+            name=channel_name, category=category,
             topic=f"Scout: {self.player.value} @ {self.coordinates.value}",
             overwrites=overwrites,
         )
 
         await database.add_scout_channel(
-            channel_id=str(new_channel.id),
-            guild_id=str(guild.id),
-            player=self.player.value,
-            coordinates=self.coordinates.value,
-            village=self.village.value,
-            scout_time=self.time.value,
+            channel_id=str(new_channel.id), guild_id=str(guild.id),
+            player=self.player.value, coordinates=self.coordinates.value,
+            village=self.village.value, scout_time=self.time.value,
             additional_info=self.additional_info.value or "",
         )
 
-        # Post info embed
-        embed = discord.Embed(
-            title="📡 Scout Request",
-            color=discord.Color.blurple(),
-        )
+        embed = discord.Embed(title="📡 Scout Request", color=discord.Color.blurple())
         embed.add_field(name="Player", value=self.player.value, inline=True)
         embed.add_field(name="Village", value=self.village.value, inline=True)
         embed.add_field(name="Coordinates", value=self.coordinates.value, inline=True)
@@ -229,23 +214,18 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             embed=embed,
             view=ScoutActionView(),
         )
-
-        await interaction.followup.send(
-            f"✅ Scout channel created: {new_channel.mention}", ephemeral=True
-        )
+        await interaction.followup.send(f"✅ Scout channel created: {new_channel.mention}", ephemeral=True)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         try:
-            await interaction.followup.send(
-                "❌ Something went wrong while creating the scout channel.", ephemeral=True
-            )
+            await interaction.followup.send("❌ Something went wrong.", ephemeral=True)
         except Exception:
             pass
         raise error
 
 
 # ---------------------------------------------------------------------------
-# Persistent button — posted in the scout request channel
+# Persistent Scout Request button
 # ---------------------------------------------------------------------------
 
 class ScoutRequestView(discord.ui.View):
@@ -253,10 +233,8 @@ class ScoutRequestView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="Scout Request",
-        style=discord.ButtonStyle.primary,
-        emoji="🔍",
-        custom_id="persistent:scout_request",
+        label="Scout Request", style=discord.ButtonStyle.primary,
+        emoji="🔍", custom_id="persistent:scout_request",
     )
     async def scout_request(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(ScoutModal())
@@ -274,7 +252,6 @@ class Scout(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     async def setup_scout(self, interaction: discord.Interaction):
         config = await database.get_guild_config(str(interaction.guild.id))
-
         if not config or not config.get("category_id") or not config.get("archive_channel_id"):
             await interaction.response.send_message(
                 "⚠️ Please configure **Category ID** and **Archive Channel ID** in the web admin panel first.",
@@ -287,19 +264,17 @@ class Scout(commands.Cog):
             description="Click the button below to submit a scout request.\nFill in the coordinates, player, village and time.",
             color=discord.Color.blurple(),
         )
-
         msg = await interaction.channel.send(embed=embed, view=ScoutRequestView())
-
         await database.update_scout_channel_and_button(
             guild_id=str(interaction.guild.id),
             scout_channel_id=str(interaction.channel.id),
             button_message_id=str(msg.id),
         )
-
         await interaction.response.send_message("✅ Scout Request button posted!", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
     bot.add_view(ScoutRequestView())
     bot.add_view(ScoutActionView())
+    bot.add_view(ScoutTakenView())
     await bot.add_cog(Scout(bot))
