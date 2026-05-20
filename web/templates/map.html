@@ -292,29 +292,32 @@ function draw() {
     ctx.globalAlpha = 1;
 
     // Labels: village name + player + alliance
-    if (scale >= 12 && !dim) {
-      const fontSize = Math.min(10, scale * 0.5);
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      const lx = cx + tS * 0.58;
-      let ly = cy + 3;
-      if (v.name)     { ctx.fillText(v.name, lx, ly); ly += fontSize + 1; }
-      if (v.player && scale >= 14) {
-        ctx.font = `${fontSize-1}px sans-serif`;
-        ctx.fillStyle = 'rgba(180,220,180,0.85)';
-        ctx.fillText(`👤 ${v.player}`, lx, ly);
+    if (scale >= 4 && !dim) {
+      const fontSize = Math.max(8, Math.min(12, scale * 0.9));
+      const lx = cx + Math.max(3, tS * 0.55);
+      let ly = cy + fontSize * 0.35;
+      if (v.name) {
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillText(v.name, lx, ly);
+        ly += fontSize + 1;
+      }
+      if (v.player && scale >= 6) {
+        ctx.font = `${fontSize - 1}px sans-serif`;
+        ctx.fillStyle = 'rgba(160,220,160,0.88)';
+        ctx.fillText(v.player, lx, ly);
         ly += fontSize;
       }
-      if (v.alliance && scale >= 16) {
-        ctx.font = `${fontSize-1}px sans-serif`;
-        ctx.fillStyle = 'rgba(180,200,255,0.8)';
+      if (v.alliance && scale >= 8) {
+        ctx.font = `${fontSize - 1}px sans-serif`;
+        ctx.fillStyle = 'rgba(160,190,255,0.82)';
         ctx.fillText(`[${v.alliance}]`, lx, ly);
         ly += fontSize;
       }
-      if (v.pop && scale >= 20) {
-        ctx.font = `${fontSize-1}px monospace`;
-        ctx.fillStyle = 'rgba(200,200,100,0.75)';
-        ctx.fillText(`${v.pop.toLocaleString()} Bev.`, lx, ly);
+      if (v.pop && scale >= 12) {
+        ctx.font = `${fontSize - 1}px monospace`;
+        ctx.fillStyle = 'rgba(210,210,100,0.75)';
+        ctx.fillText(`${v.pop.toLocaleString()}`, lx, ly);
       }
     }
   }
