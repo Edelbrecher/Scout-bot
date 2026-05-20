@@ -4,9 +4,12 @@
 {% block content %}
 <div class="container">
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
-    <div>
-      <h1>Dashboard</h1>
-      <p class="subtitle">{{ guilds|length }} server(s) connected</p>
+    <div style="display:flex; align-items:center; gap:1rem;">
+      <img src="/static/logo.png" alt="BIG-EYE" style="width:64px;height:64px;object-fit:cover;border-radius:50%;" />
+      <div>
+        <h1 style="margin:0;">Dashboard</h1>
+        <p class="subtitle" style="margin:0;">{{ guilds|length }} server(s) connected</p>
+      </div>
     </div>
     {% if invite_url %}
     <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Invite Bot</a>
