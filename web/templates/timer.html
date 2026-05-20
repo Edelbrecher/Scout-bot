@@ -158,15 +158,58 @@ document.getElementById('btnSound').addEventListener('click', function() {
   this.textContent = soundEnabled ? '🔔 Sound an' : '🔕 Sound aus';
 });
 
-// ── Browser Notifications ─────────────────────────────────────────────────────
-if ('Notification' in window && Notification.permission === 'default') {
-  Notification.requestPermission();
+// ── Service Worker + Notifications ───────────────────────────────────────────
+let swReg = null;
+
+async function initSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    await navigator.serviceWorker.ready;
+  } catch(e) {
+    console.warn('SW registration failed:', e);
+  }
 }
+
+async function ensureNotifPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  const p = await Notification.requestPermission();
+  return p === 'granted';
+}
+
+function swPost(msg) {
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (sw) sw.postMessage(msg);
+}
+
 function showNotification(title, body) {
   if (Notification.permission === 'granted') {
     new Notification(title, { body });
   }
 }
+
+// Sync all active reminders to SW so it can fire even when tab is backgrounded
+function syncToSW() {
+  const world = worldEl ? worldEl.value.trim() : '';
+  const url   = rallyUrl(world);
+  swPost({
+    type:      'sync_reminders',
+    reminders: reminders
+      .filter(r => !r.done && r.at > Date.now())
+      .map(r => ({ id: r.id, label: r.label, at: r.at, rally: r.rally, rallyUrl: r.rally ? url : null })),
+  });
+}
+
+// Sync farmlist state to SW
+function syncFarmToSW(active, ends) {
+  swPost({ type: 'sync_farm', active, ends: ends || 0 });
+}
+
+initSW().then(() => {
+  ensureNotifPermission();
+  syncToSW();
+});
 
 // ── Travian Profil ────────────────────────────────────────────────────────────
 const nameEl  = document.getElementById('travianName');
@@ -260,6 +303,7 @@ function startFarm() {
   if (farmTimer) clearInterval(farmTimer);
   farmTick();
   farmTimer = setInterval(farmTick, 500);
+  syncFarmToSW(true, farmEnds);
 }
 
 btnFarmStart.addEventListener('click', () => { getAudioCtx(); startFarm(); });
@@ -269,6 +313,7 @@ btnFarmStop.addEventListener('click', () => {
   farmBadge.style.display   = 'none';
   btnFarmStart.disabled = false;
   btnFarmStop.disabled  = true;
+  syncFarmToSW(false);
 });
 
 // ── Custom Reminders ──────────────────────────────────────────────────────────
@@ -339,6 +384,8 @@ function removeReminder(id) {
   reminders = reminders.filter(r => r.id !== id);
   saveReminders();
   renderReminders();
+  swPost({ type: 'cancel', id });
+  syncToSW();
 }
 
 function saveReminders() {
@@ -370,6 +417,7 @@ document.getElementById('addTimerForm').addEventListener('submit', e => {
   reminders.sort((a, b) => a.at - b.at);
   saveReminders();
   renderReminders();
+  syncToSW();
   document.getElementById('timerLabel').value = '';
   // advance datetime by same interval for convenience
   const next = new Date(at);
@@ -400,5 +448,11 @@ setInterval(() => {
 
 loadReminders();
 renderReminders();
+
+// Re-sync every 20s to keep the service worker alive and schedules fresh
+setInterval(() => {
+  syncToSW();
+  if (farmTimer) syncFarmToSW(true, farmEnds);
+}, 20000);
 </script>
 {% endblock %}
