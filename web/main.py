@@ -83,6 +83,24 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+VIEW_CHANNEL = "1024"  # Discord permission bit
+
+async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str):
+    """Set archive channel: @everyone hidden, allowed roles can view."""
+    token = os.environ.get("DISCORD_TOKEN", "")
+    overwrites = [
+        {"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL},  # @everyone
+    ]
+    for role_id in [r.strip() for r in allowed_role_ids.split(",") if r.strip()]:
+        overwrites.append({"id": role_id, "type": 0, "allow": VIEW_CHANNEL, "deny": "0"})
+    async with httpx.AsyncClient() as client:
+        await client.patch(
+            f"https://discord.com/api/v10/channels/{archive_channel_id}",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json={"permission_overwrites": overwrites},
+        )
+
+
 def _get_username(request: Request) -> str:
     session = get_session(request)
     return session.get("username", "") if session else ""
@@ -284,6 +302,9 @@ async def guild_save(
         allowed_role_ids=normalized_roles,
         scout_channel_id=scout_channel_id.strip(),
     )
+    # Sync archive channel permissions whenever config is saved
+    if archive_channel_id.strip():
+        await _sync_archive_permissions(guild_id, archive_channel_id.strip(), normalized_roles)
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
@@ -329,7 +350,10 @@ async def auto_setup(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{guild_id}?error=scout_ch_{r.status_code}", status_code=303)
         scout_channel_id = r.json()["id"]
 
-        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "scout-archive", "type": 0, "parent_id": category_id})
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={
+            "name": "scout-archive", "type": 0, "parent_id": category_id,
+            "permission_overwrites": [{"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL}],
+        })
         if r.status_code not in (200, 201):
             return RedirectResponse(f"/guild/{guild_id}?error=archive_ch_{r.status_code}", status_code=303)
         archive_channel_id = r.json()["id"]
