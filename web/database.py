@@ -101,6 +101,37 @@ async def init_db():
         except Exception:
             pass
 
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS availability_polls (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id            TEXT NOT NULL,
+                title               TEXT NOT NULL,
+                description         TEXT,
+                event_datetime      TEXT NOT NULL,
+                status              TEXT DEFAULT 'active',
+                discord_message_id  TEXT,
+                created_at          TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS poll_responses (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                poll_id      INTEGER NOT NULL,
+                user_id      TEXT NOT NULL,
+                user_name    TEXT NOT NULL,
+                response     TEXT NOT NULL,
+                responded_at TEXT NOT NULL,
+                UNIQUE(poll_id, user_id)
+            )
+        """)
+        await db.commit()
+
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
     password = os.environ.get("ADMIN_PASSWORD", "changeme")
@@ -454,3 +485,69 @@ async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
         await db.execute(f"UPDATE guild_configs SET {field} = ? WHERE guild_id = ?", (new_value, guild_id))
         await db.commit()
     return added
+
+
+# ---------------------------------------------------------------------------
+# Poll system
+# ---------------------------------------------------------------------------
+
+async def update_poll_channel(guild_id: str, poll_channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE guild_configs SET poll_channel_id = ? WHERE guild_id = ?", (poll_channel_id or None, guild_id))
+        await db.commit()
+
+
+async def create_poll(guild_id: str, title: str, description: str, event_datetime: str) -> int:
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO availability_polls (guild_id, title, description, event_datetime, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (guild_id, title, description, event_datetime, _dt.utcnow().isoformat()))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def set_poll_message_id(poll_id: int, message_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE availability_polls SET discord_message_id = ? WHERE id = ?", (message_id, poll_id))
+        await db.commit()
+
+
+async def get_polls(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM availability_polls WHERE guild_id = ? ORDER BY created_at DESC", (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_poll(poll_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM availability_polls WHERE id = ?", (poll_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_poll_responses(poll_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM poll_responses WHERE poll_id = ? ORDER BY responded_at ASC", (poll_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def close_poll(poll_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE availability_polls SET status = 'closed' WHERE id = ?", (poll_id,))
+        await db.commit()
+
+
+async def delete_poll(poll_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM poll_responses WHERE poll_id = ?", (poll_id,))
+        await db.execute("DELETE FROM availability_polls WHERE id = ?", (poll_id,))
+        await db.commit()

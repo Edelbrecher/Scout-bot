@@ -101,13 +101,13 @@ let dragging = false, lastMX = 0, lastMY = 0;
 // Travian uses centered coords: 0|0 is center, range -mapSize..+mapSize
 function worldToCanvas(wx, wy) {
   const cx = canvas.width  / 2 + offsetX + wx * scale;
-  const cy = canvas.height / 2 + offsetY + wy * scale;
+  const cy = canvas.height / 2 + offsetY - wy * scale; // Y-Achse invertieren: +y = Norden = oben
   return [cx, cy];
 }
 function canvasToWorld(cx, cy) {
   return [
     (cx - canvas.width  / 2 - offsetX) / scale,
-    (cy - canvas.height / 2 - offsetY) / scale,
+    -(cy - canvas.height / 2 - offsetY) / scale,
   ];
 }
 

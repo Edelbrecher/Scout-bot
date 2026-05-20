@@ -726,6 +726,139 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
     return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
 
 
+# ---------------------------------------------------------------------------
+# Routes — polls
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/polls", response_class=HTMLResponse)
+async def polls_page(request: Request, guild_id: str, saved: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    polls = await database.get_polls(guild_id)
+    # Attach response counts to each poll
+    for p in polls:
+        responses = await database.get_poll_responses(p["id"])
+        p["count_available"]   = sum(1 for r in responses if r["response"] == "available")
+        p["count_maybe"]       = sum(1 for r in responses if r["response"] == "maybe")
+        p["count_unavailable"] = sum(1 for r in responses if r["response"] == "unavailable")
+        p["responses"]         = responses
+    return templates.TemplateResponse("polls.html", {
+        "request": request, "guild": guild, "polls": polls, "saved": saved,
+    })
+
+
+@app.post("/guild/{guild_id}/polls/config")
+async def polls_config_save(request: Request, guild_id: str, poll_channel_id: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.update_poll_channel(guild_id, sanitize_snowflake(poll_channel_id))
+    return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/polls/create")
+async def polls_create(
+    request: Request,
+    guild_id: str,
+    title: str = Form(...),
+    description: str = Form(""),
+    event_datetime: str = Form(...),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("poll_channel_id"):
+        return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
+
+    title       = title.strip()[:100]
+    description = description.strip()[:500]
+
+    poll_id = await database.create_poll(guild_id, title, description, event_datetime)
+
+    token      = os.environ.get("DISCORD_TOKEN", "")
+    channel_id = guild["poll_channel_id"]
+    embed = {
+        "title": f"📅 {title}",
+        "description": description or "",
+        "color": 5793266,
+        "fields": [{"name": "🕐 Zeitpunkt (UTC)", "value": event_datetime.replace("T", " "), "inline": False}],
+        "footer": {"text": f"Umfrage #{poll_id} · Klicke einen Button um deine Verfügbarkeit anzugeben"},
+    }
+    components = [{"type": 1, "components": [
+        {"type": 2, "style": 3, "label": "Dabei",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
+        {"type": 2, "style": 1, "label": "Vielleicht",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
+        {"type": 2, "style": 4, "label": "Nicht dabei", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
+    ]}]
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json={"embeds": [embed], "components": components},
+        )
+    if resp.status_code in (200, 201):
+        await database.set_poll_message_id(poll_id, resp.json()["id"])
+    return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/polls/{poll_id}/close")
+async def polls_close(request: Request, guild_id: str, poll_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    poll = await database.get_poll(poll_id)
+    if not poll or poll.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    await database.close_poll(poll_id)
+    # Edit Discord message to remove buttons
+    if poll.get("discord_message_id") and poll.get("poll_channel_id") or True:
+        guild = await database.get_guild(guild_id)
+        if guild and guild.get("poll_channel_id") and poll.get("discord_message_id"):
+            token = os.environ.get("DISCORD_TOKEN", "")
+            responses = await database.get_poll_responses(poll_id)
+            c_av = sum(1 for r in responses if r["response"] == "available")
+            c_ma = sum(1 for r in responses if r["response"] == "maybe")
+            c_un = sum(1 for r in responses if r["response"] == "unavailable")
+            closed_embed = {
+                "title": f"🔒 {poll['title']} (geschlossen)",
+                "description": poll.get("description") or "",
+                "color": 0x555555,
+                "fields": [
+                    {"name": "🕐 Zeitpunkt (UTC)", "value": poll["event_datetime"].replace("T", " "), "inline": False},
+                    {"name": "Ergebnis", "value": f"✅ Dabei: {c_av} · ⏰ Vielleicht: {c_ma} · ❌ Nicht dabei: {c_un}", "inline": False},
+                ],
+            }
+            async with httpx.AsyncClient() as client:
+                await client.patch(
+                    f"https://discord.com/api/v10/channels/{guild['poll_channel_id']}/messages/{poll['discord_message_id']}",
+                    headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                    json={"embeds": [closed_embed], "components": []},
+                )
+    return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/polls/{poll_id}/delete")
+async def polls_delete(request: Request, guild_id: str, poll_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    poll = await database.get_poll(poll_id)
+    if not poll or poll.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+    await database.delete_poll(poll_id)
+    return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
+
+
 @app.get("/guild/{guild_id}/map", response_class=HTMLResponse)
 async def guild_map(request: Request, guild_id: str):
     session, err = _require_session(request)

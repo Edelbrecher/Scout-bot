@@ -87,6 +87,38 @@ async def init_db():
         except Exception:
             pass
 
+        # Poll system migrations
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS availability_polls (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id            TEXT NOT NULL,
+                title               TEXT NOT NULL,
+                description         TEXT,
+                event_datetime      TEXT NOT NULL,
+                status              TEXT DEFAULT 'active',
+                discord_message_id  TEXT,
+                created_at          TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS poll_responses (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                poll_id      INTEGER NOT NULL,
+                user_id      TEXT NOT NULL,
+                user_name    TEXT NOT NULL,
+                response     TEXT NOT NULL,
+                responded_at TEXT NOT NULL,
+                UNIQUE(poll_id, user_id)
+            )
+        """)
+        await db.commit()
+
 
 async def get_guild_config(guild_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -270,3 +302,22 @@ async def get_scout_channel_info(channel_id: str) -> dict | None:
         ) as cursor:
             row = await cursor.fetchone()
             return dict(row) if row else None
+
+
+async def get_poll(poll_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM availability_polls WHERE id = ?", (poll_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def upsert_poll_response(poll_id: int, user_id: str, user_name: str, response: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO poll_responses (poll_id, user_id, user_name, response, responded_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(poll_id, user_id) DO UPDATE SET
+                response=excluded.response, user_name=excluded.user_name, responded_at=excluded.responded_at
+        """, (poll_id, user_id, user_name, response, datetime.utcnow().isoformat()))
+        await db.commit()

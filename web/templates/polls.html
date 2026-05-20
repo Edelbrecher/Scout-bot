@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Umfragen · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>📅 Verfügbarkeits-Umfragen</h1>
+      <p class="subtitle">{{ guild.guild_name }}</p>
+    </div>
+  </div>
+
+  {% if saved %}
+  <div class="alert alert-success">✅ Gespeichert.</div>
+  {% endif %}
+  {% if request.query_params.get('error') == 'no_channel' %}
+  <div class="alert alert-error">❌ Bitte zuerst einen Umfrage-Channel konfigurieren.</div>
+  {% endif %}
+
+  <div class="grid-2">
+    <!-- Config -->
+    <div class="card">
+      <h2>Konfiguration</h2>
+      <form method="post" action="/guild/{{ guild.guild_id }}/polls/config">
+        <div class="form-group">
+          <label for="poll_channel_id">Umfrage-Channel ID</label>
+          <p class="field-hint">Channel wo Umfragen gepostet werden.</p>
+          <input type="text" id="poll_channel_id" name="poll_channel_id"
+            value="{{ guild.poll_channel_id or '' }}"
+            placeholder="z.B. 1234567890123456789" />
+        </div>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+      </form>
+    </div>
+
+    <!-- Create poll -->
+    <div class="card">
+      <h2>Neue Umfrage erstellen</h2>
+      {% if guild.poll_channel_id %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/polls/create">
+        <div class="form-group">
+          <label for="title">Titel</label>
+          <input type="text" id="title" name="title" required maxlength="100"
+            placeholder="z.B. Angriff auf Sektor 7" />
+        </div>
+        <div class="form-group">
+          <label for="description">Beschreibung <span style="color:var(--text-muted)">(optional)</span></label>
+          <input type="text" id="description" name="description" maxlength="500"
+            placeholder="z.B. Koordinaten 150|50, bringt Def mit" />
+        </div>
+        <div class="form-group">
+          <label for="event_datetime">Datum & Uhrzeit (UTC)</label>
+          <input type="datetime-local" id="event_datetime" name="event_datetime" required />
+        </div>
+        <button type="submit" class="btn btn-primary">📤 Umfrage posten</button>
+      </form>
+      {% else %}
+      <p class="hint">Erst Channel konfigurieren.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Poll list -->
+  {% for poll in polls %}
+  <div class="card mt-1">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+      <div>
+        <h2 style="margin:0;">{{ poll.title }}
+          {% if poll.status == 'active' %}
+          <span class="badge badge-ok" style="font-size:0.75rem;">🟢 Aktiv</span>
+          {% else %}
+          <span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;font-size:0.75rem;">🔒 Geschlossen</span>
+          {% endif %}
+        </h2>
+        {% if poll.description %}<p class="hint" style="margin:0.25rem 0 0;">{{ poll.description }}</p>{% endif %}
+        <p class="hint" style="margin:0.25rem 0 0;">🕐 {{ poll.event_datetime.replace('T', ' ') }} UTC · Erstellt: {{ poll.created_at[:16] }}</p>
+      </div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        {% if poll.status == 'active' %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/close">
+          <button type="submit" class="btn-action btn-action-warn">🔒 Schließen</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/delete"
+              onsubmit="return confirm('Umfrage löschen?')">
+          <button type="submit" class="btn-action btn-action-err">🗑 Löschen</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Response summary -->
+    <div style="display:flex; gap:1rem; margin:1rem 0 0.75rem; flex-wrap:wrap;">
+      <div style="background:rgba(50,200,100,.1); border:1px solid #4caf82; border-radius:8px; padding:0.5rem 1rem; min-width:80px; text-align:center;">
+        <div style="font-size:1.5rem; font-weight:700; color:#4caf82;">{{ poll.count_available }}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">✅ Dabei</div>
+      </div>
+      <div style="background:rgba(220,160,0,.1); border:1px solid #c89b00; border-radius:8px; padding:0.5rem 1rem; min-width:80px; text-align:center;">
+        <div style="font-size:1.5rem; font-weight:700; color:#c89b00;">{{ poll.count_maybe }}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">⏰ Vielleicht</div>
+      </div>
+      <div style="background:rgba(220,50,50,.1); border:1px solid #e05555; border-radius:8px; padding:0.5rem 1rem; min-width:80px; text-align:center;">
+        <div style="font-size:1.5rem; font-weight:700; color:#e05555;">{{ poll.count_unavailable }}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">❌ Nicht dabei</div>
+      </div>
+    </div>
+
+    <!-- Response details -->
+    {% if poll.responses %}
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:1rem;">
+      {% set available   = poll.responses | selectattr('response','eq','available')   | list %}
+      {% set maybe       = poll.responses | selectattr('response','eq','maybe')       | list %}
+      {% set unavailable = poll.responses | selectattr('response','eq','unavailable') | list %}
+
+      {% if available %}
+      <div>
+        <p style="font-weight:600; color:#4caf82; margin:0 0 0.4rem;">✅ Dabei</p>
+        {% for r in available %}
+        <div style="font-size:0.85rem; padding:0.2rem 0; border-bottom:1px solid var(--border);">
+          {{ r.user_name }}
+          <span style="color:var(--text-muted); font-size:0.75rem; float:right;">{{ r.responded_at[:16] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if maybe %}
+      <div>
+        <p style="font-weight:600; color:#c89b00; margin:0 0 0.4rem;">⏰ Vielleicht</p>
+        {% for r in maybe %}
+        <div style="font-size:0.85rem; padding:0.2rem 0; border-bottom:1px solid var(--border);">
+          {{ r.user_name }}
+          <span style="color:var(--text-muted); font-size:0.75rem; float:right;">{{ r.responded_at[:16] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if unavailable %}
+      <div>
+        <p style="font-weight:600; color:#e05555; margin:0 0 0.4rem;">❌ Nicht dabei</p>
+        {% for r in unavailable %}
+        <div style="font-size:0.85rem; padding:0.2rem 0; border-bottom:1px solid var(--border);">
+          {{ r.user_name }}
+          <span style="color:var(--text-muted); font-size:0.75rem; float:right;">{{ r.responded_at[:16] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="empty" style="margin-top:0.5rem;">Noch keine Antworten.</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="card mt-1"><p class="empty">Noch keine Umfragen erstellt.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
