@@ -167,6 +167,8 @@ async def init_db():
         """)
         await db.commit()
 
+    await _init_farming_tables()
+
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
     password = os.environ.get("ADMIN_PASSWORD", "changeme")
@@ -807,3 +809,211 @@ async def delete_attack_report(report_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM attack_reports WHERE id = ?", (report_id,))
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Farming / Map Snapshots
+# ---------------------------------------------------------------------------
+
+async def _init_farming_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS map_snapshots (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                fetched_at    TEXT NOT NULL,
+                village_id    TEXT NOT NULL,
+                x             INTEGER NOT NULL,
+                y             INTEGER NOT NULL,
+                village_name  TEXT,
+                player_id     TEXT,
+                player_name   TEXT,
+                alliance_id   TEXT,
+                alliance_name TEXT,
+                population    INTEGER NOT NULL,
+                tribe         INTEGER
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS farm_list_entries (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                added_by_id  TEXT NOT NULL,
+                added_by_name TEXT NOT NULL,
+                x            INTEGER NOT NULL,
+                y            INTEGER NOT NULL,
+                village_name TEXT,
+                player_name  TEXT,
+                population   INTEGER,
+                notes        TEXT,
+                added_at     TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+        # Index for performance
+        try:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_map_snap_guild ON map_snapshots(guild_id, fetched_at)")
+            await db.commit()
+        except Exception:
+            pass
+
+
+async def save_map_snapshot(guild_id: str, villages: list[dict]):
+    from datetime import datetime as _dt
+    fetched_at = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.executemany("""
+            INSERT INTO map_snapshots
+                (guild_id, fetched_at, village_id, x, y, village_name, player_id, player_name,
+                 alliance_id, alliance_name, population, tribe)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            (
+                guild_id, fetched_at,
+                str(v.get("village_id", "")),
+                int(v.get("x", 0)), int(v.get("y", 0)),
+                v.get("village_name"), v.get("player_id"), v.get("player_name"),
+                v.get("alliance_id"), v.get("alliance_name"),
+                int(v.get("population", 0)), v.get("tribe"),
+            )
+            for v in villages
+        ])
+        await db.commit()
+
+
+async def get_latest_snapshot_time(guild_id: str) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT MAX(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def get_snapshot_count(guild_id: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(DISTINCT fetched_at) as cnt FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+async def get_inactive_farms(
+    guild_id: str,
+    min_days: int = 3,
+    min_pop: int = 0,
+    max_pop: int = 9999,
+) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT village_id, x, y, village_name, player_name, population, tribe,
+                   MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
+                   COUNT(DISTINCT fetched_at) as snapshot_count,
+                   MIN(population) as min_pop, MAX(population) as max_pop
+            FROM map_snapshots
+            WHERE guild_id = ?
+            GROUP BY village_id
+            HAVING snapshot_count >= 2
+               AND min_pop = max_pop
+               AND julianday(last_seen) - julianday(first_seen) >= ?
+               AND population >= ? AND population <= ?
+            ORDER BY population DESC
+        """, (guild_id, min_days, min_pop, max_pop)) as cur:
+            rows = await cur.fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                from datetime import datetime as _dt
+                fs = _dt.fromisoformat(d["first_seen"])
+                ls = _dt.fromisoformat(d["last_seen"])
+                d["days_tracked"] = (ls - fs).days
+            except Exception:
+                d["days_tracked"] = 0
+            result.append(d)
+        return result
+
+
+async def add_farm_list_entry(
+    guild_id: str,
+    added_by_id: str,
+    added_by_name: str,
+    x: int,
+    y: int,
+    village_name: str | None,
+    player_name: str | None,
+    population: int | None,
+    notes: str | None,
+) -> int:
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO farm_list_entries
+                (guild_id, added_by_id, added_by_name, x, y, village_name, player_name, population, notes, added_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (guild_id, added_by_id, added_by_name, x, y,
+              village_name or None, player_name or None,
+              population if population is not None else None,
+              notes or None, _dt.utcnow().isoformat()))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_farm_list(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM farm_list_entries WHERE guild_id = ? ORDER BY added_at DESC", (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_farm_list_entry(guild_id: str, entry_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM farm_list_entries WHERE id = ? AND guild_id = ?", (entry_id, guild_id)
+        )
+        await db.commit()
+
+
+async def get_farm_stats(guild_id: str) -> dict:
+    snapshot_count = await get_snapshot_count(guild_id)
+    latest_snapshot = await get_latest_snapshot_time(guild_id)
+    inactive = await get_inactive_farms(guild_id)
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) as cnt FROM farm_list_entries WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            farm_list_count = row[0] if row else 0
+    return {
+        "snapshot_count": snapshot_count,
+        "latest_snapshot": latest_snapshot,
+        "inactive_count": len(inactive),
+        "farm_list_count": farm_list_count,
+    }
+
+
+async def get_farming_cross_reference(guild_id: str, min_days: int = 3) -> list[dict]:
+    """Farm list entries that are also inactive."""
+    inactive = await get_inactive_farms(guild_id, min_days=min_days)
+    inactive_coords = {(r["x"], r["y"]): r for r in inactive}
+    farm_list = await get_farm_list(guild_id)
+    result = []
+    for entry in farm_list:
+        key = (entry["x"], entry["y"])
+        if key in inactive_coords:
+            inactive_data = inactive_coords[key]
+            result.append({
+                "x": entry["x"],
+                "y": entry["y"],
+                "village_name": entry.get("village_name") or inactive_data.get("village_name"),
+                "player_name": entry.get("player_name") or inactive_data.get("player_name"),
+                "population": inactive_data.get("population"),
+                "days_tracked": inactive_data.get("days_tracked", 0),
+                "notes": entry.get("notes"),
+                "entry_id": entry["id"],
+            })
+    return result

@@ -86,7 +86,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://js.stripe.com; "
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: cdn.discordapp.com; "
             "font-src 'self'; "
@@ -161,9 +161,101 @@ def _require_guild(session: dict, guild_id: str):
 # App setup
 # ---------------------------------------------------------------------------
 
+def _parse_map_sql(content: str) -> list[dict]:
+    """Parse map.sql CSV content into a list of village dicts."""
+    villages = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.upper().startswith("INSERT") or line.startswith("--"):
+            continue
+        # Strip SQL INSERT wrapper if present
+        if "VALUES" in line.upper():
+            # Extract just the values part after VALUES
+            idx = line.upper().find("VALUES")
+            line = line[idx + 6:].strip().lstrip("(").rstrip(");")
+        # Try comma separator
+        parts = [p.strip().strip("'\"") for p in line.split(",")]
+        if len(parts) < 8:
+            continue
+        try:
+            # Detect format: if first field is large number (>10000) → village_id first
+            first = parts[0].strip("'\" ")
+            if first.lstrip("-").isdigit() and abs(int(first)) > 10000:
+                # Format A: village_id, village_name, x, y, _, _, player_id, population, tribe, player_name, alliance_id, alliance_name
+                vid = parts[0]
+                vname = parts[1] if len(parts) > 1 else ""
+                x = int(parts[2]) if len(parts) > 2 else 0
+                y = int(parts[3]) if len(parts) > 3 else 0
+                player_id = parts[6] if len(parts) > 6 else ""
+                population = int(parts[7]) if len(parts) > 7 else 0
+                tribe = int(parts[8]) if len(parts) > 8 else 0
+                player_name = parts[9] if len(parts) > 9 else ""
+                alliance_id = parts[10] if len(parts) > 10 else ""
+                alliance_name = parts[11] if len(parts) > 11 else ""
+            else:
+                # Format B: x, y, tribe, village_id, village_name, player_id, player_name, population, alliance_id, alliance_name
+                x = int(parts[0])
+                y = int(parts[1])
+                tribe = int(parts[2]) if len(parts) > 2 else 0
+                vid = parts[3] if len(parts) > 3 else ""
+                vname = parts[4] if len(parts) > 4 else ""
+                player_id = parts[5] if len(parts) > 5 else ""
+                player_name = parts[6] if len(parts) > 6 else ""
+                population = int(parts[7]) if len(parts) > 7 else 0
+                alliance_id = parts[8] if len(parts) > 8 else ""
+                alliance_name = parts[9] if len(parts) > 9 else ""
+            if not (-800 <= x <= 800 and -800 <= y <= 800):
+                continue
+            villages.append({
+                "village_id": vid,
+                "village_name": vname,
+                "x": x, "y": y,
+                "player_id": player_id,
+                "player_name": player_name,
+                "alliance_id": alliance_id,
+                "alliance_name": alliance_name,
+                "population": population,
+                "tribe": tribe,
+            })
+        except (ValueError, IndexError):
+            continue
+    return villages
+
+
+async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
+    url = tw_world.rstrip("/") + "/map.sql"
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url)
+        r.raise_for_status()
+    villages = _parse_map_sql(r.text)
+    if villages:
+        await database.save_map_snapshot(guild_id, villages)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
+
+    async def _snapshot_loop():
+        while True:
+            await asyncio.sleep(6 * 3600)
+            guilds = await database.get_all_guilds()
+            for g in guilds:
+                tw_world = (g.get("tw_world") or "").strip()
+                if not tw_world:
+                    continue
+                try:
+                    latest = await database.get_latest_snapshot_time(g["guild_id"])
+                    if latest:
+                        from datetime import datetime as _dt
+                        age_h = (_dt.utcnow() - _dt.fromisoformat(latest)).total_seconds() / 3600
+                        if age_h < 6:
+                            continue
+                    await _fetch_and_save_snapshot(g["guild_id"], tw_world)
+                except Exception:
+                    pass  # Don't crash the loop for one guild
+
+    asyncio.create_task(_snapshot_loop())
     yield
 
 
@@ -1415,3 +1507,107 @@ async def attacks_reset(request: Request, guild_id: str):
     if err: return err
     await database.set_attack_channel_web(guild_id, "", "")
     return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Farming
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/farming", response_class=HTMLResponse)
+async def farming_page(
+    request: Request,
+    guild_id: str,
+    saved: str = "",
+    min_days: int = 3,
+    min_pop: int = 0,
+    max_pop: int = 9999,
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    is_admin = session.get("guilds") is None
+
+    farm_stats = await database.get_farm_stats(guild_id)
+    inactive_farms = await database.get_inactive_farms(guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
+    farm_list = await database.get_farm_list(guild_id)
+    cross_reference = await database.get_farming_cross_reference(guild_id, min_days=min_days)
+    cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
+
+    return templates.TemplateResponse("farming.html", {
+        "request": request,
+        "guild": guild,
+        "is_admin": is_admin,
+        "saved": saved,
+        "farm_stats": farm_stats,
+        "inactive_farms": inactive_farms,
+        "farm_list": farm_list,
+        "cross_reference": cross_reference,
+        "cross_ref_coords": cross_ref_coords,
+        "min_days": min_days,
+        "min_pop": min_pop,
+        "max_pop": max_pop,
+    })
+
+
+@app.post("/guild/{guild_id}/farming/snapshot")
+async def farming_snapshot(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    tw_world = (guild.get("tw_world") or "").strip()
+    if not tw_world:
+        return RedirectResponse(f"/guild/{guild_id}/farming?error=no_world", status_code=303)
+    try:
+        await _fetch_and_save_snapshot(guild_id, tw_world)
+    except Exception as e:
+        return RedirectResponse(f"/guild/{guild_id}/farming?error=fetch_failed", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/farming?saved=snapshot", status_code=303)
+
+
+@app.post("/guild/{guild_id}/farming/farmlist/add")
+async def farming_farmlist_add(
+    request: Request,
+    guild_id: str,
+    x: int = Form(...),
+    y: int = Form(...),
+    village_name: str = Form(""),
+    player_name: str = Form(""),
+    population: str = Form(""),
+    notes: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    pop_int = None
+    if population.strip().isdigit():
+        pop_int = int(population.strip())
+    uid = session.get("uid", "unknown")
+    uname = session.get("username", "unknown")
+    await database.add_farm_list_entry(
+        guild_id, uid, uname, x, y,
+        village_name.strip() or None,
+        player_name.strip() or None,
+        pop_int,
+        notes.strip() or None,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/farming?saved=added", status_code=303)
+
+
+@app.post("/guild/{guild_id}/farming/farmlist/delete/{entry_id}")
+async def farming_farmlist_delete(request: Request, guild_id: str, entry_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_farm_list_entry(guild_id, entry_id)
+    return RedirectResponse(f"/guild/{guild_id}/farming", status_code=303)

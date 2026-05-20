@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}Farming · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>⚜️ Farming Intelligence</h1>
+      <p class="subtitle">{{ guild.guild_name }}</p>
+    </div>
+  </div>
+
+  {% if saved == 'snapshot' %}
+  <div class="alert alert-success">✅ Snapshot erfolgreich gespeichert.</div>
+  {% elif saved == 'added' %}
+  <div class="alert alert-success">✅ Eintrag zur Farmliste hinzugefügt.</div>
+  {% elif saved %}
+  <div class="alert alert-success">✅ Gespeichert.</div>
+  {% endif %}
+
+  {% if not guild.tw_world %}
+  <div class="alert alert-warn">
+    ⚠️ Keine Travian-Welt konfiguriert. Bitte erst eine Welt-URL unter
+    <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map-Einstellungen</a> eintragen.
+  </div>
+  {% endif %}
+
+  <!-- Status + Filter -->
+  <div class="grid-2">
+    <!-- Status -->
+    <div class="card">
+      <h2>Status &amp; Snapshots</h2>
+      <ul class="status-list">
+        <li>
+          <span class="status-label">Snapshots gespeichert</span>
+          <span class="badge">{{ farm_stats.snapshot_count }}</span>
+        </li>
+        <li>
+          <span class="status-label">Letzter Snapshot</span>
+          {% if farm_stats.latest_snapshot %}
+          <span class="badge badge-ok">{{ farm_stats.latest_snapshot[:16].replace('T', ' ') }} UTC</span>
+          {% else %}
+          <span class="badge badge-warn">Noch keiner</span>
+          {% endif %}
+        </li>
+        <li>
+          <span class="status-label">Inaktive Farmen erkannt</span>
+          <span class="badge">{{ farm_stats.inactive_count }}</span>
+        </li>
+        <li>
+          <span class="status-label">Farmliste Einträge</span>
+          <span class="badge">{{ farm_stats.farm_list_count }}</span>
+        </li>
+      </ul>
+      {% if guild.tw_world %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshot" style="margin-top:1rem;">
+        <button type="submit" class="btn btn-primary">🔄 Snapshot jetzt holen</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <!-- Filter -->
+    <div class="card">
+      <h2>Filter</h2>
+      <form method="get" action="/guild/{{ guild.guild_id }}/farming">
+        <div class="form-group">
+          <label for="min_days">Inaktiv seit mind. X Tagen</label>
+          <input type="number" id="min_days" name="min_days" value="{{ min_days }}" min="1" max="365" />
+        </div>
+        <div class="form-group">
+          <label for="min_pop">Min. Bevölkerung</label>
+          <input type="number" id="min_pop" name="min_pop" value="{{ min_pop }}" min="0" />
+        </div>
+        <div class="form-group">
+          <label for="max_pop">Max. Bevölkerung</label>
+          <input type="number" id="max_pop" name="max_pop" value="{{ max_pop }}" min="0" />
+        </div>
+        <button type="submit" class="btn btn-primary">Filtern</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Inaktive Farmen -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2>🏚️ Inaktive Farmen
+      {% if inactive_farms %}
+      <span class="badge" style="font-size:0.8rem; margin-left:0.5rem;">{{ inactive_farms | length }}</span>
+      {% endif %}
+    </h2>
+
+    {% if farm_stats.snapshot_count < 2 %}
+    <p class="hint">
+      Mindestens <strong>2 Snapshots</strong> werden benötigt um inaktive Dörfer zu erkennen.
+      Klicke oben auf <em>Snapshot jetzt holen</em> und warte dann {{ min_days }} Tag(e).
+    </p>
+    {% elif inactive_farms %}
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Rang</th>
+            <th>Koordinaten</th>
+            <th>Dorf</th>
+            <th>Spieler</th>
+            <th>Stamm</th>
+            <th>Bevölkerung</th>
+            <th>Inaktiv seit</th>
+            <th>Beobachtet</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for farm in inactive_farms %}
+          {% set is_cross = (farm.x, farm.y) in cross_ref_coords %}
+          <tr {% if is_cross %}style="background:rgba(46,213,115,0.07);"{% endif %}>
+            <td><strong>#{{ loop.index }}</strong></td>
+            <td>
+              {% if guild.tw_world %}
+              <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ farm.x }}&amp;y={{ farm.y }}"
+                 target="_blank" rel="noopener" style="font-family:monospace;">
+                {{ farm.x }}|{{ farm.y }}
+              </a>
+              {% else %}
+              <span style="font-family:monospace;">{{ farm.x }}|{{ farm.y }}</span>
+              {% endif %}
+              {% if is_cross %}
+              <span class="badge badge-ok" style="font-size:0.7rem; margin-left:0.3rem;">🎯</span>
+              {% endif %}
+            </td>
+            <td>{{ farm.village_name or '—' }}</td>
+            <td>{{ farm.player_name or '(Barbarendorf)' }}</td>
+            <td>
+              {% if farm.tribe == 1 %}🏛️ Römer
+              {% elif farm.tribe == 2 %}⚔️ Teutonen
+              {% elif farm.tribe == 3 %}🌿 Gallier
+              {% elif farm.tribe == 4 %}👾 Nataren
+              {% elif farm.tribe == 5 %}🏹 Hunnen
+              {% elif farm.tribe == 6 %}🏺 Ägypter
+              {% else %}—
+              {% endif %}
+            </td>
+            <td><strong>{{ farm.population }}</strong></td>
+            <td>{{ farm.days_tracked }} Tage</td>
+            <td style="font-size:0.8rem; color:var(--text-muted);">
+              {{ farm.first_seen[:10] }} → {{ farm.last_seen[:10] }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Population histogram -->
+    <div style="margin-top:1.5rem;">
+      <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Bevölkerungs-Verteilung</h3>
+      <canvas id="chartPop" height="80"></canvas>
+    </div>
+
+    {% else %}
+    <p class="empty">
+      Keine inaktiven Farmen gefunden mit den aktuellen Filtern
+      (mind. {{ min_days }} Tage, Bevölkerung {{ min_pop }}–{{ max_pop }}).
+    </p>
+    {% endif %}
+  </div>
+
+  <!-- Farmliste -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2>📋 Meine Farmliste</h2>
+    <p class="hint">
+      Trage Koordinaten ein die du regelmäßig raidest.
+      Wir zeigen dir welche davon inaktiv sind.
+    </p>
+
+    <!-- Add form -->
+    <form method="post" action="/guild/{{ guild.guild_id }}/farming/farmlist/add"
+          style="display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:0.5rem; align-items:end; margin-bottom:1rem;">
+      <div class="form-group" style="margin:0;">
+        <label>X</label>
+        <input type="number" name="x" placeholder="X" required style="width:100%;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Y</label>
+        <input type="number" name="y" placeholder="Y" required style="width:100%;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Dorfname</label>
+        <input type="text" name="village_name" placeholder="Optional" style="width:100%;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Spieler</label>
+        <input type="text" name="player_name" placeholder="Optional" style="width:100%;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Bevölkerung</label>
+        <input type="number" name="population" placeholder="Optional" min="0" style="width:100%;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Notizen</label>
+        <input type="text" name="notes" placeholder="Optional" style="width:100%;" />
+      </div>
+      <div style="margin:0;">
+        <label style="visibility:hidden; display:block;">.</label>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Hinzufügen</button>
+      </div>
+    </form>
+
+    {% if farm_list %}
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Koordinaten</th>
+            <th>Dorf</th>
+            <th>Spieler</th>
+            <th>Bevölkerung</th>
+            <th>Notizen</th>
+            <th>Status</th>
+            <th>Hinzugefügt</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in farm_list %}
+          {% set is_inactive = (entry.x, entry.y) in cross_ref_coords %}
+          <tr>
+            <td>
+              {% if guild.tw_world %}
+              <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ entry.x }}&amp;y={{ entry.y }}"
+                 target="_blank" rel="noopener" style="font-family:monospace;">
+                {{ entry.x }}|{{ entry.y }}
+              </a>
+              {% else %}
+              <span style="font-family:monospace;">{{ entry.x }}|{{ entry.y }}</span>
+              {% endif %}
+            </td>
+            <td>{{ entry.village_name or '—' }}</td>
+            <td>{{ entry.player_name or '—' }}</td>
+            <td>{{ entry.population if entry.population is not none else '—' }}</td>
+            <td style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              {{ entry.notes or '' }}
+            </td>
+            <td>
+              {% if is_inactive %}
+              <span class="badge badge-ok">🎯 Inaktiv</span>
+              {% else %}
+              <span class="badge badge-warn">⚡ Aktiv</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.8rem; color:var(--text-muted);">{{ entry.added_at[:10] }}</td>
+            <td>
+              <form method="post"
+                    action="/guild/{{ guild.guild_id }}/farming/farmlist/delete/{{ entry.id }}"
+                    onsubmit="return confirm('Eintrag löschen?')" style="margin:0;">
+                <button type="submit" class="btn btn-danger"
+                        style="padding:0.2rem 0.5rem; font-size:0.75rem;">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">Noch keine Einträge in der Farmliste.</p>
+    {% endif %}
+  </div>
+
+  <!-- Kreuzreferenz -->
+  {% if cross_reference %}
+  <div class="card" style="margin-bottom:1.25rem; border-color:rgba(46,213,115,0.4);">
+    <h2>🎯 Deine Farmen die inaktiv sind</h2>
+    <p class="hint" style="color:rgba(46,213,115,0.85);">
+      Diese Dörfer aus deiner Farmliste haben sich seit mindestens {{ min_days }} Tagen nicht verändert — ideale Farmziele!
+    </p>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Koordinaten</th>
+            <th>Dorf</th>
+            <th>Spieler</th>
+            <th>Bevölkerung</th>
+            <th>Inaktiv seit</th>
+            <th>Deine Notizen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ref in cross_reference %}
+          <tr style="background:rgba(46,213,115,0.07);">
+            <td>
+              {% if guild.tw_world %}
+              <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ ref.x }}&amp;y={{ ref.y }}"
+                 target="_blank" rel="noopener" style="font-family:monospace;">
+                {{ ref.x }}|{{ ref.y }}
+              </a>
+              {% else %}
+              <span style="font-family:monospace;">{{ ref.x }}|{{ ref.y }}</span>
+              {% endif %}
+            </td>
+            <td>{{ ref.village_name or '—' }}</td>
+            <td>{{ ref.player_name or '—' }}</td>
+            <td><strong>{{ ref.population }}</strong></td>
+            <td>{{ ref.days_tracked }} Tage</td>
+            <td style="color:var(--text-muted);">{{ ref.notes or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if inactive_farms %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+  const farms = {{ inactive_farms | tojson }};
+  const buckets = [0,100,200,300,400,500,600,700,800,900];
+  const labels = buckets.map((b, i) => i < buckets.length - 1 ? `${b}-${buckets[i+1]}` : '900+');
+  const counts = new Array(buckets.length).fill(0);
+  farms.forEach(f => {
+    const pop = f.population || 0;
+    let idx = Math.min(Math.floor(pop / 100), buckets.length - 1);
+    counts[idx]++;
+  });
+  const ctx = document.getElementById('chartPop');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Dörfer',
+        data: counts,
+        backgroundColor: 'rgba(241,196,15,0.6)',
+        borderColor: 'rgba(241,196,15,1)',
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `${c.parsed.y} Dorf/Dörfer` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', stepSize: 1, precision: 0 }, beginAtZero: true }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}
