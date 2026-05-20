@@ -1,3 +1,5 @@
+import asyncio
+import re
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -32,7 +34,7 @@ async def _check_auth(interaction: discord.Interaction) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Embed builders
 # ---------------------------------------------------------------------------
 
 def _build_request_embed(data: dict, status: str) -> discord.Embed:
@@ -41,12 +43,16 @@ def _build_request_embed(data: dict, status: str) -> discord.Embed:
         "hold": discord.Color.orange(),
         "accepted": discord.Color.green(),
         "rejected": discord.Color.red(),
+        "inactive": discord.Color.dark_grey(),
+        "completed": discord.Color.gold(),
     }
     status_labels = {
         "pending": "⏳ Pending",
         "hold": "⏸️ On Hold",
         "accepted": "✅ Accepted",
         "rejected": "❌ Rejected",
+        "inactive": "🔒 Inactive",
+        "completed": "🏆 Completed",
     }
     embed = discord.Embed(
         title="🪖 Res-Push Request",
@@ -62,7 +68,7 @@ def _build_request_embed(data: dict, status: str) -> discord.Embed:
     return embed
 
 
-def _build_push_embed(data: dict, contributions: list[dict]) -> discord.Embed:
+def _build_push_embed(data: dict, contributions: list[dict], status: str = "active") -> discord.Embed:
     total = sum(int(c["amount"]) for c in contributions if c["amount"].isdigit())
     try:
         target = int(data["push_height"])
@@ -73,7 +79,15 @@ def _build_push_embed(data: dict, contributions: list[dict]) -> discord.Embed:
     except (ValueError, ZeroDivisionError):
         progress_text = f"Sent so far: {total:,}"
 
-    embed = discord.Embed(title="🪖 Res-Push", color=discord.Color.green())
+    color = discord.Color.gold() if status == "completed" else \
+            discord.Color.dark_grey() if status == "inactive" else \
+            discord.Color.green()
+
+    title = "🏆 Res-Push — COMPLETED!" if status == "completed" else \
+            "🔒 Res-Push — Inactive" if status == "inactive" else \
+            "🪖 Res-Push"
+
+    embed = discord.Embed(title=title, color=color)
     embed.add_field(name="Player", value=data["player_name"], inline=True)
     embed.add_field(name="Coordinates", value=data["coordinates"], inline=True)
     embed.add_field(name="Push Goal", value=data["push_height"], inline=True)
@@ -87,6 +101,14 @@ def _build_push_embed(data: dict, contributions: list[dict]) -> discord.Embed:
         embed.add_field(name="Contributions", value=contrib_lines, inline=False)
     embed.set_footer(text=f"Requested by {data['user_name']}")
     return embed
+
+
+def _disabled_push_view(label: str) -> discord.ui.View:
+    view = discord.ui.View(timeout=None)
+    view.add_item(discord.ui.Button(label="I sent", emoji="📦", style=discord.ButtonStyle.primary, disabled=True))
+    view.add_item(discord.ui.Button(label=label, style=discord.ButtonStyle.secondary, disabled=True))
+    view.add_item(discord.ui.Button(label="Remove Channel", style=discord.ButtonStyle.danger, disabled=True))
+    return view
 
 
 # ---------------------------------------------------------------------------
@@ -158,10 +180,7 @@ class ResModal(discord.ui.Modal, title="Res-Push Request"):
 
 
 class ResSentModal(discord.ui.Modal, title="How much did you send?"):
-    amount = discord.ui.TextInput(
-        label="Amount Sent", placeholder="e.g. 5000",
-        max_length=20,
-    )
+    amount = discord.ui.TextInput(label="Amount Sent", placeholder="e.g. 5000", max_length=20)
 
     def __init__(self, request_id: int):
         super().__init__()
@@ -179,12 +198,35 @@ class ResSentModal(discord.ui.Modal, title="How much did you send?"):
 
         req = await database.get_res_request_by_id(self.request_id)
         contribs = await database.get_res_contributions(self.request_id)
-        if req and interaction.message:
-            await interaction.message.edit(embed=_build_push_embed(req, contribs))
 
-        await interaction.followup.send(
-            f"✅ Recorded: **{self.amount.value}** sent. Thanks!", ephemeral=True
-        )
+        if not req or not interaction.message:
+            await interaction.followup.send(f"✅ Recorded: **{self.amount.value}** sent. Thanks!", ephemeral=True)
+            return
+
+        # Check if goal is reached
+        total = sum(int(c["amount"]) for c in contribs if c["amount"].isdigit())
+        try:
+            target = int(req["push_height"])
+            if total >= target:
+                await database.update_res_request_status(
+                    answer_message_id=req["answer_message_id"],
+                    status="completed",
+                )
+                completed_embed = _build_push_embed(req, contribs, status="completed")
+                await interaction.message.edit(
+                    content="🏆 **Push goal reached! This push is now complete.**",
+                    embed=completed_embed,
+                    view=_disabled_push_view("Goal Reached!"),
+                )
+                await interaction.followup.send(
+                    f"✅ Recorded: **{self.amount.value}** sent. 🏆 **Push complete!**", ephemeral=True
+                )
+                return
+        except (ValueError, ZeroDivisionError):
+            pass
+
+        await interaction.message.edit(embed=_build_push_embed(req, contribs))
+        await interaction.followup.send(f"✅ Recorded: **{self.amount.value}** sent. Thanks!", ephemeral=True)
 
 
 # ---------------------------------------------------------------------------
@@ -218,32 +260,63 @@ class ResAnswerView(discord.ui.View):
             return
 
         config = await database.get_guild_config(str(interaction.guild.id))
-        if not config or not config.get("res_push_channel_id"):
-            await interaction.response.send_message("⚠️ Res-Push channel not configured.", ephemeral=True)
+        if not config or not config.get("res_push_category_id"):
+            await interaction.response.send_message("⚠️ Res-Push category not configured.", ephemeral=True)
             return
 
         await interaction.response.defer()
 
-        push_channel = interaction.guild.get_channel(int(config["res_push_channel_id"]))
-        if not push_channel:
-            await interaction.followup.send("⚠️ Res-push channel not found.", ephemeral=True)
+        category = interaction.guild.get_channel(int(config["res_push_category_id"]))
+        if not category or not isinstance(category, discord.CategoryChannel):
+            await interaction.followup.send("⚠️ Res-Push category not found.", ephemeral=True)
             return
 
+        # Build permission overwrites for the push channel
+        overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            interaction.guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, embed_links=True,
+                manage_channels=True, manage_messages=True,
+            ),
+        }
+        # Give manager roles explicit access
+        for role_id_str in (config.get("res_manager_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = interaction.guild.get_role(int(role_id_str))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, manage_messages=True,
+                )
+
+        safe_player = re.sub(r"[^a-z0-9]", "-", req["player_name"].lower())
+        channel_name = f"push-{safe_player}"[:100]
+
+        push_channel = await interaction.guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            topic=f"Res-Push: {req['player_name']} @ {req['coordinates']} — Goal: {req['push_height']}",
+            overwrites=overwrites,
+        )
+
         push_embed = _build_push_embed(req, [])
-        push_msg = await push_channel.send(embed=push_embed, view=ResPushView())
+        await push_channel.send(embed=push_embed, view=ResPushChannelView())
 
         await database.update_res_request_status(
             answer_message_id=str(interaction.message.id),
             status="accepted",
-            push_message_id=str(push_msg.id),
+            push_channel_id=str(push_channel.id),
         )
 
         updated = _build_request_embed(req, "accepted")
-        view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="Accepted", style=discord.ButtonStyle.success, disabled=True))
+        done_view = discord.ui.View()
+        done_view.add_item(discord.ui.Button(
+            label="Accepted", style=discord.ButtonStyle.success, disabled=True
+        ))
         await interaction.message.edit(
-            content=f"✅ Accepted by {interaction.user.mention}",
-            embed=updated, view=view,
+            content=f"✅ Accepted by {interaction.user.mention} → {push_channel.mention}",
+            embed=updated, view=done_view,
         )
 
     @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger, custom_id="persistent:res_reject")
@@ -281,25 +354,62 @@ class ResAnswerView(discord.ui.View):
         updated = _build_request_embed(req, "hold")
         await interaction.response.edit_message(
             content=f"⏸️ Put on hold by {interaction.user.mention}",
-            embed=updated,
-            view=ResAnswerView(),
+            embed=updated, view=ResAnswerView(),
         )
 
 
-class ResPushView(discord.ui.View):
+class ResPushChannelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(
         label="I sent", style=discord.ButtonStyle.primary,
-        emoji="📦", custom_id="persistent:res_sent",
+        emoji="📦", custom_id="persistent:res_push_sent",
     )
     async def i_sent(self, interaction: discord.Interaction, button: discord.ui.Button):
-        req = await database.get_res_request_by_push_msg(str(interaction.message.id))
+        req = await database.get_res_request_by_push_channel(str(interaction.channel.id))
         if not req:
             await interaction.response.send_message("⚠️ Request not found.", ephemeral=True)
             return
         await interaction.response.send_modal(ResSentModal(request_id=req["id"]))
+
+    @discord.ui.button(
+        label="Set Inactive", style=discord.ButtonStyle.secondary,
+        emoji="⏸️", custom_id="persistent:res_push_inactive",
+    )
+    async def set_inactive(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _check_auth(interaction):
+            return
+
+        req = await database.get_res_request_by_push_channel(str(interaction.channel.id))
+        if not req:
+            await interaction.response.send_message("⚠️ Request not found.", ephemeral=True)
+            return
+
+        await database.update_res_request_status(req["answer_message_id"], "inactive")
+
+        contribs = await database.get_res_contributions(req["id"])
+        inactive_embed = _build_push_embed(req, contribs, status="inactive")
+        await interaction.response.edit_message(
+            content=f"🔒 Set inactive by {interaction.user.mention}",
+            embed=inactive_embed,
+            view=_disabled_push_view("Inactive"),
+        )
+
+    @discord.ui.button(
+        label="Remove Channel", style=discord.ButtonStyle.danger,
+        custom_id="persistent:res_push_remove",
+    )
+    async def remove_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _check_auth(interaction):
+            return
+
+        await interaction.response.send_message("🗑️ Deleting channel in 5 seconds...", ephemeral=False)
+        await asyncio.sleep(5)
+        try:
+            await interaction.channel.delete(reason=f"Res-Push removed by {interaction.user}")
+        except discord.NotFound:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -314,9 +424,9 @@ class ResPush(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     async def setup_res(self, interaction: discord.Interaction):
         config = await database.get_guild_config(str(interaction.guild.id))
-        if not config or not config.get("res_answer_channel_id") or not config.get("res_push_channel_id"):
+        if not config or not config.get("res_answer_channel_id") or not config.get("res_push_category_id"):
             await interaction.response.send_message(
-                "⚠️ Please configure all Res-Push channel IDs in the web admin panel first.",
+                "⚠️ Please configure all Res-Push settings in the web admin panel first.",
                 ephemeral=True,
             )
             return
@@ -338,5 +448,5 @@ class ResPush(commands.Cog):
 async def setup(bot: commands.Bot):
     bot.add_view(ResRequestView())
     bot.add_view(ResAnswerView())
-    bot.add_view(ResPushView())
+    bot.add_view(ResPushChannelView())
     await bot.add_cog(ResPush(bot))

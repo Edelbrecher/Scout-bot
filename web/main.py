@@ -181,7 +181,7 @@ async def res_push_save(
     guild_id: str,
     res_request_channel_id: str = Form(""),
     res_answer_channel_id: str = Form(""),
-    res_push_channel_id: str = Form(""),
+    res_push_category_id: str = Form(""),
     res_manager_role_ids: str = Form(""),
 ):
     if not get_session_user(request):
@@ -191,7 +191,7 @@ async def res_push_save(
         guild_id=guild_id,
         res_request_channel_id=res_request_channel_id.strip(),
         res_answer_channel_id=res_answer_channel_id.strip(),
-        res_push_channel_id=res_push_channel_id.strip(),
+        res_push_category_id=res_push_category_id.strip(),
         res_manager_role_ids=normalized,
     )
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
@@ -240,17 +240,7 @@ async def res_auto_setup(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{guild_id}/res-push?error=ans_ch_{r.status_code}", status_code=303)
         res_answer_channel_id = r.json()["id"]
 
-        # 4. res-push channel
-        r = await client.post(
-            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-            headers=headers,
-            json={"name": "res-push", "type": 0, "parent_id": category_id},
-        )
-        if r.status_code not in (200, 201):
-            return RedirectResponse(f"/guild/{guild_id}/res-push?error=push_ch_{r.status_code}", status_code=303)
-        res_push_channel_id = r.json()["id"]
-
-        # 5. Post request button
+        # 4. Post request button
         payload = {
             "embeds": [{
                 "title": "🪖 Res-Push Request",
@@ -280,7 +270,7 @@ async def res_auto_setup(request: Request, guild_id: str):
         guild_id=guild_id,
         res_request_channel_id=res_request_channel_id,
         res_answer_channel_id=res_answer_channel_id,
-        res_push_channel_id=res_push_channel_id,
+        res_push_category_id=category_id,
         res_manager_role_ids=guild.get("res_manager_role_ids") or "",
     )
     await database.update_res_button(guild_id, res_request_channel_id, res_button_message_id)

@@ -72,12 +72,20 @@ async def init_db():
             "res_push_channel_id TEXT",
             "res_manager_role_ids TEXT",
             "res_button_message_id TEXT",
+            "res_push_category_id TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
             except Exception:
                 pass
+
+        # Migrate res_requests: add push_channel_id column
+        try:
+            await db.execute("ALTER TABLE res_requests ADD COLUMN push_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
 
 
 async def get_guild_config(guild_id: str) -> dict | None:
@@ -200,12 +208,12 @@ async def get_res_request_by_id(request_id: int) -> dict | None:
             return dict(row) if row else None
 
 
-async def update_res_request_status(answer_message_id: str, status: str, push_message_id: str = ""):
+async def update_res_request_status(answer_message_id: str, status: str, push_channel_id: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
-        if push_message_id:
+        if push_channel_id:
             await db.execute(
-                "UPDATE res_requests SET status = ?, push_message_id = ? WHERE answer_message_id = ?",
-                (status, push_message_id, answer_message_id),
+                "UPDATE res_requests SET status = ?, push_channel_id = ? WHERE answer_message_id = ?",
+                (status, push_channel_id, answer_message_id),
             )
         else:
             await db.execute(
@@ -213,6 +221,16 @@ async def update_res_request_status(answer_message_id: str, status: str, push_me
                 (status, answer_message_id),
             )
         await db.commit()
+
+
+async def get_res_request_by_push_channel(push_channel_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM res_requests WHERE push_channel_id = ?", (push_channel_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def add_res_contribution(request_id: int, user_id: str, user_name: str, amount: str):

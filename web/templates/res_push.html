@@ -40,10 +40,10 @@
         </div>
 
         <div class="form-group">
-          <label for="res_push_channel_id">Res-Push Channel ID</label>
-          <p class="field-hint">Accepted pushes are posted here so members can log their contributions.</p>
-          <input type="text" id="res_push_channel_id" name="res_push_channel_id"
-            value="{{ guild.res_push_channel_id or '' }}"
+          <label for="res_push_category_id">Res-Push Category ID</label>
+          <p class="field-hint">Category where individual push channels are created per accepted request.</p>
+          <input type="text" id="res_push_category_id" name="res_push_category_id"
+            value="{{ guild.res_push_category_id or '' }}"
             placeholder="e.g. 1234567890123456789" />
         </div>
 
@@ -58,14 +58,14 @@
         <button type="submit" class="btn btn-primary">Save Settings</button>
       </form>
 
-      {% if guild.res_request_channel_id and guild.res_answer_channel_id and guild.res_push_channel_id %}
+      {% if guild.res_request_channel_id and guild.res_answer_channel_id and guild.res_push_category_id %}
       <form method="post" action="/guild/{{ guild.guild_id }}/res-push/post-button" style="margin-top:1rem;">
         <button type="submit" class="btn btn-primary">🔘 Post Res-Request Button in Discord</button>
       </form>
       {% endif %}
 
       <hr style="margin:1.5rem 0;">
-      {% if not guild.res_request_channel_id or not guild.res_answer_channel_id or not guild.res_push_channel_id %}
+      {% if not guild.res_request_channel_id or not guild.res_answer_channel_id or not guild.res_push_category_id %}
       <h3>1-Click Auto Setup</h3>
       <p class="hint">Let the bot create the Res-Push category with res-request, res-answer and res-push channels automatically — then post the button.</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/res-push/auto-setup">
@@ -101,9 +101,9 @@
           {% endif %}
         </li>
         <li>
-          <span class="status-label">Res-Push Channel</span>
-          {% if guild.res_push_channel_id %}
-          <span class="badge badge-ok">✅ {{ guild.res_push_channel_id }}</span>
+          <span class="status-label">Res-Push Category</span>
+          {% if guild.res_push_category_id %}
+          <span class="badge badge-ok">✅ {{ guild.res_push_category_id }}</span>
           {% else %}
           <span class="badge badge-warn">⚠️ Not set</span>
           {% endif %}

@@ -81,12 +81,19 @@ async def init_db():
             "res_push_channel_id TEXT",
             "res_manager_role_ids TEXT",
             "res_button_message_id TEXT",
+            "res_push_category_id TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
             except Exception:
                 pass
+
+        try:
+            await db.execute("ALTER TABLE res_requests ADD COLUMN push_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -249,7 +256,7 @@ async def update_res_config(
     guild_id: str,
     res_request_channel_id: str,
     res_answer_channel_id: str,
-    res_push_channel_id: str,
+    res_push_category_id: str,
     res_manager_role_ids: str,
 ):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -257,13 +264,13 @@ async def update_res_config(
             UPDATE guild_configs
             SET res_request_channel_id = ?,
                 res_answer_channel_id  = ?,
-                res_push_channel_id    = ?,
+                res_push_category_id   = ?,
                 res_manager_role_ids   = ?
             WHERE guild_id = ?
         """, (
             res_request_channel_id or None,
             res_answer_channel_id or None,
-            res_push_channel_id or None,
+            res_push_category_id or None,
             res_manager_role_ids or None,
             guild_id,
         ))
@@ -359,7 +366,7 @@ async def reset_res_config(guild_id: str):
         await db.execute("""
             UPDATE guild_configs
             SET res_request_channel_id = NULL, res_answer_channel_id = NULL,
-                res_push_channel_id = NULL, res_button_message_id = NULL
+                res_push_category_id = NULL, res_button_message_id = NULL
             WHERE guild_id = ?
         """, (guild_id,))
         await db.commit()
