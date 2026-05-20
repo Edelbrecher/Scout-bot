@@ -197,6 +197,96 @@ async def res_push_save(
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/res-push/auto-setup")
+async def res_auto_setup(request: Request, guild_id: str):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient() as client:
+        # 1. Create category
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "Res-Push", "type": 4},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/res-push?error=category_{r.status_code}", status_code=303)
+        category_id = r.json()["id"]
+
+        # 2. res-request channel
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "res-request", "type": 0, "parent_id": category_id},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/res-push?error=req_ch_{r.status_code}", status_code=303)
+        res_request_channel_id = r.json()["id"]
+
+        # 3. res-answer channel
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "res-answer", "type": 0, "parent_id": category_id},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/res-push?error=ans_ch_{r.status_code}", status_code=303)
+        res_answer_channel_id = r.json()["id"]
+
+        # 4. res-push channel
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers,
+            json={"name": "res-push", "type": 0, "parent_id": category_id},
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/res-push?error=push_ch_{r.status_code}", status_code=303)
+        res_push_channel_id = r.json()["id"]
+
+        # 5. Post request button
+        payload = {
+            "embeds": [{
+                "title": "🪖 Res-Push Request",
+                "description": "Click the button below to submit a resource push request.",
+                "color": 5793266,
+            }],
+            "components": [{
+                "type": 1,
+                "components": [{
+                    "type": 2, "style": 1,
+                    "label": "Res Request",
+                    "emoji": {"name": "🪖"},
+                    "custom_id": "persistent:res_request",
+                }]
+            }]
+        }
+        r = await client.post(
+            f"https://discord.com/api/v10/channels/{res_request_channel_id}/messages",
+            headers=headers,
+            json=payload,
+        )
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/res-push?error=button_{r.status_code}", status_code=303)
+        res_button_message_id = r.json()["id"]
+
+    await database.update_res_config(
+        guild_id=guild_id,
+        res_request_channel_id=res_request_channel_id,
+        res_answer_channel_id=res_answer_channel_id,
+        res_push_channel_id=res_push_channel_id,
+        res_manager_role_ids=guild.get("res_manager_role_ids") or "",
+    )
+    await database.update_res_button(guild_id, res_request_channel_id, res_button_message_id)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
 @app.post("/guild/{guild_id}/res-push/post-button")
 async def res_post_button(request: Request, guild_id: str):
     if not get_session_user(request):
