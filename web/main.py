@@ -170,7 +170,9 @@ async def auth_callback(request: Request, code: str = "", error: str = ""):
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         if r.status_code != 200:
-            return RedirectResponse("/login?error=Token+exchange+failed")
+            import urllib.parse
+            detail = urllib.parse.quote(f"Token exchange failed: {r.status_code} {r.text[:200]}")
+            return RedirectResponse(f"/login?error={detail}")
         access_token = r.json()["access_token"]
 
         # Fetch Discord user
