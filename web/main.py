@@ -447,7 +447,13 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard")
     res_requests = await database.get_res_requests(guild_id)
-    return templates.TemplateResponse("res_push.html", {"request": request, "guild": guild, "res_requests": res_requests, "saved": saved})
+    token = os.environ.get("DISCORD_TOKEN", "")
+    roles = []
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"https://discord.com/api/v10/guilds/{guild_id}/roles", headers={"Authorization": f"Bot {token}"})
+        if r.status_code == 200:
+            roles = sorted(r.json(), key=lambda x: x.get("position", 0), reverse=True)
+    return templates.TemplateResponse("res_push.html", {"request": request, "guild": guild, "res_requests": res_requests, "saved": saved, "roles": roles})
 
 
 @app.post("/guild/{guild_id}/res-push")

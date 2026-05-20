@@ -128,6 +128,90 @@
     </div>
   </div>
 
+  <!-- Roles -->
+  <div class="card mt-1">
+    <h2>Server Roles ({{ roles|length }})</h2>
+    <p class="hint">Toggle which roles can accept/reject/hold requests in the Res-Answer channel.</p>
+    {% if roles %}
+    {% set res_roles = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Role ID</th>
+          <th title="Can accept/reject/hold res-push requests in res-answer">🪖 Res-Answer<br><small>Accept / Reject</small></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for role in roles %}
+        {% if role.name != '@everyone' %}
+        <tr>
+          <td>
+            {% if role.color %}
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;"></span>
+            {% endif %}
+            <strong>{{ role.name }}</strong>
+          </td>
+          <td><code style="user-select:all; font-size:0.78rem;">{{ role.id }}</code></td>
+          <td style="text-align:center;">
+            <button
+              class="role-toggle {% if role.id in res_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}"
+              data-role="{{ role.id }}"
+              data-field="res_manager_role_ids"
+              title="{{ 'Remove from Res-Answer' if role.id in res_roles else 'Add to Res-Answer' }}"
+            >{{ '✅' if role.id in res_roles else '○' }}</button>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Roles could not be loaded.</p>
+    {% endif %}
+  </div>
+
+<script>
+document.querySelectorAll('.role-toggle').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const guild = btn.dataset.guild;
+    const role  = btn.dataset.role;
+    const field = btn.dataset.field;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    try {
+      const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `field=${encodeURIComponent(field)}`
+      });
+      const text = await res.text();
+      if (res.ok) {
+        const data = JSON.parse(text);
+        const active = data.added;
+        btn.innerHTML = active ? '✅' : '○';
+        btn.classList.toggle('active', active);
+        btn.title = active ? 'Remove from Res-Answer' : 'Add to Res-Answer';
+        const inputEl = document.getElementById('res_manager_role_ids');
+        if (inputEl) {
+          const current = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
+          if (active) { if (!current.includes(role)) current.push(role); }
+          else { const idx = current.indexOf(role); if (idx !== -1) current.splice(idx, 1); }
+          inputEl.value = current.join(', ');
+        }
+      } else {
+        console.error('Toggle failed:', res.status, text);
+      }
+    } catch(e) {
+      console.error('Toggle error:', e);
+    }
+    btn.disabled = false;
+    btn.style.opacity = '';
+  });
+});
+</script>
+
   <!-- Requests Table -->
   <div class="card mt-1">
     <h2>Push Requests ({{ res_requests|length }})</h2>
