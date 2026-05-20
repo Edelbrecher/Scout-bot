@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Stats · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+{% block title %}Statistics · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -16,43 +16,40 @@
   <div class="card">
     <h2>Server Info</h2>
     <ul class="status-list">
-      <li><span class="status-label">Name</span><span>{{ discord_guild.name }}</span></li>
       <li><span class="status-label">Members</span><span>{{ discord_guild.approximate_member_count }}</span></li>
       <li><span class="status-label">Online</span><span>{{ discord_guild.approximate_presence_count }}</span></li>
       <li><span class="status-label">Boost Level</span><span>{{ discord_guild.premium_tier }}</span></li>
       <li><span class="status-label">Boosts</span><span>{{ discord_guild.premium_subscription_count or 0 }}</span></li>
-      <li><span class="status-label">Channels</span><span>{{ discord_guild.channels|length if discord_guild.channels else '—' }}</span></li>
-      <li><span class="status-label">Roles</span><span>{{ discord_guild.roles|length if discord_guild.roles else '—' }}</span></li>
       <li><span class="status-label">Region</span><span>{{ discord_guild.preferred_locale }}</span></li>
     </ul>
   </div>
   {% endif %}
 
-  <!-- Scout counts -->
-  <div class="grid-3 mt-1">
+  <!-- ── Scout ── -->
+  <h2 style="margin:1.5rem 0 0.5rem;">🔍 Scout</h2>
+  <div class="grid-3">
     <div class="card text-center">
-      <div class="stat-number">{{ stats.total }}</div>
+      <div class="stat-number">{{ scout_stats.total }}</div>
       <div class="stat-label">Total Requests</div>
     </div>
     <div class="card text-center">
-      <div class="stat-number">{{ stats.last7 }}</div>
+      <div class="stat-number">{{ scout_stats.last7 }}</div>
       <div class="stat-label">Last 7 Days</div>
     </div>
     <div class="card text-center">
-      <div class="stat-number">{{ stats.today }}</div>
+      <div class="stat-number">{{ scout_stats.today }}</div>
       <div class="stat-label">Today</div>
     </div>
   </div>
 
   <div class="grid-2 mt-1">
-    <!-- Top players -->
     <div class="card">
       <h2>Top Scouted Players</h2>
-      {% if stats.top_players %}
+      {% if scout_stats.top_players %}
       <table class="table">
         <thead><tr><th>#</th><th>Player</th><th>Requests</th></tr></thead>
         <tbody>
-          {% for row in stats.top_players %}
+          {% for row in scout_stats.top_players %}
           <tr>
             <td class="mono small">{{ loop.index }}</td>
             <td>{{ row.player }}</td>
@@ -66,14 +63,13 @@
       {% endif %}
     </div>
 
-    <!-- Top coordinates -->
     <div class="card">
       <h2>Top Coordinates</h2>
-      {% if stats.top_coords %}
+      {% if scout_stats.top_coords %}
       <table class="table">
         <thead><tr><th>#</th><th>Coordinates</th><th>Requests</th></tr></thead>
         <tbody>
-          {% for row in stats.top_coords %}
+          {% for row in scout_stats.top_coords %}
           <tr>
             <td class="mono small">{{ loop.index }}</td>
             <td><code>{{ row.coordinates }}</code></td>
@@ -88,23 +84,17 @@
     </div>
   </div>
 
-  <!-- Recent requests -->
   <div class="card mt-1">
-    <h2>Recent Requests</h2>
-    {% if stats.recent %}
+    <h2>Recent Scout Requests</h2>
+    {% if scout_stats.recent %}
     <table class="table">
       <thead>
         <tr>
-          <th>Player</th>
-          <th>Village</th>
-          <th>Coordinates</th>
-          <th>Time</th>
-          <th>Additional Info</th>
-          <th>Created</th>
+          <th>Player</th><th>Village</th><th>Coordinates</th><th>Time</th><th>Additional Info</th><th>Created</th>
         </tr>
       </thead>
       <tbody>
-        {% for ch in stats.recent %}
+        {% for ch in scout_stats.recent %}
         <tr>
           <td>{{ ch.player }}</td>
           <td>{{ ch.village }}</td>
@@ -120,5 +110,119 @@
     <p class="empty">No scout requests yet.</p>
     {% endif %}
   </div>
+
+  <!-- ── Res-Push ── -->
+  <h2 style="margin:1.5rem 0 0.5rem;">🪖 Res-Push</h2>
+  <div class="grid-3">
+    <div class="card text-center">
+      <div class="stat-number">{{ res_stats.total }}</div>
+      <div class="stat-label">Total Requests</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-number">{{ res_stats.by_status.get('accepted', 0) }}</div>
+      <div class="stat-label">Accepted</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-number">{{ res_stats.by_status.get('rejected', 0) }}</div>
+      <div class="stat-label">Rejected</div>
+    </div>
+  </div>
+
+  {% if res_stats.top_contributors %}
+  <div class="card mt-1">
+    <h2>Top Contributors</h2>
+    <table class="table">
+      <thead><tr><th>#</th><th>User</th><th>Contributions</th><th>Total Sent</th></tr></thead>
+      <tbody>
+        {% for row in res_stats.top_contributors %}
+        <tr>
+          <td class="mono small">{{ loop.index }}</td>
+          <td>{{ row.user_name }}</td>
+          <td>{{ row.cnt }}</td>
+          <td><strong>{{ row.total_sent or 0 }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="card mt-1">
+    <h2>Recent Res-Push Requests</h2>
+    {% if res_stats.recent %}
+    <table class="table">
+      <thead>
+        <tr><th>User</th><th>Village</th><th>Resource</th><th>Amount</th><th>Status</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for r in res_stats.recent %}
+        <tr>
+          <td>{{ r.user_name }}</td>
+          <td>{{ r.village_name or '—' }}</td>
+          <td>{{ r.resource_type or '—' }}</td>
+          <td>{{ r.amount or '—' }}</td>
+          <td>
+            {% if r.status == 'accepted' %}<span class="badge badge-ok">✅ Accepted</span>
+            {% elif r.status == 'rejected' %}<span class="badge" style="background:rgba(220,50,50,.15);color:#e05555;">❌ Rejected</span>
+            {% elif r.status == 'inactive' %}<span class="badge" style="background:rgba(100,100,100,.15);color:#888;">— Inactive</span>
+            {% else %}<span class="badge badge-warn">⏳ {{ r.status }}</span>{% endif %}
+          </td>
+          <td class="mono small">{{ r.created_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No res-push requests yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Polls ── -->
+  <h2 style="margin:1.5rem 0 0.5rem;">📅 Polls</h2>
+  {% set active_polls  = polls | selectattr('status', 'eq', 'active')  | list %}
+  {% set closed_polls  = polls | selectattr('status', 'eq', 'closed')  | list %}
+  <div class="grid-3">
+    <div class="card text-center">
+      <div class="stat-number">{{ polls | length }}</div>
+      <div class="stat-label">Total Polls</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-number">{{ active_polls | length }}</div>
+      <div class="stat-label">Active</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-number">{{ closed_polls | length }}</div>
+      <div class="stat-label">Closed</div>
+    </div>
+  </div>
+
+  {% if polls %}
+  <div class="card mt-1">
+    <h2>All Polls</h2>
+    <table class="table">
+      <thead>
+        <tr><th>Title</th><th>Event Date (UTC)</th><th>✅ Available</th><th>⏰ Maybe</th><th>❌ Not available</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for poll in polls %}
+        <tr>
+          <td><strong>{{ poll.title }}</strong>{% if poll.description %}<br><span class="mono small">{{ poll.description }}</span>{% endif %}</td>
+          <td class="mono small">{{ poll.event_datetime.replace('T', ' ') }}</td>
+          <td style="color:#4caf82; font-weight:700;">{{ poll.count_available }}</td>
+          <td style="color:#c89b00; font-weight:700;">{{ poll.count_maybe }}</td>
+          <td style="color:#e05555; font-weight:700;">{{ poll.count_unavailable }}</td>
+          <td>
+            {% if poll.status == 'active' %}<span class="badge badge-ok">🟢 Active</span>
+            {% else %}<span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;">🔒 Closed</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card mt-1"><p class="empty">No polls created yet.</p></div>
+  {% endif %}
+
 </div>
 {% endblock %}

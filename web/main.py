@@ -359,7 +359,6 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    scout_channels = await database.get_scout_channels(guild_id)
 
     token = os.environ.get("DISCORD_TOKEN", "")
     roles = []
@@ -373,8 +372,55 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
 
     return templates.TemplateResponse(
         "guild.html",
-        {"request": request, "guild": guild, "scout_channels": scout_channels, "saved": saved, "roles": roles},
+        {"request": request, "guild": guild, "saved": saved, "roles": roles},
     )
+
+
+@app.get("/guild/{guild_id}/scout", response_class=HTMLResponse)
+async def scout_page(request: Request, guild_id: str, saved: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    scout_channels = await database.get_scout_channels(guild_id)
+    return templates.TemplateResponse(
+        "scout.html",
+        {"request": request, "guild": guild, "scout_channels": scout_channels, "saved": saved},
+    )
+
+
+@app.post("/guild/{guild_id}/scout")
+async def scout_save(
+    request: Request,
+    guild_id: str,
+    category_id: str = Form(""),
+    archive_channel_id: str = Form(""),
+    allowed_role_ids: str = Form(""),
+    scout_channel_id: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    category_id = sanitize_snowflake(category_id)
+    archive_channel_id = sanitize_snowflake(archive_channel_id)
+    scout_channel_id = sanitize_snowflake(scout_channel_id)
+    normalized_roles = sanitize_snowflake_list(allowed_role_ids)
+
+    await database.update_guild_config(
+        guild_id=guild_id,
+        category_id=category_id,
+        archive_channel_id=archive_channel_id,
+        allowed_role_ids=normalized_roles,
+        scout_channel_id=scout_channel_id,
+    )
+    if archive_channel_id:
+        await _sync_archive_permissions(guild_id, archive_channel_id, normalized_roles)
+    return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}")
@@ -433,7 +479,7 @@ async def reset_scout(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     await database.reset_scout_config(guild_id)
-    return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/reset")
@@ -489,7 +535,7 @@ async def auto_setup(request: Request, guild_id: str):
         button_message_id = r.json()["id"]
 
     await database.auto_setup_guild(guild_id=guild_id, category_id=category_id, scout_channel_id=scout_channel_id, archive_channel_id=archive_channel_id, button_message_id=button_message_id)
-    return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
 
 
 @app.get("/guild/{guild_id}/stats", response_class=HTMLResponse)
@@ -502,7 +548,9 @@ async def guild_stats(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
 
-    stats = await database.get_guild_stats(guild_id)
+    scout_stats = await database.get_guild_stats(guild_id)
+    res_stats = await database.get_res_stats(guild_id)
+    polls = await database.get_polls(guild_id)
     token = os.environ.get("DISCORD_TOKEN", "")
     discord_guild = None
     async with httpx.AsyncClient() as client:
@@ -510,7 +558,11 @@ async def guild_stats(request: Request, guild_id: str):
         if r.status_code == 200:
             discord_guild = r.json()
 
-    return templates.TemplateResponse("stats.html", {"request": request, "guild": guild, "stats": stats, "discord_guild": discord_guild})
+    return templates.TemplateResponse("stats.html", {
+        "request": request, "guild": guild,
+        "scout_stats": scout_stats, "res_stats": res_stats, "polls": polls,
+        "discord_guild": discord_guild,
+    })
 
 
 @app.post("/guild/{guild_id}/post-button")
@@ -536,8 +588,8 @@ async def post_button(request: Request, guild_id: str):
     if resp.status_code in (200, 201):
         msg_id = resp.json().get("id", "")
         await database.update_button_message(guild_id, channel_id, msg_id)
-        return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
-    return RedirectResponse(f"/guild/{guild_id}?error=discord_{resp.status_code}", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/scout?error=discord_{resp.status_code}", status_code=303)
 
 
 # ---------------------------------------------------------------------------
