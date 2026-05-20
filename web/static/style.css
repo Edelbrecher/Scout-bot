@@ -325,3 +325,21 @@ input:focus { border-color: var(--primary); }
 .btn-action-ok:hover   { background: rgba(50,200,100,.35); }
 .btn-action-warn:hover { background: rgba(220,160,0,.35); }
 .btn-action-err:hover  { background: rgba(220,50,50,.35); }
+
+.btn-discord {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #5865F2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  margin-top: 1.5rem;
+  transition: background 0.15s;
+}
+.btn-discord:hover { background: #4752c4; }
