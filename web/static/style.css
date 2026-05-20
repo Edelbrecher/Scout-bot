@@ -310,3 +310,18 @@ input:focus { border-color: var(--primary); }
   text-decoration: none;
 }
 .btn-danger:hover { background: rgba(200,30,30,.9); }
+
+.btn-action {
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-action-ok   { background: rgba(50,200,100,.2); color: #4caf82; }
+.btn-action-warn { background: rgba(220,160,0,.2);  color: #c89b00; }
+.btn-action-err  { background: rgba(220,50,50,.2);  color: #e05555; }
+.btn-action-ok:hover   { background: rgba(50,200,100,.35); }
+.btn-action-warn:hover { background: rgba(220,160,0,.35); }
+.btn-action-err:hover  { background: rgba(220,50,50,.35); }

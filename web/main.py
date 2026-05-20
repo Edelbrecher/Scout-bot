@@ -321,6 +321,38 @@ async def res_post_button(request: Request, guild_id: str):
         return RedirectResponse(f"/guild/{guild_id}/res-push?error=discord_{resp.status_code}", status_code=303)
 
 
+@app.post("/guild/{guild_id}/res-push/requests/{request_id}/inactive")
+async def res_request_inactive(request: Request, guild_id: str, request_id: int):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    await database.set_res_request_status_by_id(request_id, "inactive")
+    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/requests/{request_id}/activate")
+async def res_request_activate(request: Request, guild_id: str, request_id: int):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    await database.set_res_request_status_by_id(request_id, "accepted")
+    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")
+async def res_request_remove(request: Request, guild_id: str, request_id: int):
+    if not get_session_user(request):
+        return RedirectResponse("/login")
+    req = await database.get_res_request_by_id_web(request_id)
+    if req and req.get("push_channel_id"):
+        token = os.environ.get("DISCORD_TOKEN", "")
+        async with httpx.AsyncClient() as client:
+            await client.delete(
+                f"https://discord.com/api/v10/channels/{req['push_channel_id']}",
+                headers={"Authorization": f"Bot {token}"},
+            )
+    await database.delete_res_request(request_id)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+
+
 @app.get("/guild/{guild_id}/res-push/stats", response_class=HTMLResponse)
 async def res_push_stats(request: Request, guild_id: str):
     if not get_session_user(request):

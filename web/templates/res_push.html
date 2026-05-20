@@ -142,6 +142,7 @@
           <th>Status</th>
           <th>Requested By</th>
           <th>Created</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -152,14 +153,32 @@
           <td>{{ req.push_height }}</td>
           <td>{{ req.reason or '—' }}</td>
           <td>
-            {% if req.status == 'accepted' %}<span class="badge badge-ok">✅ Accepted</span>
+            {% if req.status == 'accepted' %}<span class="badge badge-ok">✅ Active</span>
+            {% elif req.status == 'completed' %}<span class="badge badge-ok">🏆 Completed</span>
             {% elif req.status == 'rejected' %}<span class="badge badge-err">❌ Rejected</span>
             {% elif req.status == 'hold' %}<span class="badge badge-warn">⏸️ On Hold</span>
+            {% elif req.status == 'inactive' %}<span class="badge" style="background:rgba(100,100,100,.2);color:#aaa;">🔒 Inactive</span>
             {% else %}<span class="badge badge-warn">⏳ Pending</span>
             {% endif %}
           </td>
           <td>{{ req.user_name }}</td>
           <td class="mono small">{{ req.created_at[:16] }}</td>
+          <td>
+            <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+              {% if req.status == 'inactive' %}
+              <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/activate">
+                <button type="submit" class="btn-action btn-action-ok" title="Activate">▶ Activate</button>
+              </form>
+              {% elif req.status not in ('completed', 'rejected') %}
+              <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/inactive">
+                <button type="submit" class="btn-action btn-action-warn" title="Set Inactive">⏸ Inactive</button>
+              </form>
+              {% endif %}
+              <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/remove" onsubmit="return confirm('Remove this push request and its Discord channel?')">
+                <button type="submit" class="btn-action btn-action-err" title="Remove">🗑 Remove</button>
+              </form>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

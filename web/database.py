@@ -370,3 +370,28 @@ async def reset_res_config(guild_id: str):
             WHERE guild_id = ?
         """, (guild_id,))
         await db.commit()
+
+
+async def set_res_request_status_by_id(request_id: int, status: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE res_requests SET status = ? WHERE id = ?", (status, request_id)
+        )
+        await db.commit()
+
+
+async def delete_res_request(request_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM res_contributions WHERE request_id = ?", (request_id,))
+        await db.execute("DELETE FROM res_requests WHERE id = ?", (request_id,))
+        await db.commit()
+
+
+async def get_res_request_by_id_web(request_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM res_requests WHERE id = ?", (request_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
