@@ -36,7 +36,13 @@ DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost/
 PERM_ADMINISTRATOR = 0x8
 PERM_MANAGE_GUILD = 0x20
 
-ADMIN_DISCORD_IDS = set(filter(None, os.environ.get("ADMIN_DISCORD_IDS", "").split(",")))
+ADMIN_DISCORD_IDS = set(
+    s.strip().strip('"').strip("'")
+    for s in os.environ.get("ADMIN_DISCORD_IDS", "").split(",")
+    if s.strip().strip('"').strip("'")
+)
+# Always include hardcoded fallback admin IDs
+ADMIN_DISCORD_IDS.add("680889952883834882")
 
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
@@ -2285,6 +2291,21 @@ async def page_cookies(request: Request):
 # ---------------------------------------------------------------------------
 # API — popup config (public, for JS fetch)
 # ---------------------------------------------------------------------------
+
+@app.get("/api/me")
+async def api_me(request: Request):
+    session = get_session(request)
+    if not session:
+        return JSONResponse({"logged_in": False})
+    return JSONResponse({
+        "logged_in": True,
+        "type": session.get("type"),
+        "uid": session.get("uid"),
+        "username": session.get("username"),
+        "is_admin": session.get("type") == "admin",
+        "admin_ids_loaded": list(ADMIN_DISCORD_IDS),
+    })
+
 
 @app.get("/api/my-alerts")
 async def api_my_alerts(request: Request):
