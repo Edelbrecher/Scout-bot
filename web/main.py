@@ -1835,9 +1835,54 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
         return RedirectResponse("/dashboard")
     err = await _require_premium(guild, guild_id)
     if err: return err
+    import json as _jl, datetime as _dtl, math as _ml
     is_admin = session.get("type") == "admin"
     attack_reports = await database.get_attack_reports(guild_id, limit=50)
     attack_stats = await database.get_attack_stats(guild_id)
+
+    # For each report: parse arrival times and detect zwischendef windows
+    def _parse_remaining(arrival_str):
+        import re as _re2
+        m = _re2.search(r"in\s+(\d+):(\d+):(\d+)", arrival_str or "")
+        return int(m.group(1))*3600+int(m.group(2))*60+int(m.group(3)) if m else None
+
+    enriched_reports = []
+    for rpt in attack_reports:
+        try:
+            waves = _jl.loads(rpt.get("attacks_json") or "[]")
+        except Exception:
+            waves = []
+        created_at = rpt.get("created_at", "")
+        try:
+            created_ts = _dtl.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except Exception:
+            created_ts = None
+        timed_waves = []
+        for w in waves:
+            rs = _parse_remaining(w.get("arrival", ""))
+            if created_ts and rs is not None:
+                timed_waves.append(created_ts + _dtl.timedelta(seconds=rs))
+            else:
+                timed_waves.append(None)
+        # Detect zwischendef
+        zw = []
+        valid = [(i, t) for i, t in enumerate(timed_waves) if t]
+        valid.sort(key=lambda x: x[1])
+        for j in range(len(valid)-1):
+            ia, ta = valid[j]
+            ib, tb = valid[j+1]
+            if ta != tb:
+                gap = int((tb - ta).total_seconds())
+                if gap > 60:
+                    gap_m = gap // 60
+                    zw.append({
+                        "wave_a": ia+1, "wave_b": ib+1,
+                        "gap_label": f"{gap_m//60}h {gap_m%60}min" if gap_m>=60 else f"{gap_m}min",
+                        "arrival_a": ta.strftime("%H:%M UTC"),
+                        "arrival_b": tb.strftime("%H:%M UTC"),
+                    })
+        enriched_reports.append({**dict(rpt), "zwischendef": zw, "wave_count": len(waves)})
+
     return templates.TemplateResponse(
         "attacks.html",
         {
@@ -1845,7 +1890,7 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
             "guild": guild,
             "saved": saved,
             "is_admin": is_admin,
-            "attack_reports": attack_reports,
+            "attack_reports": enriched_reports,
             "attack_stats": attack_stats,
         },
     )
@@ -1973,26 +2018,31 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         def_x = atk.get("def_x")
         def_y = atk.get("def_y")
 
+        # Offline time from report (user was offline this long → adds to possible march window)
+        offline_seconds = atk.get("offline_seconds", 0) or 0
+
         # Server-side speed analysis if we have both coord sets + remaining time
         speed_analysis = None
+        import datetime as _dt
+        try:
+            created_ts = _dt.datetime.fromisoformat(report["created_at"].replace("Z", "+00:00"))
+        except Exception:
+            created_ts = None
+
+        arrival_ts = None
+        if created_ts and remaining_seconds is not None:
+            arrival_ts = created_ts + _dt.timedelta(seconds=remaining_seconds)
+
         if atk_x is not None and def_x is not None and remaining_seconds is not None:
             dist = travian_dist(atk_x, atk_y, def_x, def_y)
+            # Total possible window = remaining + offline (attack could have been sent while offline)
+            total_window_seconds = remaining_seconds + offline_seconds
+            total_window_hours = total_window_seconds / 3600.0
+            # max_speed: if the attack was sent right as user went offline
+            max_speed = dist / total_window_hours if total_window_hours > 0 else 0
+            # min_speed: attack was sent as soon as it was visible (remaining only)
             remaining_hours = remaining_seconds / 3600.0
-            # max possible slowest speed: if speed > dist/remaining_h the attack would have already arrived
-            max_speed = dist / remaining_hours if remaining_hours > 0 else 0
-
-            # For each known troop speed, determine if it could be the slowest unit
-            # A troop with speed S is POSSIBLE as slowest if S <= max_speed
-            # And the departure time = arrival_time - dist/S*3600
-            import datetime as _dt
-            try:
-                created_ts = _dt.datetime.fromisoformat(report["created_at"].replace("Z", "+00:00"))
-            except Exception:
-                created_ts = None
-
-            arrival_ts = None
-            if created_ts and remaining_seconds is not None:
-                arrival_ts = created_ts + _dt.timedelta(seconds=remaining_seconds)
+            min_speed = dist / remaining_hours if remaining_hours > 0 else 0
 
             possible_speeds = []
             seen_speeds = set()
@@ -2000,24 +2050,25 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
                 s = tdata["speed"]
                 if s in seen_speeds:
                     continue
-                if s > max_speed + 0.01:  # small tolerance
+                # Possible if speed <= min_speed (certain) or <= max_speed (possible with offline window)
+                if s > max_speed + 0.01:
                     continue
                 seen_speeds.add(s)
                 total_march_s = int(dist / s * 3600)
                 departure_ts = None
                 if arrival_ts:
                     departure_ts = arrival_ts - _dt.timedelta(seconds=total_march_s)
+                certain = s <= min_speed + 0.01  # certain even without offline window
                 possible_speeds.append({
                     "speed": s,
                     "total_march_s": total_march_s,
                     "departure": departure_ts.strftime("%H:%M:%S %d.%m.") if departure_ts else None,
+                    "certain": certain,
                 })
             possible_speeds.sort(key=lambda x: x["speed"])
 
-            # Best match: speed closest to max_speed (most likely slowest troop)
-            best_speed = max(possible_speeds, key=lambda x: x["speed"])["speed"] if possible_speeds else None
+            best_speed = max((p for p in possible_speeds if p["certain"]), key=lambda x: x["speed"])["speed"] if any(p["certain"] for p in possible_speeds) else (max(possible_speeds, key=lambda x: x["speed"])["speed"] if possible_speeds else None)
 
-            # Which troops match each possible speed exactly
             speed_to_troops = {}
             for tname, tdata in TROOP_DATA.items():
                 s = tdata["speed"]
@@ -2027,7 +2078,10 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
             speed_analysis = {
                 "dist": round(dist, 1),
                 "remaining_hours": round(remaining_hours, 2),
+                "offline_hours": round(offline_seconds / 3600, 2),
+                "total_window_hours": round(total_window_hours, 2),
                 "max_speed": round(max_speed, 2),
+                "min_speed": round(min_speed, 2),
                 "possible_speeds": possible_speeds,
                 "speed_to_troops": {str(k): v for k, v in speed_to_troops.items()},
                 "best_speed": best_speed,
@@ -2036,8 +2090,19 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
                 "arrival_ts": arrival_ts.strftime("%d.%m. %H:%M:%S UTC") if arrival_ts else None,
             }
 
-        # Look up attacker in map snapshots
+        # Map lookup: attacker player data + attacker village confirmation + defender village
         attacker_data = await database.get_player_from_snapshot(guild_id, atk.get("attacker", ""))
+        # Confirm attacker village from map
+        attacker_village_data = None
+        if atk_x is not None and attacker_data:
+            for v in attacker_data.get("villages", []):
+                if v["x"] == atk_x and v["y"] == atk_y:
+                    attacker_village_data = v
+                    break
+        # Look up defender village from map by coords
+        defender_village_data = None
+        if def_x is not None and def_y is not None:
+            defender_village_data = await database.get_village_from_snapshot(guild_id, def_x, def_y)
 
         enriched.append({
             **atk,
@@ -2050,13 +2115,18 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
             "atk_y": atk_y,
             "def_x": def_x,
             "def_y": def_y,
+            "offline_seconds": offline_seconds,
             "attacker_data": attacker_data,
+            "attacker_village_data": attacker_village_data,
+            "defender_village_data": defender_village_data,
             "remaining_seconds": remaining_seconds,
+            "arrival_ts": arrival_ts,
             "speed_analysis": speed_analysis,
             "is_stack": False,
+            "stack_count": 1,
         })
 
-    # Wave stack detection: group by arrival time, mark coordinated stacks
+    # Wave stack detection: same arrival → stack
     from collections import defaultdict as _defaultdict
     arrival_groups = _defaultdict(list)
     for i, atk in enumerate(enriched):
@@ -2068,6 +2138,31 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
             for i in indices:
                 enriched[i]["is_stack"] = True
                 enriched[i]["stack_count"] = len(indices)
+
+    # Zwischendef detection: multiple waves with DIFFERENT arrival times
+    import datetime as _dt2
+    zwischendef_windows = []
+    if len(enriched) > 1:
+        # Sort by arrival_ts
+        timed = [(i, e) for i, e in enumerate(enriched) if e.get("arrival_ts")]
+        timed.sort(key=lambda x: x[1]["arrival_ts"])
+        for j in range(len(timed) - 1):
+            idx_a, wave_a = timed[j]
+            idx_b, wave_b = timed[j + 1]
+            if wave_a["arrival_ts"] != wave_b["arrival_ts"]:
+                gap = (wave_b["arrival_ts"] - wave_a["arrival_ts"]).total_seconds()
+                if gap > 60:  # only meaningful gaps
+                    gap_m = int(gap // 60)
+                    zwischendef_windows.append({
+                        "wave_a": j + 1,
+                        "wave_b": j + 2,
+                        "arrival_a": wave_a["arrival_ts"].strftime("%H:%M:%S UTC"),
+                        "arrival_b": wave_b["arrival_ts"].strftime("%H:%M:%S UTC"),
+                        "gap_seconds": int(gap),
+                        "gap_label": f"{gap_m // 60}h {gap_m % 60}min" if gap_m >= 60 else f"{gap_m}min",
+                        "attacker_a": wave_a.get("attacker", "?"),
+                        "attacker_b": wave_b.get("attacker", "?"),
+                    })
 
     import json as _json2
     troop_data_json = _json2.dumps(TROOP_DATA)
@@ -2086,6 +2181,7 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         "TRIBE_EMOJI": TRIBE_EMOJI,
         "troop_data_json": troop_data_json,
         "troop_data": TROOP_DATA,
+        "zwischendef_windows": zwischendef_windows,
     })
 
 

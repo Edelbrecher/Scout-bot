@@ -17,17 +17,28 @@
     </p>
   </div>
 
-  <!-- Defender coords input (shared for all waves) -->
-  <div class="card" style="margin-bottom:1.5rem; padding:1rem 1.25rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-      <span style="font-size:0.88rem; font-weight:600;">📍 Eigene Dorfkoordinaten:</span>
-      <input id="def-x" type="number" placeholder="X" style="width:70px; padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-main); color:var(--text);">
-      <span style="color:var(--text-muted);">|</span>
-      <input id="def-y" type="number" placeholder="Y" style="width:70px; padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-main); color:var(--text);">
-      <button onclick="runAnalysis()" style="padding:0.35rem 0.9rem; border-radius:6px; border:none; background:#3b82f6; color:#fff; cursor:pointer; font-size:0.85rem; font-weight:600;">Analysieren</button>
-      <span id="coord-hint" style="font-size:0.78rem; color:var(--text-muted);"></span>
+  <!-- Zwischendef-Warnung -->
+  {% if zwischendef_windows %}
+  <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.5); border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
+    <div style="font-weight:700; color:#fbbf24; margin-bottom:0.6rem;">⚠️ Zwischendef möglich — unterschiedliche Ankunftszeiten!</div>
+    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+      {% for zw in zwischendef_windows %}
+      <div style="background:rgba(0,0,0,0.2); border-radius:6px; padding:0.6rem 0.9rem; font-size:0.85rem; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+        <span style="color:#fbbf24; font-weight:700;">Welle {{ zw.wave_a }} → Welle {{ zw.wave_b }}</span>
+        <span style="color:var(--text-muted);">|</span>
+        <span>Ankunft Welle {{ zw.wave_a }}: <strong>{{ zw.arrival_a }}</strong></span>
+        <span style="color:var(--text-muted);">→</span>
+        <span>Welle {{ zw.wave_b }}: <strong>{{ zw.arrival_b }}</strong></span>
+        <span style="color:var(--text-muted);">|</span>
+        <span style="background:rgba(251,191,36,0.2); border:1px solid rgba(251,191,36,0.4); border-radius:4px; padding:0.1rem 0.5rem; color:#fbbf24; font-weight:700;">
+          ⏱ {{ zw.gap_label }} Fenster
+        </span>
+        <span style="font-size:0.78rem; color:var(--text-muted);">→ Def schicken und vor Welle {{ zw.wave_b }} wieder abziehen</span>
+      </div>
+      {% endfor %}
     </div>
   </div>
+  {% endif %}
 
   <!-- ── Je Angriff eine Analyse-Karte ── -->
   {% for atk in attacks %}
@@ -78,8 +89,34 @@
         <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">📐 Geschwindigkeits-Analyse</h3>
         {% if atk.speed_analysis %}
         {% set sa = atk.speed_analysis %}
-        <!-- Server-side computed -->
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.6rem; margin-bottom:1rem;">
+
+        <!-- Map-Info: Angreifer-Dorf + Verteidiger-Dorf -->
+        <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:0.75rem;">
+          <div style="flex:1; min-width:200px; background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.25); border-radius:8px; padding:0.6rem 0.9rem; font-size:0.83rem;">
+            <div style="font-weight:600; color:#ef4444; margin-bottom:0.25rem;">⚔️ Angreifer-Dorf ({{ atk.atk_x }}|{{ atk.atk_y }})</div>
+            {% if atk.attacker_village_data %}
+            <div>{{ atk.attacker_village_data.village_name or '—' }} · <strong>{{ atk.attacker }}</strong>
+              {% if atk.attacker_data and atk.attacker_data.alliance_name %} [{{ atk.attacker_data.alliance_name }}]{% endif %}
+            </div>
+            <div style="color:var(--text-muted);">{{ {1:'Römer',2:'Germanen',3:'Gallier',4:'Natars',5:'Hunnen'}.get(atk.attacker_data.tribe if atk.attacker_data else 0, '?') }} · BW: {{ atk.attacker_village_data.population or '?' }}</div>
+            {% elif atk.attacker_data %}
+            <div><strong>{{ atk.attacker }}</strong> — Dorf nicht in Karte für diese Koords</div>
+            {% else %}<div style="color:var(--text-muted);">Kein Karteneintrag</div>{% endif %}
+          </div>
+          <div style="flex:1; min-width:200px; background:rgba(34,197,94,0.07); border:1px solid rgba(34,197,94,0.25); border-radius:8px; padding:0.6rem 0.9rem; font-size:0.83rem;">
+            <div style="font-weight:600; color:#22c55e; margin-bottom:0.25rem;">🛡️ Verteidiger-Dorf ({{ sa.def_x }}|{{ sa.def_y }})</div>
+            {% if atk.defender_village_data %}
+            {% set dv = atk.defender_village_data %}
+            <div>{{ dv.village_name or '—' }} · <strong>{{ dv.player_name or '?' }}</strong>
+              {% if dv.alliance_name %} [{{ dv.alliance_name }}]{% endif %}
+            </div>
+            <div style="color:var(--text-muted);">{{ {1:'Römer',2:'Germanen',3:'Gallier',4:'Natars',5:'Hunnen'}.get(dv.tribe, '?') }} · BW: {{ dv.population or '?' }}</div>
+            {% else %}<div style="color:var(--text-muted);">Kein Karteneintrag (eigenes Dorf?)</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- Stat boxes -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:0.6rem; margin-bottom:1rem;">
           <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
             <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Distanz</div>
             <div style="font-weight:700; font-family:monospace;">{{ sa.dist }} F</div>
@@ -88,17 +125,23 @@
             <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Verbleibend</div>
             <div style="font-weight:700; font-family:monospace; color:#f59e0b;">{{ sa.remaining_hours }}h</div>
           </div>
+          {% if sa.offline_hours > 0 %}
+          <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:#f59e0b; margin-bottom:0.2rem;">Offline-Zeit</div>
+            <div style="font-weight:700; font-family:monospace; color:#f59e0b;">+{{ sa.offline_hours }}h</div>
+          </div>
           <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Gesamtfenster</div>
+            <div style="font-weight:700; font-family:monospace;">{{ sa.total_window_hours }}h</div>
+          </div>
+          {% endif %}
+          <div style="background:var(--bg-main); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:0.6rem; text-align:center;">
             <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Max. Geschw.</div>
             <div style="font-weight:700; font-family:monospace; color:#ef4444;">≤ {{ sa.max_speed }} F/h</div>
           </div>
           <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
             <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Ankunft (UTC)</div>
-            <div style="font-weight:700; font-family:monospace; font-size:0.8rem;">{{ sa.arrival_ts or '—' }}</div>
-          </div>
-          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Verteidiger</div>
-            <div style="font-weight:700; font-family:monospace;">({{ sa.def_x }}|{{ sa.def_y }})</div>
+            <div style="font-weight:700; font-family:monospace; font-size:0.78rem;">{{ sa.arrival_ts or '—' }}</div>
           </div>
         </div>
 
@@ -117,15 +160,17 @@
           <tbody>
           {% for sp in sa.possible_speeds | sort(attribute='speed', reverse=True) %}
           {% set is_best = sp.speed == sa.best_speed %}
-          <tr style="border-top:1px solid var(--border);{% if is_best %} background:rgba(34,197,94,0.07);{% endif %}">
-            <td style="padding:0.35rem 0.6rem; font-family:monospace; font-weight:700; color:{% if is_best %}#22c55e{% else %}var(--text){% endif %};">
-              {{ sp.speed }} F/h {% if is_best %}<span style="font-size:0.7rem; color:#22c55e;">← wahrscheinlichste</span>{% endif %}
+          <tr style="border-top:1px solid var(--border);{% if is_best %} background:rgba(34,197,94,0.07);{% elif not sp.certain %} opacity:0.65;{% endif %}">
+            <td style="padding:0.35rem 0.6rem; font-family:monospace; font-weight:700; color:{% if is_best %}#22c55e{% elif sp.certain %}var(--text){% else %}#f59e0b{% endif %};">
+              {{ sp.speed }} F/h
+              {% if is_best %}<span style="font-size:0.68rem; color:#22c55e;">← wahrscheinlichste</span>
+              {% elif not sp.certain %}<span style="font-size:0.68rem; color:#f59e0b;">nur mit Offline-Zeit</span>{% endif %}
             </td>
             <td style="padding:0.35rem 0.6rem; color:var(--text-muted);">
               {{ sa.speed_to_troops.get(sp.speed | string, []) | join(', ') or '—' }}
             </td>
             <td style="padding:0.35rem 0.6rem; font-family:monospace;">
-              {% set h = (sp.total_march_s // 3600) %}{% set m = ((sp.total_march_s % 3600) // 60) %}{% set s = (sp.total_march_s % 60) %}{{ '%02d:%02d:%02d' | format(h, m, s) }}
+              {% set h = (sp.total_march_s // 3600) %}{% set m = ((sp.total_march_s % 3600) // 60) %}{% set s2 = (sp.total_march_s % 60) %}{{ '%02d:%02d:%02d' | format(h, m, s2) }}
             </td>
             <td style="padding:0.35rem 0.6rem; font-family:monospace; font-size:0.8rem;">{{ sp.departure or '—' }}</td>
           </tr>

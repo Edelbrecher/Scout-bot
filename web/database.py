@@ -952,6 +952,36 @@ async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | No
         }
 
 
+async def get_village_from_snapshot(guild_id: str, x: int, y: int) -> dict | None:
+    """Look up a village by exact coords in the latest map snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            latest = row["latest"] if row else None
+        if not latest:
+            return None
+        async with db.execute(
+            "SELECT * FROM map_snapshots WHERE guild_id = ? AND fetched_at = ? AND x = ? AND y = ?",
+            (guild_id, latest, x, y),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return None
+        r = dict(row)
+        return {
+            "player_name": r.get("player_name"),
+            "village_name": r.get("village_name"),
+            "alliance_name": r.get("alliance_name"),
+            "tribe": r.get("tribe"),
+            "population": r.get("population"),
+            "x": r["x"], "y": r["y"],
+        }
+
+
 async def get_reports_by_attackers(guild_id: str, attacker_names: list[str]) -> list[dict]:
     """Return all reports where any of the given attacker names appear in attacks_json."""
     if not attacker_names:

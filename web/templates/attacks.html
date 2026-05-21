@@ -137,14 +137,18 @@
     <div style="display:flex; flex-direction:column; gap:0.75rem;">
       {% for report in attack_reports %}
       {% set attacks = report.attacks_json | from_json %}
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+      <div style="background:var(--bg-card); border:1px solid {% if report.zwischendef %}rgba(251,191,36,0.4){% else %}var(--border){% endif %}; border-radius:8px; padding:1rem;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
-          <div>
+          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem;">
             <strong>{{ report.reporter_name }}</strong>
-            <span style="color:var(--text-muted); font-size:0.85rem; margin-left:0.5rem;">
-              {{ report.created_at[:16].replace('T', ' ') }} UTC
+            <span style="color:var(--text-muted); font-size:0.85rem;">{{ report.created_at[:16].replace('T', ' ') }} UTC</span>
+            <span style="color:var(--text-muted); font-size:0.8rem;">#{{ report.id }}</span>
+            <span style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem;">{{ report.wave_count }} Welle(n)</span>
+            {% if report.zwischendef %}
+            <span style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.5); color:#fbbf24; border-radius:4px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:700;">
+              ⚠️ Zwischendef möglich
             </span>
-            <span style="color:var(--text-muted); font-size:0.8rem; margin-left:0.5rem;">#{{ report.id }}</span>
+            {% endif %}
           </div>
           <div style="display:flex; gap:0.4rem; align-items:center;">
             <a href="/guild/{{ guild.guild_id }}/attacks/{{ report.id }}/analyse"
@@ -157,10 +161,18 @@
             {% endif %}
           </div>
         </div>
+        {% if report.zwischendef %}
+        <div style="margin-top:0.5rem; display:flex; flex-wrap:wrap; gap:0.4rem;">
+          {% for zw in report.zwischendef %}
+          <span style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3); border-radius:4px; padding:0.15rem 0.5rem; font-size:0.75rem; color:#fbbf24;">
+            ⏱ {{ zw.gap_label }} zwischen Welle {{ zw.wave_a }} ({{ zw.arrival_a }}) &amp; {{ zw.wave_b }} ({{ zw.arrival_b }})
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
         <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem;">
           {% for atk in attacks %}
           <span style="background:rgba(231,76,60,0.15); border:1px solid rgba(231,76,60,0.35); border-radius:4px; padding:0.2rem 0.5rem; font-size:0.8rem;">
-            {% if atk.wave %}Welle {{ atk.wave }} · {% endif %}
             <strong>{{ atk.attacker }}</strong>
             {% if atk.coords %} · {{ atk.coords }}{% endif %}
             {% if atk.arrival %} · {{ atk.arrival }}{% endif %}

@@ -154,6 +154,14 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
         custom_id="def_coords",
         max_length=20,
     )
+    offline_time = discord.ui.TextInput(
+        label="Wie lange warst du offline? (H:MM, optional)",
+        style=discord.TextStyle.short,
+        placeholder="z.B. 2:30 oder 0:45 — verlängert mögliche Marschzeit",
+        required=False,
+        custom_id="offline_time",
+        max_length=10,
+    )
 
     def __init__(self, alert_channel_id: str):
         super().__init__(custom_id="attack_modal")
@@ -163,6 +171,7 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
         try:
             raw = self.attack_text.value
             coords_raw = self.def_coords.value.strip()
+            offline_raw = self.offline_time.value.strip()
 
             # Parse defender coords
             def_x = def_y = None
@@ -171,12 +180,21 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
                 if cm:
                     def_x, def_y = int(cm.group(1)), int(cm.group(2))
 
+            # Parse offline time → seconds
+            offline_seconds = 0
+            if offline_raw:
+                om = re.search(r"(\d+):(\d{2})", offline_raw)
+                if om:
+                    offline_seconds = int(om.group(1)) * 3600 + int(om.group(2)) * 60
+
             attacks = parse_travian_attacks(raw)
-            # Inject defender coords into each attack
-            if def_x is not None:
-                for atk in attacks:
+            # Inject defender coords + offline time into each attack
+            for atk in attacks:
+                if def_x is not None:
                     atk["def_x"] = def_x
                     atk["def_y"] = def_y
+                if offline_seconds > 0:
+                    atk["offline_seconds"] = offline_seconds
 
             if not attacks:
                 await interaction.response.send_message(
