@@ -126,7 +126,7 @@ async def init_db():
         except Exception:
             pass
 
-        for col in ["requested_by_id TEXT", "requested_by_name TEXT"]:
+        for col in ["requested_by_id TEXT", "requested_by_name TEXT", "corn_scout INTEGER DEFAULT 0"]:
             try:
                 await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
                 await db.commit()
@@ -1953,6 +1953,70 @@ async def get_auth_stats() -> dict:
             "no_server_logins": no_server,
             "daily": daily,
         }
+
+
+async def _init_sitter_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS account_sitters (
+                guild_id TEXT NOT NULL,
+                discord_user_id TEXT NOT NULL,
+                PRIMARY KEY (guild_id, discord_user_id),
+                sitter1_name TEXT,
+                sitter1_travian TEXT,
+                sitter2_name TEXT,
+                sitter2_travian TEXT,
+                sitting1_name TEXT,
+                sitting1_travian TEXT,
+                sitting2_name TEXT,
+                sitting2_travian TEXT,
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def get_account_sitters(guild_id: str, user_id: str) -> dict | None:
+    await _init_sitter_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM account_sitters WHERE guild_id = ? AND discord_user_id = ?",
+            (guild_id, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def save_account_sitters(guild_id: str, user_id: str, data: dict):
+    await _init_sitter_table()
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO account_sitters
+                (guild_id, discord_user_id, sitter1_name, sitter1_travian,
+                 sitter2_name, sitter2_travian, sitting1_name, sitting1_travian,
+                 sitting2_name, sitting2_travian, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(guild_id, discord_user_id) DO UPDATE SET
+                sitter1_name    = excluded.sitter1_name,
+                sitter1_travian = excluded.sitter1_travian,
+                sitter2_name    = excluded.sitter2_name,
+                sitter2_travian = excluded.sitter2_travian,
+                sitting1_name   = excluded.sitting1_name,
+                sitting1_travian = excluded.sitting1_travian,
+                sitting2_name   = excluded.sitting2_name,
+                sitting2_travian = excluded.sitting2_travian,
+                updated_at      = excluded.updated_at
+        """, (
+            guild_id, user_id,
+            data.get("sitter1_name"), data.get("sitter1_travian"),
+            data.get("sitter2_name"), data.get("sitter2_travian"),
+            data.get("sitting1_name"), data.get("sitting1_travian"),
+            data.get("sitting2_name"), data.get("sitting2_travian"),
+            _dt.utcnow().isoformat(),
+        ))
+        await db.commit()
 
 
 async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:

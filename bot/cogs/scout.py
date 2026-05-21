@@ -307,6 +307,10 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
         required=False, style=discord.TextStyle.paragraph, max_length=500,
     )
 
+    def __init__(self, corn_scout: bool = False):
+        super().__init__()
+        self.corn_scout = corn_scout
+
     async def on_submit(self, interaction: discord.Interaction):
         if not await require_premium(interaction):
             return
@@ -358,13 +362,19 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             additional_info=self.additional_info.value or "",
             requested_by_id=str(interaction.user.id),
             requested_by_name=interaction.user.display_name,
+            corn_scout=self.corn_scout,
         )
 
-        embed = discord.Embed(title="📡 Scout Request", color=discord.Color.blurple())
+        embed = discord.Embed(
+            title="🌾🌾 Kornspäh-Anfrage" if self.corn_scout else "📡 Scout Request",
+            color=discord.Color.gold() if self.corn_scout else discord.Color.blurple(),
+        )
         embed.add_field(name="Player", value=self.player.value, inline=True)
         embed.add_field(name="Village", value=self.village.value, inline=True)
         embed.add_field(name="Coordinates", value=self.coordinates.value, inline=True)
         embed.add_field(name="Time", value=self.time.value, inline=True)
+        if self.corn_scout:
+            embed.add_field(name="🌾🌾 Kornspäh", value="Ja", inline=True)
         if self.additional_info.value:
             embed.add_field(name="Additional Info", value=self.additional_info.value, inline=False)
         embed.set_footer(text=f"Requested by {interaction.user.display_name}")
@@ -393,13 +403,22 @@ class ScoutRequestView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="Scout Request", style=discord.ButtonStyle.primary,
+        label="Scout", style=discord.ButtonStyle.primary,
         emoji="🔍", custom_id="persistent:scout_request",
     )
     async def scout_request(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await require_premium(interaction):
             return
-        await interaction.response.send_modal(ScoutModal())
+        await interaction.response.send_modal(ScoutModal(corn_scout=False))
+
+    @discord.ui.button(
+        label="Kornspäh", style=discord.ButtonStyle.secondary,
+        emoji="🌾", custom_id="persistent:corn_scout",
+    )
+    async def corn_scout_request(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await require_premium(interaction):
+            return
+        await interaction.response.send_modal(ScoutModal(corn_scout=True))
 
 
 # ---------------------------------------------------------------------------

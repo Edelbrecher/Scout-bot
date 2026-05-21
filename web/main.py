@@ -3005,11 +3005,14 @@ async def mein_account_page(request: Request, guild_id: str):
     history      = await database.get_own_villages_history(guild_id)
     uploaded     = request.query_params.get("uploaded")
     cleared      = request.query_params.get("cleared")
+    saved        = request.query_params.get("saved")
 
     # Totals for KPI strip
     total_off  = sum(v.get("off_score", 0) for v in own_villages)
     total_def  = sum(v.get("def_score", 0) for v in own_villages)
     total_crop = sum(v.get("total_crop", 0) for v in own_villages)
+
+    sitters = await database.get_account_sitters(guild_id, session.get("uid", ""))
 
     return templates.TemplateResponse("mein_account.html", {
         "request":       request,
@@ -3018,9 +3021,11 @@ async def mein_account_page(request: Request, guild_id: str):
         "history":       history,
         "uploaded":      uploaded,
         "cleared":       cleared,
+        "saved":         saved,
         "total_off":     total_off,
         "total_def":     total_def,
         "total_crop":    total_crop,
+        "sitters":       sitters,
     })
 
 
@@ -3064,6 +3069,36 @@ async def mein_account_clear(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     await database.delete_own_villages(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/mein-account?cleared=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/mein-account/sitters")
+async def save_sitters(
+    request: Request,
+    guild_id: str,
+    sitter1_name: str = Form(""),
+    sitter1_travian: str = Form(""),
+    sitter2_name: str = Form(""),
+    sitter2_travian: str = Form(""),
+    sitting1_name: str = Form(""),
+    sitting1_travian: str = Form(""),
+    sitting2_name: str = Form(""),
+    sitting2_travian: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.save_account_sitters(guild_id, session.get("uid", ""), {
+        "sitter1_name": sitter1_name or None,
+        "sitter1_travian": sitter1_travian or None,
+        "sitter2_name": sitter2_name or None,
+        "sitter2_travian": sitter2_travian or None,
+        "sitting1_name": sitting1_name or None,
+        "sitting1_travian": sitting1_travian or None,
+        "sitting2_name": sitting2_name or None,
+        "sitting2_travian": sitting2_travian or None,
+    })
+    return RedirectResponse(f"/guild/{guild_id}/mein-account?saved=1", status_code=303)
 
 
 @app.get("/guild/{guild_id}/mein-account/kampfkraft", response_class=HTMLResponse)

@@ -106,6 +106,60 @@
     </div>
   </div>
 
+  <!-- Flash: sitters saved -->
+  {% if saved %}
+  <div class="alert alert-success">✅ Sitter-Daten gespeichert.</div>
+  {% endif %}
+
+  <!-- Sitter-Verwaltung -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="margin:0 0 0.75rem;">🤝 Sitter-Verwaltung</h2>
+    <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/sitters">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+        <!-- Meine Sitter -->
+        <div>
+          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">👥 Meine Sitter (sitten meinen Account)</h3>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <div style="display:flex;gap:0.5rem;">
+              <input type="text" name="sitter1_name" value="{{ sitters.sitter1_name if sitters else '' }}"
+                     placeholder="Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+              <input type="text" name="sitter1_travian" value="{{ sitters.sitter1_travian if sitters else '' }}"
+                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+              <input type="text" name="sitter2_name" value="{{ sitters.sitter2_name if sitters else '' }}"
+                     placeholder="Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+              <input type="text" name="sitter2_travian" value="{{ sitters.sitter2_travian if sitters else '' }}"
+                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Accounts die ich sitte -->
+        <div>
+          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">🕹️ Accounts die ich sitte</h3>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <div style="display:flex;gap:0.5rem;">
+              <input type="text" name="sitting1_name" value="{{ sitters.sitting1_name if sitters else '' }}"
+                     placeholder="Spieler / Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+              <input type="text" name="sitting1_travian" value="{{ sitters.sitting1_travian if sitters else '' }}"
+                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+              <input type="text" name="sitting2_name" value="{{ sitters.sitting2_name if sitters else '' }}"
+                     placeholder="Spieler / Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+              <input type="text" name="sitting2_travian" value="{{ sitters.sitting2_travian if sitters else '' }}"
+                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="margin-top:0.75rem;">💾 Sitter-Daten speichern</button>
+    </form>
+  </div>
+
   <!-- Timeline chart -->
   {% if history and history | length > 0 %}
   <div class="card" style="margin-bottom:1.25rem;">
@@ -228,7 +282,10 @@
 <script>
 (function() {
   const history = {{ history | tojson }};
-  const labels = history.map(h => (h.uploaded_at||'').slice(0,16).replace('T',' '));
+  const labels = history.map(h => {
+    const d = new Date((h.uploaded_at||'').replace(' ','T')+'Z');
+    return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  });
   const ctx = document.getElementById('historyChart');
   if (!ctx) return;
   new Chart(ctx, {

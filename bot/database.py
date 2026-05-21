@@ -157,6 +157,14 @@ async def init_db():
             except Exception:
                 pass
 
+        # Scout corn_scout migration
+        for col in ["requested_by_id TEXT", "requested_by_name TEXT", "corn_scout INTEGER DEFAULT 0"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
 
 async def get_guild_config(guild_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -209,10 +217,11 @@ async def add_scout_channel(
     additional_info: str,
     requested_by_id: str = "",
     requested_by_name: str = "",
+    corn_scout: bool = False,
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         # Ensure columns exist (migration guard)
-        for col in ["requested_by_id TEXT", "requested_by_name TEXT"]:
+        for col in ["requested_by_id TEXT", "requested_by_name TEXT", "corn_scout INTEGER DEFAULT 0"]:
             try:
                 await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
                 await db.commit()
@@ -221,12 +230,12 @@ async def add_scout_channel(
         await db.execute("""
             INSERT OR IGNORE INTO scout_channels
                 (channel_id, guild_id, created_at, player, coordinates, village,
-                 scout_time, additional_info, requested_by_id, requested_by_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 scout_time, additional_info, requested_by_id, requested_by_name, corn_scout)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             channel_id, guild_id, datetime.utcnow().isoformat(),
             player, coordinates, village, scout_time, additional_info,
-            requested_by_id, requested_by_name,
+            requested_by_id, requested_by_name, 1 if corn_scout else 0,
         ))
         await db.commit()
 

@@ -67,7 +67,7 @@
     </div>
 
     <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
-      Formel: <code>Wert + (Wert + 300 × Korn/7) × (1,007<sup>Stufe</sup> − 1)</code> &nbsp;·&nbsp;
+      Formel: <code>Wert + (Wert + 300 × Korn/7) × (1,008<sup>Stufe</sup> − 1)</code> &nbsp;·&nbsp;
       Gilt für Angriff und beide Def-Werte &nbsp;·&nbsp; Teure Einheiten (hohes Korn) profitieren mehr &nbsp;·&nbsp;
       Quelle: <a href="https://blog.travian.com/2023/10/game-secrets-smithy-and-total-strength-of-an-army/" target="_blank" style="color:#3b82f6;">Travian Game Secrets</a>
     </p>
@@ -99,6 +99,17 @@
                    oninput="calcUpdate()"
                    style="width:100%;margin-top:0.3rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
           </div>
+        </div>
+
+        <div id="pferdtraenkeBlock" style="display:none;margin-top:0.75rem;">
+          <label style="font-size:0.8rem;color:var(--text-muted);">🐴 Pferdetränke-Stufe</label>
+          <select id="pferdtraenke" onchange="calcUpdate()"
+                  style="width:100%;margin-top:0.3rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
+            <option value="0">Nicht gebaut</option>
+            <option value="10">Stufe 10 (Equites Legati: 2→1 🌾)</option>
+            <option value="15">Stufe 15 (+ Equites Imperatoris: 3→2 🌾)</option>
+            <option value="20">Stufe 20 (+ Equites Caesaris: 4→3 🌾)</option>
+          </select>
         </div>
 
         <hr style="border-color:var(--border);margin:0.75rem 0;">
@@ -187,7 +198,7 @@
           <tbody id="smithyCompareBody"></tbody>
         </table>
       </div>
-      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">Formel: <code>BASIS + (BASIS + 300×Korn/7) × (1,007<sup>Stufe</sup>−1)</code> — Höherer Kornverbrauch = größerer Bonus pro Stufe.</p>
+      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">Formel: <code>BASIS + (BASIS + 300×Korn/7) × (1,008<sup>Stufe</sup>−1)</code> — Höherer Kornverbrauch = größerer Bonus pro Stufe.</p>
     </div>
   </div>
 
@@ -263,13 +274,13 @@ let smithyLevel  = 0;
 
 /**
  * Offizielle Travian-Schmiede-Formel:
- * verbesserter_wert = BASIS + (BASIS + 300 × KORN/7) × (1,007^STUFE − 1)
+ * verbesserter_wert = BASIS + (BASIS + 300 × KORN/7) × (1,008^STUFE − 1)
  * Gilt für Angriff, Def-Inf und Def-Kav gleichermaßen.
  * Quelle: blog.travian.com / support.travian.com
  */
 function boosted(base, lvl, crop) {
   if (lvl === 0 || base === 0) return base;
-  return Math.round(base + (base + 300 * crop / 7) * (Math.pow(1.007, lvl) - 1));
+  return Math.round(base + (base + 300 * crop / 7) * (Math.pow(1.008, lvl) - 1));
 }
 function smithyPct(base, lvl, crop) {
   if (base === 0) return 0;
@@ -290,6 +301,17 @@ function setTribe(t) {
   currentTribe = t;
   document.querySelectorAll('.tribe-btn').forEach(b => b.classList.toggle('active', b.dataset.tribe===t));
   renderTroopTable();
+}
+
+function getEffectiveCrop(troop, tribe) {
+  const ptEl = document.getElementById('pferdtraenke');
+  const pt = ptEl ? parseInt(ptEl.value)||0 : 0;
+  if (tribe === 'roman' && pt >= 10) {
+    if (troop.name === 'Equites Legati') return 1;
+    if (pt >= 15 && troop.name === 'Equites Imperatoris') return 2;
+    if (pt >= 20 && troop.name === 'Equites Caesaris') return 3;
+  }
+  return troop.crop;
 }
 
 function updateSmithyDisplay(val) {
@@ -339,6 +361,8 @@ function renderTroopTable() {
 // ── CALCULATOR ────────────────────────────────────────────────────────────
 function calcRebuild() {
   const tribe  = document.getElementById('calcTribe').value;
+  const ptBlock = document.getElementById('pferdtraenkeBlock');
+  if (ptBlock) ptBlock.style.display = tribe === 'roman' ? '' : 'none';
   const troops = TROOPS[tribe];
   const cont   = document.getElementById('calcTroopInputs');
   cont.innerHTML = troops.map((t,i) => `
@@ -373,13 +397,14 @@ function calcUpdate() {
   troops.forEach((t, i) => {
     const cnt = parseInt(document.getElementById('ct_'+i)?.value)||0;
     if (!cnt) return;
-    const eAtt  = boosted(t.att,  lvl, t.crop) * cnt;
-    const eDefI = boosted(t.defI, lvl, t.crop) * cnt;
-    const eDefC = boosted(t.defC, lvl, t.crop) * cnt;
+    const effCrop = getEffectiveCrop(t, tribe);
+    const eAtt  = boosted(t.att,  lvl, effCrop) * cnt;
+    const eDefI = boosted(t.defI, lvl, effCrop) * cnt;
+    const eDefC = boosted(t.defC, lvl, effCrop) * cnt;
     totalAtt  += eAtt;
     totalDefI += eDefI;
     totalDefC += eDefC;
-    totalCrop += t.crop * cnt;
+    totalCrop += effCrop * cnt;
     breakdown.push({ name:t.name, cnt, eAtt, eDefI, eDefC, type:t.type });
   });
 
@@ -443,10 +468,11 @@ function renderSmithyCompare(troops, _) {
     troopsAll.forEach((t,i) => {
       const c = counts[i];
       if (!c) return;
-      att  += boosted(t.att,  lvl, t.crop)*c;
-      defI += boosted(t.defI, lvl, t.crop)*c;
-      defC += boosted(t.defC, lvl, t.crop)*c;
-      crop += t.crop*c;
+      const effCrop = getEffectiveCrop(t, tribe);
+      att  += boosted(t.att,  lvl, effCrop)*c;
+      defI += boosted(t.defI, lvl, effCrop)*c;
+      defC += boosted(t.defC, lvl, effCrop)*c;
+      crop += effCrop*c;
     });
     const isCur = lvl===curLvl;
     return `<tr style="${isCur?'background:rgba(59,130,246,0.1);font-weight:700;':''}" >
