@@ -283,6 +283,14 @@ class Scout(commands.Cog):
         )
         await interaction.response.send_message("✅ Scout Request button posted!", ephemeral=True)
 
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
+        """Remove scout channel from DB when deleted directly in Discord."""
+        info = await database.get_scout_channel_info(str(channel.id))
+        if info:
+            await database.delete_scout_channel(str(channel.id))
+            print(f"[scout] Channel {channel.id} deleted in Discord → removed from DB", flush=True)
+
 
 async def setup(bot: commands.Bot):
     bot.add_view(ScoutRequestView())
