@@ -449,7 +449,7 @@ async def auth_discord(request: Request):
     client_id = get_client_id()
     if not client_id or not DISCORD_CLIENT_SECRET:
         return RedirectResponse("/login?error=Discord+OAuth2+not+configured")
-    state = request.cookies.get("oauth_state", secrets.token_urlsafe(32))
+    state = request.cookies.get("oauth_state") or secrets.token_urlsafe(32)
     params = urlencode({
         "client_id": client_id,
         "redirect_uri": DISCORD_REDIRECT_URI,
@@ -457,7 +457,9 @@ async def auth_discord(request: Request):
         "scope": "identify guilds",
         "state": state,
     })
-    return RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
+    response = RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
+    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax")
+    return response
 
 
 @app.get("/auth/callback")
