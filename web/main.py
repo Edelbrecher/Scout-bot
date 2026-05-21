@@ -1879,68 +1879,134 @@ def classify_own_village(troops: dict) -> tuple:
 
 def parse_own_villages(text: str) -> list:
     """
-    Parse Travian Dorfübersicht / Truppenübersicht copy-paste.
-    Handles tab-separated format from Travian overview pages.
+    Parse Travian 'Eigene Truppen' overview copy-paste (Strg+A / Strg+C).
+
+    Format: tab-delimited table with header "Dorfname\tTroop1\tTroop2\t..."
+    followed by village rows "VillageName\tN1\tN2\t..."
+    Village coordinates come from the sidebar section below the table.
+
+    Also handles alternative Gaul troop names as used in the overview UI:
+    Theutates Blitz, Druidenreiter, Haeduaner, Rammholz, Kriegskatapult etc.
     """
     import re
-    text = re.sub(r'[​‌‍‎‏‪-‮⁠-⁩﻿]', '', text)
+    text = re.sub(r'[​-‏‪-‮⁦-⁩﻿]', '', text)
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
-    ROMAN_TROOPS  = ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"]
-    TEUTON_TROOPS = ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Häuptling","Teutonen-Rammbock","Kriegsmaschine","Siedler","Held"]
-    GAUL_TROOPS   = ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Stammesältester","Gallier-Rammbock","Gallier-Kata","Siedler","Held"]
-    ALL_TROOPS = list(dict.fromkeys(ROMAN_TROOPS + TEUTON_TROOPS + GAUL_TROOPS))
+    # Canonical name aliases for troop names as they appear in the overview UI
+    TROOP_ALIASES = {
+        # Gaul overview names → canonical
+        "Theutates Blitz":  "Theutates-Blitz",
+        "Theutates-Blitz":  "Theutates-Blitz",
+        "Druidenreiter":    "Druidentreiter",
+        "Haeduaner":        "Haeduer",
+        "Rammholz":         "Gallier-Rammbock",
+        "Kriegskatapult":   "Gallier-Kata",
+        # Gaul scout: "Späher" in overview = Pathfinder
+        # (only when other Gaul troops present — handled by context)
+        # Teuton overview names
+        "Kundschafter":     "Späher",
+        "Teutonen Reiter":  "Teut. Ritter",
+        "Ramme":            "Teutonen-Rammbock",
+        "Katapult":         "Kriegsmaschine",
+        "Stammesführer":    "Häuptling",
+    }
 
-    villages = []
-    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    def normalize(name: str) -> str:
+        name = name.strip()
+        return TROOP_ALIASES.get(name, name)
 
+    lines = text.split('\n')
     coord_re = re.compile(r'\((-?\d+)\|(-?\d+)\)')
 
-    # First pass: find troop header line (contains multiple troop names)
-    detected_troops = None
-    for line in lines:
-        matched = [t for t in ALL_TROOPS if t.lower() in line.lower()]
-        if len(matched) >= 3:
-            detected_troops = matched
+    # ── Step 1: Find the "Dorfname" header row ────────────────────────────
+    header_idx = None
+    col_names = []
+    for i, line in enumerate(lines):
+        parts = [p.strip() for p in line.split('\t')]
+        if parts and parts[0].lower() == 'dorfname' and len(parts) >= 3:
+            header_idx = i
+            col_names = [normalize(p) for p in parts[1:]]  # skip "Dorfname"
             break
 
-    if detected_troops is None:
-        detected_troops = ROMAN_TROOPS  # fallback
+    # Detect if this is Gaul from header — "Späher" in Gaul context maps to Pathfinder
+    is_gaul = any(n in col_names for n in ("Phalanx", "Theutates-Blitz", "Gallier-Rammbock", "Druidentreiter", "Haeduer", "Gallier-Kata"))
+    if is_gaul:
+        col_names = ["Pathfinder" if n == "Späher" else n for n in col_names]
 
-    # Second pass: find village rows
+    # ── Step 2: Parse village rows from the table ─────────────────────────
+    # Each row: VillageName\tN1\tN2\t...  (stops at "Summe" row)
+    table_villages = {}  # name → troops dict
+    if header_idx is not None:
+        for line in lines[header_idx + 1:]:
+            parts = [p.strip() for p in line.split('\t')]
+            if not parts or not parts[0]:
+                continue
+            vname = parts[0]
+            if vname.lower() in ('summe', 'total', 'gesamt'):
+                break
+            # Check if row has numeric data
+            nums_raw = parts[1:]
+            nums = []
+            for n in nums_raw:
+                n_clean = re.sub(r'[ \s., ]', '', n)
+                if re.match(r'^\d+$', n_clean):
+                    nums.append(int(n_clean))
+                else:
+                    nums.append(None)
+            if not any(isinstance(n, int) for n in nums):
+                continue
+            troops = {}
+            for k, n in enumerate(nums):
+                if k < len(col_names) and isinstance(n, int) and n > 0:
+                    troops[col_names[k]] = n
+            table_villages[vname] = troops
+
+    # ── Step 3: Parse sidebar for village coordinates ─────────────────────
+    # Sidebar format:
+    #   VillageName\n
+    #   (x|y)\n
+    #   [optional group label]\n
+    sidebar_coords = {}  # name → (x, y)
     i = 0
     while i < len(lines):
-        line = lines[i]
-        cm = coord_re.search(line)
+        line = lines[i].strip()
+        cm = coord_re.match(line)
         if cm:
             x, y = int(cm.group(1)), int(cm.group(2))
-            vname = line[:cm.start()].strip().rstrip('\t').strip()
-            if not vname:
-                vname = f"({x}|{y})"
-
-            after = line[cm.end():].strip()
-            pop_m = re.match(r'[\s\t]*(\d[\d.,]*)', after)
-            pop = int(re.sub(r'[.,]', '', pop_m.group(1))) if pop_m else 0
-
-            troops = {}
-            j = i + 1
-            while j < len(lines) and j < i + 4:
-                candidate = lines[j]
-                if coord_re.search(candidate):
-                    break
-                nums = [re.sub(r'[.,\s]', '', n) for n in candidate.split('\t')]
-                nums = [int(n) for n in nums if n.isdigit()]
-                if len(nums) >= 3:
-                    for k, t in enumerate(detected_troops):
-                        if k < len(nums):
-                            if nums[k] > 0:
-                                troops[t] = nums[k]
-                    i = j
-                    break
-                j += 1
-
-            villages.append({"village_name": vname, "x": x, "y": y, "population": pop, "troops": troops})
+            # Look back for the village name (line before coords)
+            if i > 0:
+                prev = lines[i - 1].strip()
+                if prev and not coord_re.search(prev) and '\t' not in prev:
+                    sidebar_coords[prev] = (x, y)
+        # Also handle "VillageName\t(x|y)" on same line
+        elif '\t' in line:
+            for m in re.finditer(r'^([^\t]+)\t\((-?\d+)\|(-?\d+)\)', line):
+                sidebar_coords[m.group(1).strip()] = (int(m.group(2)), int(m.group(3)))
         i += 1
+
+    # ── Step 4: Merge table rows with sidebar coords ──────────────────────
+    villages = []
+    for vname, troops in table_villages.items():
+        coords = sidebar_coords.get(vname)
+        x = coords[0] if coords else None
+        y = coords[1] if coords else None
+        villages.append({
+            "village_name": vname,
+            "x": x,
+            "y": y,
+            "population": 0,
+            "troops": troops,
+        })
+
+    # Fallback: if no table found, try old coord-on-same-line format
+    if not villages:
+        for line in lines:
+            cm = coord_re.search(line)
+            if not cm:
+                continue
+            x, y = int(cm.group(1)), int(cm.group(2))
+            vname = line[:cm.start()].strip().rstrip('\t').strip() or f"({x}|{y})"
+            villages.append({"village_name": vname, "x": x, "y": y, "population": 0, "troops": {}})
 
     return villages
 
