@@ -3066,6 +3066,24 @@ async def mein_account_clear(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/mein-account?cleared=1", status_code=303)
 
 
+@app.get("/guild/{guild_id}/mein-account/kampfkraft", response_class=HTMLResponse)
+async def kampfkraft_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    # Pass own villages so the calculator can pre-fill troop counts
+    own_villages = _enrich_own_villages(await database.get_own_villages(guild_id))
+    return templates.TemplateResponse("kampfkraft.html", {
+        "request": request, "guild": guild, "own_villages": own_villages,
+    })
+
+
 # Legacy redirects — keep old /attacks/own-troops URLs working
 @app.get("/guild/{guild_id}/attacks/own-troops")
 async def _legacy_own_troops_get(guild_id: str):

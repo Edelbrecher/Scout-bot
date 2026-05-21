@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+{% block title %}Kampfkraft-Rechner · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1200px;">
+
+  <div style="margin-bottom:1.25rem;">
+    <a href="/guild/{{ guild.guild_id }}/mein-account" class="back-link">← Mein Account</a>
+    <h1 style="margin:0.25rem 0 0;">⚔️ Kampfkraft-Rechner</h1>
+    <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
+  </div>
+
+  <!-- ── Tabs ── -->
+  <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:0.25rem;">
+    <button class="tab-btn active" onclick="showTab('stats')">📊 Truppenwerte</button>
+    <button class="tab-btn" onclick="showTab('calc')">🧮 Hochrechner</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       TAB 1: TRUPPENWERTE
+  ══════════════════════════════════════════════════ -->
+  <div id="tab-stats">
+
+    <!-- Controls -->
+    <div class="card" style="margin-bottom:1rem;padding:0.85rem 1.1rem;">
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;">
+        <div>
+          <label style="font-size:0.8rem;color:var(--text-muted);">Stamm</label>
+          <div style="display:flex;gap:0.4rem;margin-top:0.3rem;">
+            <button class="tribe-btn active" data-tribe="roman"  onclick="setTribe('roman')">🦅 Römer</button>
+            <button class="tribe-btn"        data-tribe="gaul"   onclick="setTribe('gaul')">🍀 Gallier</button>
+            <button class="tribe-btn"        data-tribe="teuton" onclick="setTribe('teuton')">⚒️ Teutonen</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.2rem;">
+          <label style="font-size:0.8rem;color:var(--text-muted);">Schmiede-Level <span id="smithyValDisplay" style="color:var(--text);font-weight:700;">0</span></label>
+          <input type="range" id="smithySlider" min="0" max="20" value="0"
+                 oninput="updateSmithyDisplay(this.value)"
+                 style="width:200px;accent-color:#3b82f6;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.2rem;">
+          <label style="font-size:0.8rem;color:var(--text-muted);">Schmiede-Bonus</label>
+          <span id="smithyBonusDisplay" style="font-size:1.1rem;font-weight:700;color:#3b82f6;">+0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Troop table -->
+    <div class="card" style="overflow-x:auto;">
+      <table class="table" id="troopTable" style="min-width:720px;">
+        <thead>
+          <tr>
+            <th>Truppe</th>
+            <th style="text-align:center;">🌾 Korn</th>
+            <th style="text-align:center;">💨 Speed</th>
+            <th style="text-align:right;">⚔️ Angriff (Basis)</th>
+            <th style="text-align:right;">⚔️ Angriff (+Schmiede)</th>
+            <th style="text-align:right;">🛡️ Def Inf (Basis)</th>
+            <th style="text-align:right;">🛡️ Def Inf (+Schmiede)</th>
+            <th style="text-align:right;">🐎 Def Kav (Basis)</th>
+            <th style="text-align:right;">🐎 Def Kav (+Schmiede)</th>
+            <th style="text-align:center;">Typ</th>
+          </tr>
+        </thead>
+        <tbody id="troopTableBody"></tbody>
+      </table>
+    </div>
+
+    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
+      Schmiede-Bonus: +1,5% pro Level · max. Level 20 = +30% · gilt für Angriff und beide Def-Werte gleichzeitig.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       TAB 2: HOCHRECHNER
+  ══════════════════════════════════════════════════ -->
+  <div id="tab-calc" style="display:none;">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+
+      <!-- Left: Einstellungen -->
+      <div class="card">
+        <h3 style="margin:0 0 0.75rem;">⚙️ Einstellungen</h3>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+          <div>
+            <label style="font-size:0.8rem;color:var(--text-muted);">Stamm</label>
+            <select id="calcTribe" onchange="calcRebuild()" style="width:100%;margin-top:0.3rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
+              <option value="roman">🦅 Römer</option>
+              <option value="gaul">🍀 Gallier</option>
+              <option value="teuton">⚒️ Teutonen</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.8rem;color:var(--text-muted);">Schmiede-Level</label>
+            <input type="number" id="calcSmithy" min="0" max="20" value="0"
+                   oninput="calcUpdate()"
+                   style="width:100%;margin-top:0.3rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border);margin:0.75rem 0;">
+        <h4 style="margin:0 0 0.5rem;font-size:0.9rem;">🦸 Held</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Level</label>
+            <input type="number" id="heroLevel" min="0" max="200" value="0" oninput="calcUpdate()"
+                   style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;">
+          </div>
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Kampfstärke-Punkte</label>
+            <input type="number" id="heroFighting" min="0" max="500" value="0" oninput="calcUpdate()"
+                   style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;"
+                   placeholder="0–500">
+          </div>
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Equipment-Bonus Angriff (%)</label>
+            <input type="number" id="heroOffBonus" min="0" max="100" value="0" oninput="calcUpdate()"
+                   style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;">
+          </div>
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Equipment-Bonus Verteidigung (%)</label>
+            <input type="number" id="heroDefBonus" min="0" max="100" value="0" oninput="calcUpdate()"
+                   style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;">
+          </div>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <label style="font-size:0.78rem;color:var(--text-muted);">Held-Modus (für diesen Kampf)</label>
+          <select id="heroMode" onchange="calcUpdate()" style="width:100%;margin-top:0.25rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
+            <option value="off">100% Angriff</option>
+            <option value="def">100% Verteidigung</option>
+            <option value="none">Kein Held</option>
+          </select>
+        </div>
+
+        <hr style="border-color:var(--border);margin:0.75rem 0;">
+        <h4 style="margin:0 0 0.5rem;font-size:0.9rem;">🔢 Truppenzahl</h4>
+        <div id="calcTroopInputs" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+
+        {% if own_villages %}
+        <button onclick="prefillFromVillages()" class="btn btn-secondary" style="margin-top:0.6rem;font-size:0.8rem;width:100%;">
+          📥 Aus importierten Dörfern befüllen
+        </button>
+        {% endif %}
+      </div>
+
+      <!-- Right: Ergebnis -->
+      <div>
+        <div class="card" style="margin-bottom:0.75rem;border-color:rgba(239,68,68,0.35);background:linear-gradient(135deg,var(--bg-card),#1a0a0a);">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">⚔️ Gesamter Angriffswert</div>
+          <div id="resultAtt" style="font-size:2.2rem;font-weight:800;color:#ef4444;">0</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;" id="resultAttBreakdown"></div>
+        </div>
+        <div class="card" style="margin-bottom:0.75rem;border-color:rgba(34,197,94,0.35);background:linear-gradient(135deg,var(--bg-card),#0a1a0a);">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">🛡️ Gesamter Verteidigungswert (Inf.)</div>
+          <div id="resultDefI" style="font-size:2.2rem;font-weight:800;color:#22c55e;">0</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;" id="resultDefIBreakdown"></div>
+        </div>
+        <div class="card" style="margin-bottom:0.75rem;border-color:rgba(96,165,250,0.35);background:linear-gradient(135deg,var(--bg-card),#0a0f1a);">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">🐎 Gesamter Verteidigungswert (Kav.)</div>
+          <div id="resultDefC" style="font-size:2.2rem;font-weight:800;color:#60a5fa;">0</div>
+        </div>
+        <div class="card" style="border-color:rgba(245,158,11,0.3);">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;">📋 Aufschlüsselung</div>
+          <div id="calcBreakdown" style="font-size:0.8rem;display:flex;flex-direction:column;gap:0.3rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schmiede-Vergleich -->
+    <div class="card">
+      <h3 style="margin:0 0 0.75rem;">📈 Schmiede-Vergleich (aktuelle Auswahl)</h3>
+      <div style="overflow-x:auto;">
+        <table class="table" id="smithyCompareTable" style="min-width:600px;">
+          <thead>
+            <tr>
+              <th>Schmiede-Level</th>
+              <th style="text-align:right;">Bonus</th>
+              <th style="text-align:right;color:#ef4444;">⚔️ Angriff</th>
+              <th style="text-align:right;color:#22c55e;">🛡️ Def Inf</th>
+              <th style="text-align:right;color:#60a5fa;">🐎 Def Kav</th>
+              <th style="text-align:right;">🌾 Korn/h</th>
+            </tr>
+          </thead>
+          <tbody id="smithyCompareBody"></tbody>
+        </table>
+      </div>
+      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">⚠️ Kav-Angreifer werden gegen Kav-Def gerechnet; sonst Inf-Def. Der Held beeinflusst nur den Gesamt-Kampfwert, nicht die Schmiede-Tabelle.</p>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.tab-btn {
+  padding:0.45rem 1.1rem;border:none;background:none;cursor:pointer;
+  color:var(--text-muted);font-size:0.9rem;font-weight:600;border-bottom:2px solid transparent;
+  transition:color 0.15s,border-color 0.15s;
+}
+.tab-btn.active { color:#3b82f6;border-bottom-color:#3b82f6; }
+.tribe-btn {
+  padding:0.3rem 0.75rem;border:1px solid var(--border);border-radius:6px;
+  background:var(--bg-main);color:var(--text-muted);cursor:pointer;font-size:0.82rem;
+  transition:all 0.15s;
+}
+.tribe-btn.active { background:#1e3a5f;border-color:#3b82f6;color:#60a5fa;font-weight:700; }
+.boosted { color:#3b82f6;font-weight:700; }
+.base-val { color:var(--text-muted); }
+.highlight-row td { background:rgba(59,130,246,0.06); }
+</style>
+
+<script>
+// ──────────────────────────────────────────────────────────────────────────
+// Troop data: { name, att, defI, defC, crop, speed, type }
+// type: 'inf' | 'cav' | 'siege' | 'hero' | 'scout' | 'settler'
+// ──────────────────────────────────────────────────────────────────────────
+const TROOPS = {
+  roman: [
+    { name:"Legionär",            att:40,  defI:35,  defC:50,  crop:1, speed:6,  type:"inf"  },
+    { name:"Prätorianer",         att:30,  defI:65,  defC:35,  crop:1, speed:5,  type:"inf"  },
+    { name:"Imperianer",          att:70,  defI:40,  defC:25,  crop:1, speed:7,  type:"inf"  },
+    { name:"Equites Legati",      att:0,   defI:20,  defC:10,  crop:2, speed:16, type:"scout"},
+    { name:"Equites Imperatoris", att:120, defI:65,  defC:50,  crop:3, speed:14, type:"cav"  },
+    { name:"Equites Caesaris",    att:180, defI:80,  defC:105, crop:4, speed:10, type:"cav"  },
+    { name:"Rammbock",            att:60,  defI:30,  defC:75,  crop:5, speed:4,  type:"siege"},
+    { name:"Feuerkatapult",       att:75,  defI:60,  defC:10,  crop:6, speed:3,  type:"siege"},
+    { name:"Senator",             att:50,  defI:40,  defC:30,  crop:5, speed:4,  type:"inf"  },
+    { name:"Siedler",             att:0,   defI:80,  defC:80,  crop:1, speed:5,  type:"settler"},
+  ],
+  gaul: [
+    { name:"Phalanx",             att:15,  defI:40,  defC:50,  crop:1, speed:7,  type:"inf"  },
+    { name:"Schwertkämpfer",      att:65,  defI:35,  defC:20,  crop:1, speed:6,  type:"inf"  },
+    { name:"Pathfinder",          att:0,   defI:20,  defC:10,  crop:2, speed:17, type:"scout"},
+    { name:"Theutates-Blitz",     att:90,  defI:25,  defC:40,  crop:2, speed:19, type:"cav"  },
+    { name:"Druidentreiter",      att:45,  defI:115, defC:55,  crop:2, speed:16, type:"cav"  },
+    { name:"Haeduer",             att:140, defI:60,  defC:165, crop:3, speed:13, type:"cav"  },
+    { name:"Gallier-Rammbock",    att:50,  defI:30,  defC:105, crop:5, speed:4,  type:"siege"},
+    { name:"Gallier-Kata",        att:70,  defI:45,  defC:10,  crop:6, speed:3,  type:"siege"},
+    { name:"Stammesältester",     att:40,  defI:50,  defC:50,  crop:5, speed:5,  type:"inf"  },
+    { name:"Siedler",             att:0,   defI:80,  defC:80,  crop:1, speed:5,  type:"settler"},
+  ],
+  teuton: [
+    { name:"Keulenschwinger",     att:40,  defI:20,  defC:5,   crop:1, speed:6,  type:"inf"  },
+    { name:"Speerkämpfer",        att:10,  defI:35,  defC:60,  crop:1, speed:7,  type:"inf"  },
+    { name:"Axtkämpfer",          att:55,  defI:30,  defC:15,  crop:1, speed:6,  type:"inf"  },
+    { name:"Späher",              att:0,   defI:10,  defC:5,   crop:1, speed:9,  type:"scout"},
+    { name:"Paladin",             att:55,  defI:100, defC:40,  crop:2, speed:10, type:"cav"  },
+    { name:"Teut. Ritter",        att:150, defI:50,  defC:75,  crop:3, speed:9,  type:"cav"  },
+    { name:"Teutonen-Rammbock",   att:65,  defI:30,  defC:80,  crop:5, speed:5,  type:"siege"},
+    { name:"Kriegsmaschine",      att:50,  defI:60,  defC:10,  crop:6, speed:3,  type:"siege"},
+    { name:"Häuptling",           att:40,  defI:60,  defC:40,  crop:4, speed:5,  type:"inf"  },
+    { name:"Siedler",             att:0,   defI:80,  defC:80,  crop:1, speed:5,  type:"settler"},
+  ],
+};
+
+const TYPE_LABEL = { inf:'⚔️ Inf', cav:'🐎 Kav', siege:'💣 Belagerung', scout:'🔭 Späher', settler:'🏕️ Siedler' };
+const TYPE_COLOR = { inf:'#3b82f6', cav:'#a855f7', siege:'#f59e0b', scout:'#22c55e', settler:'#64748b' };
+
+let currentTribe = 'roman';
+let smithyLevel  = 0;
+
+function smithyBonus(lvl) { return 1 + lvl * 0.015; }
+function boosted(base, lvl) { return Math.round(base * smithyBonus(lvl)); }
+function fmt(n) { return n.toLocaleString('de-DE'); }
+
+// ── TAB switching ─────────────────────────────────────────────────────────
+function showTab(id) {
+  document.getElementById('tab-stats').style.display = id==='stats' ? '' : 'none';
+  document.getElementById('tab-calc').style.display  = id==='calc'  ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&id==='stats')||(i===1&&id==='calc')));
+  if (id === 'calc') calcRebuild();
+}
+
+// ── TROOP TABLE ───────────────────────────────────────────────────────────
+function setTribe(t) {
+  currentTribe = t;
+  document.querySelectorAll('.tribe-btn').forEach(b => b.classList.toggle('active', b.dataset.tribe===t));
+  renderTroopTable();
+}
+
+function updateSmithyDisplay(val) {
+  smithyLevel = parseInt(val);
+  document.getElementById('smithyValDisplay').textContent = val;
+  document.getElementById('smithyBonusDisplay').textContent = '+' + (smithyLevel * 1.5).toFixed(1) + '%';
+  renderTroopTable();
+}
+
+function renderTroopTable() {
+  const troops = TROOPS[currentTribe];
+  const lvl    = smithyLevel;
+  const tbody  = document.getElementById('troopTableBody');
+  tbody.innerHTML = troops.map(t => {
+    const bAtt  = t.att,  bDefI = t.defI, bDefC = t.defC;
+    const eAtt  = boosted(bAtt, lvl);
+    const eDefI = boosted(bDefI, lvl);
+    const eDefC = boosted(bDefC, lvl);
+    const isBoosted = lvl > 0;
+    const attCell  = bAtt  === 0 ? '—' : `<span class="base-val">${fmt(bAtt)}</span>`;
+    const attBoost = bAtt  === 0 ? '—' : `<span class="${isBoosted?'boosted':''}">${fmt(eAtt)}</span>`;
+    const diCell   = `<span class="base-val">${fmt(bDefI)}</span>`;
+    const diBoost  = `<span class="${isBoosted?'boosted':''}">${fmt(eDefI)}</span>`;
+    const dcCell   = `<span class="base-val">${fmt(bDefC)}</span>`;
+    const dcBoost  = `<span class="${isBoosted?'boosted':''}">${fmt(eDefC)}</span>`;
+    return `<tr>
+      <td><strong>${t.name}</strong></td>
+      <td style="text-align:center;">${t.crop}</td>
+      <td style="text-align:center;">${t.speed}</td>
+      <td style="text-align:right;">${attCell}</td>
+      <td style="text-align:right;">${attBoost}</td>
+      <td style="text-align:right;">${diCell}</td>
+      <td style="text-align:right;">${diBoost}</td>
+      <td style="text-align:right;">${dcCell}</td>
+      <td style="text-align:right;">${dcBoost}</td>
+      <td style="text-align:center;">
+        <span style="font-size:0.72rem;font-weight:700;color:${TYPE_COLOR[t.type]||'#aaa'};background:${TYPE_COLOR[t.type]||'#aaa'}22;border:1px solid ${TYPE_COLOR[t.type]||'#aaa'}55;border-radius:4px;padding:1px 6px;">${TYPE_LABEL[t.type]||t.type}</span>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── CALCULATOR ────────────────────────────────────────────────────────────
+function calcRebuild() {
+  const tribe  = document.getElementById('calcTribe').value;
+  const troops = TROOPS[tribe];
+  const cont   = document.getElementById('calcTroopInputs');
+  cont.innerHTML = troops.map((t,i) => `
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <label style="flex:1;font-size:0.82rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${t.name}">${t.name}</label>
+      <input type="number" id="ct_${i}" min="0" value="0" oninput="calcUpdate()"
+             style="width:90px;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:0.25rem 0.4rem;font-size:0.82rem;text-align:right;">
+    </div>
+  `).join('');
+  calcUpdate();
+}
+
+function calcUpdate() {
+  const tribe   = document.getElementById('calcTribe').value;
+  const smithy  = Math.min(20, Math.max(0, parseInt(document.getElementById('calcSmithy').value)||0));
+  const troops  = TROOPS[tribe];
+  const lvl     = smithy;
+
+  const heroLvl     = parseInt(document.getElementById('heroLevel').value)||0;
+  const heroFight   = Math.min(500, Math.max(0, parseInt(document.getElementById('heroFighting').value)||0));
+  const heroOffPct  = (parseFloat(document.getElementById('heroOffBonus').value)||0) / 100;
+  const heroDefPct  = (parseFloat(document.getElementById('heroDefBonus').value)||0) / 100;
+  const heroMode    = document.getElementById('heroMode').value;
+
+  // Hero base attack per Kampfstärke-Punkt: 100 + 10 per level, scaled by fighting points
+  // Approximation: each fighting point = 100 base att; hero total att = heroFight * (100 + heroLvl * 10)
+  const heroBaseAtt = heroFight * (100 + heroLvl * 10);
+
+  let totalAtt = 0, totalDefI = 0, totalDefC = 0, totalCrop = 0;
+  const breakdown = [];
+
+  troops.forEach((t, i) => {
+    const cnt = parseInt(document.getElementById('ct_'+i)?.value)||0;
+    if (!cnt) return;
+    const eAtt  = boosted(t.att, lvl) * cnt;
+    const eDefI = boosted(t.defI, lvl) * cnt;
+    const eDefC = boosted(t.defC, lvl) * cnt;
+    totalAtt  += eAtt;
+    totalDefI += eDefI;
+    totalDefC += eDefC;
+    totalCrop += t.crop * cnt;
+    breakdown.push({ name:t.name, cnt, eAtt, eDefI, eDefC, type:t.type });
+  });
+
+  // Hero contribution
+  let heroAttAdd = 0, heroDefIAdd = 0, heroDefCAdd = 0;
+  if (heroMode === 'off' && heroBaseAtt > 0) {
+    heroAttAdd  = Math.round(heroBaseAtt * (1 + heroOffPct));
+    heroAttAdd += Math.round(totalAtt * heroOffPct);
+  } else if (heroMode === 'def' && heroBaseAtt > 0) {
+    heroDefIAdd = Math.round(heroBaseAtt * (1 + heroDefPct));
+    heroDefCAdd = Math.round(heroBaseAtt * (1 + heroDefPct));
+    heroDefIAdd += Math.round(totalDefI * heroDefPct);
+    heroDefCAdd += Math.round(totalDefC * heroDefPct);
+  }
+
+  const grandAtt  = totalAtt + heroAttAdd;
+  const grandDefI = totalDefI + heroDefIAdd;
+  const grandDefC = totalDefC + heroDefCAdd;
+
+  document.getElementById('resultAtt').textContent  = fmt(grandAtt);
+  document.getElementById('resultDefI').textContent = fmt(grandDefI);
+  document.getElementById('resultDefC').textContent = fmt(grandDefC);
+
+  // Breakdown div
+  const bdDiv = document.getElementById('calcBreakdown');
+  bdDiv.innerHTML = breakdown.map(b => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.2rem 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <span style="flex:1;color:var(--text-muted);">${b.name} ×${fmt(b.cnt)}</span>
+      <span style="display:flex;gap:0.5rem;font-size:0.78rem;">
+        <span style="color:#ef4444;">⚔️ ${fmt(b.eAtt)}</span>
+        <span style="color:#22c55e;">🛡️I ${fmt(b.eDefI)}</span>
+        <span style="color:#60a5fa;">🐎 ${fmt(b.eDefC)}</span>
+      </span>
+    </div>
+  `).join('') + (heroAttAdd || heroDefIAdd ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;color:#f59e0b;border-top:1px solid rgba(245,158,11,0.2);margin-top:0.2rem;">
+      <span>🦸 Held (Level ${heroLvl}, ${heroFight} Punkte)</span>
+      <span>${heroMode==='off' ? '⚔️ +'+fmt(heroAttAdd) : '🛡️ +'+fmt(heroDefIAdd)}</span>
+    </div>
+  ` : '') + `
+    <div style="display:flex;justify-content:space-between;padding:0.3rem 0;font-weight:700;border-top:1px solid var(--border);margin-top:0.25rem;">
+      <span>🌾 Korn/h gesamt</span><span>${fmt(totalCrop)}</span>
+    </div>
+  `;
+
+  // Smithy comparison table
+  renderSmithyCompare(troops, totalCrop / (totalAtt || 1));
+}
+
+function renderSmithyCompare(troops, _) {
+  const tribe  = document.getElementById('calcTribe').value;
+  const troopsAll = TROOPS[tribe];
+  const body   = document.getElementById('smithyCompareBody');
+  const curLvl = parseInt(document.getElementById('calcSmithy').value)||0;
+
+  const counts = troopsAll.map((_,i) => parseInt(document.getElementById('ct_'+i)?.value)||0);
+  const hasAny = counts.some(c=>c>0);
+
+  const rows = [0,1,2,3,4,5,6,7,8,9,10,12,14,16,18,20].map(lvl => {
+    let att=0,defI=0,defC=0,crop=0;
+    troopsAll.forEach((t,i) => {
+      const c = counts[i];
+      if (!c) return;
+      att  += boosted(t.att,lvl)*c;
+      defI += boosted(t.defI,lvl)*c;
+      defC += boosted(t.defC,lvl)*c;
+      crop += t.crop*c;
+    });
+    const isCur = lvl===curLvl;
+    return `<tr style="${isCur?'background:rgba(59,130,246,0.1);font-weight:700;':''}" >
+      <td>${lvl}${isCur?' ◀':''}${lvl===0?' (Basis)':lvl===20?' (Max)':''}</td>
+      <td style="text-align:right;color:var(--text-muted);">+${(lvl*1.5).toFixed(1)}%</td>
+      <td style="text-align:right;color:#ef4444;">${hasAny?fmt(att):'—'}</td>
+      <td style="text-align:right;color:#22c55e;">${hasAny?fmt(defI):'—'}</td>
+      <td style="text-align:right;color:#60a5fa;">${hasAny?fmt(defC):'—'}</td>
+      <td style="text-align:right;">${hasAny?fmt(crop):'—'}</td>
+    </tr>`;
+  });
+  body.innerHTML = rows.join('');
+}
+
+// ── Pre-fill from imported villages ──────────────────────────────────────
+{% if own_villages %}
+const OWN_VILLAGES = {{ own_villages | tojson }};
+
+function prefillFromVillages() {
+  const tribe  = document.getElementById('calcTribe').value;
+  const troops = TROOPS[tribe];
+  // Sum up all troops across all villages
+  const totals = {};
+  OWN_VILLAGES.forEach(v => {
+    const t = v.troops || {};
+    Object.entries(t).forEach(([name, cnt]) => { totals[name] = (totals[name]||0)+cnt; });
+  });
+  troops.forEach((t,i) => {
+    const el = document.getElementById('ct_'+i);
+    if (el) el.value = totals[t.name] || 0;
+  });
+  calcUpdate();
+}
+{% endif %}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+renderTroopTable();
+calcRebuild();
+</script>
+{% endblock %}
