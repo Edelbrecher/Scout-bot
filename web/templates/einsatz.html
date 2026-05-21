@@ -36,6 +36,28 @@
         <input type="number" id="profileY" placeholder="0" min="-400" max="400"
           style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
+      <div class="form-group" style="margin:0;">
+        <label>🥾 Held-Stiefel</label>
+        <select id="profileBoots"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+          <option value="0">Keine</option>
+          <option value="5">Kleine Stiefel (+5 F/h)</option>
+          <option value="10">Mittlere Stiefel (+10 F/h)</option>
+          <option value="20">Große Stiefel (+20 F/h)</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>🏟️ Turnierplatz Level <span id="tpLevelDisplay" style="color:#93c5fd;">0</span></label>
+        <input type="range" id="profileTP" min="0" max="20" value="0" step="1"
+          style="width:100%; accent-color:#3b82f6; margin-top:0.4rem;"
+          oninput="document.getElementById('tpLevelDisplay').textContent=this.value; updateSendTime(); renderAllMarchTimes();" />
+        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+          <span>0 (kein)</span><span>10</span><span>20 (+200%)</span>
+        </div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.3rem;">
+          Bonus: <span id="tpBonusDisplay" style="color:#93c5fd; font-weight:600;">+0%</span> — effektive Geschwindigkeit für alle Pläne
+        </div>
+      </div>
       <div>
         <button id="btnSaveProfile" class="btn btn-primary" style="width:100%;">💾 Speichern</button>
       </div>
@@ -155,6 +177,10 @@
             <span style="color:var(--text-muted); font-size:0.82rem;">Distanz:</span><br>
             <strong id="distDisplay" style="font-size:1.15rem; font-family:monospace;">–</strong>
           </div>
+          <div>
+            <span style="color:var(--text-muted); font-size:0.82rem;">Eff. Geschwindigkeit:</span><br>
+            <strong id="effSpeedDisplay" style="font-size:1.15rem; font-family:monospace; color:#93c5fd;">–</strong>
+          </div>
         </div>
       </div>
 
@@ -213,7 +239,8 @@
           <div><span style="color:var(--text-muted);">Spieler:</span> {{ plan.player_name or '–' }}</div>
           <div><span style="color:var(--text-muted);">Ankunft:</span>
             <strong>{{ plan.arrival_time[:16].replace('T',' ') }}</strong></div>
-          <div><span style="color:var(--text-muted);">Truppen:</span> {{ plan.troop_speed }} F/h</div>
+          <div><span style="color:var(--text-muted);">Basis F/h:</span> {{ plan.troop_speed }}</div>
+          <div><span style="color:var(--text-muted);">Eff. F/h:</span> <strong class="eff-speed-val" style="color:#93c5fd;">–</strong></div>
           <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">Absendezeit:</span>
             <strong class="send-time-val">–</strong></div>
           <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">Marschzeit:</span>
@@ -257,10 +284,34 @@
 const PROFILE_KEY = 'travian_profile_einsatz';
 let profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
 
+// Turnierplatz: speed multiplier per level
+// Formula: each TP level adds 10% speed bonus (level 1=+10%, level 20=+200%)
+function tpMultiplier(level) {
+  return 1 + (level * 0.1);
+}
+
+// Effective speed = (base + hero_boots) * tp_multiplier
+function effectiveSpeed(baseSpeed) {
+  const boots = parseInt(document.getElementById('profileBoots').value) || 0;
+  const tp = parseInt(document.getElementById('profileTP').value) || 0;
+  return (baseSpeed + boots) * tpMultiplier(tp);
+}
+
+function updateTpBonus() {
+  const tp = parseInt(document.getElementById('profileTP').value) || 0;
+  document.getElementById('tpBonusDisplay').textContent = '+' + (tp * 10) + '%';
+}
+
 function loadProfile() {
   if (profile.server) document.getElementById('profileServer').value = profile.server;
   if (profile.x !== undefined) document.getElementById('profileX').value = profile.x;
   if (profile.y !== undefined) document.getElementById('profileY').value = profile.y;
+  if (profile.boots !== undefined) document.getElementById('profileBoots').value = profile.boots;
+  if (profile.tp !== undefined) {
+    document.getElementById('profileTP').value = profile.tp;
+    document.getElementById('tpLevelDisplay').textContent = profile.tp;
+  }
+  updateTpBonus();
   updateGoLinks();
   renderAllMarchTimes();
 }
@@ -270,14 +321,20 @@ document.getElementById('btnSaveProfile').addEventListener('click', () => {
     server: document.getElementById('profileServer').value.trim().replace(/\/$/, ''),
     x: parseFloat(document.getElementById('profileX').value) || 0,
     y: parseFloat(document.getElementById('profileY').value) || 0,
+    boots: parseInt(document.getElementById('profileBoots').value) || 0,
+    tp: parseInt(document.getElementById('profileTP').value) || 0,
   };
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
   document.getElementById('profileSaved').style.display = 'block';
   setTimeout(() => document.getElementById('profileSaved').style.display = 'none', 2000);
+  updateTpBonus();
   updateGoLinks();
   renderAllMarchTimes();
   updateSendTime();
 });
+
+// Update TP bonus label on slider change
+document.getElementById('profileTP').addEventListener('input', updateTpBonus);
 
 // ── Truppenwahl ────────────────────────────────────────────────────────────
 function applyTroopPreset(val) {
@@ -320,23 +377,25 @@ function updateSendTime() {
   const tx = parseFloat(document.getElementById('inp_x').value);
   const ty = parseFloat(document.getElementById('inp_y').value);
   const arrival = document.getElementById('inp_arrival').value;
-  const speed = parseFloat(document.getElementById('inp_speed').value);
+  const baseSpeed = parseFloat(document.getElementById('inp_speed').value);
   const hint = document.getElementById('profileMissingHint');
 
-  if (!arrival || isNaN(tx) || isNaN(ty) || !speed) { box.style.display='none'; return; }
+  if (!arrival || isNaN(tx) || isNaN(ty) || !baseSpeed) { box.style.display='none'; return; }
   if (profile.x === undefined || profile.y === undefined) {
     hint.style.display = 'inline'; box.style.display='none'; return;
   }
   hint.style.display = 'none';
 
+  const effSpeed = effectiveSpeed(baseSpeed);
   const dist = travianDistance(profile.x, profile.y, tx, ty);
-  const marchSec = marchSeconds(dist, speed);
+  const marchSec = marchSeconds(dist, effSpeed);
   const arrivalDate = new Date(arrival);
   const sendDate = new Date(arrivalDate.getTime() - marchSec * 1000);
 
   document.getElementById('distDisplay').textContent = dist.toFixed(1) + ' Felder';
   document.getElementById('marchTimeDisplay').textContent = formatDuration(marchSec);
   document.getElementById('sendTimeDisplay').textContent = formatLocalDT(sendDate);
+  document.getElementById('effSpeedDisplay').textContent = effSpeed.toFixed(1) + ' F/h';
   box.style.display = 'block';
 }
 
@@ -366,18 +425,21 @@ function renderAllMarchTimes() {
     const tx = parseFloat(card.dataset.x);
     const ty = parseFloat(card.dataset.y);
     const arrival = card.dataset.arrival;
-    const speed = parseFloat(card.dataset.speed);
-    if (isNaN(tx) || isNaN(ty) || !arrival || !speed) return;
+    const baseSpeed = parseFloat(card.dataset.speed);
+    if (isNaN(tx) || isNaN(ty) || !arrival || !baseSpeed) return;
 
+    const effSpeed = effectiveSpeed(baseSpeed);
     const dist = travianDistance(profile.x, profile.y, tx, ty);
-    const marchSec = marchSeconds(dist, speed);
+    const marchSec = marchSeconds(dist, effSpeed);
     const arrivalDate = new Date(arrival);
     const sendDate = new Date(arrivalDate.getTime() - marchSec * 1000);
 
     const sendEl = card.querySelector('.send-time-val');
     const marchEl = card.querySelector('.march-time-val');
+    const effEl = card.querySelector('.eff-speed-val');
     if (sendEl) sendEl.textContent = formatLocalDT(sendDate);
     if (marchEl) marchEl.textContent = formatDuration(marchSec);
+    if (effEl) effEl.textContent = effSpeed.toFixed(1) + ' F/h';
   });
 }
 
@@ -436,7 +498,7 @@ document.querySelectorAll('.btn-add-timer').forEach(btn => {
     // Send-time reminder (only if profile coords known)
     if (profile.x !== undefined && profile.y !== undefined && speed) {
       const dist = travianDistance(profile.x, profile.y, parseFloat(x), parseFloat(y));
-      const marchSec = marchSeconds(dist, speed);
+      const marchSec = marchSeconds(dist, effectiveSpeed(speed));
       const sendMs = arrivalMs - marchSec * 1000;
       if (sendMs > Date.now()) {
         timers.push({
