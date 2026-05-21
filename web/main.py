@@ -1125,7 +1125,11 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
 async def _close_scout_channel_after_delay(channel_id: str, token: str, delay: int = 120):
     await asyncio.sleep(delay)
     async with httpx.AsyncClient() as client:
-        await client.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers={"Authorization": f"Bot {token}"})
+        await client.delete(
+            f"https://discord.com/api/v10/channels/{channel_id}",
+            headers={"Authorization": f"Bot {token}"},
+        )
+    # Always remove from DB, even if the channel was already deleted in Discord
     await database.delete_scout_channel(channel_id)
 
 
@@ -1137,19 +1141,45 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
     if err: return err
     if not SNOWFLAKE_RE.match(channel_id):
         return RedirectResponse(f"/guild/{guild_id}", status_code=303)
-    # Verify the channel belongs to this guild
     ch = await database.get_scout_channel_info(channel_id)
     if not ch or ch.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}", status_code=303)
     token = os.environ.get("DISCORD_TOKEN", "")
+    DELAY = 120
+    # Check if the channel still exists in Discord
+    async with httpx.AsyncClient() as client:
+        probe = await client.get(
+            f"https://discord.com/api/v10/channels/{channel_id}",
+            headers={"Authorization": f"Bot {token}"},
+        )
+    if probe.status_code == 404:
+        # Channel already gone in Discord — remove from DB immediately
+        await database.delete_scout_channel(channel_id)
+        return RedirectResponse(f"/guild/{guild_id}/scout", status_code=303)
+    # Channel still exists — send notice and schedule deletion
     async with httpx.AsyncClient() as client:
         await client.post(
             f"https://discord.com/api/v10/channels/{channel_id}/messages",
             headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
-            json={"content": "🔒 Scout channel closed via dashboard. Channel will be deleted in 2 minutes."},
+            json={"content": f"🔒 Scout channel closed via dashboard. Channel will be deleted in {DELAY // 60} minutes."},
         )
-    asyncio.create_task(_close_scout_channel_after_delay(channel_id, token, delay=120))
+    asyncio.create_task(_close_scout_channel_after_delay(channel_id, token, delay=DELAY))
+    # Return JSON so the frontend can start a countdown
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"ok": True, "delete_in": DELAY})
     return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/scout-channels/{channel_id}/status")
+async def scout_channel_status(request: Request, guild_id: str, channel_id: str):
+    """Poll endpoint: returns whether channel still exists in our DB."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    from fastapi.responses import JSONResponse
+    ch = await database.get_scout_channel_info(channel_id)
+    return JSONResponse({"exists": ch is not None})
 
 
 # ---------------------------------------------------------------------------
