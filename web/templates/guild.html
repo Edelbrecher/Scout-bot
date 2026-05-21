@@ -2,115 +2,315 @@
 {% block title %}{{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+<div class="container" style="max-width:1100px;">
+
+  <!-- ── Header ── -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
     <div>
       <a href="/dashboard" class="back-link">← Dashboard</a>
-      <h1>🏰 {{ guild.guild_name }}</h1>
-      <p class="subtitle">Server ID: {{ guild.guild_id }}</p>
+      <h1 style="margin:0.25rem 0 0.25rem; font-size:1.75rem; display:flex; align-items:center; gap:0.5rem;">
+        🏰 {{ guild.guild_name }}
+      </h1>
+      <span style="color:var(--text-muted); font-size:0.82rem; font-family:monospace;">{{ guild.guild_id }}</span>
     </div>
-    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-      <a href="/guild/{{ guild.guild_id }}/scout"   class="btn btn-secondary">🔍 Scout</a>
-      <a href="/guild/{{ guild.guild_id }}/res-push" class="btn btn-secondary">🪖 Res-Push</a>
-      <a href="/guild/{{ guild.guild_id }}/polls"    class="btn btn-secondary">📅 Polls</a>
-      <a href="/guild/{{ guild.guild_id }}/map" class="btn btn-secondary">🗺️ Map</a>
-      <a href="/guild/{{ guild.guild_id }}/timer"    class="btn btn-secondary">⏱️ Timer</a>
-      <a href="/guild/{{ guild.guild_id }}/stats"    class="btn btn-secondary">📊 Statistics</a>
-      <a href="/guild/{{ guild.guild_id }}/attacks" class="btn btn-secondary">⚔️ Angriffe</a>
-      <a href="/guild/{{ guild.guild_id }}/einsatz" class="btn btn-secondary">🎯 Einsatz</a>
-      <a href="/guild/{{ guild.guild_id }}/farming" class="btn btn-secondary">⚜️ Farming</a>
-      <a href="/guild/{{ guild.guild_id }}/billing"  class="btn btn-secondary">💳 Abo</a>
+    <!-- Abo-Badge -->
+    {% set sub = guild.subscription_status or 'free' %}
+    <a href="/guild/{{ guild.guild_id }}/billing" style="text-decoration:none; align-self:flex-start;">
+      {% if sub == 'active' %}
+        <span class="badge" style="background:#14532d; color:#4ade80; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #4ade80;">✅ Pro aktiv</span>
+      {% elif sub == 'trialing' %}
+        <span class="badge" style="background:#1e3a5f; color:#93c5fd; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #93c5fd;">🎁 Testphase</span>
+      {% elif sub == 'past_due' %}
+        <span class="badge" style="background:#431407; color:#fb923c; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #fb923c;">⚠️ Zahlung fällig</span>
+      {% else %}
+        <span class="badge" style="background:var(--bg-card); color:var(--text-muted); font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid var(--border);">💳 Free – Upgrade</span>
+      {% endif %}
+    </a>
+  </div>
+
+  <!-- ── Setup-Wizard ── -->
+  {% set needs_setup = not guild.tw_world %}
+  <div id="setupCard" class="card" style="margin-bottom:1.5rem;
+    {% if needs_setup %}border:2px solid #f59e0b; background:linear-gradient(135deg,#1c1600,#0f0f0f);{% endif %}">
+    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSetup()">
+      <h2 style="margin:0; display:flex; align-items:center; gap:0.5rem;">
+        {% if needs_setup %}
+          <span style="color:#f59e0b;">⚙️ Ersteinrichtung erforderlich</span>
+        {% else %}
+          <span>⚙️ Server-Einstellungen</span>
+        {% endif %}
+      </h2>
+      <span id="setupChevron" style="font-size:1.2rem; transition:transform 0.2s; {% if not needs_setup %}transform:rotate(-90deg);{% endif %}">▼</span>
+    </div>
+
+    <div id="setupBody" style="{% if not needs_setup %}display:none;{% endif %} margin-top:1rem;">
+      {% if needs_setup %}
+      <p style="color:#f59e0b; margin-bottom:1rem;">
+        Bitte trage einmal die Travian-Server-URL ein. Diese wird für Karten-Snapshots, Farming-Analyse und alle Deep-Links benötigt.
+      </p>
+      {% else %}
+      <p class="hint">Travian-Server-Einstellungen für diesen Discord-Server.</p>
+      {% endif %}
+
+      <form method="post" action="/guild/{{ guild.guild_id }}/map/set-world" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group" style="margin:0; flex:1; min-width:260px;">
+          <label>Travian World URL</label>
+          <input type="url" name="server_url" required
+            placeholder="https://ts2.x1.europe.travian.com"
+            value="{{ guild.tw_world or '' }}"
+            style="width:100%; padding:0.5rem; background:var(--bg-main); color:var(--text); border:1px solid {% if needs_setup %}#f59e0b{% else %}var(--border){% endif %}; border-radius:6px;" />
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Speichern</button>
+      </form>
+
+      {% if guild.tw_world %}
+      <p style="margin-top:0.75rem; font-size:0.83rem; color:#4caf82;">
+        ✅ Aktuell: <code>{{ guild.tw_world }}</code>
+        — Nächster Karten-Snapshot automatisch alle 6 h
+      </p>
+      {% endif %}
     </div>
   </div>
 
-  <!-- Roles -->
-  <div class="card">
-    <h2>Server Roles ({{ roles|length }})</h2>
-    <p class="hint">Toggle which roles can access each part of the system. Changes take effect immediately.</p>
-    {% if roles %}
-    {% set scout_roles = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
-    {% set res_roles   = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Role</th>
-          <th>Role ID</th>
-          <th title="Access to scout-archive and new scout channels">📁 Scout<br><small>Archive + Channels</small></th>
-          <th title="Can accept/reject/hold res-push requests in res-answer">🪖 Res-Answer<br><small>Accept / Reject</small></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for role in roles %}
-        {% if role.name != '@everyone' %}
-        <tr>
-          <td>
-            {% if role.color %}
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;"></span>
-            {% endif %}
-            <strong>{{ role.name }}</strong>
-          </td>
-          <td><code style="user-select:all; font-size:0.78rem;">{{ role.id }}</code></td>
-          <td style="text-align:center;">
-            <button
-              class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
-              data-guild="{{ guild.guild_id }}"
-              data-role="{{ role.id }}"
-              data-field="allowed_role_ids"
-              title="{{ 'Remove from Scout' if role.id in scout_roles else 'Add to Scout' }}"
-            >{{ '✅' if role.id in scout_roles else '○' }}</button>
-          </td>
-          <td style="text-align:center;">
-            <button
-              class="role-toggle {% if role.id in res_roles %}active{% endif %}"
-              data-guild="{{ guild.guild_id }}"
-              data-role="{{ role.id }}"
-              data-field="res_manager_role_ids"
-              title="{{ 'Remove from Res-Answer' if role.id in res_roles else 'Add to Res-Answer' }}"
-            >{{ '✅' if role.id in res_roles else '○' }}</button>
-          </td>
-        </tr>
-        {% endif %}
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="empty">Roles could not be loaded.</p>
-    {% endif %}
+  <!-- ── Feature-Grid ── -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; margin-bottom:1.5rem;">
+
+    <!-- Scout -->
+    <a href="/guild/{{ guild.guild_id }}/scout" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🔍</div>
+      <div class="feature-body">
+        <div class="feature-title">Scout</div>
+        <div class="feature-desc">Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Res-Push -->
+    <a href="/guild/{{ guild.guild_id }}/res-push" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🪖</div>
+      <div class="feature-body">
+        <div class="feature-title">Res-Push</div>
+        <div class="feature-desc">Ressourcen-Anfragen verwalten, annehmen und koordinieren</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Polls -->
+    <a href="/guild/{{ guild.guild_id }}/polls" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">📅</div>
+      <div class="feature-body">
+        <div class="feature-title">Abstimmungen</div>
+        <div class="feature-desc">Team-Polls erstellen, Termine koordinieren und Ergebnisse auswerten</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Map -->
+    <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🗺️</div>
+      <div class="feature-body">
+        <div class="feature-title">Karte</div>
+        <div class="feature-desc">Interaktive Travian-Karte mit Allianz-Heatmap und Spieler-Suche</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Timer -->
+    <a href="/guild/{{ guild.guild_id }}/timer" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">⏱️</div>
+      <div class="feature-body">
+        <div class="feature-title">Timer & Erinnerungen</div>
+        <div class="feature-desc">Farmlisten-Timer, Angriffs-Erinnerungen und akustische Alarme</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Einsatzplanung -->
+    <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card feature-card-highlight" style="text-decoration:none;">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-body">
+        <div class="feature-title">Einsatzplanung</div>
+        <div class="feature-desc">Angriffe koordinieren, Marschzeit berechnen und direkt absenden</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Angriff-Detection -->
+    <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">⚔️</div>
+      <div class="feature-body">
+        <div class="feature-title">Angriff-Detection</div>
+        <div class="feature-desc">Eingehende Angriffe per Discord-Modal melden und auswerten</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Farming -->
+    <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">⚜️</div>
+      <div class="feature-body">
+        <div class="feature-title">Farming Intelligence</div>
+        <div class="feature-desc">Inaktive Farmen erkennen, Farmlisten verwalten und analysieren</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <!-- Statistics -->
+    <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">📊</div>
+      <div class="feature-body">
+        <div class="feature-title">Statistiken</div>
+        <div class="feature-desc">Aktivität, Scout-Verlauf und Teamleistung auf einen Blick</div>
+      </div>
+      <span class="feature-arrow">→</span>
+    </a>
+
   </div>
+
+  <!-- ── Rollen (eingeklappt) ── -->
+  <details class="card" style="cursor:pointer;">
+    <summary style="list-style:none; display:flex; justify-content:space-between; align-items:center; padding:0; font-size:1rem; font-weight:600; user-select:none;">
+      <span>🔐 Rollen &amp; Berechtigungen
+        <small style="font-size:0.75rem; font-weight:400; color:var(--text-muted); margin-left:0.5rem;">({{ roles|length }} Rollen)</small>
+      </span>
+      <span class="details-chevron" style="font-size:0.9rem; color:var(--text-muted);">▼</span>
+    </summary>
+
+    <div style="margin-top:1rem;">
+      <p class="hint">Bestimme welche Rollen auf welche Bereiche zugreifen dürfen. Änderungen wirken sofort.</p>
+      {% if roles %}
+      {% set scout_roles = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+      {% set res_roles   = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Rolle</th>
+              <th>ID</th>
+              <th title="Zugriff auf Scout-Archiv und Kanäle">📁 Scout</th>
+              <th title="Kann Res-Push Anfragen annehmen / ablehnen">🪖 Res-Answer</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for role in roles %}
+            {% if role.name != '@everyone' %}
+            <tr>
+              <td>
+                {% if role.color %}
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;vertical-align:middle;"></span>
+                {% endif %}
+                <strong>{{ role.name }}</strong>
+              </td>
+              <td><code style="user-select:all; font-size:0.78rem;">{{ role.id }}</code></td>
+              <td style="text-align:center;">
+                <button class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
+                  data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="allowed_role_ids"
+                >{{ '✅' if role.id in scout_roles else '○' }}</button>
+              </td>
+              <td style="text-align:center;">
+                <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"
+                  data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_manager_role_ids"
+                >{{ '✅' if role.id in res_roles else '○' }}</button>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty">Rollen konnten nicht geladen werden.</p>
+      {% endif %}
+    </div>
+  </details>
+
 </div>
 
+<style>
+.feature-card {
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  padding:1.1rem 1.25rem;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  transition:border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  color:var(--text);
+}
+.feature-card:hover {
+  border-color:#3b82f6;
+  transform:translateY(-2px);
+  box-shadow:0 4px 20px rgba(59,130,246,0.15);
+}
+.feature-card-highlight {
+  border-color:rgba(245,158,11,0.4);
+  background:linear-gradient(135deg,var(--bg-card),#1c1600 300%);
+}
+.feature-card-highlight:hover {
+  border-color:#f59e0b;
+  box-shadow:0 4px 20px rgba(245,158,11,0.15);
+}
+.feature-icon {
+  font-size:1.9rem;
+  flex-shrink:0;
+  width:2.4rem;
+  text-align:center;
+}
+.feature-body { flex:1; min-width:0; }
+.feature-title { font-weight:700; font-size:1rem; margin-bottom:0.2rem; }
+.feature-desc { font-size:0.82rem; color:var(--text-muted); line-height:1.4; }
+.feature-arrow { color:var(--text-muted); font-size:1.1rem; flex-shrink:0; transition:transform 0.15s; }
+.feature-card:hover .feature-arrow { transform:translateX(4px); color:#3b82f6; }
+.feature-card-highlight:hover .feature-arrow { color:#f59e0b; }
+
+details.card > summary { cursor:pointer; }
+details.card[open] .details-chevron { transform:rotate(180deg); }
+.details-chevron { transition:transform 0.2s; }
+</style>
+
 <script>
+// Setup-Wizard toggle
+let setupOpen = {{ 'true' if needs_setup else 'false' }};
+function toggleSetup() {
+  setupOpen = !setupOpen;
+  document.getElementById('setupBody').style.display = setupOpen ? 'block' : 'none';
+  document.getElementById('setupChevron').style.transform = setupOpen ? '' : 'rotate(-90deg)';
+}
+
+// Role toggles
 document.querySelectorAll('.role-toggle').forEach(btn => {
   btn.addEventListener('click', async () => {
-    const guild = btn.dataset.guild;
-    const role  = btn.dataset.role;
-    const field = btn.dataset.field;
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
+    const { guild, role, field } = btn.dataset;
+    btn.disabled = true; btn.style.opacity = '0.5';
     try {
       const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `field=${encodeURIComponent(field)}`
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`field=${encodeURIComponent(field)}`
       });
-      const text = await res.text();
       if (res.ok) {
-        const data = JSON.parse(text);
-        const active = data.added;
-        btn.innerHTML = active ? '✅' : '○';
-        btn.classList.toggle('active', active);
-        btn.title = active
-          ? (field === 'allowed_role_ids' ? 'Remove from Scout' : 'Remove from Res-Answer')
-          : (field === 'allowed_role_ids' ? 'Add to Scout' : 'Add to Res-Answer');
-      } else {
-        console.error('Toggle failed:', res.status, text);
+        const data = await res.json();
+        btn.innerHTML = data.added ? '✅' : '○';
+        btn.classList.toggle('active', data.added);
       }
-    } catch(e) {
-      console.error('Toggle error:', e);
-    }
-    btn.disabled = false;
-    btn.style.opacity = '';
+    } catch(e) { console.error(e); }
+    btn.disabled = false; btn.style.opacity = '';
   });
 });
+
+// Auto-push tw_world to localStorage (so Timer & Einsatz pick it up)
+{% if guild.tw_world %}
+(function() {
+  const server = {{ guild.tw_world | tojson }};
+  try {
+    // Update both profile keys used by timer.html and einsatz.html
+    ['travian_profile', 'travian_profile_einsatz'].forEach(key => {
+      const p = JSON.parse(localStorage.getItem(key) || '{}');
+      if (!p.server) { p.server = server; localStorage.setItem(key, JSON.stringify(p)); }
+    });
+  } catch(e) {}
+})();
+{% endif %}
 </script>
 {% endblock %}

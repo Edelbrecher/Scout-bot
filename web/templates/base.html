@@ -9,15 +9,80 @@
 <body>
   {% if request.cookies.get("scouter_session") %}
   <nav class="navbar">
-    <img src="/static/logo.png" alt="BIG-EYE" style="width:32px;height:32px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:8px;" /><span class="nav-brand">BIG-EYE-BOT</span>
-    <div class="nav-links">
+    <a href="/dashboard" style="display:flex; align-items:center; gap:0.5rem; text-decoration:none;">
+      <img src="/static/logo.png" alt="BIG-EYE" style="width:32px;height:32px;object-fit:cover;border-radius:50%;" />
+      <span class="nav-brand">BIG-EYE-BOT</span>
+    </a>
+    <div class="nav-links" style="align-items:center;">
       <a href="/dashboard">Dashboard</a>
       {% set _username = get_username(request) %}
-      {% if _username %}<span style="color:var(--text-muted); font-size:0.85rem;">👤 {{ _username }}</span>{% endif %}
-      <a href="/logout">Logout</a>
+      {% if _username %}
+      <div class="nav-profile" id="navProfileWrap">
+        <button class="nav-profile-btn" id="navProfileBtn" onclick="toggleProfileMenu()">
+          <span class="nav-avatar">{{ _username[0] | upper }}</span>
+          <span style="font-size:0.88rem;">{{ _username }}</span>
+          <span style="font-size:0.7rem; color:var(--text-muted);">▾</span>
+        </button>
+        <div class="nav-profile-menu" id="navProfileMenu">
+          <div class="nav-profile-header">
+            <div class="nav-avatar nav-avatar-lg">{{ _username[0] | upper }}</div>
+            <div>
+              <div style="font-weight:600;">{{ _username }}</div>
+              <div style="font-size:0.78rem; color:var(--text-muted);">Eingeloggt</div>
+            </div>
+          </div>
+          <div class="nav-profile-divider"></div>
+          <a href="/logout" class="nav-profile-item">🚪 Abmelden</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </nav>
   {% endif %}
+
+<style>
+.nav-profile { position:relative; }
+.nav-profile-btn {
+  display:flex; align-items:center; gap:0.5rem;
+  background:none; border:1px solid var(--border); border-radius:20px;
+  padding:0.3rem 0.75rem; cursor:pointer; color:var(--text);
+  transition:background 0.15s, border-color 0.15s;
+}
+.nav-profile-btn:hover { background:var(--bg-card); border-color:#3b82f6; }
+.nav-avatar {
+  width:28px; height:28px; border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#8b5cf6);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:0.82rem; color:#fff; flex-shrink:0;
+}
+.nav-avatar-lg { width:40px; height:40px; font-size:1.1rem; }
+.nav-profile-menu {
+  display:none; position:absolute; right:0; top:calc(100% + 8px);
+  background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
+  min-width:200px; box-shadow:0 8px 32px rgba(0,0,0,0.4); z-index:200;
+  overflow:hidden;
+}
+.nav-profile-menu.open { display:block; }
+.nav-profile-header { display:flex; align-items:center; gap:0.75rem; padding:1rem; }
+.nav-profile-divider { border-top:1px solid var(--border); }
+.nav-profile-item {
+  display:flex; align-items:center; gap:0.5rem;
+  padding:0.65rem 1rem; font-size:0.88rem; color:var(--text-muted);
+  text-decoration:none; transition:background 0.1s, color 0.1s;
+}
+.nav-profile-item:hover { background:var(--bg-main); color:var(--text); }
+</style>
+<script>
+function toggleProfileMenu() {
+  document.getElementById('navProfileMenu').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('navProfileWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('navProfileMenu')?.classList.remove('open');
+  }
+});
+</script>
 
   <main>
     {% block content %}{% endblock %}
