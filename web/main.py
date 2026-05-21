@@ -2386,7 +2386,9 @@ async def admin_set_user_plan(
     if err: return err
     if status not in ("free", "active", "trialing", "canceled", "past_due"):
         status = "free"
-    if plan not in ("starter", "clan", "alliance", "imperium", ""):
+    valid_plans = [f"{t}_{i}" for t in ("starter","clan","alliance","imperium") for i in ("monthly","annual")]
+    valid_plans += ["starter","clan","alliance","imperium",""]
+    if plan not in valid_plans:
         plan = ""
     await database.update_user_subscription_admin(discord_user_id, status, plan)
     return RedirectResponse("/admin/customers?saved=1", status_code=303)
