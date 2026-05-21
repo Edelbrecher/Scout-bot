@@ -226,6 +226,11 @@ def _require_session(request: Request):
     return session, None
 
 
+def _get_session(request: Request) -> dict | None:
+    """Returns session dict or None without redirecting (for public pages)."""
+    return get_session(request)
+
+
 def _require_guild(session: dict, guild_id: str):
     """Returns error_response if guild access denied."""
     if not SNOWFLAKE_RE.match(guild_id):
@@ -1472,6 +1477,107 @@ async def billing_portal(request: Request, guild_id: str):
     return RedirectResponse(portal.url, status_code=303)
 
 
+# ---------------------------------------------------------------------------
+# Routes — Plans (subscribe without a server)
+# ---------------------------------------------------------------------------
+
+@app.get("/plans", response_class=HTMLResponse)
+async def plans_page(request: Request, error: str = ""):
+    session = _get_session(request)
+    user_sub = None
+    if session:
+        user_sub = await database.get_user_subscription(session.get("user_id", ""))
+    return templates.TemplateResponse("plans.html", {
+        "request": request,
+        "tier_meta": TIER_META,
+        "logged_in": bool(session),
+        "user_sub": user_sub,
+        "error": error,
+    })
+
+
+@app.post("/plans/checkout")
+async def plans_checkout(request: Request, plan: str = Form("monthly"), tier: str = Form("starter")):
+    session, err = _require_session(request)
+    if err:
+        return err
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse("/plans?error=stripe_not_configured", status_code=303)
+
+    tier = tier if tier in STRIPE_PRICES else "starter"
+    interval = "monthly" if plan == "monthly" else "annual"
+    price_id = STRIPE_PRICES[tier][interval]
+    if not price_id:
+        return RedirectResponse("/plans?error=price_not_configured", status_code=303)
+
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+    discord_user_id = session.get("user_id", "")
+
+    # Re-use existing Stripe customer if available
+    user_sub = await database.get_user_subscription(discord_user_id)
+    customer_id = (user_sub or {}).get("stripe_customer_id") or None
+
+    checkout_kwargs = dict(
+        mode="subscription",
+        line_items=[{"price": price_id, "quantity": 1}],
+        allow_promotion_codes=True,
+        subscription_data={"trial_period_days": 7},
+        success_url=f"{base_url}/plans/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base_url}/plans?error=cancelled",
+        metadata={
+            "discord_user_id": discord_user_id,
+            "tier": tier,
+            "source": "plans",
+        },
+    )
+    if customer_id:
+        checkout_kwargs["customer"] = customer_id
+
+    try:
+        checkout_session = s.checkout.Session.create(**checkout_kwargs)
+    except Exception as e:
+        print(f"[plans/checkout] Stripe error: {e}")
+        return RedirectResponse(
+            f"/plans?error={str(e)[:80].replace(' ', '+')}",
+            status_code=303,
+        )
+    return RedirectResponse(checkout_session.url, status_code=303)
+
+
+@app.get("/plans/success")
+async def plans_success(request: Request, session_id: str = ""):
+    web_session, err = _require_session(request)
+    if err:
+        return err
+    s = _stripe_client()
+    if not s or not session_id:
+        return RedirectResponse("/plans", status_code=303)
+
+    try:
+        checkout = s.checkout.Session.retrieve(session_id, expand=["subscription"])
+        if checkout.metadata.get("source") == "plans":
+            sub = checkout.subscription
+            interval = "annual" if sub.items.data[0].price.recurring.interval == "year" else "monthly"
+            tier = checkout.metadata.get("tier", "starter")
+            plan_str = f"{tier}_{interval}"
+            import datetime
+            expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
+            discord_user_id = checkout.metadata.get("discord_user_id", web_session.get("user_id", ""))
+            await database.upsert_user_subscription(
+                discord_user_id=discord_user_id,
+                stripe_customer_id=checkout.customer,
+                stripe_subscription_id=sub.id,
+                status="active",
+                plan=plan_str,
+                expires_at=expires_at,
+            )
+    except Exception as e:
+        print(f"[plans/success] Error: {e}")
+
+    return RedirectResponse("/dashboard?saved=1", status_code=303)
+
+
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     payload = await request.body()
@@ -1488,33 +1594,106 @@ async def stripe_webhook(request: Request):
 
     if event["type"] in ("customer.subscription.updated", "customer.subscription.created"):
         customer_id = obj.get("customer")
-        guild = await database.get_guild_by_stripe_customer(customer_id)
-        if guild:
-            status = obj.get("status", "inactive")  # active, trialing, past_due, etc.
+        import datetime
+
+        # Check if this is a user-level subscription
+        user_sub = await database.get_user_by_stripe_customer(customer_id)
+        if user_sub:
+            status = obj.get("status", "inactive")
             interval = obj.get("items", {}).get("data", [{}])[0].get("price", {}).get("recurring", {}).get("interval", "month")
-            plan = "annual" if interval == "year" else "monthly"
-            import datetime
+            plan_interval = "annual" if interval == "year" else "monthly"
+            existing_plan = (user_sub.get("plan") or "starter").split("_")[0]
+            plan_str = f"{existing_plan}_{plan_interval}"
             expires_at = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
-            await database.update_subscription(
-                guild_id=guild["guild_id"],
+            await database.upsert_user_subscription(
+                discord_user_id=user_sub["discord_user_id"],
                 stripe_customer_id=customer_id,
                 stripe_subscription_id=obj["id"],
                 status=status,
-                plan=plan,
+                plan=plan_str,
+                expires_at=expires_at,
+            )
+        else:
+            guild = await database.get_guild_by_stripe_customer(customer_id)
+            if guild:
+                status = obj.get("status", "inactive")
+                interval = obj.get("items", {}).get("data", [{}])[0].get("price", {}).get("recurring", {}).get("interval", "month")
+                plan = "annual" if interval == "year" else "monthly"
+                expires_at = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
+                await database.update_subscription(
+                    guild_id=guild["guild_id"],
+                    stripe_customer_id=customer_id,
+                    stripe_subscription_id=obj["id"],
+                    status=status,
+                    plan=plan,
+                    expires_at=expires_at,
+                )
+
+    elif event["type"] == "checkout.session.completed":
+        # Handle user-level checkout completions (source=plans)
+        meta = obj.get("metadata") or {}
+        if meta.get("source") == "plans" and meta.get("discord_user_id"):
+            discord_user_id = meta["discord_user_id"]
+            tier = meta.get("tier", "starter")
+            import datetime
+            # Retrieve subscription details if available
+            sub_id = obj.get("subscription")
+            status = "active"
+            expires_at = None
+            plan_str = f"{tier}_monthly"
+            if sub_id:
+                s = _stripe_client()
+                if s:
+                    try:
+                        sub = s.subscriptions.retrieve(sub_id)
+                        status = sub.status
+                        interval = sub.items.data[0].price.recurring.interval
+                        plan_str = f"{tier}_{'annual' if interval == 'year' else 'monthly'}"
+                        expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
+                    except Exception:
+                        pass
+            await database.upsert_user_subscription(
+                discord_user_id=discord_user_id,
+                stripe_customer_id=obj.get("customer", ""),
+                stripe_subscription_id=sub_id or "",
+                status=status,
+                plan=plan_str,
                 expires_at=expires_at,
             )
 
     elif event["type"] == "customer.subscription.deleted":
         customer_id = obj.get("customer")
-        guild = await database.get_guild_by_stripe_customer(customer_id)
-        if guild:
-            await database.set_subscription_status(guild["guild_id"], "cancelled")
+        user_sub = await database.get_user_by_stripe_customer(customer_id)
+        if user_sub:
+            await database.upsert_user_subscription(
+                discord_user_id=user_sub["discord_user_id"],
+                stripe_customer_id=customer_id,
+                stripe_subscription_id=user_sub.get("stripe_subscription_id", ""),
+                status="cancelled",
+                plan=user_sub.get("plan", ""),
+                expires_at=user_sub.get("expires_at"),
+            )
+        else:
+            guild = await database.get_guild_by_stripe_customer(customer_id)
+            if guild:
+                await database.set_subscription_status(guild["guild_id"], "cancelled")
 
     elif event["type"] == "invoice.payment_failed":
         customer_id = obj.get("customer")
-        guild = await database.get_guild_by_stripe_customer(customer_id)
-        if guild:
-            await database.set_subscription_status(guild["guild_id"], "past_due")
+        user_sub = await database.get_user_by_stripe_customer(customer_id)
+        if user_sub:
+            await database.upsert_user_subscription(
+                discord_user_id=user_sub["discord_user_id"],
+                stripe_customer_id=customer_id,
+                stripe_subscription_id=user_sub.get("stripe_subscription_id", ""),
+                status="past_due",
+                plan=user_sub.get("plan", ""),
+                expires_at=user_sub.get("expires_at"),
+            )
+        else:
+            guild = await database.get_guild_by_stripe_customer(customer_id)
+            if guild:
+                await database.set_subscription_status(guild["guild_id"], "past_due")
 
 
 # ---------------------------------------------------------------------------
@@ -2033,7 +2212,7 @@ async def admin_set_plan(
     request: Request,
     guild_id: str,
     status: str = Form(...),
-    plan: str = Form(...),
+    plan: str = Form(""),
 ):
     session, err = _require_admin(request)
     if err: return err
@@ -2062,7 +2241,7 @@ async def admin_promos(request: Request):
                 "percent_off": c.percent_off,
                 "duration": c.duration,
                 "valid": c.valid,
-                "promo_codes": [p.code for p in promos.data],
+                "promo_codes": [{"id": p.id, "code": p.code, "active": p.active} for p in promos.data],
             })
     except Exception as exc:
         error = str(exc)
@@ -2088,12 +2267,35 @@ async def admin_promos_create(
         return RedirectResponse("/admin/promos?error=percent_off+must+be+5-100", status_code=303)
     if duration not in ("once", "forever", "repeating"):
         duration = "once"
+    import re as _re
+    clean_code = _re.sub(r'[^a-zA-Z0-9_-]', '', code.strip().upper())
+    if not clean_code:
+        return RedirectResponse("/admin/promos?error=Invalid+promo+code+format", status_code=303)
     try:
         stripe.api_key = STRIPE_SECRET_KEY
         coupon = stripe.Coupon.create(percent_off=percent_off, duration=duration, name=name.strip())
-        stripe.PromotionCode.create(coupon=coupon.id, code=code.strip().upper())
+        stripe.PromotionCode.create(coupon=coupon.id, code=clean_code)
     except Exception as exc:
         return RedirectResponse(f"/admin/promos?error={exc}", status_code=303)
+    return RedirectResponse("/admin/promos?saved=1", status_code=303)
+
+
+@app.post("/admin/promos/delete")
+async def admin_promos_delete(
+    request: Request,
+    coupon_id: str = Form(""),
+    promo_id: str = Form(""),
+):
+    session, err = _require_admin(request)
+    if err: return err
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        if promo_id:
+            stripe.PromotionCode.modify(promo_id, active=False)
+        if coupon_id and not promo_id:
+            stripe.Coupon.delete(coupon_id)
+    except Exception as exc:
+        return RedirectResponse(f"/admin/promos?error={str(exc)[:80].replace(' ', '+')}", status_code=303)
     return RedirectResponse("/admin/promos?saved=1", status_code=303)
 
 

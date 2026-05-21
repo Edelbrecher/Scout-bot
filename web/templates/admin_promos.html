@@ -75,6 +75,7 @@
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Dauer</th>
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Status</th>
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Promo-Codes</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Aktionen</th>
             </tr>
           </thead>
           <tbody>
@@ -88,12 +89,27 @@
               </td>
               <td style="padding:0.65rem 1rem;">
                 {% if c.promo_codes %}
-                  {% for code in c.promo_codes %}
-                  <span style="background:var(--bg-main); border:1px solid var(--border); border-radius:5px; padding:0.15rem 0.5rem; font-family:monospace; font-size:0.82rem; margin-right:0.3rem;">{{ code }}</span>
+                  {% for p in c.promo_codes %}
+                  <div style="display:inline-flex; align-items:center; gap:0.3rem; margin-bottom:0.2rem;">
+                    <span style="background:var(--bg-main); border:1px solid var(--border); border-radius:5px; padding:0.15rem 0.5rem; font-family:monospace; font-size:0.82rem; {% if not p.active %}opacity:0.4; text-decoration:line-through;{% endif %}">{{ p.code }}</span>
+                    {% if p.active %}
+                    <form method="post" action="/admin/promos/delete" style="display:inline;" onsubmit="return confirm('Promo-Code {{ p.code }} deaktivieren?')">
+                      <input type="hidden" name="promo_id" value="{{ p.id }}" />
+                      <input type="hidden" name="coupon_id" value="{{ c.id }}" />
+                      <button type="submit" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:0.8rem; padding:0 2px;" title="Deaktivieren">✕</button>
+                    </form>
+                    {% endif %}
+                  </div>
                   {% endfor %}
                 {% else %}
                   <span style="color:var(--text-muted);">—</span>
                 {% endif %}
+              </td>
+              <td style="padding:0.65rem 1rem;">
+                <form method="post" action="/admin/promos/delete" onsubmit="return confirm('Coupon {{ c.name }} komplett löschen?')">
+                  <input type="hidden" name="coupon_id" value="{{ c.id }}" />
+                  <button type="submit" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:6px; color:#ef4444; cursor:pointer; font-size:0.8rem; padding:0.25rem 0.6rem;">🗑 Löschen</button>
+                </form>
               </td>
             </tr>
             {% endfor %}

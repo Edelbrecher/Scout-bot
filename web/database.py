@@ -172,6 +172,7 @@ async def init_db():
     await _init_einsatz_tables()
     await _init_admin_tables()
     await _init_consent_tables()
+    await _init_user_sub_tables()
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -741,8 +742,16 @@ async def get_owner_active_guilds(owner_discord_id: str) -> list[dict]:
 
 
 async def get_owner_tier_limit(owner_discord_id: str) -> int:
-    """Returns the max number of servers this owner's highest active tier allows."""
+    """Returns the max number of servers this owner's highest active tier allows.
+    Checks user_subscriptions first, then falls back to guild-level plans."""
     _tier_limits = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
+
+    # Check user-level subscription first
+    user_sub = await get_user_subscription(owner_discord_id)
+    if user_sub and user_sub.get("subscription_status") in ("active", "trialing"):
+        plan = (user_sub.get("plan") or "starter").split("_")[0]
+        return _tier_limits.get(plan, 1)
+
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
@@ -1367,6 +1376,132 @@ async def get_funnel_stats() -> dict:
         "checkout_starts": checkout_starts,
         "completed": completed,
     }
+
+
+# ---------------------------------------------------------------------------
+# User-level subscriptions (subscribe without owning a server first)
+# ---------------------------------------------------------------------------
+
+async def _init_user_sub_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_subscriptions (
+                discord_user_id         TEXT PRIMARY KEY,
+                stripe_customer_id      TEXT,
+                stripe_subscription_id  TEXT,
+                subscription_status     TEXT DEFAULT 'free',
+                plan                    TEXT DEFAULT '',
+                expires_at              TEXT,
+                updated_at              TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def get_user_subscription(discord_user_id: str) -> dict | None:
+    """Return the user_subscriptions row for this Discord user, or None."""
+    if not discord_user_id:
+        return None
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM user_subscriptions WHERE discord_user_id = ?", (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def upsert_user_subscription(
+    discord_user_id: str,
+    stripe_customer_id: str,
+    stripe_subscription_id: str,
+    status: str,
+    plan: str,
+    expires_at: str | None = None,
+):
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO user_subscriptions
+                (discord_user_id, stripe_customer_id, stripe_subscription_id,
+                 subscription_status, plan, expires_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(discord_user_id) DO UPDATE SET
+                stripe_customer_id      = excluded.stripe_customer_id,
+                stripe_subscription_id  = excluded.stripe_subscription_id,
+                subscription_status     = excluded.subscription_status,
+                plan                    = excluded.plan,
+                expires_at              = excluded.expires_at,
+                updated_at              = excluded.updated_at
+        """, (
+            discord_user_id, stripe_customer_id, stripe_subscription_id,
+            status, plan, expires_at, _dt.utcnow().isoformat(),
+        ))
+        await db.commit()
+
+
+async def get_user_available_slots(discord_user_id: str) -> tuple[int, int]:
+    """Returns (slots_used, slots_max) for this Discord user.
+
+    slots_max is derived from user_subscriptions.plan if active/trialing,
+    otherwise falls back to the highest guild-level plan held by the owner.
+    slots_used counts guild_configs rows where owner_discord_id = user and
+    subscription_status is active or trialing.
+    """
+    _tier_limits = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
+
+    # Count used slots
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            """SELECT COUNT(*) FROM guild_configs
+               WHERE owner_discord_id = ?
+                 AND subscription_status IN ('active', 'trialing')""",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            slots_used = row[0] if row else 0
+
+    # Determine max slots
+    user_sub = await get_user_subscription(discord_user_id)
+    if user_sub and user_sub.get("subscription_status") in ("active", "trialing"):
+        tier = (user_sub.get("plan") or "starter").split("_")[0]
+        slots_max = _tier_limits.get(tier, 1)
+        return slots_used, slots_max
+
+    # Fall back to guild-level plans
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT subscription_plan FROM guild_configs
+               WHERE owner_discord_id = ?
+                 AND subscription_status IN ('active', 'trialing')
+               ORDER BY
+                   CASE WHEN subscription_plan LIKE 'imperium%' THEN 4
+                        WHEN subscription_plan LIKE 'alliance%' THEN 3
+                        WHEN subscription_plan LIKE 'clan%'     THEN 2
+                        ELSE 1 END DESC
+               LIMIT 1""",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+    if row and row["subscription_plan"]:
+        tier = row["subscription_plan"].split("_")[0]
+        slots_max = _tier_limits.get(tier, 1)
+    else:
+        slots_max = 0
+
+    return slots_used, slots_max
+
+
+async def get_user_by_stripe_customer(stripe_customer_id: str) -> dict | None:
+    """Return the user_subscriptions row for a given Stripe customer ID."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM user_subscriptions WHERE stripe_customer_id = ?", (stripe_customer_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def get_billing_visitors_without_sub() -> list[dict]:

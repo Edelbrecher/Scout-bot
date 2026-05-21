@@ -391,6 +391,36 @@ async def upsert_poll_response(poll_id: int, user_id: str, user_name: str, respo
 
 
 # ---------------------------------------------------------------------------
+# User-level subscriptions
+# ---------------------------------------------------------------------------
+
+async def get_user_subscription(discord_user_id: str) -> dict | None:
+    """Get user-level subscription from user_subscriptions table."""
+    if not discord_user_id:
+        return None
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM user_subscriptions WHERE discord_user_id = ?", (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_owner_guild_count(discord_user_id: str) -> int:
+    """Count guilds where this Discord user is owner with active/trialing sub."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            """SELECT COUNT(*) FROM guild_configs
+               WHERE owner_discord_id = ?
+                 AND subscription_status IN ('active', 'trialing')""",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+# ---------------------------------------------------------------------------
 # Subscription / server-slot enforcement
 # ---------------------------------------------------------------------------
 
