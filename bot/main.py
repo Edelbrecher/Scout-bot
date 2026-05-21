@@ -109,7 +109,13 @@ class ScouterBot(commands.Bot):
             return
 
         await database.upsert_guild_name(str(guild.id), guild.name)
+        await database.set_bot_active(str(guild.id))
         print(f"Joined guild: {guild.name} ({guild.id})")
+
+    async def on_guild_remove(self, guild: discord.Guild):
+        """Bot was kicked or left a guild — mark as kicked in DB."""
+        await database.set_bot_kicked(str(guild.id))
+        print(f"[on_guild_remove] Marked {guild.name} ({guild.id}) as kicked.")
 
 
 bot = ScouterBot()

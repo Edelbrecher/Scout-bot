@@ -500,3 +500,21 @@ async def check_guild_join_allowed(guild_id: str, discord_owner_id: str) -> tupl
             return False, f"limit_reached:{used_slots}/{max_slots}:{tier}"
 
         return True, "ok"
+
+
+async def set_bot_kicked(guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET bot_status = 'kicked', bot_kicked_at = datetime('now') WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()
+
+
+async def set_bot_active(guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET bot_status = 'active', bot_kicked_at = NULL WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()

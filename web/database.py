@@ -123,6 +123,8 @@ async def init_db():
             "attack_channel_id TEXT",
             "attack_button_message_id TEXT",
             "owner_discord_id TEXT",
+            "bot_status TEXT DEFAULT 'active'",
+            "bot_kicked_at TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
@@ -770,6 +772,26 @@ async def get_owner_tier_limit(owner_discord_id: str) -> int:
         return 0
     tier = row["subscription_plan"].split("_")[0]
     return _tier_limits.get(tier, 1)
+
+
+async def set_bot_kicked(guild_id: str):
+    """Mark guild as kicked — bot was removed from the server."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET bot_status = 'kicked', bot_kicked_at = datetime('now') WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()
+
+
+async def set_bot_active(guild_id: str):
+    """Mark guild as active — bot rejoined or is present."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET bot_status = 'active', bot_kicked_at = NULL WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()
 
 
 async def set_subscription_status(guild_id: str, status: str, expires_at: str | None = None):

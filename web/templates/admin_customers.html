@@ -169,7 +169,12 @@
               {% set gst = g.subscription_status or 'free' %}
               <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
                 <div style="flex:1; min-width:180px;">
-                  <div style="font-weight:600; font-size:0.88rem;">{{ g.guild_name }}</div>
+                  <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <span style="font-weight:600; font-size:0.88rem;">{{ g.guild_name }}</span>
+                    {% if g.bot_status == 'kicked' %}
+                    <span title="Bot wurde gekickt am {{ g.bot_kicked_at or '?' }}" style="font-size:0.7rem; padding:1px 6px; background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); border-radius:8px;">🚫 Gekickt</span>
+                    {% endif %}
+                  </div>
                   <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">{{ g.guild_id }}</div>
                   <div style="display:flex; gap:0.4rem; margin-top:0.3rem; flex-wrap:wrap;">
                     {% if gst == "active" %}<span style="font-size:0.7rem; padding:1px 6px; background:#14532d; color:#4ade80; border-radius:8px;">● active</span>
