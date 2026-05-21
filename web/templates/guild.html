@@ -94,14 +94,20 @@
   <!-- ── Feature-Grid ── -->
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; margin-bottom:1.5rem;">
 
-    <!-- Scout -->
+    {# Reusable badge macros #}
+    {%- set PRO_BADGE -%}<span style="font-size:0.72rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Pro</span>{%- endset -%}
+    {%- set WIP_BADGE -%}<span style="font-size:0.72rem;background:#92400e;color:#fcd34d;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">🚧 Beta</span>{%- endset -%}
+    {%- set LOCK_ARROW -%}<span class="feature-arrow">🔒</span>{%- endset -%}
+    {%- set OK_ARROW -%}<span class="feature-arrow">→</span>{%- endset -%}
+
+    <!-- Scout (Pro) -->
     <a href="/guild/{{ guild.guild_id }}/scout" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🔍</div>
       <div class="feature-body">
-        <div class="feature-title">Scout {% if not is_premium %}<span style="font-size:0.75rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;">Pro</span>{% endif %}</div>
+        <div class="feature-title">Scout {{ PRO_BADGE }}</div>
         <div class="feature-desc">Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte</div>
       </div>
-      <span class="feature-arrow">{% if not is_premium %}🔒{% else %}→{% endif %}</span>
+      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
 
     <!-- Res-Push -->
@@ -111,7 +117,7 @@
         <div class="feature-title">Res-Push</div>
         <div class="feature-desc">Ressourcen-Anfragen verwalten, annehmen und koordinieren</div>
       </div>
-      <span class="feature-arrow">→</span>
+      {{ OK_ARROW }}
     </a>
 
     <!-- Polls -->
@@ -121,18 +127,20 @@
         <div class="feature-title">Abstimmungen</div>
         <div class="feature-desc">Team-Polls erstellen, Termine koordinieren und Ergebnisse auswerten</div>
       </div>
-      <span class="feature-arrow">→</span>
+      {{ OK_ARROW }}
     </a>
 
-    <!-- Map -->
-    <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <!-- Karte — admin only (under construction) -->
+    {% if get_is_admin(request) %}
+    <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">🗺️</div>
       <div class="feature-body">
-        <div class="feature-title">Karte {% if not is_premium %}<span style="font-size:0.75rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;">Pro</span>{% endif %}</div>
+        <div class="feature-title">Karte {{ PRO_BADGE }} {{ WIP_BADGE }}</div>
         <div class="feature-desc">Interaktive Travian-Karte mit Allianz-Heatmap und Spieler-Suche</div>
       </div>
-      <span class="feature-arrow">{% if not is_premium %}🔒{% else %}→{% endif %}</span>
+      {{ OK_ARROW }}
     </a>
+    {% endif %}
 
     <!-- Timer -->
     <a href="/guild/{{ guild.guild_id }}/timer" class="feature-card" style="text-decoration:none;">
@@ -141,17 +149,17 @@
         <div class="feature-title">Timer & Erinnerungen</div>
         <div class="feature-desc">Farmlisten-Timer, Angriffs-Erinnerungen und akustische Alarme</div>
       </div>
-      <span class="feature-arrow">→</span>
+      {{ OK_ARROW }}
     </a>
 
-    <!-- Einsatzplanung -->
+    <!-- Einsatzplanung (Pro) -->
     <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🎯</div>
       <div class="feature-body">
-        <div class="feature-title">Einsatzplanung {% if not is_premium %}<span style="font-size:0.75rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;">Pro</span>{% endif %}</div>
+        <div class="feature-title">Einsatzplanung {{ PRO_BADGE }}</div>
         <div class="feature-desc">Angriffe koordinieren, Marschzeit berechnen und direkt absenden</div>
       </div>
-      <span class="feature-arrow">{% if not is_premium %}🔒{% else %}→{% endif %}</span>
+      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
 
     <!-- Angriff-Detection — admin only (under construction) -->
@@ -159,21 +167,21 @@
     <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title">Angriff-Detection <span style="font-size:0.72rem;background:#92400e;color:#fcd34d;padding:1px 6px;border-radius:4px;vertical-align:middle;">🚧 Beta</span></div>
+        <div class="feature-title">Angriff-Detection {{ WIP_BADGE }}</div>
         <div class="feature-desc">Eingehende Angriffe per Discord-Modal melden und auswerten</div>
       </div>
-      <span class="feature-arrow">→</span>
+      {{ OK_ARROW }}
     </a>
     {% endif %}
 
-    <!-- Farming -->
+    <!-- Farming (Pro) -->
     <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">⚜️</div>
       <div class="feature-body">
-        <div class="feature-title">Farming Intelligence {% if not is_premium %}<span style="font-size:0.75rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;">Pro</span>{% endif %}</div>
+        <div class="feature-title">Farming Intelligence {{ PRO_BADGE }}</div>
         <div class="feature-desc">Inaktive Farmen erkennen, Farmlisten verwalten und analysieren</div>
       </div>
-      <span class="feature-arrow">{% if not is_premium %}🔒{% else %}→{% endif %}</span>
+      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
 
     <!-- Statistics -->
@@ -183,7 +191,7 @@
         <div class="feature-title">Statistiken</div>
         <div class="feature-desc">Aktivität, Scout-Verlauf und Teamleistung auf einen Blick</div>
       </div>
-      <span class="feature-arrow">→</span>
+      {{ OK_ARROW }}
     </a>
 
     <!-- Serververwaltung -->
@@ -193,7 +201,7 @@
         <div class="feature-title">Server-Verwaltung</div>
         <div class="feature-desc">Dashboard-Zugang, Berechtigungen und Bot-Einstellungen</div>
       </div>
-      <span class="feature-arrow">→</span>
+      {{ OK_ARROW }}
     </a>
 
   </div>
