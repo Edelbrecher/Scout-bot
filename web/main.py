@@ -2580,6 +2580,23 @@ async def admin_stats(request: Request):
     })
 
 
+@app.get("/api/live-users")
+async def api_live_users(request: Request):
+    session, err = _require_admin(request)
+    if err: return {"users": []}
+    now = time.time()
+    users = []
+    for entry in _active_users.values():
+        users.append({
+            "username": entry.get("username") or "—",
+            "path": entry.get("path") or "—",
+            "ip": entry.get("ip") or "—",
+            "seconds_ago": int(now - entry.get("last_seen", now)),
+        })
+    users.sort(key=lambda x: x["seconds_ago"])
+    return {"users": users}
+
+
 # ---------------------------------------------------------------------------
 # Admin — contact page editor
 # ---------------------------------------------------------------------------

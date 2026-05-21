@@ -2,7 +2,6 @@
 {% block title %}Statistik · Admin · TravOps{% endblock %}
 
 {% block content %}
-<meta http-equiv="refresh" content="30">
 <div class="container">
   <div style="display:flex; gap:1.5rem;">
 
@@ -23,15 +22,20 @@
 
     <!-- Main content -->
     <div style="flex:1; min-width:0;">
-      <h1 style="margin:0 0 1.5rem;">Statistik</h1>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+        <h1 style="margin:0;">Statistik</h1>
+        <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:var(--text-muted);">
+          <span id="live-dot" style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:50%;"></span>
+          Live-Aktualisierung alle 30s
+        </div>
+      </div>
 
       <!-- Section 1: Live users -->
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
-        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600; display:flex; align-items:center; gap:0.75rem;">
-          <span style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:50%;"></span>
-          Live Nutzer (jetzt aktiv) &nbsp;
-          <span style="font-size:0.8rem; color:var(--text-muted); font-weight:400;">Auto-Refresh alle 30s</span>
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">
+          Live Nutzer <span id="live-count" style="font-size:0.82rem; color:var(--text-muted); font-weight:400;">({{ live_users|length }} aktiv)</span>
         </div>
+        <div id="live-table-wrap">
         <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
           <thead>
             <tr style="background:var(--bg-main);">
@@ -41,7 +45,7 @@
               <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Zuletzt gesehen</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="live-tbody">
             {% for u in live_users %}
             <tr style="border-top:1px solid var(--border);">
               <td style="padding:0.6rem 1rem; font-weight:600;">{{ u.username }}</td>
@@ -58,44 +62,54 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- Section 2: Funnel -->
+      {% set bv = funnel.billing_visits %}
+      {% set cs = funnel.checkout_starts %}
+      {% set cp = funnel.completed %}
+      {% set max_val = [bv, 1] | max %}
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
         <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">Conversion Funnel (letzte 30 Tage)</div>
         <div style="padding:1.5rem; display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
-          {% set bv = funnel.billing_visits %}
-          {% set cs = funnel.checkout_starts %}
-          {% set cp = funnel.completed %}
+
           <div style="flex:1; min-width:120px; text-align:center;">
             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Billing-Seite besucht</div>
-            <div style="background:#3b82f6; border-radius:8px 8px 0 0; min-height:20px;" style="height:{{ [bv * 2, 120]|min }}px;"></div>
+            <div style="height:120px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#3b82f6; border-radius:8px 8px 0 0; height:{{ [[((bv / max_val) * 120) | int, 4] | max, 120] | min }}px;"></div>
+            </div>
             <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
               <div style="font-size:1.8rem; font-weight:700; color:#3b82f6;">{{ bv }}</div>
             </div>
           </div>
+
           <div style="font-size:1.5rem; color:var(--text-muted); padding-bottom:1rem;">→</div>
+
           <div style="flex:1; min-width:120px; text-align:center;">
             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Checkout gestartet</div>
-            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-radius:8px;">
+            <div style="height:120px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#f59e0b; border-radius:8px 8px 0 0; height:{{ [[((cs / max_val) * 120) | int, 4] | max, 120] | min }}px;"></div>
+            </div>
+            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
               <div style="font-size:1.8rem; font-weight:700; color:#f59e0b;">{{ cs }}</div>
-              {% if bv > 0 %}
-              <div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cs / bv) * 100)|round(1) }}% von Schritt 1</div>
-              {% endif %}
+              {% if bv > 0 %}<div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cs / bv) * 100)|round(1) }}%</div>{% endif %}
             </div>
           </div>
+
           <div style="font-size:1.5rem; color:var(--text-muted); padding-bottom:1rem;">→</div>
+
           <div style="flex:1; min-width:120px; text-align:center;">
             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Abonnement abgeschlossen</div>
-            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-radius:8px;">
+            <div style="height:120px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#22c55e; border-radius:8px 8px 0 0; height:{{ [[((cp / max_val) * 120) | int, 4] | max, 120] | min }}px;"></div>
+            </div>
+            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
               <div style="font-size:1.8rem; font-weight:700; color:#22c55e;">{{ cp }}</div>
-              {% if cs > 0 %}
-              <div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cp / cs) * 100)|round(1) }}% von Schritt 2</div>
-              {% elif bv > 0 %}
-              <div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cp / bv) * 100)|round(1) }}% von Schritt 1</div>
-              {% endif %}
+              {% if bv > 0 %}<div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cp / bv) * 100)|round(1) }}%</div>{% endif %}
             </div>
           </div>
+
         </div>
       </div>
 
@@ -123,7 +137,43 @@
           </tbody>
         </table>
       </div>
+
     </div>
   </div>
 </div>
+
+<script>
+// Only refresh the live users table via AJAX — no full page reload
+(function() {
+  var dot = document.getElementById('live-dot');
+  var interval = setInterval(function() {
+    fetch('/api/live-users')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var tbody = document.getElementById('live-tbody');
+        var countEl = document.getElementById('live-count');
+        if (!tbody) return;
+        if (!data.users || data.users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine aktiven Nutzer.</td></tr>';
+          if (countEl) countEl.textContent = '(0 aktiv)';
+          return;
+        }
+        if (countEl) countEl.textContent = '(' + data.users.length + ' aktiv)';
+        tbody.innerHTML = data.users.map(function(u) {
+          var ago = u.seconds_ago < 60 ? u.seconds_ago + 's' : Math.floor(u.seconds_ago/60) + 'min ' + (u.seconds_ago%60) + 's';
+          return '<tr style="border-top:1px solid var(--border);">'
+            + '<td style="padding:0.6rem 1rem; font-weight:600;">' + (u.username || '—') + '</td>'
+            + '<td style="padding:0.6rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.82rem;">' + (u.path || '') + '</td>'
+            + '<td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.82rem;">' + (u.ip || '') + '</td>'
+            + '<td style="padding:0.6rem 1rem; color:var(--text-muted);">' + ago + '</td>'
+            + '</tr>';
+        }).join('');
+        // Blink dot
+        dot.style.opacity = '0';
+        setTimeout(function() { dot.style.opacity = '1'; }, 200);
+      })
+      .catch(function() {});
+  }, 30000);
+})();
+</script>
 {% endblock %}
