@@ -397,6 +397,16 @@ async def upsert_poll_response(poll_id: int, user_id: str, user_name: str, respo
 _TIER_LIMITS = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
 
 
+async def get_subscription_status(guild_id: str) -> str:
+    """Return the subscription_status for a guild ('free' if not found)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT subscription_status FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row and row[0] else "free"
+
+
 async def check_guild_join_allowed(guild_id: str, discord_owner_id: str) -> tuple[bool, str]:
     """
     Returns (allowed: bool, reason: str).

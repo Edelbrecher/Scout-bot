@@ -7,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import database
+from utils import require_premium, PREMIUM_STATUSES
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +265,10 @@ class AttacksCog(commands.Cog):
 
         for guild_id, channel_id, message_id in rows:
             try:
+                # Skip non-premium guilds on startup restore
+                sub_status = await database.get_subscription_status(guild_id)
+                if sub_status not in PREMIUM_STATUSES:
+                    continue
                 guild = self.bot.get_guild(int(guild_id))
                 if not guild:
                     continue
@@ -284,6 +289,8 @@ class AttacksCog(commands.Cog):
     @app_commands.command(name="attack-setup", description="Richtet den Angriff-Detection-Kanal ein (Admin)")
     @app_commands.default_permissions(administrator=True)
     async def attack_setup(self, interaction: discord.Interaction):
+        if not await require_premium(interaction):
+            return
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild

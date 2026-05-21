@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 
 import database
+from utils import PREMIUM_STATUSES
 
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
@@ -17,6 +18,11 @@ class Archiver(commands.Cog):
         if not message.guild:
             return
         if not message.attachments:
+            return
+
+        # Subscription gate: silently skip non-premium guilds
+        status = await database.get_subscription_status(str(message.guild.id))
+        if status not in PREMIUM_STATUSES:
             return
 
         if not await database.is_scout_channel(str(message.channel.id)):

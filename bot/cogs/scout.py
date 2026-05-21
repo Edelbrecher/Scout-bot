@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import database
+from utils import require_premium
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +256,8 @@ class Scout(commands.Cog):
     @app_commands.command(name="setup-scout", description="Post the Scout Request button in this channel")
     @app_commands.checks.has_permissions(administrator=True)
     async def setup_scout(self, interaction: discord.Interaction):
+        if not await require_premium(interaction):
+            return
         config = await database.get_guild_config(str(interaction.guild.id))
         if not config or not config.get("category_id") or not config.get("archive_channel_id"):
             await interaction.response.send_message(

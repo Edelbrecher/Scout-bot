@@ -235,6 +235,21 @@ def _require_guild(session: dict, guild_id: str):
     return None
 
 
+PREMIUM_STATUSES = ("active", "trialing")
+
+
+async def _require_premium(guild: dict | None, guild_id: str):
+    """Returns redirect to billing if guild does not have an active subscription.
+    past_due guilds are allowed through (grace period).
+    Returns None if access is granted."""
+    if guild is None:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
+    status = guild.get("subscription_status") or "free"
+    if status not in PREMIUM_STATUSES and status != "past_due":
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -1241,6 +1256,8 @@ async def guild_map(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     is_admin = session.get("type") == "admin"
     scouted = await database.get_scouted_coordinates(guild_id)
     return templates.TemplateResponse("map.html", {
@@ -1256,6 +1273,9 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
     if err: return err
     # Validate: must be https://....travian.com or similar
     url = server_url.strip().rstrip("/")
@@ -1879,6 +1899,8 @@ async def einsatz_page(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     plans = await database.get_attack_plans(guild_id)
     return templates.TemplateResponse("einsatz.html", {
         "request": request,

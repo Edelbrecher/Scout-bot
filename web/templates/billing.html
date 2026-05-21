@@ -14,7 +14,11 @@
     ✅ Abonnement aktiviert – danke! Deine Features sind jetzt freigeschaltet.
   </div>
   {% endif %}
-  {% if error == 'cancelled' %}
+  {% if error == 'premium_required' %}
+  <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
+    🔒 <strong>Diese Funktion erfordert ein Pro-Abonnement.</strong> Wähle einen Plan um fortzufahren.
+  </div>
+  {% elif error == 'cancelled' %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ Zahlung abgebrochen.</div>
   {% elif error %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ {{ error }}</div>
