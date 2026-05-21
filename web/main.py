@@ -1425,17 +1425,33 @@ def _stripe_client():
 async def guild_settings_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
     guild = await database.get_guild_config(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    if not await _can_access_guild(session, guild):
-        return RedirectResponse("/dashboard", status_code=303)
     flash = request.query_params.get("flash", "")
+    # Load Discord roles for the guild (same as main guild page)
+    token = os.environ.get("DISCORD_TOKEN", "")
+    roles = []
+    if token:
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(
+                    f"https://discord.com/api/v10/guilds/{guild_id}/roles",
+                    headers={"Authorization": f"Bot {token}"},
+                    timeout=5,
+                )
+                if r.status_code == 200:
+                    roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
+        except Exception:
+            pass
     return templates.TemplateResponse("guild_settings.html", {
         "request": request,
         "guild": guild,
         "is_owner": is_guild_owner(session, guild),
         "flash": flash,
+        "roles": roles,
     })
 
 

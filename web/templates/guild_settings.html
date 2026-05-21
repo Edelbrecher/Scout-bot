@@ -37,6 +37,57 @@
   </div>
   {% endif %}
 
+  <!-- Rollen & Berechtigungen -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin:0 0 0.75rem; font-size:1rem;">🔐 Rollen &amp; Berechtigungen
+      <small style="font-size:0.75rem; font-weight:400; color:var(--text-muted); margin-left:0.5rem;">({{ roles|length }} Rollen)</small>
+    </h2>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem;">Bestimme welche Rollen auf welche Bereiche zugreifen dürfen. Änderungen wirken sofort.</p>
+    {% if roles %}
+    {% set scout_roles = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+    {% set res_roles   = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Rolle</th>
+            <th>ID</th>
+            <th title="Zugriff auf Scout-Archiv und Kanäle">📁 Scout</th>
+            <th title="Kann Res-Push Anfragen annehmen / ablehnen">🪖 Res-Answer</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for role in roles %}
+          {% if role.name != '@everyone' %}
+          <tr>
+            <td>
+              {% if role.color %}
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;vertical-align:middle;"></span>
+              {% endif %}
+              <strong>{{ role.name }}</strong>
+            </td>
+            <td><code style="user-select:all; font-size:0.78rem;">{{ role.id }}</code></td>
+            <td style="text-align:center;">
+              <button class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
+                data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="allowed_role_ids"
+              >{{ '✅' if role.id in scout_roles else '○' }}</button>
+            </td>
+            <td style="text-align:center;">
+              <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"
+                data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_manager_role_ids"
+              >{{ '✅' if role.id in res_roles else '○' }}</button>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:0;">Rollen konnten nicht geladen werden.</p>
+    {% endif %}
+  </div>
+
   <!-- Bot entfernen -->
   {% if is_owner %}
   <div class="card" style="border-color:rgba(239,68,68,0.3);">
@@ -59,4 +110,26 @@
   {% endif %}
 
 </div>
+
+<script>
+document.querySelectorAll('.role-toggle').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const { guild, role, field } = btn.dataset;
+    btn.disabled = true; btn.style.opacity = '0.5';
+    try {
+      const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `field=${encodeURIComponent(field)}`
+      });
+      if (res.ok) {
+        const data = await res.json();
+        btn.innerHTML = data.added ? '✅' : '○';
+        btn.classList.toggle('active', data.added);
+      }
+    } catch(e) { console.error(e); }
+    btn.disabled = false; btn.style.opacity = '';
+  });
+});
+</script>
 {% endblock %}

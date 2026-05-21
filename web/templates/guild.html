@@ -196,62 +196,6 @@
 
   </div>
 
-  <!-- ── Rollen (eingeklappt) ── -->
-  <details class="card" style="cursor:pointer;">
-    <summary style="list-style:none; display:flex; justify-content:space-between; align-items:center; padding:0; font-size:1rem; font-weight:600; user-select:none;">
-      <span>🔐 Rollen &amp; Berechtigungen
-        <small style="font-size:0.75rem; font-weight:400; color:var(--text-muted); margin-left:0.5rem;">({{ roles|length }} Rollen)</small>
-      </span>
-      <span class="details-chevron" style="font-size:0.9rem; color:var(--text-muted);">▼</span>
-    </summary>
-
-    <div style="margin-top:1rem;">
-      <p class="hint">Bestimme welche Rollen auf welche Bereiche zugreifen dürfen. Änderungen wirken sofort.</p>
-      {% if roles %}
-      {% set scout_roles = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
-      {% set res_roles   = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
-      <div style="overflow-x:auto;">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Rolle</th>
-              <th>ID</th>
-              <th title="Zugriff auf Scout-Archiv und Kanäle">📁 Scout</th>
-              <th title="Kann Res-Push Anfragen annehmen / ablehnen">🪖 Res-Answer</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for role in roles %}
-            {% if role.name != '@everyone' %}
-            <tr>
-              <td>
-                {% if role.color %}
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;vertical-align:middle;"></span>
-                {% endif %}
-                <strong>{{ role.name }}</strong>
-              </td>
-              <td><code style="user-select:all; font-size:0.78rem;">{{ role.id }}</code></td>
-              <td style="text-align:center;">
-                <button class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
-                  data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="allowed_role_ids"
-                >{{ '✅' if role.id in scout_roles else '○' }}</button>
-              </td>
-              <td style="text-align:center;">
-                <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"
-                  data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_manager_role_ids"
-                >{{ '✅' if role.id in res_roles else '○' }}</button>
-              </td>
-            </tr>
-            {% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="empty">Rollen konnten nicht geladen werden.</p>
-      {% endif %}
-    </div>
-  </details>
 
 </div>
 
@@ -306,27 +250,6 @@ function toggleSetup() {
   document.getElementById('setupBody').style.display = setupOpen ? 'block' : 'none';
   document.getElementById('setupChevron').style.transform = setupOpen ? '' : 'rotate(-90deg)';
 }
-
-// Role toggles
-document.querySelectorAll('.role-toggle').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const { guild, role, field } = btn.dataset;
-    btn.disabled = true; btn.style.opacity = '0.5';
-    try {
-      const res = await fetch(`/guild/${guild}/roles/${role}/toggle`, {
-        method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`field=${encodeURIComponent(field)}`
-      });
-      if (res.ok) {
-        const data = await res.json();
-        btn.innerHTML = data.added ? '✅' : '○';
-        btn.classList.toggle('active', data.added);
-      }
-    } catch(e) { console.error(e); }
-    btn.disabled = false; btn.style.opacity = '';
-  });
-});
 
 // Auto-push tw_world to localStorage (so Timer & Einsatz pick it up)
 {% if guild.tw_world %}
