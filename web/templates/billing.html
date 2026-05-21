@@ -2,7 +2,7 @@
 {% block title %}Abonnement · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1050px;">
+<div class="container" style="max-width:960px;">
   <div style="margin-bottom:1.5rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
     <h1 style="margin:0.25rem 0 0;">💳 Abonnement</h1>
@@ -10,14 +10,14 @@
   </div>
 
   {% if saved %}
-  <div style="margin-bottom:1rem; padding:0.75rem 1rem; background:#1a3a2a; border:1px solid #4caf82; border-radius:8px; color:#4caf82;">
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a3a2a;border:1px solid #4caf82;border-radius:8px;color:#4caf82;">
     ✅ Abonnement aktiviert – danke! Deine Features sind jetzt freigeschaltet.
   </div>
   {% endif %}
   {% if error == 'cancelled' %}
-  <div style="margin-bottom:1rem; padding:0.75rem 1rem; background:#3a1a1a; border:1px solid #e05555; border-radius:8px; color:#e05555;">❌ Zahlung abgebrochen.</div>
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ Zahlung abgebrochen.</div>
   {% elif error %}
-  <div style="margin-bottom:1rem; padding:0.75rem 1rem; background:#3a1a1a; border:1px solid #e05555; border-radius:8px; color:#e05555;">❌ Fehler: {{ error }}</div>
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ {{ error }}</div>
   {% endif %}
 
   <!-- ── Aktueller Status ── -->
@@ -26,30 +26,28 @@
   {% set sub_tier   = sub_plan.split('_')[0] if '_' in sub_plan else '' %}
   {% set sub_int    = sub_plan.split('_')[1] if '_' in sub_plan else '' %}
 
-  <div class="card" style="margin-bottom:1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+  <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
     <div>
-      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.3rem;">Aktueller Plan</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;">Aktueller Plan</div>
       {% if sub_status == 'trialing' %}
-        <span style="font-size:1.1rem; font-weight:700; color:#93c5fd;">🎁 7-Tage Testphase</span>
-        {% if sub_tier %}
-          <span style="color:var(--text-muted); margin-left:0.5rem;">· {{ sub_tier | capitalize }}</span>
-        {% endif %}
+        <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;">🎁 7-Tage Testphase</span>
+        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ sub_tier|capitalize }}</span>{% endif %}
       {% elif sub_status == 'active' %}
-        <span style="font-size:1.1rem; font-weight:700; color:#4ade80;">✅ Aktiv</span>
-        {% if sub_tier %}<span style="color:var(--text-muted); margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get(sub_tier, sub_tier | capitalize) }}</span>{% endif %}
-        {% if sub_int %}<span style="color:var(--text-muted); font-size:0.85rem; margin-left:0.3rem;">({{ 'Jährlich' if sub_int == 'annual' else 'Monatlich' }})</span>{% endif %}
+        <span style="font-size:1.1rem;font-weight:700;color:#4ade80;">✅ Aktiv</span>
+        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get(sub_tier, sub_tier) }}</span>{% endif %}
+        {% if sub_int %}<span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.3rem;">({{ 'Jährlich' if sub_int == 'annual' else 'Monatlich' }})</span>{% endif %}
       {% elif sub_status == 'past_due' %}
-        <span style="font-size:1.1rem; font-weight:700; color:#fb923c;">⚠️ Zahlung überfällig</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#fb923c;">⚠️ Zahlung überfällig</span>
       {% elif sub_status == 'cancelled' %}
-        <span style="font-size:1.1rem; font-weight:700; color:#6b7280;">🔒 Gekündigt</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#6b7280;">🔒 Gekündigt</span>
       {% else %}
-        <span style="font-size:1.1rem; font-weight:700; color:var(--text-muted);">🆓 Kein aktives Abo</span>
+        <span style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">🆓 Kein aktives Abo</span>
       {% endif %}
       {% if guild.subscription_expires_at %}
-      <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">Läuft bis: {{ guild.subscription_expires_at[:10] }}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;">Läuft bis: {{ guild.subscription_expires_at[:10] }}</div>
       {% endif %}
     </div>
-    {% if guild.stripe_customer_id and sub_status in ('active', 'trialing', 'past_due') %}
+    {% if guild.stripe_customer_id and sub_status in ('active','trialing','past_due') %}
     <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
       <button type="submit" class="btn btn-secondary">🔧 Abo verwalten &amp; kündigen</button>
     </form>
@@ -62,136 +60,134 @@
   </div>
   {% else %}
 
-  <!-- ── Billing-Toggle ── -->
-  <div style="display:flex; align-items:center; justify-content:center; gap:1rem; margin-bottom:1.75rem; flex-wrap:wrap;">
-    <span style="font-size:0.95rem; font-weight:500;">Abrechnung:</span>
-    <div style="display:flex; background:var(--bg-card); border:1px solid var(--border); border-radius:30px; padding:4px; gap:4px;">
-      <button id="btnMonthly" onclick="setBilling('monthly')"
-        class="billing-toggle active"
-        style="padding:0.4rem 1.25rem; border-radius:24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.15s;">
+  <!-- ── Billing Toggle ── -->
+  <div style="display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:1.75rem;">
+    <div style="display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:30px;padding:4px;gap:4px;">
+      <button id="btnMonthly" onclick="setBilling('monthly')" type="button"
+        style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:#3b82f6;color:#fff;transition:all 0.15s;">
         Monatlich
       </button>
-      <button id="btnAnnual" onclick="setBilling('annual')"
-        class="billing-toggle"
-        style="padding:0.4rem 1.25rem; border-radius:24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.15s;">
+      <button id="btnAnnual" onclick="setBilling('annual')" type="button"
+        style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:transparent;color:var(--text-muted);transition:all 0.15s;display:flex;align-items:center;gap:0.4rem;">
         Jährlich
-        <span style="background:#f59e0b; color:#000; font-size:0.7rem; font-weight:800; padding:1px 6px; border-radius:8px; margin-left:4px; vertical-align:middle;">3 Mon. gratis</span>
+        <span style="background:#f59e0b;color:#000;font-size:0.68rem;font-weight:800;padding:1px 7px;border-radius:8px;">3 Mon. GRATIS</span>
       </button>
     </div>
   </div>
 
   <!-- ── Tier-Karten ── -->
-  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:1.5rem;">
-
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin-bottom:1.5rem;">
     {% set tiers = [
-      ('starter',  'Starter',  '⚡', 1, 6.99,  55.99,  ['Alle Kernfeatures', 'Scout-System', 'Res-Push', 'Einsatzplanung', 'Farming Intel', 'Karte & Timer']),
-      ('clan',     'Clan',     '⚔️', 2, 10.99, 87.99,  ['Alles aus Starter', '2 Discord-Server', 'Für aktive Gilden']),
-      ('alliance', 'Alliance', '🛡️', 3, 14.99, 119.99, ['Alles aus Clan', '3 Discord-Server', 'Für Allianzen']),
-      ('imperium', 'Imperium', '👑', 5, 19.99, 159.99, ['Alles aus Alliance', '5 Discord-Server', 'Für Communities']),
+      ('starter',  'Starter',  '⚡', 1, 6.99,  55.99,  'Für einzelne Gilden',    ['Scout-System','Res-Push','Einsatzplanung','Farming Intel','Karte & Timer','Angriff-Detection']),
+      ('clan',     'Clan',     '⚔️', 2, 10.99, 87.99,  'Für aktive Gilden',      ['Alles aus Starter','2 Discord-Server','Prioritäts-Support']),
+      ('alliance', 'Alliance', '🛡️', 3, 14.99, 119.99, 'Für Allianzen',          ['Alles aus Clan','3 Discord-Server']),
+      ('imperium', 'Imperium', '👑', 5, 19.99, 159.99, 'Für große Communities',  ['Alles aus Alliance','5 Discord-Server','Dedicated Support']),
     ] %}
 
-    {% for tid, tname, temoji, servers, price_m, price_a, features in tiers %}
-    {% set is_clan = tid == 'clan' %}
-    <div style="
-      position:relative;
-      border:{{ '2px solid #f59e0b' if is_clan else '1px solid var(--border)' }};
-      border-radius:14px;
-      padding:1.25rem;
-      background:{{ 'linear-gradient(135deg,var(--bg-card),#1c1600 400%)' if is_clan else 'var(--bg-card)' }};
-      display:flex; flex-direction:column;
-      transition:border-color 0.15s, transform 0.15s;
-    ">
-      {% if is_clan %}
-      <div style="position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:#f59e0b; color:#000; font-size:0.72rem; font-weight:800; padding:2px 14px; border-radius:10px; white-space:nowrap;">
+    {% for tid, tname, temoji, servers, price_m, price_a, tagline, features in tiers %}
+    {% set is_popular = tid == 'clan' %}
+    <div class="tier-card {% if is_popular %}tier-popular{% endif %}" data-tier="{{ tid }}"
+         onclick="selectTier('{{ tid }}')"
+         style="position:relative;border:2px solid {% if is_popular %}#f59e0b{% else %}var(--border){% endif %};border-radius:14px;padding:1.25rem;background:{% if is_popular %}linear-gradient(160deg,var(--bg-card),#1c1600){% else %}var(--bg-card){% endif %};cursor:pointer;transition:border-color 0.15s,transform 0.15s,box-shadow 0.15s;user-select:none;">
+
+      {% if is_popular %}
+      <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#f59e0b;color:#000;font-size:0.7rem;font-weight:800;padding:2px 12px;border-radius:10px;white-space:nowrap;">
         ⭐ BELIEBTESTE WAHL
       </div>
       {% endif %}
 
-      <div style="font-size:1.5rem; margin-bottom:0.4rem;">{{ temoji }}</div>
-      <div style="font-size:1.15rem; font-weight:800; margin-bottom:0.15rem;">{{ tname }}</div>
-      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">{{ servers }} Discord-Server</div>
+      <!-- Selected indicator -->
+      <div class="tier-check" style="display:none;position:absolute;top:10px;right:10px;width:22px;height:22px;background:#3b82f6;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:0.75rem;color:#fff;font-weight:700;">✓</div>
 
-      <!-- Preisanzeige -->
-      <div id="price_{{ tid }}_monthly" style="margin-bottom:1rem;">
-        <div style="font-size:2rem; font-weight:800; color:{{ '#f59e0b' if is_clan else 'var(--accent)' }};">
-          €{{ '%.2f'|format(price_m) | replace('.', ',') }}
-          <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">/Monat</span>
-        </div>
+      <div style="font-size:1.6rem;margin-bottom:0.3rem;">{{ temoji }}</div>
+      <div style="font-size:1.1rem;font-weight:800;">{{ tname }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;">{{ servers }} Server · {{ tagline }}</div>
+
+      <div class="price-monthly" style="margin-bottom:0.75rem;">
+        <span style="font-size:1.8rem;font-weight:800;color:{% if is_popular %}#f59e0b{% else %}#3b82f6{% endif %};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
+        <span style="font-size:0.82rem;color:var(--text-muted);">/Monat</span>
       </div>
-      <div id="price_{{ tid }}_annual" style="margin-bottom:1rem; display:none;">
-        <div style="font-size:2rem; font-weight:800; color:{{ '#f59e0b' if is_clan else 'var(--accent)' }};">
-          €{{ '%.2f'|format(price_a / 12) | replace('.', ',') }}
-          <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">/Monat</span>
-        </div>
-        <div style="font-size:0.78rem; color:var(--text-muted);">€{{ '%.2f'|format(price_a) | replace('.', ',') }} jährlich · <span style="color:#4ade80;">~33% Ersparnis</span></div>
+      <div class="price-annual" style="margin-bottom:0.75rem;display:none;">
+        <span style="font-size:1.8rem;font-weight:800;color:{% if is_popular %}#f59e0b{% else %}#3b82f6{% endif %};">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
+        <span style="font-size:0.82rem;color:var(--text-muted);">/Monat</span>
+        <div style="font-size:0.75rem;color:#4ade80;margin-top:0.1rem;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/Jahr · ~33% gespart</div>
       </div>
 
-      <ul style="list-style:none; padding:0; margin:0 0 1.25rem; flex:1; display:flex; flex-direction:column; gap:0.35rem;">
+      <ul style="list-style:none;padding:0;margin:0;font-size:0.8rem;color:var(--text-muted);display:flex;flex-direction:column;gap:0.3rem;">
         {% for feat in features %}
-        <li style="font-size:0.83rem; color:var(--text-muted); display:flex; align-items:center; gap:0.4rem;">
-          <span style="color:#4ade80; flex-shrink:0;">✓</span> {{ feat }}
-        </li>
+        <li style="display:flex;align-items:center;gap:0.35rem;"><span style="color:#4ade80;">✓</span> {{ feat }}</li>
         {% endfor %}
       </ul>
-
-      <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout">
-        <input type="hidden" name="tier" value="{{ tid }}">
-        <input type="hidden" name="plan" class="plan-input" value="monthly">
-        <button type="submit" style="
-          width:100%; padding:0.6rem;
-          background:{{ 'linear-gradient(135deg,#f59e0b,#d97706)' if is_clan else 'var(--accent)' }};
-          color:{{ '#000' if is_clan else '#fff' }};
-          border:none; border-radius:8px; cursor:pointer;
-          font-weight:700; font-size:0.9rem;
-          transition:opacity 0.15s;
-        " onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-          7 Tage gratis testen →
-        </button>
-      </form>
     </div>
     {% endfor %}
-
   </div>
 
-  <div style="text-align:center; color:var(--text-muted); font-size:0.82rem; padding:0.75rem;">
-    🎟️ Gutschein-Code beim Checkout eingeben &nbsp;·&nbsp;
-    🔒 Sichere Zahlung via Stripe &nbsp;·&nbsp;
-    📋 Keine Kreditkarte für Testphase nötig*
+  <!-- ── Checkout Button ── -->
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout" id="checkoutForm">
+      <input type="hidden" name="tier" id="selectedTier" value="clan">
+      <input type="hidden" name="plan" id="selectedPlan" value="monthly">
+      <button type="submit" id="checkoutBtn"
+        style="padding:0.85rem 2.5rem;font-size:1.05rem;font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 20px rgba(245,158,11,0.3);transition:opacity 0.15s,transform 0.15s;"
+        onmouseover="this.style.opacity='.88';this.style.transform='translateY(-1px)'"
+        onmouseout="this.style.opacity='1';this.style.transform=''">
+        🚀 Clan · 7 Tage gratis testen
+      </button>
+    </form>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.75rem;">
+      🎟️ Gutschein beim Checkout eingeben &nbsp;·&nbsp; 🔒 Zahlung via Stripe &nbsp;·&nbsp; Jederzeit kündbar
+    </p>
   </div>
 
   {% endif %}
 </div>
 
 <style>
-.billing-toggle {
-  background: transparent;
-  color: var(--text-muted);
-}
-.billing-toggle.active {
-  background: var(--accent);
-  color: #fff;
-}
+.tier-card:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(59,130,246,0.12); }
+.tier-card.selected { border-color:#3b82f6 !important; box-shadow:0 0 0 3px rgba(59,130,246,0.2); }
+.tier-card.selected .tier-check { display:flex !important; }
+.tier-popular.selected { border-color:#f59e0b !important; box-shadow:0 0 0 3px rgba(245,158,11,0.25); }
 </style>
 
 <script>
-let billingMode = 'monthly';
+let currentTier = 'clan';
+let currentPlan = 'monthly';
+
+const TIER_LABELS = {
+  starter: 'Starter', clan: 'Clan', alliance: 'Alliance', imperium: 'Imperium'
+};
+
+function selectTier(tid) {
+  currentTier = tid;
+  document.querySelectorAll('.tier-card').forEach(c => c.classList.toggle('selected', c.dataset.tier === tid));
+  document.getElementById('selectedTier').value = tid;
+  updateCheckoutBtn();
+}
 
 function setBilling(mode) {
-  billingMode = mode;
+  currentPlan = mode;
+  document.getElementById('selectedPlan').value = mode;
 
-  document.getElementById('btnMonthly').classList.toggle('active', mode === 'monthly');
-  document.getElementById('btnAnnual').classList.toggle('active', mode === 'annual');
+  const mBtn = document.getElementById('btnMonthly');
+  const aBtn = document.getElementById('btnAnnual');
+  mBtn.style.background = mode === 'monthly' ? '#3b82f6' : 'transparent';
+  mBtn.style.color      = mode === 'monthly' ? '#fff' : 'var(--text-muted)';
+  aBtn.style.background = mode === 'annual'  ? '#3b82f6' : 'transparent';
+  aBtn.style.color      = mode === 'annual'  ? '#fff' : 'var(--text-muted)';
 
-  // Show/hide price divs
-  document.querySelectorAll('[id^="price_"]').forEach(el => {
-    const isMonthly = el.id.endsWith('_monthly');
-    el.style.display = (mode === 'monthly' ? isMonthly : !isMonthly) ? 'block' : 'none';
-  });
+  document.querySelectorAll('.price-monthly').forEach(el => el.style.display = mode === 'monthly' ? '' : 'none');
+  document.querySelectorAll('.price-annual').forEach(el  => el.style.display = mode === 'annual'  ? '' : 'none');
 
-  // Update hidden plan inputs
-  document.querySelectorAll('.plan-input').forEach(inp => {
-    inp.value = mode;
-  });
+  updateCheckoutBtn();
 }
+
+function updateCheckoutBtn() {
+  const label = TIER_LABELS[currentTier] || currentTier;
+  const planLabel = currentPlan === 'annual' ? 'Jährlich' : '7 Tage gratis testen';
+  document.getElementById('checkoutBtn').textContent = `🚀 ${label} · ${planLabel}`;
+}
+
+// Pre-select Clan
+selectTier('clan');
 </script>
 {% endblock %}
