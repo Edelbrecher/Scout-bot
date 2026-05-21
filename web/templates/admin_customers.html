@@ -21,67 +21,226 @@
 
     <!-- Main content -->
     <div style="flex:1; min-width:0;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
-        <h1 style="margin:0;">Kunden</h1>
-        <span style="color:var(--text-muted); font-size:0.9rem;">{{ guilds|length }} Guilds</span>
+
+      <!-- Header -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:0.5rem;">
+        <h1 style="margin:0; font-size:1.4rem;">👥 Kunden</h1>
+        <div style="display:flex; gap:0.75rem;">
+          <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.4rem 1rem; font-size:0.85rem; text-align:center;">
+            <div style="font-weight:700; font-size:1.1rem;">{{ total_customers }}</div>
+            <div style="color:var(--text-muted); font-size:0.75rem;">Gesamt</div>
+          </div>
+          <div style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); border-radius:8px; padding:0.4rem 1rem; font-size:0.85rem; text-align:center;">
+            <div style="font-weight:700; font-size:1.1rem; color:#22c55e;">{{ total_active }}</div>
+            <div style="color:var(--text-muted); font-size:0.75rem;">Aktiv / Trial</div>
+          </div>
+        </div>
       </div>
 
-      {% if request.query_params.get("saved") %}
+      {% if saved %}
       <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✓ Änderungen gespeichert.</div>
       {% endif %}
+      {% if error %}
+      <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#ef4444; font-size:0.9rem;">⚠ {{ error }}</div>
+      {% endif %}
 
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
-        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
-          <thead>
-            <tr style="background:var(--bg-main);">
-              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Guild</th>
-              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Status</th>
-              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Plan</th>
-              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Läuft ab</th>
-              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Override</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for g in guilds %}
-            <tr style="border-top:1px solid var(--border);">
-              <td style="padding:0.65rem 1rem;">
-                <div style="font-weight:500;">{{ g.guild_name }}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted);">{{ g.guild_id }}</div>
-              </td>
-              <td style="padding:0.65rem 1rem;">
-                {% set st = g.subscription_status or "free" %}
-                {% if st == "active" %}<span style="color:#22c55e;">● active</span>
-                {% elif st == "trialing" %}<span style="color:#f59e0b;">● trialing</span>
-                {% elif st == "past_due" %}<span style="color:#ef4444;">● past_due</span>
-                {% elif st == "canceled" %}<span style="color:#6b7280;">● canceled</span>
-                {% else %}<span style="color:var(--text-muted);">● free</span>{% endif %}
-              </td>
-              <td style="padding:0.65rem 1rem; color:var(--text-muted);">{{ g.subscription_plan or "—" }}</td>
-              <td style="padding:0.65rem 1rem; color:var(--text-muted); font-size:0.8rem;">{{ g.subscription_expires_at or "—" }}</td>
-              <td style="padding:0.65rem 1rem;">
-                <form method="post" action="/admin/customers/{{ g.guild_id }}/set-plan" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-                  <select name="status" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.8rem;">
-                    {% for opt in ["free","active","trialing","canceled","past_due"] %}
-                    <option value="{{ opt }}" {% if (g.subscription_status or "free") == opt %}selected{% endif %}>{{ opt }}</option>
-                    {% endfor %}
-                  </select>
-                  <select name="plan" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.8rem;">
-                    <option value="">—</option>
-                    {% for opt in ["starter","clan","alliance","imperium"] %}
-                    <option value="{{ opt }}" {% if g.subscription_plan == opt %}selected{% endif %}>{{ opt }}</option>
-                    {% endfor %}
-                  </select>
-                  <button type="submit" style="background:#3b82f6; border:none; border-radius:6px; padding:0.25rem 0.6rem; color:#fff; font-size:0.8rem; cursor:pointer;">Speichern</button>
-                </form>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="padding:1.5rem; color:var(--text-muted); text-align:center;">Keine Guilds gefunden.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <!-- Search -->
+      <div style="margin-bottom:1rem;">
+        <input type="text" id="customerSearch" placeholder="🔍 Nutzer oder Server suchen…" oninput="filterCustomers(this.value)"
+          style="width:100%; box-sizing:border-box; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.6rem 1rem; color:var(--text); font-size:0.9rem; outline:none;">
       </div>
+
+      <!-- Customer cards -->
+      <div id="customerList">
+      {% for c in customers %}
+      {% set uid = c.discord_user_id %}
+      {% set usub = c.user_sub %}
+      {% set usub_status = usub.subscription_status or 'free' %}
+      {% set usub_plan = (usub.plan or '').split('_')[0] %}
+
+      {# Determine overall customer status #}
+      {% set has_active_guild = c.guilds | selectattr("subscription_status", "in", ["active", "trialing"]) | list | length > 0 %}
+      {% set has_past_due = c.guilds | selectattr("subscription_status", "equalto", "past_due") | list | length > 0 %}
+      {% set is_user_active = usub_status in ["active", "trialing"] %}
+
+      <div class="customer-card" data-search="{{ c.discord_username | lower }} {% for g in c.guilds %}{{ g.guild_name | lower }} {% endfor %}"
+           style="background:var(--bg-card); border:1px solid {% if has_active_guild or is_user_active %}rgba(59,130,246,0.3){% elif has_past_due %}rgba(239,68,68,0.3){% else %}var(--border){% endif %}; border-radius:12px; margin-bottom:0.85rem; overflow:hidden;">
+
+        <!-- Customer header (always visible) -->
+        <div onclick="toggleCustomer('{{ uid }}')" style="cursor:pointer; padding:1rem 1.25rem; display:flex; align-items:center; gap:1rem; user-select:none;"
+             onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+
+          <!-- Avatar -->
+          <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#3b82f6,#8b5cf6); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1.1rem; color:#fff; flex-shrink:0;">
+            {{ c.discord_username[0] | upper if c.discord_username else '?' }}
+          </div>
+
+          <!-- User info -->
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+              <span style="font-weight:700; font-size:0.95rem;">{{ c.discord_username }}</span>
+              <span style="font-size:0.72rem; color:var(--text-muted); font-family:monospace;">{{ uid }}</span>
+            </div>
+            <div style="display:flex; gap:0.4rem; margin-top:0.3rem; flex-wrap:wrap; align-items:center;">
+              <!-- User-level sub badge -->
+              {% if is_user_active %}
+                <span style="font-size:0.72rem; padding:1px 7px; background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3); border-radius:10px;">
+                  🌐 User-Abo: {{ usub_plan | capitalize }} ({{ usub_status }})
+                </span>
+              {% endif %}
+              <!-- Server count -->
+              <span style="font-size:0.72rem; color:var(--text-muted);">
+                🏰 {{ c.guilds | length }} Server
+              </span>
+              <!-- Slot indicator -->
+              {% if c.slots_max > 0 %}
+              <span style="font-size:0.72rem; padding:1px 7px; border-radius:10px; border:1px solid {% if c.slots_used >= c.slots_max %}rgba(239,68,68,0.4); background:rgba(239,68,68,0.1); color:#f87171{% else %}var(--border); background:var(--bg-main); color:var(--text-muted){% endif %};">
+                📦 {{ c.slots_used }}/{{ c.slots_max }} Slots
+              </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Status badges right side -->
+          <div style="display:flex; gap:0.4rem; align-items:center; flex-shrink:0;">
+            {% set active_guilds = c.guilds | selectattr("subscription_status", "in", ["active","trialing"]) | list %}
+            {% if active_guilds | length > 0 or is_user_active %}
+              <span style="font-size:0.78rem; padding:3px 10px; background:#14532d; color:#4ade80; border-radius:10px; font-weight:600;">● Pro</span>
+            {% elif has_past_due %}
+              <span style="font-size:0.78rem; padding:3px 10px; background:#431407; color:#fb923c; border-radius:10px; font-weight:600;">⚠ Past Due</span>
+            {% else %}
+              <span style="font-size:0.78rem; padding:3px 10px; background:var(--bg-main); color:var(--text-muted); border:1px solid var(--border); border-radius:10px;">Free</span>
+            {% endif %}
+            <span id="chevron-{{ uid }}" style="color:var(--text-muted); font-size:0.8rem; transition:transform 0.2s;">▼</span>
+          </div>
+        </div>
+
+        <!-- Expandable detail panel -->
+        <div id="detail-{{ uid }}" style="display:none; border-top:1px solid var(--border);">
+
+          <!-- User-level subscription section -->
+          <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); background:rgba(59,130,246,0.04);">
+            <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:0.75rem;">🌐 User-Abonnement (global)</div>
+            <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-start;">
+              <div style="flex:1; min-width:200px;">
+                <div style="display:grid; grid-template-columns:auto 1fr; gap:0.3rem 1rem; font-size:0.83rem;">
+                  <span style="color:var(--text-muted);">Status</span>
+                  <span>
+                    {% if usub_status == "active" %}<span style="color:#22c55e;">● active</span>
+                    {% elif usub_status == "trialing" %}<span style="color:#f59e0b;">● trialing</span>
+                    {% elif usub_status == "past_due" %}<span style="color:#ef4444;">● past_due</span>
+                    {% elif usub_status == "canceled" %}<span style="color:#6b7280;">● canceled</span>
+                    {% else %}<span style="color:var(--text-muted);">● free</span>{% endif %}
+                  </span>
+                  <span style="color:var(--text-muted);">Plan</span>
+                  <span>{{ usub.plan or '—' }}</span>
+                  <span style="color:var(--text-muted);">Läuft ab</span>
+                  <span style="font-size:0.8rem;">{{ (usub.expires_at or '—')[:10] }}</span>
+                  <span style="color:var(--text-muted);">Stripe Customer</span>
+                  <span style="font-family:monospace; font-size:0.75rem;">{{ usub.stripe_customer_id or '—' }}</span>
+                </div>
+              </div>
+              <!-- Edit user sub -->
+              <form method="post" action="/admin/customers/user/{{ uid }}/set-plan" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                <select name="status" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.3rem 0.5rem; color:var(--text); font-size:0.82rem;">
+                  {% for opt in ["free","active","trialing","canceled","past_due"] %}
+                  <option value="{{ opt }}" {% if usub_status == opt %}selected{% endif %}>{{ opt }}</option>
+                  {% endfor %}
+                </select>
+                <select name="plan" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.3rem 0.5rem; color:var(--text); font-size:0.82rem;">
+                  <option value="">— kein Plan —</option>
+                  {% for tier in ["starter","clan","alliance","imperium"] %}
+                  {% for interval in ["monthly","annual"] %}
+                  <option value="{{ tier }}_{{ interval }}" {% if usub.plan == tier+'_'+interval %}selected{% endif %}>{{ tier | capitalize }} {{ interval }}</option>
+                  {% endfor %}
+                  {% endfor %}
+                </select>
+                <button type="submit" style="background:#3b82f6; border:none; border-radius:6px; padding:0.3rem 0.75rem; color:#fff; font-size:0.82rem; cursor:pointer; font-weight:600;">Speichern</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Servers section -->
+          <div style="padding:1rem 1.25rem;">
+            <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:0.75rem;">🏰 Server ({{ c.guilds | length }})</div>
+            {% if c.guilds %}
+            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+              {% for g in c.guilds %}
+              {% set gst = g.subscription_status or 'free' %}
+              <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+                <div style="flex:1; min-width:180px;">
+                  <div style="font-weight:600; font-size:0.88rem;">{{ g.guild_name }}</div>
+                  <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">{{ g.guild_id }}</div>
+                  <div style="display:flex; gap:0.4rem; margin-top:0.3rem; flex-wrap:wrap;">
+                    {% if gst == "active" %}<span style="font-size:0.7rem; padding:1px 6px; background:#14532d; color:#4ade80; border-radius:8px;">● active</span>
+                    {% elif gst == "trialing" %}<span style="font-size:0.7rem; padding:1px 6px; background:#1e3a5f; color:#93c5fd; border-radius:8px;">● trialing</span>
+                    {% elif gst == "past_due" %}<span style="font-size:0.7rem; padding:1px 6px; background:#431407; color:#fb923c; border-radius:8px;">⚠ past_due</span>
+                    {% elif gst == "canceled" %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:#6b7280; border-radius:8px;">canceled</span>
+                    {% else %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border); border-radius:8px;">free</span>{% endif %}
+                    {% if g.subscription_plan %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border); border-radius:8px;">{{ g.subscription_plan }}</span>{% endif %}
+                  </div>
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-muted); min-width:90px;">
+                  {% if g.subscription_expires_at %}
+                  <div>Ablauf:</div>
+                  <div style="color:var(--text);">{{ g.subscription_expires_at[:10] }}</div>
+                  {% endif %}
+                  {% if g.category_id and g.archive_channel_id %}
+                  <div style="margin-top:0.3rem; color:#22c55e; font-size:0.72rem;">✅ Eingerichtet</div>
+                  {% else %}
+                  <div style="margin-top:0.3rem; color:#f59e0b; font-size:0.72rem;">⚠ Setup nötig</div>
+                  {% endif %}
+                </div>
+                <!-- Edit guild sub -->
+                <form method="post" action="/admin/customers/{{ g.guild_id }}/set-plan" style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                  <select name="status" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.78rem;">
+                    {% for opt in ["free","active","trialing","canceled","past_due"] %}
+                    <option value="{{ opt }}" {% if gst == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                  </select>
+                  <select name="plan" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.78rem;">
+                    <option value="">—</option>
+                    {% for tier in ["starter","clan","alliance","imperium"] %}
+                    <option value="{{ tier }}" {% if g.subscription_plan == tier %}selected{% endif %}>{{ tier | capitalize }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; color:var(--text); font-size:0.78rem; cursor:pointer;">Speichern</button>
+                </form>
+                <a href="/guild/{{ g.guild_id }}" style="font-size:0.78rem; color:#3b82f6; text-decoration:none;">→ öffnen</a>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">Noch keine Server. Bot wurde noch nicht eingeladen.</div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center; padding:3rem; color:var(--text-muted);">Keine Kunden gefunden.</div>
+      {% endfor %}
+      </div>
+
     </div>
   </div>
 </div>
+
+<script>
+function toggleCustomer(uid) {
+  const detail = document.getElementById('detail-' + uid);
+  const chevron = document.getElementById('chevron-' + uid);
+  const open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : 'block';
+  chevron.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+function filterCustomers(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.customer-card').forEach(card => {
+    const text = card.dataset.search || '';
+    card.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+</script>
 {% endblock %}

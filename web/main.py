@@ -525,6 +525,8 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
         "guilds": None if session_type == "admin" else accessible,
     }
     token = create_session(session_data)
+    # Cache username in user_subscriptions so admin can see who is who
+    await database.cache_discord_username(discord_id, username)
     response = RedirectResponse("/dashboard", status_code=303)
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
     response.delete_cookie("oauth_state")
@@ -2195,11 +2197,20 @@ async def admin_dashboard(request: Request):
 async def admin_customers(request: Request):
     session, err = _require_admin(request)
     if err: return err
-    guilds = await database.get_all_guilds()
+    customers = await database.get_customers_overview()
+    total_active = sum(
+        1 for c in customers
+        if any(g.get("subscription_status") in ("active","trialing") for g in c["guilds"])
+        or c["user_sub"].get("subscription_status") in ("active","trialing")
+    )
     return templates.TemplateResponse("admin_customers.html", {
         "request": request,
-        "guilds": guilds,
+        "customers": customers,
+        "total_customers": len(customers),
+        "total_active": total_active,
         "session": session,
+        "saved": request.query_params.get("saved"),
+        "error": request.query_params.get("error"),
     })
 
 
@@ -2217,6 +2228,23 @@ async def admin_set_plan(
     if plan not in ("starter", "clan", "alliance", "imperium", ""):
         plan = ""
     await database.update_subscription_plan(guild_id, status, plan)
+    return RedirectResponse("/admin/customers?saved=1", status_code=303)
+
+
+@app.post("/admin/customers/user/{discord_user_id}/set-plan")
+async def admin_set_user_plan(
+    request: Request,
+    discord_user_id: str,
+    status: str = Form(...),
+    plan: str = Form(""),
+):
+    session, err = _require_admin(request)
+    if err: return err
+    if status not in ("free", "active", "trialing", "canceled", "past_due"):
+        status = "free"
+    if plan not in ("starter", "clan", "alliance", "imperium", ""):
+        plan = ""
+    await database.update_user_subscription_admin(discord_user_id, status, plan)
     return RedirectResponse("/admin/customers?saved=1", status_code=303)
 
 

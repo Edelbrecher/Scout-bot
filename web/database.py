@@ -1392,6 +1392,7 @@ async def _init_user_sub_tables():
                 subscription_status     TEXT DEFAULT 'free',
                 plan                    TEXT DEFAULT '',
                 expires_at              TEXT,
+                discord_username        TEXT,
                 updated_at              TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -1523,3 +1524,134 @@ async def get_billing_visitors_without_sub() -> list[dict]:
             LIMIT 50
         """) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def cache_discord_username(discord_user_id: str, username: str):
+    """Store/update discord username in user_subscriptions for admin visibility."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO user_subscriptions (discord_user_id, discord_username, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(discord_user_id) DO UPDATE SET
+                discord_username = excluded.discord_username,
+                updated_at = datetime('now')
+        """, (discord_user_id, username))
+        await db.commit()
+
+
+_TIER_LIMITS = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
+
+
+async def get_customers_overview() -> list[dict]:
+    """
+    Returns all customers grouped by owner (discord_user_id).
+    Each customer has: discord_user_id, discord_username, user_sub (plan/status),
+    guilds (list of their servers), slots_used, slots_max.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # All guilds that have an owner set
+        async with db.execute("""
+            SELECT guild_id, guild_name, subscription_status, subscription_plan,
+                   subscription_expires_at, stripe_customer_id, stripe_subscription_id,
+                   owner_discord_id, category_id, archive_channel_id
+            FROM guild_configs
+            ORDER BY guild_name
+        """) as cur:
+            all_guilds = [dict(r) for r in await cur.fetchall()]
+
+        # All user-level subscriptions
+        async with db.execute("SELECT * FROM user_subscriptions") as cur:
+            user_subs = {r["discord_user_id"]: dict(r) for r in await cur.fetchall()}
+
+    # Group guilds by owner
+    by_owner: dict[str, dict] = {}
+
+    for g in all_guilds:
+        owner_id = g.get("owner_discord_id") or "__unowned__"
+        if owner_id not in by_owner:
+            usub = user_subs.get(owner_id, {})
+            by_owner[owner_id] = {
+                "discord_user_id": owner_id,
+                "discord_username": usub.get("discord_username") or owner_id,
+                "user_sub": usub,
+                "guilds": [],
+            }
+        by_owner[owner_id]["guilds"].append(g)
+
+    # Also include users with user_sub but no guilds yet
+    for uid, usub in user_subs.items():
+        if uid not in by_owner:
+            by_owner[uid] = {
+                "discord_user_id": uid,
+                "discord_username": usub.get("discord_username") or uid,
+                "user_sub": usub,
+                "guilds": [],
+            }
+
+    # Compute slots for each customer
+    customers = []
+    for owner_id, data in by_owner.items():
+        if owner_id == "__unowned__":
+            data["slots_used"] = 0
+            data["slots_max"] = 0
+            customers.append(data)
+            continue
+
+        # Slots from user_sub
+        usub = data["user_sub"]
+        usub_status = usub.get("subscription_status", "free")
+        usub_plan = (usub.get("plan") or "").split("_")[0]
+        if usub_status in ("active", "trialing") and usub_plan in _TIER_LIMITS:
+            slots_max = _TIER_LIMITS[usub_plan]
+        else:
+            # Fall back to guild-level plans
+            guild_plans = [
+                g.get("subscription_plan", "") for g in data["guilds"]
+                if g.get("subscription_status") in ("active", "trialing")
+            ]
+            best = max(
+                (_TIER_LIMITS.get((p or "").split("_")[0], 0) for p in guild_plans),
+                default=0
+            )
+            slots_max = best
+
+        slots_used = sum(
+            1 for g in data["guilds"]
+            if g.get("subscription_status") in ("active", "trialing")
+        )
+        data["slots_used"] = slots_used
+        data["slots_max"] = slots_max
+        customers.append(data)
+
+    # Sort: active customers first, then by username
+    def _sort_key(c):
+        has_active = any(
+            g.get("subscription_status") in ("active", "trialing") for g in c["guilds"]
+        ) or c["user_sub"].get("subscription_status") in ("active", "trialing")
+        return (0 if has_active else 1, c["discord_username"].lower())
+
+    customers.sort(key=_sort_key)
+    return customers
+
+
+async def update_user_subscription_admin(
+    discord_user_id: str, status: str, plan: str,
+    stripe_customer_id: str = "", stripe_subscription_id: str = "",
+):
+    """Admin override for user-level subscription."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO user_subscriptions
+                (discord_user_id, subscription_status, plan, stripe_customer_id,
+                 stripe_subscription_id, updated_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(discord_user_id) DO UPDATE SET
+                subscription_status = excluded.subscription_status,
+                plan = excluded.plan,
+                stripe_customer_id = COALESCE(NULLIF(excluded.stripe_customer_id,''), stripe_customer_id),
+                stripe_subscription_id = COALESCE(NULLIF(excluded.stripe_subscription_id,''), stripe_subscription_id),
+                updated_at = datetime('now')
+        """, (discord_user_id, status, plan, stripe_customer_id, stripe_subscription_id))
+        await db.commit()
