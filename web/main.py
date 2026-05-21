@@ -1969,15 +1969,75 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         if cm:
             atk_x, atk_y = int(cm.group(1)), int(cm.group(2))
 
-        # Look up attacker in map.sql snapshots
-        attacker_data = await database.get_player_from_snapshot(guild_id, atk.get("attacker", ""))
+        # Defender coords — stored in report by bot modal
+        def_x = atk.get("def_x")
+        def_y = atk.get("def_y")
 
-        # Compute travel time from coords if both known
-        travel_analysis = None
-        if atk_x is not None and attacker_data:
-            for village in attacker_data.get("villages", []):
-                if village.get("x") == atk_x and village.get("y") == atk_y:
-                    pass  # attacker village confirmed
+        # Server-side speed analysis if we have both coord sets + remaining time
+        speed_analysis = None
+        if atk_x is not None and def_x is not None and remaining_seconds is not None:
+            dist = travian_dist(atk_x, atk_y, def_x, def_y)
+            remaining_hours = remaining_seconds / 3600.0
+            # max possible slowest speed: if speed > dist/remaining_h the attack would have already arrived
+            max_speed = dist / remaining_hours if remaining_hours > 0 else 0
+
+            # For each known troop speed, determine if it could be the slowest unit
+            # A troop with speed S is POSSIBLE as slowest if S <= max_speed
+            # And the departure time = arrival_time - dist/S*3600
+            import datetime as _dt
+            try:
+                created_ts = _dt.datetime.fromisoformat(report["created_at"].replace("Z", "+00:00"))
+            except Exception:
+                created_ts = None
+
+            arrival_ts = None
+            if created_ts and remaining_seconds is not None:
+                arrival_ts = created_ts + _dt.timedelta(seconds=remaining_seconds)
+
+            possible_speeds = []
+            seen_speeds = set()
+            for tname, tdata in TROOP_DATA.items():
+                s = tdata["speed"]
+                if s in seen_speeds:
+                    continue
+                if s > max_speed + 0.01:  # small tolerance
+                    continue
+                seen_speeds.add(s)
+                total_march_s = int(dist / s * 3600)
+                departure_ts = None
+                if arrival_ts:
+                    departure_ts = arrival_ts - _dt.timedelta(seconds=total_march_s)
+                possible_speeds.append({
+                    "speed": s,
+                    "total_march_s": total_march_s,
+                    "departure": departure_ts.strftime("%H:%M:%S %d.%m.") if departure_ts else None,
+                })
+            possible_speeds.sort(key=lambda x: x["speed"])
+
+            # Best match: speed closest to max_speed (most likely slowest troop)
+            best_speed = max(possible_speeds, key=lambda x: x["speed"])["speed"] if possible_speeds else None
+
+            # Which troops match each possible speed exactly
+            speed_to_troops = {}
+            for tname, tdata in TROOP_DATA.items():
+                s = tdata["speed"]
+                if s <= max_speed + 0.01:
+                    speed_to_troops.setdefault(s, []).append(tname)
+
+            speed_analysis = {
+                "dist": round(dist, 1),
+                "remaining_hours": round(remaining_hours, 2),
+                "max_speed": round(max_speed, 2),
+                "possible_speeds": possible_speeds,
+                "speed_to_troops": {str(k): v for k, v in speed_to_troops.items()},
+                "best_speed": best_speed,
+                "def_x": def_x,
+                "def_y": def_y,
+                "arrival_ts": arrival_ts.strftime("%d.%m. %H:%M:%S UTC") if arrival_ts else None,
+            }
+
+        # Look up attacker in map snapshots
+        attacker_data = await database.get_player_from_snapshot(guild_id, atk.get("attacker", ""))
 
         enriched.append({
             **atk,
@@ -1988,8 +2048,11 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
             "slowest_speed": slowest_speed,
             "atk_x": atk_x,
             "atk_y": atk_y,
+            "def_x": def_x,
+            "def_y": def_y,
             "attacker_data": attacker_data,
             "remaining_seconds": remaining_seconds,
+            "speed_analysis": speed_analysis,
             "is_stack": False,
         })
 
@@ -2022,6 +2085,7 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         "history": history[:20],
         "TRIBE_EMOJI": TRIBE_EMOJI,
         "troop_data_json": troop_data_json,
+        "troop_data": TROOP_DATA,
     })
 
 

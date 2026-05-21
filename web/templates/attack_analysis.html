@@ -73,19 +73,82 @@
 
     <div style="padding:1rem 1.25rem; display:flex; flex-direction:column; gap:1.25rem;">
 
-      <!-- ── Section 2: Geschwindigkeits-Analyse (JS fills this) ── -->
+      <!-- ── Section 2: Geschwindigkeits-Analyse ── -->
       <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">📐 Geschwindigkeits-Analyse</h3>
-        <div class="speed-analysis" style="font-size:0.85rem; color:var(--text-muted);">
-          <em>Eigene Koordinaten eingeben und „Analysieren" klicken.</em>
+        <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">📐 Geschwindigkeits-Analyse</h3>
+        {% if atk.speed_analysis %}
+        {% set sa = atk.speed_analysis %}
+        <!-- Server-side computed -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.6rem; margin-bottom:1rem;">
+          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Distanz</div>
+            <div style="font-weight:700; font-family:monospace;">{{ sa.dist }} F</div>
+          </div>
+          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Verbleibend</div>
+            <div style="font-weight:700; font-family:monospace; color:#f59e0b;">{{ sa.remaining_hours }}h</div>
+          </div>
+          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Max. Geschw.</div>
+            <div style="font-weight:700; font-family:monospace; color:#ef4444;">≤ {{ sa.max_speed }} F/h</div>
+          </div>
+          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Ankunft (UTC)</div>
+            <div style="font-weight:700; font-family:monospace; font-size:0.8rem;">{{ sa.arrival_ts or '—' }}</div>
+          </div>
+          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Verteidiger</div>
+            <div style="font-weight:700; font-family:monospace;">({{ sa.def_x }}|{{ sa.def_y }})</div>
+          </div>
         </div>
+
+        <!-- Mögliche Marschgeschwindigkeiten + Abfahrtszeiten -->
+        {% if sa.possible_speeds %}
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.4rem; font-weight:600;">Mögliche Marschgeschwindigkeiten &amp; Abfahrtszeiten:</div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+          <thead>
+            <tr style="background:var(--bg-main);">
+              <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Geschw.</th>
+              <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Mögliche Truppen</th>
+              <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Gesamtmarsch</th>
+              <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Abfahrt (Server)</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for sp in sa.possible_speeds | sort(attribute='speed', reverse=True) %}
+          {% set is_best = sp.speed == sa.best_speed %}
+          <tr style="border-top:1px solid var(--border);{% if is_best %} background:rgba(34,197,94,0.07);{% endif %}">
+            <td style="padding:0.35rem 0.6rem; font-family:monospace; font-weight:700; color:{% if is_best %}#22c55e{% else %}var(--text){% endif %};">
+              {{ sp.speed }} F/h {% if is_best %}<span style="font-size:0.7rem; color:#22c55e;">← wahrscheinlichste</span>{% endif %}
+            </td>
+            <td style="padding:0.35rem 0.6rem; color:var(--text-muted);">
+              {{ sa.speed_to_troops.get(sp.speed | string, []) | join(', ') or '—' }}
+            </td>
+            <td style="padding:0.35rem 0.6rem; font-family:monospace;">
+              {% set h = (sp.total_march_s // 3600) %}{% set m = ((sp.total_march_s % 3600) // 60) %}{% set s = (sp.total_march_s % 60) %}{{ '%02d:%02d:%02d' | format(h, m, s) }}
+            </td>
+            <td style="padding:0.35rem 0.6rem; font-family:monospace; font-size:0.8rem;">{{ sp.departure or '—' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p style="color:#ef4444; font-size:0.83rem; margin:0;">Keine konsistente Geschwindigkeit gefunden — Koordinaten prüfen.</p>
+        {% endif %}
+        {% else %}
+        <!-- JS fallback wenn keine Defender-Coords im Report -->
+        <div class="speed-analysis" data-ax="{{ atk.atk_x if atk.atk_x is not none else '' }}" data-ay="{{ atk.atk_y if atk.atk_y is not none else '' }}" data-remaining="{{ atk.remaining_seconds or '' }}" style="font-size:0.85rem; color:var(--text-muted);">
+          {% if atk.def_x is none %}
+          <em>⚠️ Keine Verteidiger-Koordinaten im Report — beim nächsten Angriff im Discord-Modal eintragen, oder unten manuell eingeben:</em>
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
 
       <!-- ── Section 3: Truppen / Mögliche Truppen ── -->
       <div>
         <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">⚔️ Truppen</h3>
         {% if atk.troops and atk.total_troops > 0 %}
-        <!-- Troops known -->
         <div style="display:flex; flex-direction:column; gap:0.35rem;">
           {% for tname, count in atk.troops.items() %}
           <div style="display:flex; align-items:center; gap:0.5rem;">
@@ -102,13 +165,23 @@
           {% if atk.slowest_speed %}· Langsamste Truppe: <strong>{{ atk.slowest_speed }} Felder/h</strong>{% endif %}
         </div>
         {% else %}
-        <!-- Troops unknown — JS will render possible-troops table -->
         <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.5rem;">
-          Truppen unbekannt (Travian hat sie verborgen). Mögliche Einheiten basierend auf Marschgeschwindigkeit:
+          Truppen unbekannt (Travian verbirgt sie). {% if atk.speed_analysis %}Basierend auf der Marschgeschwindigkeit kommen folgende Einheiten als langsamste in Frage:{% endif %}
         </p>
-        <div class="possible-troops" style="font-size:0.83rem;">
-          <em style="color:var(--text-muted);">Koordinaten eingeben für Berechnung.</em>
+        {% if atk.speed_analysis and atk.speed_analysis.possible_speeds %}
+        <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem;">
+          {% for speed, troops_list in atk.speed_analysis.speed_to_troops.items() %}
+          {% set is_best = speed | float == atk.speed_analysis.best_speed %}
+          {% for tname in troops_list %}
+          <span style="padding:0.25rem 0.6rem; border-radius:6px; font-size:0.8rem; border:1px solid {% if is_best %}rgba(34,197,94,0.5){% else %}var(--border){% endif %}; background:{% if is_best %}rgba(34,197,94,0.1){% else %}var(--bg-main){% endif %}; color:{% if is_best %}#22c55e{% else %}var(--text-muted){% endif %};">
+            {{ tname }} ({{ speed }} F/h)
+          </span>
+          {% endfor %}
+          {% endfor %}
         </div>
+        {% else %}
+        <div class="possible-troops" style="font-size:0.83rem; color:var(--text-muted);"><em>Koordinaten im Discord-Modal eintragen für Analyse.</em></div>
+        {% endif %}
         {% endif %}
       </div>
 
@@ -148,26 +221,32 @@
         {% endif %}
       </div>
 
-      <!-- ── Section 5: Marschzeit-Rückrechnung Details (JS) ── -->
-      {% if not atk.troops or atk.total_troops == 0 %}
-      <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">🕐 Marschzeit-Rückrechnung</h3>
-        <div class="march-detail" style="font-size:0.83rem; color:var(--text-muted);">
-          <em>Koordinaten eingeben für Abfahrtszeiten.</em>
-        </div>
-      </div>
-      {% endif %}
-
-      <!-- ── Section 6: TP-Einschätzung ── -->
+      <!-- ── Section 5: TP-Einschätzung ── -->
       <div>
         <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">💎 TP-Einschätzung</h3>
-        <div class="tp-estimate" style="font-size:0.83rem; color:var(--text-muted);">
-          {% if atk.total_troops > 0 %}
-            Bekannte Truppen — TP direkt aus Zusammensetzung berechenbar.
-          {% else %}
-            <em>Truppen unbekannt. Einschätzung nach Volk wird berechnet.</em>
+        {% if atk.total_troops > 0 %}
+        <p style="font-size:0.83rem; color:var(--text-muted); margin:0;">Bekannte Truppen — TP direkt aus Zusammensetzung berechenbar.</p>
+        {% elif atk.speed_analysis and atk.speed_analysis.best_speed %}
+        {% set bs = atk.speed_analysis.best_speed %}
+        <p style="font-size:0.83rem; color:var(--text-muted); margin:0 0 0.5rem;">
+          Basierend auf der wahrscheinlichsten Marschgeschwindigkeit von <strong>{{ bs }} F/h</strong>:
+        </p>
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+          {% for tname in atk.speed_analysis.speed_to_troops.get(bs | string, []) %}
+          {% set td = troop_data.get(tname, {}) %}
+          {% if td.get('atk', 0) > 0 %}
+          <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; font-size:0.82rem; min-width:140px;">
+            <div style="font-weight:600; margin-bottom:0.2rem;">{{ tname }}</div>
+            <div style="color:var(--text-muted);">Angriff: <span style="color:#ef4444; font-weight:700;">{{ td.get('atk', '?') }}</span></div>
+            <div style="color:var(--text-muted);">TP: <span style="color:#f59e0b; font-weight:700;">{{ td.get('tp', '?') }}</span></div>
+            <div style="color:var(--text-muted);">Speed: {{ td.get('speed', '?') }} F/h</div>
+          </div>
           {% endif %}
+          {% endfor %}
         </div>
+        {% else %}
+        <p style="font-size:0.83rem; color:var(--text-muted); margin:0;"><em>Truppen unbekannt. Dorfkoordinaten im Discord-Modal eintragen für Einschätzung.</em></p>
+        {% endif %}
       </div>
 
     </div>

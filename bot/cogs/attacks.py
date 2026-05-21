@@ -146,6 +146,14 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
         custom_id="attack_text",
         max_length=4000,
     )
+    def_coords = discord.ui.TextInput(
+        label="Koordinaten deines Dorfes (X|Y)",
+        style=discord.TextStyle.short,
+        placeholder="z.B. -52|27",
+        required=False,
+        custom_id="def_coords",
+        max_length=20,
+    )
 
     def __init__(self, alert_channel_id: str):
         super().__init__(custom_id="attack_modal")
@@ -154,7 +162,21 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             raw = self.attack_text.value
+            coords_raw = self.def_coords.value.strip()
+
+            # Parse defender coords
+            def_x = def_y = None
+            if coords_raw:
+                cm = re.search(r"(-?\d+)[|,\s]+(-?\d+)", coords_raw)
+                if cm:
+                    def_x, def_y = int(cm.group(1)), int(cm.group(2))
+
             attacks = parse_travian_attacks(raw)
+            # Inject defender coords into each attack
+            if def_x is not None:
+                for atk in attacks:
+                    atk["def_x"] = def_x
+                    atk["def_y"] = def_y
 
             if not attacks:
                 await interaction.response.send_message(
