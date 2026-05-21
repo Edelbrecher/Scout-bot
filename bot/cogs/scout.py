@@ -155,6 +155,8 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not await require_premium(interaction):
+            return
         guild = interaction.guild
         config = await database.get_guild_config(str(guild.id))
 
@@ -242,6 +244,8 @@ class ScoutRequestView(discord.ui.View):
         emoji="🔍", custom_id="persistent:scout_request",
     )
     async def scout_request(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await require_premium(interaction):
+            return
         await interaction.response.send_modal(ScoutModal())
 
 
