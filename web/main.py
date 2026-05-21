@@ -406,6 +406,13 @@ def _get_is_admin(request: Request) -> bool:
     session = get_session(request)
     return bool(session and session.get("type") == "admin")
 
+
+def _require_admin(session: dict):
+    """Return a redirect if the user is not a TravOps admin, else None."""
+    if session.get("type") != "admin":
+        return RedirectResponse("/dashboard", status_code=303)
+    return None
+
 templates.env.globals["get_is_admin"] = _get_is_admin
 
 import json as _json
@@ -2021,6 +2028,8 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    err = _require_admin(session)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -2093,6 +2102,8 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
+    if err: return err
+    err = _require_admin(session)
     if err: return err
     guild = await database.get_guild(guild_id)
 
@@ -2423,6 +2434,8 @@ async def attacks_config_save(
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    err = _require_admin(session)
+    if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
     if err: return err
@@ -2437,6 +2450,8 @@ async def attacks_delete(request: Request, guild_id: str, report_id: int):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    err = _require_admin(session)
+    if err: return err
     if session.get("type") != "admin":
         return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
     await database.delete_attack_report(report_id)
@@ -2448,6 +2463,8 @@ async def attacks_auto_setup(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
+    if err: return err
+    err = _require_admin(session)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -2522,6 +2539,8 @@ async def attacks_reset(request: Request, guild_id: str):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    err = _require_admin(session)
+    if err: return err
     await database.set_attack_channel_web(guild_id, "", "")
     return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
 
@@ -2535,6 +2554,8 @@ async def own_troops_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
+    if err: return err
+    err = _require_admin(session)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -2616,6 +2637,8 @@ async def own_troops_upload(
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    err = _require_admin(session)
+    if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
@@ -2642,6 +2665,8 @@ async def own_troops_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
+    if err: return err
+    err = _require_admin(session)
     if err: return err
     await database.delete_own_villages(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/attacks/own-troops", status_code=303)

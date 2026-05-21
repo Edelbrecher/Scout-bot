@@ -154,15 +154,17 @@
       <span class="feature-arrow">{% if not is_premium %}🔒{% else %}→{% endif %}</span>
     </a>
 
-    <!-- Angriff-Detection -->
-    <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <!-- Angriff-Detection — admin only (under construction) -->
+    {% if get_is_admin(request) %}
+    <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title">Angriff-Detection {% if not is_premium %}<span style="font-size:0.75rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;">Pro</span>{% endif %}</div>
+        <div class="feature-title">Angriff-Detection <span style="font-size:0.72rem;background:#92400e;color:#fcd34d;padding:1px 6px;border-radius:4px;vertical-align:middle;">🚧 Beta</span></div>
         <div class="feature-desc">Eingehende Angriffe per Discord-Modal melden und auswerten</div>
       </div>
-      <span class="feature-arrow">{% if not is_premium %}🔒{% else %}→{% endif %}</span>
+      <span class="feature-arrow">→</span>
     </a>
+    {% endif %}
 
     <!-- Farming -->
     <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
