@@ -30,17 +30,58 @@ def parse_travian_attacks(text: str) -> list[dict]:
     text = re.sub(r"[​-‏‪-‮⁦-⁩﻿]", "", text)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    TROOP_NAMES = [
-        "Legionär", "Prätorianer", "Imperianer",
-        "Equites Legati", "Equites Imperatoris", "Equites Caesaris",
-        "Rammbock", "Feuerkatapult", "Senator", "Siedler", "Held",
-        # Teuton
-        "Keulenschwinger", "Speerkämpfer", "Axtkämpfer", "Späher",
-        "Paladin", "Teut. Ritter", "Häuptling",
-        # Gaul
-        "Phalanx", "Schwertkämpfer", "Pathfinder", "Theutates-Blitz",
-        "Druidentreiter", "Haeduer", "Stammesältester",
-    ]
+    # ── Tribe detection from troop names ──────────────────────────────────
+    # Maps canonical troop names (and aliases) to tribe
+    ROMAN_TROOPS  = {"Legionär", "Prätorianer", "Imperianer",
+                     "Equites Legati", "Equites Imperatoris", "Equites Caesaris",
+                     "Rammbock", "Feuerkatapult", "Senator"}
+    TEUTON_TROOPS = {"Keulenschwinger", "Speerkämpfer", "Axtkämpfer", "Späher",
+                     "Paladin", "Teut. Ritter", "Teutonen-Rammbock", "Kriegsmaschine", "Häuptling"}
+    GAUL_TROOPS   = {"Phalanx", "Schwertkämpfer", "Pathfinder", "Theutates-Blitz",
+                     "Druidentreiter", "Haeduer", "Stammesältester"}
+
+    # Aliases → canonical names (Teuton UI variants)
+    ALIASES = {
+        "Kundschafter":    "Späher",
+        "Teutonen Reiter": "Teut. Ritter",
+        "Ramme":           "Teutonen-Rammbock",
+        "Katapult":        "Kriegsmaschine",
+        "Stammesführer":   "Häuptling",
+        # Gaul alias
+        "Aufklärer":       "Pathfinder",
+    }
+
+    # Ordered troop lists per tribe (for positional count parsing)
+    ROMAN_LIST  = ["Legionär", "Prätorianer", "Imperianer",
+                   "Equites Legati", "Equites Imperatoris", "Equites Caesaris",
+                   "Rammbock", "Feuerkatapult", "Senator", "Siedler", "Held"]
+    TEUTON_LIST = ["Keulenschwinger", "Speerkämpfer", "Axtkämpfer", "Späher",
+                   "Paladin", "Teut. Ritter", "Teutonen-Rammbock", "Kriegsmaschine", "Häuptling", "Siedler", "Held"]
+    GAUL_LIST   = ["Phalanx", "Schwertkämpfer", "Pathfinder", "Theutates-Blitz",
+                   "Druidentreiter", "Haeduer", "Stammesältester", "Siedler", "Held"]
+    FALLBACK_LIST = ROMAN_LIST  # generic fallback
+
+    def normalize_name(name: str) -> str:
+        """Apply aliases to normalize troop name."""
+        return ALIASES.get(name.strip(), name.strip())
+
+    def detect_tribe(troop_header: str) -> str | None:
+        """Given the tab-separated troop name header, detect tribe."""
+        names = [normalize_name(n) for n in troop_header.split("\t") if n.strip()]
+        for name in names:
+            if name in ROMAN_TROOPS:
+                return "Römer"
+            if name in TEUTON_TROOPS:
+                return "Germanen"
+            if name in GAUL_TROOPS:
+                return "Gallier"
+        return None
+
+    def tribe_troop_list(tribe: str | None) -> list[str]:
+        if tribe == "Römer":     return ROMAN_LIST
+        if tribe == "Germanen":  return TEUTON_LIST
+        if tribe == "Gallier":   return GAUL_LIST
+        return FALLBACK_LIST
 
     ACTION_TYPE = {
         "raubt": "raid",
@@ -52,45 +93,94 @@ def parse_travian_attacks(text: str) -> list[dict]:
     }
 
     def clean_int(s: str) -> int:
-        return int(re.sub(r"[^\d]", "", s)) if re.search(r"\d", s) else 0
+        s = s.strip()
+        if s == "?" or not re.search(r"\d", s):
+            return 0
+        return int(re.sub(r"[^\d]", "", s))
+
+    # ── Auto-detect defender coords from village sidebar ──────────────────
+    # Travian rally point text contains a village list at the bottom/side like:
+    #   VillageName\n(-52|27)\n  or  VillageName\t(-52|27)
+    # Try to build a map of {village_name: (x, y)} from the full text
+    def parse_village_sidebar(raw: str) -> dict[str, tuple[int, int]]:
+        village_map = {}
+        # Pattern 1: "VillageName\t(x|y)" on same line
+        for m in re.finditer(r"^(.+?)\t\((-?\d+)\|(-?\d+)\)", raw, re.MULTILINE):
+            name = m.group(1).strip()
+            if name and not re.search(r"(Ankunft|Einheiten|Angriff|greift|raubt|aus|an)\b", name, re.IGNORECASE):
+                village_map[name] = (int(m.group(2)), int(m.group(3)))
+        # Pattern 2: village name on one line, coords on next line
+        for m in re.finditer(r"^([^\t\n(]+)\n\((-?\d+)\|(-?\d+)\)", raw, re.MULTILINE):
+            name = m.group(1).strip()
+            if name and not re.search(r"(Ankunft|Einheiten|Angriff|greift|raubt|aus|an)\b", name, re.IGNORECASE):
+                village_map[name] = (int(m.group(2)), int(m.group(3)))
+        return village_map
+
+    village_sidebar = parse_village_sidebar(text)
 
     # ── Primary: real Travian rally point block ────────────────────────────
     # Line 1: atk_village TAB [Angriff markieren]player action def_village aus
-    # Line 2: (x|y) TAB troop types
+    # Line 2: (x|y) TAB troop types  ← NOW CAPTURED
     # Line 3: Einheiten TAB counts
     # Line 4: Ankunft TAB arrival text
     block_re = re.compile(
-        r"^([^\t\n]+?)\t"                                          # attacker village
-        r"(?:Angriff\s*markieren)?"                                # optional UI button (no space before player)
-        r"(.+?)\s+"                                                # player name
+        r"^([^\t\n]+?)\t"                                           # attacker village
+        r"(?:Angriff\s*markieren)?"                                 # optional UI button
+        r"(.+?)\s+"                                                 # player name
         r"(raubt|greift\s+an|greift|verstärkt|bespitzelt|siedelt)\s+"  # action keyword
-        r"(.+?)\s+(?:aus|an)\s*\n"                                    # defender village + "aus"/"an"
-        r"\((-?\d+)\|(-?\d+)\)[^\n]*\n"                           # (x|y) coords line
-        r"Einheiten\t([^\n]+)\n"                                   # Einheiten counts
-        r"Ankunft\t([^\n]+)",                                      # Ankunft arrival
+        r"(.+?)\s+(?:aus|an)\s*\n"                                 # defender village + "aus"/"an"
+        r"\((-?\d+)\|(-?\d+)\)(?:\t([^\n]*))?\n"                  # (x|y) + optional troop header
+        r"Einheiten\t([^\n]+)\n"                                    # Einheiten counts
+        r"Ankunft\t([^\n]+)",                                       # Ankunft arrival
         re.IGNORECASE | re.MULTILINE,
     )
 
     for m in block_re.finditer(text):
-        atk_village = m.group(1).strip()
-        player      = m.group(2).strip()
-        action_raw  = m.group(3).strip().lower()
-        def_village = m.group(4).strip()
-        x, y        = m.group(5), m.group(6)
-        units_raw   = m.group(7).strip()
-        arrival_raw = m.group(8).strip()
+        atk_village    = m.group(1).strip()
+        player         = m.group(2).strip()
+        action_raw     = m.group(3).strip().lower()
+        def_village    = m.group(4).strip()
+        x, y           = m.group(5), m.group(6)
+        troop_header   = m.group(7) or ""   # tab-separated troop type names
+        units_raw      = m.group(8).strip()
+        arrival_raw    = m.group(9).strip()
 
         wave_type = next((wt for kw, wt in ACTION_TYPE.items() if kw in action_raw), "attack")
 
+        # Detect tribe from troop name header
+        tribe = detect_tribe(troop_header)
+        troop_list = tribe_troop_list(tribe)
+
+        # Normalize troop header names for positional mapping
+        header_names = [normalize_name(n) for n in troop_header.split("\t") if n.strip()]
+
         # Parse troop counts
         counts = units_raw.split("\t")
-        troops = {TROOP_NAMES[i]: clean_int(c) for i, c in enumerate(counts)
-                  if i < len(TROOP_NAMES) and clean_int(c) > 0}
+        troops = {}
+        if header_names:
+            # Use header names for mapping (most accurate)
+            for i, name in enumerate(header_names):
+                if i < len(counts):
+                    v = clean_int(counts[i])
+                    if v > 0:
+                        troops[name] = v
+        else:
+            # Fallback: positional mapping against tribe list
+            for i, c in enumerate(counts):
+                if i < len(troop_list):
+                    v = clean_int(c)
+                    if v > 0:
+                        troops[troop_list[i]] = v
 
         # Clean arrival: "in 8:39:53 Std.um 09:52:17" → readable
         arrival = arrival_raw.replace("Std.", "Std. ").strip()
 
-        attacks.append({
+        # Try to resolve defender coords from village sidebar
+        auto_def_x = auto_def_y = None
+        if def_village and def_village in village_sidebar:
+            auto_def_x, auto_def_y = village_sidebar[def_village]
+
+        entry = {
             "attacker":         player,
             "attacker_village": atk_village,
             "village":          def_village,
@@ -98,7 +188,13 @@ def parse_travian_attacks(text: str) -> list[dict]:
             "arrival":          arrival,
             "wave_type":        wave_type,
             "troops":           troops,
-        })
+            "tribe":            tribe,
+        }
+        if auto_def_x is not None:
+            entry["def_x"] = auto_def_x
+            entry["def_y"] = auto_def_y
+
+        attacks.append(entry)
 
     if attacks:
         return attacks
@@ -191,8 +287,10 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
             # Inject defender coords + offline time into each attack
             for atk in attacks:
                 if def_x is not None:
+                    # Manual input overrides auto-detected coords
                     atk["def_x"] = def_x
                     atk["def_y"] = def_y
+                # else: auto-detected coords from village sidebar remain (if present)
                 if offline_seconds > 0:
                     atk["offline_seconds"] = offline_seconds
 

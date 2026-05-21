@@ -2080,6 +2080,18 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         "Gallier-Rammbock":    {"speed": 6,  "atk": 50,  "def_inf": 30,  "def_cav": 105, "tribe": "Gallier",  "crop": 5, "tp": 320},
         "Gallier-Kata":        {"speed": 3,  "atk": 70,  "def_inf": 45,  "def_cav": 10,  "tribe": "Gallier",  "crop": 6, "tp": 600},
     }
+    # Add aliases for alternate UI names (Teuton variants etc.)
+    TROOP_ALIASES = {
+        "Kundschafter":    "Späher",
+        "Teutonen Reiter": "Teut. Ritter",
+        "Ramme":           "Teutonen-Rammbock",
+        "Katapult":        "Kriegsmaschine",
+        "Stammesführer":   "Häuptling",
+        "Aufklärer":       "Pathfinder",
+    }
+    for alias, canonical in TROOP_ALIASES.items():
+        if canonical in TROOP_DATA:
+            TROOP_DATA[alias] = TROOP_DATA[canonical]
     TROOP_SPEEDS = {name: d["speed"] for name, d in TROOP_DATA.items()}
     TROOP_TRIBE  = {name: d["tribe"] for name, d in TROOP_DATA.items()}
     TRIBE_EMOJI = {1: "🏛️", 2: "⚒️", 3: "🌿", 4: "🌑", 5: "⛩️"}
@@ -2090,9 +2102,12 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         total_troops = sum(troops.values()) if troops else 0
 
         # Classify attack
-        has_siege = any(k in troops for k in ("Rammbock", "Feuerkatapult", "Trebuchet"))
+        has_siege = any(k in troops for k in ("Rammbock", "Feuerkatapult", "Teutonen-Rammbock",
+                                               "Kriegsmaschine", "Gallier-Rammbock", "Gallier-Kata",
+                                               "Ramme", "Katapult"))
         has_cav   = any(k in troops for k in ("Equites Imperatoris", "Equites Caesaris", "Paladin",
-                                               "Teut. Ritter", "Theutates-Blitz", "Druidentreiter", "Haeduer"))
+                                               "Teut. Ritter", "Teutonen Reiter", "Theutates-Blitz",
+                                               "Druidentreiter", "Haeduer"))
         if total_troops == 0:
             classification = "❓ Keine Truppendaten"
             classification_color = "#888"
@@ -2112,12 +2127,14 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
             classification = "🗡️ Normaler Angriff"
             classification_color = "#ef4444"
 
-        # Detected tribe from troop names
-        tribe_votes = {}
-        for tname in troops:
-            t = TROOP_TRIBE.get(tname)
-            if t: tribe_votes[t] = tribe_votes.get(t, 0) + 1
-        detected_tribe = max(tribe_votes, key=tribe_votes.get) if tribe_votes else None
+        # Detected tribe — prefer field stored by parser, fallback to vote from troop names
+        detected_tribe = atk.get("tribe")
+        if not detected_tribe:
+            tribe_votes = {}
+            for tname in troops:
+                t = TROOP_TRIBE.get(tname)
+                if t: tribe_votes[t] = tribe_votes.get(t, 0) + 1
+            detected_tribe = max(tribe_votes, key=tribe_votes.get) if tribe_votes else None
 
         # Slowest troop = determines march speed
         if troops:
