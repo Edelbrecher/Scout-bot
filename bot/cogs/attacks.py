@@ -16,74 +16,116 @@ import database
 def parse_travian_attacks(text: str) -> list[dict]:
     """
     Parse Travian Legends rally point copy-paste (German UI).
-    Returns list of dicts: {attacker, village, coords, arrival, wave}.
-    Tries multiple patterns to be robust against format variations.
+
+    Real format from Versammlungsplatz (copy Strg+A / Strg+C):
+        {atk_village}\t[Angriff markieren]{player} {action} {def_village} aus
+        ({x}|{y})\t{Troop1}\t{Troop2}\t...
+        Einheiten\t{n1}\t{n2}\t...
+        Ankunft\tin H:MM:SS Std.um HH:MM:SS
     """
     attacks = []
 
-    # Normalize: collapse multiple spaces/tabs to single tab, strip CR
+    # Strip Unicode bidirectional / invisible formatting chars that Travian embeds
+    text = re.sub(r"[​-‏‪-‮⁦-⁩﻿]", "", text)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Pattern A: tab-separated row
-    # \t(Angriff|Welle N)\tPlayerName\tVillageName (X|Y)\tArrival
-    pattern_full = re.compile(
-        r"\t(Angriff|Welle\s*(\d+))\t([^\t]+?)\t([^\t(]*?\([^\t)]*\)[^\t]*?)\t([^\t\n]+)",
-        re.IGNORECASE,
-    )
-    for m in pattern_full.finditer(text):
-        wave_str, wave_num, attacker, village_coords, arrival = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
-        # Extract coords from village_coords
-        coords_match = re.search(r"\((-?\d+)\|(-?\d+)\)", village_coords)
-        coords = coords_match.group(0) if coords_match else ""
-        village = re.sub(r"\s*\([-\d|]+\)\s*$", "", village_coords).strip()
-        wave = int(wave_num) if wave_num else None
-        attacks.append({
-            "attacker": attacker.strip(),
-            "village": village,
-            "coords": coords,
-            "arrival": arrival.strip(),
-            "wave": wave,
-        })
+    TROOP_NAMES = [
+        "Legionär", "Prätorianer", "Imperianer",
+        "Equites Legati", "Equites Imperatoris", "Equites Caesaris",
+        "Rammbock", "Feuerkatapult", "Senator", "Siedler", "Held",
+        # Teuton
+        "Keulenschwinger", "Speerkämpfer", "Axtkämpfer", "Späher",
+        "Paladin", "Teut. Ritter", "Häuptling",
+        # Gaul
+        "Phalanx", "Schwertkämpfer", "Pathfinder", "Theutates-Blitz",
+        "Druidentreiter", "Haeduer", "Stammesältester",
+    ]
 
-    if attacks:
-        return attacks
+    ACTION_TYPE = {
+        "raubt": "raid",
+        "greift an": "attack",
+        "greift": "attack",
+        "verstärkt": "reinforce",
+        "bespitzelt": "spy",
+        "siedelt": "settle",
+    }
 
-    # Pattern B: lines without leading tab — "Angriff  PlayerName  Village (X|Y)  Arrival"
-    pattern_b = re.compile(
-        r"^[ \t]*(Angriff|Welle\s*(\d+))[ \t]+([^\t(]+?)[ \t]+([^\t(]*\([-\d|]+\)[^\t]*)[ \t]+([^\t\n]+)$",
+    def clean_int(s: str) -> int:
+        return int(re.sub(r"[^\d]", "", s)) if re.search(r"\d", s) else 0
+
+    # ── Primary: real Travian rally point block ────────────────────────────
+    # Line 1: atk_village TAB [Angriff markieren]player action def_village aus
+    # Line 2: (x|y) TAB troop types
+    # Line 3: Einheiten TAB counts
+    # Line 4: Ankunft TAB arrival text
+    block_re = re.compile(
+        r"^([^\t\n]+?)\t"                                          # attacker village
+        r"(?:Angriff\s*markieren)?"                                # optional UI button (no space before player)
+        r"(.+?)\s+"                                                # player name
+        r"(raubt|greift\s+an|greift|verstärkt|bespitzelt|siedelt)\s+"  # action keyword
+        r"(.+?)\s+aus\s*\n"                                        # defender village + "aus"
+        r"\((-?\d+)\|(-?\d+)\)[^\n]*\n"                           # (x|y) coords line
+        r"Einheiten\t([^\n]+)\n"                                   # Einheiten counts
+        r"Ankunft\t([^\n]+)",                                      # Ankunft arrival
         re.IGNORECASE | re.MULTILINE,
     )
-    for m in pattern_b.finditer(text):
-        wave_str, wave_num, attacker, village_coords, arrival = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
-        coords_match = re.search(r"\((-?\d+)\|(-?\d+)\)", village_coords)
-        coords = coords_match.group(0) if coords_match else ""
-        village = re.sub(r"\s*\([-\d|]+\)\s*$", "", village_coords).strip()
-        wave = int(wave_num) if wave_num else None
+
+    for m in block_re.finditer(text):
+        atk_village = m.group(1).strip()
+        player      = m.group(2).strip()
+        action_raw  = m.group(3).strip().lower()
+        def_village = m.group(4).strip()
+        x, y        = m.group(5), m.group(6)
+        units_raw   = m.group(7).strip()
+        arrival_raw = m.group(8).strip()
+
+        wave_type = next((wt for kw, wt in ACTION_TYPE.items() if kw in action_raw), "attack")
+
+        # Parse troop counts
+        counts = units_raw.split("\t")
+        troops = {TROOP_NAMES[i]: clean_int(c) for i, c in enumerate(counts)
+                  if i < len(TROOP_NAMES) and clean_int(c) > 0}
+
+        # Clean arrival: "in 8:39:53 Std.um 09:52:17" → readable
+        arrival = arrival_raw.replace("Std.", "Std. ").strip()
+
         attacks.append({
-            "attacker": attacker.strip(),
-            "village": village,
-            "coords": coords,
-            "arrival": arrival.strip(),
-            "wave": wave,
+            "attacker":         player,
+            "attacker_village": atk_village,
+            "village":          def_village,
+            "coords":           f"({x}|{y})",
+            "arrival":          arrival,
+            "wave_type":        wave_type,
+            "troops":           troops,
         })
 
     if attacks:
         return attacks
 
-    # Pattern C: minimal — just attacker + arrival, coords optional
-    pattern_c = re.compile(
-        r"(Angriff|Welle\s*(\d+))[\t ]+([^\t\n]+?)[\t ]+(?:[^\t\n]*?\([-\d|]+\)[^\t\n]*?[\t ]+)?([^\t\n]*(?:heute|morgen|\d{1,2}\.\d{1,2}\.)[\s\S]*?(?:\d{2}:\d{2}:\d{2}|\d{2}:\d{2}))",
-        re.IGNORECASE,
+    # ── Fallback: simpler scan for "Ankunft" lines and surrounding context ─
+    # Handles edge cases where the block structure is slightly different
+    arrival_re = re.compile(
+        r"^([^\t\n]*(?:Angriff\s*markieren|raubt|greift\s+an)[^\n]*)\n"
+        r"(?:\([^\n]*\n)?"
+        r"(?:Einheiten[^\n]*\n)?"
+        r"Ankunft\t([^\n]+)",
+        re.IGNORECASE | re.MULTILINE,
     )
-    for m in pattern_c.finditer(text):
-        wave_str, wave_num, attacker, arrival = m.group(1), m.group(2), m.group(3), m.group(4)
-        wave = int(wave_num) if wave_num else None
+    for m in arrival_re.finditer(text):
+        context = m.group(1)
+        arrival = m.group(2).strip().replace("Std.", "Std. ")
+        player_m = re.search(r"(?:markieren)(.+?)\s+(?:raubt|greift)", context, re.IGNORECASE)
+        player = player_m.group(1).strip() if player_m else "Unbekannt"
+        coords_m = re.search(r"\((-?\d+)\|(-?\d+)\)", context)
+        coords = coords_m.group(0) if coords_m else ""
         attacks.append({
-            "attacker": attacker.strip(),
+            "attacker": player,
+            "attacker_village": "",
             "village": "",
-            "coords": "",
-            "arrival": arrival.strip(),
-            "wave": wave,
+            "coords": coords,
+            "arrival": arrival,
+            "wave_type": "attack",
+            "troops": {},
         })
 
     return attacks
@@ -137,18 +179,24 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
         embed.add_field(name="Anzahl Angriffe", value=str(len(attacks)), inline=True)
         embed.set_footer(text=f"Report ID: {report_id}")
 
+        TYPE_EMOJI = {"raid": "🪖", "attack": "⚔️", "reinforce": "🛡️", "spy": "🕵️", "settle": "🏘️"}
         for i, atk in enumerate(attacks[:10], 1):
-            wave_label = f" (Welle {atk['wave']})" if atk.get("wave") else ""
-            name = f"Angriff {i}{wave_label}"
+            wt = atk.get("wave_type", "attack")
+            emoji = TYPE_EMOJI.get(wt, "⚔️")
+            name = f"{emoji} Angriff {i}"
             parts = []
             if atk.get("attacker"):
                 parts.append(f"**Angreifer:** {atk['attacker']}")
+            if atk.get("attacker_village"):
+                parts.append(f"**Von:** {atk['attacker_village']} {atk.get('coords','')}")
             if atk.get("village"):
-                parts.append(f"**Dorf:** {atk['village']}")
-            if atk.get("coords"):
-                parts.append(f"**Koordinaten:** {atk['coords']}")
+                parts.append(f"**Ziel:** {atk['village']}")
             if atk.get("arrival"):
                 parts.append(f"**Ankunft:** {atk['arrival']}")
+            troops = atk.get("troops", {})
+            if troops:
+                troop_str = " · ".join(f"{v}× {k}" for k, v in list(troops.items())[:5])
+                parts.append(f"**Truppen:** {troop_str}")
             embed.add_field(name=name, value="\n".join(parts) or "—", inline=False)
 
         if len(attacks) > 10:
