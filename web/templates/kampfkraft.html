@@ -67,7 +67,9 @@
     </div>
 
     <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
-      Schmiede-Bonus: +1,5% pro Level · max. Level 20 = +30% · gilt für Angriff und beide Def-Werte gleichzeitig.
+      Formel: <code>Wert + (Wert + 300 × Korn/7) × (1,007<sup>Stufe</sup> − 1)</code> &nbsp;·&nbsp;
+      Gilt für Angriff und beide Def-Werte &nbsp;·&nbsp; Teure Einheiten (hohes Korn) profitieren mehr &nbsp;·&nbsp;
+      Quelle: <a href="https://blog.travian.com/2023/10/game-secrets-smithy-and-total-strength-of-an-army/" target="_blank" style="color:#3b82f6;">Travian Game Secrets</a>
     </p>
   </div>
 
@@ -185,7 +187,7 @@
           <tbody id="smithyCompareBody"></tbody>
         </table>
       </div>
-      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">⚠️ Kav-Angreifer werden gegen Kav-Def gerechnet; sonst Inf-Def. Der Held beeinflusst nur den Gesamt-Kampfwert, nicht die Schmiede-Tabelle.</p>
+      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">Formel: <code>BASIS + (BASIS + 300×Korn/7) × (1,007<sup>Stufe</sup>−1)</code> — Höherer Kornverbrauch = größerer Bonus pro Stufe.</p>
     </div>
   </div>
 
@@ -259,8 +261,20 @@ const TYPE_COLOR = { inf:'#3b82f6', cav:'#a855f7', siege:'#f59e0b', scout:'#22c5
 let currentTribe = 'roman';
 let smithyLevel  = 0;
 
-function smithyBonus(lvl) { return 1 + lvl * 0.015; }
-function boosted(base, lvl) { return Math.round(base * smithyBonus(lvl)); }
+/**
+ * Offizielle Travian-Schmiede-Formel:
+ * verbesserter_wert = BASIS + (BASIS + 300 × KORN/7) × (1,007^STUFE − 1)
+ * Gilt für Angriff, Def-Inf und Def-Kav gleichermaßen.
+ * Quelle: blog.travian.com / support.travian.com
+ */
+function boosted(base, lvl, crop) {
+  if (lvl === 0 || base === 0) return base;
+  return Math.round(base + (base + 300 * crop / 7) * (Math.pow(1.007, lvl) - 1));
+}
+function smithyPct(base, lvl, crop) {
+  if (base === 0) return 0;
+  return ((boosted(base, lvl, crop) / base - 1) * 100).toFixed(1);
+}
 function fmt(n) { return n.toLocaleString('de-DE'); }
 
 // ── TAB switching ─────────────────────────────────────────────────────────
@@ -281,7 +295,9 @@ function setTribe(t) {
 function updateSmithyDisplay(val) {
   smithyLevel = parseInt(val);
   document.getElementById('smithyValDisplay').textContent = val;
-  document.getElementById('smithyBonusDisplay').textContent = '+' + (smithyLevel * 1.5).toFixed(1) + '%';
+  // Show example bonus for a typical inf unit (basis 40, korn 1)
+  const exPct = smithyLevel > 0 ? smithyPct(40, smithyLevel, 1) : '0.0';
+  document.getElementById('smithyBonusDisplay').textContent = '≈ +' + exPct + '% (Inf-Basis)';
   renderTroopTable();
 }
 
@@ -290,15 +306,17 @@ function renderTroopTable() {
   const lvl    = smithyLevel;
   const tbody  = document.getElementById('troopTableBody');
   tbody.innerHTML = troops.map(t => {
-    const bAtt  = t.att,  bDefI = t.defI, bDefC = t.defC;
-    const eAtt  = boosted(bAtt, lvl);
-    const eDefI = boosted(bDefI, lvl);
-    const eDefC = boosted(bDefC, lvl);
+    const bAtt  = t.att,  bDefI = t.defI, bDefC = t.defC, cr = t.crop;
+    const eAtt  = boosted(bAtt,  lvl, cr);
+    const eDefI = boosted(bDefI, lvl, cr);
+    const eDefC = boosted(bDefC, lvl, cr);
     const isBoosted = lvl > 0;
+    const attPct  = isBoosted && bAtt  > 0 ? ` <span style="font-size:0.7rem;color:#60a5fa;">(+${smithyPct(bAtt,lvl,cr)}%)</span>` : '';
+    const defPct  = isBoosted && bDefI > 0 ? ` <span style="font-size:0.7rem;color:#60a5fa;">(+${smithyPct(bDefI,lvl,cr)}%)</span>` : '';
     const attCell  = bAtt  === 0 ? '—' : `<span class="base-val">${fmt(bAtt)}</span>`;
-    const attBoost = bAtt  === 0 ? '—' : `<span class="${isBoosted?'boosted':''}">${fmt(eAtt)}</span>`;
+    const attBoost = bAtt  === 0 ? '—' : `<span class="${isBoosted?'boosted':''}">${fmt(eAtt)}</span>${attPct}`;
     const diCell   = `<span class="base-val">${fmt(bDefI)}</span>`;
-    const diBoost  = `<span class="${isBoosted?'boosted':''}">${fmt(eDefI)}</span>`;
+    const diBoost  = `<span class="${isBoosted?'boosted':''}">${fmt(eDefI)}</span>${defPct}`;
     const dcCell   = `<span class="base-val">${fmt(bDefC)}</span>`;
     const dcBoost  = `<span class="${isBoosted?'boosted':''}">${fmt(eDefC)}</span>`;
     return `<tr>
@@ -355,9 +373,9 @@ function calcUpdate() {
   troops.forEach((t, i) => {
     const cnt = parseInt(document.getElementById('ct_'+i)?.value)||0;
     if (!cnt) return;
-    const eAtt  = boosted(t.att, lvl) * cnt;
-    const eDefI = boosted(t.defI, lvl) * cnt;
-    const eDefC = boosted(t.defC, lvl) * cnt;
+    const eAtt  = boosted(t.att,  lvl, t.crop) * cnt;
+    const eDefI = boosted(t.defI, lvl, t.crop) * cnt;
+    const eDefC = boosted(t.defC, lvl, t.crop) * cnt;
     totalAtt  += eAtt;
     totalDefI += eDefI;
     totalDefC += eDefC;
@@ -425,9 +443,9 @@ function renderSmithyCompare(troops, _) {
     troopsAll.forEach((t,i) => {
       const c = counts[i];
       if (!c) return;
-      att  += boosted(t.att,lvl)*c;
-      defI += boosted(t.defI,lvl)*c;
-      defC += boosted(t.defC,lvl)*c;
+      att  += boosted(t.att,  lvl, t.crop)*c;
+      defI += boosted(t.defI, lvl, t.crop)*c;
+      defC += boosted(t.defC, lvl, t.crop)*c;
       crop += t.crop*c;
     });
     const isCur = lvl===curLvl;
