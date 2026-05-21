@@ -1959,18 +1959,18 @@ async def _init_sitter_table():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS account_sitters (
-                guild_id TEXT NOT NULL,
+                guild_id        TEXT NOT NULL,
                 discord_user_id TEXT NOT NULL,
-                PRIMARY KEY (guild_id, discord_user_id),
-                sitter1_name TEXT,
+                sitter1_name    TEXT,
                 sitter1_travian TEXT,
-                sitter2_name TEXT,
+                sitter2_name    TEXT,
                 sitter2_travian TEXT,
-                sitting1_name TEXT,
+                sitting1_name   TEXT,
                 sitting1_travian TEXT,
-                sitting2_name TEXT,
+                sitting2_name   TEXT,
                 sitting2_travian TEXT,
-                updated_at TEXT DEFAULT (datetime('now'))
+                updated_at      TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (guild_id, discord_user_id)
             )
         """)
         await db.commit()
