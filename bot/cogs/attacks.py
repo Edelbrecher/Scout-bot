@@ -64,7 +64,7 @@ def parse_travian_attacks(text: str) -> list[dict]:
         r"(?:Angriff\s*markieren)?"                                # optional UI button (no space before player)
         r"(.+?)\s+"                                                # player name
         r"(raubt|greift\s+an|greift|verstärkt|bespitzelt|siedelt)\s+"  # action keyword
-        r"(.+?)\s+aus\s*\n"                                        # defender village + "aus"
+        r"(.+?)\s+(?:aus|an)\s*\n"                                    # defender village + "aus"/"an"
         r"\((-?\d+)\|(-?\d+)\)[^\n]*\n"                           # (x|y) coords line
         r"Einheiten\t([^\n]+)\n"                                   # Einheiten counts
         r"Ankunft\t([^\n]+)",                                      # Ankunft arrival
@@ -106,8 +106,9 @@ def parse_travian_attacks(text: str) -> list[dict]:
     # ── Fallback: simpler scan for "Ankunft" lines and surrounding context ─
     # Handles edge cases where the block structure is slightly different
     arrival_re = re.compile(
-        r"^([^\t\n]*(?:Angriff\s*markieren|raubt|greift\s+an)[^\n]*)\n"
-        r"(?:\([^\n]*\n)?"
+        r"^([^\t\n]*(?:Angriff\s*markieren|raubt|greift)[^\n]*)\n"
+        r"(?:\([^\n]*\n)?"          # coords + optional troop type names
+        r"(?:[^\t\n]*\t[^\n]*\n)?"  # optional extra header line (troop names row)
         r"(?:Einheiten[^\n]*\n)?"
         r"Ankunft\t([^\n]+)",
         re.IGNORECASE | re.MULTILINE,
