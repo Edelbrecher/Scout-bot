@@ -587,7 +587,7 @@ async def dashboard(request: Request):
         guilds = all_guilds
     client_id = get_client_id()
     invite_url = (
-        f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=536996880&scope=bot+applications.commands"
+        f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=805432336&scope=bot+applications.commands"
         if client_id else ""
     )
 
