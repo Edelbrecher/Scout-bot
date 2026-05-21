@@ -143,7 +143,7 @@
           <td class="mono small">{{ ch.created_at[:16] }}</td>
           <td>
             <form method="post" action="/guild/{{ guild.guild_id }}/scout-channels/{{ ch.channel_id }}/close"
-                  onsubmit="return confirm('Close this scout channel? It will be deleted in 2 minutes.')">
+                  onsubmit="return closeChannel(this, event)">
               <button type="submit" class="btn-action btn-action-err" title="Close channel">🔒 Close</button>
             </form>
           </td>
@@ -156,4 +156,20 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+function closeChannel(form, e) {
+  if (!confirm('Diesen Scout-Channel schließen? Er wird in 2 Minuten gelöscht.')) return false;
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Wird geschlossen…';
+  btn.style.opacity = '0.6';
+  const toast = document.createElement('div');
+  toast.textContent = '🔒 Channel wird in 2 Minuten gelöscht…';
+  toast.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;background:#1e293b;border:1px solid #ef4444;color:#f87171;padding:0.75rem 1.25rem;border-radius:10px;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+  return true;
+}
+</script>
 {% endblock %}
