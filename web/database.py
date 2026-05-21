@@ -756,6 +756,7 @@ async def get_owner_active_guilds(owner_discord_id: str) -> list[dict]:
             FROM guild_configs
             WHERE owner_discord_id = ?
               AND subscription_status IN ('active', 'trialing')
+              AND (bot_status IS NULL OR bot_status != 'kicked')
         """, (owner_discord_id,)) as cursor:
             return [dict(r) for r in await cursor.fetchall()]
 

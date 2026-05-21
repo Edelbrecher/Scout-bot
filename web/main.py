@@ -237,6 +237,13 @@ def _require_guild(session: dict, guild_id: str):
         return RedirectResponse("/dashboard", status_code=303)
     if not can_access_guild(session, guild_id):
         return RedirectResponse("/dashboard", status_code=303)
+
+
+def is_guild_owner(session: dict, guild: dict) -> bool:
+    """True if the logged-in user is the subscription owner of this guild."""
+    if session.get("type") == "admin":
+        return True
+    return session.get("uid", "") == (guild.get("owner_discord_id") or "")
     return None
 
 
@@ -630,9 +637,11 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
             roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
 
     is_admin = session.get("type") == "admin"
+    is_owner = is_guild_owner(session, guild)
     return templates.TemplateResponse(
         "guild.html",
-        {"request": request, "guild": guild, "saved": saved, "roles": roles, "is_admin": is_admin},
+        {"request": request, "guild": guild, "saved": saved, "roles": roles,
+         "is_admin": is_admin, "is_owner": is_owner},
     )
 
 
@@ -1378,6 +1387,8 @@ async def billing_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     is_admin = session.get("type") == "admin"
+    if not is_guild_owner(session, guild):
+        return RedirectResponse(f"/guild/{guild_id}?error=billing_owner_only", status_code=303)
     stripe_configured = bool(STRIPE_SECRET_KEY)
     return templates.TemplateResponse("billing.html", {
         "request": request,
@@ -1475,6 +1486,36 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
         pass
 
     return RedirectResponse(f"/guild/{guild_id}/billing?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/remove-bot")
+async def remove_bot(request: Request, guild_id: str):
+    """Owner removes the bot from their server — frees the subscription slot."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    if not is_guild_owner(session, guild):
+        return RedirectResponse(f"/guild/{guild_id}?error=only_owner", status_code=303)
+
+    # Make the bot leave via Discord API
+    bot_token = os.environ.get("DISCORD_TOKEN", "")
+    left_ok = False
+    if bot_token:
+        async with httpx.AsyncClient() as client:
+            r = await client.delete(
+                f"https://discord.com/api/v10/users/@me/guilds/{guild_id}",
+                headers={"Authorization": f"Bot {bot_token}"},
+            )
+            left_ok = r.status_code in (204, 200)
+
+    # Mark as kicked + keep subscription data intact (slot freed via bot_status)
+    await database.set_bot_kicked(guild_id)
+    print(f"[remove-bot] Guild {guild_id} removed by owner {session.get('uid')} — Discord leave: {left_ok}")
+    return RedirectResponse("/dashboard?removed=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/billing/portal")
