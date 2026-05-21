@@ -42,6 +42,8 @@
             <button onclick="setLanguage('en')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="English">🇬🇧 EN</button>
           </div>
           <div class="nav-profile-divider"></div>
+          <a id="nav-billing-link" href="#" class="nav-profile-item" style="display:none;">💳 <span data-i18n="nav.billing">Abonnement</span></a>
+          <div class="nav-profile-divider"></div>
           <a href="/logout" class="nav-profile-item" data-i18n="logout">🚪 Abmelden</a>
         </div>
       </div>
@@ -83,6 +85,13 @@
 .nav-profile-item:hover { background:var(--bg-main); color:var(--text); }
 </style>
 <script>
+(function() {
+  var m = window.location.pathname.match(/^\/guild\/([^\/]+)/);
+  if (m) {
+    var el = document.getElementById('nav-billing-link');
+    if (el) { el.href = '/guild/' + m[1] + '/billing'; el.style.display = 'flex'; }
+  }
+})();
 function toggleProfileMenu() {
   document.getElementById('navProfileMenu').classList.toggle('open');
 }
