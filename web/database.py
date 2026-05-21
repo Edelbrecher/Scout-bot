@@ -1436,6 +1436,15 @@ async def _init_user_sub_tables():
             )
         """)
         await db.commit()
+        # Migrations for existing tables
+        for col in [
+            "discord_username TEXT",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE user_subscriptions ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
 
 
 async def get_user_subscription(discord_user_id: str) -> dict | None:
