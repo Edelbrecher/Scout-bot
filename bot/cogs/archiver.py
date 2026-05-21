@@ -32,15 +32,26 @@ class Archiver(commands.Cog):
             a for a in message.attachments
             if a.content_type and a.content_type.split(";")[0].strip() in IMAGE_TYPES
         ]
+        # Accept attachments without content_type as fallback (some clients don't send it)
+        if not images:
+            images = [
+                a for a in message.attachments
+                if not a.content_type and any(
+                    a.filename.lower().endswith(ext)
+                    for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp")
+                )
+            ]
         if not images:
             return
 
         config = await database.get_guild_config(str(message.guild.id))
         if not config or not config.get("archive_channel_id"):
+            print(f"[archiver] No archive_channel_id configured for guild {message.guild.id}")
             return
 
         archive_channel = message.guild.get_channel(int(config["archive_channel_id"]))
         if not archive_channel:
+            print(f"[archiver] Archive channel {config['archive_channel_id']} not found in guild {message.guild.id}")
             return
 
         scout = await database.get_scout_channel_info(str(message.channel.id))
@@ -63,12 +74,19 @@ class Archiver(commands.Cog):
         files = []
         for attachment in images:
             try:
-                files.append(await attachment.to_file())
-            except Exception:
-                pass
+                files.append(await attachment.to_file(use_cached=True))
+            except Exception as e:
+                print(f"[archiver] Failed to download attachment {attachment.filename}: {e}")
+                # Fallback: embed the image URL directly if download fails
+                embed.set_image(url=attachment.url)
 
-        if files:
-            await archive_channel.send(embed=embed, files=files)
+        try:
+            await archive_channel.send(embed=embed, files=files if files else discord.utils.MISSING)
+            print(f"[archiver] Archived {len(files)} image(s) from #{message.channel.name} → #{archive_channel.name}")
+        except discord.Forbidden:
+            print(f"[archiver] No permission to send in archive channel {archive_channel.id}")
+        except Exception as e:
+            print(f"[archiver] Failed to send to archive channel: {e}")
 
 
 async def setup(bot: commands.Bot):
