@@ -1611,3 +1611,70 @@ async def farming_farmlist_delete(request: Request, guild_id: str, entry_id: int
     if err: return err
     await database.delete_farm_list_entry(guild_id, entry_id)
     return RedirectResponse(f"/guild/{guild_id}/farming", status_code=303)
+
+
+# ── Einsatzplanung ────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/einsatz", response_class=HTMLResponse)
+async def einsatz_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    plans = await database.get_attack_plans(guild_id)
+    return templates.TemplateResponse("einsatz.html", {
+        "request": request,
+        "guild": guild,
+        "plans": plans,
+        "session": session,
+        "saved": request.query_params.get("saved"),
+    })
+
+
+@app.post("/guild/{guild_id}/einsatz/create")
+async def einsatz_create(
+    request: Request,
+    guild_id: str,
+    plan_name: str = Form(...),
+    target_x: int = Form(...),
+    target_y: int = Form(...),
+    target_name: str = Form(""),
+    player_name: str = Form(""),
+    arrival_time: str = Form(...),
+    wave_type: str = Form("attack"),
+    troop_speed: float = Form(6.0),
+    notes: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if wave_type not in ("attack", "raid", "reinforce", "spy"):
+        wave_type = "attack"
+    if troop_speed <= 0 or troop_speed > 50:
+        troop_speed = 6.0
+    uid = session.get("uid", "unknown")
+    uname = session.get("username", "unknown")
+    await database.create_attack_plan(
+        guild_id, uid, uname,
+        plan_name.strip() or "Einsatz",
+        target_x, target_y,
+        target_name.strip() or None,
+        player_name.strip() or None,
+        arrival_time,
+        wave_type,
+        troop_speed,
+        notes.strip() or None,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/einsatz?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/einsatz/delete/{plan_id}")
+async def einsatz_delete(request: Request, guild_id: str, plan_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_attack_plan(guild_id, plan_id)
+    return RedirectResponse(f"/guild/{guild_id}/einsatz", status_code=303)

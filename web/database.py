@@ -168,6 +168,7 @@ async def init_db():
         await db.commit()
 
     await _init_farming_tables()
+    await _init_einsatz_tables()
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -1027,3 +1028,72 @@ async def get_farming_cross_reference(guild_id: str, min_days: int = 3) -> list[
                 "entry_id": entry["id"],
             })
     return result
+
+
+# ── Einsatzplanung ────────────────────────────────────────────────────────────
+
+async def _init_einsatz_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS attack_plans (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                created_by   TEXT NOT NULL,
+                created_name TEXT NOT NULL,
+                plan_name    TEXT NOT NULL,
+                target_x     INTEGER NOT NULL,
+                target_y     INTEGER NOT NULL,
+                target_name  TEXT,
+                player_name  TEXT,
+                arrival_time TEXT NOT NULL,
+                wave_type    TEXT NOT NULL DEFAULT 'attack',
+                troop_speed  REAL NOT NULL DEFAULT 6.0,
+                notes        TEXT,
+                created_at   TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
+
+async def get_attack_plans(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM attack_plans WHERE guild_id = ? ORDER BY arrival_time ASC",
+            (guild_id,)
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def create_attack_plan(
+    guild_id: str, created_by: str, created_name: str,
+    plan_name: str, target_x: int, target_y: int,
+    target_name: str | None, player_name: str | None,
+    arrival_time: str, wave_type: str, troop_speed: float,
+    notes: str | None,
+) -> int:
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO attack_plans
+                (guild_id, created_by, created_name, plan_name, target_x, target_y,
+                 target_name, player_name, arrival_time, wave_type, troop_speed, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            guild_id, created_by, created_name, plan_name,
+            target_x, target_y, target_name or None, player_name or None,
+            arrival_time, wave_type, troop_speed, notes or None,
+            _dt.utcnow().isoformat(),
+        ))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_attack_plan(guild_id: str, plan_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM attack_plans WHERE id = ? AND guild_id = ?",
+            (plan_id, guild_id)
+        )
+        await db.commit()

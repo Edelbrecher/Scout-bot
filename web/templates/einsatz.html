@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+{% block title %}Einsatzplanung · {{ guild.guild_name }} · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>🎯 Einsatzplanung</h1>
+      <p class="subtitle">Koordinierte Angriffe planen – mit automatischer Marschzeit &amp; Timer-Integration</p>
+    </div>
+  </div>
+
+  {% if saved %}
+  <div class="alert alert-success" style="margin-bottom:1rem; padding:0.75rem 1rem; background:#1a3a2a; border:1px solid #4caf82; border-radius:8px; color:#4caf82;">
+    ✅ Einsatzplan gespeichert.
+  </div>
+  {% endif %}
+
+  <!-- ── Mein Profil (lokal) ── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">🏰 Mein Travian-Profil <small style="font-size:0.7rem; color:var(--text-muted); font-weight:400;">(lokal gespeichert)</small></h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.75rem; align-items:end;">
+      <div class="form-group" style="margin:0;">
+        <label>Server-URL</label>
+        <input type="url" id="profileServer" placeholder="https://ts2.x1.europe.travian.com"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Eigene X-Koordinate</label>
+        <input type="number" id="profileX" placeholder="0" min="-400" max="400"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Eigene Y-Koordinate</label>
+        <input type="number" id="profileY" placeholder="0" min="-400" max="400"
+          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div>
+        <button id="btnSaveProfile" class="btn btn-primary" style="width:100%;">💾 Speichern</button>
+      </div>
+    </div>
+    <p id="profileSaved" style="color:#4caf82; font-size:0.85rem; margin-top:0.5rem; display:none;">✅ Profil gespeichert</p>
+  </div>
+
+  <!-- ── Neuen Einsatz erstellen ── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">➕ Neuen Einsatz erstellen</h2>
+
+    <form method="post" action="/guild/{{ guild.guild_id }}/einsatz/create">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:0.75rem; margin-bottom:0.75rem;">
+
+        <div class="form-group" style="margin:0; grid-column:1/-1;">
+          <label>Bezeichnung des Einsatzes *</label>
+          <input type="text" name="plan_name" required maxlength="80" placeholder="z.B. Angriff auf DeathKnight"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label>Ziel-Dorfname</label>
+          <input type="text" name="target_name" id="inp_target_name" maxlength="60" placeholder="Dorfname"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Zielspieler</label>
+          <input type="text" name="player_name" id="inp_player_name" maxlength="60" placeholder="Spielername"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Ziel X *</label>
+          <input type="number" name="target_x" id="inp_x" required min="-400" max="400" placeholder="0"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;"
+            oninput="updateSendTime()" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Ziel Y *</label>
+          <input type="number" name="target_y" id="inp_y" required min="-400" max="400" placeholder="0"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;"
+            oninput="updateSendTime()" />
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label>Ankunftszeit (lokal) *</label>
+          <input type="datetime-local" name="arrival_time" id="inp_arrival" required
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;"
+            oninput="updateSendTime()" />
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label>Angriffstyp</label>
+          <select name="wave_type" id="inp_wave"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+            <option value="attack">⚔️ Angriff (Normal)</option>
+            <option value="raid">🪖 Plündern (Raid)</option>
+            <option value="reinforce">🛡️ Verstärken</option>
+            <option value="spy">🕵️ Spionage</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label>Truppentyp / Geschwindigkeit</label>
+          <select id="troopPreset" onchange="applyTroopPreset(this.value)"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+            <optgroup label="Römer">
+              <option value="6">Legionär (6 F/h)</option>
+              <option value="5">Prätorianer (5 F/h)</option>
+              <option value="7">Imperianer (7 F/h)</option>
+              <option value="16">Equites Legati (16 F/h)</option>
+              <option value="14">Equites Imperatoris (14 F/h)</option>
+              <option value="10">Equites Caesaris (10 F/h)</option>
+              <option value="4">Rammbock (4 F/h)</option>
+              <option value="3">Feuerschleuder (3 F/h)</option>
+            </optgroup>
+            <optgroup label="Germanen">
+              <option value="7">Keulenschwinger (7 F/h)</option>
+              <option value="7">Speerkämpfer (7 F/h)</option>
+              <option value="7">Axtkämpfer (7 F/h)</option>
+              <option value="10">Paladin (10 F/h)</option>
+              <option value="9">Teut. Ritter (9 F/h)</option>
+            </optgroup>
+            <optgroup label="Gallier">
+              <option value="7">Phalanx (7 F/h)</option>
+              <option value="19">Theutates-Blitz (19 F/h)</option>
+              <option value="16">Druidentreiter (16 F/h)</option>
+              <option value="13">Haeduer (13 F/h)</option>
+            </optgroup>
+            <optgroup label="Sonstige">
+              <option value="custom">Eigene Eingabe…</option>
+            </optgroup>
+          </select>
+          <input type="number" name="troop_speed" id="inp_speed" value="6" min="1" max="50" step="0.5"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px; margin-top:0.4rem;"
+            oninput="updateSendTime()" />
+        </div>
+
+        <div class="form-group" style="margin:0; grid-column:1/-1;">
+          <label>Notizen / Truppenzusammensetzung</label>
+          <textarea name="notes" rows="2" maxlength="500" placeholder="z.B. 3000 Equites Imp. + 500 Ram"
+            style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px; resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <!-- Berechnete Absendezeit -->
+      <div id="sendTimeBox" style="display:none; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; margin-bottom:0.75rem;">
+        <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+          <div>
+            <span style="color:var(--text-muted); font-size:0.82rem;">Absendezeit (lokal):</span><br>
+            <strong id="sendTimeDisplay" style="font-size:1.15rem; font-family:monospace; color:#f59e0b;">–</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-muted); font-size:0.82rem;">Marschzeit:</span><br>
+            <strong id="marchTimeDisplay" style="font-size:1.15rem; font-family:monospace;">–</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-muted); font-size:0.82rem;">Distanz:</span><br>
+            <strong id="distDisplay" style="font-size:1.15rem; font-family:monospace;">–</strong>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+        <button type="submit" class="btn btn-primary">💾 Einsatz speichern</button>
+        <span id="profileMissingHint" style="color:#f59e0b; font-size:0.85rem; align-self:center; display:none;">
+          ⚠️ Profil-Koordinaten setzen für Marschzeit-Kalkulation
+        </span>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── Einsatzpläne ── -->
+  <div class="card">
+    <h2 style="margin-top:0;">📋 Aktive Einsätze ({{ plans|length }})</h2>
+
+    {% if not plans %}
+    <p class="empty">Noch keine Einsätze geplant.</p>
+    {% else %}
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+      {% for plan in plans %}
+      <div class="plan-card" data-id="{{ plan.id }}"
+           data-x="{{ plan.target_x }}" data-y="{{ plan.target_y }}"
+           data-arrival="{{ plan.arrival_time }}" data-speed="{{ plan.troop_speed }}"
+           data-wave="{{ plan.wave_type }}" data-name="{{ plan.plan_name }}"
+           style="background:var(--bg-main); border:1px solid var(--border); border-radius:10px; padding:1rem;">
+
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+          <div>
+            <span style="font-size:1.05rem; font-weight:700;">
+              {% if plan.wave_type == 'attack' %}⚔️
+              {% elif plan.wave_type == 'raid' %}🪖
+              {% elif plan.wave_type == 'reinforce' %}🛡️
+              {% elif plan.wave_type == 'spy' %}🕵️
+              {% endif %}
+              {{ plan.plan_name }}
+            </span>
+            <span style="color:var(--text-muted); font-size:0.82rem; margin-left:0.5rem;">von {{ plan.created_name }}</span>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <span class="countdown-badge badge" data-arrival="{{ plan.arrival_time }}"
+              style="font-family:monospace; font-size:0.85rem; padding:0.2rem 0.6rem; border-radius:12px; background:#1e3a5f; color:#93c5fd;">
+              ⏳ …
+            </span>
+            <form method="post" action="/guild/{{ guild.guild_id }}/einsatz/delete/{{ plan.id }}" style="display:inline;"
+              onsubmit="return confirm('Einsatz löschen?')">
+              <button type="submit" class="btn btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.8rem;">🗑️</button>
+            </form>
+          </div>
+        </div>
+
+        <div style="margin-top:0.6rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.4rem 1rem; font-size:0.85rem;">
+          <div><span style="color:var(--text-muted);">Ziel:</span>
+            <strong>{{ plan.target_name or '–' }}</strong>
+            <code style="font-size:0.78rem;">({{ plan.target_x }}|{{ plan.target_y }})</code></div>
+          <div><span style="color:var(--text-muted);">Spieler:</span> {{ plan.player_name or '–' }}</div>
+          <div><span style="color:var(--text-muted);">Ankunft:</span>
+            <strong>{{ plan.arrival_time[:16].replace('T',' ') }}</strong></div>
+          <div><span style="color:var(--text-muted);">Truppen:</span> {{ plan.troop_speed }} F/h</div>
+          <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">Absendezeit:</span>
+            <strong class="send-time-val">–</strong></div>
+          <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">Marschzeit:</span>
+            <strong class="march-time-val">–</strong></div>
+        </div>
+
+        {% if plan.notes %}
+        <div style="margin-top:0.5rem; font-size:0.83rem; color:var(--text-muted); border-top:1px solid var(--border); padding-top:0.4rem;">
+          📝 {{ plan.notes }}
+        </div>
+        {% endif %}
+
+        <div style="margin-top:0.85rem; display:flex; gap:0.6rem; flex-wrap:wrap;">
+          <!-- Go Troops GO -->
+          <a class="go-link btn btn-primary" href="#" target="_blank"
+             data-x="{{ plan.target_x }}" data-y="{{ plan.target_y }}" data-wave="{{ plan.wave_type }}"
+             style="font-weight:700; background:linear-gradient(135deg,#dc2626,#b91c1c); border:none;">
+            🚀 Go Troops GO!
+          </a>
+          <!-- Timer erstellen -->
+          <button class="btn btn-secondary btn-add-timer"
+            data-name="{{ plan.plan_name }}"
+            data-arrival="{{ plan.arrival_time }}"
+            data-x="{{ plan.target_x }}" data-y="{{ plan.target_y }}"
+            data-wave="{{ plan.wave_type }}" data-speed="{{ plan.troop_speed }}">
+            ⏰ Timer erstellen
+          </button>
+          <!-- Zur Map -->
+          <a href="/guild/{{ guild.guild_id }}/map?x={{ plan.target_x }}&amp;y={{ plan.target_y }}"
+             class="btn btn-secondary" target="_blank">🗺️ Auf Map</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+// ── Profil (localStorage) ──────────────────────────────────────────────────
+const PROFILE_KEY = 'travian_profile_einsatz';
+let profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+
+function loadProfile() {
+  if (profile.server) document.getElementById('profileServer').value = profile.server;
+  if (profile.x !== undefined) document.getElementById('profileX').value = profile.x;
+  if (profile.y !== undefined) document.getElementById('profileY').value = profile.y;
+  updateGoLinks();
+  renderAllMarchTimes();
+}
+
+document.getElementById('btnSaveProfile').addEventListener('click', () => {
+  profile = {
+    server: document.getElementById('profileServer').value.trim().replace(/\/$/, ''),
+    x: parseFloat(document.getElementById('profileX').value) || 0,
+    y: parseFloat(document.getElementById('profileY').value) || 0,
+  };
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  document.getElementById('profileSaved').style.display = 'block';
+  setTimeout(() => document.getElementById('profileSaved').style.display = 'none', 2000);
+  updateGoLinks();
+  renderAllMarchTimes();
+  updateSendTime();
+});
+
+// ── Truppenwahl ────────────────────────────────────────────────────────────
+function applyTroopPreset(val) {
+  if (val === 'custom') return;
+  document.getElementById('inp_speed').value = val;
+  updateSendTime();
+}
+
+// ── Marschzeit-Kalkulation ─────────────────────────────────────────────────
+const MAP_SIZE = 400;
+
+function travianDistance(x1, y1, x2, y2) {
+  let dx = Math.abs(x1 - x2);
+  let dy = Math.abs(y1 - y2);
+  if (dx > MAP_SIZE) dx = 2 * MAP_SIZE - dx;
+  if (dy > MAP_SIZE) dy = 2 * MAP_SIZE - dy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// travel time in seconds
+function marchSeconds(dist, speed) {
+  return Math.ceil(dist / speed * 3600);
+}
+
+function formatDuration(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function formatLocalDT(date) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} `
+       + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function updateSendTime() {
+  const box = document.getElementById('sendTimeBox');
+  const tx = parseFloat(document.getElementById('inp_x').value);
+  const ty = parseFloat(document.getElementById('inp_y').value);
+  const arrival = document.getElementById('inp_arrival').value;
+  const speed = parseFloat(document.getElementById('inp_speed').value);
+  const hint = document.getElementById('profileMissingHint');
+
+  if (!arrival || isNaN(tx) || isNaN(ty) || !speed) { box.style.display='none'; return; }
+  if (profile.x === undefined || profile.y === undefined) {
+    hint.style.display = 'inline'; box.style.display='none'; return;
+  }
+  hint.style.display = 'none';
+
+  const dist = travianDistance(profile.x, profile.y, tx, ty);
+  const marchSec = marchSeconds(dist, speed);
+  const arrivalDate = new Date(arrival);
+  const sendDate = new Date(arrivalDate.getTime() - marchSec * 1000);
+
+  document.getElementById('distDisplay').textContent = dist.toFixed(1) + ' Felder';
+  document.getElementById('marchTimeDisplay').textContent = formatDuration(marchSec);
+  document.getElementById('sendTimeDisplay').textContent = formatLocalDT(sendDate);
+  box.style.display = 'block';
+}
+
+// ── Go Troops GO links ─────────────────────────────────────────────────────
+const WAVE_TT = { attack: 2, raid: 1, reinforce: 5, spy: 3 };
+
+function updateGoLinks() {
+  document.querySelectorAll('.go-link').forEach(a => {
+    const x = a.dataset.x, y = a.dataset.y;
+    const wave = a.dataset.wave;
+    const tt = WAVE_TT[wave] || 2;
+    const server = profile.server || '';
+    if (server) {
+      a.href = `${server}/build.php?gid=16&tt=${tt}&x=${x}&y=${y}`;
+    } else {
+      a.href = '#';
+      a.onclick = () => { alert('Bitte zuerst deine Server-URL im Profil eintragen!'); return false; };
+    }
+  });
+}
+
+// ── Marschzeiten für bestehende Pläne ─────────────────────────────────────
+function renderAllMarchTimes() {
+  if (profile.x === undefined || profile.y === undefined) return;
+
+  document.querySelectorAll('.plan-card').forEach(card => {
+    const tx = parseFloat(card.dataset.x);
+    const ty = parseFloat(card.dataset.y);
+    const arrival = card.dataset.arrival;
+    const speed = parseFloat(card.dataset.speed);
+    if (isNaN(tx) || isNaN(ty) || !arrival || !speed) return;
+
+    const dist = travianDistance(profile.x, profile.y, tx, ty);
+    const marchSec = marchSeconds(dist, speed);
+    const arrivalDate = new Date(arrival);
+    const sendDate = new Date(arrivalDate.getTime() - marchSec * 1000);
+
+    const sendEl = card.querySelector('.send-time-val');
+    const marchEl = card.querySelector('.march-time-val');
+    if (sendEl) sendEl.textContent = formatLocalDT(sendDate);
+    if (marchEl) marchEl.textContent = formatDuration(marchSec);
+  });
+}
+
+// ── Countdown-Badges ──────────────────────────────────────────────────────
+function updateCountdowns() {
+  const now = Date.now();
+  document.querySelectorAll('.countdown-badge').forEach(el => {
+    const arrival = new Date(el.dataset.arrival).getTime();
+    const diff = Math.floor((arrival - now) / 1000);
+    if (diff < 0) {
+      el.textContent = '✅ Vorbei';
+      el.style.background = '#1a3a1a';
+      el.style.color = '#4caf82';
+    } else if (diff < 3600) {
+      el.textContent = '⚡ ' + formatDuration(diff);
+      el.style.background = '#3b1f0a';
+      el.style.color = '#f97316';
+    } else {
+      el.textContent = '⏳ ' + formatDuration(diff);
+      el.style.background = '#1e3a5f';
+      el.style.color = '#93c5fd';
+    }
+  });
+}
+setInterval(updateCountdowns, 1000);
+updateCountdowns();
+
+// ── Timer erstellen (in localStorage für Timer-Seite) ─────────────────────
+const TIMER_KEY = 'travian_timers_v2';
+
+document.querySelectorAll('.btn-add-timer').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const name = btn.dataset.name;
+    const arrival = btn.dataset.arrival;
+    const x = btn.dataset.x, y = btn.dataset.y;
+    const wave = btn.dataset.wave;
+    const speed = parseFloat(btn.dataset.speed);
+
+    // Build two timers: send-time reminder + arrival reminder
+    let timers = JSON.parse(localStorage.getItem(TIMER_KEY) || '[]');
+    const arrivalDate = new Date(arrival);
+
+    // Arrival reminder
+    timers.push({
+      id: Date.now() + Math.random(),
+      label: `🎯 Ankunft: ${name}`,
+      at: arrivalDate.toISOString(),
+      rally: profile.server
+        ? `${profile.server}/build.php?gid=16&tt=${WAVE_TT[wave]||2}&x=${x}&y=${y}`
+        : '',
+    });
+
+    // Send-time reminder (only if profile coords known)
+    if (profile.x !== undefined && profile.y !== undefined && speed) {
+      const dist = travianDistance(profile.x, profile.y, parseFloat(x), parseFloat(y));
+      const marchSec = marchSeconds(dist, speed);
+      const sendDate = new Date(arrivalDate.getTime() - marchSec * 1000);
+      timers.push({
+        id: Date.now() + 1 + Math.random(),
+        label: `🚀 ABSENDEN: ${name}`,
+        at: sendDate.toISOString(),
+        rally: profile.server
+          ? `${profile.server}/build.php?gid=16&tt=${WAVE_TT[wave]||2}&x=${x}&y=${y}`
+          : '',
+      });
+    }
+
+    localStorage.setItem(TIMER_KEY, JSON.stringify(timers));
+
+    btn.textContent = '✅ Timer gesetzt!';
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = '⏰ Timer erstellen';
+      btn.disabled = false;
+    }, 2500);
+  });
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadProfile();
+
+// Arrival input default to next full hour
+const now = new Date();
+now.setMinutes(0, 0, 0);
+now.setHours(now.getHours() + 2);
+const pad = n => String(n).padStart(2,'0');
+const defVal = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+document.getElementById('inp_arrival').value = defVal;
+</script>
+{% endblock %}
