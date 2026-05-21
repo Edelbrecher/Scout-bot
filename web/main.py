@@ -1149,7 +1149,7 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
             json={"content": "🔒 Scout channel closed via dashboard. Channel will be deleted in 2 minutes."},
         )
     asyncio.create_task(_close_scout_channel_after_delay(channel_id, token, delay=120))
-    return RedirectResponse(f"/guild/{guild_id}?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------
