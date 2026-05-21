@@ -84,6 +84,43 @@
 
     <div style="padding:1rem 1.25rem; display:flex; flex-direction:column; gap:1.25rem;">
 
+      <!-- ── Own Village Panel ── -->
+      {% if atk.own_village %}
+      {% set ov = atk.own_village %}
+      {% set vtype = ov.village_type %}
+      <div style="background:rgba(34,197,94,0.07); border:1px solid rgba(34,197,94,0.35); border-radius:8px; padding:0.75rem 1rem;">
+        <div style="font-weight:700; color:#22c55e; margin-bottom:0.4rem; font-size:0.9rem;">
+          📊 Eigene Truppen in diesem Dorf:
+          <strong>{{ ov.village_name or '?' }}</strong>
+          <span style="font-weight:400; color:var(--text-muted);">({{ ov.x }}|{{ ov.y }})</span>
+          <span style="margin-left:0.5rem;
+            background:{% if vtype=='off' %}rgba(239,68,68,0.18){% elif vtype=='def' %}rgba(34,197,94,0.18){% elif vtype=='scout' %}rgba(139,92,246,0.18){% else %}rgba(100,116,139,0.18){% endif %};
+            border:1px solid {% if vtype=='off' %}rgba(239,68,68,0.45){% elif vtype=='def' %}rgba(34,197,94,0.45){% elif vtype=='scout' %}rgba(139,92,246,0.45){% else %}rgba(100,116,139,0.45){% endif %};
+            color:{% if vtype=='off' %}#ef4444{% elif vtype=='def' %}#22c55e{% elif vtype=='scout' %}#a78bfa{% else %}#94a3b8{% endif %};
+            border-radius:20px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:700;">
+            {% if vtype=='off' %}🗡️ Off{% elif vtype=='def' %}🛡️ Def{% elif vtype=='scout' %}🔭 Scout{% elif vtype=='leer' %}📭 Leer{% else %}⚔️ Gemischt{% endif %}
+          </span>
+        </div>
+        <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.4rem;">
+          Off-Score: <strong style="color:#ef4444;">{{ ov.off_score }}</strong> ·
+          Def-Score: <strong style="color:#22c55e;">{{ ov.def_score }}</strong>
+        </div>
+        {% if ov.troops %}
+        <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+          {% for tname, cnt in ov.troops.items() %}
+          {% if cnt > 0 %}
+          <span style="background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); border-radius:4px; padding:0.15rem 0.45rem; font-size:0.78rem;">
+            {{ tname }}: <strong>{{ cnt }}</strong>
+          </span>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <span style="color:var(--text-muted); font-size:0.82rem;">Keine Truppen eingetragen</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
       <!-- ── Section 2: Geschwindigkeits-Analyse ── -->
       <div>
         <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">📐 Geschwindigkeits-Analyse</h3>

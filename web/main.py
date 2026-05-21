@@ -1837,6 +1837,115 @@ async def stripe_webhook(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Own-village helpers
+# ---------------------------------------------------------------------------
+
+def classify_own_village(troops: dict) -> tuple:
+    """Returns (village_type, off_score, def_score, priority)"""
+    TROOP_OFF = {
+        "Imperianer": 70, "Equites Imperatoris": 120, "Equites Caesaris": 180,
+        "Axtkämpfer": 55, "Teut. Ritter": 150, "Keulenschwinger": 40,
+        "Theutates-Blitz": 90, "Haeduer": 200, "Schwertkämpfer": 65,
+    }
+    TROOP_DEF = {
+        "Prätorianer": 65, "Legionär": 35, "Equites Legati": 20,
+        "Speerkämpfer": 60, "Paladin": 100,
+        "Phalanx": 40, "Druidentreiter": 115,
+    }
+    TROOP_SCOUT = {"Equites Legati": 1, "Späher": 1, "Pathfinder": 1}
+    SIEGE = {
+        "Rammbock": 1, "Feuerkatapult": 1, "Teutonen-Rammbock": 1,
+        "Kriegsmaschine": 1, "Gallier-Rammbock": 1, "Gallier-Kata": 1,
+    }
+
+    off_score = sum(TROOP_OFF.get(t, 0) * c for t, c in troops.items())
+    def_score = sum(TROOP_DEF.get(t, 0) * c for t, c in troops.items())
+    scout_count = sum(c for t, c in troops.items() if t in TROOP_SCOUT)
+    siege_count = sum(c for t, c in troops.items() if t in SIEGE)
+    total = sum(troops.values())
+
+    if total == 0:
+        return "leer", 0, 0, 0
+    if siege_count > 5:
+        return "off", off_score, def_score, off_score
+    if off_score > def_score * 2:
+        return "off", off_score, def_score, off_score
+    if def_score > off_score * 1.5:
+        return "def", off_score, def_score, def_score
+    if scout_count > total * 0.5:
+        return "scout", off_score, def_score, 10
+    return "mixed", off_score, def_score, (off_score + def_score) // 2
+
+
+def parse_own_villages(text: str) -> list:
+    """
+    Parse Travian Dorfübersicht / Truppenübersicht copy-paste.
+    Handles tab-separated format from Travian overview pages.
+    """
+    import re
+    text = re.sub(r'[​‌‍‎‏‪-‮⁠-⁩﻿]', '', text)
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    ROMAN_TROOPS  = ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"]
+    TEUTON_TROOPS = ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Häuptling","Teutonen-Rammbock","Kriegsmaschine","Siedler","Held"]
+    GAUL_TROOPS   = ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Stammesältester","Gallier-Rammbock","Gallier-Kata","Siedler","Held"]
+    ALL_TROOPS = list(dict.fromkeys(ROMAN_TROOPS + TEUTON_TROOPS + GAUL_TROOPS))
+
+    villages = []
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+    coord_re = re.compile(r'\((-?\d+)\|(-?\d+)\)')
+
+    # First pass: find troop header line (contains multiple troop names)
+    detected_troops = None
+    for line in lines:
+        matched = [t for t in ALL_TROOPS if t.lower() in line.lower()]
+        if len(matched) >= 3:
+            detected_troops = matched
+            break
+
+    if detected_troops is None:
+        detected_troops = ROMAN_TROOPS  # fallback
+
+    # Second pass: find village rows
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        cm = coord_re.search(line)
+        if cm:
+            x, y = int(cm.group(1)), int(cm.group(2))
+            vname = line[:cm.start()].strip().rstrip('\t').strip()
+            if not vname:
+                vname = f"({x}|{y})"
+
+            after = line[cm.end():].strip()
+            pop_m = re.match(r'[\s\t]*(\d[\d.,]*)', after)
+            pop = int(re.sub(r'[.,]', '', pop_m.group(1))) if pop_m else 0
+
+            troops = {}
+            j = i + 1
+            while j < len(lines) and j < i + 4:
+                candidate = lines[j]
+                if coord_re.search(candidate):
+                    break
+                nums = [re.sub(r'[.,\s]', '', n) for n in candidate.split('\t')]
+                nums = [int(n) for n in nums if n.isdigit()]
+                if len(nums) >= 3:
+                    for k, t in enumerate(detected_troops):
+                        if k < len(nums):
+                            if nums[k] > 0:
+                                troops[t] = nums[k]
+                    i = j
+                    break
+                j += 1
+
+            villages.append({"village_name": vname, "x": x, "y": y, "population": pop, "troops": troops})
+        i += 1
+
+    return villages
+
+
+# ---------------------------------------------------------------------------
 # Routes — Attacks
 # ---------------------------------------------------------------------------
 
@@ -2187,6 +2296,25 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
     all_attackers = {atk.get("attacker") for atk in attacks if atk.get("attacker")}
     history = await database.get_reports_by_attackers(guild_id, list(all_attackers))
 
+    # Load own villages and cross-reference defender coords
+    own_villages_raw = await database.get_own_villages(guild_id)
+    own_by_coords = {}
+    for v in own_villages_raw:
+        try:
+            v["troops"] = _json2.loads(v.get("troops_json") or "{}")
+        except Exception:
+            v["troops"] = {}
+        if v.get("x") is not None and v.get("y") is not None:
+            own_by_coords[(v["x"], v["y"])] = v
+
+    # Attach own-village data to each attack wave
+    for atk in enriched:
+        dx, dy = atk.get("def_x"), atk.get("def_y")
+        if dx is not None and dy is not None:
+            atk["own_village"] = own_by_coords.get((int(dx), int(dy)))
+        else:
+            atk["own_village"] = None
+
     return templates.TemplateResponse("attack_analysis.html", {
         "request": request,
         "guild": guild,
@@ -2198,6 +2326,7 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         "troop_data_json": troop_data_json,
         "troop_data": TROOP_DATA,
         "zwischendef_windows": zwischendef_windows,
+        "own_villages_count": len(own_villages_raw),
     })
 
 
@@ -2312,6 +2441,111 @@ async def attacks_reset(request: Request, guild_id: str):
     if err: return err
     await database.set_attack_channel_web(guild_id, "", "")
     return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Own Troops / Village Upload
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/attacks/own-troops", response_class=HTMLResponse)
+async def own_troops_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    import json as _json
+    own_villages = await database.get_own_villages(guild_id)
+    # Parse troops_json back to dict for display
+    for v in own_villages:
+        try:
+            v["troops"] = _json.loads(v.get("troops_json") or "{}")
+        except Exception:
+            v["troops"] = {}
+
+    # Load recent attack reports for defense priority cross-reference
+    attack_reports = await database.get_attack_reports(guild_id, limit=20)
+    # Build a set of defender coords from recent reports
+    import datetime as _dt
+    def_targets = []
+    for rpt in attack_reports:
+        try:
+            waves = _json.loads(rpt.get("attacks_json") or "[]")
+        except Exception:
+            waves = []
+        for w in waves:
+            dx, dy = w.get("def_x"), w.get("def_y")
+            if dx is not None and dy is not None:
+                def_targets.append({"x": int(dx), "y": int(dy), "report_id": rpt["id"],
+                                     "created_at": rpt.get("created_at","")[:16],
+                                     "arrival": w.get("arrival","")})
+
+    # For each def target, find matching own village or nearest
+    own_by_coords = {(v["x"], v["y"]): v for v in own_villages}
+    priority_rows = []
+    seen = set()
+    for t in def_targets:
+        key = (t["x"], t["y"])
+        if key in seen:
+            continue
+        seen.add(key)
+        match = own_by_coords.get(key)
+        if match:
+            priority_rows.append({**t, "own_village": match, "urgency": "red"})
+
+    return templates.TemplateResponse("own_troops.html", {
+        "request": request,
+        "guild": guild,
+        "own_villages": own_villages,
+        "priority_rows": priority_rows,
+        "upload_msg": None,
+    })
+
+
+@app.post("/guild/{guild_id}/attacks/own-troops")
+async def own_troops_upload(
+    request: Request,
+    guild_id: str,
+    troop_text: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    uploaded_by = session.get("username") or session.get("discord_username") or "unknown"
+    parsed = parse_own_villages(troop_text)
+    for v in parsed:
+        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}))
+        v["village_type"] = vtype
+        v["off_score"] = off_s
+        v["def_score"] = def_s
+        v["priority"] = prio
+
+    if parsed:
+        await database.save_own_villages(guild_id, parsed, uploaded_by)
+
+    return RedirectResponse(f"/guild/{guild_id}/attacks/own-troops?uploaded={len(parsed)}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/attacks/own-troops/clear")
+async def own_troops_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_own_villages(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/attacks/own-troops", status_code=303)
 
 
 # ---------------------------------------------------------------------------

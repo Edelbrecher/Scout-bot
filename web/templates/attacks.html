@@ -9,6 +9,11 @@
       <h1>⚔️ Angriff-Detection</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
+    <div style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.25rem;">
+      <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
+        🏰 Eigene Dörfer
+      </a>
+    </div>
   </div>
 
   {% if saved %}

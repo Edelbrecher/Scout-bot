@@ -192,6 +192,7 @@ async def init_db():
     await _init_admin_tables()
     await _init_consent_tables()
     await _init_user_sub_tables()
+    await _init_own_villages_table()
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -1773,6 +1774,83 @@ async def get_auth_logs(limit: int = 200) -> list[dict]:
             SELECT * FROM auth_logs ORDER BY created_at DESC LIMIT ?
         """, (limit,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def _init_own_villages_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS guild_own_villages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                village_name TEXT,
+                x INTEGER,
+                y INTEGER,
+                population INTEGER,
+                troops_json TEXT,
+                village_type TEXT,
+                def_score INTEGER DEFAULT 0,
+                off_score INTEGER DEFAULT 0,
+                priority INTEGER DEFAULT 0,
+                uploaded_by TEXT,
+                uploaded_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, x, y)
+            )
+        """)
+        await db.commit()
+
+
+async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: str):
+    """Upsert all villages for a guild."""
+    import json as _json
+    async with aiosqlite.connect(DB_PATH) as db:
+        for v in villages:
+            await db.execute("""
+                INSERT INTO guild_own_villages
+                    (guild_id, village_name, x, y, population, troops_json,
+                     village_type, def_score, off_score, priority, uploaded_by, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(guild_id, x, y) DO UPDATE SET
+                    village_name = excluded.village_name,
+                    population   = excluded.population,
+                    troops_json  = excluded.troops_json,
+                    village_type = excluded.village_type,
+                    def_score    = excluded.def_score,
+                    off_score    = excluded.off_score,
+                    priority     = excluded.priority,
+                    uploaded_by  = excluded.uploaded_by,
+                    uploaded_at  = excluded.uploaded_at
+            """, (
+                guild_id,
+                v.get("village_name"),
+                v.get("x"),
+                v.get("y"),
+                v.get("population", 0),
+                _json.dumps(v.get("troops", {})),
+                v.get("village_type", "mixed"),
+                v.get("def_score", 0),
+                v.get("off_score", 0),
+                v.get("priority", 0),
+                uploaded_by,
+            ))
+        await db.commit()
+
+
+async def get_own_villages(guild_id: str) -> list[dict]:
+    """Return all own villages for a guild, sorted by priority desc."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_own_villages WHERE guild_id = ? ORDER BY priority DESC, village_name ASC",
+            (guild_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_own_villages(guild_id: str):
+    """Delete all own villages for a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
+        await db.commit()
 
 
 async def get_auth_stats() -> dict:

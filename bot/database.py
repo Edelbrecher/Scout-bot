@@ -518,3 +518,76 @@ async def set_bot_active(guild_id: str):
             (guild_id,),
         )
         await db.commit()
+
+
+async def get_village_from_snapshot(guild_id: str, x: int, y: int) -> dict | None:
+    """Look up a village by exact coords in the latest map snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            latest = row["latest"] if row else None
+        if not latest:
+            return None
+        async with db.execute(
+            "SELECT * FROM map_snapshots WHERE guild_id = ? AND fetched_at = ? AND x = ? AND y = ?",
+            (guild_id, latest, x, y),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return None
+        r = dict(row)
+        return {
+            "player_name": r.get("player_name"),
+            "village_name": r.get("village_name"),
+            "alliance_name": r.get("alliance_name"),
+            "tribe": r.get("tribe"),
+            "population": r.get("population"),
+            "x": r["x"], "y": r["y"],
+        }
+
+
+async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | None:
+    """Look up a player by name in the latest map snapshot."""
+    if not player_name:
+        return None
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            latest = row["latest"] if row else None
+        if not latest:
+            return None
+        async with db.execute(
+            """SELECT * FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+               AND lower(player_name) = lower(?)""",
+            (guild_id, latest, player_name),
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+        if not rows:
+            return None
+        first = rows[0]
+        return {
+            "player_name": first.get("player_name"),
+            "alliance_name": first.get("alliance_name"),
+            "alliance_id": first.get("alliance_id"),
+            "tribe": first.get("tribe"),
+            "villages": [
+                {
+                    "x": r["x"], "y": r["y"],
+                    "village_name": r.get("village_name"),
+                    "population": r.get("population"),
+                    "is_capital": False,
+                }
+                for r in rows
+            ],
+            "total_pop": sum(r.get("population", 0) or 0 for r in rows),
+            "village_count": len(rows),
+        }

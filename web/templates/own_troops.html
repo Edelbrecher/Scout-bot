@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Eigene Dörfer & Truppen · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <div style="margin-bottom:1.5rem;">
+    <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Angriff-Detection</a>
+    <h1 style="margin:0.25rem 0 0;">🏰 Eigene Dörfer &amp; Truppen</h1>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:0.25rem 0 0;">{{ guild.guild_name }}</p>
+  </div>
+
+  {% set uploaded = request.query_params.get('uploaded') %}
+  {% if uploaded %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">
+    ✅ {{ uploaded }} Dorf/Dörfer erfolgreich importiert.
+  </div>
+  {% endif %}
+
+  <!-- Upload section -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h2>📋 Truppendaten importieren</h2>
+    <p class="hint">
+      Öffne in Travian die <strong>Truppenübersicht</strong> (Dorf → Truppen → Truppenübersicht),
+      markiere alles (<kbd>Strg+A</kbd>) und kopiere (<kbd>Strg+C</kbd>), dann hier einfügen.
+      Die Tabelle wird automatisch erkannt.
+    </p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/attacks/own-troops">
+      <div class="form-group">
+        <label for="troop_text">Truppenübersicht (Einfügen mit Strg+V)</label>
+        <textarea id="troop_text" name="troop_text" rows="8"
+                  placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."
+                  style="font-family:monospace; font-size:0.82rem; width:100%; resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+        <button type="submit" class="btn btn-primary">⬆️ Importieren</button>
+        {% if own_villages %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/attacks/own-troops/clear"
+              onsubmit="return confirm('Alle eigenen Dörfer löschen?')" style="margin:0;">
+          <button type="submit" class="btn btn-danger">🗑 Alle löschen</button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Defense Priority -->
+  {% if priority_rows %}
+  <div class="card" style="margin-bottom:1.5rem; border-color:rgba(239,68,68,0.4);">
+    <h2>🎯 Verteidigungs-Empfehlung</h2>
+    <p class="hint">Angriffe die auf eigene Dörfer in der Datenbank zielen.</p>
+    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+      {% for row in priority_rows %}
+      {% set v = row.own_village %}
+      <div style="background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:0.8rem 1rem; display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-start;">
+        <div style="flex:1; min-width:220px;">
+          <div style="font-weight:700; font-size:0.95rem;">
+            🔴 {{ v.village_name or '?' }}
+            <span style="color:var(--text-muted); font-weight:400; font-size:0.82rem;">({{ row.x }}|{{ row.y }})</span>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">
+            Meldung #{{ row.report_id }} · {{ row.created_at }} UTC
+            {% if row.arrival %} · Ankunft: <strong>{{ row.arrival }}</strong>{% endif %}
+          </div>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          {% set vtype = v.village_type %}
+          <span style="display:inline-block; margin-bottom:0.4rem;
+            background:{% if vtype=='off' %}rgba(239,68,68,0.2){% elif vtype=='def' %}rgba(34,197,94,0.2){% elif vtype=='scout' %}rgba(139,92,246,0.2){% else %}rgba(100,116,139,0.2){% endif %};
+            border:1px solid {% if vtype=='off' %}rgba(239,68,68,0.5){% elif vtype=='def' %}rgba(34,197,94,0.5){% elif vtype=='scout' %}rgba(139,92,246,0.5){% else %}rgba(100,116,139,0.5){% endif %};
+            color:{% if vtype=='off' %}#ef4444{% elif vtype=='def' %}#22c55e{% elif vtype=='scout' %}#a78bfa{% else %}#94a3b8{% endif %};
+            border-radius:20px; padding:0.15rem 0.6rem; font-size:0.78rem; font-weight:700;">
+            {% if vtype=='off' %}🗡️ Off{% elif vtype=='def' %}🛡️ Def{% elif vtype=='scout' %}🔭 Scout{% elif vtype=='leer' %}📭 Leer{% else %}⚔️ Gemischt{% endif %}
+          </span>
+          <div style="font-size:0.8rem;">
+            Def-Score: <strong>{{ v.def_score }}</strong> ·
+            Off-Score: <strong>{{ v.off_score }}</strong>
+          </div>
+          {% if v.troops %}
+          <div style="margin-top:0.35rem; display:flex; flex-wrap:wrap; gap:0.25rem;">
+            {% for tname, cnt in v.troops.items() %}
+            {% if cnt > 0 %}
+            <span style="background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem;">
+              {{ tname }}: <strong>{{ cnt }}</strong>
+            </span>
+            {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div>
+          <a href="/guild/{{ guild.guild_id }}/attacks/{{ row.report_id }}/analyse"
+             class="btn btn-secondary" style="font-size:0.8rem; padding:0.25rem 0.6rem;">🔬 Analyse</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Villages table -->
+  {% if own_villages %}
+  <div class="card">
+    <h2>🏘️ Importierte Dörfer ({{ own_villages | length }})</h2>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Dorf</th>
+            <th>Koords</th>
+            <th>Typ</th>
+            <th style="text-align:right;">Off-Score</th>
+            <th style="text-align:right;">Def-Score</th>
+            <th>Truppen</th>
+            <th style="color:var(--text-muted); font-size:0.8rem;">Importiert</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in own_villages %}
+          {% set vtype = v.village_type %}
+          <tr>
+            <td><strong>{{ v.village_name or '—' }}</strong>
+              {% if v.population %}<span style="color:var(--text-muted); font-size:0.78rem;"> BW {{ v.population }}</span>{% endif %}
+            </td>
+            <td style="font-family:monospace; font-size:0.85rem;">({{ v.x }}|{{ v.y }})</td>
+            <td>
+              <span style="
+                background:{% if vtype=='off' %}rgba(239,68,68,0.18){% elif vtype=='def' %}rgba(34,197,94,0.18){% elif vtype=='scout' %}rgba(139,92,246,0.18){% elif vtype=='leer' %}rgba(100,116,139,0.12){% else %}rgba(100,116,139,0.18){% endif %};
+                border:1px solid {% if vtype=='off' %}rgba(239,68,68,0.45){% elif vtype=='def' %}rgba(34,197,94,0.45){% elif vtype=='scout' %}rgba(139,92,246,0.45){% else %}rgba(100,116,139,0.45){% endif %};
+                color:{% if vtype=='off' %}#ef4444{% elif vtype=='def' %}#22c55e{% elif vtype=='scout' %}#a78bfa{% else %}#94a3b8{% endif %};
+                border-radius:20px; padding:0.15rem 0.55rem; font-size:0.78rem; font-weight:700; white-space:nowrap;">
+                {% if vtype=='off' %}🗡️ Off{% elif vtype=='def' %}🛡️ Def{% elif vtype=='scout' %}🔭 Scout{% elif vtype=='leer' %}📭 Leer{% else %}⚔️ Gemischt{% endif %}
+              </span>
+            </td>
+            <td style="text-align:right; font-weight:700; color:#ef4444;">{{ v.off_score }}</td>
+            <td style="text-align:right; font-weight:700; color:#22c55e;">{{ v.def_score }}</td>
+            <td>
+              <!-- Mini bar chart -->
+              {% if v.troops %}
+              <div style="display:flex; flex-wrap:wrap; gap:0.2rem; max-width:320px;">
+                {% set total_troops = v.troops.values() | sum %}
+                {% for tname, cnt in v.troops.items() %}
+                {% if cnt > 0 %}
+                <div style="position:relative; display:flex; flex-direction:column; align-items:center;"
+                     title="{{ tname }}: {{ cnt }}">
+                  <div style="
+                    height:28px; width:{{ [4, (cnt / [total_troops,1]|max * 60)|int]|max }}px;
+                    background:{% if vtype=='off' %}rgba(239,68,68,0.55){% elif vtype=='def' %}rgba(34,197,94,0.55){% else %}rgba(100,116,139,0.55){% endif %};
+                    border-radius:2px 2px 0 0; min-width:4px;">
+                  </div>
+                  <span style="font-size:0.6rem; color:var(--text-muted); writing-mode:vertical-rl; transform:rotate(180deg); margin-top:2px; max-height:40px; overflow:hidden;">
+                    {{ tname | truncate(8, true, '') }}
+                  </span>
+                  <span style="font-size:0.65rem; color:var(--text); font-weight:600;">{{ cnt }}</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+              </div>
+              {% else %}
+              <span style="color:var(--text-muted); font-size:0.82rem;">Keine Truppen</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--text-muted); font-size:0.78rem; white-space:nowrap;">
+              {{ v.uploaded_at[:16] if v.uploaded_at else '—' }}<br>
+              <span>{{ v.uploaded_by or '' }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <p class="empty">Noch keine eigenen Dörfer importiert. Nutze das Formular oben.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
