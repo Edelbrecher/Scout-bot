@@ -38,6 +38,10 @@
               <div style="font-size:0.78rem; color:var(--text-muted);">Eingeloggt</div>
             </div>
           </div>
+          {% if _is_admin %}
+          <div class="nav-profile-divider"></div>
+          <a href="/admin" class="nav-profile-item" style="color:#f59e0b;">⚙️ Admin</a>
+          {% endif %}
           <div id="nav-past-due-block" style="display:none;">
             <div class="nav-profile-divider"></div>
             <div id="nav-past-due-content" style="padding:0.6rem 1rem; background:rgba(220,38,38,0.1);">
