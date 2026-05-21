@@ -44,6 +44,37 @@
     </form>
   </div>
 
+  <!-- Timeline chart -->
+  {% if history and history | length > 0 %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h2>📈 Entwicklung der Truppenstärke</h2>
+    <p class="hint">Jeder Datenpunkt = ein Import. Zeigt wie sich Off, Def und Korn über Zeit entwickelt haben.</p>
+    <div style="position:relative; height:220px;">
+      <canvas id="historyChart"></canvas>
+    </div>
+    <!-- mini stats row -->
+    {% set last = history[-1] %}
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:1rem;">
+      <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
+        <div style="font-size:0.75rem; color:var(--text-muted);">⚔️ Off-Score gesamt</div>
+        <div style="font-size:1.4rem; font-weight:800; color:#ef4444;">{{ "{:,}".format(last.total_off).replace(",",".") }}</div>
+      </div>
+      <div style="background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
+        <div style="font-size:0.75rem; color:var(--text-muted);">🛡️ Def-Score gesamt</div>
+        <div style="font-size:1.4rem; font-weight:800; color:#22c55e;">{{ "{:,}".format(last.total_def).replace(",",".") }}</div>
+      </div>
+      <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
+        <div style="font-size:0.75rem; color:var(--text-muted);">🌾 Korn-Verbrauch</div>
+        <div style="font-size:1.4rem; font-weight:800; color:#f59e0b;">{{ "{:,}".format(last.total_crop).replace(",",".") }}</div>
+      </div>
+      <div style="background:rgba(100,116,139,0.08); border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
+        <div style="font-size:0.75rem; color:var(--text-muted);">🏘️ Dörfer</div>
+        <div style="font-size:1.4rem; font-weight:800; color:var(--text);">{{ last.village_count }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Defense Priority -->
   {% if priority_rows %}
   <div class="card" style="margin-bottom:1.5rem; border-color:rgba(239,68,68,0.4);">
@@ -227,4 +258,73 @@
 </style>
 
 </div>
+
+{% if history and history | length > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+  const history = {{ history | tojson }};
+  const labels = history.map(h => h.uploaded_at.slice(0,16).replace('T',' '));
+  const ctx = document.getElementById('historyChart');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '⚔️ Off-Score',
+          data: history.map(h => h.total_off),
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,0.08)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: history.length < 30 ? 4 : 2,
+          pointHoverRadius: 6,
+        },
+        {
+          label: '🛡️ Def-Score',
+          data: history.map(h => h.total_def),
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.08)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: history.length < 30 ? 4 : 2,
+          pointHoverRadius: 6,
+        },
+        {
+          label: '🌾 Korn',
+          data: history.map(h => h.total_crop),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.0)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: history.length < 30 ? 4 : 2,
+          pointHoverRadius: 6,
+          borderDash: [5,3],
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#ccc', font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('de-DE')}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 }, maxRotation: 30 } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 },
+             callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, beginAtZero: true }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

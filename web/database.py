@@ -193,6 +193,7 @@ async def init_db():
     await _init_consent_tables()
     await _init_user_sub_tables()
     await _init_own_villages_table()
+    await _init_own_villages_history_table()
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -1800,25 +1801,35 @@ async def _init_own_villages_table():
 
 
 async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: str):
-    """Upsert all villages for a guild."""
+    """Replace all own villages for a guild and record a history snapshot."""
     import json as _json
+    CROP_MAP = {
+        "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
+        "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
+        "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
+        "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
+        "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3,
+        "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Kriegsmaschine": 6,
+        "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
+        "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
+        "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
+        "Siedler": 1, "Held": 0,
+    }
+    total_off = sum(v.get("off_score", 0) for v in villages)
+    total_def = sum(v.get("def_score", 0) for v in villages)
+    total_crop = sum(
+        sum(CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
+        for v in villages
+    )
     async with aiosqlite.connect(DB_PATH) as db:
+        # Full replace: delete all current villages, then insert fresh
+        await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
         for v in villages:
             await db.execute("""
                 INSERT INTO guild_own_villages
                     (guild_id, village_name, x, y, population, troops_json,
                      village_type, def_score, off_score, priority, uploaded_by, uploaded_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                ON CONFLICT(guild_id, x, y) DO UPDATE SET
-                    village_name = excluded.village_name,
-                    population   = excluded.population,
-                    troops_json  = excluded.troops_json,
-                    village_type = excluded.village_type,
-                    def_score    = excluded.def_score,
-                    off_score    = excluded.off_score,
-                    priority     = excluded.priority,
-                    uploaded_by  = excluded.uploaded_by,
-                    uploaded_at  = excluded.uploaded_at
             """, (
                 guild_id,
                 v.get("village_name"),
@@ -1832,6 +1843,12 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
                 v.get("priority", 0),
                 uploaded_by,
             ))
+        # Record history snapshot
+        await db.execute("""
+            INSERT INTO guild_own_villages_history
+                (guild_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
+            VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
+        """, (guild_id, total_off, total_def, total_crop, len(villages), uploaded_by))
         await db.commit()
 
 
@@ -1851,6 +1868,34 @@ async def delete_own_villages(guild_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
         await db.commit()
+
+
+async def _init_own_villages_history_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS guild_own_villages_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                uploaded_at TEXT DEFAULT (datetime('now')),
+                total_off INTEGER DEFAULT 0,
+                total_def INTEGER DEFAULT 0,
+                total_crop INTEGER DEFAULT 0,
+                village_count INTEGER DEFAULT 0,
+                uploaded_by TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def get_own_villages_history(guild_id: str) -> list[dict]:
+    """Return historical snapshots for own villages, oldest first."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_own_villages_history WHERE guild_id = ? ORDER BY uploaded_at ASC",
+            (guild_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_auth_stats() -> dict:

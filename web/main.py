@@ -2594,11 +2594,14 @@ async def own_troops_page(request: Request, guild_id: str):
         if match:
             priority_rows.append({**t, "own_village": match, "urgency": "red"})
 
+    history = await database.get_own_villages_history(guild_id)
+
     return templates.TemplateResponse("own_troops.html", {
         "request": request,
         "guild": guild,
         "own_villages": own_villages,
         "priority_rows": priority_rows,
+        "history": history,
         "upload_msg": None,
     })
 
