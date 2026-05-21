@@ -2960,6 +2960,119 @@ async def own_troops_clear(request: Request, guild_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Routes — Mein Account (own villages / own troops — central data hub)
+# ---------------------------------------------------------------------------
+
+_CROP_MAP = {
+    "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
+    "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
+    "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
+    "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
+    "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3, "Teutonen Reiter": 3,
+    "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Ramme": 5, "Kriegsmaschine": 6, "Katapult": 6,
+    "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
+    "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
+    "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
+    "Siedler": 1, "Held": 0,
+}
+
+
+def _enrich_own_villages(own_villages: list) -> list:
+    """Attach parsed troops + crop total to each village row."""
+    import json as _json
+    for v in own_villages:
+        try:
+            v["troops"] = _json.loads(v.get("troops_json") or "{}")
+        except Exception:
+            v["troops"] = {}
+        v["total_crop"] = sum(_CROP_MAP.get(t, 1) * c for t, c in v["troops"].items())
+    return own_villages
+
+
+@app.get("/guild/{guild_id}/mein-account", response_class=HTMLResponse)
+async def mein_account_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    own_villages = _enrich_own_villages(await database.get_own_villages(guild_id))
+    history      = await database.get_own_villages_history(guild_id)
+    uploaded     = request.query_params.get("uploaded")
+    cleared      = request.query_params.get("cleared")
+
+    # Totals for KPI strip
+    total_off  = sum(v.get("off_score", 0) for v in own_villages)
+    total_def  = sum(v.get("def_score", 0) for v in own_villages)
+    total_crop = sum(v.get("total_crop", 0) for v in own_villages)
+
+    return templates.TemplateResponse("mein_account.html", {
+        "request":       request,
+        "guild":         guild,
+        "own_villages":  own_villages,
+        "history":       history,
+        "uploaded":      uploaded,
+        "cleared":       cleared,
+        "total_off":     total_off,
+        "total_def":     total_def,
+        "total_crop":    total_crop,
+    })
+
+
+@app.post("/guild/{guild_id}/mein-account")
+async def mein_account_upload(
+    request: Request,
+    guild_id: str,
+    troop_text: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    uploaded_by = session.get("username") or session.get("discord_username") or "unknown"
+    parsed = parse_own_villages(troop_text)
+    for v in parsed:
+        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}))
+        v["village_type"] = vtype
+        v["off_score"]    = off_s
+        v["def_score"]    = def_s
+        v["priority"]     = prio
+    if parsed:
+        await database.save_own_villages(guild_id, parsed, uploaded_by)
+    return RedirectResponse(f"/guild/{guild_id}/mein-account?uploaded={len(parsed)}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/mein-account/clear")
+async def mein_account_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    await database.delete_own_villages(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/mein-account?cleared=1", status_code=303)
+
+
+# Legacy redirects — keep old /attacks/own-troops URLs working
+@app.get("/guild/{guild_id}/attacks/own-troops")
+async def _legacy_own_troops_get(guild_id: str):
+    return RedirectResponse(f"/guild/{guild_id}/mein-account", status_code=301)
+
+
+# ---------------------------------------------------------------------------
 # Routes — Farming
 # ---------------------------------------------------------------------------
 

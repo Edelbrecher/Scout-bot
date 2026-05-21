@@ -184,6 +184,16 @@
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
 
+    <!-- Mein Account (Pro) -->
+    <a href="/guild/{{ guild.guild_id }}/mein-account" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+      <div class="feature-icon">🏰</div>
+      <div class="feature-body">
+        <div class="feature-title">Mein Account {{ PRO_BADGE }}</div>
+        <div class="feature-desc">Eigene Dörfer & Truppen importieren — Datenbasis für alle Features</div>
+      </div>
+      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+    </a>
+
     <!-- Statistics -->
     <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📊</div>
