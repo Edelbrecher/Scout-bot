@@ -185,7 +185,7 @@
     </a>
 
     <!-- Serververwaltung -->
-    <a href="#server-verwaltung" class="feature-card" style="text-decoration:none;">
+    <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">⚙️</div>
       <div class="feature-body">
         <div class="feature-title">Server-Verwaltung</div>
@@ -342,53 +342,5 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
 })();
 {% endif %}
 </script>
-
-<!-- ── Manager-Hinweis + Bot entfernen ── -->
-<div class="card" id="server-verwaltung" style="margin-top:1.5rem; border:1px solid var(--border);">
-  <h2 style="margin:0 0 1rem; font-size:1rem; display:flex; align-items:center; gap:0.5rem;">⚙️ Server-Verwaltung</h2>
-
-  <!-- Wer hat Zugang -->
-  <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.9rem 1rem; margin-bottom:1rem;">
-    <div style="font-size:0.85rem; font-weight:600; margin-bottom:0.4rem;">👥 Dashboard-Zugang</div>
-    <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.6;">
-      Alle Discord-Mitglieder dieses Servers mit <strong style="color:var(--text);">Administrator</strong> oder <strong style="color:var(--text);">Server verwalten</strong> Berechtigung können sich unter <strong style="color:var(--text);">travops.online</strong> mit Discord einloggen und diesen Server verwalten.<br>
-      <span style="color:#f59e0b;">💳 Abonnement & Bot-Entfernung</span> sind nur für den Inhaber des Abonnements verfügbar.
-    </div>
-  </div>
-
-  <!-- Berechtigungen reparieren -->
-  {% if guild.archive_channel_id %}
-  <div style="background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:8px; padding:0.9rem 1rem; margin-bottom:0.75rem;">
-    <div style="font-size:0.85rem; font-weight:600; color:#f59e0b; margin-bottom:0.3rem;">🔧 Archive-Channel Berechtigungen</div>
-    <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.6rem;">Falls Bilder nicht archiviert werden: Bot-Berechtigungen im Archive-Channel neu setzen.</div>
-    <form method="post" action="/guild/{{ guild.guild_id }}/fix-archive-perms">
-      <button type="submit" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:0.4rem 1rem; color:#f59e0b; cursor:pointer; font-size:0.82rem; font-weight:600;">
-        🔧 Berechtigungen reparieren
-      </button>
-    </form>
-  </div>
-  {% endif %}
-
-  {% if is_owner %}
-  <!-- Bot entfernen -->
-  <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:0.9rem 1rem;">
-    <div style="font-size:0.85rem; font-weight:600; color:#f87171; margin-bottom:0.4rem;">🚫 Bot entfernen</div>
-    <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.75rem; line-height:1.5;">
-      Der Bot verlässt diesen Server und dein Abo-Slot wird wieder freigegeben.<br>
-      <strong style="color:#f87171;">Achtung:</strong> Alle Scout-Kanäle und Einstellungen bleiben gespeichert und können nach erneutem Einladen wiederhergestellt werden.
-    </div>
-    <form method="post" action="/guild/{{ guild.guild_id }}/remove-bot"
-          onsubmit="return confirm('Bot wirklich von {{ guild.guild_name }} entfernen? Der Slot wird freigegeben.')">
-      <button type="submit" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:0.45rem 1.1rem; color:#f87171; cursor:pointer; font-size:0.85rem; font-weight:600;">
-        🚫 Bot jetzt entfernen
-      </button>
-    </form>
-  </div>
-  {% else %}
-  <div style="font-size:0.82rem; color:var(--text-muted); font-style:italic;">
-    Nur der Abo-Inhaber kann den Bot entfernen.
-  </div>
-  {% endif %}
-</div>
 
 {% endblock %}

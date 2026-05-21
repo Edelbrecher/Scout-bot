@@ -851,9 +851,9 @@ async def fix_archive_perms(request: Request, guild_id: str):
             json={"allow": ALLOW_BOT, "deny": "0", "type": 1},
         )
         if r.status_code not in (200, 201, 204):
-            return RedirectResponse(f"/guild/{guild_id}?error=perms_{r.status_code}", status_code=303)
+            return RedirectResponse(f"/guild/{guild_id}/settings?flash=⚠️+Fehler:+perms_{r.status_code}", status_code=303)
 
-    return RedirectResponse(f"/guild/{guild_id}?saved=perms_fixed", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/settings?flash=✅+Berechtigungen+erfolgreich+repariert", status_code=303)
 
 
 @app.get("/guild/{guild_id}/stats", response_class=HTMLResponse)
@@ -1419,6 +1419,24 @@ def _stripe_client():
         return None
     stripe.api_key = STRIPE_SECRET_KEY
     return stripe
+
+
+@app.get("/guild/{guild_id}/settings")
+async def guild_settings_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    guild = await database.get_guild_config(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    if not await _can_access_guild(session, guild):
+        return RedirectResponse("/dashboard", status_code=303)
+    flash = request.query_params.get("flash", "")
+    return templates.TemplateResponse("guild_settings.html", {
+        "request": request,
+        "guild": guild,
+        "is_owner": is_guild_owner(session, guild),
+        "flash": flash,
+    })
 
 
 @app.get("/guild/{guild_id}/billing")
