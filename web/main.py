@@ -562,7 +562,7 @@ async def dashboard(request: Request):
     )
 
     # Server-slot limits for this user
-    owner_discord_id = session.get("user_id", "")
+    owner_discord_id = session.get("uid", "")
     owner_active_guilds = await database.get_owner_active_guilds(owner_discord_id) if owner_discord_id else []
     slots_used = len(owner_active_guilds)
     slots_max = await database.get_owner_tier_limit(owner_discord_id) if owner_discord_id else 0
@@ -1402,7 +1402,7 @@ async def billing_checkout(
         subscription_data={"trial_period_days": 7},
         success_url=f"{base_url}/guild/{guild_id}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{base_url}/guild/{guild_id}/billing?error=cancelled",
-        metadata={"guild_id": guild_id, "tier": tier, "owner_discord_id": session.get("user_id", "")},
+        metadata={"guild_id": guild_id, "tier": tier, "owner_discord_id": session.get("uid", "")},
     )
     if customer_id:
         checkout_kwargs["customer"] = customer_id
@@ -1438,7 +1438,7 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
         plan_str = f"{tier}_{interval}"
         import datetime
         expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
-        owner_discord_id = checkout.metadata.get("owner_discord_id") or session.get("user_id", "")
+        owner_discord_id = checkout.metadata.get("owner_discord_id") or session.get("uid", "")
         await database.update_subscription(
             guild_id=guild_id,
             stripe_customer_id=checkout.customer,
@@ -1484,7 +1484,7 @@ async def plans_page(request: Request, error: str = ""):
     session = _get_session(request)
     user_sub = None
     if session:
-        user_sub = await database.get_user_subscription(session.get("user_id", ""))
+        user_sub = await database.get_user_subscription(session.get("uid", ""))
     return templates.TemplateResponse("plans.html", {
         "request": request,
         "tier_meta": TIER_META,
@@ -1510,7 +1510,7 @@ async def plans_checkout(request: Request, plan: str = Form("monthly"), tier: st
         return RedirectResponse("/plans?error=price_not_configured", status_code=303)
 
     base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
-    discord_user_id = session.get("user_id", "")
+    discord_user_id = session.get("uid", "")
 
     # Re-use existing Stripe customer if available
     user_sub = await database.get_user_subscription(discord_user_id)
@@ -1561,7 +1561,7 @@ async def plans_success(request: Request, session_id: str = ""):
             plan_str = f"{tier}_{interval}"
             import datetime
             expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
-            discord_user_id = checkout.metadata.get("discord_user_id", web_session.get("user_id", ""))
+            discord_user_id = checkout.metadata.get("discord_user_id", web_session.get("uid", ""))
             await database.upsert_user_subscription(
                 discord_user_id=discord_user_id,
                 stripe_customer_id=checkout.customer,
