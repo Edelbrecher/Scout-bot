@@ -15,7 +15,7 @@
       <span class="nav-brand">TravOps</span>
     </a>
     <div class="nav-links" style="align-items:center;">
-      <a href="/dashboard" data-i18n="dashboard">Dashboard</a>
+      <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
       {% if _is_admin %}
       <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
       {% endif %}
@@ -53,8 +53,8 @@
           <div class="nav-profile-divider"></div>
           <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem;">
             <span style="font-size:0.8rem; color:var(--text-muted);">Sprache:</span>
-            <button onclick="setLanguage('de')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="Deutsch">🇩🇪 DE</button>
-            <button onclick="setLanguage('en')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="English">🇬🇧 EN</button>
+            <button class="lang-btn" data-lang="de" onclick="setLanguage('de')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="Deutsch">🇩🇪 DE</button>
+            <button class="lang-btn" data-lang="en" onclick="setLanguage('en')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="English">🇬🇧 EN</button>
           </div>
           <div class="nav-profile-divider"></div>
           <a id="nav-billing-link" href="#" class="nav-profile-item" style="display:none;">💳 <span data-i18n="nav.billing">Abonnement</span></a>
