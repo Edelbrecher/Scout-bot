@@ -211,13 +211,39 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
 
             # Post to alert channel
             alert_channel = interaction.guild.get_channel(int(self.alert_channel_id))
+            channel_ok = False
             if alert_channel:
-                await alert_channel.send(embed=embed)
+                # Ensure bot has permission to send
+                bot_member = interaction.guild.me
+                perms = alert_channel.permissions_for(bot_member)
+                if not perms.send_messages or not perms.embed_links:
+                    try:
+                        await alert_channel.set_permissions(
+                            bot_member,
+                            view_channel=True,
+                            send_messages=True,
+                            embed_links=True,
+                            attach_files=True,
+                        )
+                    except discord.Forbidden:
+                        pass
+                try:
+                    await alert_channel.send(embed=embed)
+                    channel_ok = True
+                except discord.Forbidden:
+                    print(f"[attacks] Cannot send to alert channel {self.alert_channel_id}: Forbidden", flush=True)
 
-            await interaction.response.send_message(
-                f"✅ **{len(attacks)} Angriff(e)** wurden gemeldet und im Alarm-Kanal gepostet.",
-                ephemeral=True,
-            )
+            if channel_ok:
+                await interaction.response.send_message(
+                    f"✅ **{len(attacks)} Angriff(e)** wurden gemeldet und im Alarm-Kanal gepostet.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    f"⚠️ **{len(attacks)} Angriff(e)** erkannt, aber der Bot hat keine Schreibrechte im Alarm-Kanal.\n"
+                    f"Bitte den Alarm-Kanal im Dashboard neu einrichten oder die Bot-Berechtigungen prüfen.",
+                    ephemeral=True,
+                )
         except Exception as e:
             print(f"[attacks] on_submit error: {e}", flush=True)
             try:
@@ -319,9 +345,12 @@ class AttacksCog(commands.Cog):
         bot_member = guild.get_member(self.bot.user.id)
 
         # Create category
+        bot_overwrite = discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, embed_links=True, attach_files=True, read_message_history=True
+        )
         overwrites_category = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            bot_member: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            bot_member: bot_overwrite,
         }
         try:
             category = await guild.create_category(
@@ -336,7 +365,7 @@ class AttacksCog(commands.Cog):
         # Create alert channel inside category
         overwrites_channel = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            bot_member: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            bot_member: bot_overwrite,
         }
         channel = await guild.create_text_channel(
             "angriff-alarm", category=category, overwrites=overwrites_channel
