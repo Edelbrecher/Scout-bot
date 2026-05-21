@@ -1878,27 +1878,40 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         if dy > MAP_SIZE: dy = 2 * MAP_SIZE - dy
         return _math.sqrt(dx * dx + dy * dy)
 
-    TROOP_SPEEDS = {
+    TROOP_DATA = {
         # Romans
-        "Legionär": 6, "Prätorianer": 5, "Imperianer": 7,
-        "Equites Legati": 16, "Equites Imperatoris": 14, "Equites Caesaris": 10,
-        "Rammbock": 4, "Feuerkatapult": 3, "Senator": 5,
+        "Legionär":            {"speed": 6,  "atk": 40,  "def_inf": 35,  "def_cav": 50,  "tribe": "Römer",    "crop": 1, "tp": 40},
+        "Prätorianer":         {"speed": 5,  "atk": 5,   "def_inf": 65,  "def_cav": 35,  "tribe": "Römer",    "crop": 1, "tp": 30},
+        "Imperianer":          {"speed": 7,  "atk": 70,  "def_inf": 30,  "def_cav": 25,  "tribe": "Römer",    "crop": 1, "tp": 70},
+        "Equites Legati":      {"speed": 16, "atk": 40,  "def_inf": 20,  "def_cav": 10,  "tribe": "Römer",    "crop": 2, "tp": 80},
+        "Equites Imperatoris": {"speed": 14, "atk": 120, "def_inf": 65,  "def_cav": 50,  "tribe": "Römer",    "crop": 3, "tp": 260},
+        "Equites Caesaris":    {"speed": 10, "atk": 180, "def_inf": 80,  "def_cav": 105, "tribe": "Römer",    "crop": 4, "tp": 450},
+        "Rammbock":            {"speed": 4,  "atk": 60,  "def_inf": 30,  "def_cav": 75,  "tribe": "Römer",    "crop": 5, "tp": 300},
+        "Feuerkatapult":       {"speed": 3,  "atk": 75,  "def_inf": 60,  "def_cav": 10,  "tribe": "Römer",    "crop": 6, "tp": 600},
+        "Senator":             {"speed": 4,  "atk": 50,  "def_inf": 40,  "def_cav": 30,  "tribe": "Römer",    "crop": 5, "tp": 500},
         # Teutons
-        "Keulenschwinger": 7, "Speerkämpfer": 7, "Axtkämpfer": 7,
-        "Späher": 9, "Paladin": 10, "Teut. Ritter": 9,
+        "Keulenschwinger":     {"speed": 7,  "atk": 40,  "def_inf": 20,  "def_cav": 5,   "tribe": "Germanen", "crop": 1, "tp": 40},
+        "Speerkämpfer":        {"speed": 7,  "atk": 10,  "def_inf": 35,  "def_cav": 60,  "tribe": "Germanen", "crop": 1, "tp": 20},
+        "Axtkämpfer":          {"speed": 7,  "atk": 55,  "def_inf": 10,  "def_cav": 5,   "tribe": "Germanen", "crop": 1, "tp": 60},
+        "Späher":              {"speed": 9,  "atk": 0,   "def_inf": 10,  "def_cav": 10,  "tribe": "Germanen", "crop": 1, "tp": 20},
+        "Paladin":             {"speed": 10, "atk": 55,  "def_inf": 100, "def_cav": 40,  "tribe": "Germanen", "crop": 2, "tp": 160},
+        "Teut. Ritter":        {"speed": 11, "atk": 150, "def_inf": 50,  "def_cav": 75,  "tribe": "Germanen", "crop": 3, "tp": 400},
+        "Häuptling":           {"speed": 7,  "atk": 40,  "def_inf": 60,  "def_cav": 40,  "tribe": "Germanen", "crop": 4, "tp": 500},
+        "Teutonen-Rammbock":   {"speed": 5,  "atk": 65,  "def_inf": 30,  "def_cav": 80,  "tribe": "Germanen", "crop": 5, "tp": 350},
+        "Kriegsmaschine":      {"speed": 3,  "atk": 50,  "def_inf": 60,  "def_cav": 10,  "tribe": "Germanen", "crop": 6, "tp": 600},
         # Gauls
-        "Phalanx": 7, "Schwertkämpfer": 6, "Pathfinder": 17,
-        "Theutates-Blitz": 19, "Druidentreiter": 16, "Haeduer": 13,
+        "Phalanx":             {"speed": 7,  "atk": 15,  "def_inf": 40,  "def_cav": 50,  "tribe": "Gallier",  "crop": 1, "tp": 20},
+        "Schwertkämpfer":      {"speed": 6,  "atk": 65,  "def_inf": 35,  "def_cav": 20,  "tribe": "Gallier",  "crop": 1, "tp": 60},
+        "Pathfinder":          {"speed": 17, "atk": 0,   "def_inf": 10,  "def_cav": 10,  "tribe": "Gallier",  "crop": 2, "tp": 20},
+        "Theutates-Blitz":     {"speed": 19, "atk": 90,  "def_inf": 25,  "def_cav": 10,  "tribe": "Gallier",  "crop": 2, "tp": 160},
+        "Druidentreiter":      {"speed": 16, "atk": 45,  "def_inf": 115, "def_cav": 55,  "tribe": "Gallier",  "crop": 2, "tp": 240},
+        "Haeduer":             {"speed": 13, "atk": 200, "def_inf": 45,  "def_cav": 80,  "tribe": "Gallier",  "crop": 3, "tp": 500},
+        "Stammesältester":     {"speed": 5,  "atk": 40,  "def_inf": 50,  "def_cav": 50,  "tribe": "Gallier",  "crop": 5, "tp": 500},
+        "Gallier-Rammbock":    {"speed": 6,  "atk": 50,  "def_inf": 30,  "def_cav": 105, "tribe": "Gallier",  "crop": 5, "tp": 320},
+        "Gallier-Kata":        {"speed": 3,  "atk": 70,  "def_inf": 45,  "def_cav": 10,  "tribe": "Gallier",  "crop": 6, "tp": 600},
     }
-    TROOP_TRIBE = {
-        "Legionär": "Römer", "Prätorianer": "Römer", "Imperianer": "Römer",
-        "Equites Legati": "Römer", "Equites Imperatoris": "Römer", "Equites Caesaris": "Römer",
-        "Rammbock": "Römer", "Feuerkatapult": "Römer", "Senator": "Römer",
-        "Keulenschwinger": "Germanen", "Speerkämpfer": "Germanen", "Axtkämpfer": "Germanen",
-        "Späher": "Germanen", "Paladin": "Germanen", "Teut. Ritter": "Germanen",
-        "Phalanx": "Gallier", "Schwertkämpfer": "Gallier", "Pathfinder": "Gallier",
-        "Theutates-Blitz": "Gallier", "Druidentreiter": "Gallier", "Haeduer": "Gallier",
-    }
+    TROOP_SPEEDS = {name: d["speed"] for name, d in TROOP_DATA.items()}
+    TROOP_TRIBE  = {name: d["tribe"] for name, d in TROOP_DATA.items()}
     TRIBE_EMOJI = {1: "🏛️", 2: "⚒️", 3: "🌿", 4: "🌑", 5: "⛩️"}
 
     enriched = []
@@ -1942,9 +1955,16 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         else:
             slowest_speed = None
 
+        # Parse remaining march time from arrival string e.g. "in 22:00:28 Std. um 15:00:14"
+        import re as _re
+        remaining_seconds = None
+        arrival_str = atk.get("arrival", "")
+        rm = _re.search(r"in\s+(\d+):(\d+):(\d+)", arrival_str)
+        if rm:
+            remaining_seconds = int(rm.group(1)) * 3600 + int(rm.group(2)) * 60 + int(rm.group(3))
+
         # Parse coords from attacker village "(x|y)"
         atk_x = atk_y = None
-        import re as _re
         cm = _re.search(r"\((-?\d+)\|(-?\d+)\)", atk.get("coords", ""))
         if cm:
             atk_x, atk_y = int(cm.group(1)), int(cm.group(2))
@@ -1969,7 +1989,25 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
             "atk_x": atk_x,
             "atk_y": atk_y,
             "attacker_data": attacker_data,
+            "remaining_seconds": remaining_seconds,
+            "is_stack": False,
         })
+
+    # Wave stack detection: group by arrival time, mark coordinated stacks
+    from collections import defaultdict as _defaultdict
+    arrival_groups = _defaultdict(list)
+    for i, atk in enumerate(enriched):
+        key = atk.get("arrival", "")
+        if key:
+            arrival_groups[key].append(i)
+    for indices in arrival_groups.values():
+        if len(indices) > 1:
+            for i in indices:
+                enriched[i]["is_stack"] = True
+                enriched[i]["stack_count"] = len(indices)
+
+    import json as _json2
+    troop_data_json = _json2.dumps(TROOP_DATA)
 
     # Historical reports from same attacker
     all_attackers = {atk.get("attacker") for atk in attacks if atk.get("attacker")}
@@ -1983,6 +2021,7 @@ async def attacks_analyse(request: Request, guild_id: str, report_id: int):
         "history_count": len(history),
         "history": history[:20],
         "TRIBE_EMOJI": TRIBE_EMOJI,
+        "troop_data_json": troop_data_json,
     })
 
 

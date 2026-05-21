@@ -2,7 +2,7 @@
 {% block title %}Angriffs-Analyse #{{ report.id }} · {{ guild.guild_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1000px;">
+<div class="container" style="max-width:1040px;">
 
   <div style="margin-bottom:1.5rem;">
     <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Angriff-Detection</a>
@@ -17,11 +17,28 @@
     </p>
   </div>
 
+  <!-- Defender coords input (shared for all waves) -->
+  <div class="card" style="margin-bottom:1.5rem; padding:1rem 1.25rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      <span style="font-size:0.88rem; font-weight:600;">📍 Eigene Dorfkoordinaten:</span>
+      <input id="def-x" type="number" placeholder="X" style="width:70px; padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-main); color:var(--text);">
+      <span style="color:var(--text-muted);">|</span>
+      <input id="def-y" type="number" placeholder="Y" style="width:70px; padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-main); color:var(--text);">
+      <button onclick="runAnalysis()" style="padding:0.35rem 0.9rem; border-radius:6px; border:none; background:#3b82f6; color:#fff; cursor:pointer; font-size:0.85rem; font-weight:600;">Analysieren</button>
+      <span id="coord-hint" style="font-size:0.78rem; color:var(--text-muted);"></span>
+    </div>
+  </div>
+
   <!-- ── Je Angriff eine Analyse-Karte ── -->
   {% for atk in attacks %}
-  <div style="margin-bottom:1.5rem; border:1px solid {% if atk.classification.startswith('💥') or atk.classification.startswith('⚔️') %}rgba(220,38,38,0.5){% elif atk.classification.startswith('🪶') %}rgba(245,158,11,0.4){% else %}var(--border){% endif %}; border-radius:12px; overflow:hidden;">
+  <div class="atk-card" id="atk-{{ loop.index0 }}"
+       data-ax="{{ atk.atk_x if atk.atk_x is not none else '' }}"
+       data-ay="{{ atk.atk_y if atk.atk_y is not none else '' }}"
+       data-remaining="{{ atk.remaining_seconds if atk.remaining_seconds is not none else '' }}"
+       data-tribe="{{ atk.detected_tribe or (atk.attacker_data.tribe if atk.attacker_data else '') }}"
+       style="margin-bottom:2rem; border:1px solid {% if atk.classification.startswith('💥') or atk.classification.startswith('⚔️') %}rgba(220,38,38,0.5){% elif atk.classification.startswith('🪶') %}rgba(245,158,11,0.4){% else %}var(--border){% endif %}; border-radius:12px; overflow:hidden;">
 
-    <!-- Header -->
+    <!-- ── Section 1: Header ── -->
     <div style="background:{% if atk.classification.startswith('💥') or atk.classification.startswith('⚔️') %}rgba(220,38,38,0.12){% elif atk.classification.startswith('🪶') %}rgba(245,158,11,0.1){% else %}var(--bg-card){% endif %}; padding:1rem 1.25rem; display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center;">
       <div style="flex:1; min-width:0;">
         <div style="font-size:1.1rem; font-weight:700;">
@@ -36,6 +53,13 @@
           {% if atk.coords %} · Koordinaten: <code>{{ atk.coords }}</code>{% endif %}
           {% if atk.arrival %} · Ankunft: <strong>{{ atk.arrival }}</strong>{% endif %}
         </div>
+        {% if atk.is_stack %}
+        <div style="margin-top:0.4rem;">
+          <span style="background:rgba(251,191,36,0.15); border:1px solid #fbbf24; color:#fbbf24; border-radius:20px; padding:0.2rem 0.75rem; font-size:0.8rem; font-weight:700;">
+            ⚡ GESTAPELT: {{ atk.stack_count }} Wellen gleichzeitig
+          </span>
+        </div>
+        {% endif %}
       </div>
       <div style="text-align:right; flex-shrink:0;">
         <span style="background:rgba(0,0,0,0.3); border:1px solid {{ atk.classification_color }}; color:{{ atk.classification_color }}; border-radius:20px; padding:0.3rem 0.9rem; font-size:0.85rem; font-weight:700;">
@@ -47,16 +71,25 @@
       </div>
     </div>
 
-    <div style="padding:1rem 1.25rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem;">
+    <div style="padding:1rem 1.25rem; display:flex; flex-direction:column; gap:1.25rem;">
 
-      <!-- Truppen-Analyse -->
+      <!-- ── Section 2: Geschwindigkeits-Analyse (JS fills this) ── -->
       <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Truppen</h3>
-        {% if atk.troops %}
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">📐 Geschwindigkeits-Analyse</h3>
+        <div class="speed-analysis" style="font-size:0.85rem; color:var(--text-muted);">
+          <em>Eigene Koordinaten eingeben und „Analysieren" klicken.</em>
+        </div>
+      </div>
+
+      <!-- ── Section 3: Truppen / Mögliche Truppen ── -->
+      <div>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">⚔️ Truppen</h3>
+        {% if atk.troops and atk.total_troops > 0 %}
+        <!-- Troops known -->
         <div style="display:flex; flex-direction:column; gap:0.35rem;">
           {% for tname, count in atk.troops.items() %}
           <div style="display:flex; align-items:center; gap:0.5rem;">
-            <span style="font-size:0.85rem; min-width:160px;">{{ tname }}</span>
+            <span style="font-size:0.85rem; min-width:170px;">{{ tname }}</span>
             <div style="flex:1; background:var(--bg-main); border-radius:4px; height:6px; overflow:hidden;">
               <div style="background:#ef4444; height:100%; width:{{ [100, count * 2] | min }}%; border-radius:4px;"></div>
             </div>
@@ -66,75 +99,80 @@
         </div>
         <div style="margin-top:0.75rem; font-size:0.82rem; color:var(--text-muted);">
           Gesamt: <strong style="color:var(--text);">{{ atk.total_troops }} Einheiten</strong>
-          {% if atk.slowest_speed %}
-          · Langsamste Truppe: <strong>{{ atk.slowest_speed }} Felder/h</strong>
-          {% endif %}
+          {% if atk.slowest_speed %}· Langsamste Truppe: <strong>{{ atk.slowest_speed }} Felder/h</strong>{% endif %}
         </div>
         {% else %}
-        <p style="color:var(--text-muted); font-size:0.85rem;">Keine Truppendaten im Report.</p>
+        <!-- Troops unknown — JS will render possible-troops table -->
+        <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.5rem;">
+          Truppen unbekannt (Travian hat sie verborgen). Mögliche Einheiten basierend auf Marschgeschwindigkeit:
+        </p>
+        <div class="possible-troops" style="font-size:0.83rem;">
+          <em style="color:var(--text-muted);">Koordinaten eingeben für Berechnung.</em>
+        </div>
         {% endif %}
       </div>
 
-      <!-- Angreifer-Profil aus Map -->
+      <!-- ── Section 4: Angreifer-Profil ── -->
       <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Angreifer-Profil</h3>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">👤 Angreifer-Profil</h3>
         {% if atk.attacker_data %}
         {% set ad = atk.attacker_data %}
-        <div style="display:flex; flex-direction:column; gap:0.35rem; font-size:0.85rem;">
-          <div>🏰 <strong>{{ ad.village_count }}</strong> Dörfer</div>
-          <div>👥 Gesamtbev.: <strong>{{ ad.total_pop | int }}</strong></div>
-          {% if ad.alliance_name %}
-          <div>🛡️ Allianz: <strong>{{ ad.alliance_name }}</strong></div>
-          {% endif %}
-          {% if ad.tribe %}
-          <div>{{ TRIBE_EMOJI.get(ad.tribe, '❓') }} Volk: <strong>
-            {{ {1:'Römer', 2:'Germanen', 3:'Gallier', 4:'Natars', 5:'Hunnen'}.get(ad.tribe, 'Unbekannt') }}
-          </strong></div>
+        <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+          <div style="display:flex; flex-direction:column; gap:0.3rem; font-size:0.85rem;">
+            <div>🏰 <strong>{{ ad.village_count }}</strong> Dörfer</div>
+            <div>👥 Gesamtbev.: <strong>{{ ad.total_pop | int }}</strong></div>
+            {% if ad.alliance_name %}<div>🛡️ Allianz: <strong>{{ ad.alliance_name }}</strong></div>{% endif %}
+            {% if ad.tribe %}
+            <div>{{ TRIBE_EMOJI.get(ad.tribe, '❓') }} Volk: <strong>{{ {1:'Römer', 2:'Germanen', 3:'Gallier', 4:'Natars', 5:'Hunnen'}.get(ad.tribe, 'Unbekannt') }}</strong></div>
+            {% endif %}
+          </div>
+          {% if ad.villages %}
+          <details style="flex:1; min-width:200px;">
+            <summary style="font-size:0.82rem; color:var(--text-muted); cursor:pointer;">Alle {{ ad.village_count }} Dörfer anzeigen</summary>
+            <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.2rem; max-height:160px; overflow-y:auto;">
+              {% for v in ad.villages %}
+              <div style="font-size:0.78rem; display:flex; justify-content:space-between; color:var(--text-muted); padding:0.2rem 0; border-bottom:1px solid var(--border);">
+                <span>{{ v.village_name or '–' }}</span>
+                <span style="font-family:monospace;">({{ v.x }}|{{ v.y }})</span>
+                <span>{{ v.population or '–' }} BW</span>
+              </div>
+              {% endfor %}
+            </div>
+          </details>
           {% endif %}
         </div>
-        {% if ad.villages %}
-        <details style="margin-top:0.6rem;">
-          <summary style="font-size:0.82rem; color:var(--text-muted); cursor:pointer;">
-            Alle {{ ad.village_count }} Dörfer anzeigen
-          </summary>
-          <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.2rem; max-height:160px; overflow-y:auto;">
-            {% for v in ad.villages %}
-            <div style="font-size:0.78rem; display:flex; justify-content:space-between; color:var(--text-muted); padding:0.2rem 0; border-bottom:1px solid var(--border);">
-              <span>{{ v.village_name or '–' }}</span>
-              <span style="font-family:monospace;">({{ v.x }}|{{ v.y }})</span>
-              <span>{{ v.population or '–' }} BW</span>
-            </div>
-            {% endfor %}
-          </div>
-        </details>
-        {% endif %}
         {% else %}
-        <p style="color:var(--text-muted); font-size:0.85rem;">
-          Kein Karteneintrag für <em>{{ atk.attacker }}</em> gefunden.
-          <br><small>Tipp: Karten-Snapshot aktualisieren unter Farming.</small>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin:0;">
+          Kein Karteneintrag für <em>{{ atk.attacker }}</em>. Tipp: Karten-Snapshot unter Farming aktualisieren.
         </p>
         {% endif %}
       </div>
 
-      <!-- Marschzeit-Analyse -->
-      {% if atk.atk_x is not none %}
+      <!-- ── Section 5: Marschzeit-Rückrechnung Details (JS) ── -->
+      {% if not atk.troops or atk.total_troops == 0 %}
       <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Marschzeit-Analyse</h3>
-        <div id="marchAnalysis_{{ loop.index }}"
-             data-ax="{{ atk.atk_x }}" data-ay="{{ atk.atk_y }}"
-             data-speed="{{ atk.slowest_speed or 6 }}"
-             data-arrival="{{ atk.arrival }}"
-             style="font-size:0.85rem;">
-          <div style="color:var(--text-muted);">Angriffsursprung: <code>({{ atk.atk_x }}|{{ atk.atk_y }})</code></div>
-          <div style="color:var(--text-muted); margin-top:0.25rem;">Eigene Position in Profil eintragen für Distanzberechnung.</div>
-          <div class="march-result" style="margin-top:0.5rem;"></div>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">🕐 Marschzeit-Rückrechnung</h3>
+        <div class="march-detail" style="font-size:0.83rem; color:var(--text-muted);">
+          <em>Koordinaten eingeben für Abfahrtszeiten.</em>
         </div>
       </div>
       {% endif %}
 
+      <!-- ── Section 6: TP-Einschätzung ── -->
+      <div>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">💎 TP-Einschätzung</h3>
+        <div class="tp-estimate" style="font-size:0.83rem; color:var(--text-muted);">
+          {% if atk.total_troops > 0 %}
+            Bekannte Truppen — TP direkt aus Zusammensetzung berechenbar.
+          {% else %}
+            <em>Truppen unbekannt. Einschätzung nach Volk wird berechnet.</em>
+          {% endif %}
+        </div>
+      </div>
+
     </div>
 
-    <!-- Empfehlung -->
+    <!-- ── Section 7: Empfehlung ── -->
     <div style="border-top:1px solid var(--border); padding:0.75rem 1.25rem; background:rgba(0,0,0,0.15);">
       <span style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">💡 Empfehlung: </span>
       <span style="font-size:0.85rem;">
@@ -143,13 +181,17 @@
         {% elif atk.classification.startswith('💥') %}
           <strong style="color:#dc2626;">Echte Belagerung mit Katapulten/Rammen!</strong> Sofort Verstärkung anfordern, Truppen in Sicherheit bringen.
         {% elif atk.classification.startswith('⚡') %}
-          Kavallerie-Angriff — schnell und schlagkräftig. Reaktionszeit prüfen, Def-Kavallerie schicken.
+          {% if atk.is_stack %}
+            <strong style="color:#fbbf24;">Koordinierter Stack!</strong> Mehrere Wellen gleichzeitig — höchste Alarmstufe, Allianz sofort benachrichtigen.
+          {% else %}
+            Kavallerie-Angriff — schnell und schlagkräftig. Reaktionszeit prüfen, Def-Kavallerie schicken.
+          {% endif %}
         {% elif atk.classification.startswith('⚔️') %}
           Großangriff — Allianz benachrichtigen, maximale Verteidigung organisieren.
         {% elif atk.classification.startswith('🗡️') %}
           Normaler Angriff. Verteidigung bereitstellen basierend auf geschickten Truppen.
         {% else %}
-          Truppendaten prüfen — vollständigen Truppenplatz-Text einfügen für bessere Analyse.
+          Truppen unbekannt — Marschgeschwindigkeit analysieren und mögliche Einheiten prüfen. Vorsichtshalber Verstärkung anfordern.
         {% endif %}
       </span>
     </div>
@@ -191,47 +233,257 @@
 </div>
 
 <script>
-// Marschzeit-Analyse mit lokalem Profil
-const profile = JSON.parse(localStorage.getItem('travian_profile_einsatz') || '{}');
+const TROOP_DATA = {{ troop_data_json | safe }};
 const MAP_SIZE = 400;
 
+// ── helpers ──────────────────────────────────────────────────────────
 function travianDist(x1, y1, x2, y2) {
   let dx = Math.abs(x1 - x2), dy = Math.abs(y1 - y2);
-  if (dx > MAP_SIZE) dx = 2*MAP_SIZE - dx;
-  if (dy > MAP_SIZE) dy = 2*MAP_SIZE - dy;
-  return Math.sqrt(dx*dx + dy*dy);
+  if (dx > MAP_SIZE) dx = 2 * MAP_SIZE - dx;
+  if (dy > MAP_SIZE) dy = 2 * MAP_SIZE - dy;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 function fmtDur(s) {
-  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
+function fmtLocalTime(dateObj) {
+  return dateObj.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) + ' ' +
+         dateObj.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
+}
 
-document.querySelectorAll('[id^=marchAnalysis_]').forEach(el => {
-  if (profile.x === undefined || profile.y === undefined) return;
-  const ax = parseFloat(el.dataset.ax), ay = parseFloat(el.dataset.ay);
-  const speed = parseFloat(el.dataset.speed) || 6;
-  const dist = travianDist(profile.x, profile.y, ax, ay);
-  const marchSec = Math.ceil(dist / speed * 3600);
-  const resultEl = el.querySelector('.march-result');
-  if (resultEl) {
-    resultEl.innerHTML = `
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-top:0.25rem;">
-        <div style="background:var(--bg-main); border-radius:6px; padding:0.5rem; text-align:center;">
-          <div style="font-size:0.72rem; color:var(--text-muted);">Distanz</div>
-          <div style="font-weight:700; font-family:monospace;">${dist.toFixed(1)} F</div>
-        </div>
-        <div style="background:var(--bg-main); border-radius:6px; padding:0.5rem; text-align:center;">
-          <div style="font-size:0.72rem; color:var(--text-muted);">Marschzeit</div>
-          <div style="font-weight:700; font-family:monospace; color:#f59e0b;">${fmtDur(marchSec)}</div>
-        </div>
-        <div style="background:var(--bg-main); border-radius:6px; padding:0.5rem; text-align:center;">
-          <div style="font-size:0.72rem; color:var(--text-muted);">Von (${profile.x}|${profile.y})</div>
-          <div style="font-weight:700; font-family:monospace; font-size:0.78rem;">zu (${ax}|${ay})</div>
-        </div>
-      </div>`;
+const TRIBES = ["Römer", "Germanen", "Gallier"];
+const TRIBE_COLORS = {"Römer": "#a78bfa", "Germanen": "#f87171", "Gallier": "#34d399"};
+
+// Offensive troops only (atk > 0), excluding pure scouts
+const OFF_TROOPS = Object.entries(TROOP_DATA).filter(([n, d]) => d.atk > 0);
+
+// ── main analysis runner ──────────────────────────────────────────────
+function runAnalysis() {
+  const dx = parseFloat(document.getElementById('def-x').value);
+  const dy = parseFloat(document.getElementById('def-y').value);
+  if (isNaN(dx) || isNaN(dy)) {
+    document.getElementById('coord-hint').textContent = '⚠️ Bitte gültige Koordinaten eingeben.';
+    return;
   }
-  // Also update the "own position hint" text
-  const hint = el.querySelector(':not(.march-result)');
-});
+  document.getElementById('coord-hint').textContent = '';
+  // Save to localStorage
+  try {
+    const prof = JSON.parse(localStorage.getItem('travian_profile_einsatz') || '{}');
+    prof.x = dx; prof.y = dy;
+    localStorage.setItem('travian_profile_einsatz', JSON.stringify(prof));
+  } catch(e) {}
+
+  document.querySelectorAll('.atk-card').forEach(card => analyseCard(card, dx, dy));
+}
+
+function analyseCard(card, dx, dy) {
+  const ax = parseFloat(card.dataset.ax);
+  const ay = parseFloat(card.dataset.ay);
+  const remainingSec = parseFloat(card.dataset.remaining);
+  const knownTribe = card.dataset.tribe; // numeric (from map) or string (from troops)
+
+  // ── Section 2: Speed analysis ──
+  const speedEl = card.querySelector('.speed-analysis');
+  if (speedEl) {
+    if (!isNaN(ax) && !isNaN(ay)) {
+      const dist = travianDist(dx, dy, ax, ay);
+      let speedHtml = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.5rem; margin-bottom:0.5rem;">
+          <div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted);">Distanz</div>
+            <div style="font-weight:700; font-family:monospace; font-size:1rem;">${dist.toFixed(2)} F</div>
+          </div>`;
+      if (!isNaN(remainingSec) && remainingSec > 0) {
+        const remainingHours = remainingSec / 3600;
+        const maxSpeed = dist / remainingHours;
+        const departureMs = Date.now() - (remainingSec * 1000) + (remainingSec * 1000); // = Date.now() actually departure was in past
+        // departure = now - (totalMarchTime - remainingSec) but we don't know total.
+        // We know: at THIS moment, remainingSec seconds remain.
+        // So arrival = now + remainingSec
+        const arrivalTime = new Date(Date.now() + remainingSec * 1000);
+        speedHtml += `
+          <div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted);">Verbleibend</div>
+            <div style="font-weight:700; font-family:monospace; font-size:1rem; color:#f59e0b;">${fmtDur(remainingSec)}</div>
+          </div>
+          <div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted);">Max. Geschw.</div>
+            <div style="font-weight:700; font-family:monospace; font-size:1rem; color:#60a5fa;">${maxSpeed.toFixed(2)} F/h</div>
+          </div>
+          <div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center;">
+            <div style="font-size:0.7rem; color:var(--text-muted);">Ankunft (lokal)</div>
+            <div style="font-weight:700; font-size:0.82rem;">${fmtLocalTime(arrivalTime)}</div>
+          </div>`;
+      } else {
+        speedHtml += `<div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center; grid-column:span 2;">
+          <div style="font-size:0.78rem; color:var(--text-muted);">Keine Zeitangabe im Report — Geschwindigkeitsberechnung nicht möglich.</div>
+        </div>`;
+      }
+      speedHtml += `</div>
+        <div style="font-size:0.78rem; color:var(--text-muted);">Angreifer: <code>(${ax}|${ay})</code> → Verteidiger: <code>(${dx}|${dy})</code></div>`;
+      speedEl.innerHTML = speedHtml;
+    } else {
+      speedEl.innerHTML = '<em style="color:var(--text-muted);">Angriffskoordinaten unbekannt — Analyse nicht möglich.</em>';
+    }
+  }
+
+  // ── Sections 3 + 5 + 6: only when troops unknown ──
+  const possibleEl = card.querySelector('.possible-troops');
+  const marchDetailEl = card.querySelector('.march-detail');
+  const tpEl = card.querySelector('.tp-estimate');
+
+  if (!possibleEl) return; // troops known, skip
+
+  if (isNaN(ax) || isNaN(ay) || isNaN(remainingSec) || remainingSec <= 0) {
+    if (possibleEl) possibleEl.innerHTML = '<em style="color:var(--text-muted);">Keine ausreichenden Daten für Truppenberechnung.</em>';
+    return;
+  }
+
+  const dist = travianDist(dx, dy, ax, ay);
+  const remainingHours = remainingSec / 3600;
+  const maxSpeed = dist / remainingHours;
+
+  // Group possible troops by tribe
+  const possible = {};
+  const impossible = {};
+  TRIBES.forEach(t => { possible[t] = []; impossible[t] = []; });
+
+  OFF_TROOPS.forEach(([name, d]) => {
+    if (d.speed <= maxSpeed) {
+      possible[d.tribe].push([name, d]);
+    } else {
+      impossible[d.tribe].push([name, d]);
+    }
+  });
+
+  // ── Section 3: possible troops table ──
+  let html3 = '';
+  TRIBES.forEach(tribe => {
+    const color = TRIBE_COLORS[tribe];
+    html3 += `<div style="margin-bottom:0.75rem;">
+      <div style="font-size:0.8rem; font-weight:700; color:${color}; margin-bottom:0.3rem;">${tribe}</div>
+      <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+        <thead><tr style="color:var(--text-muted);">
+          <th style="text-align:left; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Truppe</th>
+          <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Geschw.</th>
+          <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">ATK</th>
+          <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">TP</th>
+          <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Möglich?</th>
+        </tr></thead>
+        <tbody>`;
+    [...possible[tribe], ...impossible[tribe]].forEach(([name, d]) => {
+      const isPoss = d.speed <= maxSpeed;
+      html3 += `<tr style="${isPoss ? '' : 'opacity:0.35;'}">
+        <td style="padding:0.2rem 0.4rem; ${isPoss ? 'color:var(--text);' : 'color:var(--text-muted);'}">${name}</td>
+        <td style="text-align:center; padding:0.2rem 0.4rem; font-family:monospace;">${d.speed}</td>
+        <td style="text-align:center; padding:0.2rem 0.4rem; font-family:monospace;">${d.atk}</td>
+        <td style="text-align:center; padding:0.2rem 0.4rem; font-family:monospace;">${d.tp}</td>
+        <td style="text-align:center; padding:0.2rem 0.4rem;">
+          ${isPoss ? '<span style="color:#34d399; font-weight:700;">✓</span>' : '<span style="color:#6b7280;">✗</span>'}
+        </td>
+      </tr>`;
+    });
+    html3 += `</tbody></table></div>`;
+  });
+  possibleEl.innerHTML = html3;
+
+  // ── Section 5: March-time detail for each possible troop ──
+  if (marchDetailEl) {
+    const arrivalTime = new Date(Date.now() + remainingSec * 1000);
+    let html5 = `<table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+      <thead><tr style="color:var(--text-muted);">
+        <th style="text-align:left; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Truppe</th>
+        <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Geschw.</th>
+        <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Gesamtmarsch</th>
+        <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Abfahrt (lokal)</th>
+      </tr></thead><tbody>`;
+    TRIBES.forEach(tribe => {
+      possible[tribe].forEach(([name, d]) => {
+        const totalMarchSec = (dist / d.speed) * 3600;
+        const departureTime = new Date(arrivalTime.getTime() - totalMarchSec * 1000);
+        html5 += `<tr>
+          <td style="padding:0.2rem 0.4rem;">${name}</td>
+          <td style="text-align:center; font-family:monospace;">${d.speed}</td>
+          <td style="text-align:center; font-family:monospace; color:#f59e0b;">${fmtDur(totalMarchSec)}</td>
+          <td style="text-align:center; font-size:0.78rem;">${fmtLocalTime(departureTime)}</td>
+        </tr>`;
+      });
+    });
+    html5 += `</tbody></table>`;
+    marchDetailEl.innerHTML = html5;
+  }
+
+  // ── Section 6: TP estimate ──
+  if (tpEl) {
+    // Determine tribe from map data (numeric) or from card data attribute (string)
+    let tribeStr = null;
+    const tribeRaw = card.dataset.tribe;
+    if (tribeRaw) {
+      const n = parseInt(tribeRaw);
+      if (!isNaN(n)) {
+        tribeStr = {1:'Römer', 2:'Germanen', 3:'Gallier'}[n] || null;
+      } else {
+        tribeStr = tribeRaw || null;
+      }
+    }
+
+    const TYPICAL_OFF = {
+      "Römer": [
+        {name: "Imperianer-Bash", comp: {"Imperianer": 500, "Equites Imperatoris": 200}},
+        {name: "Cav-Only", comp: {"Equites Caesaris": 300, "Equites Imperatoris": 100}},
+      ],
+      "Germanen": [
+        {name: "Axtkämpfer-Masse", comp: {"Axtkämpfer": 800, "Teut. Ritter": 100}},
+        {name: "Ritter-Bash", comp: {"Teut. Ritter": 400, "Axtkämpfer": 200}},
+      ],
+      "Gallier": [
+        {name: "Blitz-Rush", comp: {"Theutates-Blitz": 400, "Haeduer": 100}},
+        {name: "Haeduer-Bash", comp: {"Haeduer": 300, "Druidentreiter": 150}},
+      ],
+    };
+
+    let tpHtml = '';
+    if (tribeStr && TYPICAL_OFF[tribeStr]) {
+      tpHtml = `<div style="font-size:0.82rem; margin-bottom:0.4rem;">Volk erkannt: <strong style="color:${TRIBE_COLORS[tribeStr] || 'var(--text)'};">${tribeStr}</strong>. Typische Off-Kompositionen:</div>`;
+      TYPICAL_OFF[tribeStr].forEach(comp => {
+        let tp = 0;
+        Object.entries(comp.comp).forEach(([t, cnt]) => { tp += (TROOP_DATA[t]?.tp || 0) * cnt; });
+        const atk = Object.entries(comp.comp).reduce((s, [t, cnt]) => s + (TROOP_DATA[t]?.atk || 0) * cnt, 0);
+        tpHtml += `<div style="background:var(--bg-main); border-radius:6px; padding:0.5rem 0.75rem; margin-bottom:0.3rem; font-size:0.8rem;">
+          <strong>${comp.name}</strong>: ca. <span style="color:#a78bfa; font-weight:700;">${tp.toLocaleString('de-DE')} TP</span>
+          · ATK ~${atk.toLocaleString('de-DE')}
+        </div>`;
+      });
+      tpHtml += `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">* Nur Schätzwerte. Echte Werte hängen von Kasernen-Stufe, Helden-Bonus und Forschungsstand ab.</div>`;
+    } else {
+      // Compute range across possible troops
+      const possibleAll = TRIBES.flatMap(t => possible[t]);
+      if (possibleAll.length > 0) {
+        const minTP = Math.min(...possibleAll.map(([,d]) => d.tp));
+        const maxTP = Math.max(...possibleAll.map(([,d]) => d.tp));
+        tpHtml = `<div style="font-size:0.82rem;">Mögliche Einheitenarten: TP-Spanne pro Einheit <strong>${minTP}–${maxTP}</strong>.
+          <br>Volk nicht eindeutig erkennbar. Karten-Snapshot für genauere Einschätzung nutzen.</div>`;
+      } else {
+        tpHtml = '<em style="color:var(--text-muted);">Keine möglichen Einheiten ermittelt.</em>';
+      }
+    }
+    tpEl.innerHTML = tpHtml;
+  }
+}
+
+// ── Auto-run on load if profile has coords ──────────────────────────
+(function init() {
+  try {
+    const prof = JSON.parse(localStorage.getItem('travian_profile_einsatz') || '{}');
+    if (prof.x !== undefined && prof.y !== undefined) {
+      document.getElementById('def-x').value = prof.x;
+      document.getElementById('def-y').value = prof.y;
+      document.getElementById('coord-hint').textContent = '(aus Profil geladen)';
+      runAnalysis();
+    }
+  } catch(e) {}
+})();
 </script>
 {% endblock %}
