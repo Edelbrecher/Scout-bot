@@ -2096,6 +2096,26 @@ async def page_cookies(request: Request):
 # API — popup config (public, for JS fetch)
 # ---------------------------------------------------------------------------
 
+@app.get("/api/my-alerts")
+async def api_my_alerts(request: Request):
+    """Returns payment alerts for the logged-in user (used by nav profile dropdown)."""
+    session = get_session(request)
+    if not session:
+        return JSONResponse({"past_due": []})
+    all_guilds = await database.get_all_guilds()
+    if session["guilds"] is not None:
+        allowed = set(session["guilds"])
+        guilds = [g for g in all_guilds if g["guild_id"] in allowed]
+    else:
+        guilds = all_guilds
+    past_due = [
+        {"guild_id": g["guild_id"], "guild_name": g["guild_name"]}
+        for g in guilds
+        if g.get("subscription_status") == "past_due"
+    ]
+    return JSONResponse({"past_due": past_due})
+
+
 @app.get("/api/popup-config")
 async def api_popup_config():
     raw = await database.get_setting("popup_config")

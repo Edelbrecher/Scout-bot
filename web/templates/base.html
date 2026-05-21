@@ -23,7 +23,10 @@
       {% if _username %}
       <div class="nav-profile" id="navProfileWrap">
         <button class="nav-profile-btn" id="navProfileBtn" onclick="toggleProfileMenu()">
-          <span class="nav-avatar">{{ _username[0] | upper }}</span>
+          <span style="position:relative; display:inline-flex;">
+            <span class="nav-avatar">{{ _username[0] | upper }}</span>
+            <span id="nav-alert-dot" style="display:none; position:absolute; top:-2px; right:-2px; width:10px; height:10px; background:#ef4444; border-radius:50%; border:2px solid var(--bg-main);"></span>
+          </span>
           <span style="font-size:0.88rem;">{{ _username }}</span>
           <span style="font-size:0.7rem; color:var(--text-muted);">▾</span>
         </button>
@@ -33,6 +36,14 @@
             <div>
               <div style="font-weight:600;">{{ _username }}</div>
               <div style="font-size:0.78rem; color:var(--text-muted);">Eingeloggt</div>
+            </div>
+          </div>
+          <div id="nav-past-due-block" style="display:none;">
+            <div class="nav-profile-divider"></div>
+            <div id="nav-past-due-content" style="padding:0.6rem 1rem; background:rgba(220,38,38,0.1);">
+              <div style="font-size:0.78rem; font-weight:700; color:#f87171; margin-bottom:0.3rem;">⚠️ Zahlung fehlgeschlagen</div>
+              <div id="nav-past-due-text" style="font-size:0.75rem; color:#fca5a5; line-height:1.4; margin-bottom:0.4rem;"></div>
+              <div id="nav-past-due-links"></div>
             </div>
           </div>
           <div class="nav-profile-divider"></div>
@@ -92,6 +103,34 @@
     if (el) { el.href = '/guild/' + m[1] + '/billing'; el.style.display = 'flex'; }
   }
 })();
+// Load payment alerts
+fetch('/api/my-alerts').then(function(r){ return r.json(); }).then(function(data){
+  if (!data.past_due || data.past_due.length === 0) return;
+  // Show red dot on avatar
+  var dot = document.getElementById('nav-alert-dot');
+  if (dot) dot.style.display = 'block';
+  // Show warning block in dropdown
+  var block = document.getElementById('nav-past-due-block');
+  if (block) block.style.display = 'block';
+  var textEl = document.getElementById('nav-past-due-text');
+  var linksEl = document.getElementById('nav-past-due-links');
+  if (textEl) {
+    if (data.past_due.length === 1) {
+      textEl.textContent = 'Für "' + data.past_due[0].guild_name + '" ist eine Zahlung offen. Bitte aktualisiere deine Zahlungsdaten.';
+    } else {
+      textEl.textContent = data.past_due.length + ' Server haben offene Zahlungen. Bitte aktualisiere deine Zahlungsdaten.';
+    }
+  }
+  if (linksEl) {
+    data.past_due.forEach(function(g) {
+      var a = document.createElement('a');
+      a.href = '/guild/' + g.guild_id + '/billing';
+      a.textContent = '💳 ' + g.guild_name + ' →';
+      a.style.cssText = 'display:block; font-size:0.75rem; color:#f87171; font-weight:600; text-decoration:none; margin-top:2px;';
+      linksEl.appendChild(a);
+    });
+  }
+}).catch(function(){});
 function toggleProfileMenu() {
   document.getElementById('navProfileMenu').classList.toggle('open');
 }
