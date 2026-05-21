@@ -1587,7 +1587,7 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
         if checkout.metadata.get("guild_id") != guild_id:
             return RedirectResponse(f"/guild/{guild_id}/billing?error=invalid", status_code=303)
         sub = checkout.subscription
-        interval = "annual" if sub.items.data[0].price.recurring.interval == "year" else "monthly"
+        interval = "annual" if sub["items"]["data"][0]["price"]["recurring"]["interval"] == "year" else "monthly"
         tier = checkout.metadata.get("tier", "starter")
         plan_str = f"{tier}_{interval}"
         import datetime
@@ -1808,7 +1808,7 @@ async def plans_success(request: Request, session_id: str = ""):
         checkout = s.checkout.Session.retrieve(session_id, expand=["subscription"])
         if checkout.metadata.get("source") == "plans":
             sub = checkout.subscription
-            interval = "annual" if sub.items.data[0].price.recurring.interval == "year" else "monthly"
+            interval = "annual" if sub["items"]["data"][0]["price"]["recurring"]["interval"] == "year" else "monthly"
             tier = checkout.metadata.get("tier", "starter")
             plan_str = f"{tier}_{interval}"
             import datetime
@@ -1910,8 +1910,8 @@ async def stripe_webhook(request: Request):
                     try:
                         sub = s.subscriptions.retrieve(sub_id)
                         status = sub.status
-                        price_id = sub.items.data[0].price.id
-                        interval = sub.items.data[0].price.recurring.interval
+                        price_id = sub["items"]["data"][0]["price"]["id"]
+                        interval = sub["items"]["data"][0]["price"]["recurring"]["interval"]
                         # Prefer price_id→tier over metadata tier (single source of truth)
                         resolved_tier = PRICE_TO_TIER.get(price_id, tier)
                         plan_str = f"{resolved_tier}_{'annual' if interval == 'year' else 'monthly'}"
@@ -1938,8 +1938,8 @@ async def stripe_webhook(request: Request):
                 if s:
                     try:
                         sub = s.subscriptions.retrieve(sub_id)
-                        price_id = sub.items.data[0].price.id
-                        interval = sub.items.data[0].price.recurring.interval
+                        price_id = sub["items"]["data"][0]["price"]["id"]
+                        interval = sub["items"]["data"][0]["price"]["recurring"]["interval"]
                         resolved_tier = PRICE_TO_TIER.get(price_id, tier)
                         plan_str = f"{resolved_tier}_{'annual' if interval == 'year' else 'monthly'}"
                         expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
