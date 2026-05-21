@@ -53,12 +53,12 @@ class ScouterBot(commands.Bot):
                         tier_info = (
                             f"\n\nDein aktuelles Paket **{tier.capitalize()}** erlaubt **{used_max} Server**. "
                             f"Upgrade auf ein höheres Paket, um mehr Server hinzuzufügen:\n"
-                            f"➡️ https://big-eye-bot.com/dashboard"
+                            f"➡️ https://travops.online/dashboard"
                         )
                     else:
                         tier_info = (
                             "\n\nBitte erwirb ein Abonnement im Dashboard und lade den Bot danach erneut ein:\n"
-                            "➡️ https://big-eye-bot.com/dashboard"
+                            "➡️ https://travops.online/dashboard"
                         )
                     await owner.send(
                         f"👋 Hallo! Ich wollte deinem Server **{guild.name}** beitreten, "

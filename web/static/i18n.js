@@ -13,8 +13,8 @@ const TRANSLATIONS = {
     "logout": "🚪 Log out",
     // Dashboard hero
     "hero.tagline": "Save 3+ hours every week — automatically.",
-    "hero.sub": "BIG-EYE-BOT handles the tedious work so your alliance can focus on what matters: winning.",
-    "benefits.title": "Why thousands of guilds trust BIG-EYE-BOT",
+    "hero.sub": "TravOps handles the tedious work so your alliance can focus on what matters: winning.",
+    "benefits.title": "Why thousands of guilds trust TravOps",
     "benefit.time.title": "Save hours every week",
     "benefit.time.body": "Auto farm-list snapshots, attack detection and march-time calculators replace hours of manual work — every single day.",
     "benefit.coord.title": "Perfect coordination",
@@ -47,8 +47,8 @@ const TRANSLATIONS = {
     "logout": "🚪 Abmelden",
     // Dashboard hero
     "hero.tagline": "Spare 3+ Stunden pro Woche — automatisch.",
-    "hero.sub": "BIG-EYE-BOT übernimmt die mühsame Arbeit, damit deine Allianz sich auf das Wesentliche konzentrieren kann: Gewinnen.",
-    "benefits.title": "Warum tausende Gilden auf BIG-EYE-BOT vertrauen",
+    "hero.sub": "TravOps übernimmt die mühsame Arbeit, damit deine Allianz sich auf das Wesentliche konzentrieren kann: Gewinnen.",
+    "benefits.title": "Warum tausende Gilden auf TravOps vertrauen",
     "benefit.time.title": "Stunden pro Woche sparen",
     "benefit.time.body": "Automatische Karten-Snapshots, Angriffserkennung und Marschzeit-Kalkulator ersetzen stundenlange manuelle Arbeit — jeden einzelnen Tag.",
     "benefit.coord.title": "Perfekte Koordination",

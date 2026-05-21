@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}BIG-EYE-BOT{% endblock %}</title>
+  <title>{% block title %}TravOps{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -11,8 +11,8 @@
   {% set _is_admin = get_is_admin(request) %}
   <nav class="navbar">
     <a href="/dashboard" style="display:flex; align-items:center; gap:0.5rem; text-decoration:none;">
-      <img src="/static/logo.png" alt="BIG-EYE" style="width:32px;height:32px;object-fit:cover;border-radius:50%;" />
-      <span class="nav-brand">BIG-EYE-BOT</span>
+      <img src="/static/logo.png" alt="TravOps" style="width:32px;height:32px;object-fit:cover;border-radius:50%;" />
+      <span class="nav-brand">TravOps</span>
     </a>
     <div class="nav-links" style="align-items:center;">
       <a href="/dashboard" data-i18n="dashboard">Dashboard</a>
@@ -245,7 +245,7 @@ document.addEventListener('click', e => {
       <a href="/cookies" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Cookies</a>
       <a href="/kontakt" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Kontakt</a>
     </div>
-    © {{ current_year }} BIG-EYE-BOT · Alle Rechte vorbehalten
+    © {{ current_year }} TravOps · Alle Rechte vorbehalten
   </footer>
 </body>
 </html>
