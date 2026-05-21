@@ -352,7 +352,7 @@ function renderReminders() {
       hour:'2-digit', minute:'2-digit'
     });
 
-    const url = r.rally ? rallyUrl(worldEl.value.trim()) : null;
+    const url = r.rallyUrl || (r.rally ? rallyUrl(worldEl.value.trim()) : null);
     const linkHtml = url
       ? `<a href="${url}" target="_blank" class="btn btn-secondary" style="font-size:0.78rem; padding:0.25rem 0.6rem; white-space:nowrap;">⚔️ Rally</a>`
       : '';
@@ -438,7 +438,7 @@ setInterval(() => {
     if (left <= 0 && !r.done) {
       r.done = true;
       playBeep('done');
-      const url = r.rally ? rallyUrl(worldEl.value.trim()) : null;
+      const url = r.rallyUrl || (r.rally ? rallyUrl(worldEl.value.trim()) : null);
       showNotification(`✅ ${r.label}`, url ? 'Jetzt zum Versammlungsplatz!' : 'Zeit!');
       if (url) window.open(url, '_blank');
     }

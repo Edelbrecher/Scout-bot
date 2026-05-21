@@ -1157,7 +1157,7 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
         return RedirectResponse(f"/guild/{guild_id}/map?error=invalid_url", status_code=303)
     await database.update_tw_world(guild_id, url)
-    return RedirectResponse(f"/guild/{guild_id}/map", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}", status_code=303)
 
 
 @app.get("/guild/{guild_id}/map/data")
@@ -1397,6 +1397,141 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
             "attack_stats": attack_stats,
         },
     )
+
+
+@app.get("/guild/{guild_id}/attacks/{report_id}/analyse", response_class=HTMLResponse)
+async def attacks_analyse(request: Request, guild_id: str, report_id: int):
+    import json as _json, math as _math
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+
+    report = await database.get_attack_report(guild_id, report_id)
+    if not report:
+        return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
+
+    try:
+        attacks = _json.loads(report["attacks_json"])
+    except Exception:
+        attacks = []
+
+    MAP_SIZE = 400
+
+    def travian_dist(x1, y1, x2, y2):
+        dx = abs(x1 - x2)
+        dy = abs(y1 - y2)
+        if dx > MAP_SIZE: dx = 2 * MAP_SIZE - dx
+        if dy > MAP_SIZE: dy = 2 * MAP_SIZE - dy
+        return _math.sqrt(dx * dx + dy * dy)
+
+    TROOP_SPEEDS = {
+        # Romans
+        "Legionär": 6, "Prätorianer": 5, "Imperianer": 7,
+        "Equites Legati": 16, "Equites Imperatoris": 14, "Equites Caesaris": 10,
+        "Rammbock": 4, "Feuerkatapult": 3, "Senator": 5,
+        # Teutons
+        "Keulenschwinger": 7, "Speerkämpfer": 7, "Axtkämpfer": 7,
+        "Späher": 9, "Paladin": 10, "Teut. Ritter": 9,
+        # Gauls
+        "Phalanx": 7, "Schwertkämpfer": 6, "Pathfinder": 17,
+        "Theutates-Blitz": 19, "Druidentreiter": 16, "Haeduer": 13,
+    }
+    TROOP_TRIBE = {
+        "Legionär": "Römer", "Prätorianer": "Römer", "Imperianer": "Römer",
+        "Equites Legati": "Römer", "Equites Imperatoris": "Römer", "Equites Caesaris": "Römer",
+        "Rammbock": "Römer", "Feuerkatapult": "Römer", "Senator": "Römer",
+        "Keulenschwinger": "Germanen", "Speerkämpfer": "Germanen", "Axtkämpfer": "Germanen",
+        "Späher": "Germanen", "Paladin": "Germanen", "Teut. Ritter": "Germanen",
+        "Phalanx": "Gallier", "Schwertkämpfer": "Gallier", "Pathfinder": "Gallier",
+        "Theutates-Blitz": "Gallier", "Druidentreiter": "Gallier", "Haeduer": "Gallier",
+    }
+    TRIBE_EMOJI = {1: "🏛️", 2: "⚒️", 3: "🌿", 4: "🌑", 5: "⛩️"}
+
+    enriched = []
+    for atk in attacks:
+        troops = atk.get("troops", {})
+        total_troops = sum(troops.values()) if troops else 0
+
+        # Classify attack
+        has_siege = any(k in troops for k in ("Rammbock", "Feuerkatapult", "Trebuchet"))
+        has_cav   = any(k in troops for k in ("Equites Imperatoris", "Equites Caesaris", "Paladin",
+                                               "Teut. Ritter", "Theutates-Blitz", "Druidentreiter", "Haeduer"))
+        if total_troops == 0:
+            classification = "❓ Keine Truppendaten"
+            classification_color = "#888"
+        elif total_troops <= 3:
+            classification = "🪶 Fake / Probe"
+            classification_color = "#f59e0b"
+        elif has_siege:
+            classification = "💥 Echte Belagerung"
+            classification_color = "#dc2626"
+        elif has_cav and total_troops > 100:
+            classification = "⚡ Kavallerie-Angriff"
+            classification_color = "#f97316"
+        elif total_troops > 500:
+            classification = "⚔️ Großangriff"
+            classification_color = "#dc2626"
+        else:
+            classification = "🗡️ Normaler Angriff"
+            classification_color = "#ef4444"
+
+        # Detected tribe from troop names
+        tribe_votes = {}
+        for tname in troops:
+            t = TROOP_TRIBE.get(tname)
+            if t: tribe_votes[t] = tribe_votes.get(t, 0) + 1
+        detected_tribe = max(tribe_votes, key=tribe_votes.get) if tribe_votes else None
+
+        # Slowest troop = determines march speed
+        if troops:
+            slowest_speed = min(TROOP_SPEEDS.get(t, 6) for t in troops)
+        else:
+            slowest_speed = None
+
+        # Parse coords from attacker village "(x|y)"
+        atk_x = atk_y = None
+        import re as _re
+        cm = _re.search(r"\((-?\d+)\|(-?\d+)\)", atk.get("coords", ""))
+        if cm:
+            atk_x, atk_y = int(cm.group(1)), int(cm.group(2))
+
+        # Look up attacker in map.sql snapshots
+        attacker_data = await database.get_player_from_snapshot(guild_id, atk.get("attacker", ""))
+
+        # Compute travel time from coords if both known
+        travel_analysis = None
+        if atk_x is not None and attacker_data:
+            for village in attacker_data.get("villages", []):
+                if village.get("x") == atk_x and village.get("y") == atk_y:
+                    pass  # attacker village confirmed
+
+        enriched.append({
+            **atk,
+            "total_troops": total_troops,
+            "classification": classification,
+            "classification_color": classification_color,
+            "detected_tribe": detected_tribe,
+            "slowest_speed": slowest_speed,
+            "atk_x": atk_x,
+            "atk_y": atk_y,
+            "attacker_data": attacker_data,
+        })
+
+    # Historical reports from same attacker
+    all_attackers = {atk.get("attacker") for atk in attacks if atk.get("attacker")}
+    history = await database.get_reports_by_attackers(guild_id, list(all_attackers))
+
+    return templates.TemplateResponse("attack_analysis.html", {
+        "request": request,
+        "guild": guild,
+        "report": report,
+        "attacks": enriched,
+        "history_count": len(history),
+        "history": history[:20],
+        "TRIBE_EMOJI": TRIBE_EMOJI,
+    })
 
 
 @app.post("/guild/{guild_id}/attacks/config")

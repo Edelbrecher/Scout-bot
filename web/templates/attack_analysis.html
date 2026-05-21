@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Angriffs-Analyse #{{ report.id }} · {{ guild.guild_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1000px;">
+
+  <div style="margin-bottom:1.5rem;">
+    <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Angriff-Detection</a>
+    <h1 style="margin:0.25rem 0 0; display:flex; align-items:center; gap:0.5rem;">
+      🔬 Angriffs-Analyse
+      <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">Meldung #{{ report.id }}</span>
+    </h1>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:0.25rem 0 0;">
+      Gemeldet von <strong>{{ report.reporter_name }}</strong>
+      am {{ report.created_at[:16].replace('T',' ') }} UTC ·
+      {{ attacks|length }} Angriff(e) erkannt
+    </p>
+  </div>
+
+  <!-- ── Je Angriff eine Analyse-Karte ── -->
+  {% for atk in attacks %}
+  <div style="margin-bottom:1.5rem; border:1px solid {% if atk.classification.startswith('💥') or atk.classification.startswith('⚔️') %}rgba(220,38,38,0.5){% elif atk.classification.startswith('🪶') %}rgba(245,158,11,0.4){% else %}var(--border){% endif %}; border-radius:12px; overflow:hidden;">
+
+    <!-- Header -->
+    <div style="background:{% if atk.classification.startswith('💥') or atk.classification.startswith('⚔️') %}rgba(220,38,38,0.12){% elif atk.classification.startswith('🪶') %}rgba(245,158,11,0.1){% else %}var(--bg-card){% endif %}; padding:1rem 1.25rem; display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:1.1rem; font-weight:700;">
+          {{ '⚔️' if atk.wave_type == 'attack' else '🪖' if atk.wave_type == 'raid' else '🛡️' if atk.wave_type == 'reinforce' else '🕵️' }}
+          {{ atk.attacker or 'Unbekannt' }}
+          {% if atk.attacker_village %}
+            <span style="color:var(--text-muted); font-weight:400; font-size:0.88rem;">von {{ atk.attacker_village }}</span>
+          {% endif %}
+        </div>
+        <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.2rem;">
+          {% if atk.village %}Ziel: <strong>{{ atk.village }}</strong>{% endif %}
+          {% if atk.coords %} · Koordinaten: <code>{{ atk.coords }}</code>{% endif %}
+          {% if atk.arrival %} · Ankunft: <strong>{{ atk.arrival }}</strong>{% endif %}
+        </div>
+      </div>
+      <div style="text-align:right; flex-shrink:0;">
+        <span style="background:rgba(0,0,0,0.3); border:1px solid {{ atk.classification_color }}; color:{{ atk.classification_color }}; border-radius:20px; padding:0.3rem 0.9rem; font-size:0.85rem; font-weight:700;">
+          {{ atk.classification }}
+        </span>
+        {% if atk.detected_tribe %}
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.3rem;">Volk: <strong>{{ atk.detected_tribe }}</strong></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="padding:1rem 1.25rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem;">
+
+      <!-- Truppen-Analyse -->
+      <div>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Truppen</h3>
+        {% if atk.troops %}
+        <div style="display:flex; flex-direction:column; gap:0.35rem;">
+          {% for tname, count in atk.troops.items() %}
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <span style="font-size:0.85rem; min-width:160px;">{{ tname }}</span>
+            <div style="flex:1; background:var(--bg-main); border-radius:4px; height:6px; overflow:hidden;">
+              <div style="background:#ef4444; height:100%; width:{{ [100, count * 2] | min }}%; border-radius:4px;"></div>
+            </div>
+            <span style="font-family:monospace; font-size:0.85rem; color:#ef4444; font-weight:700; min-width:50px; text-align:right;">{{ count }}×</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div style="margin-top:0.75rem; font-size:0.82rem; color:var(--text-muted);">
+          Gesamt: <strong style="color:var(--text);">{{ atk.total_troops }} Einheiten</strong>
+          {% if atk.slowest_speed %}
+          · Langsamste Truppe: <strong>{{ atk.slowest_speed }} Felder/h</strong>
+          {% endif %}
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted); font-size:0.85rem;">Keine Truppendaten im Report.</p>
+        {% endif %}
+      </div>
+
+      <!-- Angreifer-Profil aus Map -->
+      <div>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Angreifer-Profil</h3>
+        {% if atk.attacker_data %}
+        {% set ad = atk.attacker_data %}
+        <div style="display:flex; flex-direction:column; gap:0.35rem; font-size:0.85rem;">
+          <div>🏰 <strong>{{ ad.village_count }}</strong> Dörfer</div>
+          <div>👥 Gesamtbev.: <strong>{{ ad.total_pop | int }}</strong></div>
+          {% if ad.alliance_name %}
+          <div>🛡️ Allianz: <strong>{{ ad.alliance_name }}</strong></div>
+          {% endif %}
+          {% if ad.tribe %}
+          <div>{{ TRIBE_EMOJI.get(ad.tribe, '❓') }} Volk: <strong>
+            {{ {1:'Römer', 2:'Germanen', 3:'Gallier', 4:'Natars', 5:'Hunnen'}.get(ad.tribe, 'Unbekannt') }}
+          </strong></div>
+          {% endif %}
+        </div>
+        {% if ad.villages %}
+        <details style="margin-top:0.6rem;">
+          <summary style="font-size:0.82rem; color:var(--text-muted); cursor:pointer;">
+            Alle {{ ad.village_count }} Dörfer anzeigen
+          </summary>
+          <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.2rem; max-height:160px; overflow-y:auto;">
+            {% for v in ad.villages %}
+            <div style="font-size:0.78rem; display:flex; justify-content:space-between; color:var(--text-muted); padding:0.2rem 0; border-bottom:1px solid var(--border);">
+              <span>{{ v.village_name or '–' }}</span>
+              <span style="font-family:monospace;">({{ v.x }}|{{ v.y }})</span>
+              <span>{{ v.population or '–' }} BW</span>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+        {% else %}
+        <p style="color:var(--text-muted); font-size:0.85rem;">
+          Kein Karteneintrag für <em>{{ atk.attacker }}</em> gefunden.
+          <br><small>Tipp: Karten-Snapshot aktualisieren unter Farming.</small>
+        </p>
+        {% endif %}
+      </div>
+
+      <!-- Marschzeit-Analyse -->
+      {% if atk.atk_x is not none %}
+      <div>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Marschzeit-Analyse</h3>
+        <div id="marchAnalysis_{{ loop.index }}"
+             data-ax="{{ atk.atk_x }}" data-ay="{{ atk.atk_y }}"
+             data-speed="{{ atk.slowest_speed or 6 }}"
+             data-arrival="{{ atk.arrival }}"
+             style="font-size:0.85rem;">
+          <div style="color:var(--text-muted);">Angriffsursprung: <code>({{ atk.atk_x }}|{{ atk.atk_y }})</code></div>
+          <div style="color:var(--text-muted); margin-top:0.25rem;">Eigene Position in Profil eintragen für Distanzberechnung.</div>
+          <div class="march-result" style="margin-top:0.5rem;"></div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Empfehlung -->
+    <div style="border-top:1px solid var(--border); padding:0.75rem 1.25rem; background:rgba(0,0,0,0.15);">
+      <span style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">💡 Empfehlung: </span>
+      <span style="font-size:0.85rem;">
+        {% if atk.classification.startswith('🪶') %}
+          Wahrscheinlich ein Fake oder Probe-Angriff. Geringe Truppen — kein Stress, aber im Auge behalten. Prüfe ob weitere Wellen folgen.
+        {% elif atk.classification.startswith('💥') %}
+          <strong style="color:#dc2626;">Echte Belagerung mit Katapulten/Rammen!</strong> Sofort Verstärkung anfordern, Truppen in Sicherheit bringen.
+        {% elif atk.classification.startswith('⚡') %}
+          Kavallerie-Angriff — schnell und schlagkräftig. Reaktionszeit prüfen, Def-Kavallerie schicken.
+        {% elif atk.classification.startswith('⚔️') %}
+          Großangriff — Allianz benachrichtigen, maximale Verteidigung organisieren.
+        {% elif atk.classification.startswith('🗡️') %}
+          Normaler Angriff. Verteidigung bereitstellen basierend auf geschickten Truppen.
+        {% else %}
+          Truppendaten prüfen — vollständigen Truppenplatz-Text einfügen für bessere Analyse.
+        {% endif %}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- ── Angreifer-Historie ── -->
+  {% if history %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin-top:0;">📅 Angreifer-Historie ({{ history_count }} Meldungen)</h2>
+    <p class="hint">Alle früheren gemeldeten Angriffe dieser Spieler.</p>
+    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+      {% for hr in history %}
+      {% set h_attacks = hr.attacks_json | from_json %}
+      <div style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0.75rem; background:var(--bg-main); border-radius:6px; font-size:0.83rem; flex-wrap:wrap;">
+        <span style="color:var(--text-muted); font-family:monospace; flex-shrink:0;">{{ hr.created_at[:16].replace('T',' ') }}</span>
+        <span>von <strong>{{ hr.reporter_name }}</strong></span>
+        <div style="display:flex; flex-wrap:wrap; gap:0.3rem; flex:1;">
+          {% for ha in h_attacks %}
+          <span style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:4px; padding:0.15rem 0.4rem;">
+            {{ ha.get('attacker','?') }}
+            {% if ha.get('coords') %}· {{ ha.coords }}{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+        <a href="/guild/{{ guild.guild_id }}/attacks/{{ hr.id }}/analyse" class="btn btn-secondary" style="font-size:0.78rem; padding:0.2rem 0.5rem; flex-shrink:0;">🔬</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Rohdaten ── -->
+  <details class="card">
+    <summary style="cursor:pointer; list-style:none; font-weight:600;">📋 Rohdaten (Original-Text)</summary>
+    <pre style="margin-top:0.75rem; font-size:0.75rem; white-space:pre-wrap; word-break:break-word; color:var(--text-muted); max-height:300px; overflow-y:auto; background:var(--bg-main); padding:0.75rem; border-radius:6px;">{{ report.raw_text }}</pre>
+  </details>
+
+</div>
+
+<script>
+// Marschzeit-Analyse mit lokalem Profil
+const profile = JSON.parse(localStorage.getItem('travian_profile_einsatz') || '{}');
+const MAP_SIZE = 400;
+
+function travianDist(x1, y1, x2, y2) {
+  let dx = Math.abs(x1 - x2), dy = Math.abs(y1 - y2);
+  if (dx > MAP_SIZE) dx = 2*MAP_SIZE - dx;
+  if (dy > MAP_SIZE) dy = 2*MAP_SIZE - dy;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+function fmtDur(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+document.querySelectorAll('[id^=marchAnalysis_]').forEach(el => {
+  if (profile.x === undefined || profile.y === undefined) return;
+  const ax = parseFloat(el.dataset.ax), ay = parseFloat(el.dataset.ay);
+  const speed = parseFloat(el.dataset.speed) || 6;
+  const dist = travianDist(profile.x, profile.y, ax, ay);
+  const marchSec = Math.ceil(dist / speed * 3600);
+  const resultEl = el.querySelector('.march-result');
+  if (resultEl) {
+    resultEl.innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-top:0.25rem;">
+        <div style="background:var(--bg-main); border-radius:6px; padding:0.5rem; text-align:center;">
+          <div style="font-size:0.72rem; color:var(--text-muted);">Distanz</div>
+          <div style="font-weight:700; font-family:monospace;">${dist.toFixed(1)} F</div>
+        </div>
+        <div style="background:var(--bg-main); border-radius:6px; padding:0.5rem; text-align:center;">
+          <div style="font-size:0.72rem; color:var(--text-muted);">Marschzeit</div>
+          <div style="font-weight:700; font-family:monospace; color:#f59e0b;">${fmtDur(marchSec)}</div>
+        </div>
+        <div style="background:var(--bg-main); border-radius:6px; padding:0.5rem; text-align:center;">
+          <div style="font-size:0.72rem; color:var(--text-muted);">Von (${profile.x}|${profile.y})</div>
+          <div style="font-weight:700; font-family:monospace; font-size:0.78rem;">zu (${ax}|${ay})</div>
+        </div>
+      </div>`;
+  }
+  // Also update the "own position hint" text
+  const hint = el.querySelector(':not(.march-result)');
+});
+</script>
+{% endblock %}

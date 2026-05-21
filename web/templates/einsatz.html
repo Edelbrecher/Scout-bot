@@ -406,7 +406,8 @@ setInterval(updateCountdowns, 1000);
 updateCountdowns();
 
 // ── Timer erstellen (in localStorage für Timer-Seite) ─────────────────────
-const TIMER_KEY = 'travian_timers_v2';
+// Uses same key & format as timer.html: 'travianReminders', at in ms, rally bool + rallyUrl
+const TIMER_KEY = 'travianReminders';
 
 document.querySelectorAll('.btn-add-timer').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -416,33 +417,37 @@ document.querySelectorAll('.btn-add-timer').forEach(btn => {
     const wave = btn.dataset.wave;
     const speed = parseFloat(btn.dataset.speed);
 
-    // Build two timers: send-time reminder + arrival reminder
     let timers = JSON.parse(localStorage.getItem(TIMER_KEY) || '[]');
-    const arrivalDate = new Date(arrival);
+    const arrivalMs = new Date(arrival).getTime();
+    const targetUrl = profile.server
+      ? `${profile.server}/build.php?gid=16&tt=${WAVE_TT[wave]||2}&x=${x}&y=${y}`
+      : null;
 
     // Arrival reminder
     timers.push({
-      id: Date.now() + Math.random(),
+      id: Math.random().toString(36).slice(2),
       label: `🎯 Ankunft: ${name}`,
-      at: arrivalDate.toISOString(),
-      rally: profile.server
-        ? `${profile.server}/build.php?gid=16&tt=${WAVE_TT[wave]||2}&x=${x}&y=${y}`
-        : '',
+      at: arrivalMs,
+      rally: !!targetUrl,
+      rallyUrl: targetUrl,
+      warnFired: false,
     });
 
     // Send-time reminder (only if profile coords known)
     if (profile.x !== undefined && profile.y !== undefined && speed) {
       const dist = travianDistance(profile.x, profile.y, parseFloat(x), parseFloat(y));
       const marchSec = marchSeconds(dist, speed);
-      const sendDate = new Date(arrivalDate.getTime() - marchSec * 1000);
-      timers.push({
-        id: Date.now() + 1 + Math.random(),
-        label: `🚀 ABSENDEN: ${name}`,
-        at: sendDate.toISOString(),
-        rally: profile.server
-          ? `${profile.server}/build.php?gid=16&tt=${WAVE_TT[wave]||2}&x=${x}&y=${y}`
-          : '',
-      });
+      const sendMs = arrivalMs - marchSec * 1000;
+      if (sendMs > Date.now()) {
+        timers.push({
+          id: Math.random().toString(36).slice(2),
+          label: `🚀 ABSENDEN: ${name}`,
+          at: sendMs,
+          rally: !!targetUrl,
+          rallyUrl: targetUrl,
+          warnFired: false,
+        });
+      }
     }
 
     localStorage.setItem(TIMER_KEY, JSON.stringify(timers));

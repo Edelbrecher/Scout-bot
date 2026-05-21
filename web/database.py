@@ -806,6 +806,86 @@ async def set_attack_channel_web(guild_id: str, attack_channel_id: str, attack_b
         await db.commit()
 
 
+async def get_attack_report(guild_id: str, report_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM attack_reports WHERE id = ? AND guild_id = ?",
+            (report_id, guild_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | None:
+    """Look up a player by name in the latest map snapshot."""
+    if not player_name:
+        return None
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Get the latest snapshot time for this guild
+        async with db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            latest = row["latest"] if row else None
+        if not latest:
+            return None
+        # Fetch all villages of this player from the latest snapshot
+        async with db.execute(
+            """SELECT * FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+               AND lower(player_name) = lower(?)""",
+            (guild_id, latest, player_name),
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+        if not rows:
+            return None
+        first = rows[0]
+        return {
+            "player_name": first.get("player_name"),
+            "alliance_name": first.get("alliance_name"),
+            "alliance_id": first.get("alliance_id"),
+            "tribe": first.get("tribe"),
+            "villages": [
+                {
+                    "x": r["x"], "y": r["y"],
+                    "village_name": r.get("village_name"),
+                    "population": r.get("population"),
+                    "is_capital": False,
+                }
+                for r in rows
+            ],
+            "total_pop": sum(r.get("population", 0) or 0 for r in rows),
+            "village_count": len(rows),
+        }
+
+
+async def get_reports_by_attackers(guild_id: str, attacker_names: list[str]) -> list[dict]:
+    """Return all reports where any of the given attacker names appear in attacks_json."""
+    if not attacker_names:
+        return []
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM attack_reports WHERE guild_id = ? ORDER BY created_at DESC",
+            (guild_id,),
+        ) as cur:
+            all_rows = [dict(r) for r in await cur.fetchall()]
+    import json as _json
+    results = []
+    name_set = {n.lower() for n in attacker_names}
+    for row in all_rows:
+        try:
+            attacks = _json.loads(row["attacks_json"])
+        except Exception:
+            continue
+        if any((a.get("attacker") or "").lower() in name_set for a in attacks):
+            results.append(row)
+    return results
+
+
 async def delete_attack_report(report_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM attack_reports WHERE id = ?", (report_id,))
