@@ -170,6 +170,23 @@ async def init_db():
         """)
         await db.commit()
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS auth_logs (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at      TEXT DEFAULT (datetime('now')),
+                discord_id      TEXT,
+                username        TEXT,
+                ip              TEXT,
+                status          TEXT NOT NULL,
+                detail          TEXT,
+                guild_count     INTEGER DEFAULT 0,
+                accessible_guilds INTEGER DEFAULT 0,
+                has_active_sub  INTEGER DEFAULT 0,
+                is_returning    INTEGER DEFAULT 0
+            )
+        """)
+        await db.commit()
+
     await _init_farming_tables()
     await _init_einsatz_tables()
     await _init_admin_tables()
@@ -1677,3 +1694,80 @@ async def update_user_subscription_admin(
                 updated_at = datetime('now')
         """, (discord_user_id, status, plan, stripe_customer_id, stripe_subscription_id))
         await db.commit()
+
+
+async def has_logged_in_before(discord_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT discord_username FROM user_subscriptions WHERE discord_user_id = ? AND discord_username IS NOT NULL",
+            (discord_id,)
+        ) as cur:
+            return await cur.fetchone() is not None
+
+
+async def log_auth(
+    status: str,
+    discord_id: str = "",
+    username: str = "",
+    ip: str = "",
+    detail: str = "",
+    guild_count: int = 0,
+    accessible_guilds: int = 0,
+    has_active_sub: bool = False,
+    is_returning: bool = False,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO auth_logs
+                (status, discord_id, username, ip, detail, guild_count, accessible_guilds, has_active_sub, is_returning)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (status, discord_id, username, ip, detail, guild_count, accessible_guilds,
+              1 if has_active_sub else 0, 1 if is_returning else 0))
+        await db.commit()
+
+
+async def get_auth_logs(limit: int = 200) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM auth_logs ORDER BY created_at DESC LIMIT ?
+        """, (limit,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_auth_stats() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT status, COUNT(*) as count
+            FROM auth_logs
+            WHERE created_at >= datetime('now', '-30 days')
+            GROUP BY status
+        """) as cur:
+            by_status = {r["status"]: r["count"] for r in await cur.fetchall()}
+        async with db.execute("""
+            SELECT is_returning, COUNT(*) as count
+            FROM auth_logs
+            WHERE status='success' AND created_at >= datetime('now', '-30 days')
+            GROUP BY is_returning
+        """) as cur:
+            returning = {r["is_returning"]: r["count"] for r in await cur.fetchall()}
+        async with db.execute("""
+            SELECT COUNT(*) as count FROM auth_logs
+            WHERE status='success' AND accessible_guilds=0 AND created_at >= datetime('now', '-30 days')
+        """) as cur:
+            no_server = (await cur.fetchone())["count"]
+        async with db.execute("""
+            SELECT DATE(created_at) as day, COUNT(*) as count
+            FROM auth_logs
+            WHERE status='success' AND created_at >= datetime('now', '-14 days')
+            GROUP BY day ORDER BY day
+        """) as cur:
+            daily = [dict(r) for r in await cur.fetchall()]
+        return {
+            "by_status": by_status,
+            "new_users": returning.get(0, 0),
+            "returning_users": returning.get(1, 0),
+            "no_server_logins": no_server,
+            "daily": daily,
+        }

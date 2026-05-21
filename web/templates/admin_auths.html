@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Auth-Protokoll · Admin · TravOps{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
+        <a href="/admin/contact" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+        <a href="/admin/auths" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">🔐 Auths</a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div style="flex:1; min-width:0;">
+
+      <!-- Header -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:0.5rem;">
+        <h1 style="margin:0; font-size:1.4rem;">🔐 Auth-Protokoll</h1>
+        <span style="font-size:0.85rem; color:var(--text-muted);">Letzte 30 Tage · letzte 300 Einträge</span>
+      </div>
+
+      <!-- Stats row -->
+      {% set total_success = stats.by_status.get('success', 0) %}
+      {% set total_cancelled = stats.by_status.get('cancelled', 0) %}
+      {% set total_errors = stats.by_status.get('token_error', 0) + stats.by_status.get('user_fetch_error', 0) + stats.by_status.get('csrf_error', 0) + stats.by_status.get('guilds_fetch_error', 0) %}
+      {% set total_all = namespace(val=0) %}
+      {% for s, c in stats.by_status.items() %}{% set total_all.val = total_all.val + c %}{% endfor %}
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:0.4rem;">Gesamt (30 Tage)</div>
+          <div style="font-size:1.8rem; font-weight:700;">{{ total_all.val }}</div>
+        </div>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:0.4rem;">Erfolgreich</div>
+          <div style="font-size:1.8rem; font-weight:700; color:#22c55e;">{{ total_success }}</div>
+        </div>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:0.4rem;">Abgebrochen / Fehler</div>
+          <div style="font-size:1.8rem; font-weight:700; color:#ef4444;">{{ total_cancelled + total_errors }}</div>
+        </div>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:0.4rem;">Neu / Wiederkehrend</div>
+          <div style="font-size:1.8rem; font-weight:700;">{{ stats.new_users }} <span style="font-size:1rem; color:var(--text-muted);">/ {{ stats.returning_users }}</span></div>
+        </div>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:0.4rem;">Ohne Server</div>
+          <div style="font-size:1.8rem; font-weight:700; color:#f59e0b;">{{ stats.no_server_logins }}</div>
+        </div>
+      </div>
+
+      <!-- Status breakdown + daily chart -->
+      <div style="display:grid; grid-template-columns:1fr 2fr; gap:1rem; margin-bottom:1.5rem;">
+        <!-- Status breakdown -->
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1.25rem;">
+          <div style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:1rem;">Status-Verteilung (30d)</div>
+          {% for status, count in stats.by_status.items() %}
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--border);">
+            <span>
+              {% if status == 'success' %}<span style="background:#16a34a22; color:#22c55e; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600;">success</span>
+              {% elif status == 'cancelled' %}<span style="background:#6b728022; color:#9ca3af; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600;">cancelled</span>
+              {% elif status == 'csrf_error' %}<span style="background:#f59e0b22; color:#f59e0b; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600;">csrf_error</span>
+              {% elif status == 'token_error' %}<span style="background:#ef444422; color:#ef4444; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600;">token_error</span>
+              {% elif status == 'user_fetch_error' %}<span style="background:#ef444422; color:#ef4444; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600;">user_fetch_error</span>
+              {% else %}<span style="background:#6b728022; color:#9ca3af; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.8rem; font-weight:600;">{{ status }}</span>
+              {% endif %}
+            </span>
+            <span style="font-weight:700;">{{ count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Daily logins chart -->
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1.25rem;">
+          <div style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:1rem;">Erfolgreiche Logins (14 Tage)</div>
+          {% if stats.daily %}
+          {% set max_count = namespace(val=1) %}
+          {% for d in stats.daily %}{% if d.count > max_count.val %}{% set max_count.val = d.count %}{% endif %}{% endfor %}
+          <div style="display:flex; align-items:flex-end; gap:4px; height:80px;">
+            {% for d in stats.daily %}
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
+              <div style="width:100%; background:#f59e0b; border-radius:3px 3px 0 0; height:{{ ((d.count / max_count.val) * 70) | int }}px; min-height:4px;" title="{{ d.day }}: {{ d.count }}"></div>
+            </div>
+            {% endfor %}
+          </div>
+          <div style="display:flex; gap:4px; margin-top:4px;">
+            {% for d in stats.daily %}
+            <div style="flex:1; font-size:0.6rem; color:var(--text-muted); text-align:center; overflow:hidden;">{{ d.day[-5:] }}</div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="color:var(--text-muted); font-size:0.9rem;">Noch keine Daten.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Filter buttons -->
+      <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+        <button onclick="filterLogs('all')" id="filter-all" style="padding:0.4rem 1rem; border-radius:6px; border:1px solid var(--border); background:#f59e0b; color:#000; font-size:0.85rem; cursor:pointer; font-weight:600;">Alle</button>
+        <button onclick="filterLogs('success')" id="filter-success" style="padding:0.4rem 1rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text); font-size:0.85rem; cursor:pointer;">Nur Erfolge</button>
+        <button onclick="filterLogs('error')" id="filter-error" style="padding:0.4rem 1rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text); font-size:0.85rem; cursor:pointer;">Nur Fehler</button>
+        <button onclick="filterLogs('no_server')" id="filter-no_server" style="padding:0.4rem 1rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text); font-size:0.85rem; cursor:pointer;">Ohne Server</button>
+      </div>
+
+      <!-- Logs table -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:auto;">
+        {% if logs %}
+        <table style="width:100%; border-collapse:collapse; font-size:0.84rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:600; white-space:nowrap;">Datum/Zeit</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:600;">Status</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:600;">Discord-Name</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:600;">Discord-ID</th>
+              <th style="padding:0.65rem 0.75rem; text-align:center; color:var(--text-muted); font-weight:600;">Server</th>
+              <th style="padding:0.65rem 0.75rem; text-align:center; color:var(--text-muted); font-weight:600;">Zugängl.</th>
+              <th style="padding:0.65rem 0.75rem; text-align:center; color:var(--text-muted); font-weight:600;">Abo</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:600;">Typ</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:600;">IP</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for log in logs %}
+          {% set row_bg = '' %}
+          {% if log.status == 'success' %}{% set row_bg = 'rgba(34,197,94,0.04)' %}
+          {% elif log.status == 'cancelled' %}{% set row_bg = '' %}
+          {% else %}{% set row_bg = 'rgba(239,68,68,0.06)' %}{% endif %}
+          <tr class="log-row"
+              data-status="{{ log.status }}"
+              data-accessible="{{ log.accessible_guilds }}"
+              style="border-bottom:1px solid var(--border); background:{{ row_bg }};"
+              onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='{{ row_bg }}'">
+            <td style="padding:0.55rem 1rem; white-space:nowrap; color:var(--text-muted); font-size:0.8rem;">{{ log.created_at[:16] if log.created_at else '—' }}</td>
+            <td style="padding:0.55rem 1rem;">
+              {% if log.status == 'success' %}<span style="background:#16a34a22; color:#22c55e; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem; font-weight:600;">success</span>
+              {% elif log.status == 'cancelled' %}<span style="background:#6b728022; color:#9ca3af; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem; font-weight:600;">cancelled</span>
+              {% elif log.status == 'csrf_error' %}<span style="background:#f59e0b22; color:#f59e0b; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem; font-weight:600;">csrf_error</span>
+              {% elif log.status == 'token_error' %}<span style="background:#ef444422; color:#ef4444; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem; font-weight:600;">token_error</span>
+              {% elif log.status == 'user_fetch_error' %}<span style="background:#ef444422; color:#ef4444; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem; font-weight:600;">user_fetch_error</span>
+              {% else %}<span style="background:#6b728022; color:#9ca3af; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem; font-weight:600;">{{ log.status }}</span>
+              {% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ log.username or '—' }}</td>
+            <td style="padding:0.55rem 1rem; font-family:monospace; font-size:0.8rem; color:var(--text-muted);">{{ log.discord_id or '—' }}</td>
+            <td style="padding:0.55rem 0.75rem; text-align:center;">{{ log.guild_count if log.guild_count is not none else '—' }}</td>
+            <td style="padding:0.55rem 0.75rem; text-align:center;">
+              {% if log.status == 'success' %}
+                {% if log.accessible_guilds == 0 %}<span style="color:#f59e0b;">0</span>{% else %}<span style="color:#22c55e;">{{ log.accessible_guilds }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td style="padding:0.55rem 0.75rem; text-align:center;">
+              {% if log.has_active_sub %}<span style="color:#22c55e; font-size:1rem;">✓</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem;">
+              {% if log.status == 'success' %}
+                {% if log.is_returning %}<span style="background:#3b82f622; color:#60a5fa; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem;">Wiederkehrend</span>
+                {% else %}<span style="background:#8b5cf622; color:#a78bfa; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.78rem;">Neu</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem; font-family:monospace; font-size:0.78rem; color:var(--text-muted);">{{ log.ip or '—' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div style="padding:3rem; text-align:center; color:var(--text-muted);">Noch keine Auth-Einträge.</div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function filterLogs(type) {
+  document.querySelectorAll('[id^="filter-"]').forEach(b => {
+    b.style.background = 'var(--bg-card)';
+    b.style.color = 'var(--text)';
+    b.style.fontWeight = '';
+  });
+  const active = document.getElementById('filter-' + type);
+  if (active) { active.style.background = '#f59e0b'; active.style.color = '#000'; active.style.fontWeight = '600'; }
+
+  document.querySelectorAll('.log-row').forEach(row => {
+    const status = row.dataset.status;
+    const accessible = parseInt(row.dataset.accessible) || 0;
+    let show = false;
+    if (type === 'all') show = true;
+    else if (type === 'success') show = status === 'success';
+    else if (type === 'error') show = status !== 'success' && status !== 'cancelled';
+    else if (type === 'no_server') show = status === 'success' && accessible === 0;
+    row.style.display = show ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

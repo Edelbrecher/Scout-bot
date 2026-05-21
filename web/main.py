@@ -462,12 +462,15 @@ async def auth_discord(request: Request):
 
 @app.get("/auth/callback")
 async def auth_callback(request: Request, code: str = "", error: str = "", state: str = ""):
+    _ip = request.client.host if request.client else ""
     if error or not code:
+        await database.log_auth(status="cancelled", ip=_ip, detail=error or "no_code")
         return RedirectResponse("/login?error=Discord+authentication+cancelled")
 
     # Validate OAuth state to prevent CSRF
     expected_state = request.cookies.get("oauth_state", "")
     if not expected_state or not secrets.compare_digest(expected_state, state):
+        await database.log_auth(status="csrf_error", ip=_ip, detail="state_mismatch")
         return RedirectResponse("/login?error=Invalid+OAuth+state.+Please+try+again.")
 
     client_id = get_client_id()
@@ -485,6 +488,7 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         if r.status_code != 200:
+            await database.log_auth(status="token_error", ip=_ip, detail=f"status={r.status_code}")
             return RedirectResponse("/login?error=Discord+authentication+failed.+Please+try+again.")
         access_token = r.json()["access_token"]
 
@@ -493,6 +497,7 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if user_r.status_code != 200:
+            await database.log_auth(status="user_fetch_error", ip=_ip, detail=f"status={user_r.status_code}")
             return RedirectResponse("/login?error=Failed+to+fetch+user+info.")
         user = user_r.json()
 
@@ -517,6 +522,22 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
 
     username = user.get("global_name") or user.get("username", "Unknown")
     discord_id = str(user["id"])
+
+    # Gather log metadata before mutating DB
+    _is_returning = await database.has_logged_in_before(discord_id)
+    _sub = await database.get_user_subscription(discord_id)
+    _has_active_sub = bool(_sub and _sub.get("subscription_status") in ("active", "trialing"))
+    await database.log_auth(
+        status="success",
+        discord_id=discord_id,
+        username=username,
+        ip=_ip,
+        guild_count=len(user_guilds),
+        accessible_guilds=len(accessible),
+        has_active_sub=_has_active_sub,
+        is_returning=_is_returning,
+    )
+
     session_type = "admin" if discord_id in ADMIN_DISCORD_IDS else "discord"
     session_data = {
         "type": session_type,
@@ -2491,6 +2512,20 @@ async def admin_contact(request: Request):
     return templates.TemplateResponse("admin_contact.html", {
         "request": request,
         "config": config,
+        "session": session,
+    })
+
+
+@app.get("/admin/auths", response_class=HTMLResponse)
+async def admin_auths(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    logs = await database.get_auth_logs(limit=300)
+    stats = await database.get_auth_stats()
+    return templates.TemplateResponse("admin_auths.html", {
+        "request": request,
+        "logs": logs,
+        "stats": stats,
         "session": session,
     })
 
