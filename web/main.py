@@ -781,6 +781,13 @@ async def auto_setup(request: Request, guild_id: str):
     headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
     async with httpx.AsyncClient() as client:
+        # Get bot's own user ID for permission overwrites
+        bot_user_r = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
+        bot_id = bot_user_r.json()["id"] if bot_user_r.status_code == 200 else None
+
+        # Permission bits
+        ALLOW_BOT = str(1024 + 2048 + 16384 + 32768)  # VIEW_CHANNEL + SEND_MESSAGES + EMBED_LINKS + ATTACH_FILES
+
         r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "Scout", "type": 4})
         if r.status_code not in (200, 201):
             return RedirectResponse(f"/guild/{guild_id}?error=category_{r.status_code}", status_code=303)
@@ -791,9 +798,14 @@ async def auto_setup(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{guild_id}?error=scout_ch_{r.status_code}", status_code=303)
         scout_channel_id = r.json()["id"]
 
+        # Archive channel: hidden from @everyone, bot has explicit send/attach perms
+        archive_overwrites = [{"id": guild_id, "type": 0, "allow": "0", "deny": str(VIEW_CHANNEL)}]
+        if bot_id:
+            archive_overwrites.append({"id": bot_id, "type": 1, "allow": ALLOW_BOT, "deny": "0"})
+
         r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={
             "name": "scout-archive", "type": 0, "parent_id": category_id,
-            "permission_overwrites": [{"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL}],
+            "permission_overwrites": archive_overwrites,
         })
         if r.status_code not in (200, 201):
             return RedirectResponse(f"/guild/{guild_id}?error=archive_ch_{r.status_code}", status_code=303)
@@ -810,6 +822,38 @@ async def auto_setup(request: Request, guild_id: str):
 
     await database.auto_setup_guild(guild_id=guild_id, category_id=category_id, scout_channel_id=scout_channel_id, archive_channel_id=archive_channel_id, button_message_id=button_message_id)
     return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/fix-archive-perms")
+async def fix_archive_perms(request: Request, guild_id: str):
+    """Fix bot permissions on the archive channel."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("archive_channel_id"):
+        return RedirectResponse(f"/guild/{guild_id}?error=no_archive_channel", status_code=303)
+
+    token = os.environ.get("DISCORD_TOKEN", "")
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    ALLOW_BOT = str(1024 + 2048 + 16384 + 32768)
+    archive_channel_id = guild["archive_channel_id"]
+
+    async with httpx.AsyncClient() as client:
+        bot_user_r = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
+        if bot_user_r.status_code != 200:
+            return RedirectResponse(f"/guild/{guild_id}?error=bot_id_failed", status_code=303)
+        bot_id = bot_user_r.json()["id"]
+        r = await client.put(
+            f"https://discord.com/api/v10/channels/{archive_channel_id}/permissions/{bot_id}",
+            headers=headers,
+            json={"allow": ALLOW_BOT, "deny": "0", "type": 1},
+        )
+        if r.status_code not in (200, 201, 204):
+            return RedirectResponse(f"/guild/{guild_id}?error=perms_{r.status_code}", status_code=303)
+
+    return RedirectResponse(f"/guild/{guild_id}?saved=perms_fixed", status_code=303)
 
 
 @app.get("/guild/{guild_id}/stats", response_class=HTMLResponse)

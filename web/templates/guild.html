@@ -328,6 +328,19 @@ document.querySelectorAll('.role-toggle').forEach(btn => {
     </div>
   </div>
 
+  <!-- Berechtigungen reparieren -->
+  {% if guild.archive_channel_id %}
+  <div style="background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:8px; padding:0.9rem 1rem; margin-bottom:0.75rem;">
+    <div style="font-size:0.85rem; font-weight:600; color:#f59e0b; margin-bottom:0.3rem;">🔧 Archive-Channel Berechtigungen</div>
+    <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.6rem;">Falls Bilder nicht archiviert werden: Bot-Berechtigungen im Archive-Channel neu setzen.</div>
+    <form method="post" action="/guild/{{ guild.guild_id }}/fix-archive-perms">
+      <button type="submit" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:0.4rem 1rem; color:#f59e0b; cursor:pointer; font-size:0.82rem; font-weight:600;">
+        🔧 Berechtigungen reparieren
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
   {% if is_owner %}
   <!-- Bot entfernen -->
   <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:0.9rem 1rem;">
