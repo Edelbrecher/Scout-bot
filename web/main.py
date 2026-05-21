@@ -39,8 +39,36 @@ PERM_MANAGE_GUILD = 0x20
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PRICE_MONTHLY   = os.environ.get("STRIPE_PRICE_MONTHLY", "")
-STRIPE_PRICE_ANNUAL    = os.environ.get("STRIPE_PRICE_ANNUAL", "")
+
+# Pricing tiers: Starter / Clan / Alliance / Imperium
+STRIPE_PRICES: dict[str, dict[str, str]] = {
+    "starter": {
+        "monthly": os.environ.get("STRIPE_PRICE_STARTER_M", "price_1TZBc13rAqb4qtRxOuJbuV8P"),
+        "annual":  os.environ.get("STRIPE_PRICE_STARTER_A", "price_1TZBdb3rAqb4qtRxfyiH8bLx"),
+    },
+    "clan": {
+        "monthly": os.environ.get("STRIPE_PRICE_CLAN_M", "price_1TZKYe3rAqb4qtRxbKdiDnKk"),
+        "annual":  os.environ.get("STRIPE_PRICE_CLAN_A", "price_1TZKbS3rAqb4qtRx2dHjKNID"),
+    },
+    "alliance": {
+        "monthly": os.environ.get("STRIPE_PRICE_ALLIANCE_M", "price_1TZKZC3rAqb4qtRxul7TvBlF"),
+        "annual":  os.environ.get("STRIPE_PRICE_ALLIANCE_A", "price_1TZKcF3rAqb4qtRxyT6kMn8o"),
+    },
+    "imperium": {
+        "monthly": os.environ.get("STRIPE_PRICE_IMPERIUM_M", "price_1TZKa33rAqb4qtRxUntPWFfM"),
+        "annual":  os.environ.get("STRIPE_PRICE_IMPERIUM_A", "price_1TZKdO3rAqb4qtRxTio11mmP"),
+    },
+}
+# Keep legacy vars as aliases for Starter
+STRIPE_PRICE_MONTHLY = STRIPE_PRICES["starter"]["monthly"]
+STRIPE_PRICE_ANNUAL  = STRIPE_PRICES["starter"]["annual"]
+
+TIER_META = {
+    "starter":  {"name": "Starter",  "servers": 1, "monthly": 6.99,  "annual": 55.99},
+    "clan":     {"name": "Clan",     "servers": 2, "monthly": 10.99, "annual": 87.99},
+    "alliance": {"name": "Alliance", "servers": 3, "monthly": 14.99, "annual": 119.99},
+    "imperium": {"name": "Imperium", "servers": 5, "monthly": 19.99, "annual": 159.99},
+}
 
 # Discord snowflake: 17-20 digit numeric string
 SNOWFLAKE_RE = re.compile(r"^\d{17,20}$")
@@ -1222,20 +1250,26 @@ async def billing_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     is_admin = session.get("type") == "admin"
-    stripe_configured = bool(STRIPE_SECRET_KEY and STRIPE_PRICE_MONTHLY and STRIPE_PRICE_ANNUAL)
+    stripe_configured = bool(STRIPE_SECRET_KEY)
     return templates.TemplateResponse("billing.html", {
         "request": request,
         "guild": guild,
         "is_admin": is_admin,
         "stripe_pk": STRIPE_PUBLISHABLE_KEY,
         "stripe_configured": stripe_configured,
+        "tier_meta": TIER_META,
         "saved": request.query_params.get("saved"),
         "error": request.query_params.get("error"),
     })
 
 
 @app.post("/guild/{guild_id}/billing/checkout")
-async def billing_checkout(request: Request, guild_id: str, plan: str = Form(...)):
+async def billing_checkout(
+    request: Request,
+    guild_id: str,
+    plan: str = Form("monthly"),
+    tier: str = Form("starter"),
+):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -1247,7 +1281,9 @@ async def billing_checkout(request: Request, guild_id: str, plan: str = Form(...
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
-    price_id = STRIPE_PRICE_MONTHLY if plan == "monthly" else STRIPE_PRICE_ANNUAL
+    tier = tier if tier in STRIPE_PRICES else "starter"
+    interval = "monthly" if plan == "monthly" else "annual"
+    price_id = STRIPE_PRICES[tier][interval]
     if not price_id:
         return RedirectResponse(f"/guild/{guild_id}/billing?error=price_not_configured", status_code=303)
 
@@ -1261,7 +1297,7 @@ async def billing_checkout(request: Request, guild_id: str, plan: str = Form(...
         subscription_data={"trial_period_days": 7},
         success_url=f"{base_url}/guild/{guild_id}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{base_url}/guild/{guild_id}/billing?error=cancelled",
-        metadata={"guild_id": guild_id},
+        metadata={"guild_id": guild_id, "tier": tier},
     )
     if customer_id:
         checkout_kwargs["customer"] = customer_id
@@ -1287,7 +1323,9 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
         if checkout.metadata.get("guild_id") != guild_id:
             return RedirectResponse(f"/guild/{guild_id}/billing?error=invalid", status_code=303)
         sub = checkout.subscription
-        plan = "annual" if sub.items.data[0].price.recurring.interval == "year" else "monthly"
+        interval = "annual" if sub.items.data[0].price.recurring.interval == "year" else "monthly"
+        tier = checkout.metadata.get("tier", "starter")
+        plan_str = f"{tier}_{interval}"
         import datetime
         expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
         await database.update_subscription(
@@ -1295,7 +1333,7 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
             stripe_customer_id=checkout.customer,
             stripe_subscription_id=sub.id,
             status="active",
-            plan=plan,
+            plan=plan_str,
             expires_at=expires_at,
         )
     except Exception:
