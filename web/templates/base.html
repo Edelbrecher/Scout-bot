@@ -209,6 +209,7 @@ document.addEventListener('click', e => {
     </div>
     <div style="display:flex; gap:0.5rem; flex-shrink:0;">
       <a href="/cookies" style="padding:0.4rem 0.9rem; border:1px solid #475569; border-radius:6px; color:#94a3b8; text-decoration:none; font-size:0.83rem;">Details</a>
+      <button onclick="declineCookies()" style="padding:0.4rem 0.9rem; background:none; border:1px solid #475569; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:0.83rem;">Ablehnen</button>
       <button onclick="acceptCookies()" style="padding:0.4rem 1.1rem; background:#3b82f6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.83rem; font-weight:600;">Akzeptieren</button>
     </div>
   </div>
@@ -220,6 +221,14 @@ document.addEventListener('click', e => {
   })();
   function acceptCookies() {
     localStorage.setItem('beb_cookies_accepted', '1');
+    fetch('/api/cookie-consent', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'accepted'})}).catch(function(){});
+    const b = document.getElementById('cookie-banner');
+    b.style.opacity = '0';
+    b.style.transition = 'opacity 0.3s';
+    setTimeout(() => b.style.display = 'none', 300);
+  }
+  function declineCookies() {
+    fetch('/api/cookie-consent', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'withdrawn'})}).catch(function(){});
     const b = document.getElementById('cookie-banner');
     b.style.opacity = '0';
     b.style.transition = 'opacity 0.3s';
@@ -234,6 +243,7 @@ document.addEventListener('click', e => {
       <a href="/datenschutz" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Datenschutz</a>
       <a href="/agb" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">AGB</a>
       <a href="/cookies" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Cookies</a>
+      <a href="/kontakt" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Kontakt</a>
     </div>
     © {{ current_year }} BIG-EYE-BOT · Alle Rechte vorbehalten
   </footer>

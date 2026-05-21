@@ -171,6 +171,7 @@ async def init_db():
     await _init_farming_tables()
     await _init_einsatz_tables()
     await _init_admin_tables()
+    await _init_consent_tables()
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -1267,4 +1268,123 @@ async def get_recent_guilds(limit: int = 10) -> list[dict]:
         async with db.execute(
             "SELECT * FROM guild_configs ORDER BY rowid DESC LIMIT ?", (limit,)
         ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Cookie consent audit log
+# ---------------------------------------------------------------------------
+
+async def _init_consent_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS cookie_consents (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    TEXT,
+                username   TEXT,
+                action     TEXT NOT NULL,
+                ip         TEXT,
+                user_agent TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS page_visits (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    TEXT,
+                username   TEXT,
+                path       TEXT NOT NULL,
+                ip         TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
+
+async def log_cookie_consent(
+    user_id: str | None,
+    username: str | None,
+    action: str,
+    ip: str | None,
+    user_agent: str | None,
+):
+    from datetime import datetime as _dt2
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO cookie_consents (user_id, username, action, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, username, action, ip, user_agent, _dt2.utcnow().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_cookie_consents(limit: int = 200) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM cookie_consents ORDER BY created_at DESC LIMIT ?", (limit,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Page visits (funnel)
+# ---------------------------------------------------------------------------
+
+async def log_page_visit(
+    user_id: str | None,
+    username: str | None,
+    path: str,
+    ip: str | None,
+):
+    from datetime import datetime as _dt3
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO page_visits (user_id, username, path, ip, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, username, path, ip, _dt3.utcnow().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_funnel_stats() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM page_visits WHERE path LIKE '%/billing' OR path LIKE '%/billing/' AND created_at >= datetime('now', '-30 days')"
+        ) as cur:
+            billing_visits = (await cur.fetchone())[0]
+
+        async with db.execute(
+            "SELECT COUNT(*) FROM page_visits WHERE path LIKE '%/billing/checkout%' AND created_at >= datetime('now', '-30 days')"
+        ) as cur:
+            checkout_starts = (await cur.fetchone())[0]
+
+        async with db.execute(
+            "SELECT COUNT(*) FROM guild_configs WHERE subscription_status = 'active' AND subscription_expires_at >= datetime('now', '-30 days')"
+        ) as cur:
+            completed = (await cur.fetchone())[0]
+
+    return {
+        "billing_visits": billing_visits,
+        "checkout_starts": checkout_starts,
+        "completed": completed,
+    }
+
+
+async def get_billing_visitors_without_sub() -> list[dict]:
+    """Users who visited billing pages but don't have active subscription."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT pv.user_id, pv.username, pv.path, MAX(pv.created_at) as last_visit
+            FROM page_visits pv
+            WHERE pv.path LIKE '%/billing%'
+              AND pv.user_id IS NOT NULL
+              AND pv.user_id NOT IN (
+                  SELECT owner_discord_id FROM guild_configs
+                  WHERE subscription_status IN ('active', 'trialing')
+                  AND owner_discord_id IS NOT NULL
+              )
+            GROUP BY pv.user_id
+            ORDER BY last_visit DESC
+            LIMIT 50
+        """) as cur:
             return [dict(r) for r in await cur.fetchall()]

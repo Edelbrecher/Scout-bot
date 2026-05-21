@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Statistik · Admin · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<meta http-equiv="refresh" content="30">
+<div class="container">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">📈 Statistik</a>
+        <a href="/admin/contact" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div style="flex:1; min-width:0;">
+      <h1 style="margin:0 0 1.5rem;">Statistik</h1>
+
+      <!-- Section 1: Live users -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600; display:flex; align-items:center; gap:0.75rem;">
+          <span style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:50%;"></span>
+          Live Nutzer (jetzt aktiv) &nbsp;
+          <span style="font-size:0.8rem; color:var(--text-muted); font-weight:400;">Auto-Refresh alle 30s</span>
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+          <thead>
+            <tr style="background:var(--bg-main);">
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Nutzer</th>
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Aktuelle Seite</th>
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">IP</th>
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Zuletzt gesehen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in live_users %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:0.6rem 1rem; font-weight:600;">{{ u.username }}</td>
+              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.82rem;">{{ u.path }}</td>
+              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.82rem;">{{ u.ip }}</td>
+              <td style="padding:0.6rem 1rem; color:var(--text-muted);">
+                {% if u.seconds_ago < 60 %}{{ u.seconds_ago }}s
+                {% else %}{{ (u.seconds_ago // 60) }}min {{ (u.seconds_ago % 60) }}s
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine aktiven Nutzer.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Section 2: Funnel -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">Conversion Funnel (letzte 30 Tage)</div>
+        <div style="padding:1.5rem; display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+          {% set bv = funnel.billing_visits %}
+          {% set cs = funnel.checkout_starts %}
+          {% set cp = funnel.completed %}
+          <div style="flex:1; min-width:120px; text-align:center;">
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Billing-Seite besucht</div>
+            <div style="background:#3b82f6; border-radius:8px 8px 0 0; min-height:20px;" style="height:{{ [bv * 2, 120]|min }}px;"></div>
+            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
+              <div style="font-size:1.8rem; font-weight:700; color:#3b82f6;">{{ bv }}</div>
+            </div>
+          </div>
+          <div style="font-size:1.5rem; color:var(--text-muted); padding-bottom:1rem;">→</div>
+          <div style="flex:1; min-width:120px; text-align:center;">
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Checkout gestartet</div>
+            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-radius:8px;">
+              <div style="font-size:1.8rem; font-weight:700; color:#f59e0b;">{{ cs }}</div>
+              {% if bv > 0 %}
+              <div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cs / bv) * 100)|round(1) }}% von Schritt 1</div>
+              {% endif %}
+            </div>
+          </div>
+          <div style="font-size:1.5rem; color:var(--text-muted); padding-bottom:1rem;">→</div>
+          <div style="flex:1; min-width:120px; text-align:center;">
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Abonnement abgeschlossen</div>
+            <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-radius:8px;">
+              <div style="font-size:1.8rem; font-weight:700; color:#22c55e;">{{ cp }}</div>
+              {% if cs > 0 %}
+              <div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cp / cs) * 100)|round(1) }}% von Schritt 2</div>
+              {% elif bv > 0 %}
+              <div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cp / bv) * 100)|round(1) }}% von Schritt 1</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Billing without subscription -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">Nutzer auf Billing-Seite ohne aktives Abonnement</div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+          <thead>
+            <tr style="background:var(--bg-main);">
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Nutzer</th>
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Letzter Besuch (Seite)</th>
+              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Letzter Besuch</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in no_sub %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:0.6rem 1rem;">{{ u.username or u.user_id or '—' }}</td>
+              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.82rem;">{{ u.path }}</td>
+              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.82rem;">{{ (u.last_visit or '')[:19] }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine Einträge.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

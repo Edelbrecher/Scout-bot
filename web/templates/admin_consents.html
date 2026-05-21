@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Cookie-Einwilligungen · Admin · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
+        <a href="/admin/contact" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div style="flex:1; min-width:0;">
+      <h1 style="margin:0 0 1.5rem;">Cookie-Einwilligungen</h1>
+
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">
+          Letzte {{ consents|length }} Einträge (neueste zuerst)
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+            <thead>
+              <tr style="background:var(--bg-main);">
+                <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Datum/Zeit</th>
+                <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Nutzer</th>
+                <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Aktion</th>
+                <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">IP</th>
+                <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Browser</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in consents %}
+              <tr style="border-top:1px solid var(--border);">
+                <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.8rem; white-space:nowrap;">{{ c.created_at[:19] if c.created_at else '—' }}</td>
+                <td style="padding:0.6rem 1rem;">{{ c.username or '—' }}</td>
+                <td style="padding:0.6rem 1rem;">
+                  {% if c.action == 'accepted' %}
+                  <span style="color:#22c55e; font-weight:600;">✓ akzeptiert</span>
+                  {% else %}
+                  <span style="color:#f87171; font-weight:600;">✗ abgelehnt</span>
+                  {% endif %}
+                </td>
+                <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.8rem;">{{ c.ip or '—' }}</td>
+                <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.75rem; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ c.user_agent or '' }}">{{ (c.user_agent or '—')[:60] }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine Einträge vorhanden.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

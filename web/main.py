@@ -91,6 +91,9 @@ def sanitize_snowflake_list(value: str) -> str:
 
 _rate_store: dict[str, list[float]] = defaultdict(list)
 
+# Live user tracking
+_active_users: dict[str, dict] = {}
+
 def _is_rate_limited(ip: str, limit: int = 10, window: int = 60) -> bool:
     now = time.time()
     hits = [t for t in _rate_store[ip] if now - t < window]
@@ -104,6 +107,45 @@ def _is_rate_limited(ip: str, limit: int = 10, window: int = 60) -> bool:
 # ---------------------------------------------------------------------------
 # Security headers middleware
 # ---------------------------------------------------------------------------
+
+class UserTrackingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Track active users
+        token = request.cookies.get(SESSION_COOKIE)
+        path = request.url.path
+        if token:
+            try:
+                session_data = signer.loads(token, max_age=SESSION_MAX_AGE)
+                if isinstance(session_data, dict):
+                    uid = session_data.get("uid") or session_data.get("username", "")
+                    uname = session_data.get("username", "")
+                else:
+                    uid = str(session_data)
+                    uname = str(session_data)
+            except Exception:
+                uid = None
+                uname = None
+            ip = request.client.host if request.client else None
+            if uid:
+                _active_users[token] = {
+                    "user_id": uid,
+                    "username": uname,
+                    "path": path,
+                    "last_seen": time.time(),
+                    "ip": ip,
+                }
+                # Cleanup old entries
+                cutoff = time.time() - 300
+                for k in list(_active_users.keys()):
+                    if _active_users[k]["last_seen"] < cutoff:
+                        del _active_users[k]
+                # Log billing page visits to DB
+                if "/billing" in path:
+                    import asyncio as _aio
+                    _aio.create_task(database.log_page_visit(uid, uname, path, ip))
+        response = await call_next(request)
+        return response
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -293,6 +335,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(UserTrackingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/sw.js")
@@ -2055,6 +2098,131 @@ async def admin_popup_save(
     }
     await database.set_setting("popup_config", _json_mod.dumps(config))
     return RedirectResponse("/admin/popup?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# API — cookie consent
+# ---------------------------------------------------------------------------
+
+from pydantic import BaseModel
+
+class CookieConsentBody(BaseModel):
+    action: str
+
+@app.post("/api/cookie-consent")
+async def api_cookie_consent(request: Request, body: CookieConsentBody):
+    session = get_session(request)
+    user_id = session.get("uid") if session else None
+    username = session.get("username") if session else None
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    action = body.action if body.action in ("accepted", "withdrawn") else "accepted"
+    await database.log_cookie_consent(user_id, username, action, ip, ua)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin — cookie consents
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/consents", response_class=HTMLResponse)
+async def admin_consents(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    consents = await database.get_cookie_consents(200)
+    return templates.TemplateResponse("admin_consents.html", {
+        "request": request,
+        "consents": consents,
+        "session": session,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Admin — stats / live users / funnel
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/stats", response_class=HTMLResponse)
+async def admin_stats(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    now = time.time()
+    live_users = []
+    for entry in _active_users.values():
+        live_users.append({
+            "username": entry.get("username") or "—",
+            "path": entry.get("path") or "—",
+            "ip": entry.get("ip") or "—",
+            "seconds_ago": int(now - entry.get("last_seen", now)),
+        })
+    live_users.sort(key=lambda x: x["seconds_ago"])
+    funnel = await database.get_funnel_stats()
+    no_sub = await database.get_billing_visitors_without_sub()
+    return templates.TemplateResponse("admin_stats.html", {
+        "request": request,
+        "live_users": live_users,
+        "funnel": funnel,
+        "no_sub": no_sub,
+        "session": session,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Admin — contact page editor
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/contact", response_class=HTMLResponse)
+async def admin_contact(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    raw = await database.get_setting("contact_config")
+    config = _json_mod.loads(raw) if raw else {
+        "email": "",
+        "discord_invite": "",
+        "response_time": "24 Stunden",
+        "support_hours": "Mo–Fr 9–18 Uhr",
+        "extra_text": "",
+    }
+    return templates.TemplateResponse("admin_contact.html", {
+        "request": request,
+        "config": config,
+        "session": session,
+    })
+
+
+@app.post("/admin/contact/save")
+async def admin_contact_save(
+    request: Request,
+    email: str = Form(""),
+    discord_invite: str = Form(""),
+    response_time: str = Form(""),
+    support_hours: str = Form(""),
+    extra_text: str = Form(""),
+):
+    session, err = _require_admin(request)
+    if err: return err
+    config = {
+        "email": email.strip()[:200],
+        "discord_invite": discord_invite.strip()[:500],
+        "response_time": response_time.strip()[:200],
+        "support_hours": support_hours.strip()[:200],
+        "extra_text": extra_text.strip()[:2000],
+    }
+    await database.set_setting("contact_config", _json_mod.dumps(config))
+    return RedirectResponse("/admin/contact?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Public — contact page
+# ---------------------------------------------------------------------------
+
+@app.get("/kontakt", response_class=HTMLResponse)
+async def kontakt(request: Request):
+    raw = await database.get_setting("contact_config")
+    config = _json_mod.loads(raw) if raw else {}
+    return templates.TemplateResponse("kontakt.html", {
+        "request": request,
+        "config": config,
+    })
 
 
 # ---------------------------------------------------------------------------
