@@ -71,6 +71,14 @@ STRIPE_PRICES: dict[str, dict[str, str]] = {
 STRIPE_PRICE_MONTHLY = STRIPE_PRICES["starter"]["monthly"]
 STRIPE_PRICE_ANNUAL  = STRIPE_PRICES["starter"]["annual"]
 
+# Reverse map: price_id → tier name (for webhook tier detection)
+PRICE_TO_TIER: dict[str, str] = {
+    price_id: tier
+    for tier, intervals in STRIPE_PRICES.items()
+    for price_id in intervals.values()
+    if price_id
+}
+
 TIER_META = {
     "starter":  {"name": "Starter",  "servers": 1, "monthly": 6.99,  "annual": 55.99},
     "clan":     {"name": "Clan",     "servers": 2, "monthly": 10.99, "annual": 87.99},
@@ -1768,15 +1776,26 @@ async def stripe_webhook(request: Request):
         customer_id = obj.get("customer")
         import datetime
 
+        # Extract price info from subscription object
+        items_data = obj.get("items", {}).get("data", [{}])
+        price_obj  = items_data[0].get("price", {}) if items_data else {}
+        price_id   = price_obj.get("id", "")
+        interval   = price_obj.get("recurring", {}).get("interval", "month")
+        plan_interval = "annual" if interval == "year" else "monthly"
+
+        # Resolve tier from price_id (covers upgrades/downgrades via Stripe portal)
+        tier_from_price = PRICE_TO_TIER.get(price_id)
+
+        status     = obj.get("status", "inactive")
+        expires_at = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
+
         # Check if this is a user-level subscription
         user_sub = await database.get_user_by_stripe_customer(customer_id)
         if user_sub:
-            status = obj.get("status", "inactive")
-            interval = obj.get("items", {}).get("data", [{}])[0].get("price", {}).get("recurring", {}).get("interval", "month")
-            plan_interval = "annual" if interval == "year" else "monthly"
-            existing_plan = (user_sub.get("plan") or "starter").split("_")[0]
-            plan_str = f"{existing_plan}_{plan_interval}"
-            expires_at = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
+            # Use price_id → tier if available, else keep existing tier
+            existing_tier = (user_sub.get("plan") or "starter").split("_")[0]
+            tier = tier_from_price or existing_tier
+            plan_str = f"{tier}_{plan_interval}"
             await database.upsert_user_subscription(
                 discord_user_id=user_sub["discord_user_id"],
                 stripe_customer_id=customer_id,
@@ -1785,21 +1804,24 @@ async def stripe_webhook(request: Request):
                 plan=plan_str,
                 expires_at=expires_at,
             )
+            print(f"[webhook] user sub updated: {user_sub['discord_user_id']} → {plan_str} ({status})", flush=True)
         else:
             guild = await database.get_guild_by_stripe_customer(customer_id)
             if guild:
-                status = obj.get("status", "inactive")
-                interval = obj.get("items", {}).get("data", [{}])[0].get("price", {}).get("recurring", {}).get("interval", "month")
-                plan = "annual" if interval == "year" else "monthly"
-                expires_at = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
+                # For guild subscriptions: tier_from_price or existing guild plan
+                existing_guild_tier = (guild.get("subscription_plan") or "starter").split("_")[0]
+                tier = tier_from_price or existing_guild_tier
+                plan_str = f"{tier}_{plan_interval}"
+                expires_at_val = datetime.datetime.utcfromtimestamp(obj["current_period_end"]).isoformat()
                 await database.update_subscription(
                     guild_id=guild["guild_id"],
                     stripe_customer_id=customer_id,
                     stripe_subscription_id=obj["id"],
                     status=status,
-                    plan=plan,
-                    expires_at=expires_at,
+                    plan=plan_str,
+                    expires_at=expires_at_val,
                 )
+                print(f"[webhook] guild sub updated: {guild['guild_id']} → {plan_str} ({status})", flush=True)
 
     elif event["type"] == "checkout.session.completed":
         # Handle user-level checkout completions (source=plans)
@@ -1808,7 +1830,6 @@ async def stripe_webhook(request: Request):
             discord_user_id = meta["discord_user_id"]
             tier = meta.get("tier", "starter")
             import datetime
-            # Retrieve subscription details if available
             sub_id = obj.get("subscription")
             status = "active"
             expires_at = None
@@ -1819,11 +1840,14 @@ async def stripe_webhook(request: Request):
                     try:
                         sub = s.subscriptions.retrieve(sub_id)
                         status = sub.status
+                        price_id = sub.items.data[0].price.id
                         interval = sub.items.data[0].price.recurring.interval
-                        plan_str = f"{tier}_{'annual' if interval == 'year' else 'monthly'}"
+                        # Prefer price_id→tier over metadata tier (single source of truth)
+                        resolved_tier = PRICE_TO_TIER.get(price_id, tier)
+                        plan_str = f"{resolved_tier}_{'annual' if interval == 'year' else 'monthly'}"
                         expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[webhook] checkout sub retrieve error: {e}", flush=True)
             await database.upsert_user_subscription(
                 discord_user_id=discord_user_id,
                 stripe_customer_id=obj.get("customer", ""),
@@ -1832,6 +1856,35 @@ async def stripe_webhook(request: Request):
                 plan=plan_str,
                 expires_at=expires_at,
             )
+            print(f"[webhook] checkout.completed: {discord_user_id} → {plan_str} ({status})", flush=True)
+        # Handle guild-level checkout completions
+        elif meta.get("guild_id") and meta.get("owner_discord_id"):
+            guild_id = meta["guild_id"]
+            tier = meta.get("tier", "starter")
+            import datetime
+            sub_id = obj.get("subscription")
+            if sub_id:
+                s = _stripe_client()
+                if s:
+                    try:
+                        sub = s.subscriptions.retrieve(sub_id)
+                        price_id = sub.items.data[0].price.id
+                        interval = sub.items.data[0].price.recurring.interval
+                        resolved_tier = PRICE_TO_TIER.get(price_id, tier)
+                        plan_str = f"{resolved_tier}_{'annual' if interval == 'year' else 'monthly'}"
+                        expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
+                        await database.update_subscription(
+                            guild_id=guild_id,
+                            stripe_customer_id=obj.get("customer", ""),
+                            stripe_subscription_id=sub_id,
+                            status=sub.status,
+                            plan=plan_str,
+                            expires_at=expires_at,
+                            owner_discord_id=meta.get("owner_discord_id"),
+                        )
+                        print(f"[webhook] guild checkout.completed: {guild_id} → {plan_str}", flush=True)
+                    except Exception as e:
+                        print(f"[webhook] guild checkout sub error: {e}", flush=True)
 
     elif event["type"] == "customer.subscription.deleted":
         customer_id = obj.get("customer")
