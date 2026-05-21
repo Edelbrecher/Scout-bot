@@ -388,3 +388,75 @@ async def upsert_poll_response(poll_id: int, user_id: str, user_name: str, respo
                 response=excluded.response, user_name=excluded.user_name, responded_at=excluded.responded_at
         """, (poll_id, user_id, user_name, response, datetime.utcnow().isoformat()))
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Subscription / server-slot enforcement
+# ---------------------------------------------------------------------------
+
+_TIER_LIMITS = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
+
+
+async def check_guild_join_allowed(guild_id: str, discord_owner_id: str) -> tuple[bool, str]:
+    """
+    Returns (allowed: bool, reason: str).
+    A guild join is allowed when:
+    - The guild already has an active/trialing subscription in the DB, OR
+    - The Discord server owner has remaining server slots in their subscription.
+    If the guild is brand-new (not in DB) and the owner is at/over their limit → not allowed.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # 1. Check if this guild already exists with an active sub
+        async with db.execute(
+            "SELECT subscription_status, subscription_plan FROM guild_configs WHERE guild_id = ?",
+            (guild_id,)
+        ) as cur:
+            existing = await cur.fetchone()
+
+        if existing and existing["subscription_status"] in ("active", "trialing"):
+            return True, "existing_active"
+
+        # 2. Check owner's slots (by owner_discord_id matching the Discord server owner)
+        async with db.execute(
+            """
+            SELECT subscription_plan
+            FROM guild_configs
+            WHERE owner_discord_id = ?
+              AND subscription_status IN ('active', 'trialing')
+            ORDER BY
+                CASE WHEN subscription_plan LIKE 'imperium%' THEN 4
+                     WHEN subscription_plan LIKE 'alliance%' THEN 3
+                     WHEN subscription_plan LIKE 'clan%'     THEN 2
+                     ELSE 1 END DESC
+            LIMIT 1
+            """,
+            (discord_owner_id,)
+        ) as cur:
+            best_plan_row = await cur.fetchone()
+
+        if not best_plan_row:
+            # No subscription at all → only allow if guild already in DB (was previously configured)
+            return existing is not None, "no_subscription"
+
+        tier = (best_plan_row["subscription_plan"] or "starter").split("_")[0]
+        max_slots = _TIER_LIMITS.get(tier, 1)
+
+        # Count currently active/trialing guilds for this owner
+        async with db.execute(
+            """
+            SELECT COUNT(*) FROM guild_configs
+            WHERE owner_discord_id = ?
+              AND subscription_status IN ('active', 'trialing')
+              AND guild_id != ?
+            """,
+            (discord_owner_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+        used_slots = row[0] if row else 0
+
+        if used_slots >= max_slots:
+            return False, f"limit_reached:{used_slots}/{max_slots}:{tier}"
+
+        return True, "ok"

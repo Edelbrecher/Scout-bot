@@ -27,6 +27,7 @@ const TRANSLATIONS = {
     "benefit.setup.body": "One-click auto setup, no technical knowledge required. Everything works out of the box.",
     // Server cards
     "dashboard.servers": "Your servers",
+    "dashboard.slots_full": "Server limit reached — upgrade for more slots",
     "dashboard.invite": "+ Invite Bot",
     "dashboard.empty": "No servers found yet.",
     "dashboard.empty.hint": "Invite the bot to a Discord server — it will appear here automatically.",
@@ -60,6 +61,7 @@ const TRANSLATIONS = {
     "benefit.setup.body": "Ein-Klick Auto-Setup, kein technisches Wissen erforderlich. Alles funktioniert sofort.",
     // Server cards
     "dashboard.servers": "Deine Server",
+    "dashboard.slots_full": "Server-Limit erreicht — upgrade für mehr Slots",
     "dashboard.invite": "+ Bot einladen",
     "dashboard.empty": "Noch keine Server gefunden.",
     "dashboard.empty.hint": "Lade den Bot auf einen Discord-Server ein — er erscheint hier automatisch.",

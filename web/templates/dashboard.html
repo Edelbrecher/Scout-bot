@@ -133,9 +133,23 @@
 
   <!-- ── Server-Liste ── -->
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-    <h2 style="margin:0; font-size:1.1rem;" data-i18n="dashboard.servers">Deine Server</h2>
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      <h2 style="margin:0; font-size:1.1rem;" data-i18n="dashboard.servers">Deine Server</h2>
+      {% if slots_max > 0 %}
+      <span style="font-size:0.78rem; padding:2px 10px; border-radius:20px; border:1px solid {% if slots_full %}rgba(220,38,38,0.5); background:rgba(220,38,38,0.1); color:#f87171;{% else %}var(--border); background:var(--bg-card); color:var(--text-muted);{% endif %}">
+        🖥️ {{ slots_used }}/{{ slots_max }} Server
+      </span>
+      {% endif %}
+    </div>
     {% if invite_url %}
-    <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" data-i18n="dashboard.invite">+ Bot einladen</a>
+      {% if slots_full %}
+      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+        <span style="font-size:0.8rem; color:#f87171;">⚠️ Server-Limit erreicht — upgrade für mehr Slots</span>
+        <span class="btn btn-primary" style="opacity:0.4; cursor:not-allowed; pointer-events:none;" data-i18n="dashboard.invite">+ Bot einladen</span>
+      </div>
+      {% else %}
+      <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" data-i18n="dashboard.invite">+ Bot einladen</a>
+      {% endif %}
     {% endif %}
   </div>
 

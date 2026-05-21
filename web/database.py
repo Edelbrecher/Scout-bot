@@ -122,6 +122,7 @@ async def init_db():
             "subscription_expires_at TEXT",
             "attack_channel_id TEXT",
             "attack_button_message_id TEXT",
+            "owner_discord_id TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
@@ -709,6 +710,7 @@ async def update_subscription(
     status: str,
     plan: str,
     expires_at: str | None,
+    owner_discord_id: str | None = None,
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -717,10 +719,47 @@ async def update_subscription(
                 stripe_subscription_id  = ?,
                 subscription_status     = ?,
                 subscription_plan       = ?,
-                subscription_expires_at = ?
+                subscription_expires_at = ?,
+                owner_discord_id        = COALESCE(?, owner_discord_id)
             WHERE guild_id = ?
-        """, (stripe_customer_id, stripe_subscription_id, status, plan, expires_at, guild_id))
+        """, (stripe_customer_id, stripe_subscription_id, status, plan, expires_at, owner_discord_id, guild_id))
         await db.commit()
+
+
+async def get_owner_active_guilds(owner_discord_id: str) -> list[dict]:
+    """All guilds where this Discord user is the subscription owner and sub is active/trialing."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT guild_id, guild_name, subscription_status, subscription_plan
+            FROM guild_configs
+            WHERE owner_discord_id = ?
+              AND subscription_status IN ('active', 'trialing')
+        """, (owner_discord_id,)) as cursor:
+            return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_owner_tier_limit(owner_discord_id: str) -> int:
+    """Returns the max number of servers this owner's highest active tier allows."""
+    _tier_limits = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT subscription_plan FROM guild_configs
+            WHERE owner_discord_id = ?
+              AND subscription_status IN ('active', 'trialing')
+            ORDER BY
+                CASE WHEN subscription_plan LIKE 'imperium%' THEN 4
+                     WHEN subscription_plan LIKE 'alliance%' THEN 3
+                     WHEN subscription_plan LIKE 'clan%'     THEN 2
+                     ELSE 1 END DESC
+            LIMIT 1
+        """, (owner_discord_id,)) as cursor:
+            row = await cursor.fetchone()
+    if not row or not row["subscription_plan"]:
+        return 0
+    tier = row["subscription_plan"].split("_")[0]
+    return _tier_limits.get(tier, 1)
 
 
 async def set_subscription_status(guild_id: str, status: str, expires_at: str | None = None):

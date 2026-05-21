@@ -489,9 +489,25 @@ async def dashboard(request: Request):
         f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=536996880&scope=bot+applications.commands"
         if client_id else ""
     )
+
+    # Server-slot limits for this user
+    owner_discord_id = session.get("user_id", "")
+    owner_active_guilds = await database.get_owner_active_guilds(owner_discord_id) if owner_discord_id else []
+    slots_used = len(owner_active_guilds)
+    slots_max = await database.get_owner_tier_limit(owner_discord_id) if owner_discord_id else 0
+    slots_full = slots_max > 0 and slots_used >= slots_max
+
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "guilds": guilds, "invite_url": invite_url, "session": session},
+        {
+            "request": request,
+            "guilds": guilds,
+            "invite_url": invite_url,
+            "session": session,
+            "slots_used": slots_used,
+            "slots_max": slots_max,
+            "slots_full": slots_full,
+        },
     )
 
 
@@ -1305,7 +1321,7 @@ async def billing_checkout(
         subscription_data={"trial_period_days": 7},
         success_url=f"{base_url}/guild/{guild_id}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{base_url}/guild/{guild_id}/billing?error=cancelled",
-        metadata={"guild_id": guild_id, "tier": tier},
+        metadata={"guild_id": guild_id, "tier": tier, "owner_discord_id": session.get("user_id", "")},
     )
     if customer_id:
         checkout_kwargs["customer"] = customer_id
@@ -1341,6 +1357,7 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
         plan_str = f"{tier}_{interval}"
         import datetime
         expires_at = datetime.datetime.utcfromtimestamp(sub.current_period_end).isoformat()
+        owner_discord_id = checkout.metadata.get("owner_discord_id") or session.get("user_id", "")
         await database.update_subscription(
             guild_id=guild_id,
             stripe_customer_id=checkout.customer,
@@ -1348,6 +1365,7 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
             status="active",
             plan=plan_str,
             expires_at=expires_at,
+            owner_discord_id=owner_discord_id or None,
         )
     except Exception:
         pass
