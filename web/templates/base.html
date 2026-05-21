@@ -8,13 +8,17 @@
 </head>
 <body>
   {% if request.cookies.get("scouter_session") %}
+  {% set _is_admin = get_is_admin(request) %}
   <nav class="navbar">
     <a href="/dashboard" style="display:flex; align-items:center; gap:0.5rem; text-decoration:none;">
       <img src="/static/logo.png" alt="BIG-EYE" style="width:32px;height:32px;object-fit:cover;border-radius:50%;" />
       <span class="nav-brand">BIG-EYE-BOT</span>
     </a>
     <div class="nav-links" style="align-items:center;">
-      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard" data-i18n="dashboard">Dashboard</a>
+      {% if _is_admin %}
+      <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
+      {% endif %}
       {% set _username = get_username(request) %}
       {% if _username %}
       <div class="nav-profile" id="navProfileWrap">
@@ -32,7 +36,13 @@
             </div>
           </div>
           <div class="nav-profile-divider"></div>
-          <a href="/logout" class="nav-profile-item">🚪 Abmelden</a>
+          <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem;">
+            <span style="font-size:0.8rem; color:var(--text-muted);">Sprache:</span>
+            <button onclick="setLanguage('de')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="Deutsch">🇩🇪 DE</button>
+            <button onclick="setLanguage('en')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="English">🇬🇧 EN</button>
+          </div>
+          <div class="nav-profile-divider"></div>
+          <a href="/logout" class="nav-profile-item" data-i18n="logout">🚪 Abmelden</a>
         </div>
       </div>
       {% endif %}
@@ -59,7 +69,7 @@
 .nav-profile-menu {
   display:none; position:absolute; right:0; top:calc(100% + 8px);
   background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
-  min-width:200px; box-shadow:0 8px 32px rgba(0,0,0,0.4); z-index:200;
+  min-width:220px; box-shadow:0 8px 32px rgba(0,0,0,0.4); z-index:200;
   overflow:hidden;
 }
 .nav-profile-menu.open { display:block; }
@@ -87,5 +97,53 @@ document.addEventListener('click', e => {
   <main>
     {% block content %}{% endblock %}
   </main>
+
+  <!-- i18n -->
+  <script src="/static/i18n.js"></script>
+
+  <!-- Promo popup -->
+  <div id="beb-popup" style="display:none; position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; max-width:320px; border-radius:14px; box-shadow:0 8px 40px rgba(0,0,0,0.5); overflow:hidden; transform:translateY(30px); opacity:0; transition:transform 0.4s cubic-bezier(.22,1,.36,1), opacity 0.4s ease;">
+    <div id="beb-popup-inner" style="padding:1.25rem 1.25rem 1rem; background:#1a1a2e; color:#f1f5f9;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+        <strong id="beb-popup-title" style="font-size:1rem; line-height:1.3;"></strong>
+        <button onclick="bebDismissPopup()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;padding:0 0 0 0.5rem;line-height:1;">×</button>
+      </div>
+      <p id="beb-popup-body" style="font-size:0.875rem; color:#94a3b8; margin:0 0 0.75rem;"></p>
+      <a id="beb-popup-btn" href="#" style="display:inline-block; background:#3b82f6; color:#fff; text-decoration:none; padding:0.4rem 1rem; border-radius:8px; font-size:0.85rem; font-weight:600;"></a>
+    </div>
+  </div>
+  <script>
+  (function() {
+    fetch('/api/popup-config').then(r => r.json()).then(cfg => {
+      if (!cfg.enabled) return;
+      const key = 'beb_popup_dismissed_' + (cfg.version || 0);
+      if (localStorage.getItem(key)) return;
+      const el = document.getElementById('beb-popup');
+      const inner = document.getElementById('beb-popup-inner');
+      document.getElementById('beb-popup-title').textContent = cfg.title || '';
+      document.getElementById('beb-popup-body').textContent = cfg.body || '';
+      const btn = document.getElementById('beb-popup-btn');
+      btn.textContent = cfg.button_text || 'Mehr erfahren';
+      btn.href = cfg.button_url || '#';
+      if (cfg.bg_color) inner.style.background = cfg.bg_color;
+      el.style.display = 'block';
+      setTimeout(() => {
+        el.style.transform = 'translateY(0)';
+        el.style.opacity = '1';
+      }, 4000);
+      window._bebPopupKey = key;
+    }).catch(() => {});
+  })();
+  function bebDismissPopup() {
+    const el = document.getElementById('beb-popup');
+    el.style.transform = 'translateY(30px)';
+    el.style.opacity = '0';
+    setTimeout(() => { el.style.display = 'none'; }, 400);
+    if (window._bebPopupKey) localStorage.setItem(window._bebPopupKey, '1');
+  }
+  </script>
+
+  <!-- Onboarding tour -->
+  <script src="/static/tour.js"></script>
 </body>
 </html>

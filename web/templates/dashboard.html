@@ -7,8 +7,8 @@
     <div style="display:flex; align-items:center; gap:1rem;">
       <img src="/static/logo.png" alt="BIG-EYE" style="width:64px;height:64px;object-fit:cover;border-radius:50%;" />
       <div>
-        <h1 style="margin:0;">Dashboard</h1>
-        <p class="subtitle" style="margin:0;">{{ guilds|length }} server(s) connected</p>
+        <h1 style="margin:0;" data-i18n="dashboard">Dashboard</h1>
+        <p class="subtitle" style="margin:0;">{{ guilds|length }} <span data-i18n="servers_connected">server(s) connected</span></p>
       </div>
     </div>
     {% if invite_url %}

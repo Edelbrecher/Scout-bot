@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Kunden · Admin · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Dashboard</a>
+        <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">👥 Kunden</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Promo-Codes</a>
+        <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup-Config</a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div style="flex:1; min-width:0;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+        <h1 style="margin:0;">Kunden</h1>
+        <span style="color:var(--text-muted); font-size:0.9rem;">{{ guilds|length }} Guilds</span>
+      </div>
+
+      {% if request.query_params.get("saved") %}
+      <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✓ Änderungen gespeichert.</div>
+      {% endif %}
+
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+          <thead>
+            <tr style="background:var(--bg-main);">
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Guild</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Status</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Plan</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Läuft ab</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Override</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for g in guilds %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:0.65rem 1rem;">
+                <div style="font-weight:500;">{{ g.guild_name }}</div>
+                <div style="font-size:0.75rem; color:var(--text-muted);">{{ g.guild_id }}</div>
+              </td>
+              <td style="padding:0.65rem 1rem;">
+                {% set st = g.subscription_status or "free" %}
+                {% if st == "active" %}<span style="color:#22c55e;">● active</span>
+                {% elif st == "trialing" %}<span style="color:#f59e0b;">● trialing</span>
+                {% elif st == "past_due" %}<span style="color:#ef4444;">● past_due</span>
+                {% elif st == "canceled" %}<span style="color:#6b7280;">● canceled</span>
+                {% else %}<span style="color:var(--text-muted);">● free</span>{% endif %}
+              </td>
+              <td style="padding:0.65rem 1rem; color:var(--text-muted);">{{ g.subscription_plan or "—" }}</td>
+              <td style="padding:0.65rem 1rem; color:var(--text-muted); font-size:0.8rem;">{{ g.subscription_expires_at or "—" }}</td>
+              <td style="padding:0.65rem 1rem;">
+                <form method="post" action="/admin/customers/{{ g.guild_id }}/set-plan" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                  <select name="status" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.8rem;">
+                    {% for opt in ["free","active","trialing","canceled","past_due"] %}
+                    <option value="{{ opt }}" {% if (g.subscription_status or "free") == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                  </select>
+                  <select name="plan" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.8rem;">
+                    <option value="">—</option>
+                    {% for opt in ["starter","clan","alliance","imperium"] %}
+                    <option value="{{ opt }}" {% if g.subscription_plan == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" style="background:#3b82f6; border:none; border-radius:6px; padding:0.25rem 0.6rem; color:#fff; font-size:0.8rem; cursor:pointer;">Speichern</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="padding:1.5rem; color:var(--text-muted); text-align:center;">Keine Guilds gefunden.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

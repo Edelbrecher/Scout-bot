@@ -324,6 +324,12 @@ def _get_username(request: Request) -> str:
 
 templates.env.globals["get_username"] = _get_username
 
+def _get_is_admin(request: Request) -> bool:
+    session = get_session(request)
+    return bool(session and session.get("type") == "admin")
+
+templates.env.globals["get_is_admin"] = _get_is_admin
+
 import json as _json
 templates.env.filters["from_json"] = lambda s: _json.loads(s) if s else []
 
@@ -1856,3 +1862,192 @@ async def einsatz_delete(request: Request, guild_id: str, plan_id: int):
     if err: return err
     await database.delete_attack_plan(guild_id, plan_id)
     return RedirectResponse(f"/guild/{guild_id}/einsatz", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — admin panel
+# ---------------------------------------------------------------------------
+
+import json as _json_mod
+
+def _require_admin(request: Request):
+    """Returns (session, error_response). error_response set if not admin."""
+    session = get_session(request)
+    if not session:
+        return None, RedirectResponse("/login", status_code=303)
+    if session.get("type") != "admin":
+        return None, RedirectResponse("/dashboard", status_code=303)
+    return session, None
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    guilds = await database.get_all_guilds()
+    total = len(guilds)
+    active = sum(1 for g in guilds if g.get("subscription_status") == "active")
+    trialing = sum(1 for g in guilds if g.get("subscription_status") == "trialing")
+    free = sum(1 for g in guilds if g.get("subscription_status") in (None, "free", ""))
+    # MRR estimate based on plan
+    plan_prices = {"starter": 6.99, "clan": 10.99, "alliance": 14.99, "imperium": 19.99}
+    mrr = sum(
+        plan_prices.get(g.get("subscription_plan") or "starter", 6.99)
+        for g in guilds
+        if g.get("subscription_status") in ("active", "trialing")
+    )
+    recent = await database.get_recent_guilds(10)
+    return templates.TemplateResponse("admin_dashboard.html", {
+        "request": request,
+        "total": total,
+        "active": active,
+        "trialing": trialing,
+        "free": free,
+        "mrr": round(mrr, 2),
+        "recent": recent,
+        "session": session,
+    })
+
+
+@app.get("/admin/customers", response_class=HTMLResponse)
+async def admin_customers(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    guilds = await database.get_all_guilds()
+    return templates.TemplateResponse("admin_customers.html", {
+        "request": request,
+        "guilds": guilds,
+        "session": session,
+    })
+
+
+@app.post("/admin/customers/{guild_id}/set-plan")
+async def admin_set_plan(
+    request: Request,
+    guild_id: str,
+    status: str = Form(...),
+    plan: str = Form(...),
+):
+    session, err = _require_admin(request)
+    if err: return err
+    if status not in ("free", "active", "trialing", "canceled", "past_due"):
+        status = "free"
+    if plan not in ("starter", "clan", "alliance", "imperium", ""):
+        plan = ""
+    await database.update_subscription_plan(guild_id, status, plan)
+    return RedirectResponse("/admin/customers?saved=1", status_code=303)
+
+
+@app.get("/admin/promos", response_class=HTMLResponse)
+async def admin_promos(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    coupons = []
+    error = ""
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        coupon_list = stripe.Coupon.list(limit=20)
+        for c in coupon_list.data:
+            promos = stripe.PromotionCode.list(coupon=c.id, limit=10)
+            coupons.append({
+                "id": c.id,
+                "name": c.name or c.id,
+                "percent_off": c.percent_off,
+                "duration": c.duration,
+                "valid": c.valid,
+                "promo_codes": [p.code for p in promos.data],
+            })
+    except Exception as exc:
+        error = str(exc)
+    return templates.TemplateResponse("admin_promos.html", {
+        "request": request,
+        "coupons": coupons,
+        "error": error,
+        "session": session,
+    })
+
+
+@app.post("/admin/promos/create")
+async def admin_promos_create(
+    request: Request,
+    name: str = Form(...),
+    code: str = Form(...),
+    percent_off: int = Form(...),
+    duration: str = Form("once"),
+):
+    session, err = _require_admin(request)
+    if err: return err
+    if not 5 <= percent_off <= 100:
+        return RedirectResponse("/admin/promos?error=percent_off+must+be+5-100", status_code=303)
+    if duration not in ("once", "forever", "repeating"):
+        duration = "once"
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        coupon = stripe.Coupon.create(percent_off=percent_off, duration=duration, name=name.strip())
+        stripe.PromotionCode.create(coupon=coupon.id, code=code.strip().upper())
+    except Exception as exc:
+        return RedirectResponse(f"/admin/promos?error={exc}", status_code=303)
+    return RedirectResponse("/admin/promos?saved=1", status_code=303)
+
+
+@app.get("/admin/popup", response_class=HTMLResponse)
+async def admin_popup(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    raw = await database.get_setting("popup_config")
+    config = _json_mod.loads(raw) if raw else {
+        "enabled": False,
+        "title": "🎉 Angebot",
+        "body": "Upgrade auf Pro und spare 20%!",
+        "button_text": "Jetzt upgraden",
+        "button_url": "",
+        "bg_color": "#1a1a2e",
+        "version": 0,
+    }
+    return templates.TemplateResponse("admin_popup.html", {
+        "request": request,
+        "config": config,
+        "session": session,
+    })
+
+
+@app.post("/admin/popup/save")
+async def admin_popup_save(
+    request: Request,
+    title: str = Form(""),
+    body: str = Form(""),
+    button_text: str = Form(""),
+    button_url: str = Form(""),
+    bg_color: str = Form("#1a1a2e"),
+    enabled: str = Form("off"),
+):
+    session, err = _require_admin(request)
+    if err: return err
+    import time as _time
+    config = {
+        "enabled": enabled == "on",
+        "title": title.strip()[:200],
+        "body": body.strip()[:1000],
+        "button_text": button_text.strip()[:100],
+        "button_url": button_url.strip()[:500],
+        "bg_color": bg_color.strip()[:20] if bg_color.strip().startswith("#") else "#1a1a2e",
+        "version": int(_time.time()),
+    }
+    await database.set_setting("popup_config", _json_mod.dumps(config))
+    return RedirectResponse("/admin/popup?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# API — popup config (public, for JS fetch)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/popup-config")
+async def api_popup_config():
+    raw = await database.get_setting("popup_config")
+    if not raw:
+        return JSONResponse({"enabled": False})
+    try:
+        data = _json_mod.loads(raw)
+    except Exception:
+        return JSONResponse({"enabled": False})
+    return JSONResponse(data)

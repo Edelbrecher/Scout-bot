@@ -169,6 +169,7 @@ async def init_db():
 
     await _init_farming_tables()
     await _init_einsatz_tables()
+    await _init_admin_tables()
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -1177,3 +1178,54 @@ async def delete_attack_plan(guild_id: str, plan_id: int):
             (plan_id, guild_id)
         )
         await db.commit()
+
+
+# ── Admin settings ────────────────────────────────────────────────────────────
+
+async def _init_admin_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS admin_settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def get_setting(key: str) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT value FROM admin_settings WHERE key = ?", (key,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def set_setting(key: str, value: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO admin_settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+        await db.commit()
+
+
+async def update_subscription_plan(guild_id: str, status: str, plan: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET subscription_status = ?, subscription_plan = ? WHERE guild_id = ?",
+            (status, plan, guild_id),
+        )
+        await db.commit()
+
+
+async def get_recent_guilds(limit: int = 10) -> list[dict]:
+    """Return the most recently added guilds (no created_at column, use rowid)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_configs ORDER BY rowid DESC LIMIT ?", (limit,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]

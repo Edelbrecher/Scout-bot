@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Promo-Codes · Admin · BIG-EYE-BOT{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Dashboard</a>
+        <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">🎟 Promo-Codes</a>
+        <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup-Config</a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div style="flex:1; min-width:0;">
+      <h1 style="margin:0 0 1.5rem;">Promo-Codes</h1>
+
+      {% if request.query_params.get("saved") %}
+      <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✓ Coupon erstellt.</div>
+      {% endif %}
+      {% if error %}
+      <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#ef4444; font-size:0.9rem;">⚠ {{ error }}</div>
+      {% endif %}
+      {% if request.query_params.get("error") %}
+      <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#ef4444; font-size:0.9rem;">⚠ {{ request.query_params.get("error") }}</div>
+      {% endif %}
+
+      <!-- Create coupon form -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1.25rem; margin-bottom:1.5rem;">
+        <h2 style="margin:0 0 1rem; font-size:1rem;">Neuen Coupon erstellen</h2>
+        <form method="post" action="/admin/promos/create" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div>
+            <label style="display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.3rem;">Name</label>
+            <input name="name" required placeholder="z.B. Sommer-Deal" style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; color:var(--text); font-size:0.9rem; box-sizing:border-box;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.3rem;">Code</label>
+            <input name="code" required placeholder="SOMMER20" style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; color:var(--text); font-size:0.9rem; box-sizing:border-box; text-transform:uppercase;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.3rem;">Rabatt (%)</label>
+            <input name="percent_off" type="number" min="5" max="100" value="20" required style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; color:var(--text); font-size:0.9rem; box-sizing:border-box;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.3rem;">Dauer</label>
+            <select name="duration" style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; color:var(--text); font-size:0.9rem; box-sizing:border-box;">
+              <option value="once">once (einmalig)</option>
+              <option value="forever">forever (dauerhaft)</option>
+              <option value="repeating">repeating (wiederkehrend)</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1;">
+            <button type="submit" style="background:#3b82f6; border:none; border-radius:8px; padding:0.55rem 1.5rem; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer;">Coupon erstellen</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Existing coupons -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">Bestehende Coupons</div>
+        {% if coupons %}
+        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+          <thead>
+            <tr style="background:var(--bg-main);">
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Name</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Rabatt</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Dauer</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Status</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Promo-Codes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in coupons %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:0.65rem 1rem; font-weight:500;">{{ c.name }}</td>
+              <td style="padding:0.65rem 1rem; color:#22c55e;">{{ c.percent_off }}%</td>
+              <td style="padding:0.65rem 1rem; color:var(--text-muted);">{{ c.duration }}</td>
+              <td style="padding:0.65rem 1rem;">
+                {% if c.valid %}<span style="color:#22c55e;">● aktiv</span>{% else %}<span style="color:#6b7280;">● inaktiv</span>{% endif %}
+              </td>
+              <td style="padding:0.65rem 1rem;">
+                {% if c.promo_codes %}
+                  {% for code in c.promo_codes %}
+                  <span style="background:var(--bg-main); border:1px solid var(--border); border-radius:5px; padding:0.15rem 0.5rem; font-family:monospace; font-size:0.82rem; margin-right:0.3rem;">{{ code }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div style="padding:1.5rem; color:var(--text-muted); text-align:center;">Noch keine Coupons vorhanden.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
