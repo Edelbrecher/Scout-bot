@@ -36,6 +36,8 @@ DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost/
 PERM_ADMINISTRATOR = 0x8
 PERM_MANAGE_GUILD = 0x20
 
+ADMIN_DISCORD_IDS = set(filter(None, os.environ.get("ADMIN_DISCORD_IDS", "").split(",")))
+
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -492,11 +494,13 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
         )
 
     username = user.get("global_name") or user.get("username", "Unknown")
+    discord_id = str(user["id"])
+    session_type = "admin" if discord_id in ADMIN_DISCORD_IDS else "discord"
     session_data = {
-        "type": "discord",
-        "uid": str(user["id"]),
+        "type": session_type,
+        "uid": discord_id,
         "username": username,
-        "guilds": accessible,
+        "guilds": None if session_type == "admin" else accessible,
     }
     token = create_session(session_data)
     response = RedirectResponse("/dashboard", status_code=303)
