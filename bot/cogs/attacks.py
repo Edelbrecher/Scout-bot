@@ -152,71 +152,91 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
         self.alert_channel_id = alert_channel_id
 
     async def on_submit(self, interaction: discord.Interaction):
-        raw = self.attack_text.value
-        attacks = parse_travian_attacks(raw)
+        try:
+            raw = self.attack_text.value
+            attacks = parse_travian_attacks(raw)
 
-        if not attacks:
+            if not attacks:
+                await interaction.response.send_message(
+                    "❌ Keine Angriffe erkannt. Stelle sicher, dass du den kompletten Truppenplatz-Text (Strg+A + Strg+C) eingefügt hast.",
+                    ephemeral=True,
+                )
+                return
+
+            guild_id = str(interaction.guild_id)
+            reporter_id = str(interaction.user.id)
+            reporter_name = interaction.user.display_name
+            attacks_json_str = json.dumps(attacks, ensure_ascii=False)
+
+            report_id = await database.save_attack_report(
+                guild_id, reporter_id, reporter_name, raw, attacks_json_str
+            )
+
+            # Build embed
+            embed = discord.Embed(
+                title="⚔️ Angriff gemeldet!",
+                color=0xe74c3c,
+                timestamp=datetime.utcnow(),
+            )
+            embed.add_field(name="Gemeldet von", value=interaction.user.mention, inline=True)
+            embed.add_field(name="Anzahl Angriffe", value=str(len(attacks)), inline=True)
+            embed.set_footer(text=f"Report ID: {report_id}")
+
+            TYPE_EMOJI = {"raid": "🪖", "attack": "⚔️", "reinforce": "🛡️", "spy": "🕵️", "settle": "🏘️"}
+            for i, atk in enumerate(attacks[:10], 1):
+                wt = atk.get("wave_type", "attack")
+                emoji = TYPE_EMOJI.get(wt, "⚔️")
+                name = f"{emoji} Angriff {i}"
+                parts = []
+                if atk.get("attacker"):
+                    parts.append(f"**Angreifer:** {atk['attacker']}")
+                if atk.get("attacker_village"):
+                    parts.append(f"**Von:** {atk['attacker_village']} {atk.get('coords','')}")
+                if atk.get("village"):
+                    parts.append(f"**Ziel:** {atk['village']}")
+                if atk.get("arrival"):
+                    parts.append(f"**Ankunft:** {atk['arrival']}")
+                troops = atk.get("troops", {})
+                if troops:
+                    troop_str = " · ".join(f"{v}× {k}" for k, v in list(troops.items())[:5])
+                    parts.append(f"**Truppen:** {troop_str}")
+                embed.add_field(name=name, value="\n".join(parts) or "—", inline=False)
+
+            if len(attacks) > 10:
+                embed.add_field(
+                    name="...",
+                    value=f"Und {len(attacks) - 10} weitere Angriffe (siehe Dashboard)",
+                    inline=False,
+                )
+
+            # Post to alert channel
+            alert_channel = interaction.guild.get_channel(int(self.alert_channel_id))
+            if alert_channel:
+                await alert_channel.send(embed=embed)
+
             await interaction.response.send_message(
-                "❌ Keine Angriffe erkannt. Stelle sicher, dass du den kompletten Truppenplatz-Text (Strg+A + Strg+C) eingefügt hast.",
+                f"✅ **{len(attacks)} Angriff(e)** wurden gemeldet und im Alarm-Kanal gepostet.",
                 ephemeral=True,
             )
-            return
+        except Exception as e:
+            print(f"[attacks] on_submit error: {e}", flush=True)
+            try:
+                await interaction.response.send_message(
+                    f"❌ Fehler beim Verarbeiten: {e}",
+                    ephemeral=True,
+                )
+            except Exception:
+                pass
 
-        guild_id = str(interaction.guild_id)
-        reporter_id = str(interaction.user.id)
-        reporter_name = interaction.user.display_name
-        attacks_json_str = json.dumps(attacks, ensure_ascii=False)
-
-        report_id = await database.save_attack_report(
-            guild_id, reporter_id, reporter_name, raw, attacks_json_str
-        )
-
-        # Build embed
-        embed = discord.Embed(
-            title="⚔️ Angriff gemeldet!",
-            color=0xe74c3c,
-            timestamp=datetime.utcnow(),
-        )
-        embed.add_field(name="Gemeldet von", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Anzahl Angriffe", value=str(len(attacks)), inline=True)
-        embed.set_footer(text=f"Report ID: {report_id}")
-
-        TYPE_EMOJI = {"raid": "🪖", "attack": "⚔️", "reinforce": "🛡️", "spy": "🕵️", "settle": "🏘️"}
-        for i, atk in enumerate(attacks[:10], 1):
-            wt = atk.get("wave_type", "attack")
-            emoji = TYPE_EMOJI.get(wt, "⚔️")
-            name = f"{emoji} Angriff {i}"
-            parts = []
-            if atk.get("attacker"):
-                parts.append(f"**Angreifer:** {atk['attacker']}")
-            if atk.get("attacker_village"):
-                parts.append(f"**Von:** {atk['attacker_village']} {atk.get('coords','')}")
-            if atk.get("village"):
-                parts.append(f"**Ziel:** {atk['village']}")
-            if atk.get("arrival"):
-                parts.append(f"**Ankunft:** {atk['arrival']}")
-            troops = atk.get("troops", {})
-            if troops:
-                troop_str = " · ".join(f"{v}× {k}" for k, v in list(troops.items())[:5])
-                parts.append(f"**Truppen:** {troop_str}")
-            embed.add_field(name=name, value="\n".join(parts) or "—", inline=False)
-
-        if len(attacks) > 10:
-            embed.add_field(
-                name="...",
-                value=f"Und {len(attacks) - 10} weitere Angriffe (siehe Dashboard)",
-                inline=False,
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        print(f"[attacks] Modal error: {error}", flush=True)
+        try:
+            await interaction.response.send_message(
+                f"❌ Interner Fehler: {error}",
+                ephemeral=True,
             )
-
-        # Post to alert channel
-        alert_channel = interaction.guild.get_channel(int(self.alert_channel_id))
-        if alert_channel:
-            await alert_channel.send(embed=embed)
-
-        await interaction.response.send_message(
-            f"✅ **{len(attacks)} Angriff(e)** wurden gemeldet und im Alarm-Kanal gepostet.",
-            ephemeral=True,
-        )
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
