@@ -61,6 +61,25 @@ async def init_db():
                 created_at  TEXT NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scout_reports (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id      TEXT NOT NULL,
+                guild_id        TEXT NOT NULL,
+                source          TEXT NOT NULL DEFAULT 'text',  -- 'text' or 'ocr'
+                raw_text        TEXT,
+                target_player   TEXT,
+                target_village  TEXT,
+                target_coords   TEXT,
+                attacker_player TEXT,
+                attacker_village TEXT,
+                resources_json  TEXT,   -- {"wood":..,"clay":..,"iron":..,"crop":..,"total":..}
+                troops_json     TEXT,   -- {"Legionnaire":5, ...}
+                losses_json     TEXT,   -- {"Legionnaire":1, ...}
+                experience      INTEGER DEFAULT 0,
+                created_at      TEXT NOT NULL
+            )
+        """)
         await db.commit()
 
     # Migrations
@@ -332,6 +351,69 @@ async def get_scout_channel_info(channel_id: str) -> dict | None:
         ) as cursor:
             row = await cursor.fetchone()
             return dict(row) if row else None
+
+
+async def delete_scout_channel(channel_id: str):
+    """Remove a scout channel from the database (e.g. when deleted in Discord)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM scout_channels WHERE channel_id = ?", (channel_id,))
+        await db.commit()
+
+
+async def save_scout_report(
+    channel_id: str,
+    guild_id: str,
+    source: str,
+    raw_text: str | None,
+    target_player: str | None,
+    target_village: str | None,
+    target_coords: str | None,
+    attacker_player: str | None,
+    attacker_village: str | None,
+    resources_json: str | None,
+    troops_json: str | None,
+    losses_json: str | None,
+    experience: int = 0,
+) -> int:
+    """Insert a parsed scout report and return its rowid."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO scout_reports
+                (channel_id, guild_id, source, raw_text,
+                 target_player, target_village, target_coords,
+                 attacker_player, attacker_village,
+                 resources_json, troops_json, losses_json,
+                 experience, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            channel_id, guild_id, source, raw_text,
+            target_player, target_village, target_coords,
+            attacker_player, attacker_village,
+            resources_json, troops_json, losses_json,
+            experience, datetime.utcnow().isoformat(),
+        ))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_scout_reports(channel_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM scout_reports WHERE channel_id = ? ORDER BY created_at DESC",
+            (channel_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_all_scout_reports(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM scout_reports WHERE guild_id = ? ORDER BY created_at DESC",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_poll(poll_id: int) -> dict | None:

@@ -1,4 +1,6 @@
 import asyncio
+import io
+import json
 import re
 
 import discord
@@ -7,6 +9,157 @@ from discord.ext import commands
 
 import database
 from utils import require_premium
+
+# ---------------------------------------------------------------------------
+# Travian Scout-Report Parser
+# ---------------------------------------------------------------------------
+
+# Troop-name aliases (DE + EN) → canonical name
+_TROOP_ALIASES: dict[str, str] = {
+    # Römisch / Roman
+    "legionnaire": "Legionnaire", "legionär": "Legionnaire", "legionäre": "Legionnaire",
+    "praetorian": "Praetorian", "prätorianer": "Praetorian",
+    "imperian": "Imperian", "imperier": "Imperian",
+    "equites legati": "Equites Legati", "aufklärer": "Equites Legati",
+    "equites imperatoris": "Equites Imperatoris",
+    "equites caesaris": "Equites Caesaris",
+    "battering ram": "Battering Ram", "rammbock": "Battering Ram",
+    "fire catapult": "Fire Catapult", "feuerwerkzeug": "Fire Catapult",
+    "senator": "Senator",
+    "settler": "Settler", "siedler": "Settler",
+    # Gallisch / Gaul
+    "phalanx": "Phalanx",
+    "swordsman": "Swordsman", "schwertkämpfer": "Swordsman",
+    "pathfinder": "Pathfinder", "pfadfinder": "Pathfinder",
+    "theutates thunder": "Theutates Thunder", "theutates-donner": "Theutates Thunder",
+    "druidrider": "Druidrider", "druidentreiter": "Druidrider",
+    "haeduan": "Haeduan", "haeduer": "Haeduan",
+    "ram": "Gaul Ram", "gallische ramme": "Gaul Ram",
+    "trebuchet": "Trebuchet", "trebuchet": "Trebuchet",
+    "chieftain": "Chieftain", "häuptling (gallisch)": "Chieftain",
+    # Teutonisch / Teuton
+    "clubswinger": "Clubswinger", "keulenträger": "Clubswinger",
+    "spearman": "Spearman", "speerträger": "Spearman",
+    "axeman": "Axeman", "axtkämpfer": "Axeman",
+    "scout": "Scout", "späher": "Scout",
+    "paladin": "Paladin",
+    "teutonic knight": "Teutonic Knight", "teut. ritter": "Teutonic Knight", "teutonischer ritter": "Teutonic Knight",
+    "teutonen-rammbock": "Teuton Ram", "teuton ram": "Teuton Ram",
+    "kriegsmaschine": "Catapult", "catapult": "Catapult",
+    "häuptling": "Chief", "chief": "Chief",
+    # Natars
+    "natarian": "Natarian", "natarianische": "Natarian",
+}
+
+_RESOURCE_RE = re.compile(
+    r"(?:holz|wood|lumber)[:\s]+([0-9.,]+).*?"
+    r"(?:lehm|ton|clay)[:\s]+([0-9.,]+).*?"
+    r"(?:eisen|iron)[:\s]+([0-9.,]+).*?"
+    r"(?:korn|getreide|crop)[:\s]+([0-9.,]+)",
+    re.IGNORECASE | re.DOTALL,
+)
+_COORD_RE   = re.compile(r"\((-?\d+)\|(-?\d+)\)")
+_PLAYER_RE  = re.compile(r"(?:spieler|player)[:\s]+(.+)", re.IGNORECASE)
+_VILLAGE_RE = re.compile(r"(?:dorf|village)[:\s]+(.+)", re.IGNORECASE)
+_EXP_RE     = re.compile(r"(?:erfahrung|experience)[:\s]+([0-9]+)", re.IGNORECASE)
+_NUM_RE     = re.compile(r"[\d.,]+")
+
+# Line patterns that suggest this is a troop row:
+# "Legionnaire  10  0" or "Legionär: 10"
+_TROOP_LINE_RE = re.compile(
+    r"^(.+?)\s{2,}(\d+)(?:\s+(\d+))?$|^(.+?):\s*(\d+)$",
+    re.MULTILINE,
+)
+
+
+def _clean_num(s: str) -> int:
+    return int(re.sub(r"[.,]", "", s)) if s else 0
+
+
+def parse_scout_report(text: str) -> dict:
+    """Parse a Travian scout report pasted as plain text.
+    Returns a dict with all extracted fields (may be partially filled)."""
+    result: dict = {
+        "target_player": None, "target_village": None, "target_coords": None,
+        "attacker_player": None, "attacker_village": None,
+        "resources": None, "troops": {}, "losses": {}, "experience": 0,
+    }
+
+    # Resources
+    m = _RESOURCE_RE.search(text)
+    if m:
+        wood, clay, iron, crop = [_clean_num(x) for x in m.groups()]
+        result["resources"] = {"wood": wood, "clay": clay, "iron": iron, "crop": crop,
+                               "total": wood + clay + iron + crop}
+
+    # Coordinates — first match = target
+    coords = _COORD_RE.findall(text)
+    if coords:
+        result["target_coords"] = f"({coords[0][0]}|{coords[0][1]})"
+
+    # Player / Village names
+    players = _PLAYER_RE.findall(text)
+    villages = _VILLAGE_RE.findall(text)
+    if players:
+        result["target_player"] = players[0].strip()
+        if len(players) > 1:
+            result["attacker_player"] = players[1].strip()
+    if villages:
+        result["target_village"] = villages[0].strip()
+        if len(villages) > 1:
+            result["attacker_village"] = villages[1].strip()
+
+    # Experience
+    m = _EXP_RE.search(text)
+    if m:
+        result["experience"] = int(m.group(1))
+
+    # Troops: scan every line for "TroopName  count  losses" pattern
+    troops: dict[str, int] = {}
+    losses: dict[str, int] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or len(line) > 80:
+            continue
+        # Split on 2+ whitespace
+        parts = re.split(r"\s{2,}", line)
+        if len(parts) >= 2:
+            name_raw = parts[0].strip()
+            # Try to match numbers
+            nums = [_clean_num(p) for p in parts[1:] if _NUM_RE.fullmatch(p.strip())]
+            if not nums:
+                continue
+            canonical = _TROOP_ALIASES.get(name_raw.lower())
+            if canonical:
+                troops[canonical] = nums[0]
+                if len(nums) >= 2:
+                    losses[canonical] = nums[1]
+        # Also handle "Name: N" format
+        elif ":" in line:
+            name_raw, _, val = line.partition(":")
+            name_raw = name_raw.strip()
+            val = val.strip()
+            canonical = _TROOP_ALIASES.get(name_raw.lower())
+            if canonical and _NUM_RE.fullmatch(val):
+                troops[canonical] = _clean_num(val)
+
+    result["troops"] = troops
+    result["losses"] = losses
+    return result
+
+
+async def _try_ocr(image_bytes: bytes) -> str | None:
+    """Attempt OCR on image bytes. Returns extracted text or None if unavailable."""
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        return pytesseract.image_to_string(img, lang="deu+eng")
+    except ImportError:
+        return None  # tesseract not installed
+    except Exception as e:
+        print(f"[scout][ocr] error: {e}", flush=True)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +435,81 @@ class Scout(commands.Cog):
             button_message_id=str(msg.id),
         )
         await interaction.response.send_message("✅ Scout Request button posted!", ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Listen for scout reports posted in scout channels."""
+        if message.author.bot:
+            return
+        channel_id = str(message.channel.id)
+        if not await database.is_scout_channel(channel_id):
+            return
+
+        guild_id = str(message.guild.id) if message.guild else ""
+        ch_info  = await database.get_scout_channel_info(channel_id)
+
+        # ── Text report ──────────────────────────────────────────────────────
+        if message.content and len(message.content) > 30:
+            parsed = parse_scout_report(message.content)
+            # Only save if we extracted something meaningful
+            if parsed["troops"] or parsed["resources"] or parsed["target_player"]:
+                # Fallback: fill coords/player from channel meta if not in text
+                if not parsed["target_coords"] and ch_info:
+                    parsed["target_coords"] = ch_info.get("coordinates")
+                if not parsed["target_player"] and ch_info:
+                    parsed["target_player"] = ch_info.get("player")
+                if not parsed["target_village"] and ch_info:
+                    parsed["target_village"] = ch_info.get("village")
+                await database.save_scout_report(
+                    channel_id=channel_id, guild_id=guild_id, source="text",
+                    raw_text=message.content,
+                    target_player=parsed["target_player"],
+                    target_village=parsed["target_village"],
+                    target_coords=parsed["target_coords"],
+                    attacker_player=parsed["attacker_player"],
+                    attacker_village=parsed["attacker_village"],
+                    resources_json=json.dumps(parsed["resources"]) if parsed["resources"] else None,
+                    troops_json=json.dumps(parsed["troops"]) if parsed["troops"] else None,
+                    losses_json=json.dumps(parsed["losses"]) if parsed["losses"] else None,
+                    experience=parsed["experience"],
+                )
+                await message.add_reaction("📋")
+                print(f"[scout] text report saved for ch {channel_id}: {parsed['troops']}", flush=True)
+                return
+
+        # ── Image / OCR report ───────────────────────────────────────────────
+        for attachment in message.attachments:
+            if not attachment.content_type or not attachment.content_type.startswith("image/"):
+                continue
+            img_bytes = await attachment.read()
+            ocr_text = await _try_ocr(img_bytes)
+            if not ocr_text:
+                # OCR unavailable — acknowledge image but note we can't parse it
+                await message.add_reaction("🖼️")
+                continue
+            parsed = parse_scout_report(ocr_text)
+            if parsed["troops"] or parsed["resources"] or parsed["target_player"]:
+                if not parsed["target_coords"] and ch_info:
+                    parsed["target_coords"] = ch_info.get("coordinates")
+                if not parsed["target_player"] and ch_info:
+                    parsed["target_player"] = ch_info.get("player")
+                if not parsed["target_village"] and ch_info:
+                    parsed["target_village"] = ch_info.get("village")
+                await database.save_scout_report(
+                    channel_id=channel_id, guild_id=guild_id, source="ocr",
+                    raw_text=ocr_text,
+                    target_player=parsed["target_player"],
+                    target_village=parsed["target_village"],
+                    target_coords=parsed["target_coords"],
+                    attacker_player=parsed["attacker_player"],
+                    attacker_village=parsed["attacker_village"],
+                    resources_json=json.dumps(parsed["resources"]) if parsed["resources"] else None,
+                    troops_json=json.dumps(parsed["troops"]) if parsed["troops"] else None,
+                    losses_json=json.dumps(parsed["losses"]) if parsed["losses"] else None,
+                    experience=parsed["experience"],
+                )
+                await message.add_reaction("🔍")
+                print(f"[scout] ocr report saved for ch {channel_id}", flush=True)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):

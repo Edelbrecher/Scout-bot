@@ -1229,9 +1229,41 @@ async def scout_channel_status(request: Request, guild_id: str, channel_id: str)
     """Poll endpoint: returns whether channel still exists in our DB."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    from fastapi.responses import JSONResponse
     ch = await database.get_scout_channel_info(channel_id)
     return JSONResponse({"exists": ch is not None})
+
+
+@app.get("/guild/{guild_id}/scout-channels/{channel_id}")
+async def scout_channel_detail(request: Request, guild_id: str, channel_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    ch = await database.get_scout_channel_info(channel_id)
+    if not ch or ch.get("guild_id") != guild_id:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    reports = await database.get_scout_reports_for_channel(channel_id)
+    # Always return JSON (used by the slide-over panel)
+    return JSONResponse({"ch": dict(ch), "reports": reports})
+
+
+@app.get("/guild/{guild_id}/scout/stats", response_class=HTMLResponse)
+async def scout_stats_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    stats = await database.get_scout_stats(guild_id)
+    return templates.TemplateResponse(
+        "scout_stats.html",
+        {"request": request, "guild": guild, "stats": stats},
+    )
 
 
 # ---------------------------------------------------------------------------

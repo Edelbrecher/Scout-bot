@@ -48,6 +48,25 @@ async def init_db():
     # Migrations
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS scout_reports (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id      TEXT NOT NULL,
+                guild_id        TEXT NOT NULL,
+                source          TEXT NOT NULL DEFAULT 'text',
+                raw_text        TEXT,
+                target_player   TEXT,
+                target_village  TEXT,
+                target_coords   TEXT,
+                attacker_player TEXT,
+                attacker_village TEXT,
+                resources_json  TEXT,
+                troops_json     TEXT,
+                losses_json     TEXT,
+                experience      INTEGER DEFAULT 0,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS res_requests (
                 id                INTEGER PRIMARY KEY AUTOINCREMENT,
                 guild_id          TEXT NOT NULL,
@@ -1934,3 +1953,33 @@ async def get_auth_stats() -> dict:
             "no_server_logins": no_server,
             "daily": daily,
         }
+
+
+async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM scout_reports WHERE channel_id = ? ORDER BY created_at DESC",
+            (channel_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_scout_stats(guild_id: str) -> list[dict]:
+    """Aggregate scout reports per target player for statistics view."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT
+                sr.target_player,
+                sr.target_coords,
+                COUNT(*) AS scout_count,
+                MAX(sr.created_at) AS last_scouted,
+                GROUP_CONCAT(sr.troops_json, '|||') AS all_troops,
+                GROUP_CONCAT(sr.resources_json, '|||') AS all_resources
+            FROM scout_reports sr
+            WHERE sr.guild_id = ? AND sr.target_player IS NOT NULL
+            GROUP BY sr.target_player
+            ORDER BY scout_count DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
