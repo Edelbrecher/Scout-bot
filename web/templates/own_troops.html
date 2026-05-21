@@ -109,9 +109,10 @@
             <th>Dorf</th>
             <th>Koords</th>
             <th>Typ</th>
-            <th style="text-align:right;">Off-Score</th>
-            <th style="text-align:right;">Def-Score</th>
-            <th>Truppen</th>
+            <th style="text-align:right;">Off</th>
+            <th style="text-align:right;">Def</th>
+            <th style="text-align:right;">🌾 Korn</th>
+            <th style="min-width:200px;">Truppenverteilung</th>
             <th style="color:var(--text-muted); font-size:0.8rem;">Importiert</th>
           </tr>
         </thead>
@@ -119,40 +120,48 @@
           {% for v in own_villages %}
           {% set vtype = v.village_type %}
           <tr>
-            <td><strong>{{ v.village_name or '—' }}</strong>
-              {% if v.population %}<span style="color:var(--text-muted); font-size:0.78rem;"> BW {{ v.population }}</span>{% endif %}
+            <td><strong>{{ v.village_name or '—' }}</strong></td>
+            <td style="font-family:monospace; font-size:0.85rem; white-space:nowrap;">
+              {% if v.x is not none %}({{ v.x }}|{{ v.y }}){% else %}—{% endif %}
             </td>
-            <td style="font-family:monospace; font-size:0.85rem;">({{ v.x }}|{{ v.y }})</td>
             <td>
-              <span style="
-                background:{% if vtype=='off' %}rgba(239,68,68,0.18){% elif vtype=='def' %}rgba(34,197,94,0.18){% elif vtype=='scout' %}rgba(139,92,246,0.18){% elif vtype=='leer' %}rgba(100,116,139,0.12){% else %}rgba(100,116,139,0.18){% endif %};
-                border:1px solid {% if vtype=='off' %}rgba(239,68,68,0.45){% elif vtype=='def' %}rgba(34,197,94,0.45){% elif vtype=='scout' %}rgba(139,92,246,0.45){% else %}rgba(100,116,139,0.45){% endif %};
-                color:{% if vtype=='off' %}#ef4444{% elif vtype=='def' %}#22c55e{% elif vtype=='scout' %}#a78bfa{% else %}#94a3b8{% endif %};
-                border-radius:20px; padding:0.15rem 0.55rem; font-size:0.78rem; font-weight:700; white-space:nowrap;">
-                {% if vtype=='off' %}🗡️ Off{% elif vtype=='def' %}🛡️ Def{% elif vtype=='scout' %}🔭 Scout{% elif vtype=='leer' %}📭 Leer{% else %}⚔️ Gemischt{% endif %}
+              <span class="vtype-badge vtype-{{ vtype }}">
+                {% if vtype=='off' %}🗡️ Off{% elif vtype=='def' %}🛡️ Def{% elif vtype=='scout' %}🔭 Scout{% elif vtype=='leer' %}📭 Leer{% else %}⚔️ Mix{% endif %}
               </span>
             </td>
-            <td style="text-align:right; font-weight:700; color:#ef4444;">{{ v.off_score }}</td>
-            <td style="text-align:right; font-weight:700; color:#22c55e;">{{ v.def_score }}</td>
+            <td style="text-align:right; font-weight:700; color:#ef4444; white-space:nowrap;">{{ "{:,}".format(v.off_score).replace(",",".") }}</td>
+            <td style="text-align:right; font-weight:700; color:#22c55e; white-space:nowrap;">{{ "{:,}".format(v.def_score).replace(",",".") }}</td>
+            <td style="text-align:right; font-weight:700; color:#f59e0b; white-space:nowrap;">
+              {% if v.total_crop %}{{ "{:,}".format(v.total_crop).replace(",",".") }}{% else %}—{% endif %}
+            </td>
             <td>
-              <!-- Mini bar chart -->
               {% if v.troops %}
-              <div style="display:flex; flex-wrap:wrap; gap:0.2rem; max-width:320px;">
-                {% set total_troops = v.troops.values() | sum %}
+              {% set total_crop = v.total_crop or 1 %}
+              <!-- Stacked horizontal bar -->
+              <div class="troop-bar-wrap">
+                {% set ns = namespace(idx=0) %}
                 {% for tname, cnt in v.troops.items() %}
                 {% if cnt > 0 %}
-                <div style="position:relative; display:flex; flex-direction:column; align-items:center;"
-                     title="{{ tname }}: {{ cnt }}">
-                  <div style="
-                    height:28px; width:{{ [4, (cnt / [total_troops,1]|max * 60)|int]|max }}px;
-                    background:{% if vtype=='off' %}rgba(239,68,68,0.55){% elif vtype=='def' %}rgba(34,197,94,0.55){% else %}rgba(100,116,139,0.55){% endif %};
-                    border-radius:2px 2px 0 0; min-width:4px;">
-                  </div>
-                  <span style="font-size:0.6rem; color:var(--text-muted); writing-mode:vertical-rl; transform:rotate(180deg); margin-top:2px; max-height:40px; overflow:hidden;">
-                    {{ tname | truncate(8, true, '') }}
-                  </span>
-                  <span style="font-size:0.65rem; color:var(--text); font-weight:600;">{{ cnt }}</span>
-                </div>
+                {% set crop_per = [1,1,1,2,3,4,5,6,5,1,0,1,1,1,1,2,3,4,5,6,1,1,2,2,2,3,5,5,6] %}
+                {% set troop_crop = (cnt * 1)|int %}
+                {% set pct = (cnt / (v.troops.values()|sum) * 100)|round(1) %}
+                <div class="troop-seg" data-troop="{{ tname }}" data-count="{{ cnt }}"
+                     style="width:{{ pct }}%; background:var(--tc-{{ ns.idx % 10 }});"
+                     title="{{ tname }}: {{ cnt }}"></div>
+                {% set ns.idx = ns.idx + 1 %}
+                {% endif %}
+                {% endfor %}
+              </div>
+              <!-- Legend -->
+              <div class="troop-legend">
+                {% set ns2 = namespace(idx=0) %}
+                {% for tname, cnt in v.troops.items() %}
+                {% if cnt > 0 %}
+                <span class="troop-pill" style="border-color:var(--tc-{{ ns2.idx % 10 }});">
+                  <span class="troop-dot" style="background:var(--tc-{{ ns2.idx % 10 }});"></span>
+                  {{ tname }}&thinsp;<strong>{{ cnt }}</strong>
+                </span>
+                {% set ns2.idx = ns2.idx + 1 %}
                 {% endif %}
                 {% endfor %}
               </div>
@@ -175,6 +184,47 @@
     <p class="empty">Noch keine eigenen Dörfer importiert. Nutze das Formular oben.</p>
   </div>
   {% endif %}
+
+<style>
+/* Troop color palette */
+:root {
+  --tc-0: #ef4444; --tc-1: #3b82f6; --tc-2: #22c55e; --tc-3: #f59e0b;
+  --tc-4: #a855f7; --tc-5: #06b6d4; --tc-6: #f97316; --tc-7: #ec4899;
+  --tc-8: #84cc16; --tc-9: #64748b;
+}
+.troop-bar-wrap {
+  display:flex; height:14px; border-radius:7px; overflow:hidden;
+  background:rgba(255,255,255,0.06); min-width:160px; max-width:320px;
+  margin-bottom:6px;
+}
+.troop-seg {
+  height:100%; transition:opacity 0.15s; cursor:default; min-width:2px;
+}
+.troop-seg:hover { opacity:0.7; }
+.troop-legend {
+  display:flex; flex-wrap:wrap; gap:3px; max-width:320px;
+}
+.troop-pill {
+  display:inline-flex; align-items:center; gap:3px;
+  font-size:0.72rem; color:var(--text-muted);
+  background:rgba(255,255,255,0.04); border:1px solid transparent;
+  border-radius:4px; padding:1px 5px; white-space:nowrap;
+}
+.troop-pill strong { color:var(--text); }
+.troop-dot {
+  width:6px; height:6px; border-radius:50%; flex-shrink:0;
+}
+/* Typ badges */
+.vtype-badge {
+  display:inline-block; border-radius:20px; padding:0.15rem 0.55rem;
+  font-size:0.78rem; font-weight:700; white-space:nowrap; border:1px solid;
+}
+.vtype-off   { background:rgba(239,68,68,0.18);   border-color:rgba(239,68,68,0.45);   color:#ef4444; }
+.vtype-def   { background:rgba(34,197,94,0.18);   border-color:rgba(34,197,94,0.45);   color:#22c55e; }
+.vtype-scout { background:rgba(139,92,246,0.18);  border-color:rgba(139,92,246,0.45);  color:#a78bfa; }
+.vtype-leer  { background:rgba(100,116,139,0.12); border-color:rgba(100,116,139,0.35); color:#94a3b8; }
+.vtype-mixed { background:rgba(100,116,139,0.18); border-color:rgba(100,116,139,0.45); color:#94a3b8; }
+</style>
 
 </div>
 {% endblock %}

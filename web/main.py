@@ -2545,11 +2545,24 @@ async def own_troops_page(request: Request, guild_id: str):
     import json as _json
     own_villages = await database.get_own_villages(guild_id)
     # Parse troops_json back to dict for display
+    CROP_MAP = {
+        "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
+        "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
+        "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
+        "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
+        "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3, "Teutonen Reiter": 3,
+        "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Ramme": 5, "Kriegsmaschine": 6, "Katapult": 6,
+        "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
+        "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
+        "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
+        "Siedler": 1, "Held": 0,
+    }
     for v in own_villages:
         try:
             v["troops"] = _json.loads(v.get("troops_json") or "{}")
         except Exception:
             v["troops"] = {}
+        v["total_crop"] = sum(CROP_MAP.get(t, 1) * c for t, c in v["troops"].items())
 
     # Load recent attack reports for defense priority cross-reference
     attack_reports = await database.get_attack_reports(guild_id, limit=20)
