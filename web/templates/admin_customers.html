@@ -78,8 +78,22 @@
           <!-- User info -->
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-              <span style="font-weight:700; font-size:0.95rem;">{{ c.discord_username }}</span>
-              <span style="font-size:0.72rem; color:var(--text-muted); font-family:monospace;">{{ uid }}</span>
+              {% if uid == '__unowned__' %}
+                <span style="font-weight:700; font-size:0.95rem; color:var(--text-muted);">Ohne Inhaber</span>
+              {% else %}
+                <span style="font-weight:700; font-size:0.95rem;">{{ c.discord_username }}</span>
+                {% if c.stripe_info.name and c.stripe_info.name != c.discord_username %}
+                  <span style="font-size:0.78rem; color:var(--text-muted);">· {{ c.stripe_info.name }}</span>
+                {% endif %}
+              {% endif %}
+              {% if c.stripe_info.email %}
+                <a href="mailto:{{ c.stripe_info.email }}" style="font-size:0.78rem; color:#3b82f6; text-decoration:none;">{{ c.stripe_info.email }}</a>
+              {% endif %}
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.15rem;">
+              {% if uid != '__unowned__' %}
+              <span style="font-size:0.72rem; color:var(--text-muted); font-family:monospace;">Discord: {{ uid }}</span>
+              {% endif %}
             </div>
             <div style="display:flex; gap:0.4rem; margin-top:0.3rem; flex-wrap:wrap; align-items:center;">
               <!-- User-level sub badge -->
@@ -138,6 +152,14 @@
                   <span style="font-size:0.8rem;">{{ (usub.expires_at or '—')[:10] }}</span>
                   <span style="color:var(--text-muted);">Stripe Customer</span>
                   <span style="font-family:monospace; font-size:0.75rem;">{{ usub.stripe_customer_id or '—' }}</span>
+                  {% if c.stripe_info.email %}
+                  <span style="color:var(--text-muted);">E-Mail</span>
+                  <span><a href="mailto:{{ c.stripe_info.email }}" style="color:#3b82f6;">{{ c.stripe_info.email }}</a></span>
+                  {% endif %}
+                  {% if c.stripe_info.name %}
+                  <span style="color:var(--text-muted);">Stripe Name</span>
+                  <span>{{ c.stripe_info.name }}</span>
+                  {% endif %}
                 </div>
               </div>
               <!-- Edit user sub -->

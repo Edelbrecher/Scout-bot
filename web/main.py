@@ -2198,6 +2198,42 @@ async def admin_customers(request: Request):
     session, err = _require_admin(request)
     if err: return err
     customers = await database.get_customers_overview()
+
+    # Enrich with Stripe customer data (email, name) where we have a stripe_customer_id
+    stripe_cache: dict[str, dict] = {}
+    if STRIPE_SECRET_KEY:
+        stripe.api_key = STRIPE_SECRET_KEY
+        # Collect unique stripe_customer_ids across all customers + guilds
+        cids: set[str] = set()
+        for c in customers:
+            cid = c["user_sub"].get("stripe_customer_id")
+            if cid:
+                cids.add(cid)
+            for g in c["guilds"]:
+                gcid = g.get("stripe_customer_id")
+                if gcid:
+                    cids.add(gcid)
+        for cid in cids:
+            try:
+                sc = stripe.Customer.retrieve(cid)
+                stripe_cache[cid] = {
+                    "email": sc.get("email") or "",
+                    "name": sc.get("name") or "",
+                }
+            except Exception:
+                pass
+
+    # Attach stripe info to each customer
+    for c in customers:
+        cid = c["user_sub"].get("stripe_customer_id")
+        if not cid:
+            # Fall back to first guild with a stripe_customer_id
+            for g in c["guilds"]:
+                if g.get("stripe_customer_id"):
+                    cid = g["stripe_customer_id"]
+                    break
+        c["stripe_info"] = stripe_cache.get(cid, {}) if cid else {}
+
     total_active = sum(
         1 for c in customers
         if any(g.get("subscription_status") in ("active","trialing") for g in c["guilds"])
