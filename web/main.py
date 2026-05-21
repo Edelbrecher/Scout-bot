@@ -513,11 +513,7 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
             or (int(g.get("permissions", 0)) & PERM_MANAGE_GUILD)
         )
     ]
-
-    if not accessible:
-        return RedirectResponse(
-            "/login?error=No+accessible+servers+found.+You+need+Admin+or+Manage+Server+permission."
-        )
+    # No longer block login if no accessible servers — users can subscribe without a server
 
     username = user.get("global_name") or user.get("username", "Unknown")
     discord_id = str(user["id"])
