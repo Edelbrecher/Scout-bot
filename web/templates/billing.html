@@ -52,11 +52,25 @@
       {% endif %}
     </div>
     {% if guild.stripe_customer_id and sub_status in ('active','trialing','past_due') %}
-    <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
-      <button type="submit" class="btn btn-secondary">🔧 Abo verwalten &amp; kündigen</button>
-    </form>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
+        <button type="submit" class="btn btn-secondary">🔧 Verwalten</button>
+      </form>
+      {% if is_owner %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/billing/cancel"
+            onsubmit="return confirm('Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.')">
+        <button type="submit" class="btn btn-danger">❌ Abo kündigen</button>
+      </form>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
+
+  {% if cancelled %}
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;">
+    ✅ Dein Abo wurde gekündigt und läuft bis zum Ende der bezahlten Periode weiter.
+  </div>
+  {% endif %}
 
   {% if not stripe_configured %}
   <div class="card">

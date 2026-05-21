@@ -1512,10 +1512,12 @@ async def billing_page(request: Request, guild_id: str):
         "request": request,
         "guild": guild,
         "is_admin": is_admin,
+        "is_owner": is_guild_owner(session, guild),
         "stripe_pk": STRIPE_PUBLISHABLE_KEY,
         "stripe_configured": stripe_configured,
         "tier_meta": TIER_META,
         "saved": request.query_params.get("saved"),
+        "cancelled": request.query_params.get("cancelled"),
         "error": request.query_params.get("error"),
     })
 
@@ -1657,12 +1659,79 @@ async def billing_portal(request: Request, guild_id: str):
     return RedirectResponse(portal.url, status_code=303)
 
 
+@app.post("/guild/{guild_id}/billing/cancel")
+async def billing_cancel(request: Request, guild_id: str):
+    """Cancel the guild subscription at period end."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=not_found", status_code=303)
+    if not is_guild_owner(session, guild):
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=only_owner", status_code=303)
+    sub_id = guild.get("stripe_subscription_id")
+    if not sub_id:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=no_subscription", status_code=303)
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=stripe_error", status_code=303)
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        stripe.Subscription.modify(sub_id, cancel_at_period_end=True)
+        await database.update_subscription(
+            guild_id=guild_id,
+            stripe_customer_id=guild.get("stripe_customer_id", ""),
+            stripe_subscription_id=sub_id,
+            status="cancelled",
+            plan=guild.get("subscription_plan", ""),
+            expires_at=guild.get("subscription_expires_at"),
+        )
+    except Exception as e:
+        print(f"[billing/cancel] Error: {e}", flush=True)
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=cancel_failed", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/billing?cancelled=1", status_code=303)
+
+
+@app.post("/plans/cancel")
+async def plans_cancel(request: Request):
+    """Cancel the user-level subscription at period end."""
+    session, err = _require_session(request)
+    if err: return err
+    discord_user_id = session.get("uid", "")
+    user_sub = await database.get_user_subscription(discord_user_id)
+    if not user_sub:
+        return RedirectResponse("/plans?error=no_subscription", status_code=303)
+    sub_id = user_sub.get("stripe_subscription_id")
+    if not sub_id:
+        return RedirectResponse("/plans?error=no_subscription", status_code=303)
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse("/plans?error=stripe_error", status_code=303)
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        stripe.Subscription.modify(sub_id, cancel_at_period_end=True)
+        await database.upsert_user_subscription(
+            discord_user_id=discord_user_id,
+            stripe_customer_id=user_sub.get("stripe_customer_id", ""),
+            stripe_subscription_id=sub_id,
+            status="cancelled",
+            plan=user_sub.get("plan", ""),
+            expires_at=user_sub.get("expires_at"),
+        )
+    except Exception as e:
+        print(f"[plans/cancel] Error: {e}", flush=True)
+        return RedirectResponse("/plans?error=cancel_failed", status_code=303)
+    return RedirectResponse("/plans?cancelled=1", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # Routes — Plans (subscribe without a server)
 # ---------------------------------------------------------------------------
 
 @app.get("/plans", response_class=HTMLResponse)
-async def plans_page(request: Request, error: str = ""):
+async def plans_page(request: Request, error: str = "", cancelled: str = ""):
     session = _get_session(request)
     user_sub = None
     if session:
@@ -1673,6 +1742,7 @@ async def plans_page(request: Request, error: str = ""):
         "logged_in": bool(session),
         "user_sub": user_sub,
         "error": error,
+        "cancelled": cancelled,
     })
 
 
