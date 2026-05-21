@@ -619,6 +619,8 @@ async def scout_page(request: Request, guild_id: str, saved: str = ""):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     scout_channels = await database.get_scout_channels(guild_id)
     return templates.TemplateResponse(
         "scout.html",
@@ -638,6 +640,9 @@ async def scout_save(
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
     if err: return err
 
     category_id = sanitize_snowflake(category_id)
@@ -1525,6 +1530,8 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     is_admin = session.get("type") == "admin"
     attack_reports = await database.get_attack_reports(guild_id, limit=50)
     attack_stats = await database.get_attack_stats(guild_id)
@@ -1686,6 +1693,9 @@ async def attacks_config_save(
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     attack_channel_id = sanitize_snowflake(attack_channel_id)
     await database.set_attack_channel_web(guild_id, attack_channel_id)
     return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
@@ -1838,6 +1848,8 @@ async def farming_snapshot(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     tw_world = (guild.get("tw_world") or "").strip()
