@@ -373,6 +373,35 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(UserTrackingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+from fastapi import Request as _FRequest
+from fastapi.responses import HTMLResponse as _HTMLResponse
+from starlette.exceptions import HTTPException as _HTTPException
+
+@app.exception_handler(_HTTPException)
+async def http_exception_handler(request: _FRequest, exc: _HTTPException):
+    _tmpl = Jinja2Templates(directory="templates")
+    if exc.status_code == 404:
+        ctx = {"emoji": "🗺️", "code": "404", "message": "Diese Seite existiert nicht.", "detail": None}
+    elif exc.status_code == 403:
+        ctx = {"emoji": "🔒", "code": "403", "message": "Zugriff verweigert.", "detail": None}
+    else:
+        ctx = {"emoji": "⚙️", "code": str(exc.status_code), "message": exc.detail or "Ein Fehler ist aufgetreten.", "detail": None}
+    return _tmpl.TemplateResponse("error.html", {"request": request, **ctx}, status_code=exc.status_code)
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: _FRequest, exc: Exception):
+    import traceback as _tb
+    _tmpl = Jinja2Templates(directory="templates")
+    detail = type(exc).__name__ + ": " + str(exc)
+    print(f"[500] {request.url} → {detail}\n{''.join(_tb.format_exc())}", flush=True)
+    return _tmpl.TemplateResponse("error.html", {
+        "request": request,
+        "emoji": "💥",
+        "code": "500",
+        "message": "Interner Serverfehler. Wir wurden benachrichtigt.",
+        "detail": detail,
+    }, status_code=500)
+
 @app.get("/sw.js")
 async def service_worker():
     return FileResponse("static/sw.js", media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
@@ -1434,7 +1463,7 @@ async def guild_settings_page(request: Request, guild_id: str):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
-    guild = await database.get_guild_config(guild_id)
+    guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     flash = request.query_params.get("flash", "")
