@@ -1301,10 +1301,15 @@ async def billing_checkout(
     )
     if customer_id:
         checkout_kwargs["customer"] = customer_id
-    else:
-        checkout_kwargs["customer_creation"] = "always"
 
-    checkout_session = s.checkout.Session.create(**checkout_kwargs)
+    try:
+        checkout_session = s.checkout.Session.create(**checkout_kwargs)
+    except Exception as e:
+        print(f"[billing] Stripe checkout error: {e}")
+        return RedirectResponse(
+            f"/guild/{guild_id}/billing?error={str(e)[:80].replace(' ', '+')}",
+            status_code=303,
+        )
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
