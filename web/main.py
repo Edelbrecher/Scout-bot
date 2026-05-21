@@ -3,9 +3,11 @@ import asyncio
 import base64
 import re
 import secrets
+import smtplib
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from email.mime.text import MIMEText
 from urllib.parse import urlencode
 
 import httpx
@@ -78,6 +80,43 @@ PRICE_TO_TIER: dict[str, str] = {
     for price_id in intervals.values()
     if price_id
 }
+
+# ---------------------------------------------------------------------------
+# E-Mail notifications
+# ---------------------------------------------------------------------------
+_NOTIFY_TO   = "support@travops.online"
+_SMTP_HOST   = os.environ.get("SMTP_HOST", "")
+_SMTP_PORT   = int(os.environ.get("SMTP_PORT", "587"))
+_SMTP_USER   = os.environ.get("SMTP_USER", "")
+_SMTP_PASS   = os.environ.get("SMTP_PASS", "")
+_SMTP_FROM   = os.environ.get("SMTP_FROM", _SMTP_USER)
+
+
+def _send_email(subject: str, body: str) -> None:
+    """Send a plain-text notification e-mail (fire-and-forget, runs in thread)."""
+    if not _SMTP_HOST or not _SMTP_USER or not _SMTP_PASS:
+        print(f"[mail] SMTP not configured — skipping: {subject}", flush=True)
+        return
+    try:
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = subject
+        msg["From"]    = _SMTP_FROM
+        msg["To"]      = _NOTIFY_TO
+        with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=10) as s:
+            s.ehlo()
+            s.starttls()
+            s.login(_SMTP_USER, _SMTP_PASS)
+            s.sendmail(_SMTP_FROM, [_NOTIFY_TO], msg.as_string())
+        print(f"[mail] sent: {subject}", flush=True)
+    except Exception as exc:
+        print(f"[mail] error sending '{subject}': {exc}", flush=True)
+
+
+async def _notify(subject: str, body: str) -> None:
+    """Async wrapper — runs SMTP in a thread so it never blocks the event loop."""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _send_email, subject, body)
+
 
 TIER_META = {
     "starter":  {"name": "Starter",  "servers": 1, "monthly": 6.99,  "annual": 55.99},
@@ -597,6 +636,19 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
     token = create_session(session_data)
     # Cache username in user_subscriptions so admin can see who is who
     await database.cache_discord_username(discord_id, username)
+
+    # Notify on first-ever login
+    if not _is_returning:
+        asyncio.create_task(_notify(
+            subject=f"🆕 Neuer Nutzer: {username}",
+            body=(
+                f"Ein neuer Nutzer hat sich zum ersten Mal bei TravOps angemeldet.\n\n"
+                f"Discord-Name : {username}\n"
+                f"Discord-ID   : {discord_id}\n"
+                f"Server-Anzahl: {len(user_guilds)} (davon {len(accessible)} zugänglich)\n"
+            ),
+        ))
+
     response = RedirectResponse("/dashboard", status_code=303)
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
     response.delete_cookie("oauth_state")
@@ -1957,6 +2009,19 @@ async def stripe_webhook(request: Request):
                 expires_at=expires_at,
             )
             print(f"[webhook] checkout.completed: {discord_user_id} → {plan_str} ({status})", flush=True)
+            # Lookup cached username for notification
+            _uname = (await database.get_user_subscription(discord_user_id) or {}).get("discord_username", discord_user_id)
+            asyncio.create_task(_notify(
+                subject=f"💳 Neuer Käufer: {_uname} – {plan_str}",
+                body=(
+                    f"Ein Nutzer hat ein TravOps-Abonnement abgeschlossen.\n\n"
+                    f"Discord-Name : {_uname}\n"
+                    f"Discord-ID   : {discord_user_id}\n"
+                    f"Plan         : {plan_str}\n"
+                    f"Status       : {status}\n"
+                    f"Stripe-Kunde : {obj.get('customer', '—')}\n"
+                ),
+            ))
         # Handle guild-level checkout completions
         elif meta.get("guild_id") and meta.get("owner_discord_id"):
             guild_id = meta["guild_id"]
@@ -1983,6 +2048,18 @@ async def stripe_webhook(request: Request):
                             owner_discord_id=meta.get("owner_discord_id"),
                         )
                         print(f"[webhook] guild checkout.completed: {guild_id} → {plan_str}", flush=True)
+                        _owner = meta.get("owner_discord_id", "—")
+                        asyncio.create_task(_notify(
+                            subject=f"💳 Neuer Guild-Käufer: {guild_id} – {plan_str}",
+                            body=(
+                                f"Ein Server-Besitzer hat ein TravOps Guild-Abo abgeschlossen.\n\n"
+                                f"Guild-ID     : {guild_id}\n"
+                                f"Owner-ID     : {_owner}\n"
+                                f"Plan         : {plan_str}\n"
+                                f"Status       : {sub.status}\n"
+                                f"Stripe-Kunde : {obj.get('customer', '—')}\n"
+                            ),
+                        ))
                     except Exception as e:
                         print(f"[webhook] guild checkout sub error: {e}", flush=True)
 
