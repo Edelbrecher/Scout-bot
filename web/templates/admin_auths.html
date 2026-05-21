@@ -86,10 +86,10 @@
           {% if stats.daily %}
           {% set max_count = namespace(val=1) %}
           {% for d in stats.daily %}{% if d.count > max_count.val %}{% set max_count.val = d.count %}{% endif %}{% endfor %}
-          <div style="display:flex; align-items:flex-end; gap:4px; height:80px;">
+          <div style="display:flex; align-items:flex-end; gap:4px; height:80px; overflow:hidden;">
             {% for d in stats.daily %}
-            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
-              <div style="width:100%; background:#f59e0b; border-radius:3px 3px 0 0; height:{{ ((d.count / max_count.val) * 70) | int }}px; min-height:4px;" title="{{ d.day }}: {{ d.count }}"></div>
+            <div style="flex:1; height:100%; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#f59e0b; border-radius:3px 3px 0 0; height:{{ [[(( d.count / max_count.val) * 76) | int, 4] | max, 80] | min }}px;" title="{{ d.day }}: {{ d.count }}"></div>
             </div>
             {% endfor %}
           </div>
