@@ -145,5 +145,45 @@ document.addEventListener('click', e => {
 
   <!-- Onboarding tour -->
   <script src="/static/tour.js"></script>
+
+  <!-- Cookie Consent Banner -->
+  <div id="cookie-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:10000; background:#1a1a2e; border-top:1px solid #334155; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
+    <div style="flex:1; min-width:0;">
+      <span style="font-size:0.88rem; color:#e2e8f0;">
+        🍪 Wir verwenden technisch notwendige Cookies für den Login sowie lokalen Browser-Speicher für deine Einstellungen.
+        Keine Tracking- oder Werbe-Cookies.
+        <a href="/cookies" style="color:#3b82f6; margin-left:0.3rem;">Mehr erfahren</a>
+      </span>
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-shrink:0;">
+      <a href="/cookies" style="padding:0.4rem 0.9rem; border:1px solid #475569; border-radius:6px; color:#94a3b8; text-decoration:none; font-size:0.83rem;">Details</a>
+      <button onclick="acceptCookies()" style="padding:0.4rem 1.1rem; background:#3b82f6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.83rem; font-weight:600;">Akzeptieren</button>
+    </div>
+  </div>
+  <script>
+  (function() {
+    if (!localStorage.getItem('beb_cookies_accepted')) {
+      document.getElementById('cookie-banner').style.display = 'flex';
+    }
+  })();
+  function acceptCookies() {
+    localStorage.setItem('beb_cookies_accepted', '1');
+    const b = document.getElementById('cookie-banner');
+    b.style.opacity = '0';
+    b.style.transition = 'opacity 0.3s';
+    setTimeout(() => b.style.display = 'none', 300);
+  }
+  </script>
+
+  <!-- Footer -->
+  <footer style="text-align:center; padding:1.5rem 1rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.8rem; margin-top:2rem;">
+    <div style="display:flex; justify-content:center; gap:1.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+      <a href="/impressum" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Impressum</a>
+      <a href="/datenschutz" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Datenschutz</a>
+      <a href="/agb" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">AGB</a>
+      <a href="/cookies" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Cookies</a>
+    </div>
+    © {{ current_year }} BIG-EYE-BOT · Alle Rechte vorbehalten
+  </footer>
 </body>
 </html>

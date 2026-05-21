@@ -331,7 +331,9 @@ def _get_is_admin(request: Request) -> bool:
 templates.env.globals["get_is_admin"] = _get_is_admin
 
 import json as _json
+import datetime as _dt_global
 templates.env.filters["from_json"] = lambda s: _json.loads(s) if s else []
+templates.env.globals["current_year"] = _dt_global.datetime.utcnow().year
 
 
 # ---------------------------------------------------------------------------
@@ -2035,6 +2037,59 @@ async def admin_popup_save(
     }
     await database.set_setting("popup_config", _json_mod.dumps(config))
     return RedirectResponse("/admin/popup?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# API — popup config (public, for JS fetch)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Legal pages
+# ---------------------------------------------------------------------------
+
+import datetime as _dt
+
+_IMPRESSUM = {
+    "name":        os.environ.get("IMPRESSUM_NAME", "Maximilian Frischholz"),
+    "street":      os.environ.get("IMPRESSUM_STREET", "Musterstraße 1"),
+    "city":        os.environ.get("IMPRESSUM_CITY", "12345 Musterstadt"),
+    "country":     os.environ.get("IMPRESSUM_COUNTRY", "Deutschland"),
+    "email":       os.environ.get("IMPRESSUM_EMAIL", "kontakt@big-eye-bot.com"),
+    "phone":       os.environ.get("IMPRESSUM_PHONE", ""),
+    "website":     os.environ.get("IMPRESSUM_WEBSITE", "https://big-eye-bot.com"),
+    "ust_id":      os.environ.get("IMPRESSUM_UST_ID", ""),
+    "responsible": os.environ.get("IMPRESSUM_RESPONSIBLE", "Maximilian Frischholz, Anschrift wie oben"),
+    "updated":     os.environ.get("IMPRESSUM_UPDATED", "Mai 2026"),
+}
+
+templates.env.globals["impressum"] = _IMPRESSUM
+
+def _legal_ctx(request: Request) -> dict:
+    return {
+        "request": request,
+        "impressum": _IMPRESSUM,
+        "current_year": _dt.datetime.utcnow().year,
+    }
+
+
+@app.get("/impressum", response_class=HTMLResponse)
+async def page_impressum(request: Request):
+    return templates.TemplateResponse("impressum.html", _legal_ctx(request))
+
+
+@app.get("/datenschutz", response_class=HTMLResponse)
+async def page_datenschutz(request: Request):
+    return templates.TemplateResponse("datenschutz.html", _legal_ctx(request))
+
+
+@app.get("/agb", response_class=HTMLResponse)
+async def page_agb(request: Request):
+    return templates.TemplateResponse("agb.html", _legal_ctx(request))
+
+
+@app.get("/cookies", response_class=HTMLResponse)
+async def page_cookies(request: Request):
+    return templates.TemplateResponse("cookies.html", _legal_ctx(request))
 
 
 # ---------------------------------------------------------------------------

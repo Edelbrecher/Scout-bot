@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Cookie-Richtlinie · BIG-EYE-BOT{% endblock %}
+{% block content %}
+<div class="container" style="max-width:780px; padding-bottom:3rem;">
+  <div style="margin-bottom:1.5rem;">
+    <a href="/dashboard" class="back-link">← Zurück</a>
+    <h1 style="margin:0.5rem 0 0;">Cookie-Richtlinie</h1>
+  </div>
+
+  <div class="card" style="line-height:1.8;">
+
+    <h2>Was sind Cookies?</h2>
+    <p>Cookies sind kleine Textdateien, die beim Besuch einer Website auf Ihrem Gerät gespeichert werden. Wir verwenden außerdem den lokalen Browser-Speicher (localStorage) für ähnliche Zwecke.</p>
+
+    <h2>Welche Cookies wir verwenden</h2>
+
+    <div style="overflow-x:auto; margin:1rem 0;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Typ</th>
+            <th>Zweck</th>
+            <th>Dauer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>scouter_session</code></td>
+            <td>🔒 Notwendig</td>
+            <td>Session-Authentifizierung (Discord-Login)</td>
+            <td>8 Stunden</td>
+          </tr>
+          <tr>
+            <td><code>beb_lang</code></td>
+            <td>⚙️ Funktional</td>
+            <td>Spracheinstellung (DE/EN)</td>
+            <td>Dauerhaft (localStorage)</td>
+          </tr>
+          <tr>
+            <td><code>beb_tour_done</code></td>
+            <td>⚙️ Funktional</td>
+            <td>Status der Einführungstour</td>
+            <td>Dauerhaft (localStorage)</td>
+          </tr>
+          <tr>
+            <td><code>beb_popup_dismissed_*</code></td>
+            <td>⚙️ Funktional</td>
+            <td>Geschlossener Zustand von Angebots-Popups</td>
+            <td>Dauerhaft (localStorage)</td>
+          </tr>
+          <tr>
+            <td><code>travian_profile*</code></td>
+            <td>⚙️ Funktional</td>
+            <td>Gespeicherte Travian-Profildaten (Server-URL, Koordinaten)</td>
+            <td>Dauerhaft (localStorage)</td>
+          </tr>
+          <tr>
+            <td><code>travianReminders</code></td>
+            <td>⚙️ Funktional</td>
+            <td>Lokale Timer und Erinnerungen</td>
+            <td>Dauerhaft (localStorage)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Wir verwenden <strong>keine</strong> Tracking-Cookies, Analyse-Cookies (Google Analytics o. ä.) oder Werbe-Cookies.</p>
+
+    <h2>Notwendige Cookies</h2>
+    <p>Das Session-Cookie <code>scouter_session</code> ist technisch notwendig für den Betrieb des Dienstes. Ohne dieses Cookie ist eine Anmeldung nicht möglich. Es enthält ausschließlich eine verschlüsselte Session-ID und keine personenbezogenen Daten im Klartext. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.</p>
+
+    <h2>Funktionale Cookies / localStorage</h2>
+    <p>Die im localStorage gespeicherten Daten dienen ausschließlich der Verbesserung Ihrer Benutzererfahrung. Sie können diese Daten jederzeit über die Entwickler-Tools Ihres Browsers löschen (<code>F12 → Application → Local Storage</code>).</p>
+
+    <h2>Cookies von Drittanbietern</h2>
+    <p>Bei der Nutzung unseres Zahlungsdienstleisters <strong>Stripe</strong> (beim Checkout) können Cookies von Stripe gesetzt werden. Diese unterliegen der Datenschutzrichtlinie von Stripe: <a href="https://stripe.com/de/privacy" style="color:var(--accent);" target="_blank">stripe.com/de/privacy</a>.</p>
+
+    <h2>Cookies verwalten</h2>
+    <p>Sie können Cookies in Ihrem Browser jederzeit deaktivieren oder löschen. Bitte beachten Sie, dass bei Deaktivierung des Session-Cookies eine Anmeldung nicht mehr möglich ist.</p>
+    <ul>
+      <li><a href="https://support.google.com/chrome/answer/95647" style="color:var(--accent);" target="_blank">Chrome</a></li>
+      <li><a href="https://support.mozilla.org/de/kb/cookies-erlauben-und-ablehnen" style="color:var(--accent);" target="_blank">Firefox</a></li>
+      <li><a href="https://support.apple.com/de-de/guide/safari/sfri11471/mac" style="color:var(--accent);" target="_blank">Safari</a></li>
+    </ul>
+
+    <p style="color:var(--text-muted); font-size:0.82rem; margin-top:2rem;">Letzte Aktualisierung: {{ impressum.updated }}</p>
+  </div>
+</div>
+{% endblock %}

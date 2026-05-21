@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}AGB · BIG-EYE-BOT{% endblock %}
+{% block content %}
+<div class="container" style="max-width:780px; padding-bottom:3rem;">
+  <div style="margin-bottom:1.5rem;">
+    <a href="/dashboard" class="back-link">← Zurück</a>
+    <h1 style="margin:0.5rem 0 0;">Allgemeine Geschäftsbedingungen</h1>
+  </div>
+
+  <div class="card" style="line-height:1.8;">
+
+    <h2>§ 1 Geltungsbereich</h2>
+    <p>Diese Allgemeinen Geschäftsbedingungen gelten für alle Verträge zwischen BIG-EYE-BOT (nachfolgend „Anbieter") und dem Kunden über die Nutzung des Discord-Bot-Dienstes BIG-EYE-BOT und der dazugehörigen Weboberfläche.</p>
+
+    <h2>§ 2 Leistungsbeschreibung</h2>
+    <p>BIG-EYE-BOT ist ein Discord-Bot-Dienst für das Browserspiel Travian Legends. Der Dienst umfasst je nach gewähltem Abonnement-Paket folgende Funktionen: Scout-Archivierung, Ressourcen-Management, Angriffserkennung, Kartenansicht, Farming-Analyse, Einsatzplanung und Timer-Funktionen.</p>
+    <p>Der Anbieter erbringt seine Leistungen im Rahmen der technischen und betrieblichen Möglichkeiten. Ein ununterbrochener Betrieb wird nicht garantiert. Geplante Wartungsarbeiten werden nach Möglichkeit angekündigt.</p>
+
+    <h2>§ 3 Vertragsschluss und Testphase</h2>
+    <p>Der Vertrag kommt durch die Buchung eines Abonnements über die Weboberfläche zustande. Jedes neue Abonnement beinhaltet eine kostenlose Testphase von 7 Tagen. Während dieser Zeit kann das Abonnement jederzeit ohne Angabe von Gründen kostenfrei gekündigt werden. Nach Ablauf der Testphase wird das gewählte Abonnement automatisch kostenpflichtig.</p>
+
+    <h2>§ 4 Abonnements und Preise</h2>
+    <p>Es stehen folgende Pakete zur Auswahl:</p>
+    <ul>
+      <li><strong>Starter:</strong> 1 Discord-Server · €6,99/Monat oder €55,99/Jahr</li>
+      <li><strong>Clan:</strong> 2 Discord-Server · €10,99/Monat oder €87,99/Jahr</li>
+      <li><strong>Alliance:</strong> 3 Discord-Server · €14,99/Monat oder €119,99/Jahr</li>
+      <li><strong>Imperium:</strong> 5 Discord-Server · €19,99/Monat oder €159,99/Jahr</li>
+    </ul>
+    <p>Alle Preise sind Endpreise inklusive der gesetzlichen Mehrwertsteuer, sofern diese anfällt. Der Anbieter behält sich das Recht vor, Preise mit einer Ankündigungsfrist von 30 Tagen zu ändern.</p>
+
+    <h2>§ 5 Zahlung</h2>
+    <p>Die Zahlung erfolgt über den Zahlungsdienstleister Stripe. Bei monatlichen Abonnements wird der Betrag monatlich im Voraus abgebucht, bei jährlichen Abonnements einmal jährlich. Bei fehlgeschlagener Zahlung wird das Abonnement nach einer Karenzzeit von 7 Tagen deaktiviert.</p>
+
+    <h2>§ 6 Kündigung</h2>
+    <p>Das Abonnement kann jederzeit zum Ende der aktuellen Abrechnungsperiode gekündigt werden. Die Kündigung erfolgt über das Kundenportal (Stripe Customer Portal), erreichbar über die Seite „Abonnement" im Dashboard. Eine Rückerstattung bereits gezahlter Beträge erfolgt nicht, außer während der Testphase.</p>
+
+    <h2>§ 7 Nutzungsbedingungen</h2>
+    <p>Der Kunde verpflichtet sich:</p>
+    <ul>
+      <li>Den Dienst ausschließlich für die Nutzung im Zusammenhang mit dem Spiel Travian Legends zu verwenden</li>
+      <li>Die Nutzungsbedingungen von Discord einzuhalten</li>
+      <li>Keine automatisierten Anfragen oder Scraping-Aktivitäten durchzuführen</li>
+      <li>Zugangsdaten nicht an Dritte weiterzugeben</li>
+    </ul>
+    <p>Bei Verstößen ist der Anbieter berechtigt, den Zugang ohne Vorankündigung zu sperren.</p>
+
+    <h2>§ 8 Haftungsbeschränkung</h2>
+    <p>Der Anbieter haftet nur für Schäden, die durch vorsätzliches oder grob fahrlässiges Verhalten entstanden sind. Die Haftung für leichte Fahrlässigkeit ist ausgeschlossen. Der Dienst wird „as is" bereitgestellt. Der Anbieter übernimmt keine Garantie für die Erreichbarkeit der Travian-Server oder die Verfügbarkeit der Spieledaten.</p>
+
+    <h2>§ 9 Datenschutz</h2>
+    <p>Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer <a href="/datenschutz" style="color:var(--accent);">Datenschutzerklärung</a>.</p>
+
+    <h2>§ 10 Änderungen der AGB</h2>
+    <p>Der Anbieter behält sich vor, diese AGB mit einer Ankündigungsfrist von 30 Tagen zu ändern. Änderungen werden per E-Mail oder über das Dashboard mitgeteilt. Bei Widerspruch innerhalb von 30 Tagen gilt das Recht zur außerordentlichen Kündigung.</p>
+
+    <h2>§ 11 Anwendbares Recht und Gerichtsstand</h2>
+    <p>Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Anbieters.</p>
+
+    <p style="color:var(--text-muted); font-size:0.82rem; margin-top:2rem;">Stand: {{ impressum.updated }}</p>
+  </div>
+</div>
+{% endblock %}
