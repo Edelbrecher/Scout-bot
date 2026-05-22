@@ -218,6 +218,7 @@ async def init_db():
     await _init_dual_links_table()
     await _init_farmlist_analyses_table()
     await _init_hospital_table()
+    await _init_alliance_members_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH) as db:
@@ -2527,3 +2528,67 @@ async def delete_hospital_data(guild_id: str, discord_user_id: str):
             (guild_id, discord_user_id),
         )
         await db.commit()
+
+
+# ── Allianz-Mitglieder ────────────────────────────────────────────────────────
+
+async def _init_alliance_members_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_members (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                player_name   TEXT NOT NULL,
+                villages      INTEGER DEFAULT 0,
+                population    INTEGER DEFAULT 0,
+                points        INTEGER DEFAULT 0,
+                rank          INTEGER DEFAULT 0,
+                tribe         TEXT DEFAULT '',
+                imported_at   TEXT NOT NULL,
+                imported_by   TEXT NOT NULL
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_am_guild ON alliance_members(guild_id)")
+        await db.commit()
+
+
+async def save_alliance_members(guild_id: str, members: list[dict], imported_by: str):
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM alliance_members WHERE guild_id = ?", (guild_id,))
+        await db.executemany("""
+            INSERT INTO alliance_members
+                (guild_id, player_name, villages, population, points, rank, tribe, imported_at, imported_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            (guild_id, m["player_name"], m.get("villages", 0), m.get("population", 0),
+             m.get("points", 0), m.get("rank", 0), m.get("tribe", ""), now, imported_by)
+            for m in members
+        ])
+        await db.commit()
+
+
+async def get_alliance_members(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM alliance_members WHERE guild_id = ? ORDER BY rank ASC",
+            (guild_id,)
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_alliance_members_meta(guild_id: str) -> dict | None:
+    """Return import metadata (count, when, by whom)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """SELECT COUNT(*) as cnt, MAX(imported_at) as last_import, imported_by
+               FROM alliance_members WHERE guild_id = ?""",
+            (guild_id,)
+        )
+        row = await cur.fetchone()
+        if not row or not row["cnt"]:
+            return None
+        return dict(row)

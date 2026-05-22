@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}Mitglieder · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1 style="margin:0.25rem 0 0;">👥 Allianz-Mitglieder</h1>
+      <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+      <button type="button" class="btn btn-primary"
+              onclick="document.getElementById('importModal').style.display='flex'">
+        ⬆️ Mitglieder importieren
+      </button>
+      {% if members %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/clear"
+            onsubmit="return confirm('Mitgliederliste löschen?')" style="margin:0;">
+        <button type="submit" class="btn btn-danger">🗑 Löschen</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if imported is not none and imported != '' %}
+  <div class="alert alert-success">✅ {{ imported }} Mitglieder erfolgreich importiert.</div>
+  {% endif %}
+  {% if cleared %}
+  <div class="alert alert-success">🗑️ Mitgliederliste gelöscht.</div>
+  {% endif %}
+
+  {% if members %}
+
+  <!-- KPI strip -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;">{{ members|length }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">👥 Mitglieder</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
+        {{ members | sum(attribute='villages') | int }}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🏘️ Dörfer gesamt</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">
+        {{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🌍 Bevölkerung gesamt</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
+        {{ "{:,}".format((members | sum(attribute='population') / members|length) | int).replace(",",".") }}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">📊 ⌀ Bevölkerung</div>
+    </div>
+  </div>
+
+  {% if meta %}
+  <p class="hint" style="margin-bottom:0.75rem;">
+    📅 Zuletzt importiert: <strong>{{ meta.last_import[:16].replace('T',' ') }} UTC</strong>
+    von <strong>{{ meta.imported_by }}</strong>
+  </p>
+  {% endif %}
+
+  <!-- Search + sort controls -->
+  <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center;">
+    <input type="text" id="memberSearch" placeholder="🔍 Spieler suchen…"
+           oninput="filterMembers()"
+           style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
+                  background:var(--bg-card);color:var(--text);font-size:0.875rem;width:220px;">
+    <select id="tribeFilter" onchange="filterMembers()"
+            style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
+                   background:var(--bg-card);color:var(--text);font-size:0.875rem;">
+      <option value="">Alle Stämme</option>
+      {% set tribes = members | map(attribute='tribe') | select | unique | list | sort %}
+      {% for t in tribes %}{% if t %}
+      <option value="{{ t }}">{{ t }}</option>
+      {% endif %}{% endfor %}
+    </select>
+    <span id="memberCount" style="font-size:0.82rem;color:var(--text-muted);margin-left:0.25rem;"></span>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table class="table" id="memberTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)" style="cursor:pointer;">Rang ▲</th>
+          <th onclick="sortTable(1)" style="cursor:pointer;">Spieler</th>
+          <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;">Dörfer</th>
+          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;">Bevölkerung</th>
+          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;">Punkte</th>
+          <th>Stamm</th>
+        </tr>
+      </thead>
+      <tbody id="memberBody">
+        {% for m in members %}
+        <tr data-name="{{ m.player_name | lower }}" data-tribe="{{ m.tribe | lower }}">
+          <td style="color:var(--text-muted);font-size:0.85rem;">{{ m.rank or loop.index }}</td>
+          <td><strong>{{ m.player_name }}</strong></td>
+          <td style="text-align:right;">{{ m.villages }}</td>
+          <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.population).replace(",",".") }}</td>
+          <td style="text-align:right;color:var(--text-muted);font-size:0.85rem;">
+            {{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}
+          </td>
+          <td>
+            {% set t = m.tribe | lower %}
+            {% if t == 'römer' %}🏛️ Römer
+            {% elif t == 'teutonen' %}⚔️ Teutonen
+            {% elif t == 'gallier' %}🌿 Gallier
+            {% elif t == 'ägypter' %}🏺 Ägypter
+            {% elif t == 'hunnen' %}🏹 Hunnen
+            {% elif t == 'spartaner' %}🛡️ Spartaner
+            {% elif m.tribe %}{{ m.tribe }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tribe distribution chart -->
+  <div class="card" style="margin-top:1.25rem;">
+    <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">Stamm-Verteilung</h3>
+    <canvas id="chartTribes" height="60"></canvas>
+  </div>
+
+  {% else %}
+  <div class="card">
+    <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
+      Noch keine Mitglieder importiert. Öffne in Travian die <strong>Allianz → Mitglieder</strong>-Seite,
+      markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und importiere hier.
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Import Modal -->
+<div id="importModal"
+     style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);
+            align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+              padding:1.5rem;width:100%;max-width:620px;position:relative;">
+    <button onclick="document.getElementById('importModal').style.display='none'"
+            style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
+                   color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
+    <h2 style="margin:0 0 0.5rem;">👥 Mitglieder importieren</h2>
+    <p class="hint" style="margin-bottom:0.75rem;">
+      Öffne in Travian <strong>Allianz → Mitglieder</strong>, markiere die gesamte Seite
+      (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.<br>
+      <span style="color:var(--text-muted);font-size:0.82rem;">
+        Format: Spielername · Dörfer · Bevölkerung · Punkte · Rang · Stamm (tab-getrennt)
+      </span>
+    </p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder">
+      <textarea name="members_text" rows="12"
+        placeholder="Spielername&#9;3&#9;450&#9;12500&#9;1&#9;Römer&#10;MusterSpieler&#9;2&#9;310&#9;8900&#9;2&#9;Gallier&#10;..."
+        style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;
+               background:var(--bg-main);color:var(--text);border:1px solid var(--border);
+               border-radius:6px;padding:0.5rem;box-sizing:border-box;"></textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+        <button type="submit" class="btn btn-primary">⬆️ Importieren</button>
+        <button type="button" class="btn"
+                onclick="document.getElementById('importModal').style.display='none'">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if members %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// ── Filter + search ───────────────────────────────────────────────────────────
+function filterMembers() {
+  const q     = document.getElementById('memberSearch').value.trim().toLowerCase();
+  const tribe = document.getElementById('tribeFilter').value.toLowerCase();
+  const rows  = document.querySelectorAll('#memberBody tr');
+  let shown   = 0;
+  rows.forEach(row => {
+    const nameMatch  = !q     || row.dataset.name.includes(q);
+    const tribeMatch = !tribe || row.dataset.tribe === tribe;
+    const vis = nameMatch && tribeMatch;
+    row.style.display = vis ? '' : 'none';
+    if (vis) shown++;
+  });
+  document.getElementById('memberCount').textContent =
+    shown < rows.length ? `${shown} von ${rows.length} Mitgliedern` : `${rows.length} Mitglieder`;
+}
+
+// ── Sort ─────────────────────────────────────────────────────────────────────
+let sortAsc = [true, true, false, false, false];
+function sortTable(col) {
+  const tbody = document.getElementById('memberBody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  const asc   = sortAsc[col];
+  rows.sort((a, b) => {
+    const ca = a.querySelectorAll('td')[col]?.textContent.replace(/[^\d-]/g,'') || a.querySelectorAll('td')[col]?.textContent || '';
+    const cb = b.querySelectorAll('td')[col]?.textContent.replace(/[^\d-]/g,'') || b.querySelectorAll('td')[col]?.textContent || '';
+    const na = parseFloat(ca), nb = parseFloat(cb);
+    if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+    return asc ? ca.localeCompare(cb) : cb.localeCompare(ca);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  sortAsc[col] = !asc;
+  filterMembers();
+}
+
+// ── Tribe chart ───────────────────────────────────────────────────────────────
+(function() {
+  const members = {{ members | tojson }};
+  const counts  = {};
+  const COLORS  = { 'Römer':'#c0392b', 'Teutonen':'#85929e', 'Gallier':'#58d68d',
+                    'Ägypter':'#d4ac0d', 'Hunnen':'#9b59b6', 'Spartaner':'#1abc9c' };
+  members.forEach(m => {
+    const t = m.tribe || 'Unbekannt';
+    counts[t] = (counts[t] || 0) + 1;
+  });
+  const labels = Object.keys(counts);
+  const data   = Object.values(counts);
+  const colors = labels.map(l => COLORS[l] || '#888');
+  new Chart(document.getElementById('chartTribes'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => `${c.parsed.y} Spieler` } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#ccc' } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', precision: 0 }, beginAtZero: true }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

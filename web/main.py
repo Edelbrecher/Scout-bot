@@ -4016,3 +4016,140 @@ async def allianz_hospital(request: Request, guild_id: str):
         "grouped": list(grouped.values()),
         "all_entries": all_entries,
     })
+
+
+# ── Allianz-Mitglieder ────────────────────────────────────────────────────────
+
+def parse_alliance_members(text: str) -> list[dict]:
+    """Parse Travian alliance member list copy-paste.
+
+    Travian formats (tab-separated):
+      Spieler  Dörfer  Bevölkerung  Punkte  Rang  Stamm
+      Player   Villages  Population  Points  Rank  Tribe
+    """
+    import re as _re
+    text = _re.sub(r'[​-‏‪-‮⁠-⁩﻿]', '', text)
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+
+    _SKIP = _re.compile(
+        r'^(Spieler|Player|Bevölkerung|Population|Punkte|Points|Rang|Rank|Stamm|Tribe|'
+        r'Dörfer|Villages|Name|Allianz|Alliance|Mitglieder|Members|Übersicht|Overview|'
+        r'Homepage|©|Discord|Support|Server time|TravOps|Profile|Management)',
+        _re.IGNORECASE
+    )
+    _INT = _re.compile(r'^[\d.,\s]+$')
+
+    TRIBE_DE = {
+        'römer': 'Römer', 'roman': 'Römer', 'romans': 'Römer',
+        'teutonen': 'Teutonen', 'teuton': 'Teutonen', 'teutons': 'Teutonen',
+        'gallier': 'Gallier', 'gaul': 'Gallier', 'gauls': 'Gallier',
+        'ägypter': 'Ägypter', 'egyptian': 'Ägypter', 'egyptians': 'Ägypter',
+        'hunnen': 'Hunnen', 'hun': 'Hunnen', 'huns': 'Hunnen',
+        'spartaner': 'Spartaner', 'spartan': 'Spartaner', 'spartans': 'Spartaner',
+    }
+
+    def clean_int(s: str) -> int:
+        try:
+            return int(_re.sub(r'[^\d]', '', s))
+        except ValueError:
+            return 0
+
+    members = []
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if '\t' not in stripped:
+            continue
+        parts = [p.strip() for p in stripped.split('\t')]
+        parts = [p for p in parts if p]
+        if len(parts) < 2:
+            continue
+        if _SKIP.match(parts[0]):
+            continue
+        # Heuristic: first field = player name (not purely numeric)
+        if _INT.match(parts[0]):
+            continue
+
+        player_name = parts[0]
+        # Try to find numeric fields: villages, population, points, rank
+        nums = []
+        tribe = ''
+        for p in parts[1:]:
+            clean = _re.sub(r'[^\d]', '', p)
+            if clean and len(clean) >= 1:
+                nums.append(int(clean))
+            elif p.lower() in TRIBE_DE:
+                tribe = TRIBE_DE[p.lower()]
+            elif p and not _INT.match(p) and not tribe:
+                tribe = p  # fallback: keep raw value
+
+        members.append({
+            "player_name": player_name,
+            "villages":   nums[0] if len(nums) > 0 else 0,
+            "population": nums[1] if len(nums) > 1 else 0,
+            "points":     nums[2] if len(nums) > 2 else 0,
+            "rank":       nums[3] if len(nums) > 3 else 0,
+            "tribe":      tribe,
+        })
+    return members
+
+
+@app.get("/guild/{guild_id}/allianz/mitglieder", response_class=HTMLResponse)
+async def alliance_members_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    members = await database.get_alliance_members(guild_id)
+    meta    = await database.get_alliance_members_meta(guild_id)
+
+    return templates.TemplateResponse("alliance_members.html", {
+        "request": request,
+        "guild": guild,
+        "members": members,
+        "meta": meta,
+        "imported": request.query_params.get("imported"),
+        "cleared": request.query_params.get("cleared"),
+    })
+
+
+@app.post("/guild/{guild_id}/allianz/mitglieder")
+async def alliance_members_import(
+    request: Request,
+    guild_id: str,
+    members_text: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    parsed = parse_alliance_members(members_text)
+    if parsed:
+        uname = session.get("username", "unknown")
+        await database.save_alliance_members(guild_id, parsed, uname)
+
+    return RedirectResponse(
+        f"/guild/{guild_id}/allianz/mitglieder?imported={len(parsed)}",
+        status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/allianz/mitglieder/clear")
+async def alliance_members_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    async with __import__('aiosqlite').connect(database.DB_PATH) as db:
+        await db.execute("DELETE FROM alliance_members WHERE guild_id = ?", (guild_id,))
+        await db.commit()
+    return RedirectResponse(
+        f"/guild/{guild_id}/allianz/mitglieder?cleared=1",
+        status_code=303
+    )
