@@ -773,10 +773,19 @@ async def get_enemy_scout_history(guild_id: str, player_name: str) -> list[dict]
             FROM scout_reports sr
             LEFT JOIN scout_images si
                 ON si.scout_report_id = sr.id
-            WHERE sr.guild_id = ? AND sr.target_player = ?
+            WHERE sr.guild_id = ?
+              AND (
+                sr.target_player = ?
+                OR sr.target_player = (
+                    SELECT player FROM scout_channels
+                    WHERE guild_id = sr.guild_id
+                      AND LOWER(player) = LOWER(?)
+                    LIMIT 1
+                )
+              )
             GROUP BY sr.id
             ORDER BY sr.created_at DESC
-        """, (guild_id, player_name)) as cur:
+        """, (guild_id, player_name, player_name)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
             for r in rows:
                 urls = r.pop("image_urls_concat", "") or ""

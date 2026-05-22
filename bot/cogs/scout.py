@@ -569,51 +569,44 @@ class Scout(commands.Cog):
                 continue
 
             parsed = parse_scout_report(ocr_text)
-            if parsed["troops"] or parsed["resources"] or parsed["target_player"]:
-                if not parsed["target_coords"] and ch_info:
-                    parsed["target_coords"] = ch_info.get("coordinates")
-                if not parsed["target_player"] and ch_info:
-                    parsed["target_player"] = ch_info.get("player")
-                if not parsed["target_village"] and ch_info:
-                    parsed["target_village"] = ch_info.get("village")
-                report_id = await database.save_scout_report(
-                    channel_id=channel_id, guild_id=guild_id, source="ocr",
-                    raw_text=ocr_text,
-                    target_player=parsed["target_player"],
-                    target_village=parsed["target_village"],
-                    target_coords=parsed["target_coords"],
-                    attacker_player=parsed["attacker_player"],
-                    attacker_village=parsed["attacker_village"],
-                    resources_json=json.dumps(parsed["resources"]) if parsed["resources"] else None,
-                    troops_json=json.dumps(parsed["troops"]) if parsed["troops"] else None,
-                    losses_json=json.dumps(parsed["losses"]) if parsed["losses"] else None,
-                    experience=parsed["experience"],
+
+            # Always use channel meta as primary source for enemy identity
+            # OCR target is stored as metadata but channel player = the scouted enemy
+            enemy_player = (ch_info or {}).get("player") or parsed.get("attacker_player") or parsed.get("target_player") or ""
+            enemy_coords = (ch_info or {}).get("coordinates") or parsed.get("target_coords") or ""
+            enemy_village = (ch_info or {}).get("village") or parsed.get("target_village") or ""
+
+            # Save report — target_player = the channel's enemy (not OCR-parsed defender)
+            report_id = await database.save_scout_report(
+                channel_id=channel_id, guild_id=guild_id, source="ocr",
+                raw_text=ocr_text,
+                target_player=enemy_player,
+                target_village=enemy_village,
+                target_coords=enemy_coords,
+                attacker_player=parsed.get("attacker_player"),
+                attacker_village=parsed.get("attacker_village"),
+                resources_json=json.dumps(parsed["resources"]) if parsed.get("resources") else None,
+                troops_json=json.dumps(parsed["troops"]) if parsed.get("troops") else None,
+                losses_json=json.dumps(parsed["losses"]) if parsed.get("losses") else None,
+                experience=parsed.get("experience", 0),
+            )
+            # Save image linked to this report
+            await database.save_scout_image(
+                guild_id=guild_id, channel_id=channel_id,
+                discord_url=image_url,
+                discord_message_id=str(message.id),
+                scout_report_id=report_id,
+            )
+            # Upsert enemy from channel meta
+            if enemy_player:
+                await database.upsert_enemy(
+                    guild_id=guild_id,
+                    player_name=enemy_player,
+                    coordinates=enemy_coords,
+                    village=enemy_village,
                 )
-                # Save image linked to this report
-                await database.save_scout_image(
-                    guild_id=guild_id, channel_id=channel_id,
-                    discord_url=image_url,
-                    discord_message_id=str(message.id),
-                    scout_report_id=report_id,
-                )
-                # Upsert enemy
-                if parsed.get("target_player"):
-                    await database.upsert_enemy(
-                        guild_id=guild_id,
-                        player_name=parsed["target_player"],
-                        coordinates=parsed.get("target_coords", "") or "",
-                        village=parsed.get("target_village", "") or "",
-                    )
-                await message.add_reaction("🔍")
-                print(f"[scout] ocr report saved for ch {channel_id}", flush=True)
-            else:
-                # OCR ran but parsed nothing — still save the image
-                await database.save_scout_image(
-                    guild_id=guild_id, channel_id=channel_id,
-                    discord_url=image_url,
-                    discord_message_id=str(message.id),
-                )
-                await message.add_reaction("🖼️")
+            await message.add_reaction("🔍")
+            print(f"[scout] ocr report saved for ch {channel_id}, enemy={enemy_player}", flush=True)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
