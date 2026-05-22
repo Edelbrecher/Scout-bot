@@ -149,12 +149,33 @@ def parse_scout_report(text: str) -> dict:
 
 
 async def _try_ocr(image_bytes: bytes) -> str | None:
-    """Attempt OCR on image bytes. Returns extracted text or None if unavailable."""
+    """Attempt OCR on image bytes with preprocessing for Travian dark-UI screenshots."""
     try:
         import pytesseract
-        from PIL import Image
-        img = Image.open(io.BytesIO(image_bytes))
-        return pytesseract.image_to_string(img, lang="deu+eng")
+        from PIL import Image, ImageFilter, ImageEnhance
+        import io as _io
+
+        img = Image.open(_io.BytesIO(image_bytes)).convert("RGB")
+
+        # Scale up small images — Tesseract works better at higher DPI
+        w, h = img.size
+        if w < 1200:
+            scale = 1200 / w
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+        # Enhance contrast & sharpness for dark Travian UI
+        img = ImageEnhance.Contrast(img).enhance(2.0)
+        img = ImageEnhance.Sharpness(img).enhance(2.0)
+
+        # Try colour + grayscale, pick longer result
+        cfg = "--oem 3 --psm 6"
+        text_color = pytesseract.image_to_string(img, lang="deu+eng", config=cfg)
+        gray = img.convert("L")
+        text_gray  = pytesseract.image_to_string(gray, lang="deu+eng", config=cfg)
+        text = text_color if len(text_color) >= len(text_gray) else text_gray
+
+        print(f"[scout][ocr] extracted {len(text)} chars", flush=True)
+        return text if text.strip() else None
     except ImportError:
         return None  # tesseract not installed
     except Exception as e:
@@ -497,6 +518,7 @@ class Scout(commands.Cog):
                 return
 
         # ── Image / OCR report ───────────────────────────────────────────────
+        print(f"[scout] message in scout ch {channel_id}: {len(message.attachments)} attachments, content len={len(message.content)}", flush=True)
         for attachment in message.attachments:
             if not attachment.content_type or not attachment.content_type.startswith("image/"):
                 continue
