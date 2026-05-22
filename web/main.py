@@ -428,6 +428,11 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
     villages = _parse_map_sql(r.text)
     if villages:
         await database.save_map_snapshot(guild_id, villages)
+        # Auto-sync alliance members if alliance name is configured
+        try:
+            await database.sync_alliance_members_from_snapshot(guild_id)
+        except Exception:
+            pass
 
 
 @asynccontextmanager
@@ -4139,17 +4144,38 @@ async def alliance_members_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
-    members = await database.get_alliance_members(guild_id)
-    meta    = await database.get_alliance_members_meta(guild_id)
+    members        = await database.get_alliance_members(guild_id)
+    meta           = await database.get_alliance_members_meta(guild_id)
+    alliance_name  = await database.get_tw_alliance_name(guild_id)
 
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
         "guild": guild,
         "members": members,
         "meta": meta,
+        "alliance_name": alliance_name,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
+        "synced": request.query_params.get("synced"),
     })
+
+
+@app.post("/guild/{guild_id}/allianz/mitglieder/set-alliance")
+async def alliance_members_set_alliance(
+    request: Request, guild_id: str,
+    alliance_name: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.set_tw_alliance_name(guild_id, alliance_name)
+    # Trigger immediate sync if snapshot exists
+    count = await database.sync_alliance_members_from_snapshot(guild_id)
+    return RedirectResponse(
+        f"/guild/{guild_id}/allianz/mitglieder?synced={count}",
+        status_code=303
+    )
 
 
 @app.post("/guild/{guild_id}/allianz/mitglieder")

@@ -11,6 +11,12 @@
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
     <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+      {% if members %}
+      <button type="button" class="btn btn-secondary"
+              onclick="document.getElementById('chartModal').style.display='flex'">
+        📊 Top 20 Punkte
+      </button>
+      {% endif %}
       <button type="button" class="btn btn-primary"
               onclick="document.getElementById('importModal').style.display='flex'">
         ⬆️ Mitglieder importieren
@@ -30,6 +36,34 @@
   {% if cleared %}
   <div class="alert alert-success">🗑️ Mitgliederliste gelöscht.</div>
   {% endif %}
+  {% if synced is not none and synced != '' %}
+  <div class="alert alert-success">🔄 {{ synced }} Mitglieder aus Snapshot synchronisiert.</div>
+  {% endif %}
+
+  <!-- Auto-Sync Einstellung -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;">🔄 Auto-Sync aus Karten-Snapshot</h3>
+    <p class="hint" style="margin-bottom:0.75rem;">
+      Allianz-Namen eintragen → Mitglieder werden automatisch bei jedem Snapshot-Update (alle 6h) aktualisiert.
+      Bevölkerung und Dörfer kommen dann direkt aus der Karte.
+    </p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance"
+          style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+        <label>Allianz-Name (exakt wie in Travian)</label>
+        <input type="text" name="alliance_name"
+               value="{{ alliance_name or '' }}"
+               placeholder="z.B. The Dackel"
+               style="width:100%;">
+      </div>
+      <button type="submit" class="btn btn-primary">Speichern &amp; Sync</button>
+    </form>
+    {% if alliance_name %}
+    <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#2ed573;">
+      ✅ Auto-Sync aktiv für <strong>{{ alliance_name }}</strong> — wird bei jedem Snapshot aktualisiert.
+    </p>
+    {% endif %}
+  </div>
 
   {% if members %}
 
@@ -111,12 +145,6 @@
     </table>
   </div>
 
-  <div style="margin-top:0.75rem;">
-    <button type="button" class="btn btn-secondary"
-            onclick="document.getElementById('chartModal').style.display='flex'">
-      📊 Top 20 Punkte-Verteilung
-    </button>
-  </div>
 
   {% else %}
   <div class="card">

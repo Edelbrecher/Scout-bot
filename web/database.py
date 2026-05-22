@@ -222,7 +222,7 @@ async def init_db():
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH) as db:
-        for col in ["alliance_manager_role_ids TEXT"]:
+        for col in ["alliance_manager_role_ids TEXT", "tw_alliance_name TEXT"]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
@@ -2592,3 +2592,89 @@ async def get_alliance_members_meta(guild_id: str) -> dict | None:
         if not row or not row["cnt"]:
             return None
         return dict(row)
+
+
+async def get_tw_alliance_name(guild_id: str) -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT tw_alliance_name FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        )
+        row = await cur.fetchone()
+        return (row["tw_alliance_name"] or "") if row else ""
+
+
+async def set_tw_alliance_name(guild_id: str, name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET tw_alliance_name = ? WHERE guild_id = ?",
+            (name.strip() or None, guild_id)
+        )
+        await db.commit()
+
+
+async def sync_alliance_members_from_snapshot(guild_id: str) -> int:
+    """Rebuild alliance_members from the latest map snapshot for this guild.
+    Requires tw_alliance_name to be set. Returns number of members synced."""
+    alliance_name = await get_tw_alliance_name(guild_id)
+    if not alliance_name:
+        return 0
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Latest snapshot time
+        cur = await db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
+            (guild_id,)
+        )
+        row = await cur.fetchone()
+        if not row or not row["latest"]:
+            return 0
+        latest = row["latest"]
+
+        # Aggregate per player in that alliance
+        cur = await db.execute(
+            """SELECT player_name, player_id,
+                      COUNT(*) as villages,
+                      SUM(population) as population
+               FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND alliance_name = ?
+                 AND player_name IS NOT NULL AND player_name != ''
+               GROUP BY player_id
+               ORDER BY population DESC""",
+            (guild_id, latest, alliance_name)
+        )
+        rows = await cur.fetchall()
+
+    if not rows:
+        return 0
+
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    members = []
+    for i, r in enumerate(rows):
+        members.append((
+            guild_id,
+            r["player_name"],
+            r["villages"] or 0,
+            r["population"] or 0,
+            0,   # points — not in map.sql
+            i + 1,  # rank by population
+            "",   # tribe
+            now,
+            "auto-sync"
+        ))
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM alliance_members WHERE guild_id = ?", (guild_id,))
+        await db.executemany(
+            """INSERT INTO alliance_members
+               (guild_id, player_name, villages, population, points, rank, tribe, imported_at, imported_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            members
+        )
+        await db.commit()
+
+    return len(members)
