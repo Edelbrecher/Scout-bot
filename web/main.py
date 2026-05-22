@@ -3495,7 +3495,7 @@ async def farmlist_analyst_page(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     err = await _require_premium(guild, guild_id)
     if err: return err
-    past = await database.get_farmlist_analyses(guild_id, session["discord_id"])
+    past = await database.get_farmlist_analyses(guild_id, session.get("uid", ""))
     return templates.TemplateResponse("farmlist_analyst.html", {
         "request":     request,
         "guild":       guild,
@@ -3570,11 +3570,11 @@ async def farmlist_analyst_post(
 
     # Save analysis to DB
     await database.save_farmlist_analysis(
-        guild_id, session["discord_id"],
+        guild_id, session.get("uid", ""),
         session.get("username", ""),
         stats, group_stats,
     )
-    past = await database.get_farmlist_analyses(guild_id, session["discord_id"])
+    past = await database.get_farmlist_analyses(guild_id, session.get("uid", ""))
 
     return templates.TemplateResponse("farmlist_analyst.html", {
         "request":      request,
@@ -3591,7 +3591,7 @@ async def farmlist_analyst_post(
 async def farmlist_analysis_delete(request: Request, guild_id: str, analysis_id: int):
     session, err = _require_session(request)
     if err: return err
-    await database.delete_farmlist_analysis(analysis_id, session["discord_id"])
+    await database.delete_farmlist_analysis(analysis_id, session.get("uid", ""))
     return RedirectResponse(f"/guild/{guild_id}/farmlist-analyst", status_code=303)
 
 
