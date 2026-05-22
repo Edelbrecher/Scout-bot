@@ -280,6 +280,13 @@ function toggleExt() {
   btn.textContent   = vis ? '⚙️ Erweiterte Filterung ▾' : '⚙️ Erweiterte Filterung ▴';
 }
 
+// Strip empty inputs before submit so FastAPI doesn't get "" for numeric fields
+document.getElementById('searchForm').addEventListener('submit', function() {
+  this.querySelectorAll('input[type="number"]').forEach(function(el) {
+    if (el.value === '') el.disabled = true;
+  });
+});
+
 // Simple client-side sort
 let _sortAsc = true;
 let _sortCol = 1;
