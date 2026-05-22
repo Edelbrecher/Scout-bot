@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Server · Admin · TravOps{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex;gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px;flex-shrink:0;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:sticky;top:1rem;">
+        <div style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/servers" style="display:block;padding:0.65rem 1rem;color:#f59e0b;text-decoration:none;font-size:0.9rem;background:rgba(245,158,11,0.08);">🖥 Server</a>
+        <a href="/admin/promos" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
+        <a href="/admin/contact" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+        <a href="/admin/auths" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🔐 Auths</a>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div style="flex:1;min-width:0;">
+      <h1 style="margin:0 0 0.25rem;">🖥 Server & Snapshots</h1>
+      <p style="color:var(--text-muted);font-size:0.875rem;margin:0 0 1.5rem;">
+        Alle Guilds · map.sql Parse-Status · Snapshot-Verlauf
+      </p>
+
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;">{{ servers|length }}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Guilds gesamt</div>
+        </div>
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">
+            {{ servers | selectattr('tw_world') | list | length }}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Mit Travian-Welt</div>
+        </div>
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
+            {{ servers | selectattr('snap_count') | list | length }}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Mit Snapshots</div>
+        </div>
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
+            {{ servers | sum(attribute='latest_village_count') | int }}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Dörfer (letzte Snapshots)</div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Guild</th>
+              <th>Travian-Welt</th>
+              <th style="text-align:center;">Snapshots</th>
+              <th style="text-align:center;">Dörfer (letzter)</th>
+              <th style="text-align:center;">Mitglieder</th>
+              <th>Letzter Fetch</th>
+              <th>Erster Fetch</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in servers %}
+            <tr>
+              <td>
+                <a href="/guild/{{ s.guild_id }}" style="font-weight:600;color:var(--text);">
+                  {{ s.guild_name or s.guild_id }}
+                </a>
+                {% if s.subscription_status in ('active','trialing') %}
+                <span style="font-size:0.72rem;background:rgba(34,197,94,0.15);color:#22c55e;
+                             border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.3rem;">
+                  {{ s.subscription_plan or 'aktiv' }}
+                </span>
+                {% endif %}
+              </td>
+              <td style="font-size:0.82rem;color:var(--text-muted);">
+                {% if s.tw_world %}
+                <a href="{{ s.tw_world }}" target="_blank"
+                   style="color:#93c5fd;text-decoration:none;font-family:monospace;">
+                  {{ s.tw_world | replace('https://','') | truncate(35, true, '…') }}
+                </a>
+                {% else %}
+                <span style="color:var(--text-muted);font-style:italic;">nicht konfiguriert</span>
+                {% endif %}
+              </td>
+              <td style="text-align:center;">
+                {% if s.snap_count > 0 %}
+                <span style="font-weight:700;color:#22c55e;">{{ s.snap_count }}</span>
+                {% else %}
+                <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td style="text-align:center;">
+                {% if s.latest_village_count > 0 %}
+                <span style="font-weight:600;">
+                  {{ "{:,}".format(s.latest_village_count).replace(",",".") }}
+                </span>
+                {% if s.latest_village_count < 5000 %}
+                <span style="color:#f59e0b;font-size:0.75rem;margin-left:0.2rem;"
+                      title="Wenige Dörfer — Parser-Problem?">⚠️</span>
+                {% endif %}
+                {% else %}
+                <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td style="text-align:center;">
+                {% if s.member_count > 0 %}
+                <span>{{ s.member_count }}</span>
+                {% else %}
+                <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td style="font-size:0.82rem;">
+                {% if s.last_fetch %}
+                <span style="color:var(--text-muted);">{{ s.last_fetch[:16].replace('T',' ') }} UTC</span>
+                {% else %}
+                <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td style="font-size:0.82rem;">
+                {% if s.first_fetch %}
+                <span style="color:var(--text-muted);">{{ s.first_fetch[:16].replace('T',' ') }} UTC</span>
+                {% else %}
+                <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.snap_count > 0 %}
+                <form method="post"
+                      action="/admin/servers/{{ s.guild_id }}/clear-snapshots"
+                      onsubmit="return confirm('Snapshots für {{ s.guild_name }} löschen?')"
+                      style="margin:0;">
+                  <button type="submit" class="btn btn-danger"
+                          style="font-size:0.75rem;padding:0.25rem 0.6rem;">
+                    🗑
+                  </button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">
+                Noch keine Guilds registriert.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

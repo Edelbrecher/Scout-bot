@@ -3735,6 +3735,26 @@ async def admin_auths(request: Request):
     })
 
 
+@app.get("/admin/servers", response_class=HTMLResponse)
+async def admin_servers(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    servers = await database.get_servers_overview()
+    return templates.TemplateResponse("admin_servers.html", {
+        "request": request,
+        "servers": servers,
+        "session": session,
+    })
+
+
+@app.post("/admin/servers/{guild_id}/clear-snapshots")
+async def admin_clear_snapshots(request: Request, guild_id: str):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.clear_all_snapshots(guild_id)
+    return RedirectResponse("/admin/servers", status_code=303)
+
+
 @app.post("/admin/contact/save")
 async def admin_contact_save(
     request: Request,

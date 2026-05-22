@@ -1138,6 +1138,69 @@ async def clear_all_snapshots(guild_id: str):
         await db.commit()
 
 
+async def get_servers_overview() -> list[dict]:
+    """Return all guilds with tw_world set, plus snapshot stats per guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # All guilds with tw_world configured
+        async with db.execute("""
+            SELECT guild_id, guild_name, tw_world,
+                   subscription_status, subscription_plan
+            FROM guild_configs
+            ORDER BY guild_name
+        """) as cur:
+            guilds = [dict(r) for r in await cur.fetchall()]
+
+        # Snapshot stats per guild
+        async with db.execute("""
+            SELECT guild_id,
+                   COUNT(DISTINCT fetched_at)  AS snap_count,
+                   MAX(fetched_at)             AS last_fetch,
+                   MIN(fetched_at)             AS first_fetch,
+                   COUNT(*)                    AS total_villages,
+                   COUNT(DISTINCT fetched_at || '|' || CASE WHEN fetched_at = (
+                       SELECT MAX(s2.fetched_at) FROM map_snapshots s2
+                       WHERE s2.guild_id = map_snapshots.guild_id
+                   ) THEN '1' ELSE '0' END)    AS _unused
+            FROM map_snapshots
+            GROUP BY guild_id
+        """) as cur:
+            snap_rows = {r["guild_id"]: dict(r) for r in await cur.fetchall()}
+
+        # Villages in latest snapshot per guild
+        async with db.execute("""
+            SELECT m.guild_id, COUNT(*) AS latest_village_count
+            FROM map_snapshots m
+            INNER JOIN (
+                SELECT guild_id, MAX(fetched_at) AS max_ts
+                FROM map_snapshots GROUP BY guild_id
+            ) latest ON m.guild_id = latest.guild_id AND m.fetched_at = latest.max_ts
+            GROUP BY m.guild_id
+        """) as cur:
+            latest_counts = {r["guild_id"]: r["latest_village_count"] for r in await cur.fetchall()}
+
+        # Alliance member counts
+        async with db.execute("""
+            SELECT guild_id, COUNT(*) AS member_count
+            FROM alliance_members GROUP BY guild_id
+        """) as cur:
+            member_counts = {r["guild_id"]: r["member_count"] for r in await cur.fetchall()}
+
+        result = []
+        for g in guilds:
+            gid = g["guild_id"]
+            snap = snap_rows.get(gid, {})
+            result.append({
+                **g,
+                "snap_count": snap.get("snap_count", 0),
+                "last_fetch": snap.get("last_fetch", None),
+                "first_fetch": snap.get("first_fetch", None),
+                "latest_village_count": latest_counts.get(gid, 0),
+                "member_count": member_counts.get(gid, 0),
+            })
+        return result
+
+
 async def prune_old_snapshots(guild_id: str, keep_days: int = 30):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
