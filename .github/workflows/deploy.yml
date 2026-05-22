@@ -14,8 +14,11 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          command_timeout: 10m
           script: |
             cd /opt/td-scouter
-            git pull origin main
+            git fetch origin main
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git reset --hard origin/main
             docker compose down --remove-orphans
             docker compose up --build -d
