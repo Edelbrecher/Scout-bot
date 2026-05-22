@@ -666,7 +666,10 @@ class Scout(commands.Cog):
                     discord_url=image_url,
                     discord_message_id=str(message.id),
                 )
-                await message.add_reaction("🖼️")
+                try:
+                    await message.add_reaction("🖼️")
+                except discord.HTTPException:
+                    pass
                 # Also upsert enemy if we know the target from channel meta
                 if ch_info and ch_info.get("player"):
                     await database.upsert_enemy(
@@ -744,7 +747,10 @@ class Scout(commands.Cog):
                     coordinates=enemy_coords,
                     village=enemy_village,
                 )
-            await message.add_reaction("🔍")
+            try:
+                await message.add_reaction("🔍")
+            except discord.HTTPException:
+                pass  # reaction already exists (multiple images in one message)
             print(f"[scout] ocr report saved for ch {channel_id}, enemy={enemy_player}", flush=True)
 
     @commands.Cog.listener()
