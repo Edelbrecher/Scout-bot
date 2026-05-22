@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Settle-Liste · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;">
+
+  <div style="margin-bottom:1.25rem;">
+    <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+    <h1 style="margin:0.25rem 0 0;">📍 Settle-Liste</h1>
+    <p class="subtitle" style="margin:0;">Nächste Siedlungskoordinaten koordinieren — keine Konflikte beim Worldstart</p>
+  </div>
+
+  <!-- Eintrag hinzufügen -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="margin:0 0 0.75rem;">➕ Neuen Eintrag hinzufügen</h2>
+    <form method="post" action="/guild/{{ guild.guild_id }}/settle-list"
+          style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-end;">
+      <div class="form-group" style="margin:0;flex:0 0 160px;">
+        <label style="font-size:0.82rem;">Koordinaten <span style="color:#ef4444;">*</span></label>
+        <input type="text" name="coordinates" required placeholder="(25|-17)"
+               style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-family:monospace;font-size:0.9rem;">
+      </div>
+      <div class="form-group" style="margin:0;flex:1;min-width:160px;">
+        <label style="font-size:0.82rem;">Spieler-Name (optional)</label>
+        <input type="text" name="player_name" placeholder="Mein Travian-Name"
+               style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.85rem;">
+      </div>
+      <div class="form-group" style="margin:0;flex:2;min-width:200px;">
+        <label style="font-size:0.82rem;">Notiz (optional)</label>
+        <input type="text" name="note" placeholder="z.B. Nächste Welle, Getreide-Tal"
+               style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.85rem;">
+      </div>
+      <button type="submit" class="btn btn-primary" style="flex-shrink:0;">📍 Eintragen</button>
+    </form>
+  </div>
+
+  <!-- Liste -->
+  {% if entries %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0.85rem;">
+    {% for e in entries %}
+    <div class="card settle-card" style="padding:1rem 1.1rem;position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+        <div>
+          <div style="font-family:monospace;font-size:1.25rem;font-weight:800;color:#3b82f6;letter-spacing:0.02em;">
+            {{ e.coordinates }}
+          </div>
+          {% if e.player_name %}
+          <div style="font-size:0.88rem;font-weight:600;margin-top:0.15rem;">{{ e.player_name }}</div>
+          {% endif %}
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">
+            von {{ e.discord_username or e.discord_user_id }}
+            · {{ e.created_at[:10] if e.created_at else '' }}
+          </div>
+          {% if e.note %}
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.4rem;font-style:italic;">
+            {{ e.note }}
+          </div>
+          {% endif %}
+        </div>
+        {% if is_manager or e.discord_user_id == uid %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/settle-list/{{ e.id }}/delete"
+              onsubmit="return confirm('Eintrag löschen?')" style="flex-shrink:0;">
+          <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.6rem;font-size:0.75rem;">✕</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:3rem 1rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">📍</div>
+    <h2 style="margin:0 0 0.5rem;">Noch keine Einträge</h2>
+    <p style="color:var(--text-muted);">Trage deine geplanten Siedlungskoordinaten ein, bevor der Worldstart losgeht.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.settle-card { border:1px solid var(--border); transition:border-color 0.15s; }
+.settle-card:hover { border-color:#3b82f6; }
+</style>
+{% endblock %}

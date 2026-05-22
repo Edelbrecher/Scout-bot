@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Farmlist-Analyst · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1200px;">
+
+  <div style="margin-bottom:1.25rem;">
+    <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+    <h1 style="margin:0.25rem 0 0;">📋 Farmlist-Analyst</h1>
+    <p class="subtitle" style="margin:0;">Farmlisten auswerten — gute, mittelmäßige und sinnlose Farmen auf einen Blick</p>
+  </div>
+
+  <!-- Eingabe -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="margin:0 0 0.5rem;">📋 Farmliste einfügen</h2>
+    <p class="hint" style="margin-bottom:0.75rem;">
+      Öffne in Travian deine Farmliste, markiere alle Einträge (<kbd>Strg+A</kbd>),
+      kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
+    </p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/farmlist-analyst">
+      <textarea name="farmlist_text" rows="10"
+        placeholder="Farmliste hier einfügen…"
+        style="width:100%;font-family:monospace;font-size:0.78rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;resize:vertical;">{{ raw_text }}</textarea>
+      <button type="submit" class="btn btn-primary" style="margin-top:0.6rem;">🔍 Analysieren</button>
+    </form>
+  </div>
+
+  {% if stats %}
+  <!-- KPI -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+    <div class="card" style="padding:0.8rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;">{{ stats.total }}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">🏘️ Farmen</div>
+    </div>
+    <div class="card" style="padding:0.8rem;text-align:center;border-color:rgba(34,197,94,0.4);">
+      <div style="font-size:1.5rem;font-weight:800;color:#22c55e;">{{ stats.gut }}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">🟢 Gut</div>
+    </div>
+    <div class="card" style="padding:0.8rem;text-align:center;border-color:rgba(234,179,8,0.4);">
+      <div style="font-size:1.5rem;font-weight:800;color:#eab308;">{{ stats.ok }}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">🟡 OK</div>
+    </div>
+    <div class="card" style="padding:0.8rem;text-align:center;border-color:rgba(239,68,68,0.4);">
+      <div style="font-size:1.5rem;font-weight:800;color:#ef4444;">{{ stats.sinnlos }}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">🔴 Sinnlos</div>
+    </div>
+    <div class="card" style="padding:0.8rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;">{{ stats.avg_res }}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">∅ Ressourcen</div>
+    </div>
+    <div class="card" style="padding:0.8rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;">{{ stats.avg_dist }}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">∅ Distanz</div>
+    </div>
+  </div>
+
+  <!-- Filter Tabs -->
+  <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <button class="filter-btn active" onclick="filterFarms('all', this)">Alle ({{ stats.total }})</button>
+    <button class="filter-btn" onclick="filterFarms('gut', this)">🟢 Gut ({{ stats.gut }})</button>
+    <button class="filter-btn" onclick="filterFarms('ok', this)">🟡 OK ({{ stats.ok }})</button>
+    <button class="filter-btn" onclick="filterFarms('sinnlos', this)">🔴 Sinnlos ({{ stats.sinnlos }})</button>
+  </div>
+
+  <!-- Tabelle -->
+  <div class="card" style="overflow-x:auto;">
+    <table class="table" id="farmTable">
+      <thead>
+        <tr>
+          <th style="cursor:pointer;" onclick="sortTable('village_name')">Dorfname ↕</th>
+          <th style="cursor:pointer;text-align:right;" onclick="sortTable('population')">Pop ↕</th>
+          <th style="cursor:pointer;text-align:right;" onclick="sortTable('distance')">Distanz ↕</th>
+          <th style="text-align:right;">Truppen</th>
+          <th>Letzter Raid</th>
+          <th style="cursor:pointer;text-align:right;" onclick="sortTable('resources')">Ressourcen ↕</th>
+          <th style="cursor:pointer;text-align:right;" onclick="sortTable('efficiency')">Effizienz ↕</th>
+          <th>Bewertung</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in farms %}
+        <tr class="farm-row" data-rating="{{ f.rating }}"
+            style="{% if f.rating == 'gut' %}border-left:3px solid #22c55e;{% elif f.rating == 'ok' %}border-left:3px solid #eab308;{% else %}border-left:3px solid #ef4444;{% endif %}">
+          <td>
+            <strong>{{ f.village_name }}</strong>
+            {% if f.abandoned %}<span style="color:#f59e0b;font-size:0.72rem;margin-left:4px;">⚠️ Verlassen?</span>{% endif %}
+            <div style="font-size:0.72rem;color:var(--text-muted);">{{ f.list_name }}</div>
+          </td>
+          <td style="text-align:right;font-size:0.85rem;">{{ f.population }}</td>
+          <td style="text-align:right;font-family:monospace;">{{ f.distance }}</td>
+          <td style="text-align:right;font-family:monospace;">{{ f.troops }}</td>
+          <td style="font-size:0.82rem;color:var(--text-muted);">{{ f.last_raid or '—' }}</td>
+          <td style="text-align:right;font-weight:700;
+              {% if f.resources >= 50 %}color:#22c55e;{% elif f.resources > 0 %}color:#eab308;{% else %}color:#ef4444;{% endif %}">
+            {{ f.resources }}
+          </td>
+          <td style="text-align:right;font-family:monospace;">{{ f.efficiency }}</td>
+          <td>
+            {% if f.rating == 'gut' %}
+              <span class="rating-badge rating-gut">🟢 Gut</span>
+            {% elif f.rating == 'ok' %}
+              <span class="rating-badge rating-ok">🟡 OK</span>
+            {% else %}
+              <span class="rating-badge rating-sinnlos">🔴 Sinnlos</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif raw_text %}
+  <div class="card" style="text-align:center;padding:2rem;">
+    <div style="font-size:2rem;margin-bottom:0.5rem;">⚠️</div>
+    <p style="color:var(--text-muted);">Keine Farmen erkannt. Prüfe das Format — der Text muss tabellarisch aus Travian kopiert worden sein.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.filter-btn {
+  padding:0.4rem 1rem;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  color:var(--text);
+  cursor:pointer;
+  font-size:0.85rem;
+  transition:border-color 0.15s,background 0.15s;
+}
+.filter-btn.active, .filter-btn:hover {
+  border-color:#3b82f6;
+  background:rgba(59,130,246,0.12);
+}
+.rating-badge {
+  display:inline-block;
+  border-radius:4px;
+  padding:0.15rem 0.5rem;
+  font-size:0.75rem;
+  font-weight:700;
+  white-space:nowrap;
+}
+.rating-gut    { background:rgba(34,197,94,0.18); color:#22c55e; }
+.rating-ok     { background:rgba(234,179,8,0.18); color:#eab308; }
+.rating-sinnlos{ background:rgba(239,68,68,0.18); color:#ef4444; }
+</style>
+
+<script>
+function filterFarms(rating, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.farm-row').forEach(row => {
+    row.style.display = (rating === 'all' || row.dataset.rating === rating) ? '' : 'none';
+  });
+}
+
+let sortDir = {};
+function sortTable(key) {
+  sortDir[key] = sortDir[key] === 'asc' ? 'desc' : 'asc';
+  const tbody = document.querySelector('#farmTable tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const keyIdx = { village_name:0, population:1, distance:2, resources:5, efficiency:6 };
+  const idx = keyIdx[key];
+  rows.sort((a, b) => {
+    const aCell = a.cells[idx].textContent.trim();
+    const bCell = b.cells[idx].textContent.trim();
+    const aVal = parseFloat(aCell) || aCell;
+    const bVal = parseFloat(bCell) || bCell;
+    const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    return sortDir[key] === 'asc' ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

@@ -213,6 +213,23 @@ async def init_db():
     await _init_user_sub_tables()
     await _init_own_villages_table()
     await _init_own_villages_history_table()
+    await _init_sitter_table()
+    await _init_settle_list_table()
+    await _init_dual_links_table()
+
+    # New column migrations
+    async with aiosqlite.connect(DB_PATH) as db:
+        for col in ["alliance_manager_role_ids TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+        try:
+            await db.execute("ALTER TABLE account_sitters ADD COLUMN is_shared INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
 
     # Seed admin user from env if not exists
     username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -1991,13 +2008,14 @@ async def get_account_sitters(guild_id: str, user_id: str) -> dict | None:
 async def save_account_sitters(guild_id: str, user_id: str, data: dict):
     await _init_sitter_table()
     from datetime import datetime as _dt
+    is_shared = 1 if data.get("is_shared") else 0
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT INTO account_sitters
                 (guild_id, discord_user_id, sitter1_name, sitter1_travian,
                  sitter2_name, sitter2_travian, sitting1_name, sitting1_travian,
-                 sitting2_name, sitting2_travian, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 sitting2_name, sitting2_travian, is_shared, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(guild_id, discord_user_id) DO UPDATE SET
                 sitter1_name    = excluded.sitter1_name,
                 sitter1_travian = excluded.sitter1_travian,
@@ -2007,6 +2025,7 @@ async def save_account_sitters(guild_id: str, user_id: str, data: dict):
                 sitting1_travian = excluded.sitting1_travian,
                 sitting2_name   = excluded.sitting2_name,
                 sitting2_travian = excluded.sitting2_travian,
+                is_shared       = excluded.is_shared,
                 updated_at      = excluded.updated_at
         """, (
             guild_id, user_id,
@@ -2014,6 +2033,7 @@ async def save_account_sitters(guild_id: str, user_id: str, data: dict):
             data.get("sitter2_name"), data.get("sitter2_travian"),
             data.get("sitting1_name"), data.get("sitting1_travian"),
             data.get("sitting2_name"), data.get("sitting2_travian"),
+            is_shared,
             _dt.utcnow().isoformat(),
         ))
         await db.commit()
@@ -2025,6 +2045,151 @@ async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
         async with db.execute(
             "SELECT * FROM scout_reports WHERE channel_id = ? ORDER BY created_at DESC",
             (channel_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def _init_settle_list_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS settle_list (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                discord_user_id TEXT NOT NULL,
+                discord_username TEXT,
+                player_name TEXT,
+                coordinates TEXT NOT NULL,
+                note TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def get_settle_list(guild_id: str) -> list[dict]:
+    await _init_settle_list_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM settle_list WHERE guild_id = ? ORDER BY created_at DESC",
+            (guild_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_settle_entry(
+    guild_id: str, user_id: str, username: str,
+    player_name: str | None, coordinates: str, note: str | None,
+) -> int:
+    await _init_settle_list_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO settle_list (guild_id, discord_user_id, discord_username, player_name, coordinates, note)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (guild_id, user_id, username or None, player_name or None, coordinates, note or None))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_settle_entry(entry_id: int, guild_id: str, user_id: str, is_manager: bool):
+    await _init_settle_list_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        if is_manager:
+            await db.execute(
+                "DELETE FROM settle_list WHERE id = ? AND guild_id = ?",
+                (entry_id, guild_id),
+            )
+        else:
+            await db.execute(
+                "DELETE FROM settle_list WHERE id = ? AND guild_id = ? AND discord_user_id = ?",
+                (entry_id, guild_id, user_id),
+            )
+        await db.commit()
+
+
+async def _init_dual_links_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS dual_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                owner_discord_id TEXT NOT NULL,
+                owner_username TEXT,
+                invite_token TEXT UNIQUE NOT NULL,
+                dual_discord_id TEXT,
+                dual_username TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT DEFAULT (datetime('now')),
+                accepted_at TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def create_dual_invite(guild_id: str, owner_id: str, owner_username: str) -> str:
+    await _init_dual_links_table()
+    import secrets as _sec
+    token = _sec.token_urlsafe(24)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO dual_links (guild_id, owner_discord_id, owner_username, invite_token)
+            VALUES (?, ?, ?, ?)
+        """, (guild_id, owner_id, owner_username or None, token))
+        await db.commit()
+    return token
+
+
+async def get_dual_link_by_token(token: str) -> dict | None:
+    await _init_dual_links_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM dual_links WHERE invite_token = ?", (token,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def accept_dual_invite(token: str, dual_id: str, dual_username: str):
+    await _init_dual_links_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE dual_links
+            SET dual_discord_id = ?, dual_username = ?, status = 'active',
+                accepted_at = datetime('now')
+            WHERE invite_token = ? AND status = 'pending'
+        """, (dual_id, dual_username or None, token))
+        await db.commit()
+
+
+async def get_dual_links_for_owner(guild_id: str, owner_id: str) -> list[dict]:
+    await _init_dual_links_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM dual_links WHERE guild_id = ? AND owner_discord_id = ? ORDER BY created_at DESC",
+            (guild_id, owner_id),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def revoke_dual_link(token: str, owner_id: str):
+    await _init_dual_links_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE dual_links SET status = 'revoked' WHERE invite_token = ? AND owner_discord_id = ?",
+            (token, owner_id),
+        )
+        await db.commit()
+
+
+async def get_all_shared_sitters(guild_id: str) -> list[dict]:
+    await _init_sitter_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM account_sitters WHERE guild_id = ? AND is_shared = 1",
+            (guild_id,),
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 

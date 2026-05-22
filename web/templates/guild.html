@@ -194,6 +194,36 @@
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
 
+    <!-- Settle-Liste (kein Pro) -->
+    <a href="/guild/{{ guild.guild_id }}/settle-list" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">📍</div>
+      <div class="feature-body">
+        <div class="feature-title">Settle-Liste</div>
+        <div class="feature-desc">Nächste Siedlungen koordinieren — verhindert Konflikte beim Worldstart</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
+
+    <!-- Farmlist-Analyst (Pro) -->
+    <a href="/guild/{{ guild.guild_id }}/farmlist-analyst" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+      <div class="feature-icon">📋</div>
+      <div class="feature-body">
+        <div class="feature-title">Farmlist-Analyst {{ PRO_BADGE }}</div>
+        <div class="feature-desc">Farmlisten auswerten — gute, mittelmäßige und sinnlose Farmen erkennen</div>
+      </div>
+      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+    </a>
+
+    <!-- Allianz-Sitter-Listen -->
+    <a href="/guild/{{ guild.guild_id }}/allianz/sitter-liste" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🤝</div>
+      <div class="feature-body">
+        <div class="feature-title">Allianz-Listen</div>
+        <div class="feature-desc">Freigegebene Sitter- und Dual-Listen aller Mitglieder auf einen Blick</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
+
     <!-- Statistics -->
     <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📊</div>

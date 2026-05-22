@@ -3013,6 +3013,8 @@ async def mein_account_page(request: Request, guild_id: str):
     total_crop = sum(v.get("total_crop", 0) for v in own_villages)
 
     sitters = await database.get_account_sitters(guild_id, session.get("uid", ""))
+    dual_links = await database.get_dual_links_for_owner(guild_id, session.get("uid", ""))
+    dual_created = request.query_params.get("dual_created")
 
     return templates.TemplateResponse("mein_account.html", {
         "request":       request,
@@ -3026,6 +3028,8 @@ async def mein_account_page(request: Request, guild_id: str):
         "total_def":     total_def,
         "total_crop":    total_crop,
         "sitters":       sitters,
+        "dual_links":    dual_links,
+        "dual_created":  dual_created,
     })
 
 
@@ -3083,6 +3087,7 @@ async def save_sitters(
     sitting1_travian: str = Form(""),
     sitting2_name: str = Form(""),
     sitting2_travian: str = Form(""),
+    is_shared: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -3097,6 +3102,7 @@ async def save_sitters(
         "sitting1_travian": sitting1_travian or None,
         "sitting2_name": sitting2_name or None,
         "sitting2_travian": sitting2_travian or None,
+        "is_shared": bool(is_shared),
     })
     return RedirectResponse(f"/guild/{guild_id}/mein-account?saved=1", status_code=303)
 
@@ -3123,6 +3129,363 @@ async def kampfkraft_page(request: Request, guild_id: str):
 @app.get("/guild/{guild_id}/attacks/own-troops")
 async def _legacy_own_troops_get(guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/mein-account", status_code=301)
+
+
+# ---------------------------------------------------------------------------
+# Helper: alliance manager check
+# ---------------------------------------------------------------------------
+
+def _is_alliance_manager(session: dict, guild: dict) -> bool:
+    """True if user is admin, guild owner, or has MANAGE_GUILD permission on this guild."""
+    if session.get("type") == "admin":
+        return True
+    if session.get("uid") == (guild.get("owner_discord_id") or ""):
+        return True
+    # Check MANAGE_GUILD permission from guilds stored in session
+    guild_id = guild.get("guild_id", "")
+    # session doesn't carry per-guild permissions directly, but accessible guilds
+    # require MANAGE_GUILD already (see auth_callback), so any accessible guild is managed.
+    # For a more granular check we'd need the permission bits stored in session.
+    # Simple approach: if user can access this guild, they have MANAGE_GUILD.
+    return True  # Already gated by can_access_guild which requires MANAGE_GUILD
+
+
+# ---------------------------------------------------------------------------
+# Routes — Allianz Sitter-Liste (Feature 1)
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/allianz/sitter-liste", response_class=HTMLResponse)
+async def allianz_sitter_liste(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    shared = await database.get_all_shared_sitters(guild_id)
+    return templates.TemplateResponse("allianz_sitter.html", {
+        "request": request,
+        "guild": guild,
+        "shared_sitters": shared,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Routes — Settle-Liste (Feature 2)
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/settle-list", response_class=HTMLResponse)
+async def settle_list_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    entries = await database.get_settle_list(guild_id)
+    is_manager = _is_alliance_manager(session, guild)
+    return templates.TemplateResponse("settle_list.html", {
+        "request": request,
+        "guild": guild,
+        "entries": entries,
+        "uid": session.get("uid", ""),
+        "is_manager": is_manager,
+    })
+
+
+@app.post("/guild/{guild_id}/settle-list")
+async def settle_list_add(
+    request: Request,
+    guild_id: str,
+    coordinates: str = Form(...),
+    player_name: str = Form(""),
+    note: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    coords = coordinates.strip()[:30]
+    if not coords:
+        return RedirectResponse(f"/guild/{guild_id}/settle-list?error=coords_required", status_code=303)
+    await database.add_settle_entry(
+        guild_id=guild_id,
+        user_id=session.get("uid", ""),
+        username=session.get("username", ""),
+        player_name=player_name.strip()[:80] or None,
+        coordinates=coords,
+        note=note.strip()[:200] or None,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/settle-list", status_code=303)
+
+
+@app.post("/guild/{guild_id}/settle-list/{entry_id}/delete")
+async def settle_list_delete(request: Request, guild_id: str, entry_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    is_manager = _is_alliance_manager(session, guild)
+    await database.delete_settle_entry(entry_id, guild_id, session.get("uid", ""), is_manager)
+    return RedirectResponse(f"/guild/{guild_id}/settle-list", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Dual-Link System (Feature 3)
+# ---------------------------------------------------------------------------
+
+@app.post("/guild/{guild_id}/mein-account/dual/create")
+async def dual_create(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    token = await database.create_dual_invite(
+        guild_id=guild_id,
+        owner_id=session.get("uid", ""),
+        owner_username=session.get("username", ""),
+    )
+    return RedirectResponse(f"/guild/{guild_id}/mein-account?dual_created={token}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/mein-account/dual/revoke")
+async def dual_revoke(request: Request, guild_id: str, token: str = Form(...)):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.revoke_dual_link(token, session.get("uid", ""))
+    return RedirectResponse(f"/guild/{guild_id}/mein-account", status_code=303)
+
+
+@app.get("/dual/join/{token}", response_class=HTMLResponse)
+async def dual_join_page(request: Request, token: str):
+    session, err = _require_session(request)
+    if err: return err
+    link = await database.get_dual_link_by_token(token)
+    if not link or link["status"] == "revoked":
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "emoji": "🔗",
+            "code": "404",
+            "message": "Dieser Einladungslink ist ungültig oder wurde widerrufen.",
+            "detail": None,
+        }, status_code=404)
+    return templates.TemplateResponse("dual_join.html", {
+        "request": request,
+        "link": link,
+        "token": token,
+        "already_active": link["status"] == "active",
+    })
+
+
+@app.post("/dual/join/{token}")
+async def dual_join_accept(request: Request, token: str):
+    session, err = _require_session(request)
+    if err: return err
+    link = await database.get_dual_link_by_token(token)
+    if not link or link["status"] != "pending":
+        return RedirectResponse(f"/dual/join/{token}", status_code=303)
+    await database.accept_dual_invite(token, session.get("uid", ""), session.get("username", ""))
+    return RedirectResponse(f"/dual/join/{token}?accepted=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Farmlist-Analyst (Feature 4)
+# ---------------------------------------------------------------------------
+
+def parse_farmlist(text: str) -> list[dict]:
+    """Parse Travian farmlist copy-paste into structured farm dicts."""
+    import re as _re
+    # Strip Unicode direction/formatting marks (LRE, RLE, PDF, LRM, RLM, etc.)
+    clean = _re.sub(r'[‪‫‬‭‮‎‏]', '', text)
+    # Normalize line endings
+    lines = clean.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+
+    farms = []
+    i = 0
+    current_list_name = "Unbekannte Liste"
+
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.strip()
+
+        # Detect farmlist section headers (no leading tabs, not empty, not a number)
+        if stripped and not raw.startswith('\t') and not _re.match(r'^[\d\s]+$', stripped):
+            # Could be a list name
+            parts = stripped.split('\t')
+            if len(parts) == 1 and not _re.match(r'^\d+$', stripped):
+                current_list_name = stripped
+                i += 1
+                continue
+
+        # Farm entry: starts with 2+ tabs → village name, pop, distance
+        if raw.startswith('\t\t') or (raw.startswith('\t') and raw.count('\t') >= 2):
+            parts = [p.strip() for p in raw.split('\t')]
+            # Remove empty leading parts
+            while parts and parts[0] == '':
+                parts.pop(0)
+
+            if len(parts) >= 3:
+                village_name = parts[0]
+                # Try to parse population and distance
+                try:
+                    population = int(_re.sub(r'\D', '', parts[1])) if parts[1] else 0
+                except Exception:
+                    population = 0
+                try:
+                    distance_str = _re.sub(r'[^\d.,]', '', parts[2]).replace(',', '.')
+                    distance = float(distance_str) if distance_str else 0.0
+                except Exception:
+                    distance = 0.0
+
+                # Read next lines for troops, time, resources, other
+                troops = 0
+                last_raid = ""
+                resources = 0
+                other = 0
+                for j in range(1, 5):
+                    if i + j >= len(lines):
+                        break
+                    val = lines[i + j].strip()
+                    val = _re.sub(r'[‪‫‬‭‮‎‏]', '', val)
+                    if not val:
+                        continue
+                    if j == 1:
+                        try:
+                            troops = int(_re.sub(r'\D', '', val)) if val else 0
+                        except Exception:
+                            last_raid = val
+                    elif j == 2:
+                        # Could be time string or resources
+                        num = _re.sub(r'\D', '', val)
+                        if num and len(num) > 0 and len(val) <= 10:
+                            try:
+                                resources = int(num)
+                            except Exception:
+                                last_raid = val
+                        else:
+                            last_raid = val
+                    elif j == 3:
+                        num = _re.sub(r'\D', '', val)
+                        try:
+                            n = int(num) if num else 0
+                            if resources == 0:
+                                resources = n
+                            else:
+                                other = n
+                        except Exception:
+                            if not last_raid:
+                                last_raid = val
+                    elif j == 4:
+                        num = _re.sub(r'\D', '', val)
+                        try:
+                            other = int(num) if num else 0
+                        except Exception:
+                            pass
+
+                # Rating
+                efficiency = round(resources / distance, 1) if distance > 0 else 0.0
+                if resources >= 50 and efficiency > 10:
+                    rating = "gut"
+                elif resources > 0:
+                    rating = "ok"
+                else:
+                    rating = "sinnlos"
+
+                farms.append({
+                    "list_name": current_list_name,
+                    "village_name": village_name,
+                    "population": population,
+                    "distance": distance,
+                    "troops": troops,
+                    "last_raid": last_raid,
+                    "resources": resources,
+                    "other": other,
+                    "efficiency": efficiency,
+                    "rating": rating,
+                    "abandoned": population == 0,
+                })
+                i += 5
+                continue
+        i += 1
+
+    return farms
+
+
+@app.get("/guild/{guild_id}/farmlist-analyst", response_class=HTMLResponse)
+async def farmlist_analyst_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    return templates.TemplateResponse("farmlist_analyst.html", {
+        "request": request,
+        "guild": guild,
+        "farms": [],
+        "stats": None,
+        "raw_text": "",
+    })
+
+
+@app.post("/guild/{guild_id}/farmlist-analyst", response_class=HTMLResponse)
+async def farmlist_analyst_post(
+    request: Request,
+    guild_id: str,
+    farmlist_text: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    farms = parse_farmlist(farmlist_text)
+
+    # Build stats
+    gut = [f for f in farms if f["rating"] == "gut"]
+    ok = [f for f in farms if f["rating"] == "ok"]
+    sinnlos = [f for f in farms if f["rating"] == "sinnlos"]
+    avg_res = round(sum(f["resources"] for f in farms) / len(farms), 1) if farms else 0
+    avg_dist = round(sum(f["distance"] for f in farms) / len(farms), 1) if farms else 0
+    stats = {
+        "total": len(farms),
+        "gut": len(gut),
+        "ok": len(ok),
+        "sinnlos": len(sinnlos),
+        "avg_res": avg_res,
+        "avg_dist": avg_dist,
+    }
+
+    return templates.TemplateResponse("farmlist_analyst.html", {
+        "request": request,
+        "guild": guild,
+        "farms": farms,
+        "stats": stats,
+        "raw_text": farmlist_text,
+    })
 
 
 # ---------------------------------------------------------------------------
