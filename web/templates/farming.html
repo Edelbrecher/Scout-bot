@@ -73,6 +73,14 @@
           {% endif %}
         </li>
         <li>
+          <span class="status-label">Nächster Auto-Fetch</span>
+          {% if farm_stats.latest_snapshot %}
+          <span class="badge" id="nextFetchBadge">—</span>
+          {% else %}
+          <span class="badge badge-warn">Beim nächsten Seitenaufruf</span>
+          {% endif %}
+        </li>
+        <li>
           <span class="status-label">Inaktive Farmen erkannt</span>
           <span class="badge">{{ farm_stats.inactive_count }}</span>
         </li>
@@ -525,6 +533,31 @@
   </div><!-- /tab farmlist -->
 
 </div>
+
+{% if farm_stats.latest_snapshot %}
+<script>
+(function() {
+  const lastSnap = new Date('{{ farm_stats.latest_snapshot }}Z');
+  const nextFetch = new Date(lastSnap.getTime() + 6 * 3600 * 1000);
+  function update() {
+    const rem = nextFetch - Date.now();
+    const badge = document.getElementById('nextFetchBadge');
+    if (!badge) return;
+    if (rem <= 0) {
+      badge.textContent = 'Läuft gleich…';
+      badge.className = 'badge badge-ok';
+      return;
+    }
+    const h = Math.floor(rem / 3600000);
+    const m = Math.floor((rem % 3600000) / 60000);
+    const s = Math.floor((rem % 60000) / 1000);
+    badge.textContent = `in ${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+  }
+  update();
+  setInterval(update, 1000);
+})();
+</script>
+{% endif %}
 
 {% if inactive_farms or growth_data %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
