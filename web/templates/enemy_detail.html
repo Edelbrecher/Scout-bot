@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}{{ enemy.player_name }} · Gegner · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link">← Gegner-Kartei</a>
+      <h1 style="margin:0.25rem 0 0;">🎯 {{ enemy.player_name }}</h1>
+      <p class="subtitle" style="margin:0;">
+        {% if enemy.coordinates %}{{ enemy.coordinates }}{% endif %}
+        {% if enemy.village %} · {{ enemy.village }}{% endif %}
+        &nbsp;·&nbsp; Zuerst gesehen: {{ enemy.first_seen[:10] }}
+      </p>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+      <form method="post"
+            action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/delete"
+            onsubmit="return confirm('Gegner löschen?')" style="margin:0;">
+        <button type="submit" class="btn btn-danger" style="font-size:0.82rem;">🗑 Löschen</button>
+      </form>
+    </div>
+  </div>
+
+  {% if request.query_params.get('saved') %}
+  <div class="alert alert-success">✅ Notizen gespeichert.</div>
+  {% endif %}
+
+  <!-- KPI strip -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">{{ enemy.scout_count }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🔭 Scouts</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">{{ history|length }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">📋 Berichte</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
+        {% set img_count = history | sum(attribute='images') | list | length %}
+        {{ history | selectattr('images') | list | length }}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🖼️ Screenshots</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">
+        {{ enemy.last_seen[:16].replace('T',' ') }}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">📅 Letzter Scout</div>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h3 style="margin:0 0 0.6rem;font-size:0.95rem;">📝 Notizen</h3>
+    <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/notes">
+      <textarea name="notes" rows="3"
+                placeholder="Eigene Notizen zu diesem Gegner…"
+                style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
+                       border:1px solid var(--border);border-radius:6px;padding:0.5rem;
+                       font-size:0.875rem;box-sizing:border-box;">{{ enemy.notes or '' }}</textarea>
+      <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;font-size:0.85rem;">
+        Speichern
+      </button>
+    </form>
+  </div>
+
+  <!-- Scout history -->
+  <h2 style="margin:0 0 0.75rem;font-size:1.05rem;">📜 Scout-Verlauf</h2>
+
+  {% if history %}
+  {% for report in history %}
+  <div class="card" style="margin-bottom:1rem;border-left:3px solid
+    {% if report.source == 'ocr' %}rgba(147,197,253,0.5){% else %}rgba(34,197,94,0.5){% endif %};">
+
+    <!-- Report header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+      <div>
+        <span style="font-size:0.75rem;background:
+          {% if report.source == 'ocr' %}rgba(147,197,253,0.15);color:#93c5fd{% else %}rgba(34,197,94,0.15);color:#22c55e{% endif %};
+          border-radius:4px;padding:0.15rem 0.5rem;">
+          {% if report.source == 'ocr' %}🔍 OCR{% else %}📋 Text{% endif %}
+        </span>
+        {% if report.target_village %}
+        <span style="font-size:0.82rem;color:var(--text-muted);margin-left:0.5rem;">
+          🏘️ {{ report.target_village }}
+        </span>
+        {% endif %}
+        {% if report.target_coords %}
+        <span style="font-size:0.82rem;font-family:monospace;color:#93c5fd;margin-left:0.5rem;">
+          {{ report.target_coords }}
+        </span>
+        {% endif %}
+      </div>
+      <span style="font-size:0.8rem;color:var(--text-muted);">
+        📅 {{ report.created_at[:16].replace('T',' ') }} UTC
+      </span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.75rem;">
+
+      <!-- Troops -->
+      {% if report.troops_json %}
+      {% set troops = report.troops_json | from_json %}
+      {% if troops %}
+      <div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+                    letter-spacing:.04em;margin-bottom:0.4rem;">⚔️ Truppen</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+          {% for troop, count in troops.items() %}
+          {% if count %}
+          <span style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);
+                       border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
+            {{ troop }}: <strong>{{ count }}</strong>
+          </span>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <!-- Resources -->
+      {% if report.resources_json %}
+      {% set res = report.resources_json | from_json %}
+      {% if res %}
+      <div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+                    letter-spacing:.04em;margin-bottom:0.4rem;">🌾 Ressourcen</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+          {% for k, v in res.items() %}
+          {% if v %}
+          <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);
+                       border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
+            {{ k }}: <strong>{{ v }}</strong>
+          </span>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <!-- Losses -->
+      {% if report.losses_json %}
+      {% set losses = report.losses_json | from_json %}
+      {% if losses %}
+      <div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+                    letter-spacing:.04em;margin-bottom:0.4rem;">💀 Verluste</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+          {% for troop, count in losses.items() %}
+          {% if count %}
+          <span style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);
+                       border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
+            {{ troop }}: <strong>{{ count }}</strong>
+          </span>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <!-- Attacker -->
+      {% if report.attacker_player %}
+      <div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+                    letter-spacing:.04em;margin-bottom:0.4rem;">🗡️ Scout-Sender</div>
+        <span style="font-size:0.85rem;">{{ report.attacker_player }}</span>
+        {% if report.attacker_village %}
+        <span style="font-size:0.8rem;color:var(--text-muted);"> · {{ report.attacker_village }}</span>
+        {% endif %}
+        {% if report.experience %}
+        <span style="font-size:0.78rem;color:#f59e0b;"> · {{ report.experience }} XP</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Images -->
+    {% if report.images %}
+    <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+      <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+                  letter-spacing:.04em;margin-bottom:0.5rem;">🖼️ Screenshots</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+        {% for img_url in report.images %}
+        <a href="{{ img_url }}" target="_blank">
+          <img src="{{ img_url }}" alt="Scout-Screenshot"
+               style="height:100px;width:auto;border-radius:6px;border:1px solid var(--border);
+                      object-fit:cover;cursor:pointer;transition:opacity 0.2s;"
+               onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="card">
+    <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
+      Noch keine Scout-Berichte für diesen Gegner vorhanden.
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

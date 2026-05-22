@@ -501,11 +501,29 @@ class Scout(commands.Cog):
             if not attachment.content_type or not attachment.content_type.startswith("image/"):
                 continue
             img_bytes = await attachment.read()
+
+            # Always save the image URL (regardless of OCR success)
+            image_url = attachment.url
+
             ocr_text = await _try_ocr(img_bytes)
             if not ocr_text:
-                # OCR unavailable — acknowledge image but note we can't parse it
+                # OCR unavailable — save image reference only
+                await database.save_scout_image(
+                    guild_id=guild_id, channel_id=channel_id,
+                    discord_url=image_url,
+                    discord_message_id=str(message.id),
+                )
                 await message.add_reaction("🖼️")
+                # Also upsert enemy if we know the target from channel meta
+                if ch_info and ch_info.get("player"):
+                    await database.upsert_enemy(
+                        guild_id=guild_id,
+                        player_name=ch_info["player"],
+                        coordinates=ch_info.get("coordinates", ""),
+                        village=ch_info.get("village", ""),
+                    )
                 continue
+
             parsed = parse_scout_report(ocr_text)
             if parsed["troops"] or parsed["resources"] or parsed["target_player"]:
                 if not parsed["target_coords"] and ch_info:
@@ -514,7 +532,7 @@ class Scout(commands.Cog):
                     parsed["target_player"] = ch_info.get("player")
                 if not parsed["target_village"] and ch_info:
                     parsed["target_village"] = ch_info.get("village")
-                await database.save_scout_report(
+                report_id = await database.save_scout_report(
                     channel_id=channel_id, guild_id=guild_id, source="ocr",
                     raw_text=ocr_text,
                     target_player=parsed["target_player"],
@@ -527,8 +545,40 @@ class Scout(commands.Cog):
                     losses_json=json.dumps(parsed["losses"]) if parsed["losses"] else None,
                     experience=parsed["experience"],
                 )
+                # Save image linked to this report
+                await database.save_scout_image(
+                    guild_id=guild_id, channel_id=channel_id,
+                    discord_url=image_url,
+                    discord_message_id=str(message.id),
+                    scout_report_id=report_id,
+                )
+                # Upsert enemy
+                if parsed.get("target_player"):
+                    await database.upsert_enemy(
+                        guild_id=guild_id,
+                        player_name=parsed["target_player"],
+                        coordinates=parsed.get("target_coords", "") or "",
+                        village=parsed.get("target_village", "") or "",
+                    )
                 await message.add_reaction("🔍")
                 print(f"[scout] ocr report saved for ch {channel_id}", flush=True)
+            else:
+                # OCR ran but parsed nothing — still save the image
+                await database.save_scout_image(
+                    guild_id=guild_id, channel_id=channel_id,
+                    discord_url=image_url,
+                    discord_message_id=str(message.id),
+                )
+                await message.add_reaction("🖼️")
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        """When a message in a scout channel is deleted in Discord, mark the request closed."""
+        channel_id = str(payload.channel_id)
+        if not await database.is_scout_channel(channel_id):
+            return
+        await database.close_scout_channel_by_message(str(payload.message_id))
+        print(f"[scout] Message {payload.message_id} deleted → scout request closed", flush=True)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):

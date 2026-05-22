@@ -667,6 +667,141 @@ async def delete_scout_channel(channel_id: str):
         await db.commit()
 
 
+async def close_scout_channel_by_message(discord_message_id: str):
+    """Mark a scout_channel as closed when its Discord message is deleted."""
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE scout_channels SET closed_at = ?, closed_by = 'discord_delete'
+            WHERE discord_message_id = ? AND closed_at IS NULL
+        """, (_dt.utcnow().isoformat(), discord_message_id))
+        await db.commit()
+
+
+async def save_scout_image(
+    guild_id: str, channel_id: str, discord_url: str,
+    discord_message_id: str = "", scout_report_id: int | None = None
+) -> int:
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO scout_images (scout_report_id, guild_id, channel_id,
+                                      discord_url, discord_message_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (scout_report_id, guild_id, channel_id, discord_url,
+              discord_message_id, _dt.utcnow().isoformat()))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_scout_images_for_channel(channel_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM scout_images WHERE channel_id = ? ORDER BY created_at DESC
+        """, (channel_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+# ── Enemy Kartei ──────────────────────────────────────────────────────────────
+
+async def upsert_enemy(
+    guild_id: str, player_name: str,
+    coordinates: str = "", village: str = ""
+) -> int:
+    """Create or update an enemy entry. Returns the enemy id."""
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("""
+            INSERT INTO enemies (guild_id, player_name, coordinates, village,
+                                 first_seen, last_seen, scout_count)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(guild_id, player_name) DO UPDATE SET
+                last_seen   = excluded.last_seen,
+                scout_count = scout_count + 1,
+                coordinates = CASE WHEN excluded.coordinates != '' THEN excluded.coordinates
+                                   ELSE coordinates END,
+                village     = CASE WHEN excluded.village != '' THEN excluded.village
+                                   ELSE village END
+        """, (guild_id, player_name, coordinates or "", village or "", now, now))
+        await db.commit()
+        async with db.execute(
+            "SELECT id FROM enemies WHERE guild_id=? AND player_name=?",
+            (guild_id, player_name)
+        ) as cur:
+            row = await cur.fetchone()
+            return row["id"] if row else 0
+
+
+async def get_enemies(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT e.*,
+                   COUNT(sr.id) as report_count
+            FROM enemies e
+            LEFT JOIN scout_reports sr
+                ON sr.guild_id = e.guild_id
+                AND sr.target_player = e.player_name
+            WHERE e.guild_id = ?
+            GROUP BY e.id
+            ORDER BY e.last_seen DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_enemy(guild_id: str, player_name: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM enemies WHERE guild_id=? AND player_name=?",
+            (guild_id, player_name)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_enemy_scout_history(guild_id: str, player_name: str) -> list[dict]:
+    """All scout reports for an enemy, with images."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT sr.*,
+                   GROUP_CONCAT(si.discord_url, '|||') as image_urls_concat
+            FROM scout_reports sr
+            LEFT JOIN scout_images si
+                ON si.scout_report_id = sr.id
+            WHERE sr.guild_id = ? AND sr.target_player = ?
+            GROUP BY sr.id
+            ORDER BY sr.created_at DESC
+        """, (guild_id, player_name)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+            for r in rows:
+                urls = r.pop("image_urls_concat", "") or ""
+                r["images"] = [u for u in urls.split("|||") if u]
+            return rows
+
+
+async def update_enemy_notes(guild_id: str, player_name: str, notes: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE enemies SET notes=? WHERE guild_id=? AND player_name=?",
+            (notes, guild_id, player_name)
+        )
+        await db.commit()
+
+
+async def delete_enemy(guild_id: str, player_name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM enemies WHERE guild_id=? AND player_name=?",
+            (guild_id, player_name)
+        )
+        await db.commit()
+
+
 _ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids"}
 
 async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
@@ -2612,6 +2747,53 @@ async def _init_alliance_members_table():
             )
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_am_guild ON alliance_members(guild_id)")
+
+        # Scout images table — stores Discord CDN URL + optional cached bytes
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scout_images (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                scout_report_id INTEGER,
+                guild_id        TEXT NOT NULL,
+                channel_id      TEXT NOT NULL,
+                discord_url     TEXT NOT NULL,
+                discord_message_id TEXT,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_si_report ON scout_images(scout_report_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_si_guild  ON scout_images(guild_id)")
+
+        # Enemies table — one row per unique target player
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemies (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                coordinates TEXT,
+                village     TEXT,
+                notes       TEXT DEFAULT '',
+                first_seen  TEXT NOT NULL,
+                last_seen   TEXT NOT NULL,
+                scout_count INTEGER DEFAULT 0,
+                UNIQUE(guild_id, player_name)
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_enemies_guild ON enemies(guild_id)")
+
+        # Migrations: add discord_message_id + image_url to scout_reports
+        for col in ["discord_message_id TEXT", "image_urls TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_reports ADD COLUMN {col}")
+            except Exception:
+                pass
+        # Migrations: add requested_by_id / requested_by_name to scout_channels
+        for col in ["closed_at TEXT", "closed_by TEXT", "discord_message_id TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
+            except Exception:
+                pass
+        await db.commit()
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS travian_servers (
                 url             TEXT PRIMARY KEY,

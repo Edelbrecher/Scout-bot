@@ -4251,6 +4251,71 @@ def parse_alliance_members(text: str) -> list[dict]:
     return members
 
 
+@app.get("/guild/{guild_id}/enemies", response_class=HTMLResponse)
+async def enemies_page(request: Request, guild_id: str, saved: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    enemies = await database.get_enemies(guild_id)
+    return templates.TemplateResponse("enemies.html", {
+        "request": request,
+        "guild": guild,
+        "enemies": enemies,
+        "saved": saved,
+    })
+
+
+@app.get("/guild/{guild_id}/enemies/{player_name}", response_class=HTMLResponse)
+async def enemy_detail(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    enemy = await database.get_enemy(guild_id, player_name)
+    if not enemy:
+        return RedirectResponse(f"/guild/{guild_id}/enemies", status_code=303)
+    history = await database.get_enemy_scout_history(guild_id, player_name)
+    # Also get all scout images for this player's channels
+    return templates.TemplateResponse("enemy_detail.html", {
+        "request": request,
+        "guild": guild,
+        "enemy": enemy,
+        "history": history,
+    })
+
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/notes")
+async def enemy_update_notes(
+    request: Request, guild_id: str, player_name: str,
+    notes: str = Form("")
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.update_enemy_notes(guild_id, player_name, notes)
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies/{player_name}?saved=1", status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/delete")
+async def enemy_delete(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_enemy(guild_id, player_name)
+    return RedirectResponse(f"/guild/{guild_id}/enemies?saved=deleted", status_code=303)
+
+
 @app.get("/guild/{guild_id}/allianz/mitglieder", response_class=HTMLResponse)
 async def alliance_members_page(request: Request, guild_id: str):
     session, err = _require_session(request)
