@@ -3136,15 +3136,15 @@ async def farmlist_analysis_delete(request: Request, guild_id: str, analysis_id:
 async def farming_inactive_search(
     request: Request,
     guild_id: str,
-    ref_x: int = 0,
-    ref_y: int = 0,
-    max_pop_increase: int = 0,
-    min_pop: int = 0,
-    max_pop: int = 9999,
-    min_player_pop: int = 0,
-    max_player_pop: int = 999999,
-    min_dist: float = 0,
-    max_dist: float = 9999,
+    ref_x: Optional[int] = None,
+    ref_y: Optional[int] = None,
+    max_pop_increase: Optional[int] = None,
+    min_pop: Optional[int] = None,
+    max_pop: Optional[int] = None,
+    min_player_pop: Optional[int] = None,
+    max_player_pop: Optional[int] = None,
+    min_dist: Optional[float] = None,
+    max_dist: Optional[float] = None,
     player_filter: str = "",
     alliance_filter: str = "",
     exclude_players: str = "",
@@ -3163,6 +3163,17 @@ async def farming_inactive_search(
     tw_world = (guild.get("tw_world") or "").strip()
     snap_count = await database.get_snapshot_count(guild_id)
     result = {"villages": [], "snap_dates": [], "total": 0}
+
+    # Apply defaults for optional numeric params
+    ref_x = ref_x or 0
+    ref_y = ref_y or 0
+    max_pop_increase = max_pop_increase if max_pop_increase is not None else 0
+    min_pop = min_pop or 0
+    max_pop = max_pop if max_pop is not None else 9999
+    min_player_pop = min_player_pop or 0
+    max_player_pop = max_player_pop if max_player_pop is not None else 999999
+    min_dist = min_dist or 0.0
+    max_dist = max_dist if max_dist is not None else 9999.0
 
     if searched and snap_count >= 1:
         result = await database.search_inactive_advanced(
