@@ -1247,6 +1247,115 @@ async def get_farm_stats(guild_id: str) -> dict:
     }
 
 
+async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
+    """Return top growing / shrinking players between first and last snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # We need first and last snapshot times
+        cur = await db.execute(
+            "SELECT MIN(fetched_at) as first_snap, MAX(fetched_at) as last_snap "
+            "FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        )
+        row = await cur.fetchone()
+        if not row or not row["first_snap"] or row["first_snap"] == row["last_snap"]:
+            return []
+        first_snap = row["first_snap"]
+        last_snap  = row["last_snap"]
+
+        # Sum population per player at first snapshot
+        cur = await db.execute(
+            """SELECT player_id, player_name, SUM(population) as pop
+               FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ? AND player_id IS NOT NULL AND player_id != 0
+               GROUP BY player_id""",
+            (guild_id, first_snap)
+        )
+        first = {r["player_id"]: {"name": r["player_name"], "pop": r["pop"]} for r in await cur.fetchall()}
+
+        cur = await db.execute(
+            """SELECT player_id, player_name, SUM(population) as pop, COUNT(*) as villages
+               FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ? AND player_id IS NOT NULL AND player_id != 0
+               GROUP BY player_id""",
+            (guild_id, last_snap)
+        )
+        last_rows = await cur.fetchall()
+
+    results = []
+    for r in last_rows:
+        pid = r["player_id"]
+        pop_now = r["pop"] or 0
+        pop_before = first.get(pid, {}).get("pop", pop_now)
+        delta = pop_now - pop_before
+        results.append({
+            "player_id": pid,
+            "player_name": r["player_name"] or "(unbekannt)",
+            "pop_before": pop_before,
+            "pop_now": pop_now,
+            "delta": delta,
+            "villages": r["villages"],
+            "first_snap": first_snap[:16].replace("T", " "),
+            "last_snap": last_snap[:16].replace("T", " "),
+        })
+
+    results.sort(key=lambda x: x["delta"], reverse=True)
+    return results[:limit]
+
+
+async def search_map_snapshot(guild_id: str, query: str) -> list[dict]:
+    """Search villages/players in the latest snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        )
+        row = await cur.fetchone()
+        if not row or not row["latest"]:
+            return []
+        latest = row["latest"]
+        q = f"%{query}%"
+        cur = await db.execute(
+            """SELECT x, y, village_name, player_name, alliance_name, population, tribe
+               FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND (village_name LIKE ? OR player_name LIKE ? OR alliance_name LIKE ?)
+               ORDER BY population DESC LIMIT 100""",
+            (guild_id, latest, q, q, q)
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_farmlist_heatmap(guild_id: str, discord_user_id: str) -> list[dict]:
+    """Return all farm coords with resource totals from user's latest farmlist analysis."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """SELECT farms_json FROM farmlist_analyses
+               WHERE guild_id = ? AND discord_user_id = ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (guild_id, discord_user_id)
+        )
+        row = await cur.fetchone()
+    if not row or not row["farms_json"]:
+        return []
+    import json as _json
+    farms = _json.loads(row["farms_json"])
+    result = []
+    for f in farms:
+        if not isinstance(f, dict):
+            continue
+        try:
+            x = int(f.get("x", 0))
+            y = int(f.get("y", 0))
+        except (TypeError, ValueError):
+            continue
+        res = (f.get("resources_last") or 0) + (f.get("resources_total") or 0)
+        result.append({"x": x, "y": y, "resources": res,
+                        "village_name": f.get("village_name", ""),
+                        "player_name": f.get("player_name", "")})
+    return result
+
+
 async def get_farming_cross_reference(guild_id: str, min_days: int = 3) -> list[dict]:
     """Farm list entries that are also inactive."""
     inactive = await get_inactive_farms(guild_id, min_days=min_days)

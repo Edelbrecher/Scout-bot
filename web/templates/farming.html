@@ -26,6 +26,20 @@
   </div>
   {% endif %}
 
+  <!-- Tab navigation -->
+  <div style="display:flex; gap:0.5rem; margin-bottom:1.25rem; flex-wrap:wrap;">
+    {% set tabs = [('inactive','🏚️ Inaktive Farmen'), ('growth','📈 Wachstum'), ('search','🔍 Suche'), ('farmlist','📋 Farmliste')] %}
+    {% for t_id, t_label in tabs %}
+    <a href="/guild/{{ guild.guild_id }}/farming?tab={{ t_id }}&min_days={{ min_days }}&min_pop={{ min_pop }}&max_pop={{ max_pop }}"
+       style="padding:0.45rem 1rem; border-radius:8px; font-size:0.875rem; text-decoration:none; font-weight:{% if tab == t_id %}600{% else %}400{% endif %};
+              background:{% if tab == t_id %}var(--accent){% else %}var(--card-bg){% endif %};
+              color:{% if tab == t_id %}#fff{% else %}var(--text-muted){% endif %};
+              border:1px solid {% if tab == t_id %}var(--accent){% else %}var(--border){% endif %};">
+      {{ t_label }}
+    </a>
+    {% endfor %}
+  </div>
+
   <!-- Status + Filter -->
   <div class="grid-2">
     <!-- Status -->
@@ -81,7 +95,8 @@
     </div>
   </div>
 
-  <!-- Inaktive Farmen -->
+  <!-- ══ TAB: Inaktive Farmen ══ -->
+  <div {% if tab != 'inactive' %}style="display:none;"{% endif %}>
   <div class="card" style="margin-bottom:1.25rem;">
     <h2>🏚️ Inaktive Farmen
       {% if inactive_farms %}
@@ -164,6 +179,152 @@
     {% endif %}
   </div>
 
+  </div><!-- /tab inactive -->
+
+  <!-- ══ TAB: Wachstum ══ -->
+  <div {% if tab != 'growth' %}style="display:none;"{% endif %}>
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2>📈 Spieler-Wachstum</h2>
+    {% if farm_stats.snapshot_count < 2 %}
+    <p class="hint">Mindestens <strong>2 Snapshots</strong> werden benötigt. Klicke auf <em>Snapshot jetzt holen</em> und warte einige Stunden.</p>
+    {% elif not growth_data %}
+    <p class="empty">Keine Wachstumsdaten verfügbar.</p>
+    {% else %}
+    {% set first_snap = growth_data[0].first_snap %}
+    {% set last_snap  = growth_data[0].last_snap %}
+    <p class="hint" style="margin-bottom:0.75rem;">Populationsveränderung von <strong>{{ first_snap }}</strong> bis <strong>{{ last_snap }}</strong> UTC.</p>
+
+    <div style="display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+      <div class="card" style="flex:1; min-width:140px; padding:0.75rem; text-align:center; border-color:rgba(46,213,115,0.4);">
+        <div style="font-size:1.4rem; font-weight:700; color:#2ed573;">
+          +{{ growth_data | selectattr('delta','gt',0) | sum(attribute='delta') | int | abs }}
+        </div>
+        <div style="font-size:0.8rem; color:var(--text-muted);">Bevölkerung gewachsen</div>
+      </div>
+      <div class="card" style="flex:1; min-width:140px; padding:0.75rem; text-align:center; border-color:rgba(231,76,60,0.4);">
+        <div style="font-size:1.4rem; font-weight:700; color:#e74c3c;">
+          {{ growth_data | selectattr('delta','lt',0) | sum(attribute='delta') | int }}
+        </div>
+        <div style="font-size:0.8rem; color:var(--text-muted);">Bevölkerung geschrumpft</div>
+      </div>
+      <div class="card" style="flex:1; min-width:140px; padding:0.75rem; text-align:center;">
+        <div style="font-size:1.4rem; font-weight:700;">{{ growth_data | length }}</div>
+        <div style="font-size:0.8rem; color:var(--text-muted);">Spieler beobachtet</div>
+      </div>
+    </div>
+
+    <!-- Growth chart (top 20) -->
+    <canvas id="chartGrowth" height="100" style="margin-bottom:1.25rem;"></canvas>
+
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Spieler</th>
+            <th>Dörfer</th>
+            <th>Pop. vorher</th>
+            <th>Pop. jetzt</th>
+            <th>Δ Wachstum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in growth_data %}
+          <tr>
+            <td>
+              {% if guild.tw_world %}
+              <a href="javascript:void(0)" onclick="document.getElementById('q').value='{{ p.player_name | e }}'; document.getElementById('searchForm').submit();" style="cursor:pointer;">{{ p.player_name }}</a>
+              {% else %}{{ p.player_name }}{% endif %}
+            </td>
+            <td>{{ p.villages }}</td>
+            <td>{{ p.pop_before }}</td>
+            <td><strong>{{ p.pop_now }}</strong></td>
+            <td>
+              {% if p.delta > 0 %}
+              <span style="color:#2ed573; font-weight:600;">+{{ p.delta }}</span>
+              {% elif p.delta < 0 %}
+              <span style="color:#e74c3c; font-weight:600;">{{ p.delta }}</span>
+              {% else %}
+              <span style="color:var(--text-muted);">0</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+  </div><!-- /tab growth -->
+
+  <!-- ══ TAB: Suche ══ -->
+  <div {% if tab != 'search' %}style="display:none;"{% endif %}>
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2>🔍 Spieler &amp; Dörfer suchen</h2>
+    <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="searchForm">
+      <input type="hidden" name="tab" value="search" />
+      <input type="hidden" name="min_days" value="{{ min_days }}" />
+      <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+        <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+          <label for="q">Spieler-, Dorf- oder Allianzname</label>
+          <input type="text" id="q" name="q" value="{{ q | e }}" placeholder="z.B. Caesar, Roma, -RO-" style="width:100%;" />
+        </div>
+        <button type="submit" class="btn btn-primary">Suchen</button>
+      </div>
+    </form>
+
+    {% if q %}
+    {% if search_results %}
+    <div style="overflow-x:auto; margin-top:1rem;">
+      <p class="hint">{{ search_results | length }} Treffer für <strong>{{ q | e }}</strong></p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Koordinaten</th>
+            <th>Dorf</th>
+            <th>Spieler</th>
+            <th>Allianz</th>
+            <th>Stamm</th>
+            <th>Bevölkerung</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in search_results %}
+          <tr>
+            <td>
+              {% if guild.tw_world %}
+              <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ r.x }}&amp;y={{ r.y }}"
+                 target="_blank" rel="noopener" style="font-family:monospace;">{{ r.x }}|{{ r.y }}</a>
+              {% else %}
+              <span style="font-family:monospace;">{{ r.x }}|{{ r.y }}</span>
+              {% endif %}
+            </td>
+            <td>{{ r.village_name or '—' }}</td>
+            <td>{{ r.player_name or '(Barbarendorf)' }}</td>
+            <td>{{ r.alliance_name or '—' }}</td>
+            <td>
+              {% if r.tribe == 1 %}🏛️ Römer
+              {% elif r.tribe == 2 %}⚔️ Teutonen
+              {% elif r.tribe == 3 %}🌿 Gallier
+              {% elif r.tribe == 4 %}👾 Nataren
+              {% elif r.tribe == 5 %}🏹 Hunnen
+              {% elif r.tribe == 6 %}🏺 Ägypter
+              {% else %}—{% endif %}
+            </td>
+            <td><strong>{{ r.population }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty" style="margin-top:1rem;">Keine Treffer für <strong>{{ q | e }}</strong>.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+  </div><!-- /tab search -->
+
+  <!-- ══ TAB: Farmliste ══ -->
+  <div {% if tab != 'farmlist' %}style="display:none;"{% endif %}>
   <!-- Farmliste -->
   <div class="card" style="margin-bottom:1.25rem;">
     <h2>📋 Meine Farmliste</h2>
@@ -266,7 +427,7 @@
     {% endif %}
   </div>
 
-  <!-- Kreuzreferenz -->
+  <!-- Kreuzreferenz (inside farmlist tab) -->
   {% if cross_reference %}
   <div class="card" style="margin-bottom:1.25rem; border-color:rgba(46,213,115,0.4);">
     <h2>🎯 Deine Farmen die inaktiv sind</h2>
@@ -311,9 +472,11 @@
   </div>
   {% endif %}
 
+  </div><!-- /tab farmlist -->
+
 </div>
 
-{% if inactive_farms %}
+{% if inactive_farms or growth_data %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function() {
@@ -350,6 +513,42 @@
       scales: {
         x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 } } },
         y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', stepSize: 1, precision: 0 }, beginAtZero: true }
+      }
+    }
+  });
+})();
+
+// ── Growth chart ─────────────────────────────────────────────────────────────
+(function() {
+  const growthRaw = {{ growth_data | tojson }};
+  const ctx2 = document.getElementById('chartGrowth');
+  if (!ctx2 || !growthRaw.length) return;
+  // Top 20 by absolute delta
+  const top = [...growthRaw].sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0,20);
+  top.reverse(); // chart shows bottom-to-top for horizontal
+  new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: top.map(p => p.player_name),
+      datasets: [{
+        label: 'Δ Population',
+        data: top.map(p => p.delta),
+        backgroundColor: top.map(p => p.delta >= 0 ? 'rgba(46,213,115,0.65)' : 'rgba(231,76,60,0.65)'),
+        borderColor:     top.map(p => p.delta >= 0 ? 'rgba(46,213,115,1)'    : 'rgba(231,76,60,1)'),
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `Δ ${c.parsed.x > 0 ? '+' : ''}${c.parsed.x}` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#ddd', font: { size: 10 } } }
       }
     }
   });

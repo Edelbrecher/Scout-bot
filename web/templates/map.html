@@ -77,6 +77,7 @@
         <option value="alliance">Heatmap Allianzen</option>
         <option value="player">Heatmap Spieler</option>
         <option value="pop">Heatmap Population</option>
+        <option value="farmheat">🌾 Farmlist Ressourcen</option>
       </select>
     </div>
     <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;">✕ Reset</button>
@@ -137,6 +138,8 @@ let viewMode    = 'tribe';
 let allianceColorMap = new Map();  // alliance name → color
 let playerColorMap   = new Map();  // player name → color
 let maxPop = 1;
+let farmHeatMap = new Map();  // "x|y" → resource value
+let maxFarmRes  = 1;
 
 for (const s of SCOUTED_RAW) {
   const m = (s.coordinates || '').match(/(-?\d+)\|(-?\d+)/);
@@ -161,6 +164,19 @@ function popColor(pop) {
   return `rgb(${r},${g},${b})`;
 }
 
+function farmHeatColor(val) {
+  // No data → dark grey; else green (low) → yellow → red (high)
+  if (!val) return '#2a2a2a';
+  const t = Math.min(1, val / maxFarmRes);
+  if (t < 0.5) {
+    const s = t * 2;
+    return `rgb(${Math.round(30+s*200)},${Math.round(180)},${Math.round(30)})`;
+  } else {
+    const s = (t - 0.5) * 2;
+    return `rgb(${Math.round(230)},${Math.round(180-s*150)},${Math.round(30-s*20)})`;
+  }
+}
+
 function getVillageColor(v) {
   if (v.isNatar) return NATAR_COLOR;
   switch (viewMode) {
@@ -174,6 +190,8 @@ function getVillageColor(v) {
       return playerColorMap.get(v.player);
     case 'pop':
       return popColor(v.pop || 0);
+    case 'farmheat':
+      return farmHeatColor(farmHeatMap.get(`${v.x}|${v.y}`) || 0);
     default:
       return TRIBE_COLOR[v.tribe] || '#aaaaaa';
   }
@@ -376,6 +394,48 @@ function setViewMode(mode) {
   } else if (mode === 'pop') {
     legend.style.display = 'none';
     aList.style.display  = 'none';
+  } else if (mode === 'farmheat') {
+    legend.style.display = 'none';
+    aList.style.display  = 'none';
+    loadFarmHeatmap();
+    return; // loadFarmHeatmap calls draw()
+  }
+  draw();
+}
+
+async function loadFarmHeatmap() {
+  const aList = document.getElementById('allianceList');
+  aList.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted);">⏳ Lade Farmlist-Daten…</span>';
+  aList.style.display = 'block';
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/map/heatmap-data`);
+    const json = await r.json();
+    const data = json.data || [];
+    farmHeatMap.clear();
+    maxFarmRes = 1;
+    for (const d of data) {
+      const key = `${d.x}|${d.y}`;
+      farmHeatMap.set(key, d.resources);
+      if (d.resources > maxFarmRes) maxFarmRes = d.resources;
+    }
+    if (data.length === 0) {
+      aList.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted);">⚠️ Keine Farmlist-Analyse gefunden. Bitte erst eine Analyse im <a href="javascript:history.back()">Farmlist-Analyst</a> speichern.</span>';
+    } else {
+      // Build legend
+      aList.innerHTML = `
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">
+          🌾 Farmlist Ressourcen-Heatmap · ${data.length} Farmen geladen
+          <span style="margin-left:1rem;">
+            <span style="display:inline-block;width:10px;height:10px;background:#1eb41e;border-radius:2px;"></span> wenig &nbsp;
+            <span style="display:inline-block;width:10px;height:10px;background:#e6c01e;border-radius:2px;"></span> mittel &nbsp;
+            <span style="display:inline-block;width:10px;height:10px;background:#e63020;border-radius:2px;"></span> viel &nbsp;
+            <span style="display:inline-block;width:10px;height:10px;background:#2a2a2a;border:1px solid #555;border-radius:2px;"></span> keine Daten
+          </span>
+        </div>`;
+    }
+  } catch(e) {
+    const aList2 = document.getElementById('allianceList');
+    aList2.innerHTML = `<span style="font-size:0.75rem; color:red;">Fehler: ${e.message}</span>`;
   }
   draw();
 }
@@ -505,6 +565,8 @@ window.addEventListener('mousemove', e => {
     if (best.pop)      tip += ` &nbsp;·&nbsp; 🏘️ <strong>${best.pop.toLocaleString()}</strong>`;
     if (best.isCapital) tip += ' &nbsp;·&nbsp; 👑 Hauptstadt';
     if (sc) tip += `<br><span style="color:#e05555;">🔴 Scout: ${sc.player||''} / ${sc.village||''}</span>`;
+    const fhRes = farmHeatMap.get(`${best.x}|${best.y}`);
+    if (fhRes) tip += `<br>🌾 Ressourcen (letzte Raids): <strong>${fhRes.toLocaleString()}</strong>`;
     tooltip.innerHTML = tip;
     tooltip.style.display = 'block';
     const tx = e.clientX-rect.left+16;

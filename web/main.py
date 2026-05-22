@@ -1547,6 +1547,18 @@ async def guild_map_data(request: Request, guild_id: str):
         return JSONResponse({"error": str(e)}, status_code=502)
 
 
+@app.get("/guild/{guild_id}/map/heatmap-data")
+async def guild_map_heatmap_data(request: Request, guild_id: str):
+    """Return farmlist resource data for heatmap overlay."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "")
+    data = await database.get_farmlist_heatmap(guild_id, uid)
+    return JSONResponse({"data": data})
+
+
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")
 async def res_request_remove(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
@@ -3051,6 +3063,8 @@ async def farming_page(
     min_days: int = 3,
     min_pop: int = 0,
     max_pop: int = 9999,
+    tab: str = "inactive",
+    q: str = "",
 ):
     session, err = _require_session(request)
     if err: return err
@@ -3068,6 +3082,14 @@ async def farming_page(
     cross_reference = await database.get_farming_cross_reference(guild_id, min_days=min_days)
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
 
+    # Growth analysis
+    growth_data = await database.get_player_growth(guild_id, limit=100)
+
+    # Search
+    search_results = []
+    if q.strip():
+        search_results = await database.search_map_snapshot(guild_id, q.strip())
+
     return templates.TemplateResponse("farming.html", {
         "request": request,
         "guild": guild,
@@ -3081,6 +3103,10 @@ async def farming_page(
         "min_days": min_days,
         "min_pop": min_pop,
         "max_pop": max_pop,
+        "tab": tab,
+        "q": q,
+        "growth_data": growth_data,
+        "search_results": search_results,
     })
 
 
