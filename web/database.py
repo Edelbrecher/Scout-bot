@@ -206,6 +206,19 @@ async def init_db():
         """)
         await db.commit()
 
+    # Report channels table
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS report_channels (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL UNIQUE,
+                channel_id   TEXT,
+                channel_name TEXT,
+                created_at   TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
     await _init_farming_tables()
     await _init_einsatz_tables()
     await _init_admin_tables()
@@ -809,6 +822,38 @@ async def delete_enemy(guild_id: str, player_name: str):
             (guild_id, player_name)
         )
         await db.commit()
+
+
+async def set_report_channel(guild_id: str, channel_id: str | None, channel_name: str | None):
+    from datetime import datetime
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO report_channels (guild_id, channel_id, channel_name, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id   = excluded.channel_id,
+                channel_name = excluded.channel_name
+        """, (guild_id, channel_id, channel_name, now))
+        await db.commit()
+
+
+async def get_report_channel(guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM report_channels WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def is_report_channel(channel_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT 1 FROM report_channels WHERE channel_id = ?", (channel_id,)
+        ) as cur:
+            return await cur.fetchone() is not None
 
 
 _ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids"}

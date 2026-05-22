@@ -195,6 +195,16 @@ async def init_db():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_enemies_guild ON enemies(guild_id)")
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS report_channels (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL UNIQUE,
+                channel_id   TEXT,
+                channel_name TEXT,
+                created_at   TEXT NOT NULL
+            )
+        """)
+
         # Migrations: discord_message_id on scout_channels
         for col in ["closed_at TEXT", "closed_by TEXT", "discord_message_id TEXT",
                     "discord_message_id TEXT"]:
@@ -788,6 +798,37 @@ async def close_scout_channel_by_message(discord_message_id: str):
             WHERE discord_message_id = ? AND closed_at IS NULL
         """, (datetime.utcnow().isoformat(), discord_message_id))
         await db.commit()
+
+
+async def set_report_channel(guild_id: str, channel_id: str | None, channel_name: str | None):
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO report_channels (guild_id, channel_id, channel_name, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id   = excluded.channel_id,
+                channel_name = excluded.channel_name
+        """, (guild_id, channel_id, channel_name, now))
+        await db.commit()
+
+
+async def get_report_channel(guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM report_channels WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def is_report_channel(channel_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT 1 FROM report_channels WHERE channel_id = ?", (channel_id,)
+        ) as cur:
+            return await cur.fetchone() is not None
 
 
 async def get_player_tribe(guild_id: str, player_name: str) -> int:

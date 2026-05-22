@@ -610,15 +610,19 @@ class Scout(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Listen for scout reports posted in scout channels."""
+        """Listen for scout reports posted in scout channels or report channels."""
         if message.author.bot:
             return
         channel_id = str(message.channel.id)
-        if not await database.is_scout_channel(channel_id):
+
+        is_scout  = await database.is_scout_channel(channel_id)
+        is_report = (not is_scout) and await database.is_report_channel(channel_id)
+
+        if not is_scout and not is_report:
             return
 
         guild_id = str(message.guild.id) if message.guild else ""
-        ch_info  = await database.get_scout_channel_info(channel_id)
+        ch_info  = await database.get_scout_channel_info(channel_id) if is_scout else None
 
         # ── Text report ──────────────────────────────────────────────────────
         if message.content and len(message.content) > 30:
@@ -664,7 +668,7 @@ class Scout(commands.Cog):
                         guild_id=guild_id, channel_id=channel_id,
                         discord_url=image_url, discord_message_id=str(message.id),
                     )
-                    if ch_info and ch_info.get("player"):
+                    if not is_report and ch_info and ch_info.get("player"):
                         await database.upsert_enemy(
                             guild_id=guild_id, player_name=ch_info["player"],
                             coordinates=ch_info.get("coordinates", ""),
@@ -678,9 +682,15 @@ class Scout(commands.Cog):
 
                 parsed = parse_scout_report(ocr_text)
 
-                enemy_player  = (ch_info or {}).get("player") or parsed.get("attacker_player") or parsed.get("target_player") or ""
-                enemy_coords  = (ch_info or {}).get("coordinates") or parsed.get("target_coords") or ""
-                enemy_village = (ch_info or {}).get("village") or parsed.get("target_village") or ""
+                if is_report:
+                    # Report channel: enemy = defender (target), attacker = our player
+                    enemy_player  = parsed.get("target_player") or ""
+                    enemy_coords  = parsed.get("target_coords") or ""
+                    enemy_village = parsed.get("target_village") or ""
+                else:
+                    enemy_player  = (ch_info or {}).get("player") or parsed.get("attacker_player") or parsed.get("target_player") or ""
+                    enemy_coords  = (ch_info or {}).get("coordinates") or parsed.get("target_coords") or ""
+                    enemy_village = (ch_info or {}).get("village") or parsed.get("target_village") or ""
 
                 async def _resolve(pos_key: str, player_name: str) -> dict:
                     positions = parsed.get(pos_key)
@@ -727,10 +737,10 @@ class Scout(commands.Cog):
                         coordinates=enemy_coords, village=enemy_village,
                     )
                 try:
-                    await message.add_reaction("🔍")
+                    await message.add_reaction("📋" if is_report else "🔍")
                 except discord.HTTPException:
                     pass
-                print(f"[scout] ocr report saved for ch {channel_id}, enemy={enemy_player}", flush=True)
+                print(f"[scout] {'report' if is_report else 'ocr'} report saved for ch {channel_id}, enemy={enemy_player}", flush=True)
 
             except Exception as e:
                 import traceback

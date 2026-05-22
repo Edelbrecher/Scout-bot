@@ -16,7 +16,49 @@
 
   {% if saved == 'deleted' %}
   <div class="alert alert-success">🗑️ Gegner gelöscht.</div>
+  {% elif saved == 'report_channel' %}
+  <div class="alert alert-success">✅ Report-Channel gespeichert.</div>
+  {% elif saved == 'report_channel_cleared' %}
+  <div class="alert alert-success">🗑️ Report-Channel entfernt.</div>
   {% endif %}
+
+  <!-- Report Channel Card -->
+  <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+      <span style="font-size:1.1rem;">📋</span>
+      <strong style="font-size:1rem;">Report-Channel</strong>
+    </div>
+    {% if report_channel and report_channel.channel_id %}
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;">
+      <span style="background:var(--bg-hover,rgba(255,255,255,0.06));border:1px solid var(--border);
+                   border-radius:20px;padding:0.25rem 0.85rem;font-size:0.875rem;font-family:monospace;">
+        {% if report_channel.channel_name %}#{{ report_channel.channel_name }}{% endif %}
+        &nbsp;<span style="color:var(--text-muted);font-size:0.78rem;">{{ report_channel.channel_id }}</span>
+      </span>
+      <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/clear" style="margin:0;">
+        <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.78rem;padding:0.2rem 0.65rem;">
+          Entfernen
+        </button>
+      </form>
+    </div>
+    {% endif %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/set"
+          style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+      <input type="text" name="channel_id" placeholder="Channel-ID"
+             value="{{ report_channel.channel_id if report_channel and report_channel.channel_id else '' }}"
+             style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid var(--border);
+                    background:var(--bg-card);color:var(--text);font-size:0.875rem;width:200px;">
+      <input type="text" name="channel_name" placeholder="Channel-Name (optional)"
+             value="{{ report_channel.channel_name if report_channel and report_channel.channel_name else '' }}"
+             style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid var(--border);
+                    background:var(--bg-card);color:var(--text);font-size:0.875rem;width:200px;">
+      <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.875rem;">Speichern</button>
+    </form>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:0.5rem 0 0;">
+      Channel-ID aus Discord kopieren (Rechtsklick → ID kopieren). Der Bot OCR't alle
+      Kampfberichte die dort gepostet werden und speichert sie automatisch in die Gegner-Kartei.
+    </p>
+  </div>
 
   {% if enemies %}
 

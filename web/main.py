@@ -4346,11 +4346,13 @@ async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     enemies = await database.get_enemies(guild_id)
+    report_channel = await database.get_report_channel(guild_id)
     return templates.TemplateResponse("enemies.html", {
         "request": request,
         "guild": guild,
         "enemies": enemies,
         "saved": saved,
+        "report_channel": report_channel,
     })
 
 
@@ -4374,6 +4376,29 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
         "enemy": enemy,
         "history": history,
     })
+
+
+@app.post("/guild/{guild_id}/enemies/report-channel/set")
+async def set_report_channel(
+    request: Request, guild_id: str,
+    channel_id: str = Form(""), channel_name: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.set_report_channel(guild_id, channel_id.strip() or None, channel_name.strip() or None)
+    return RedirectResponse(f"/guild/{guild_id}/enemies?saved=report_channel", status_code=303)
+
+
+@app.post("/guild/{guild_id}/enemies/report-channel/clear")
+async def clear_report_channel(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.set_report_channel(guild_id, None, None)
+    return RedirectResponse(f"/guild/{guild_id}/enemies?saved=report_channel_cleared", status_code=303)
 
 
 @app.post("/guild/{guild_id}/enemies/{player_name}/notes")
