@@ -238,8 +238,22 @@ def parse_scout_report(text: str) -> dict:
     att_player, att_village = _extract_player_from_block(att_block)
     def_player, def_village = _extract_player_from_block(def_block)
 
+    if not att_player:
+        result["invalid_reason"] = "attacker_player_unreadable"
+        return result
     if not def_player:
         result["invalid_reason"] = "defender_player_unreadable"
+        return result
+
+    # ── Troop rows must be present in BOTH sections ──────────────────────────
+    attacker_sent, attacker_losses = _parse_troop_section(att_block, "ATTACKER")
+    defender_sent, defender_losses = _parse_troop_section(def_block, "DEFENDER")
+
+    if not attacker_sent:
+        result["invalid_reason"] = "attacker_troops_missing"
+        return result
+    if not defender_sent:
+        result["invalid_reason"] = "defender_troops_missing"
         return result
 
     # ── Report is valid ──────────────────────────────────────────────────────
@@ -257,13 +271,11 @@ def parse_scout_report(text: str) -> dict:
     elif coords_all:
         result["target_coords"] = f"({coords_all[0][0]}|{coords_all[0][1]})"
 
-    # Raw troop positions — tribe resolved later in on_message
-    attacker_sent, attacker_losses = _parse_troop_section(att_block, "ATTACKER")
-    defender_sent, defender_losses = _parse_troop_section(def_block, "DEFENDER")
-    if attacker_sent:   result["attacker_troop_positions"] = attacker_sent
-    if attacker_losses: result["attacker_loss_positions"]  = attacker_losses
-    if defender_sent:   result["defender_troop_positions"] = defender_sent
-    if defender_losses: result["defender_loss_positions"]  = defender_losses
+    # Store troop positions (already extracted during validation above)
+    result["attacker_troop_positions"] = attacker_sent
+    if attacker_losses: result["attacker_loss_positions"] = attacker_losses
+    result["defender_troop_positions"] = defender_sent
+    if defender_losses: result["defender_loss_positions"] = defender_losses
 
     # Resources — label-based first, then 4-number fallback on full text
     m = _RESOURCE_RE.search(text)
