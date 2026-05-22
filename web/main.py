@@ -3308,119 +3308,177 @@ async def dual_join_accept(request: Request, token: str):
 # ---------------------------------------------------------------------------
 
 def parse_farmlist(text: str) -> list[dict]:
-    """Parse Travian farmlist copy-paste into structured farm dicts."""
+    """Parse Travian farmlist copy-paste (single or multi-list) into structured farm dicts.
+
+    Schema per entry (after header line with village+pop+dist):
+      Line +1: troops count (integer)
+      Line +2: last raid time (HH:MM:SS) or date (yesterday / DD.MM.YYYY)
+      Line +3: resources stolen last raid
+      Line +4: total resources stolen (cumulative)
+    """
     import re as _re
-    # Strip Unicode direction/formatting marks (LRE, RLE, PDF, LRM, RLM, etc.)
-    clean = _re.sub(r'[‪‫‬‭‮‎‏]', '', text)
-    # Normalize line endings
+
+    # Strip all Unicode direction/formatting marks (LRE, PDF, LRM, etc.)
+    _UNI = _re.compile(r'[‪‫‬‭‮‎‏⁨⁩‪‫‬‭‮‎‏]')
+    clean = _UNI.sub('', text)
     lines = clean.replace('\r\n', '\n').replace('\r', '\n').split('\n')
 
+    # Skip-patterns for UI chrome lines (no tabs)
+    _SKIP = _re.compile(
+        r'being raided|^Start\s*\(|^Add target|No target selected|'
+        r'^Farm list|^Create farm|^Start all|^Start farm|'
+        r'^Farm lists:|^Villages\s+\d|^Village groups|^Population:|^Loyalty:|'
+        r'^Spawn$|^\([-\d]+\|[-\d]+\)$|Capital$|Off Villa$|Sup \(|Oasis$|'
+        r'Construction\)|Finished\)|^Task overview|^Homepage|^\© \d{4}|'
+        r'Discord|Support|Game rules|Terms|Imprint|^Server time|^Alliance banner|'
+        r'^Info box|^Link list|^Send Hero|^Recall|^Incoming|^Troop|^CP Over|'
+        r'^Farm Builder|^Kirilloid|^Friso|^GT|^Elephant|^Cropper|^Smithy|^TravOps|'
+        r'^top10|^Profile|^Rally|^Management|^Overview$|^Send troops|^Simulators|'
+        r'^Switch to avatar|^Hero\d|Privacy settings|\d+/\d+$',
+        _re.IGNORECASE
+    )
+
+    _TIME  = _re.compile(r'^\d{1,2}:\d{2}:\d{2}$')
+    _DATE  = _re.compile(r'^(yesterday|\d{1,2}\.\d{1,2}\.\d{4})$', _re.IGNORECASE)
+    # Group header: e.g. "00 Gen", "01 Exo", "02 Levi", "11 Chr"
+    _GROUP = _re.compile(r'^\d{2}\s+\w+$')
+    # Farmlist name: e.g. "N0 Gen Farmlist", "N1 Exo Farmlist"
+    _LIST  = _re.compile(r'^N\d+\s+\w+\s+Farmlist\b', _re.IGNORECASE)
+
     farms = []
+    current_group = "Unbekannte Gruppe"
+    current_list  = "Unbekannte Liste"
     i = 0
-    current_list_name = "Unbekannte Liste"
 
     while i < len(lines):
-        raw = lines[i]
+        raw      = lines[i]
         stripped = raw.strip()
 
-        # Detect farmlist section headers (no leading tabs, not empty, not a number)
-        if stripped and not raw.startswith('\t') and not _re.match(r'^[\d\s]+$', stripped):
-            # Could be a list name
-            parts = stripped.split('\t')
-            if len(parts) == 1 and not _re.match(r'^\d+$', stripped):
-                current_list_name = stripped
-                i += 1
-                continue
+        # ── skip empty lines ──────────────────────────────────────────────
+        if not stripped:
+            i += 1
+            continue
 
-        # Farm entry: starts with 2+ tabs → village name, pop, distance
+        # ── skip UI chrome (no-tab lines that match skip patterns) ────────
+        if not raw.startswith('\t') and _SKIP.search(stripped):
+            i += 1
+            continue
+
+        # ── farmlist name  e.g. "N0 Exo Farmlist" ────────────────────────
+        if not raw.startswith('\t') and _LIST.match(stripped):
+            current_list = stripped
+            i += 1
+            continue
+
+        # ── group header  e.g. "00 Gen", "01 Exo" ────────────────────────
+        if not raw.startswith('\t') and _GROUP.match(stripped):
+            current_group = stripped
+            i += 1
+            continue
+
+        # ── farm entry line: 2+ leading tabs, at least 3 tab-fields ──────
         if raw.startswith('\t\t') or (raw.startswith('\t') and raw.count('\t') >= 2):
             parts = [p.strip() for p in raw.split('\t')]
-            # Remove empty leading parts
-            while parts and parts[0] == '':
+            while parts and not parts[0]:
                 parts.pop(0)
 
-            if len(parts) >= 3:
+            if len(parts) >= 3 and parts[0]:
                 village_name = parts[0]
-                # Try to parse population and distance
+
                 try:
                     population = int(_re.sub(r'\D', '', parts[1])) if parts[1] else 0
                 except Exception:
                     population = 0
+
                 try:
-                    distance_str = _re.sub(r'[^\d.,]', '', parts[2]).replace(',', '.')
-                    distance = float(distance_str) if distance_str else 0.0
+                    ds = _re.sub(r'[^\d.,]', '', parts[2]).replace(',', '.')
+                    distance = float(ds) if ds else 0.0
                 except Exception:
                     distance = 0.0
 
-                # Read next lines for troops, time, resources, other
-                troops = 0
+                # --- read the 4 lines that follow the header line ----------
+                troops    = 0
                 last_raid = ""
-                resources = 0
-                other = 0
-                for j in range(1, 5):
+                res_last  = 0   # resources stolen in last raid
+                res_total = 0   # total resources stolen (cumulative)
+                skip_next = 0   # how many extra lines to advance
+
+                for j in range(1, 6):
                     if i + j >= len(lines):
                         break
-                    val = lines[i + j].strip()
-                    val = _re.sub(r'[‪‫‬‭‮‎‏]', '', val)
-                    if not val:
-                        continue
+                    nxt = _UNI.sub('', lines[i + j]).strip()
+                    if not nxt:
+                        # blank separator → entry is done
+                        break
+                    # stop if we hit the next farm entry
+                    if lines[i + j].startswith('\t\t'):
+                        break
+
                     if j == 1:
+                        # troops (pure integer)
                         try:
-                            troops = int(_re.sub(r'\D', '', val)) if val else 0
-                        except Exception:
-                            last_raid = val
-                    elif j == 2:
-                        # Could be time string or resources
-                        num = _re.sub(r'\D', '', val)
-                        if num and len(num) > 0 and len(val) <= 10:
-                            try:
-                                resources = int(num)
-                            except Exception:
-                                last_raid = val
-                        else:
-                            last_raid = val
-                    elif j == 3:
-                        num = _re.sub(r'\D', '', val)
-                        try:
-                            n = int(num) if num else 0
-                            if resources == 0:
-                                resources = n
-                            else:
-                                other = n
-                        except Exception:
-                            if not last_raid:
-                                last_raid = val
-                    elif j == 4:
-                        num = _re.sub(r'\D', '', val)
-                        try:
-                            other = int(num) if num else 0
+                            troops = int(_re.sub(r'\D', '', nxt))
                         except Exception:
                             pass
+                        skip_next = 1
 
-                # Rating
-                efficiency = round(resources / distance, 1) if distance > 0 else 0.0
-                if resources >= 50 and efficiency > 10:
+                    elif j == 2:
+                        # time or date
+                        if _TIME.match(nxt) or _DATE.match(nxt):
+                            last_raid = nxt
+                        skip_next = 2
+
+                    elif j == 3:
+                        # resources stolen last raid
+                        try:
+                            res_last = int(_re.sub(r'\D', '', nxt)) if nxt else 0
+                        except Exception:
+                            pass
+                        skip_next = 3
+
+                    elif j == 4:
+                        # total resources (cumulative)
+                        try:
+                            res_total = int(_re.sub(r'\D', '', nxt)) if nxt else 0
+                        except Exception:
+                            pass
+                        skip_next = 4
+                        break  # entry complete
+
+                # Rating based on last-raid loot and efficiency
+                efficiency = round(res_last / distance, 1) if distance > 0 else 0.0
+                if res_last >= 100:
                     rating = "gut"
-                elif resources > 0:
+                elif res_last > 0:
                     rating = "ok"
                 else:
-                    rating = "sinnlos"
+                    rating = "leer"   # empty last raid
+
+                # Natars & oases always 0 resources → flag as "natar"
+                is_natar = bool(_re.match(r'^Natars\s', village_name))
+                is_oasis = 'oasis' in village_name.lower() or 'Occupied oasis' in village_name
 
                 farms.append({
-                    "list_name": current_list_name,
+                    "group":       current_group,
+                    "list_name":   current_list,
                     "village_name": village_name,
-                    "population": population,
-                    "distance": distance,
-                    "troops": troops,
-                    "last_raid": last_raid,
-                    "resources": resources,
-                    "other": other,
-                    "efficiency": efficiency,
-                    "rating": rating,
-                    "abandoned": population == 0,
+                    "population":  population,
+                    "distance":    distance,
+                    "troops":      troops,
+                    "last_raid":   last_raid,
+                    "res_last":    res_last,
+                    "res_total":   res_total,
+                    "efficiency":  efficiency,
+                    "rating":      rating,
+                    "abandoned":   population == 0 and not is_natar and not is_oasis,
+                    "is_natar":    is_natar,
+                    "is_oasis":    is_oasis,
+                    # backwards-compat alias
+                    "resources":   res_last,
                 })
-                i += 5
+                i += skip_next + 1
                 continue
+
         i += 1
 
     return farms
@@ -3438,11 +3496,12 @@ async def farmlist_analyst_page(request: Request, guild_id: str):
     err = await _require_premium(guild, guild_id)
     if err: return err
     return templates.TemplateResponse("farmlist_analyst.html", {
-        "request": request,
-        "guild": guild,
-        "farms": [],
-        "stats": None,
-        "raw_text": "",
+        "request":     request,
+        "guild":       guild,
+        "farms":       [],
+        "stats":       None,
+        "group_stats": [],
+        "raw_text":    "",
     })
 
 
@@ -3464,27 +3523,56 @@ async def farmlist_analyst_post(
 
     farms = parse_farmlist(farmlist_text)
 
-    # Build stats
-    gut = [f for f in farms if f["rating"] == "gut"]
-    ok = [f for f in farms if f["rating"] == "ok"]
-    sinnlos = [f for f in farms if f["rating"] == "sinnlos"]
-    avg_res = round(sum(f["resources"] for f in farms) / len(farms), 1) if farms else 0
+    # ── overall stats ──────────────────────────────────────────────────────
+    gut     = [f for f in farms if f["rating"] == "gut"]
+    ok      = [f for f in farms if f["rating"] == "ok"]
+    leer    = [f for f in farms if f["rating"] == "leer"]
+    total_res_last  = sum(f["res_last"]  for f in farms)
+    total_res_total = sum(f["res_total"] for f in farms)
+    avg_res  = round(total_res_last  / len(farms), 1) if farms else 0
     avg_dist = round(sum(f["distance"] for f in farms) / len(farms), 1) if farms else 0
+
+    # ── per-group stats ────────────────────────────────────────────────────
+    from collections import defaultdict as _dd
+    _grp_data: dict = _dd(list)
+    for f in farms:
+        _grp_data[f["group"]].append(f)
+
+    group_stats = []
+    for grp_name, grp_farms in _grp_data.items():
+        non_natar = [f for f in grp_farms if not f["is_natar"] and not f["is_oasis"]]
+        group_stats.append({
+            "name":      grp_name,
+            "total":     len(grp_farms),
+            "gut":       sum(1 for f in grp_farms if f["rating"] == "gut"),
+            "ok":        sum(1 for f in grp_farms if f["rating"] == "ok"),
+            "leer":      sum(1 for f in grp_farms if f["rating"] == "leer"),
+            "natars":    sum(1 for f in grp_farms if f["is_natar"]),
+            "res_last":  sum(f["res_last"]  for f in grp_farms),
+            "res_total": sum(f["res_total"] for f in grp_farms),
+            "avg_dist":  round(sum(f["distance"] for f in non_natar) / len(non_natar), 1) if non_natar else 0,
+            "lists":     sorted({f["list_name"] for f in grp_farms}),
+        })
+
     stats = {
-        "total": len(farms),
-        "gut": len(gut),
-        "ok": len(ok),
-        "sinnlos": len(sinnlos),
-        "avg_res": avg_res,
-        "avg_dist": avg_dist,
+        "total":           len(farms),
+        "gut":             len(gut),
+        "ok":              len(ok),
+        "leer":            len(leer),
+        "avg_res":         avg_res,
+        "avg_dist":        avg_dist,
+        "total_res_last":  total_res_last,
+        "total_res_total": total_res_total,
+        "groups":          [g["name"] for g in group_stats],
     }
 
     return templates.TemplateResponse("farmlist_analyst.html", {
-        "request": request,
-        "guild": guild,
-        "farms": farms,
-        "stats": stats,
-        "raw_text": farmlist_text,
+        "request":      request,
+        "guild":        guild,
+        "farms":        farms,
+        "stats":        stats,
+        "group_stats":  group_stats,
+        "raw_text":     farmlist_text,
     })
 
 
