@@ -4021,77 +4021,111 @@ async def allianz_hospital(request: Request, guild_id: str):
 # ── Allianz-Mitglieder ────────────────────────────────────────────────────────
 
 def parse_alliance_members(text: str) -> list[dict]:
-    """Parse Travian alliance member list copy-paste.
+    """Parse Travian alliance members page copy-paste.
 
-    Travian formats (tab-separated):
-      Spieler  Dörfer  Bevölkerung  Punkte  Rang  Stamm
-      Player   Villages  Population  Points  Rank  Tribe
+    The real Travian format is line-based (NOT tab-separated per row):
+        1.                      ← rank line
+        now online              ← status line
+        TT.exe                  ← player name
+           (optional icon/tag lines)
+        13539\t16\t             ← points TAB villages
+
+    Each block is separated by blank lines.
+    Points come before villages in the numeric line.
     """
     import re as _re
+
+    # Strip Unicode direction marks and zero-width characters
     text = _re.sub(r'[​-‏‪-‮⁠-⁩﻿]', '', text)
+    # Normalise line endings
     lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
 
-    _SKIP = _re.compile(
-        r'^(Spieler|Player|Bevölkerung|Population|Punkte|Points|Rang|Rank|Stamm|Tribe|'
-        r'Dörfer|Villages|Name|Allianz|Alliance|Mitglieder|Members|Übersicht|Overview|'
-        r'Homepage|©|Discord|Support|Server time|TravOps|Profile|Management)',
+    _RANK_LINE   = _re.compile(r'^\s*(\d+)\.\s*$')
+    _STATUS_LINE = _re.compile(
+        r'^(now online|max\.\s*\d+\s*h|offline|inaktiv|inactive|away)', _re.IGNORECASE
+    )
+    _NUM_LINE    = _re.compile(r'^\s*[\d\s.,]+(?:\t[\d\s.,]+)+\s*$')
+    _NOISE       = _re.compile(
+        r'^(Homepage|©|Discord|Support|Server time|Game rules|Terms|Imprint|'
+        r'Switch to|Hero|Server|Alliance|Members|Overview|Profile|Attacks|Bonuses|'
+        r'Forum|Options|Details|Tag:|Name:|Members|Ranking|Attacker|Defender|'
+        r'Position|Description|Link list|Farm List|Recall|Incoming|Troop|CP |'
+        r'Farm Builder|Kirilloid|Friso|GT |Elephant|Cropper|Smithy|TravOps|'
+        r'top10|Spawn|Capital|Village groups|Task overview|Send Hero|'
+        r'Population:|Loyalty:|Villages )',
         _re.IGNORECASE
     )
-    _INT = _re.compile(r'^[\d.,\s]+$')
 
-    TRIBE_DE = {
-        'römer': 'Römer', 'roman': 'Römer', 'romans': 'Römer',
-        'teutonen': 'Teutonen', 'teuton': 'Teutonen', 'teutons': 'Teutonen',
-        'gallier': 'Gallier', 'gaul': 'Gallier', 'gauls': 'Gallier',
-        'ägypter': 'Ägypter', 'egyptian': 'Ägypter', 'egyptians': 'Ägypter',
-        'hunnen': 'Hunnen', 'hun': 'Hunnen', 'huns': 'Hunnen',
-        'spartaner': 'Spartaner', 'spartan': 'Spartaner', 'spartans': 'Spartaner',
-    }
-
-    def clean_int(s: str) -> int:
+    def to_int(s: str) -> int:
         try:
             return int(_re.sub(r'[^\d]', '', s))
-        except ValueError:
+        except (ValueError, TypeError):
             return 0
 
     members = []
+    rank = None
+    name = None
+    # State: looking for rank → status → name → numbers
+    state = 'seek_rank'
+
     for raw in lines:
         stripped = raw.strip()
-        if not stripped:
-            continue
-        if '\t' not in stripped:
-            continue
-        parts = [p.strip() for p in stripped.split('\t')]
-        parts = [p for p in parts if p]
-        if len(parts) < 2:
-            continue
-        if _SKIP.match(parts[0]):
-            continue
-        # Heuristic: first field = player name (not purely numeric)
-        if _INT.match(parts[0]):
+
+        # Skip noise lines always
+        if _NOISE.search(stripped):
+            rank = None; name = None; state = 'seek_rank'
             continue
 
-        player_name = parts[0]
-        # Try to find numeric fields: villages, population, points, rank
-        nums = []
-        tribe = ''
-        for p in parts[1:]:
-            clean = _re.sub(r'[^\d]', '', p)
-            if clean and len(clean) >= 1:
-                nums.append(int(clean))
-            elif p.lower() in TRIBE_DE:
-                tribe = TRIBE_DE[p.lower()]
-            elif p and not _INT.match(p) and not tribe:
-                tribe = p  # fallback: keep raw value
+        if state == 'seek_rank':
+            m = _RANK_LINE.match(stripped)
+            if m:
+                rank = int(m.group(1))
+                state = 'seek_status'
 
-        members.append({
-            "player_name": player_name,
-            "villages":   nums[0] if len(nums) > 0 else 0,
-            "population": nums[1] if len(nums) > 1 else 0,
-            "points":     nums[2] if len(nums) > 2 else 0,
-            "rank":       nums[3] if len(nums) > 3 else 0,
-            "tribe":      tribe,
-        })
+        elif state == 'seek_status':
+            if _STATUS_LINE.match(stripped):
+                state = 'seek_name'
+            elif stripped and not _RANK_LINE.match(stripped):
+                # Some formats skip the status line — treat this as name
+                if stripped and len(stripped) <= 30 and not stripped.isdigit():
+                    name = stripped
+                    state = 'seek_nums'
+                else:
+                    rank = None; state = 'seek_rank'
+
+        elif state == 'seek_name':
+            if stripped and not _STATUS_LINE.match(stripped) and not _RANK_LINE.match(stripped):
+                # skip obvious non-name lines (pure numbers / long noise)
+                if not _NUM_LINE.match(stripped):
+                    name = stripped
+                    state = 'seek_nums'
+
+        elif state == 'seek_nums':
+            if not stripped:
+                continue  # skip blank lines within a block
+            if _NUM_LINE.match(stripped):
+                parts = [to_int(p) for p in stripped.split('\t') if _re.sub(r'[^\d]', '', p)]
+                if len(parts) >= 2 and name:
+                    # Travian alliance page: Points  Villages
+                    points   = parts[0]
+                    villages = parts[1]
+                    members.append({
+                        "player_name": name,
+                        "rank":        rank or len(members) + 1,
+                        "points":      points,
+                        "villages":    villages,
+                        "population":  0,   # not shown on this page
+                        "tribe":       "",
+                    })
+                rank = None; name = None; state = 'seek_rank'
+            elif _RANK_LINE.match(stripped):
+                # New rank block started — previous entry had no numbers, skip it
+                rank = int(_RANK_LINE.match(stripped).group(1))
+                name = None; state = 'seek_status'
+            elif _NOISE.search(stripped) or len(stripped) > 40:
+                rank = None; name = None; state = 'seek_rank'
+            # else: icon / tag line between name and numbers — ignore
+
     return members
 
 

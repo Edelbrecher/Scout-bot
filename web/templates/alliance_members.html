@@ -47,15 +47,15 @@
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">
-        {{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}
+        {{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🌍 Bevölkerung gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🏆 Punkte gesamt</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
-        {{ "{:,}".format((members | sum(attribute='population') / members|length) | int).replace(",",".") }}
+        {{ "{:,}".format((members | sum(attribute='points') / members|length) | int).replace(",",".") }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">📊 ⌀ Bevölkerung</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">📊 ⌀ Punkte</div>
     </div>
   </div>
 
@@ -72,15 +72,6 @@
            oninput="filterMembers()"
            style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
                   background:var(--bg-card);color:var(--text);font-size:0.875rem;width:220px;">
-    <select id="tribeFilter" onchange="filterMembers()"
-            style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
-                   background:var(--bg-card);color:var(--text);font-size:0.875rem;">
-      <option value="">Alle Stämme</option>
-      {% set tribes = members | map(attribute='tribe') | select | unique | list | sort %}
-      {% for t in tribes %}{% if t %}
-      <option value="{{ t }}">{{ t }}</option>
-      {% endif %}{% endfor %}
-    </select>
     <span id="memberCount" style="font-size:0.82rem;color:var(--text-muted);margin-left:0.25rem;"></span>
   </div>
 
@@ -91,8 +82,8 @@
           <th onclick="sortTable(0)" style="cursor:pointer;">Rang ▲</th>
           <th onclick="sortTable(1)" style="cursor:pointer;">Spieler</th>
           <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;">Dörfer</th>
-          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;">Bevölkerung</th>
-          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;">Punkte</th>
+          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;">Punkte</th>
+          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;">Dörfer</th>
           <th>Stamm</th>
         </tr>
       </thead>
@@ -101,11 +92,8 @@
         <tr data-name="{{ m.player_name | lower }}" data-tribe="{{ m.tribe | lower }}">
           <td style="color:var(--text-muted);font-size:0.85rem;">{{ m.rank or loop.index }}</td>
           <td><strong>{{ m.player_name }}</strong></td>
+          <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}</td>
           <td style="text-align:right;">{{ m.villages }}</td>
-          <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.population).replace(",",".") }}</td>
-          <td style="text-align:right;color:var(--text-muted);font-size:0.85rem;">
-            {{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}
-          </td>
           <td>
             {% set t = m.tribe | lower %}
             {% if t == 'römer' %}🏛️ Römer
@@ -123,10 +111,10 @@
     </table>
   </div>
 
-  <!-- Tribe distribution chart -->
+  <!-- Points distribution chart -->
   <div class="card" style="margin-top:1.25rem;">
-    <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">Stamm-Verteilung</h3>
-    <canvas id="chartTribes" height="60"></canvas>
+    <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">Punkte-Verteilung (Top 20)</h3>
+    <canvas id="chartPoints" height="100"></canvas>
   </div>
 
   {% else %}
@@ -177,14 +165,11 @@
 <script>
 // ── Filter + search ───────────────────────────────────────────────────────────
 function filterMembers() {
-  const q     = document.getElementById('memberSearch').value.trim().toLowerCase();
-  const tribe = document.getElementById('tribeFilter').value.toLowerCase();
-  const rows  = document.querySelectorAll('#memberBody tr');
-  let shown   = 0;
+  const q    = document.getElementById('memberSearch').value.trim().toLowerCase();
+  const rows = document.querySelectorAll('#memberBody tr');
+  let shown  = 0;
   rows.forEach(row => {
-    const nameMatch  = !q     || row.dataset.name.includes(q);
-    const tribeMatch = !tribe || row.dataset.tribe === tribe;
-    const vis = nameMatch && tribeMatch;
+    const vis = !q || row.dataset.name.includes(q);
     row.style.display = vis ? '' : 'none';
     if (vis) shown++;
   });
@@ -210,29 +195,31 @@ function sortTable(col) {
   filterMembers();
 }
 
-// ── Tribe chart ───────────────────────────────────────────────────────────────
+// ── Points chart (top 20) ────────────────────────────────────────────────────
 (function() {
   const members = {{ members | tojson }};
-  const counts  = {};
-  const COLORS  = { 'Römer':'#c0392b', 'Teutonen':'#85929e', 'Gallier':'#58d68d',
-                    'Ägypter':'#d4ac0d', 'Hunnen':'#9b59b6', 'Spartaner':'#1abc9c' };
-  members.forEach(m => {
-    const t = m.tribe || 'Unbekannt';
-    counts[t] = (counts[t] || 0) + 1;
-  });
-  const labels = Object.keys(counts);
-  const data   = Object.values(counts);
-  const colors = labels.map(l => COLORS[l] || '#888');
-  new Chart(document.getElementById('chartTribes'), {
+  const top = [...members].sort((a,b) => b.points - a.points).slice(0, 20).reverse();
+  new Chart(document.getElementById('chartPoints'), {
     type: 'bar',
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 4 }] },
+    data: {
+      labels: top.map(m => m.player_name),
+      datasets: [{
+        label: 'Punkte',
+        data: top.map(m => m.points),
+        backgroundColor: 'rgba(147,197,253,0.6)',
+        borderColor: 'rgba(147,197,253,1)',
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
     options: {
+      indexAxis: 'y',
       responsive: true,
       plugins: { legend: { display: false },
-                 tooltip: { callbacks: { label: c => `${c.parsed.y} Spieler` } } },
+                 tooltip: { callbacks: { label: c => `${c.parsed.x.toLocaleString('de-DE')} Punkte` } } },
       scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#ccc' } },
-        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', precision: 0 }, beginAtZero: true }
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#ddd', font: { size: 10 } } }
       }
     }
   });
