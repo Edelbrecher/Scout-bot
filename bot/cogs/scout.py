@@ -106,6 +106,34 @@ _TROOP_ALIASES: dict[str, str] = {
     "natarian": "Natarian", "natarianische": "Natarian",
 }
 
+# All known section-header keywords (used to split blocks)
+_SECTION_HEADER_RE = re.compile(
+    r'\b(ATTACKER|ANGREIFER|DEFENDER|VERTEIDIGER|STATISTICS|STATISTIK'
+    r'|REINFORCEMENTS|VERSTÄRKUNGEN|SUPPORT|UNTERSTÜTZUNG)\b',
+    re.IGNORECASE,
+)
+
+def _find_section(text: str, section: str) -> tuple[int, int] | None:
+    """Return (start, end) char positions for a named section block.
+    section should be the EN name ('ATTACKER' or 'DEFENDER').
+    Returns None if the section header is not found."""
+    alt_map = {
+        "attacker": "angreifer", "defender": "verteidiger",
+        "angreifer": "attacker", "verteidiger": "defender",
+    }
+    alt = alt_map.get(section.lower(), "")
+    pattern = (
+        rf'\b(?:{re.escape(section)}|{re.escape(alt)})\b' if alt
+        else rf'\b{re.escape(section)}\b'
+    )
+    m = re.search(pattern, text, re.IGNORECASE)
+    if not m:
+        return None
+    next_m = _SECTION_HEADER_RE.search(text, m.end())
+    end = next_m.start() if next_m else len(text)
+    return m.start(), end
+
+
 _RESOURCE_RE = re.compile(
     r"(?:holz|wood|lumber)[:\s]+([0-9.,]+).*?"
     r"(?:lehm|ton|clay)[:\s]+([0-9.,]+).*?"
@@ -151,24 +179,98 @@ def _clean_num(s: str) -> int:
     return int(re.sub(r"[.,]", "", s)) if s else 0
 
 
+def _extract_player_from_block(block: str) -> tuple[str | None, str | None]:
+    """Extract (player_name, village_name) from a section block.
+    Uses 'X from village Y' / 'X aus Dorf Y' pattern first, then label fallback."""
+    def _clean(raw: str) -> str:
+        raw = raw.strip()
+        raw = re.sub(r"^\[.*?\]\s*", "", raw)
+        raw = re.sub(r"^\(.*?\)\s*", "", raw)
+        return raw.strip()
+
+    m = _FROM_VILLAGE_RE.search(block)
+    if m:
+        return _clean(m.group(1)), m.group(2).strip()
+
+    # Fallback: "Spieler: X" / "Player: X"
+    pm = _PLAYER_RE.search(block)
+    vm = _VILLAGE_RE.search(block)
+    player  = _clean(pm.group(1)) if pm else None
+    village = vm.group(1).strip() if vm else None
+    return player, village
+
+
 def parse_scout_report(text: str) -> dict:
-    """Parse a Travian scout report pasted as plain text.
-    Returns a dict with all extracted fields (may be partially filled)."""
+    """Parse a Travian scout/battle report.
+
+    Validation rules:
+      - ATTACKER section must be present.
+      - DEFENDER section must be present AND appear AFTER the ATTACKER section.
+      - DEFENDER must contain a readable player name.
+    If any rule fails, result['valid'] is False and 'invalid_reason' explains why.
+    """
     result: dict = {
+        "valid": False, "invalid_reason": None,
         "target_player": None, "target_village": None, "target_coords": None,
         "attacker_player": None, "attacker_village": None,
         "resources": None, "troops": {}, "losses": {}, "experience": 0,
         "text_strike": bool(_STRIKE_RE.search(text)),
     }
 
-    # Resources — try label-based first, then 4-number line (OCR icon fallback)
+    # ── Section validation ───────────────────────────────────────────────────
+    att_bounds = _find_section(text, "ATTACKER")
+    def_bounds = _find_section(text, "DEFENDER")
+
+    if not att_bounds:
+        result["invalid_reason"] = "no_attacker_section"
+        return result
+    if not def_bounds:
+        result["invalid_reason"] = "no_defender_section"
+        return result
+    if def_bounds[0] <= att_bounds[0]:
+        result["invalid_reason"] = "defender_before_attacker"
+        return result
+
+    att_block = text[att_bounds[0]:att_bounds[1]]
+    def_block = text[def_bounds[0]:def_bounds[1]]
+
+    # Extract player/village strictly within each block
+    att_player, att_village = _extract_player_from_block(att_block)
+    def_player, def_village = _extract_player_from_block(def_block)
+
+    if not def_player:
+        result["invalid_reason"] = "defender_player_unreadable"
+        return result
+
+    # ── Report is valid ──────────────────────────────────────────────────────
+    result["valid"] = True
+    result["attacker_player"]  = att_player
+    result["attacker_village"] = att_village
+    result["target_player"]    = def_player
+    result["target_village"]   = def_village
+
+    # Coordinates — prefer one from defender block, fallback to first in full text
+    coords_def = _COORD_RE.findall(def_block)
+    coords_all = _COORD_RE.findall(text)
+    if coords_def:
+        result["target_coords"] = f"({coords_def[0][0]}|{coords_def[0][1]})"
+    elif coords_all:
+        result["target_coords"] = f"({coords_all[0][0]}|{coords_all[0][1]})"
+
+    # Raw troop positions — tribe resolved later in on_message
+    attacker_sent, attacker_losses = _parse_troop_section(att_block, "ATTACKER")
+    defender_sent, defender_losses = _parse_troop_section(def_block, "DEFENDER")
+    if attacker_sent:   result["attacker_troop_positions"] = attacker_sent
+    if attacker_losses: result["attacker_loss_positions"]  = attacker_losses
+    if defender_sent:   result["defender_troop_positions"] = defender_sent
+    if defender_losses: result["defender_loss_positions"]  = defender_losses
+
+    # Resources — label-based first, then 4-number fallback on full text
     m = _RESOURCE_RE.search(text)
     if m:
-        wood, clay, iron, crop = [_clean_num(x) for x in m.groups()]
-        result["resources"] = {"wood": wood, "clay": clay, "iron": iron, "crop": crop,
-                               "total": wood + clay + iron + crop}
+        w, c, i, cr = [_clean_num(x) for x in m.groups()]
+        result["resources"] = {"wood": w, "clay": c, "iron": i, "crop": cr, "total": w+c+i+cr}
     else:
-        # Find all 4-number lines, pick the largest total (= stolen resources)
         best, best_total = None, 0
         for mm in _RES_4NUM_RE.finditer(text):
             vals = [_clean_num(x) for x in mm.groups()]
@@ -179,7 +281,7 @@ def parse_scout_report(text: str) -> dict:
             result["resources"] = {"wood": best[0], "clay": best[1],
                                    "iron": best[2], "crop": best[3], "total": best_total}
 
-    # Statistics section
+    # Statistics (search full text — usually in its own section below)
     m = _COMBAT_STR_RE.search(text)
     if m:
         result.setdefault("stats", {})["combat_attacker"] = _clean_num(m.group(1))
@@ -193,71 +295,21 @@ def parse_scout_report(text: str) -> dict:
         result.setdefault("stats", {})["supply_attacker"] = _clean_num(m.group(1))
         result["stats"]["supply_defender"] = _clean_num(m.group(2))
 
-    # Raw troop rows (positions) — tribe resolved later in on_message
-    attacker_sent, attacker_losses = _parse_troop_section(text, "ATTACKER")
-    defender_sent, defender_losses = _parse_troop_section(text, "DEFENDER")
-    if attacker_sent:
-        result["attacker_troop_positions"] = attacker_sent
-    if attacker_losses:
-        result["attacker_loss_positions"] = attacker_losses
-    if defender_sent:
-        result["defender_troop_positions"] = defender_sent
-    if defender_losses:
-        result["defender_loss_positions"] = defender_losses
-
-    # Coordinates — first match = target
-    coords = _COORD_RE.findall(text)
-    if coords:
-        result["target_coords"] = f"({coords[0][0]}|{coords[0][1]})"
-
-    # Player / Village names — Travian format: "[Alliance] PlayerName from village VillageName"
-    from_village_matches = _FROM_VILLAGE_RE.findall(text)
-    if from_village_matches:
-        # First match = attacker, second = defender
-        def _clean_player(raw: str) -> str:
-            # Strip alliance tag like "[TD] " or "(TD) "
-            raw = raw.strip()
-            raw = re.sub(r"^\[.*?\]\s*", "", raw)
-            raw = re.sub(r"^\(.*?\)\s*", "", raw)
-            return raw.strip()
-
-        attacker_raw, attacker_village = from_village_matches[0]
-        result["attacker_player"]  = _clean_player(attacker_raw)
-        result["attacker_village"] = attacker_village.strip()
-        if len(from_village_matches) > 1:
-            defender_raw, defender_village = from_village_matches[1]
-            result["target_player"]  = _clean_player(defender_raw)
-            result["target_village"] = defender_village.strip()
-    else:
-        # Fallback: explicit "Spieler:" / "Player:" labels
-        players = _PLAYER_RE.findall(text)
-        villages = _VILLAGE_RE.findall(text)
-        if players:
-            result["target_player"] = players[0].strip()
-            if len(players) > 1:
-                result["attacker_player"] = players[1].strip()
-        if villages:
-            result["target_village"] = villages[0].strip()
-            if len(villages) > 1:
-                result["attacker_village"] = villages[1].strip()
-
     # Experience
     m = _EXP_RE.search(text)
     if m:
         result["experience"] = int(m.group(1))
 
-    # Troops: scan every line for "TroopName  count  losses" pattern
+    # Troop name-based extraction (alias table) — search full text
     troops: dict[str, int] = {}
     losses: dict[str, int] = {}
     for line in text.splitlines():
         line = line.strip()
         if not line or len(line) > 80:
             continue
-        # Split on 2+ whitespace
         parts = re.split(r"\s{2,}", line)
         if len(parts) >= 2:
             name_raw = parts[0].strip()
-            # Try to match numbers
             nums = [_clean_num(p) for p in parts[1:] if _NUM_RE.fullmatch(p.strip())]
             if not nums:
                 continue
@@ -266,14 +318,11 @@ def parse_scout_report(text: str) -> dict:
                 troops[canonical] = nums[0]
                 if len(nums) >= 2:
                     losses[canonical] = nums[1]
-        # Also handle "Name: N" format
         elif ":" in line:
             name_raw, _, val = line.partition(":")
-            name_raw = name_raw.strip()
-            val = val.strip()
-            canonical = _TROOP_ALIASES.get(name_raw.lower())
-            if canonical and _NUM_RE.fullmatch(val):
-                troops[canonical] = _clean_num(val)
+            canonical = _TROOP_ALIASES.get(name_raw.strip().lower())
+            if canonical and _NUM_RE.fullmatch(val.strip()):
+                troops[canonical] = _clean_num(val.strip())
 
     result["troops"] = troops
     result["losses"] = losses
@@ -627,8 +676,8 @@ class Scout(commands.Cog):
         # ── Text report ──────────────────────────────────────────────────────
         if message.content and len(message.content) > 30:
             parsed = parse_scout_report(message.content)
-            # Only save if we extracted something meaningful
-            if parsed["troops"] or parsed["resources"] or parsed["target_player"]:
+            # Only save if report is valid (both sections present, defender readable)
+            if parsed.get("valid"):
                 # Fallback: fill coords/player from channel meta if not in text
                 if not parsed["target_coords"] and ch_info:
                     parsed["target_coords"] = ch_info.get("coordinates")
@@ -682,13 +731,29 @@ class Scout(commands.Cog):
 
                 parsed = parse_scout_report(ocr_text)
 
+                if not parsed.get("valid"):
+                    reason = parsed.get("invalid_reason", "unknown")
+                    print(f"[scout] report rejected ({reason}) in ch {channel_id}", flush=True)
+                    # Save the image unlinked so it's not lost, but don't create an enemy entry
+                    await database.save_scout_image(
+                        guild_id=guild_id, channel_id=channel_id,
+                        discord_url=image_url, discord_message_id=str(message.id),
+                    )
+                    try:
+                        await message.add_reaction("❓")
+                    except discord.HTTPException:
+                        pass
+                    continue
+
                 if is_report:
                     # Report channel: enemy = defender (target), attacker = our player
                     enemy_player  = parsed.get("target_player") or ""
                     enemy_coords  = parsed.get("target_coords") or ""
                     enemy_village = parsed.get("target_village") or ""
                 else:
-                    enemy_player  = (ch_info or {}).get("player") or parsed.get("attacker_player") or parsed.get("target_player") or ""
+                    # Scout channel: enemy identity from channel metadata (reliable),
+                    # coords/village enriched from OCR defender block
+                    enemy_player  = (ch_info or {}).get("player") or parsed.get("target_player") or ""
                     enemy_coords  = (ch_info or {}).get("coordinates") or parsed.get("target_coords") or ""
                     enemy_village = (ch_info or {}).get("village") or parsed.get("target_village") or ""
 
