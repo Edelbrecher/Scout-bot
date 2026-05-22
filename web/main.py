@@ -7,6 +7,7 @@ import smtplib
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from typing import Optional
 from email.mime.text import MIMEText
 from urllib.parse import urlencode
 
