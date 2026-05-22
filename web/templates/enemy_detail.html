@@ -163,6 +163,31 @@
       {% endif %}
       {% endif %}
 
+      <!-- Statistics -->
+      {% if report.stats_json %}
+      {% set stats = report.stats_json | from_json %}
+      {% if stats %}
+      <div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+                    letter-spacing:.04em;margin-bottom:0.4rem;">📊 Statistiken</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+          {% if stats.combat_attacker is defined %}
+          <span style="background:rgba(147,197,253,0.1);border:1px solid rgba(147,197,253,0.2);
+                       border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
+            ⚔️ {{ stats.combat_attacker }} vs 🛡️ {{ stats.combat_defender }}
+          </span>
+          {% endif %}
+          {% if stats.res_lost_attacker is defined %}
+          <span style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);
+                       border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
+            💸 Verluste: {{ stats.res_lost_attacker }} / {{ stats.res_lost_defender }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
       <!-- Attacker -->
       {% if report.attacker_player %}
       <div>

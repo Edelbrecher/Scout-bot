@@ -428,23 +428,31 @@ async def save_scout_report(
     troops_json: str | None,
     losses_json: str | None,
     experience: int = 0,
+    stats_json: str | None = None,
 ) -> int:
     """Insert a parsed scout report and return its rowid."""
     async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "ALTER TABLE scout_reports ADD COLUMN stats_json TEXT"
+        ).close() if False else None
+        try:
+            await db.execute("ALTER TABLE scout_reports ADD COLUMN stats_json TEXT")
+        except Exception:
+            pass
         cur = await db.execute("""
             INSERT INTO scout_reports
                 (channel_id, guild_id, source, raw_text,
                  target_player, target_village, target_coords,
                  attacker_player, attacker_village,
                  resources_json, troops_json, losses_json,
-                 experience, created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 experience, created_at, stats_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             channel_id, guild_id, source, raw_text,
             target_player, target_village, target_coords,
             attacker_player, attacker_village,
             resources_json, troops_json, losses_json,
-            experience, datetime.utcnow().isoformat(),
+            experience, datetime.utcnow().isoformat(), stats_json,
         ))
         await db.commit()
         return cur.lastrowid

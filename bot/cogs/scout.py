@@ -58,6 +58,12 @@ _RESOURCE_RE = re.compile(
     r"(?:korn|getreide|crop)[:\s]+([0-9.,]+)",
     re.IGNORECASE | re.DOTALL,
 )
+# 4 numbers on one line separated by spaces = stolen resources (wood clay iron crop)
+_RES_4NUM_RE = re.compile(r"(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)")
+# Statistics section
+_COMBAT_STR_RE   = re.compile(r"combat strength[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
+_RES_LOST_RE     = re.compile(r"resources lost[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
+_SUPPLY_BEFORE_RE= re.compile(r"supply before[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
 _COORD_RE   = re.compile(r"\((-?\d+)[|\]](-?\d+)\)")
 # "from village VillageName" — attacker line: "[Alliance] PlayerName from village VillageName"
 _FROM_VILLAGE_RE = re.compile(r"(.+?)\s+from village\s+(.+)", re.IGNORECASE)
@@ -88,12 +94,37 @@ def parse_scout_report(text: str) -> dict:
         "resources": None, "troops": {}, "losses": {}, "experience": 0,
     }
 
-    # Resources
+    # Resources — try label-based first, then 4-number line (OCR icon fallback)
     m = _RESOURCE_RE.search(text)
     if m:
         wood, clay, iron, crop = [_clean_num(x) for x in m.groups()]
         result["resources"] = {"wood": wood, "clay": clay, "iron": iron, "crop": crop,
                                "total": wood + clay + iron + crop}
+    else:
+        # Find all 4-number lines, pick the largest total (= stolen resources)
+        best, best_total = None, 0
+        for mm in _RES_4NUM_RE.finditer(text):
+            vals = [_clean_num(x) for x in mm.groups()]
+            t = sum(vals)
+            if t > best_total:
+                best, best_total = vals, t
+        if best and best_total > 0:
+            result["resources"] = {"wood": best[0], "clay": best[1],
+                                   "iron": best[2], "crop": best[3], "total": best_total}
+
+    # Statistics section
+    m = _COMBAT_STR_RE.search(text)
+    if m:
+        result.setdefault("stats", {})["combat_attacker"] = _clean_num(m.group(1))
+        result["stats"]["combat_defender"] = _clean_num(m.group(2))
+    m = _RES_LOST_RE.search(text)
+    if m:
+        result.setdefault("stats", {})["res_lost_attacker"] = _clean_num(m.group(1))
+        result["stats"]["res_lost_defender"] = _clean_num(m.group(2))
+    m = _SUPPLY_BEFORE_RE.search(text)
+    if m:
+        result.setdefault("stats", {})["supply_attacker"] = _clean_num(m.group(1))
+        result["stats"]["supply_defender"] = _clean_num(m.group(2))
 
     # Coordinates — first match = target
     coords = _COORD_RE.findall(text)
@@ -589,6 +620,7 @@ class Scout(commands.Cog):
                 troops_json=json.dumps(parsed["troops"]) if parsed.get("troops") else None,
                 losses_json=json.dumps(parsed["losses"]) if parsed.get("losses") else None,
                 experience=parsed.get("experience", 0),
+                stats_json=json.dumps(parsed["stats"]) if parsed.get("stats") else None,
             )
             # Save image linked to this report
             await database.save_scout_image(
