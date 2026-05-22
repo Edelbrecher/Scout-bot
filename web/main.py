@@ -353,20 +353,26 @@ def _parse_sql_tuple(s: str) -> list[str]:
 
 
 _VALUES_RE = re.compile(r"VALUES\s*\((.+)\);?\s*$", re.IGNORECASE)
+_IS_NUM    = re.compile(r"^-?\d+(\.\d+)?$")
 
 
 def _parse_map_sql(content: str) -> list[dict]:
-    """Parse Travian map.sql into a list of village dicts.
+    """Parse Travian map.sql — handles three known column layouts.
 
-    Travian map.sql has two known column layouts (same as map.html parseSql):
+    Layout A — new T4.5+ format (village_id first, small):
+        vid, x, y, tribe, pid, vname, pscore, pname, aid, aname, pop, ?, isCapital
+        Detected by: v[0]>=0, v[7] is NOT numeric (it's player_name string)
 
-    Format X-first  (|v[0]| <= 800):
-        x, y, ?, tribe, vid, vname, pop, pname, pid, aname, aid, ?, isCapital
-        idx:  0  1  2    3    4      5    6    7      8     9    10  11   12
+    Layout B — old x-first (x/y coordinates first):
+        x, y, type_id, tribe, vid, vname, pop, pname, pid, aname, aid, ?, isCapital
+        Detected by: v[0] is coordinate (can be negative), v[7] is NOT numeric
 
-    Format VID-first (|v[0]| > 800):
-        vid, x, y, ?, tribe, ?, vname, pop, pname, ?, aname, ?, ?, isCapital
-        idx:   0  1  2  3    4   5      6    7     8   9    10  11  12   13
+    Layout C — old vid-first (large village_id first):
+        vid, x, y, type_id, tribe, ?, vname, pop, pname, ?, aname, ?, ?, isCapital
+        Detected by: v[0] is large (>800), v[7] IS numeric (population)
+
+    The key discriminator between A and B: in layout A, v[2] is the y-coordinate
+    (large |value|), while in layout B, v[2] is type_id (always 1, 2, or 3).
     """
     villages = []
     for raw_line in content.splitlines():
@@ -377,33 +383,52 @@ def _parse_map_sql(content: str) -> list[dict]:
         if len(v) < 7:
             continue
         try:
-            f0 = float(v[0]) if v[0] not in ('NULL', '') else 0
-            if abs(f0) <= 800:
-                # x-first format
-                x     = int(float(v[0]))
-                y     = int(float(v[1]))
-                tribe = int(float(v[3])) if len(v) > 3 and v[3] not in ('NULL','') else 0
-                vname = v[5] if len(v) > 5 else ""
-                pop   = int(float(v[6])) if len(v) > 6 and v[6] not in ('NULL','') else 0
-                pname = v[7] if len(v) > 7 and v[7] not in ('NULL', '') else ""
-                aname = v[9] if len(v) > 9 and v[9] not in ('NULL', '') else ""
-                vid   = v[4] if len(v) > 4 else ""
-                pid   = v[8] if len(v) > 8 else ""
-                aid   = v[10] if len(v) > 10 else ""
-            else:
-                # vid-first format
-                vid   = v[0]
+            f0 = float(v[0]) if v[0] not in ('NULL', '') else None
+            if f0 is None:
+                continue
+
+            # Detect layout
+            v7_is_num = len(v) > 7 and _IS_NUM.match(v[7].strip())
+
+            if not v7_is_num and f0 >= 0 and len(v) > 10:
+                # Layout A: new format — vid, x, y, tribe, pid, vname, pscore, pname, aid, aname, pop
                 x     = int(float(v[1]))
                 y     = int(float(v[2]))
-                tribe = int(float(v[4])) if len(v) > 4 and v[4] not in ('NULL','') else 0
+                tribe = int(float(v[3])) if v[3] not in ('NULL', '') else 0
+                vname = v[5]
+                pop   = int(float(v[10])) if v[10] not in ('NULL', '') else 0
+                pname = v[7]
+                aname = v[9] if v[9] not in ('NULL', '') else ""
+                pid   = v[4]
+                vid   = v[0]
+
+            elif not v7_is_num and abs(f0) <= 800:
+                # Layout B: old x-first — x, y, type_id, tribe, vid, vname, pop, pname, pid, aname
+                x     = int(f0)
+                y     = int(float(v[1]))
+                tribe = int(float(v[3])) if len(v) > 3 and v[3] not in ('NULL', '') else 0
+                vname = v[5] if len(v) > 5 else ""
+                pop   = int(float(v[6])) if len(v) > 6 and v[6] not in ('NULL', '') else 0
+                pname = v[7] if v[7] not in ('NULL', '') else ""
+                aname = v[9] if len(v) > 9 and v[9] not in ('NULL', '') else ""
+                pid   = v[8] if len(v) > 8 else ""
+                vid   = v[4] if len(v) > 4 else ""
+
+            else:
+                # Layout C: old vid-first — vid, x, y, type_id, tribe, ?, vname, pop, pname, ?, aname
+                x     = int(float(v[1]))
+                y     = int(float(v[2]))
+                tribe = int(float(v[4])) if len(v) > 4 and v[4] not in ('NULL', '') else 0
                 vname = v[6] if len(v) > 6 else ""
-                pop   = int(float(v[7])) if len(v) > 7 and v[7] not in ('NULL','') else 0
+                pop   = int(float(v[7])) if len(v) > 7 and v[7] not in ('NULL', '') else 0
                 pname = v[8] if len(v) > 8 and v[8] not in ('NULL', '') else ""
                 aname = v[10] if len(v) > 10 and v[10] not in ('NULL', '') else ""
                 pid   = v[8] if len(v) > 8 else ""
-                aid   = v[9] if len(v) > 9 else ""
+                vid   = v[0]
+
         except (ValueError, IndexError):
             continue
+
         if not (-800 <= x <= 800 and -800 <= y <= 800):
             continue
         villages.append({
@@ -412,7 +437,7 @@ def _parse_map_sql(content: str) -> list[dict]:
             "x": x, "y": y,
             "player_id": pid,
             "player_name": pname,
-            "alliance_id": aid,
+            "alliance_id": "",
             "alliance_name": aname,
             "population": pop,
             "tribe": tribe,
