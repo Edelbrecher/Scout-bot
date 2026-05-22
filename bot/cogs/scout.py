@@ -46,13 +46,17 @@ def _extract_troop_row(line: str) -> list[int]:
     return [int(n) for n in nums]
 
 def _parse_troop_section(text: str, section: str) -> tuple[list[int] | None, list[int] | None]:
-    """Extract the 'sent' and 'losses' rows from ATTACKER or DEFENDER section.
+    """Extract the 'sent' and 'losses' rows from ATTACKER/ANGREIFER or DEFENDER/VERTEIDIGER section.
     Returns (sent_row, losses_row)."""
-    sec_start = re.search(rf'\b{section}\b', text, re.IGNORECASE)
+    # Support both EN and DE keywords
+    _DE = {"attacker": "angreifer", "defender": "verteidiger", "statistics": "statistik"}
+    alt = _DE.get(section.lower(), section)
+    sec_start = re.search(rf'\b(?:{section}|{alt})\b', text, re.IGNORECASE)
     if not sec_start:
         return None, None
-    next_sec = re.search(r'\b(ATTACKER|DEFENDER|STATISTICS)\b',
-                         text[sec_start.end():], re.IGNORECASE)
+    next_sec = re.search(
+        r'\b(ATTACKER|ANGREIFER|DEFENDER|VERTEIDIGER|STATISTICS|STATISTIK)\b',
+        text[sec_start.end():], re.IGNORECASE)
     block = text[sec_start.end(): sec_start.end() + next_sec.start()] if next_sec else text[sec_start.end():]
 
     rows = []
@@ -116,13 +120,20 @@ _COMBAT_STR_RE   = re.compile(r"combat strength[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*
 _RES_LOST_RE     = re.compile(r"resources lost[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
 _SUPPLY_BEFORE_RE= re.compile(r"supply before[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
 _COORD_RE   = re.compile(r"\((-?\d+)[|\]](-?\d+)\)")
-# "from village VillageName" — attacker line: "[Alliance] PlayerName from village VillageName"
-_FROM_VILLAGE_RE = re.compile(r"(.+?)\s+from village\s+(.+)", re.IGNORECASE)
+# EN: "from village" / DE: "aus Dorf"
+_FROM_VILLAGE_RE = re.compile(r"(.+?)\s+(?:from village|aus Dorf)\s+(.+)", re.IGNORECASE)
 # Fallback: explicit label
 _PLAYER_RE  = re.compile(r"(?:spieler|player)[:\s]+(.+)", re.IGNORECASE)
 _VILLAGE_RE = re.compile(r"(?:dorf|village)[:\s]+(.+)", re.IGNORECASE)
 _EXP_RE     = re.compile(r"(?:erfahrung|experience)[:\s]+([0-9]+)", re.IGNORECASE)
 _NUM_RE     = re.compile(r"[\d.,]+")
+# Strike detection via text
+_STRIKE_RE  = re.compile(
+    r"keine truppen des angreifers sind zurückgekehrt|"
+    r"no troops of the attacker returned|"
+    r"all attacking troops were destroyed",
+    re.IGNORECASE
+)
 
 # Line patterns that suggest this is a troop row:
 # "Legionnaire  10  0" or "Legionär: 10"
@@ -143,6 +154,7 @@ def parse_scout_report(text: str) -> dict:
         "target_player": None, "target_village": None, "target_coords": None,
         "attacker_player": None, "attacker_village": None,
         "resources": None, "troops": {}, "losses": {}, "experience": 0,
+        "text_strike": bool(_STRIKE_RE.search(text)),
     }
 
     # Resources — try label-based first, then 4-number line (OCR icon fallback)
@@ -712,7 +724,7 @@ class Scout(commands.Cog):
                 troops_json=troops_json,
                 losses_json=losses_json,
                 experience=parsed.get("experience", 0),
-                stats_json=json.dumps(parsed["stats"]) if parsed.get("stats") else None,
+                stats_json=json.dumps({**(parsed.get("stats") or {}), "text_strike": parsed.get("text_strike", False)}),
             )
             # Save image linked to this report
             await database.save_scout_image(
