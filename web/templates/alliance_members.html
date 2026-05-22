@@ -14,7 +14,7 @@
       {% if members %}
       <button type="button" class="btn btn-secondary"
               onclick="openChartModal()">
-        📊 Top 20 Punkte
+        📊 Top 20 Einwohner
       </button>
       {% endif %}
       <button type="button" class="btn btn-primary"
@@ -185,7 +185,7 @@
     <button onclick="document.getElementById('chartModal').style.display='none'"
             style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
                    color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
-    <h2 style="margin:0 0 0.25rem;">📊 Top 20 — Punkte-Verteilung</h2>
+    <h2 style="margin:0 0 0.25rem;">📊 Top 20 — Einwohner-Verteilung</h2>
     <p style="margin:0 0 1rem;font-size:0.82rem;color:var(--text-muted);">
       Klicke auf einen Balken um den Spieler-Steckbrief zu öffnen.
     </p>
@@ -335,14 +335,14 @@ let   _chartInstance = null;
 function openChartModal() {
   document.getElementById('chartModal').style.display = 'flex';
   if (_chartInstance) return;
-  const top = [..._chartMembers].sort((a,b) => b.points - a.points).slice(0, 20);
+  const top = [..._chartMembers].sort((a,b) => b.population - a.population).slice(0, 20);
   _chartInstance = new Chart(document.getElementById('chartPoints'), {
     type: 'bar',
     data: {
       labels: top.map(m => m.player_name),
       datasets: [{
-        label: 'Punkte',
-        data: top.map(m => m.points),
+        label: 'Einwohner',
+        data: top.map(m => m.population),
         backgroundColor: top.map((_, i) =>
           i === 0 ? 'rgba(251,191,36,0.75)' :
           i === 1 ? 'rgba(209,213,219,0.65)' :
