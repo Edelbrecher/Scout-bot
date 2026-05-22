@@ -2678,3 +2678,30 @@ async def sync_alliance_members_from_snapshot(guild_id: str) -> int:
         await db.commit()
 
     return len(members)
+
+
+async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
+    """Return all distinct alliances from the latest snapshot, sorted by village count."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        )
+        row = await cur.fetchone()
+        if not row or not row["latest"]:
+            return []
+        latest = row["latest"]
+        cur = await db.execute(
+            """SELECT alliance_name,
+                      COUNT(DISTINCT player_id) as member_count,
+                      COUNT(*) as village_count,
+                      SUM(population) as total_pop
+               FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND alliance_name IS NOT NULL AND alliance_name != ''
+               GROUP BY alliance_name
+               ORDER BY member_count DESC
+               LIMIT 200""",
+            (guild_id, latest)
+        )
+        return [dict(r) for r in await cur.fetchall()]

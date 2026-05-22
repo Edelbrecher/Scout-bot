@@ -4144,9 +4144,10 @@ async def alliance_members_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
-    members        = await database.get_alliance_members(guild_id)
-    meta           = await database.get_alliance_members_meta(guild_id)
-    alliance_name  = await database.get_tw_alliance_name(guild_id)
+    members           = await database.get_alliance_members(guild_id)
+    meta              = await database.get_alliance_members_meta(guild_id)
+    alliance_name     = await database.get_tw_alliance_name(guild_id)
+    snapshot_alliances = await database.get_alliance_names_from_snapshot(guild_id)
 
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
@@ -4154,6 +4155,7 @@ async def alliance_members_page(request: Request, guild_id: str):
         "members": members,
         "meta": meta,
         "alliance_name": alliance_name,
+        "snapshot_alliances": snapshot_alliances,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
         "synced": request.query_params.get("synced"),

@@ -44,24 +44,47 @@
   <div class="card" style="margin-bottom:1.25rem;">
     <h3 style="margin:0 0 0.5rem;font-size:0.95rem;">🔄 Auto-Sync aus Karten-Snapshot</h3>
     <p class="hint" style="margin-bottom:0.75rem;">
-      Allianz-Namen eintragen → Mitglieder werden automatisch bei jedem Snapshot-Update (alle 6h) aktualisiert.
-      Bevölkerung und Dörfer kommen dann direkt aus der Karte.
+      Allianz auswählen → Mitglieder werden automatisch bei jedem Snapshot-Update (alle 6h) aktualisiert.
+      Bevölkerung und Dörfer kommen direkt aus der Karte.
     </p>
+
+    {% if snapshot_alliances %}
     <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance"
           style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
-      <div class="form-group" style="margin:0;flex:1;min-width:200px;">
-        <label>Allianz-Name (exakt wie in Travian)</label>
-        <input type="text" name="alliance_name"
-               value="{{ alliance_name or '' }}"
-               placeholder="z.B. The Dackel"
-               style="width:100%;">
+      <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+        <label>Allianz aus Snapshot wählen</label>
+        <select name="alliance_name" style="width:100%;padding:0.45rem 0.65rem;
+                border-radius:6px;border:1px solid var(--border);
+                background:var(--bg-main);color:var(--text);font-size:0.875rem;">
+          <option value="">— Keine (Auto-Sync deaktivieren) —</option>
+          {% for a in snapshot_alliances %}
+          <option value="{{ a.alliance_name }}"
+            {% if a.alliance_name == alliance_name %}selected{% endif %}>
+            {{ a.alliance_name }}
+            ({{ a.member_count }} Spieler · {{ a.village_count }} Dörfer)
+          </option>
+          {% endfor %}
+        </select>
       </div>
       <button type="submit" class="btn btn-primary">Speichern &amp; Sync</button>
     </form>
     {% if alliance_name %}
-    <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#2ed573;">
-      ✅ Auto-Sync aktiv für <strong>{{ alliance_name }}</strong> — wird bei jedem Snapshot aktualisiert.
+    <p style="margin:0.6rem 0 0;font-size:0.82rem;color:#2ed573;">
+      ✅ Auto-Sync aktiv für <strong>{{ alliance_name }}</strong> — wird bei jedem Snapshot automatisch aktualisiert.
     </p>
+    {% endif %}
+
+    {% else %}
+    <div style="padding:0.75rem 1rem;background:rgba(241,196,15,0.08);border:1px solid rgba(241,196,15,0.3);
+                border-radius:8px;font-size:0.875rem;">
+      ⚠️ Noch kein Snapshot geladen — erst einen Snapshot holen damit Allianzen zur Auswahl stehen.
+      <a href="/guild/{{ guild.guild_id }}/farming" style="margin-left:0.5rem;">→ Farming / Snapshots</a>
+    </div>
+    {% if alliance_name %}
+    <p style="margin:0.6rem 0 0;font-size:0.82rem;color:#f59e0b;">
+      ⚙️ Gespeichert: <strong>{{ alliance_name }}</strong> — wird nach dem nächsten Snapshot aktiv.
+    </p>
+    {% endif %}
     {% endif %}
   </div>
 
