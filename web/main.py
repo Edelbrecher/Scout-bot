@@ -4319,6 +4319,102 @@ async def alliance_members_import(
     )
 
 
+@app.get("/guild/{guild_id}/allianz/mitglieder/player-detail")
+async def alliance_player_detail(request: Request, guild_id: str, player_name: str = ""):
+    """JSON endpoint: village list + growth for a single player from map snapshots."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    import aiosqlite as _aio
+    async with _aio.connect(database.DB_PATH) as db:
+        db.row_factory = _aio.Row
+
+        # Latest snapshot time
+        async with db.execute(
+            "SELECT MAX(fetched_at) as ts FROM map_snapshots WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            latest_ts = row["ts"] if row else None
+
+        # First snapshot time
+        async with db.execute(
+            "SELECT MIN(fetched_at) as ts FROM map_snapshots WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            first_ts = row["ts"] if row else None
+
+        villages = []
+        if latest_ts:
+            async with db.execute("""
+                SELECT village_name, x, y, population, tribe
+                FROM map_snapshots
+                WHERE guild_id=? AND fetched_at=? AND player_name=?
+                ORDER BY population DESC
+            """, (guild_id, latest_ts, player_name)) as cur:
+                villages = [dict(r) for r in await cur.fetchall()]
+
+        # Growth: population per village between first and last snapshot
+        growth = []
+        if first_ts and latest_ts and first_ts != latest_ts:
+            async with db.execute("""
+                SELECT
+                    v_late.village_name,
+                    v_late.x, v_late.y,
+                    v_late.population AS pop_now,
+                    v_early.population AS pop_then,
+                    v_late.population - COALESCE(v_early.population, 0) AS delta
+                FROM map_snapshots v_late
+                LEFT JOIN map_snapshots v_early
+                    ON v_early.guild_id = v_late.guild_id
+                    AND v_early.village_name = v_late.village_name
+                    AND v_early.x = v_late.x AND v_early.y = v_late.y
+                    AND v_early.fetched_at = ?
+                WHERE v_late.guild_id=? AND v_late.fetched_at=? AND v_late.player_name=?
+                ORDER BY delta DESC
+            """, (first_ts, guild_id, latest_ts, player_name)) as cur:
+                growth = [dict(r) for r in await cur.fetchall()]
+
+        # Alliance member record
+        async with db.execute("""
+            SELECT points, villages, population, rank, tribe
+            FROM alliance_members WHERE guild_id=? AND player_name=?
+            ORDER BY rowid DESC LIMIT 1
+        """, (guild_id, player_name)) as cur:
+            member_row = await cur.fetchone()
+            member = dict(member_row) if member_row else {}
+
+        # Conquest detection: villages that appeared in latest but not in first snapshot
+        # (new player or conquered from enemy)
+        new_villages = []
+        if first_ts and latest_ts and first_ts != latest_ts:
+            async with db.execute("""
+                SELECT v_new.village_name, v_new.x, v_new.y, v_new.population
+                FROM map_snapshots v_new
+                LEFT JOIN map_snapshots v_old
+                    ON v_old.guild_id = v_new.guild_id
+                    AND v_old.x = v_new.x AND v_old.y = v_new.y
+                    AND v_old.player_name = v_new.player_name
+                    AND v_old.fetched_at = ?
+                WHERE v_new.guild_id=? AND v_new.fetched_at=? AND v_new.player_name=?
+                  AND v_old.x IS NULL
+                ORDER BY v_new.population DESC
+            """, (first_ts, guild_id, latest_ts, player_name)) as cur:
+                new_villages = [dict(r) for r in await cur.fetchall()]
+
+    return JSONResponse({
+        "player_name": player_name,
+        "member": member,
+        "villages": villages,
+        "growth": growth,
+        "new_villages": new_villages,
+        "snapshot_count": 2 if (first_ts and latest_ts and first_ts != latest_ts) else 1,
+        "first_snap": first_ts[:16].replace("T", " ") + " UTC" if first_ts else None,
+        "last_snap": latest_ts[:16].replace("T", " ") + " UTC" if latest_ts else None,
+    })
+
+
 @app.post("/guild/{guild_id}/allianz/mitglieder/clear")
 async def alliance_members_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
