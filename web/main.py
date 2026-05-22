@@ -3153,10 +3153,11 @@ async def farming_page(
     is_admin = session.get("guilds") is None
 
     # Auto-fetch first snapshot if none exists and world is configured
+    # Skip auto-fetch right after a manual clear so the user sees an empty state
     tw_world = (guild.get("tw_world") or "").strip()
     auto_fetched = False
     auto_fetch_error = ""
-    if tw_world:
+    if tw_world and saved != "snapshots_cleared":
         snap_count_pre = await database.get_snapshot_count(guild_id)
         if snap_count_pre == 0:
             try:
