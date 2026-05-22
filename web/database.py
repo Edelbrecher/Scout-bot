@@ -1410,19 +1410,23 @@ async def search_inactive_advanced(
     tribes: list | None = None,
     include_natars: bool = False,
     max_pop_increase: int = 0,
-    limit: int = 200,
+    limit: int = 300,
 ) -> dict:
-    """
-    Advanced inactive farm search. Returns villages that haven't grown across snapshots,
-    with population delta per snapshot date and distance from ref coords.
-    """
     import math
-    from datetime import datetime as _dt
 
     async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
 
-        # Get last N distinct snapshot timestamps (up to 8 for date columns)
+        # Ensure indexes exist for fast lookups
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_mapsnap_guild_ts
+            ON map_snapshots(guild_id, fetched_at)
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_mapsnap_guild_xy
+            ON map_snapshots(guild_id, x, y)
+        """)
+
+        # Last 8 distinct snapshot timestamps
         async with db.execute("""
             SELECT DISTINCT fetched_at FROM map_snapshots
             WHERE guild_id = ?
@@ -1433,49 +1437,53 @@ async def search_inactive_advanced(
         if len(snap_dates) < 2:
             return {"villages": [], "snap_dates": snap_dates, "total": 0}
 
-        latest_ts  = snap_dates[0]
-        oldest_ts  = snap_dates[-1]
+        latest_ts = snap_dates[0]
 
-        # Build exclusion lists
+        # Build filter lists
         excl_players   = [p.strip().lower() for p in exclude_players.split(",")  if p.strip()]
         incl_players   = [p.strip().lower() for p in player_filter.split(",")    if p.strip()]
         incl_alliances = [a.strip().lower() for a in alliance_filter.split(",")  if a.strip()]
+        excl_alliances = [a.strip().lower() for a in (exclude_alliances or "").split(",") if a.strip()]
 
-        # Fetch all villages from latest snapshot with their pop history
-        async with db.execute("""
-            SELECT v.village_id, v.x, v.y, v.village_name, v.player_name,
+        snap_placeholders = ",".join("?" * len(snap_dates))
+
+        # CTE: per-village stats across all tracked snapshots (no self-join)
+        # Then join latest snapshot for village details
+        query = f"""
+            WITH stats AS (
+                SELECT guild_id, x, y,
+                       MAX(population) - MIN(population) AS pop_range,
+                       COUNT(DISTINCT fetched_at)         AS snap_count
+                FROM map_snapshots
+                WHERE guild_id = ?
+                  AND fetched_at IN ({snap_placeholders})
+                GROUP BY guild_id, x, y
+            )
+            SELECT v.x, v.y, v.village_name, v.player_name,
                    v.alliance_name, v.population, v.tribe,
-                   -- Min/max across all tracked snapshots
-                   MIN(h.population) as min_pop_all,
-                   MAX(h.population) as max_pop_all,
-                   COUNT(DISTINCT h.fetched_at) as snap_count
+                   s.pop_range, s.snap_count
             FROM map_snapshots v
-            JOIN map_snapshots h
-                ON h.guild_id = v.guild_id
-                AND h.x = v.x AND h.y = v.y
-            WHERE v.guild_id = ? AND v.fetched_at = ?
-            GROUP BY v.x, v.y
-            HAVING snap_count >= 2
-               AND (max_pop_all - min_pop_all) <= ?
-               AND v.population >= ? AND v.population <= ?
-        """, (guild_id, latest_ts, max_pop_increase, min_pop, max_pop)) as cur:
+            JOIN stats s ON s.guild_id = v.guild_id AND s.x = v.x AND s.y = v.y
+            WHERE v.guild_id = ?
+              AND v.fetched_at = ?
+              AND s.snap_count >= 2
+              AND s.pop_range <= ?
+              AND v.population >= ? AND v.population <= ?
+        """
+        params = [guild_id, *snap_dates, guild_id, latest_ts, max_pop_increase, min_pop, max_pop]
+
+        # Natars filter in SQL
+        if not include_natars:
+            query += " AND v.tribe != 4 AND v.tribe != '4'"
+
+        async with db.execute(query, params) as cur:
+            cur.row_factory = aiosqlite.Row
             raw = [dict(r) for r in await cur.fetchall()]
 
-        # For each remaining village, fetch pop per snapshot date
-        # Build a lookup: (x, y, fetched_at) -> population
-        async with db.execute("""
-            SELECT x, y, fetched_at, population
-            FROM map_snapshots
-            WHERE guild_id = ?
-              AND fetched_at IN ({})
-        """.format(",".join("?" * len(snap_dates))),
-            (guild_id, *snap_dates)
-        ) as cur:
-            pop_lookup = {}
-            for r in await cur.fetchall():
-                pop_lookup[(r[0], r[1], r[2])] = r[3]
+        if not raw:
+            return {"villages": [], "snap_dates": snap_dates, "total": 0}
 
-        # Get player total population (sum across all their villages in latest snap)
+        # Player total pop from latest snapshot
         async with db.execute("""
             SELECT player_name, SUM(population) as total_pop
             FROM map_snapshots WHERE guild_id=? AND fetched_at=?
@@ -1483,43 +1491,59 @@ async def search_inactive_advanced(
         """, (guild_id, latest_ts)) as cur:
             player_pop = {r[0]: r[1] for r in await cur.fetchall()}
 
-        # Filter and enrich
-        villages = []
+        # Collect only the xy coords that pass text/distance filters first
+        filtered = []
         for v in raw:
             pname = (v["player_name"] or "").strip()
             aname = (v["alliance_name"] or "").strip()
 
-            # Natars filter
-            if not include_natars and v["tribe"] in (4, "4"):
-                continue
-            # Player filter
             if incl_players and pname.lower() not in incl_players:
                 continue
-            # Alliance filter
             if incl_alliances and aname.lower() not in incl_alliances:
                 continue
-            # Exclude players
             if excl_players and pname.lower() in excl_players:
                 continue
-            # Player pop filter
+            if excl_alliances and aname.lower() in excl_alliances:
+                continue
             pp = player_pop.get(pname, 0) or 0
             if pp < min_player_pop or pp > max_player_pop:
                 continue
-            # Tribe filter
             if tribes and v["tribe"] not in tribes:
                 continue
 
-            # Distance (Travian wraps at ±400 → shortest path)
-            dx = abs(v["x"] - ref_x)
-            dy = abs(v["y"] - ref_y)
-            dx = min(dx, 800 - dx)
-            dy = min(dy, 800 - dy)
+            dx = min(abs(v["x"] - ref_x), 800 - abs(v["x"] - ref_x))
+            dy = min(abs(v["y"] - ref_y), 800 - abs(v["y"] - ref_y))
             dist = round(math.sqrt(dx*dx + dy*dy), 2)
-
             if dist < min_distance or dist > max_distance:
                 continue
 
-            # Pop deltas per snapshot date
+            filtered.append({**v, "distance": dist, "player_total_pop": pp})
+
+        total = len(filtered)
+        filtered.sort(key=lambda v: v["distance"])
+        filtered = filtered[:limit]
+
+        if not filtered:
+            return {"villages": [], "snap_dates": snap_dates, "total": 0}
+
+        # Fetch pop history only for the villages in the result set
+        xy_set = {(v["x"], v["y"]) for v in filtered}
+        xy_placeholders = ",".join("(?,?)" for _ in xy_set)
+        xy_flat = [val for xy in xy_set for val in xy]
+
+        pop_lookup: dict = {}
+        async with db.execute(f"""
+            SELECT x, y, fetched_at, population
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND fetched_at IN ({snap_placeholders})
+              AND (x, y) IN ({xy_placeholders})
+        """, [guild_id, *snap_dates, *xy_flat]) as cur:
+            for r in await cur.fetchall():
+                pop_lookup[(r[0], r[1], r[2])] = r[3]
+
+        villages = []
+        for v in filtered:
             x, y = v["x"], v["y"]
             pop_history = []
             for i, ts in enumerate(snap_dates):
@@ -1531,24 +1555,9 @@ async def search_inactive_advanced(
                     pop_history.append(0)
                 else:
                     pop_history.append(pop_now - pop_prev)
+            villages.append({**v, "pop_history": pop_history})
 
-            villages.append({
-                **v,
-                "distance": dist,
-                "player_total_pop": pp,
-                "pop_history": pop_history,
-            })
-
-        # Sort by distance
-        villages.sort(key=lambda v: v["distance"])
-        total = len(villages)
-        villages = villages[:limit]
-
-        return {
-            "villages": villages,
-            "snap_dates": snap_dates,
-            "total": total,
-        }
+        return {"villages": villages, "snap_dates": snap_dates, "total": total}
 
 
 async def add_farm_list_entry(
