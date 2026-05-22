@@ -3076,6 +3076,18 @@ async def farming_page(
 
     is_admin = session.get("guilds") is None
 
+    # Auto-fetch first snapshot if none exists and world is configured
+    tw_world = (guild.get("tw_world") or "").strip()
+    auto_fetched = False
+    if tw_world:
+        snap_count_pre = await database.get_snapshot_count(guild_id)
+        if snap_count_pre == 0:
+            try:
+                await _fetch_and_save_snapshot(guild_id, tw_world)
+                auto_fetched = True
+            except Exception:
+                pass
+
     farm_stats = await database.get_farm_stats(guild_id)
     inactive_farms = await database.get_inactive_farms(guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
     farm_list = await database.get_farm_list(guild_id)
@@ -3120,6 +3132,7 @@ async def farming_page(
         "growth_data": growth_data,
         "search_results": search_results,
         "search_error": search_error,
+        "auto_fetched": auto_fetched,
     })
 
 

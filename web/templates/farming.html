@@ -19,6 +19,13 @@
   <div class="alert alert-success">✅ Gespeichert.</div>
   {% endif %}
 
+  {% if auto_fetched %}
+  <div class="alert alert-success">
+    ✅ Erster Snapshot automatisch geladen! Der <strong>zweite Snapshot</strong> wird vom System automatisch alle 6 Stunden geholt
+    — danach werden inaktive Farmen erkannt. Oder klick jetzt nochmal auf <em>🔄 Snapshot jetzt holen</em> um sofort einen zweiten zu speichern.
+  </div>
+  {% endif %}
+
   {% if not guild.tw_world %}
   <div class="alert alert-warn">
     ⚠️ Keine Travian-Welt konfiguriert. Bitte erst eine Welt-URL unter
@@ -105,10 +112,23 @@
     </h2>
 
     {% if farm_stats.snapshot_count < 2 %}
-    <p class="hint">
-      Mindestens <strong>2 Snapshots</strong> werden benötigt um inaktive Dörfer zu erkennen.
-      Klicke oben auf <em>Snapshot jetzt holen</em> und warte dann {{ min_days }} Tag(e).
-    </p>
+    <div style="padding:1rem; background:rgba(241,196,15,0.08); border:1px solid rgba(241,196,15,0.3); border-radius:8px;">
+      {% if farm_stats.snapshot_count == 0 %}
+      <strong>⏳ Noch kein Snapshot vorhanden.</strong>
+      <p style="margin:0.4rem 0 0; color:var(--text-muted); font-size:0.88rem;">
+        Klicke auf <em>🔄 Snapshot jetzt holen</em> (oben links) um die Kartendaten zu laden.
+        Für die Inaktivitätserkennung werden zwei Snapshots mit zeitlichem Abstand benötigt —
+        danach siehst du welche Dörfer sich nicht verändert haben.
+      </p>
+      {% else %}
+      <strong>📸 Erster Snapshot vorhanden — warte auf den zweiten.</strong>
+      <p style="margin:0.4rem 0 0; color:var(--text-muted); font-size:0.88rem;">
+        Das System holt automatisch alle <strong>6 Stunden</strong> einen neuen Snapshot.
+        Du kannst auch jetzt manuell auf <em>🔄 Snapshot jetzt holen</em> klicken um sofort den zweiten zu speichern
+        — dann werden inaktive Dörfer sofort erkannt.
+      </p>
+      {% endif %}
+    </div>
     {% elif inactive_farms %}
     <div style="overflow-x:auto;">
       <table class="table">
