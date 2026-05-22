@@ -3079,14 +3079,15 @@ async def farming_page(
     # Auto-fetch first snapshot if none exists and world is configured
     tw_world = (guild.get("tw_world") or "").strip()
     auto_fetched = False
+    auto_fetch_error = ""
     if tw_world:
         snap_count_pre = await database.get_snapshot_count(guild_id)
         if snap_count_pre == 0:
             try:
                 await _fetch_and_save_snapshot(guild_id, tw_world)
                 auto_fetched = True
-            except Exception:
-                pass
+            except Exception as e:
+                auto_fetch_error = str(e)
 
     farm_stats = await database.get_farm_stats(guild_id)
     inactive_farms = await database.get_inactive_farms(guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
@@ -3100,13 +3101,13 @@ async def farming_page(
     # Search — auto-fetch snapshot on-demand if none exists yet
     search_results = []
     search_error = ""
+    snap_count_for_search = await database.get_snapshot_count(guild_id)
     if q.strip():
-        snap_count = await database.get_snapshot_count(guild_id)
-        if snap_count == 0:
-            tw_world = (guild.get("tw_world") or "").strip()
+        if snap_count_for_search == 0:
             if tw_world:
                 try:
                     await _fetch_and_save_snapshot(guild_id, tw_world)
+                    snap_count_for_search = 1
                 except Exception as e:
                     search_error = f"Snapshot konnte nicht geladen werden: {e}"
             else:
@@ -3133,6 +3134,8 @@ async def farming_page(
         "search_results": search_results,
         "search_error": search_error,
         "auto_fetched": auto_fetched,
+        "auto_fetch_error": auto_fetch_error,
+        "snap_count_for_search": snap_count_for_search,
     })
 
 

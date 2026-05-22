@@ -21,8 +21,13 @@
 
   {% if auto_fetched %}
   <div class="alert alert-success">
-    ✅ Erster Snapshot automatisch geladen! Der <strong>zweite Snapshot</strong> wird vom System automatisch alle 6 Stunden geholt
-    — danach werden inaktive Farmen erkannt. Oder klick jetzt nochmal auf <em>🔄 Snapshot jetzt holen</em> um sofort einen zweiten zu speichern.
+    ✅ Erster Snapshot automatisch geladen! Der <strong>zweite Snapshot</strong> wird automatisch alle 6 Stunden geholt
+    — oder klick auf <em>🔄 Snapshot jetzt holen</em> um sofort einen zweiten zu speichern.
+  </div>
+  {% elif auto_fetch_error %}
+  <div class="alert alert-warn">
+    ⚠️ Snapshot konnte nicht automatisch geladen werden: <code>{{ auto_fetch_error }}</code><br>
+    Bitte prüfe die Travian-Welt-URL unter <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map-Einstellungen</a>.
   </div>
   {% endif %}
 
@@ -280,6 +285,17 @@
   <div {% if tab != 'search' %}style="display:none;"{% endif %}>
   <div class="card" style="margin-bottom:1.25rem;">
     <h2>🔍 Spieler &amp; Dörfer suchen</h2>
+
+    {% if snap_count_for_search == 0 %}
+    <div style="padding:0.75rem 1rem; background:rgba(241,196,15,0.08); border:1px solid rgba(241,196,15,0.3); border-radius:8px; margin-bottom:0.75rem; font-size:0.875rem;">
+      ⚠️ Noch kein Snapshot geladen. Die erste Suche lädt automatisch die Kartendaten — das kann <strong>10–30 Sekunden</strong> dauern.
+    </div>
+    {% else %}
+    <p class="hint" style="margin-bottom:0.75rem;">
+      📸 {{ snap_count_for_search }} Snapshot(s) vorhanden — Suche in den zuletzt geladenen Kartendaten.
+    </p>
+    {% endif %}
+
     <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="searchForm">
       <input type="hidden" name="tab" value="search" />
       <input type="hidden" name="min_days" value="{{ min_days }}" />
