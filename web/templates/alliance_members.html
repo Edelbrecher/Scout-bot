@@ -153,6 +153,18 @@
           <td style="color:var(--text-muted);font-size:0.85rem;">{{ m.rank or loop.index }}</td>
           <td>
             <strong style="color:#93c5fd;">{{ m.player_name }}</strong>
+            {% if m.player_name in strike_info %}
+            {% set s = strike_info[m.player_name] %}
+            <span title="Totalverlust vor {{ s.days_ago }} Tag(en)"
+                  style="margin-left:0.4rem;background:rgba(239,68,68,0.15);color:#ef4444;
+                         border:1px solid rgba(239,68,68,0.35);border-radius:4px;
+                         padding:0.05rem 0.4rem;font-size:0.7rem;font-weight:700;vertical-align:middle;">
+              ⚡ Strike
+              <span style="font-weight:400;opacity:0.8;">
+                {{ 'heute' if s.days_ago == 0 else ('gestern' if s.days_ago == 1 else 'vor ' ~ s.days_ago ~ 'd') }}
+              </span>
+            </span>
+            {% endif %}
           </td>
           <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}</td>
           <td style="text-align:right;">{{ m.villages if m.villages else '—' }}</td>

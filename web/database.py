@@ -3061,6 +3061,45 @@ async def get_alliance_members(guild_id: str) -> list[dict]:
         return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_strike_info_for_players(guild_id: str, player_names: list[str]) -> dict[str, dict]:
+    """Return most recent Strike report per player (attacker_player).
+    Result: { player_name: { "created_at": "...", "days_ago": N } }
+    """
+    if not player_names:
+        return {}
+    placeholders = ",".join("?" * len(player_names))
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(f"""
+            SELECT attacker_player, MAX(created_at) as last_strike
+            FROM scout_reports
+            WHERE guild_id = ?
+              AND attacker_player IN ({placeholders})
+              AND (
+                stats_json LIKE '%"text_strike": true%'
+                OR stats_json LIKE '%"text_strike":true%'
+              )
+            GROUP BY attacker_player
+        """, [guild_id, *player_names]) as cur:
+            rows = await cur.fetchall()
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    result = {}
+    for row in rows:
+        pname, ts = row[0], row[1]
+        if not pname or not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            days = (now - dt).days
+        except Exception:
+            days = 0
+        result[pname] = {"created_at": ts, "days_ago": days}
+    return result
+
+
 async def get_alliance_members_meta(guild_id: str) -> dict | None:
     """Return import metadata (count, when, by whom)."""
     async with aiosqlite.connect(DB_PATH) as db:

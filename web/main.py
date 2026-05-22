@@ -4415,6 +4415,8 @@ async def alliance_members_page(request: Request, guild_id: str):
     meta              = await database.get_alliance_members_meta(guild_id)
     alliance_name     = await database.get_tw_alliance_name(guild_id)
     snapshot_alliances = await database.get_alliance_names_from_snapshot(guild_id)
+    player_names      = [m["player_name"] for m in members]
+    strike_info       = await database.get_strike_info_for_players(guild_id, player_names)
 
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
@@ -4423,6 +4425,7 @@ async def alliance_members_page(request: Request, guild_id: str):
         "meta": meta,
         "alliance_name": alliance_name,
         "snapshot_alliances": snapshot_alliances,
+        "strike_info": strike_info,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
         "synced": request.query_params.get("synced"),
