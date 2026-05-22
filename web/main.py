@@ -3085,10 +3085,22 @@ async def farming_page(
     # Growth analysis
     growth_data = await database.get_player_growth(guild_id, limit=100)
 
-    # Search
+    # Search — auto-fetch snapshot on-demand if none exists yet
     search_results = []
+    search_error = ""
     if q.strip():
-        search_results = await database.search_map_snapshot(guild_id, q.strip())
+        snap_count = await database.get_snapshot_count(guild_id)
+        if snap_count == 0:
+            tw_world = (guild.get("tw_world") or "").strip()
+            if tw_world:
+                try:
+                    await _fetch_and_save_snapshot(guild_id, tw_world)
+                except Exception as e:
+                    search_error = f"Snapshot konnte nicht geladen werden: {e}"
+            else:
+                search_error = "Keine Travian-Welt konfiguriert. Bitte erst eine Welt-URL unter Map-Einstellungen eintragen."
+        if not search_error:
+            search_results = await database.search_map_snapshot(guild_id, q.strip())
 
     return templates.TemplateResponse("farming.html", {
         "request": request,
@@ -3107,6 +3119,7 @@ async def farming_page(
         "q": q,
         "growth_data": growth_data,
         "search_results": search_results,
+        "search_error": search_error,
     })
 
 

@@ -272,6 +272,10 @@
       </div>
     </form>
 
+    {% if search_error %}
+    <div class="alert alert-warn" style="margin-top:1rem;">⚠️ {{ search_error }}</div>
+    {% endif %}
+
     {% if q %}
     {% if search_results %}
     <div style="overflow-x:auto; margin-top:1rem;">
