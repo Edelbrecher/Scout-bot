@@ -111,10 +111,11 @@
     </table>
   </div>
 
-  <!-- Points distribution chart -->
-  <div class="card" style="margin-top:1.25rem;">
-    <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">Punkte-Verteilung (Top 20)</h3>
-    <canvas id="chartPoints" height="100"></canvas>
+  <div style="margin-top:0.75rem;">
+    <button type="button" class="btn btn-secondary"
+            onclick="document.getElementById('chartModal').style.display='flex'">
+      📊 Top 20 Punkte-Verteilung
+    </button>
   </div>
 
   {% else %}
@@ -126,6 +127,21 @@
   </div>
   {% endif %}
 
+</div>
+
+<!-- Chart Modal -->
+<div id="chartModal"
+     style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.7);
+            align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+              padding:1.5rem;width:100%;max-width:700px;position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="document.getElementById('chartModal').style.display='none'"
+            style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
+                   color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
+    <h2 style="margin:0 0 1rem;">📊 Top 20 — Punkte-Verteilung</h2>
+    <canvas id="chartPoints"></canvas>
+  </div>
 </div>
 
 <!-- Import Modal -->
@@ -198,7 +214,8 @@ function sortTable(col) {
 // ── Points chart (top 20) ────────────────────────────────────────────────────
 (function() {
   const members = {{ members | tojson }};
-  const top = [...members].sort((a,b) => b.points - a.points).slice(0, 20).reverse();
+  // highest at top → sort descending, no reverse
+  const top = [...members].sort((a,b) => b.points - a.points).slice(0, 20);
   new Chart(document.getElementById('chartPoints'), {
     type: 'bar',
     data: {
