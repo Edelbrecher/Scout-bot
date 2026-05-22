@@ -746,6 +746,7 @@ class Scout(commands.Cog):
                 if not parsed.get("valid"):
                     reason = parsed.get("invalid_reason", "unknown")
                     print(f"[scout] report rejected ({reason}) in ch {channel_id}", flush=True)
+                    print(f"[scout][ocr_dump]\n{ocr_text}\n[/ocr_dump]", flush=True)
                     # Save the image unlinked so it's not lost, but don't create an enemy entry
                     await database.save_scout_image(
                         guild_id=guild_id, channel_id=channel_id,
