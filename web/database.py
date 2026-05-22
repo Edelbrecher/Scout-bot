@@ -216,6 +216,7 @@ async def init_db():
     await _init_sitter_table()
     await _init_settle_list_table()
     await _init_dual_links_table()
+    await _init_farmlist_analyses_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH) as db:
@@ -2192,6 +2193,101 @@ async def get_all_shared_sitters(guild_id: str) -> list[dict]:
             (guild_id,),
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def _init_farmlist_analyses_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS farmlist_analyses (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id         TEXT NOT NULL,
+                discord_user_id  TEXT NOT NULL,
+                discord_username TEXT,
+                created_at       TEXT DEFAULT (datetime('now')),
+                total_farms      INTEGER DEFAULT 0,
+                own_villages     INTEGER DEFAULT 0,
+                avg_res          REAL DEFAULT 0,
+                gut              INTEGER DEFAULT 0,
+                ok               INTEGER DEFAULT 0,
+                leer             INTEGER DEFAULT 0,
+                total_res_last   INTEGER DEFAULT 0,
+                total_res_total  INTEGER DEFAULT 0,
+                groups_json      TEXT DEFAULT '[]',
+                fazit            TEXT DEFAULT 'mittel'
+            )
+        """)
+        await db.commit()
+
+
+async def save_farmlist_analysis(
+    guild_id: str,
+    discord_user_id: str,
+    discord_username: str,
+    stats: dict,
+    group_stats: list,
+) -> int:
+    await _init_farmlist_analyses_table()
+    import json as _json
+
+    groups = [g["name"] for g in group_stats]
+    own_villages = len(group_stats)
+
+    # Fazit based on % of gut farms (excluding natars)
+    total = stats.get("total", 0)
+    gut   = stats.get("gut",  0)
+    ok    = stats.get("ok",   0)
+    pct   = (gut / total * 100) if total > 0 else 0
+    if pct >= 60:
+        fazit = "sehr gut"
+    elif pct >= 40:
+        fazit = "gut"
+    elif pct >= 20:
+        fazit = "mittel"
+    elif pct >= 8:
+        fazit = "schlecht"
+    else:
+        fazit = "sehr schlecht"
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO farmlist_analyses
+                (guild_id, discord_user_id, discord_username,
+                 total_farms, own_villages, avg_res,
+                 gut, ok, leer,
+                 total_res_last, total_res_total,
+                 groups_json, fazit)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            guild_id, discord_user_id, discord_username,
+            total, own_villages, stats.get("avg_res", 0),
+            gut, ok, stats.get("leer", 0),
+            stats.get("total_res_last", 0), stats.get("total_res_total", 0),
+            _json.dumps(groups, ensure_ascii=False), fazit,
+        ))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_farmlist_analyses(guild_id: str, discord_user_id: str, limit: int = 20) -> list[dict]:
+    await _init_farmlist_analyses_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM farmlist_analyses
+            WHERE guild_id = ? AND discord_user_id = ?
+            ORDER BY created_at DESC LIMIT ?
+        """, (guild_id, discord_user_id, limit)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_farmlist_analysis(analysis_id: int, discord_user_id: str):
+    await _init_farmlist_analyses_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM farmlist_analyses WHERE id = ? AND discord_user_id = ?",
+            (analysis_id, discord_user_id),
+        )
+        await db.commit()
 
 
 async def get_scout_stats(guild_id: str) -> list[dict]:

@@ -10,6 +10,79 @@
     <p class="subtitle" style="margin:0;">Mehrere Farmlisten auf einmal einfügen und auswerten</p>
   </div>
 
+  <!-- ── Analyse-Verlauf ─────────────────────────────────────────────── -->
+  {% if past %}
+  <div style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;">🗂️ Gespeicherte Analysen</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;">
+      {% for a in past %}
+      {% set groups = a.groups_json | from_json %}
+      {% set fazit_color = {
+        'sehr gut':      '#22c55e',
+        'gut':           '#86efac',
+        'mittel':        '#eab308',
+        'schlecht':      '#f97316',
+        'sehr schlecht': '#ef4444'
+      }.get(a.fazit, '#6b7280') %}
+      <div class="card" style="padding:0.85rem;position:relative;border-top:3px solid {{ fazit_color }};">
+        <!-- Fazit badge -->
+        <span style="position:absolute;top:0.6rem;right:0.6rem;background:{{ fazit_color }}22;
+              color:{{ fazit_color }};border:1px solid {{ fazit_color }}55;
+              border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:700;">
+          {{ a.fazit | title }}
+        </span>
+
+        <!-- Datum -->
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:0.3rem;">
+          🕐 {{ a.created_at[:16].replace('T',' ') }}
+        </div>
+
+        <!-- Hauptzahlen -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem;margin-bottom:0.5rem;">
+          <div>
+            <div style="font-size:1.25rem;font-weight:800;">{{ a.total_farms }}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">🏘️ Farmen</div>
+          </div>
+          <div>
+            <div style="font-size:1.25rem;font-weight:800;">{{ a.own_villages }}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">🏰 eigene Dörfer</div>
+          </div>
+          <div>
+            <div style="font-size:1.1rem;font-weight:700;">{{ a.avg_res }}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">∅ Res / Farm</div>
+          </div>
+          <div>
+            <div style="font-size:1.1rem;font-weight:700;">
+              <span style="color:#22c55e;">{{ a.gut }}</span>
+              <span style="color:var(--text-muted);font-size:0.8rem;">/ {{ a.ok }} / {{ a.leer }}</span>
+            </div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">🟢 / 🟡 / 🔴</div>
+          </div>
+        </div>
+
+        <!-- Gruppen -->
+        {% if groups %}
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem;
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          {{ groups | join(' · ') }}
+        </div>
+        {% endif %}
+
+        <!-- Löschen -->
+        <form method="post" action="/guild/{{ guild.guild_id }}/farmlist-analyst/{{ a.id }}/delete"
+              onsubmit="return confirm('Analyse löschen?')">
+          <button type="submit"
+            style="background:none;border:1px solid var(--border);border-radius:4px;
+                   padding:2px 8px;font-size:0.72rem;color:var(--text-muted);cursor:pointer;">
+            🗑️ Löschen
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Eingabe -->
   <div class="card" style="margin-bottom:1.25rem;">
     <h2 style="margin:0 0 0.5rem;">📋 Farmliste einfügen</h2>
