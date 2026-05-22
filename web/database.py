@@ -2213,7 +2213,9 @@ async def _init_farmlist_analyses_table():
                 total_res_last   INTEGER DEFAULT 0,
                 total_res_total  INTEGER DEFAULT 0,
                 groups_json      TEXT DEFAULT '[]',
-                fazit            TEXT DEFAULT 'mittel'
+                fazit            TEXT DEFAULT 'mittel',
+                farms_json       TEXT DEFAULT '[]',
+                group_stats_json TEXT DEFAULT '[]'
             )
         """)
         await db.commit()
@@ -2225,6 +2227,7 @@ async def save_farmlist_analysis(
     discord_username: str,
     stats: dict,
     group_stats: list,
+    farms: list = None,
 ) -> int:
     await _init_farmlist_analyses_table()
     import json as _json
@@ -2255,14 +2258,17 @@ async def save_farmlist_analysis(
                  total_farms, own_villages, avg_res,
                  gut, ok, leer,
                  total_res_last, total_res_total,
-                 groups_json, fazit)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 groups_json, fazit,
+                 farms_json, group_stats_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             guild_id, discord_user_id, discord_username,
             total, own_villages, stats.get("avg_res", 0),
             gut, ok, stats.get("leer", 0),
             stats.get("total_res_last", 0), stats.get("total_res_total", 0),
             _json.dumps(groups, ensure_ascii=False), fazit,
+            _json.dumps(farms or [], ensure_ascii=False),
+            _json.dumps(group_stats, ensure_ascii=False),
         ))
         await db.commit()
         return cur.lastrowid
@@ -2278,6 +2284,18 @@ async def get_farmlist_analyses(guild_id: str, discord_user_id: str, limit: int 
             ORDER BY created_at DESC LIMIT ?
         """, (guild_id, discord_user_id, limit)) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_farmlist_analysis(analysis_id: int, discord_user_id: str) -> dict | None:
+    await _init_farmlist_analyses_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM farmlist_analyses WHERE id = ? AND discord_user_id = ?",
+            (analysis_id, discord_user_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def delete_farmlist_analysis(analysis_id: int, discord_user_id: str):

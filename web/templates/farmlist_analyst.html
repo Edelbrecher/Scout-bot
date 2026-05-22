@@ -68,15 +68,23 @@
         </div>
         {% endif %}
 
-        <!-- Löschen -->
-        <form method="post" action="/guild/{{ guild.guild_id }}/farmlist-analyst/{{ a.id }}/delete"
-              onsubmit="return confirm('Analyse löschen?')">
-          <button type="submit"
-            style="background:none;border:1px solid var(--border);border-radius:4px;
-                   padding:2px 8px;font-size:0.72rem;color:var(--text-muted);cursor:pointer;">
-            🗑️ Löschen
-          </button>
-        </form>
+        <!-- Aktionen -->
+        <div style="display:flex;gap:0.4rem;margin-top:0.3rem;">
+          <a href="/guild/{{ guild.guild_id }}/farmlist-analyst/{{ a.id }}/open"
+             style="flex:1;text-align:center;background:var(--bg-card);border:1px solid var(--border);
+                    border-radius:4px;padding:2px 8px;font-size:0.72rem;color:var(--text);
+                    text-decoration:none;{% if opened_id == a.id %}font-weight:700;border-color:{{ fazit_color }};{% endif %}">
+            📂 Öffnen
+          </a>
+          <form method="post" action="/guild/{{ guild.guild_id }}/farmlist-analyst/{{ a.id }}/delete"
+                onsubmit="return confirm('Analyse löschen?')" style="margin:0;">
+            <button type="submit"
+              style="background:none;border:1px solid var(--border);border-radius:4px;
+                     padding:2px 8px;font-size:0.72rem;color:var(--text-muted);cursor:pointer;">
+              🗑️
+            </button>
+          </form>
+        </div>
       </div>
       {% endfor %}
     </div>

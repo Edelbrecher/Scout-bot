@@ -3572,7 +3572,7 @@ async def farmlist_analyst_post(
     await database.save_farmlist_analysis(
         guild_id, session.get("uid", ""),
         session.get("username", ""),
-        stats, group_stats,
+        stats, group_stats, farms,
     )
     past = await database.get_farmlist_analyses(guild_id, session.get("uid", ""))
 
@@ -3584,6 +3584,49 @@ async def farmlist_analyst_post(
         "group_stats":  group_stats,
         "past":         past,
         "raw_text":     farmlist_text,
+    })
+
+
+@app.get("/guild/{guild_id}/farmlist-analyst/{analysis_id}/open", response_class=HTMLResponse)
+async def farmlist_analysis_open(request: Request, guild_id: str, analysis_id: int):
+    import json as _json
+    session, err = _require_session(request)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    row = await database.get_farmlist_analysis(analysis_id, session.get("uid", ""))
+    if not row:
+        return RedirectResponse(f"/guild/{guild_id}/farmlist-analyst")
+
+    farms      = _json.loads(row.get("farms_json") or "[]")
+    group_stats = _json.loads(row.get("group_stats_json") or "[]")
+    past       = await database.get_farmlist_analyses(guild_id, session.get("uid", ""))
+
+    stats = {
+        "total":          row["total_farms"],
+        "gut":            row["gut"],
+        "ok":             row["ok"],
+        "leer":           row["leer"],
+        "avg_res":        row["avg_res"],
+        "total_res_last": row["total_res_last"],
+        "total_res_total":row["total_res_total"],
+        "groups":         _json.loads(row.get("groups_json") or "[]"),
+        "avg_dist":       round(sum(f.get("distance", 0) for f in farms if not f.get("is_npc")) / max(1, sum(1 for f in farms if not f.get("is_npc"))), 1) if farms else 0,
+    }
+
+    return templates.TemplateResponse("farmlist_analyst.html", {
+        "request":     request,
+        "guild":       guild,
+        "farms":       farms,
+        "stats":       stats,
+        "group_stats": group_stats,
+        "past":        past,
+        "raw_text":    "",
+        "opened_id":   analysis_id,
     })
 
 
