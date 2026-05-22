@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}Inaktive Suche · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1300px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}/farming" class="back-link">← Farming</a>
+      <h1 style="margin:0.25rem 0 0;">🏚️ Inactive Search
+        {% if searched and result.total %}
+        <span style="font-size:1rem;background:rgba(147,197,253,0.15);color:#93c5fd;border-radius:6px;padding:0.15rem 0.6rem;margin-left:0.5rem;font-weight:600;">
+          {{ result.total }}
+        </span>
+        {% endif %}
+      </h1>
+      <p class="subtitle" style="margin:0;">
+        {% if snap_count == 0 %}⚠️ Kein Snapshot vorhanden — erst Snapshot holen
+        {% elif snap_count == 1 %}⚠️ Nur 1 Snapshot — für Aktivitätserkennung sind mind. 2 nötig
+        {% else %}{{ snap_count }} Snapshots verfügbar · {% if result.snap_dates %}letzter: {{ result.snap_dates[0][:10] }}{% endif %}
+        {% endif %}
+      </p>
+    </div>
+    {% if snap_count == 0 %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshot" style="margin:0;">
+      <button type="submit" class="btn btn-primary">🔄 Snapshot holen</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- ── Filter form ─────────────────────────────────────────────────────── -->
+  <form method="get" action="/guild/{{ guild.guild_id }}/farming/inactive-search" id="searchForm">
+    <input type="hidden" name="searched" value="1">
+
+    <div class="card" style="margin-bottom:1rem;">
+      <!-- Row 1: coords + days -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div class="form-group" style="margin:0;">
+          <label>Koordinaten (Referenz)</label>
+          <div style="display:flex;gap:0.4rem;align-items:center;">
+            <input type="number" name="ref_x" value="{{ ref_x }}" placeholder="X"
+                   style="width:90px;" class="form-control">
+            <span style="color:var(--text-muted);">|</span>
+            <input type="number" name="ref_y" value="{{ ref_y }}" placeholder="Y"
+                   style="width:90px;" class="form-control">
+          </div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Max. Bevölkerungs-Zunahme
+            <span class="hint" style="margin:0;">(0 = komplett inaktiv)</span>
+          </label>
+          <select name="max_pop_increase" class="form-control">
+            {% for v in [0, 5, 10, 20, 50, 100] %}
+            <option value="{{ v }}" {% if max_pop_increase == v %}selected{% endif %}>{{ v }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Travian-Welt</label>
+          <div style="padding:0.45rem 0.65rem;background:var(--bg-main);border:1px solid var(--border);
+                      border-radius:6px;font-size:0.875rem;color:var(--text-muted);">
+            {{ tw_world | replace('https://','') if tw_world else '— nicht konfiguriert —' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Erweiterte Filterung toggle -->
+      <button type="button" id="extToggle"
+              onclick="toggleExt()"
+              style="background:none;border:1px solid var(--border);border-radius:6px;
+                     color:#93c5fd;font-size:0.82rem;padding:0.3rem 0.75rem;cursor:pointer;
+                     margin-bottom:0.75rem;">
+        ⚙️ Erweiterte Filterung ▾
+      </button>
+
+      <div id="extFilters" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1rem;">
+          <!-- Distance -->
+          <div class="form-group" style="margin:0;">
+            <label>Distanz</label>
+            <div style="display:flex;gap:0.4rem;align-items:center;">
+              <input type="number" name="min_dist" value="{{ min_dist if min_dist > 0 else '' }}"
+                     placeholder="Min" class="form-control" style="width:90px;">
+              <span style="color:var(--text-muted);">–</span>
+              <input type="number" name="max_dist" value="{{ max_dist if max_dist < 9999 else '' }}"
+                     placeholder="Max" class="form-control" style="width:90px;">
+            </div>
+          </div>
+          <!-- Village pop -->
+          <div class="form-group" style="margin:0;">
+            <label>Einwohner Dorf</label>
+            <div style="display:flex;gap:0.4rem;align-items:center;">
+              <input type="number" name="min_pop" value="{{ min_pop if min_pop > 0 else '' }}"
+                     placeholder="Min" class="form-control" style="width:90px;">
+              <span style="color:var(--text-muted);">–</span>
+              <input type="number" name="max_pop" value="{{ max_pop if max_pop < 9999 else '' }}"
+                     placeholder="Max" class="form-control" style="width:90px;">
+            </div>
+          </div>
+          <!-- Player pop -->
+          <div class="form-group" style="margin:0;">
+            <label>Einwohner Spieler</label>
+            <div style="display:flex;gap:0.4rem;align-items:center;">
+              <input type="number" name="min_player_pop" value="{{ min_player_pop if min_player_pop > 0 else '' }}"
+                     placeholder="Min" class="form-control" style="width:90px;">
+              <span style="color:var(--text-muted);">–</span>
+              <input type="number" name="max_player_pop" value="{{ max_player_pop if max_player_pop < 999999 else '' }}"
+                     placeholder="Max" class="form-control" style="width:90px;">
+            </div>
+          </div>
+          <!-- Player filter -->
+          <div class="form-group" style="margin:0;">
+            <label>Spieler (kommagetrennt)</label>
+            <input type="text" name="player_filter" value="{{ player_filter }}"
+                   placeholder="Spielername…" class="form-control">
+          </div>
+          <!-- Alliance filter -->
+          <div class="form-group" style="margin:0;">
+            <label>Allianz</label>
+            <input type="text" name="alliance_filter" value="{{ alliance_filter }}"
+                   placeholder="Allianzname…" class="form-control" list="allianceList">
+            <datalist id="allianceList">
+              {% for a in alliance_names %}
+              <option value="{{ a }}">
+              {% endfor %}
+            </datalist>
+          </div>
+          <!-- Exclude players -->
+          <div class="form-group" style="margin:0;">
+            <label>Spieler ausschließen</label>
+            <input type="text" name="exclude_players" value="{{ exclude_players }}"
+                   placeholder="Spieler1, Spieler2…" class="form-control">
+          </div>
+          <!-- Exclude alliances -->
+          <div class="form-group" style="margin:0;">
+            <label>Allianzen ausschließen</label>
+            <input type="text" name="exclude_alliances" value="{{ exclude_alliances }}"
+                   placeholder="Allianz1, Allianz2…" class="form-control">
+          </div>
+          <!-- Natars -->
+          <div class="form-group" style="margin:0;">
+            <label>Natars einschließen</label>
+            <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem;">
+              <input type="checkbox" name="include_natars" value="true"
+                     {% if include_natars %}checked{% endif %}
+                     style="width:16px;height:16px;">
+              <span style="font-size:0.875rem;">Nataren-Dörfer anzeigen</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button type="submit" class="btn btn-primary">🔍 Suchen</button>
+        <a href="/guild/{{ guild.guild_id }}/farming/inactive-search" class="btn">Filter löschen</a>
+        {% if snap_count > 0 %}
+        <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">
+          {{ snap_count }} Snapshots ·
+          {% if result.snap_dates %}
+          letzte Daten: {{ result.snap_dates[0][:10] }}
+          {% endif %}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+
+  <!-- ── Results table ───────────────────────────────────────────────────── -->
+  {% if searched %}
+  {% if result.villages %}
+
+  <div style="overflow-x:auto;">
+    <table class="table" style="font-size:0.82rem;white-space:nowrap;">
+      <thead>
+        <tr>
+          <th style="width:30px;"></th>
+          <th onclick="sortResults(1)" style="cursor:pointer;">Distanz ▲</th>
+          <th onclick="sortResults(2)" style="cursor:pointer;">Travian-Account</th>
+          <th onclick="sortResults(3)" style="cursor:pointer;">Dorf</th>
+          {% for ts in result.snap_dates %}
+          <th style="text-align:center;color:var(--text-muted);font-size:0.75rem;">
+            {{ ts[5:10] }}
+          </th>
+          {% endfor %}
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody">
+        {% for v in result.villages %}
+        {% set tribe_icon = ['🦅','⚔️','🛡️','🌿','⚙️','🪓','🌊','🌙'] %}
+        <tr data-dist="{{ v.distance }}">
+          <td style="text-align:center;color:var(--text-muted);">{{ loop.index }}</td>
+          <td>
+            <span style="font-weight:600;">{{ v.distance }}</span>
+          </td>
+          <td>
+            <div style="font-weight:600;color:var(--text);">{{ v.player_name or '—' }}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">
+              <span title="Spieler-Bevölkerung">👥 {{ v.player_total_pop }}</span>
+              {% if v.alliance_name %}
+              <span style="margin-left:0.4rem;" title="Allianz">[{{ v.alliance_name }}]</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <div style="font-weight:500;">{{ v.village_name or '—' }}</div>
+            <div style="font-size:0.75rem;">
+              <a href="{{ tw_world }}/karte.php?x={{ v.x }}&y={{ v.y }}" target="_blank"
+                 style="color:#93c5fd;text-decoration:none;font-family:monospace;">
+                [{{ v.x }}|{{ v.y }}]
+              </a>
+              <span style="color:var(--text-muted);margin-left:0.3rem;">
+                👥 {{ v.population }}
+              </span>
+            </div>
+          </td>
+          <!-- Pop delta per snapshot date -->
+          {% for delta in v.pop_history %}
+          <td style="text-align:center;">
+            {% if delta is none %}
+            <span style="color:var(--text-muted);">—</span>
+            {% elif delta == 0 %}
+            <span style="color:var(--text-muted);">0</span>
+            {% elif delta > 0 %}
+            <span style="background:rgba(248,113,113,0.15);color:#f87171;border-radius:4px;
+                         padding:0.1rem 0.35rem;font-size:0.75rem;">+{{ delta }}</span>
+            {% else %}
+            <span style="background:rgba(34,197,94,0.15);color:#22c55e;border-radius:4px;
+                         padding:0.1rem 0.35rem;font-size:0.75rem;">{{ delta }}</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td style="white-space:nowrap;">
+            <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive"
+               style="display:inline-flex;align-items:center;justify-content:center;
+                      width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+                      background:var(--bg-main);text-decoration:none;font-size:0.9rem;"
+               title="Details">🔍</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if result.total > result.villages | length %}
+  <p style="color:var(--text-muted);font-size:0.82rem;margin-top:0.5rem;text-align:center;">
+    Zeige {{ result.villages|length }} von {{ result.total }} Ergebnissen.
+    Filter verfeinern um mehr zu sehen.
+  </p>
+  {% endif %}
+
+  {% else %}
+  <div class="card" style="text-align:center;padding:2rem;">
+    <p style="color:var(--text-muted);margin:0;">
+      {% if snap_count < 2 %}
+      ⚠️ Mindestens 2 Snapshots nötig um Aktivität zu erkennen. Warte ca. 6 Stunden bis zum nächsten automatischen Snapshot.
+      {% else %}
+      Keine inaktiven Dörfer mit diesen Filtern gefunden.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+  {% endif %}
+
+</div>
+
+<script>
+// Auto-open extended filters if any extended filter is set
+(function() {
+  const ext = {{ 'true' if (min_pop or max_pop < 9999 or min_player_pop or max_player_pop < 999999 or min_dist or max_dist < 9999 or player_filter or alliance_filter or exclude_players or exclude_alliances or include_natars) else 'false' }};
+  if (ext) toggleExt();
+})();
+
+function toggleExt() {
+  const el  = document.getElementById('extFilters');
+  const btn = document.getElementById('extToggle');
+  const vis = el.style.display !== 'none';
+  el.style.display  = vis ? 'none' : 'block';
+  btn.textContent   = vis ? '⚙️ Erweiterte Filterung ▾' : '⚙️ Erweiterte Filterung ▴';
+}
+
+// Simple client-side sort
+let _sortAsc = true;
+let _sortCol = 1;
+function sortResults(col) {
+  const tbody = document.getElementById('resultsBody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const asc  = col === _sortCol ? !_sortAsc : true;
+  _sortAsc = asc; _sortCol = col;
+  rows.sort((a, b) => {
+    const ca = a.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const cb = b.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const na = parseFloat(ca.replace(/[^\d.-]/g, '')), nb = parseFloat(cb.replace(/[^\d.-]/g, ''));
+    if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+    return asc ? ca.localeCompare(cb) : cb.localeCompare(ca);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

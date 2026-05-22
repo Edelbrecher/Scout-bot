@@ -3132,6 +3132,79 @@ async def farmlist_analysis_delete(request: Request, guild_id: str, analysis_id:
 # Routes — Farming
 # ---------------------------------------------------------------------------
 
+@app.get("/guild/{guild_id}/farming/inactive-search", response_class=HTMLResponse)
+async def farming_inactive_search(
+    request: Request,
+    guild_id: str,
+    ref_x: int = 0,
+    ref_y: int = 0,
+    max_pop_increase: int = 0,
+    min_pop: int = 0,
+    max_pop: int = 9999,
+    min_player_pop: int = 0,
+    max_player_pop: int = 999999,
+    min_dist: float = 0,
+    max_dist: float = 9999,
+    player_filter: str = "",
+    alliance_filter: str = "",
+    exclude_players: str = "",
+    exclude_alliances: str = "",
+    include_natars: bool = False,
+    searched: bool = False,
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    tw_world = (guild.get("tw_world") or "").strip()
+    snap_count = await database.get_snapshot_count(guild_id)
+    result = {"villages": [], "snap_dates": [], "total": 0}
+
+    if searched and snap_count >= 1:
+        result = await database.search_inactive_advanced(
+            guild_id=guild_id,
+            ref_x=ref_x, ref_y=ref_y,
+            max_pop_increase=max_pop_increase,
+            min_pop=min_pop, max_pop=max_pop,
+            min_player_pop=min_player_pop, max_player_pop=max_player_pop,
+            min_distance=min_dist, max_distance=max_dist,
+            player_filter=player_filter,
+            alliance_filter=alliance_filter,
+            exclude_players=exclude_players,
+            exclude_alliances=exclude_alliances,
+            include_natars=include_natars,
+            limit=300,
+        )
+
+    # Alliance names from snapshot for autocomplete
+    alliance_names = await database.get_alliance_names_from_snapshot(guild_id)
+
+    return templates.TemplateResponse("farming_inactive_search.html", {
+        "request": request,
+        "guild": guild,
+        "tw_world": tw_world,
+        "snap_count": snap_count,
+        "result": result,
+        "searched": searched,
+        # Re-pass filter values
+        "ref_x": ref_x, "ref_y": ref_y,
+        "max_pop_increase": max_pop_increase,
+        "min_pop": min_pop, "max_pop": max_pop,
+        "min_player_pop": min_player_pop, "max_player_pop": max_player_pop,
+        "min_dist": min_dist, "max_dist": max_dist,
+        "player_filter": player_filter,
+        "alliance_filter": alliance_filter,
+        "exclude_players": exclude_players,
+        "exclude_alliances": exclude_alliances,
+        "include_natars": include_natars,
+        "alliance_names": [a["alliance_name"] for a in alliance_names],
+    })
+
+
 @app.get("/guild/{guild_id}/farming", response_class=HTMLResponse)
 async def farming_page(
     request: Request,

@@ -1392,6 +1392,165 @@ async def get_inactive_farms(
         return result
 
 
+async def search_inactive_advanced(
+    guild_id: str,
+    ref_x: int = 0,
+    ref_y: int = 0,
+    max_days_inactive: int = 2,
+    min_pop: int = 0,
+    max_pop: int = 9999,
+    min_player_pop: int = 0,
+    max_player_pop: int = 999999,
+    max_distance: float = 9999,
+    min_distance: float = 0,
+    player_filter: str = "",
+    alliance_filter: str = "",
+    exclude_players: str = "",
+    exclude_alliances: str = "",
+    tribes: list | None = None,
+    include_natars: bool = False,
+    max_pop_increase: int = 0,
+    limit: int = 200,
+) -> dict:
+    """
+    Advanced inactive farm search. Returns villages that haven't grown across snapshots,
+    with population delta per snapshot date and distance from ref coords.
+    """
+    import math
+    from datetime import datetime as _dt
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Get last N distinct snapshot timestamps (up to 8 for date columns)
+        async with db.execute("""
+            SELECT DISTINCT fetched_at FROM map_snapshots
+            WHERE guild_id = ?
+            ORDER BY fetched_at DESC LIMIT 8
+        """, (guild_id,)) as cur:
+            snap_dates = [r[0] for r in await cur.fetchall()]
+
+        if len(snap_dates) < 2:
+            return {"villages": [], "snap_dates": snap_dates, "total": 0}
+
+        latest_ts  = snap_dates[0]
+        oldest_ts  = snap_dates[-1]
+
+        # Build exclusion lists
+        excl_players   = [p.strip().lower() for p in exclude_players.split(",")  if p.strip()]
+        incl_players   = [p.strip().lower() for p in player_filter.split(",")    if p.strip()]
+        incl_alliances = [a.strip().lower() for a in alliance_filter.split(",")  if a.strip()]
+
+        # Fetch all villages from latest snapshot with their pop history
+        async with db.execute("""
+            SELECT v.village_id, v.x, v.y, v.village_name, v.player_name,
+                   v.alliance_name, v.population, v.tribe,
+                   -- Min/max across all tracked snapshots
+                   MIN(h.population) as min_pop_all,
+                   MAX(h.population) as max_pop_all,
+                   COUNT(DISTINCT h.fetched_at) as snap_count
+            FROM map_snapshots v
+            JOIN map_snapshots h
+                ON h.guild_id = v.guild_id
+                AND h.x = v.x AND h.y = v.y
+            WHERE v.guild_id = ? AND v.fetched_at = ?
+            GROUP BY v.x, v.y
+            HAVING snap_count >= 2
+               AND (max_pop_all - min_pop_all) <= ?
+               AND v.population >= ? AND v.population <= ?
+        """, (guild_id, latest_ts, max_pop_increase, min_pop, max_pop)) as cur:
+            raw = [dict(r) for r in await cur.fetchall()]
+
+        # For each remaining village, fetch pop per snapshot date
+        # Build a lookup: (x, y, fetched_at) -> population
+        async with db.execute("""
+            SELECT x, y, fetched_at, population
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND fetched_at IN ({})
+        """.format(",".join("?" * len(snap_dates))),
+            (guild_id, *snap_dates)
+        ) as cur:
+            pop_lookup = {}
+            for r in await cur.fetchall():
+                pop_lookup[(r[0], r[1], r[2])] = r[3]
+
+        # Get player total population (sum across all their villages in latest snap)
+        async with db.execute("""
+            SELECT player_name, SUM(population) as total_pop
+            FROM map_snapshots WHERE guild_id=? AND fetched_at=?
+            GROUP BY player_name
+        """, (guild_id, latest_ts)) as cur:
+            player_pop = {r[0]: r[1] for r in await cur.fetchall()}
+
+        # Filter and enrich
+        villages = []
+        for v in raw:
+            pname = (v["player_name"] or "").strip()
+            aname = (v["alliance_name"] or "").strip()
+
+            # Natars filter
+            if not include_natars and v["tribe"] in (4, "4"):
+                continue
+            # Player filter
+            if incl_players and pname.lower() not in incl_players:
+                continue
+            # Alliance filter
+            if incl_alliances and aname.lower() not in incl_alliances:
+                continue
+            # Exclude players
+            if excl_players and pname.lower() in excl_players:
+                continue
+            # Player pop filter
+            pp = player_pop.get(pname, 0) or 0
+            if pp < min_player_pop or pp > max_player_pop:
+                continue
+            # Tribe filter
+            if tribes and v["tribe"] not in tribes:
+                continue
+
+            # Distance (Travian wraps at ±400 → shortest path)
+            dx = abs(v["x"] - ref_x)
+            dy = abs(v["y"] - ref_y)
+            dx = min(dx, 800 - dx)
+            dy = min(dy, 800 - dy)
+            dist = round(math.sqrt(dx*dx + dy*dy), 2)
+
+            if dist < min_distance or dist > max_distance:
+                continue
+
+            # Pop deltas per snapshot date
+            x, y = v["x"], v["y"]
+            pop_history = []
+            for i, ts in enumerate(snap_dates):
+                pop_now  = pop_lookup.get((x, y, ts))
+                pop_prev = pop_lookup.get((x, y, snap_dates[i+1])) if i+1 < len(snap_dates) else None
+                if pop_now is None:
+                    pop_history.append(None)
+                elif pop_prev is None:
+                    pop_history.append(0)
+                else:
+                    pop_history.append(pop_now - pop_prev)
+
+            villages.append({
+                **v,
+                "distance": dist,
+                "player_total_pop": pp,
+                "pop_history": pop_history,
+            })
+
+        # Sort by distance
+        villages.sort(key=lambda v: v["distance"])
+        total = len(villages)
+        villages = villages[:limit]
+
+        return {
+            "villages": villages,
+            "snap_dates": snap_dates,
+            "total": total,
+        }
+
+
 async def add_farm_list_entry(
     guild_id: str,
     added_by_id: str,

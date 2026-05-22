@@ -128,11 +128,16 @@
   <!-- ══ TAB: Inaktive Farmen ══ -->
   <div {% if tab != 'inactive' %}style="display:none;"{% endif %}>
   <div class="card" style="margin-bottom:1.25rem;">
-    <h2>🏚️ Inaktive Farmen
-      {% if inactive_farms %}
-      <span class="badge" style="font-size:0.8rem; margin-left:0.5rem;">{{ inactive_farms | length }}</span>
-      {% endif %}
-    </h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+      <h2 style="margin:0;">🏚️ Inaktive Farmen
+        {% if inactive_farms %}
+        <span class="badge" style="font-size:0.8rem; margin-left:0.5rem;">{{ inactive_farms | length }}</span>
+        {% endif %}
+      </h2>
+      <a href="/guild/{{ guild.guild_id }}/farming/inactive-search" class="btn btn-primary" style="font-size:0.82rem;">
+        🔍 Erweiterte Suche
+      </a>
+    </div>
 
     {% if farm_stats.snapshot_count < 2 %}
     <div style="padding:1rem; background:rgba(241,196,15,0.08); border:1px solid rgba(241,196,15,0.3); border-radius:8px;">
