@@ -2219,6 +2219,12 @@ async def _init_farmlist_analyses_table():
             )
         """)
         await db.commit()
+        for col, default in [("farms_json", "'[]'"), ("group_stats_json", "'[]'")]:
+            try:
+                await db.execute(f"ALTER TABLE farmlist_analyses ADD COLUMN {col} TEXT DEFAULT {default}")
+                await db.commit()
+            except Exception:
+                pass  # column already exists
 
 
 async def save_farmlist_analysis(
