@@ -391,7 +391,8 @@ def _parse_map_sql(content: str) -> list[dict]:
             v7_is_num = len(v) > 7 and _IS_NUM.match(v[7].strip())
 
             if not v7_is_num and f0 >= 0 and len(v) > 10:
-                # Layout A: new format — vid, x, y, tribe, pid, vname, pscore, pname, aid, aname, pop
+                # Layout A: new T4.5+ format
+                # (village_id, x, y, tribe, row_uid, village_name, player_id, player_name, alliance_id, alliance_name, population, ...)
                 x     = int(float(v[1]))
                 y     = int(float(v[2]))
                 tribe = int(float(v[3])) if v[3] not in ('NULL', '') else 0
@@ -399,7 +400,7 @@ def _parse_map_sql(content: str) -> list[dict]:
                 pop   = int(float(v[10])) if v[10] not in ('NULL', '') else 0
                 pname = v[7]
                 aname = v[9] if v[9] not in ('NULL', '') else ""
-                pid   = v[4]
+                pid   = v[6]   # v[6] = real player_id (constant per player across all their villages)
                 vid   = v[0]
 
             elif not v7_is_num and abs(f0) <= 800:
