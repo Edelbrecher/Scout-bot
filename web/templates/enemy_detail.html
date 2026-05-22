@@ -39,8 +39,7 @@
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
-        {% set img_count = history | sum(attribute='images') | list | length %}
-        {{ history | selectattr('images') | list | length }}
+        {{ history | map(attribute='images') | map('length') | sum }}
       </div>
       <div style="font-size:0.78rem;color:var(--text-muted);">🖼️ Screenshots</div>
     </div>
