@@ -165,6 +165,51 @@ async def init_db():
             except Exception:
                 pass
 
+        # Scout images + enemies tables
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scout_images (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                scout_report_id     INTEGER,
+                guild_id            TEXT NOT NULL,
+                channel_id          TEXT NOT NULL,
+                discord_url         TEXT NOT NULL,
+                discord_message_id  TEXT,
+                created_at          TEXT NOT NULL
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_si_report ON scout_images(scout_report_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_si_guild  ON scout_images(guild_id)")
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemies (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                coordinates TEXT,
+                village     TEXT,
+                notes       TEXT DEFAULT '',
+                first_seen  TEXT NOT NULL,
+                last_seen   TEXT NOT NULL,
+                scout_count INTEGER DEFAULT 0,
+                UNIQUE(guild_id, player_name)
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_enemies_guild ON enemies(guild_id)")
+
+        # Migrations: discord_message_id on scout_channels
+        for col in ["closed_at TEXT", "closed_by TEXT", "discord_message_id TEXT",
+                    "discord_message_id TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_channels ADD COLUMN {col}")
+            except Exception:
+                pass
+        # Migrations: discord_message_id + image_urls on scout_reports
+        for col in ["discord_message_id TEXT", "image_urls TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE scout_reports ADD COLUMN {col}")
+            except Exception:
+                pass
+        await db.commit()
+
 
 async def get_guild_config(guild_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -682,3 +727,56 @@ async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | No
             "total_pop": sum(r.get("population", 0) or 0 for r in rows),
             "village_count": len(rows),
         }
+
+
+async def save_scout_image(
+    guild_id: str, channel_id: str, discord_url: str,
+    discord_message_id: str = "", scout_report_id: int | None = None
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO scout_images
+                (scout_report_id, guild_id, channel_id, discord_url, discord_message_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (scout_report_id, guild_id, channel_id, discord_url,
+              discord_message_id, datetime.utcnow().isoformat()))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def upsert_enemy(
+    guild_id: str, player_name: str,
+    coordinates: str = "", village: str = ""
+) -> int:
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO enemies (guild_id, player_name, coordinates, village,
+                                 first_seen, last_seen, scout_count)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(guild_id, player_name) DO UPDATE SET
+                last_seen   = excluded.last_seen,
+                scout_count = scout_count + 1,
+                coordinates = CASE WHEN excluded.coordinates != '' THEN excluded.coordinates
+                                   ELSE coordinates END,
+                village     = CASE WHEN excluded.village != '' THEN excluded.village
+                                   ELSE village END
+        """, (guild_id, player_name, coordinates or "", village or "", now, now))
+        await db.commit()
+        async with db.execute(
+            "SELECT id FROM enemies WHERE guild_id=? AND player_name=?",
+            (guild_id, player_name)
+        ) as cur:
+            db.row_factory = aiosqlite.Row
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+async def close_scout_channel_by_message(discord_message_id: str):
+    """Mark a scout_channel as closed when its Discord message is deleted."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE scout_channels SET closed_at = ?, closed_by = 'discord_delete'
+            WHERE discord_message_id = ? AND closed_at IS NULL
+        """, (datetime.utcnow().isoformat(), discord_message_id))
+        await db.commit()
