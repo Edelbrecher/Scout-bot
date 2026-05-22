@@ -91,27 +91,46 @@
   </div>
   {% endif %}
 
-  <!-- Eingabe -->
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin:0 0 0.5rem;">📋 Farmliste einfügen</h2>
-    <p class="hint" style="margin-bottom:0.75rem;">
-      Öffne in Travian deine <strong>Farmlist-Übersicht</strong> (alle Listen sichtbar),
-      markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
-      Mehrere Listen (N0, N1, N2 …) sowie verschiedene Gruppen (00 Gen, 01 Exo …) werden automatisch erkannt.
-    </p>
-    <form method="post" action="/guild/{{ guild.guild_id }}/farmlist-analyst">
-      <textarea name="farmlist_text" rows="8"
-        placeholder="Farmlisten hier einfügen…"
-        style="width:100%;font-family:monospace;font-size:0.78rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;resize:vertical;">{{ raw_text }}</textarea>
-      <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;">
-        <button type="submit" class="btn btn-primary">🔍 Analysieren</button>
-        {% if stats %}
-        <span style="color:var(--text-muted);font-size:0.82rem;">
-          {{ stats.total }} Farmen · {{ stats.groups|length }} Gruppen erkannt
-        </span>
-        {% endif %}
-      </div>
-    </form>
+  <!-- Eingabe-Button -->
+  <div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;">
+    <button onclick="document.getElementById('fl-modal').style.display='flex'" class="btn btn-primary">
+      📋 Neue Analyse
+    </button>
+    {% if stats %}
+    <span style="color:var(--text-muted);font-size:0.85rem;">
+      {{ stats.total }} Farmen · {{ stats.groups|length }} Gruppen erkannt
+    </span>
+    {% endif %}
+  </div>
+
+  <!-- Modal -->
+  <div id="fl-modal" style="display:{% if not stats and not opened_id %}flex{% else %}none{% endif %};
+       position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);
+       align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+                width:100%;max-width:680px;padding:1.5rem;position:relative;">
+      <button onclick="document.getElementById('fl-modal').style.display='none'"
+              style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
+                     font-size:1.2rem;cursor:pointer;color:var(--text-muted);">✕</button>
+      <h2 style="margin:0 0 0.4rem;font-size:1rem;">📋 Farmliste einfügen</h2>
+      <p class="hint" style="margin-bottom:0.75rem;font-size:0.82rem;">
+        Öffne in Travian deine <strong>Farmlist-Übersicht</strong> (alle Listen sichtbar),
+        markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
+        Mehrere Listen (N0, N1, N2 …) sowie verschiedene Gruppen (00 Gen, 01 Exo …) werden automatisch erkannt.
+      </p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/farmlist-analyst">
+        <textarea name="farmlist_text" rows="10"
+          placeholder="Farmlisten hier einfügen…"
+          style="width:100%;font-family:monospace;font-size:0.78rem;background:var(--bg-main);
+                 color:var(--text);border:1px solid var(--border);border-radius:6px;
+                 padding:0.5rem;resize:vertical;box-sizing:border-box;">{{ raw_text }}</textarea>
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+          <button type="submit" class="btn btn-primary">🔍 Analysieren</button>
+          <button type="button" onclick="document.getElementById('fl-modal').style.display='none'"
+                  class="btn">Abbrechen</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   {% if stats %}
