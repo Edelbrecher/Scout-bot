@@ -14,6 +14,56 @@ from utils import require_premium
 # Travian Scout-Report Parser
 # ---------------------------------------------------------------------------
 
+# Troop names by tribe (1=Roman, 2=Teuton, 3=Gaul, 4=Natar, 5=Hun, 6=Egyptian, 7=Spartan)
+# 10 troops + optional hero at position 10
+_TRIBE_TROOPS: dict[int, list[str]] = {
+    1: ["Legionnaire","Praetorian","Imperian","Equites Legati","Equites Imperatoris",
+        "Equites Caesaris","Battering Ram","Fire Catapult","Senator","Settler"],
+    2: ["Clubswinger","Spearman","Axeman","Scout","Paladin",
+        "Teutonic Knight","Ram","Catapult","Chief","Settler"],
+    3: ["Phalanx","Swordsman","Pathfinder","Theutates Thunder","Druidrider",
+        "Haeduan","Battering Ram","Trebuchet","Chieftain","Settler"],
+    4: ["Natarian Soldier","Natarian Spearman","Natarian Marksman","Natarian Vanguard",
+        "Natarian Horseman","Natarian Champion","Natarian Battering Ram","Natarian Catapult",
+        "Natarian Chief","Natarian Settler"],
+    5: ["Mercenary","Bowman","Spotter","Steppe Rider","Marksman",
+        "Marauder","Ram","Catapult","Logades","Settler"],
+    6: ["Slave Militia","Ash Warden","Khopesh Warrior","Sopdu Explorer","Anhur Guard",
+        "Resheph Chariot","Stone Slinger","Rocket Catapult","Nomarch","Settler"],
+    7: ["Hoplite","Sentinel","Shieldsman","Servant","Ephor",
+        "Strategos","Battering Ram","Stone Catapult","Governor","Settler"],
+}
+
+def _extract_troop_row(line: str) -> list[int]:
+    """Extract a sequence of integers from a troop table row (OCR-noisy)."""
+    # Replace common OCR artifacts: () → 0, 0) → 0, )0 → 0, lone ) → 0
+    cleaned = re.sub(r'\(\)', '0', line)
+    cleaned = re.sub(r'(\d)\)', r'\1', cleaned)
+    cleaned = re.sub(r'\)(\d)', r'\1', cleaned)
+    cleaned = re.sub(r'\)', '0', cleaned)
+    nums = re.findall(r'\d+', cleaned)
+    # First token is likely the row icon text, skip if non-numeric word precedes
+    return [int(n) for n in nums]
+
+def _parse_troop_section(text: str, section: str) -> list[int] | None:
+    """Extract the 'sent' row from ATTACKER or DEFENDER section."""
+    # Find section boundaries
+    sec_start = re.search(rf'\b{section}\b', text, re.IGNORECASE)
+    if not sec_start:
+        return None
+    next_sec = re.search(r'\b(ATTACKER|DEFENDER|STATISTICS)\b',
+                         text[sec_start.end():], re.IGNORECASE)
+    block = text[sec_start.end(): sec_start.end() + next_sec.start()] if next_sec else text[sec_start.end():]
+
+    # Find rows that contain 5+ numbers (troop counts)
+    rows = []
+    for line in block.splitlines():
+        nums = _extract_troop_row(line)
+        if len(nums) >= 5:
+            rows.append(nums)
+    # First such row = sent, second = losses
+    return rows[0] if rows else None
+
 # Troop-name aliases (DE + EN) → canonical name
 _TROOP_ALIASES: dict[str, str] = {
     # Römisch / Roman
@@ -125,6 +175,14 @@ def parse_scout_report(text: str) -> dict:
     if m:
         result.setdefault("stats", {})["supply_attacker"] = _clean_num(m.group(1))
         result["stats"]["supply_defender"] = _clean_num(m.group(2))
+
+    # Raw troop rows (positions) — tribe resolved later in on_message
+    attacker_row = _parse_troop_section(text, "ATTACKER")
+    defender_row = _parse_troop_section(text, "DEFENDER")
+    if attacker_row:
+        result["attacker_troop_positions"] = attacker_row
+    if defender_row:
+        result["defender_troop_positions"] = defender_row
 
     # Coordinates — first match = target
     coords = _COORD_RE.findall(text)
@@ -602,12 +660,40 @@ class Scout(commands.Cog):
             parsed = parse_scout_report(ocr_text)
 
             # Always use channel meta as primary source for enemy identity
-            # OCR target is stored as metadata but channel player = the scouted enemy
             enemy_player = (ch_info or {}).get("player") or parsed.get("attacker_player") or parsed.get("target_player") or ""
             enemy_coords = (ch_info or {}).get("coordinates") or parsed.get("target_coords") or ""
             enemy_village = (ch_info or {}).get("village") or parsed.get("target_village") or ""
 
-            # Save report — target_player = the channel's enemy (not OCR-parsed defender)
+            # Resolve troop positions → names using tribe from DB
+            troops_json = None
+            losses_json = None
+            if not parsed.get("troops"):
+                # Try positional troop extraction
+                for role, player_name, pos_key in [
+                    ("attacker", parsed.get("attacker_player"), "attacker_troop_positions"),
+                    ("defender", enemy_player, "defender_troop_positions"),
+                ]:
+                    positions = parsed.get(pos_key)
+                    if not positions:
+                        continue
+                    tribe = await database.get_player_tribe(guild_id, player_name or "")
+                    troop_names = _TRIBE_TROOPS.get(tribe, [])
+                    if not troop_names:
+                        continue
+                    named = {}
+                    for i, count in enumerate(positions[:len(troop_names)]):
+                        if count > 0:
+                            named[troop_names[i]] = count
+                    if named:
+                        if role == "attacker":
+                            parsed["troops"] = named
+                        else:
+                            parsed["troops"] = {**parsed.get("troops", {}), **named}
+
+            troops_json = json.dumps(parsed["troops"]) if parsed.get("troops") else None
+            losses_json = json.dumps(parsed["losses"]) if parsed.get("losses") else None
+
+            # Save report — target_player = the channel's enemy
             report_id = await database.save_scout_report(
                 channel_id=channel_id, guild_id=guild_id, source="ocr",
                 raw_text=ocr_text,
@@ -617,8 +703,8 @@ class Scout(commands.Cog):
                 attacker_player=parsed.get("attacker_player"),
                 attacker_village=parsed.get("attacker_village"),
                 resources_json=json.dumps(parsed["resources"]) if parsed.get("resources") else None,
-                troops_json=json.dumps(parsed["troops"]) if parsed.get("troops") else None,
-                losses_json=json.dumps(parsed["losses"]) if parsed.get("losses") else None,
+                troops_json=troops_json,
+                losses_json=losses_json,
                 experience=parsed.get("experience", 0),
                 stats_json=json.dumps(parsed["stats"]) if parsed.get("stats") else None,
             )

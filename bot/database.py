@@ -788,3 +788,22 @@ async def close_scout_channel_by_message(discord_message_id: str):
             WHERE discord_message_id = ? AND closed_at IS NULL
         """, (datetime.utcnow().isoformat(), discord_message_id))
         await db.commit()
+
+
+async def get_player_tribe(guild_id: str, player_name: str) -> int:
+    """Look up a player's tribe from map_snapshots. Returns 0 if unknown."""
+    if not player_name:
+        return 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT tribe FROM map_snapshots
+            WHERE guild_id = ? AND player_name = ?
+            ORDER BY fetched_at DESC LIMIT 1
+        """, (guild_id, player_name)) as cur:
+            row = await cur.fetchone()
+            if row and row[0]:
+                try:
+                    return int(row[0])
+                except (ValueError, TypeError):
+                    return 0
+    return 0
