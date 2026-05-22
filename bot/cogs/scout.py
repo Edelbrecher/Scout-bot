@@ -179,25 +179,49 @@ def _clean_num(s: str) -> int:
     return int(re.sub(r"[.,]", "", s)) if s else 0
 
 
-def _extract_player_from_block(block: str) -> tuple[str | None, str | None]:
-    """Extract (player_name, village_name) from a section block.
-    Uses 'X from village Y' / 'X aus Dorf Y' pattern first, then label fallback."""
-    def _clean(raw: str) -> str:
-        raw = raw.strip()
-        raw = re.sub(r"^\[.*?\]\s*", "", raw)
-        raw = re.sub(r"^\(.*?\)\s*", "", raw)
-        return raw.strip()
+def _clean_player_name(raw: str) -> str:
+    raw = raw.strip()
+    raw = re.sub(r"^\[.*?\]\s*", "", raw)
+    raw = re.sub(r"^\(.*?\)\s*", "", raw)
+    return raw.strip()
 
+
+def _extract_player_from_block(block: str) -> tuple[str | None, str | None]:
+    """Extract (player_name, village_name) from a section block."""
     m = _FROM_VILLAGE_RE.search(block)
     if m:
-        return _clean(m.group(1)), m.group(2).strip()
-
-    # Fallback: "Spieler: X" / "Player: X"
+        return _clean_player_name(m.group(1)), m.group(2).strip()
     pm = _PLAYER_RE.search(block)
     vm = _VILLAGE_RE.search(block)
-    player  = _clean(pm.group(1)) if pm else None
+    player  = _clean_player_name(pm.group(1)) if pm else None
     village = vm.group(1).strip() if vm else None
     return player, village
+
+
+def _extract_troop_rows(block: str) -> tuple[list[int] | None, list[int] | None]:
+    """Extract (sent_row, losses_row) from any block by scanning for
+    lines with ≥5 numbers — does NOT rely on section header keywords."""
+    rows = []
+    for line in block.splitlines():
+        nums = _extract_troop_row(line)
+        if len(nums) >= 5:
+            rows.append(nums)
+    sent   = rows[0] if len(rows) > 0 else None
+    losses = rows[1] if len(rows) > 1 else None
+    return sent, losses
+
+
+def _split_report_blocks(text: str) -> tuple[str, str] | None:
+    """Split a report into (attacker_block, defender_block) using
+    'X from village Y' / 'X aus Dorf Y' as anchors.
+    Returns None if fewer than 2 such lines are found.
+    The first occurrence = attacker; the second = defender."""
+    matches = list(_FROM_VILLAGE_RE.finditer(text))
+    if len(matches) < 2:
+        return None
+    att_block = text[matches[0].start() : matches[1].start()]
+    def_block = text[matches[1].start():]
+    return att_block, def_block
 
 
 def parse_scout_report(text: str) -> dict:
@@ -217,24 +241,16 @@ def parse_scout_report(text: str) -> dict:
         "text_strike": bool(_STRIKE_RE.search(text)),
     }
 
-    # ── Section validation ───────────────────────────────────────────────────
-    att_bounds = _find_section(text, "ATTACKER")
-    def_bounds = _find_section(text, "DEFENDER")
-
-    if not att_bounds:
-        result["invalid_reason"] = "no_attacker_section"
+    # ── Split into attacker / defender blocks via "from village" anchors ─────
+    # This is deliberately NOT based on section-header keywords because OCR
+    # frequently garbles "DEFENDER" → "perenoer" etc. due to surrounding icons.
+    blocks = _split_report_blocks(text)
+    if not blocks:
+        result["invalid_reason"] = "cannot_split_blocks"
         return result
-    if not def_bounds:
-        result["invalid_reason"] = "no_defender_section"
-        return result
-    if def_bounds[0] <= att_bounds[0]:
-        result["invalid_reason"] = "defender_before_attacker"
-        return result
+    att_block, def_block = blocks
 
-    att_block = text[att_bounds[0]:att_bounds[1]]
-    def_block = text[def_bounds[0]:def_bounds[1]]
-
-    # Extract player/village strictly within each block
+    # ── Player names ─────────────────────────────────────────────────────────
     att_player, att_village = _extract_player_from_block(att_block)
     def_player, def_village = _extract_player_from_block(def_block)
 
@@ -245,9 +261,9 @@ def parse_scout_report(text: str) -> dict:
         result["invalid_reason"] = "defender_player_unreadable"
         return result
 
-    # ── Troop rows must be present in BOTH sections ──────────────────────────
-    attacker_sent, attacker_losses = _parse_troop_section(att_block, "ATTACKER")
-    defender_sent, defender_losses = _parse_troop_section(def_block, "DEFENDER")
+    # ── Troop rows must be present in BOTH blocks ─────────────────────────────
+    attacker_sent, attacker_losses = _extract_troop_rows(att_block)
+    defender_sent, defender_losses = _extract_troop_rows(def_block)
 
     if not attacker_sent:
         result["invalid_reason"] = "attacker_troops_missing"
