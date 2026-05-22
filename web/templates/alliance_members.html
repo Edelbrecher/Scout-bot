@@ -104,15 +104,15 @@
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">
-        {{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}
+        {{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🏆 Punkte gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🌍 Bevölkerung</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
-        {{ "{:,}".format((members | sum(attribute='points') / members|length) | int).replace(",",".") }}
+        {{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">📊 ⌀ Punkte</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🏆 Punkte gesamt</div>
     </div>
   </div>
 
@@ -138,30 +138,19 @@
         <tr>
           <th onclick="sortTable(0)" style="cursor:pointer;">Rang ▲</th>
           <th onclick="sortTable(1)" style="cursor:pointer;">Spieler</th>
-          <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;">Dörfer</th>
-          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;">Punkte</th>
-          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;">Dörfer</th>
-          <th>Stamm</th>
+          <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;">Punkte</th>
+          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;">Dörfer</th>
+          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;">Bevölkerung</th>
         </tr>
       </thead>
       <tbody id="memberBody">
         {% for m in members %}
-        <tr data-name="{{ m.player_name | lower }}" data-tribe="{{ m.tribe | lower }}">
+        <tr data-name="{{ m.player_name | lower }}">
           <td style="color:var(--text-muted);font-size:0.85rem;">{{ m.rank or loop.index }}</td>
           <td><strong>{{ m.player_name }}</strong></td>
           <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}</td>
-          <td style="text-align:right;">{{ m.villages }}</td>
-          <td>
-            {% set t = m.tribe | lower %}
-            {% if t == 'römer' %}🏛️ Römer
-            {% elif t == 'teutonen' %}⚔️ Teutonen
-            {% elif t == 'gallier' %}🌿 Gallier
-            {% elif t == 'ägypter' %}🏺 Ägypter
-            {% elif t == 'hunnen' %}🏹 Hunnen
-            {% elif t == 'spartaner' %}🛡️ Spartaner
-            {% elif m.tribe %}{{ m.tribe }}
-            {% else %}—{% endif %}
-          </td>
+          <td style="text-align:right;">{{ m.villages if m.villages else '—' }}</td>
+          <td style="text-align:right;color:var(--text-muted);">{{ "{:,}".format(m.population).replace(",",".") if m.population else '—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
