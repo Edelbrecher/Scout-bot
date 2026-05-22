@@ -65,6 +65,7 @@ code {
 main { padding: 2rem 1rem; }
 
 .container { max-width: 960px; margin: 0 auto; }
+.container-wide { max-width: 1400px; margin: 0 auto; }
 
 .page-header { margin-bottom: 1.5rem; }
 .page-header h1 { font-size: 1.6rem; margin-bottom: .25rem; }

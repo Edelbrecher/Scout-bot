@@ -3735,16 +3735,86 @@ async def admin_auths(request: Request):
     })
 
 
+async def _discover_travian_servers() -> list[dict]:
+    """Probe known Travian URL patterns and return active servers."""
+    import asyncio as _aio
+    regions = ["europe", "international", "america", "asia", "arabia",
+               "de", "fr", "pl", "ru", "nl", "cz", "hu", "ro", "tr", "it", "es", "pt"]
+    speeds  = ["x1", "x2", "x3", "x5", "x10"]
+    nums    = range(1, 16)
+
+    candidates = [
+        f"https://ts{n}.{sp}.{r}.travian.com"
+        for n in nums for sp in speeds for r in regions
+    ]
+
+    found = []
+    async def probe(url: str):
+        try:
+            async with httpx.AsyncClient(timeout=5) as c:
+                r = await c.get(url + "/api/v1/info",
+                                headers={"User-Agent": "TravOps/1.0"})
+                if r.status_code == 200:
+                    data = r.json()
+                    players = data.get("playersCount", 0)
+                    speed   = data.get("serverConfiguration", {}).get("speed", 1)
+                    region  = url.split(".")[2] if url.count(".") >= 3 else ""
+                    found.append({"url": url, "players": players, "speed": speed, "region": region})
+                    await database.upsert_travian_server(url, players, speed, region)
+        except Exception:
+            pass
+
+    await _aio.gather(*[probe(u) for u in candidates])
+    return sorted(found, key=lambda x: -x["players"])
+
+
 @app.get("/admin/servers", response_class=HTMLResponse)
-async def admin_servers(request: Request):
+async def admin_servers(request: Request, discovered: str = ""):
     session, err = _require_admin(request)
     if err: return err
-    servers = await database.get_servers_overview()
+    guild_overview = await database.get_servers_overview()
+    travian_servers = await database.get_travian_servers()
     return templates.TemplateResponse("admin_servers.html", {
         "request": request,
-        "servers": servers,
+        "servers": guild_overview,
+        "travian_servers": travian_servers,
+        "discovered": discovered,
         "session": session,
     })
+
+
+@app.post("/admin/servers/discover")
+async def admin_servers_discover(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    found = await _discover_travian_servers()
+    return RedirectResponse(f"/admin/servers?discovered={len(found)}", status_code=303)
+
+
+@app.post("/admin/servers/travian/{url:path}/fetch-snapshot")
+async def admin_fetch_travian_snapshot(request: Request, url: str):
+    session, err = _require_admin(request)
+    if err: return err
+    # Reconstruct URL (FastAPI strips the https://)
+    full_url = "https://" + url if not url.startswith("http") else url
+    try:
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.get(full_url.rstrip("/") + "/map.sql")
+            r.raise_for_status()
+        villages = _parse_map_sql(r.text)
+        await database.mark_travian_server_snapshot(full_url, len(villages))
+        return RedirectResponse(f"/admin/servers?discovered=0&snap_ok={len(villages)}", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/admin/servers?snap_err={str(e)[:80]}", status_code=303)
+
+
+@app.post("/admin/servers/travian/{url:path}/delete")
+async def admin_delete_travian_server(request: Request, url: str):
+    session, err = _require_admin(request)
+    if err: return err
+    full_url = "https://" + url if not url.startswith("http") else url
+    await database.delete_travian_server(full_url)
+    return RedirectResponse("/admin/servers", status_code=303)
 
 
 @app.post("/admin/servers/{guild_id}/clear-snapshots")

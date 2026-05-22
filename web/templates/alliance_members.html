@@ -13,7 +13,7 @@
     <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
       {% if members %}
       <button type="button" class="btn btn-secondary"
-              onclick="document.getElementById('chartModal').style.display='flex'">
+              onclick="openChartModal()">
         📊 Top 20 Punkte
       </button>
       {% endif %}
@@ -251,12 +251,15 @@ function sortTable(col) {
   filterMembers();
 }
 
-// ── Points chart (top 20) ────────────────────────────────────────────────────
-(function() {
-  const members = {{ members | tojson }};
-  // highest at top → sort descending, no reverse
-  const top = [...members].sort((a,b) => b.points - a.points).slice(0, 20);
-  new Chart(document.getElementById('chartPoints'), {
+// ── Points chart (top 20) — lazy init when modal opens ───────────────────────
+const _chartMembers = {{ members | tojson }};
+let   _chartInstance = null;
+
+function openChartModal() {
+  document.getElementById('chartModal').style.display = 'flex';
+  if (_chartInstance) return;   // already drawn
+  const top = [..._chartMembers].sort((a,b) => b.points - a.points).slice(0, 20);
+  _chartInstance = new Chart(document.getElementById('chartPoints'), {
     type: 'bar',
     data: {
       labels: top.map(m => m.player_name),
@@ -280,7 +283,7 @@ function sortTable(col) {
       }
     }
   });
-})();
+}
 </script>
 {% endif %}
 {% endblock %}

@@ -2,11 +2,11 @@
 {% block title %}Server · Admin · TravOps{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-wide">
   <div style="display:flex;gap:1.5rem;">
 
     <!-- Sidebar -->
-    <div style="width:180px;flex-shrink:0;">
+    <div style="width:190px;flex-shrink:0;">
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:sticky;top:1rem;">
         <div style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Admin</div>
         <a href="/admin" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
@@ -23,13 +23,163 @@
 
     <!-- Main -->
     <div style="flex:1;min-width:0;">
-      <h1 style="margin:0 0 0.25rem;">🖥 Server & Snapshots</h1>
-      <p style="color:var(--text-muted);font-size:0.875rem;margin:0 0 1.5rem;">
-        Alle Guilds · map.sql Parse-Status · Snapshot-Verlauf
-      </p>
+
+      <!-- Alerts -->
+      {% if discovered and discovered != '0' %}
+      <div class="alert alert-success" style="margin-bottom:1rem;">
+        ✅ Discovery abgeschlossen — <strong>{{ discovered }}</strong> aktive Travian-Server gefunden und gespeichert.
+      </div>
+      {% endif %}
+
+      <!-- ══ Section 1: Travian-Serverliste ══════════════════════════════════════ -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+        <div>
+          <h1 style="margin:0 0 0.2rem;">🌍 Travian-Serverliste</h1>
+          <p style="color:var(--text-muted);font-size:0.875rem;margin:0;">
+            Alle bekannten aktiven Travian-Server · automatisch per API gescannt
+          </p>
+        </div>
+        <form method="post" action="/admin/servers/discover" style="margin:0;">
+          <button type="submit" class="btn btn-primary" id="discoverBtn"
+                  onclick="this.textContent='⏳ Scanne…';this.disabled=true;">
+            🔍 Server scannen
+          </button>
+        </form>
+      </div>
 
       <!-- KPI strip -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">{{ travian_servers|length }}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Travian-Server</div>
+        </div>
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
+            {{ travian_servers | sum(attribute='players_count') | int | string | replace(',','.') }}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Spieler gesamt</div>
+        </div>
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
+            {{ travian_servers | selectattr('guilds_using') | list | length }}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Server in Benutzung</div>
+        </div>
+        <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#e879f9;">
+            {{ travian_servers | selectattr('last_snapshot') | list | length }}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Mit Snapshot</div>
+        </div>
+      </div>
+
+      <!-- Travian Server Table -->
+      {% if travian_servers %}
+      <div class="card" style="padding:0;margin-bottom:2rem;overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="table" style="margin:0;">
+            <thead>
+              <tr>
+                <th>Server-URL</th>
+                <th style="text-align:center;">Region</th>
+                <th style="text-align:center;">Speed</th>
+                <th style="text-align:right;">Spieler</th>
+                <th style="text-align:center;">Guilds</th>
+                <th style="text-align:right;">Dörfer (Snapshot)</th>
+                <th>Letzter Scan</th>
+                <th>Letzter Snapshot</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ts in travian_servers %}
+              <tr {% if ts.guilds_using %}style="background:rgba(245,158,11,0.04);"{% endif %}>
+                <td style="font-family:monospace;font-size:0.82rem;">
+                  <a href="{{ ts.url }}" target="_blank" style="color:#93c5fd;text-decoration:none;">
+                    {{ ts.url | replace('https://','') }}
+                  </a>
+                  {% if ts.guilds_using %}
+                  <span style="font-size:0.7rem;background:rgba(245,158,11,0.2);color:#f59e0b;
+                               border-radius:4px;padding:0.1rem 0.35rem;margin-left:0.3rem;">aktiv</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:center;font-size:0.85rem;">{{ ts.region or '—' }}</td>
+                <td style="text-align:center;">
+                  <span style="font-size:0.82rem;background:rgba(147,197,253,0.15);color:#93c5fd;
+                               border-radius:4px;padding:0.1rem 0.4rem;">x{{ ts.speed }}</span>
+                </td>
+                <td style="text-align:right;font-weight:600;">
+                  {{ "{:,}".format(ts.players_count).replace(",",".") }}
+                </td>
+                <td style="text-align:center;">
+                  {% if ts.guilds_using %}
+                  <span style="color:#f59e0b;font-weight:600;">{{ ts.guilds_using }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:right;">
+                  {% if ts.village_count %}
+                  <span style="font-weight:600;">{{ "{:,}".format(ts.village_count).replace(",",".") }}</span>
+                  {% if ts.village_count < 5000 %}
+                  <span title="Wenig Dörfer — Parser-Problem?" style="color:#f59e0b;font-size:0.75rem;"> ⚠️</span>
+                  {% endif %}
+                  {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:0.8rem;color:var(--text-muted);">
+                  {{ ts.last_checked[:16].replace('T',' ') ~ ' UTC' if ts.last_checked else '—' }}
+                </td>
+                <td style="font-size:0.8rem;color:var(--text-muted);">
+                  {{ ts.last_snapshot[:16].replace('T',' ') ~ ' UTC' if ts.last_snapshot else '—' }}
+                </td>
+                <td style="white-space:nowrap;">
+                  <form method="post"
+                        action="/admin/servers/travian/{{ ts.url | replace('https://','') }}/fetch-snapshot"
+                        style="display:inline;margin:0;">
+                    <button type="submit" class="btn btn-secondary"
+                            style="font-size:0.72rem;padding:0.2rem 0.5rem;"
+                            title="map.sql jetzt laden">
+                      📸
+                    </button>
+                  </form>
+                  <form method="post"
+                        action="/admin/servers/travian/{{ ts.url | replace('https://','') }}/delete"
+                        onsubmit="return confirm('Server entfernen?')"
+                        style="display:inline;margin:0;">
+                    <button type="submit" class="btn btn-danger"
+                            style="font-size:0.72rem;padding:0.2rem 0.5rem;">
+                      🗑
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="card" style="margin-bottom:2rem;">
+        <p style="color:var(--text-muted);margin:0;">
+          Noch keine Server gescannt.
+          Klicke <strong>🔍 Server scannen</strong> um alle aktiven Travian-Server automatisch zu entdecken.
+          (Dauert ca. 15–20 Sekunden)
+        </p>
+      </div>
+      {% endif %}
+
+      <!-- ══ Section 2: Guild-Snapshots ════════════════════════════════════════ -->
+      <div style="margin-bottom:1rem;">
+        <h2 style="margin:0 0 0.25rem;">🏰 Guild-Snapshot-Status</h2>
+        <p style="color:var(--text-muted);font-size:0.875rem;margin:0;">
+          Alle registrierten Guilds mit ihrer konfigurierten Travian-Welt und Snapshot-Verlauf
+        </p>
+      </div>
+
+      <!-- KPI -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
         <div class="card" style="padding:0.85rem 1rem;text-align:center;">
           <div style="font-size:1.6rem;font-weight:800;">{{ servers|length }}</div>
           <div style="font-size:0.78rem;color:var(--text-muted);">Guilds gesamt</div>
@@ -50,113 +200,100 @@
           <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
             {{ servers | sum(attribute='latest_village_count') | int }}
           </div>
-          <div style="font-size:0.78rem;color:var(--text-muted);">Dörfer (letzte Snapshots)</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">Dörfer (gesamt)</div>
         </div>
       </div>
 
-      <!-- Table -->
-      <div style="overflow-x:auto;">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Guild</th>
-              <th>Travian-Welt</th>
-              <th style="text-align:center;">Snapshots</th>
-              <th style="text-align:center;">Dörfer (letzter)</th>
-              <th style="text-align:center;">Mitglieder</th>
-              <th>Letzter Fetch</th>
-              <th>Erster Fetch</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in servers %}
-            <tr>
-              <td>
-                <a href="/guild/{{ s.guild_id }}" style="font-weight:600;color:var(--text);">
-                  {{ s.guild_name or s.guild_id }}
-                </a>
-                {% if s.subscription_status in ('active','trialing') %}
-                <span style="font-size:0.72rem;background:rgba(34,197,94,0.15);color:#22c55e;
-                             border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.3rem;">
-                  {{ s.subscription_plan or 'aktiv' }}
-                </span>
-                {% endif %}
-              </td>
-              <td style="font-size:0.82rem;color:var(--text-muted);">
-                {% if s.tw_world %}
-                <a href="{{ s.tw_world }}" target="_blank"
-                   style="color:#93c5fd;text-decoration:none;font-family:monospace;">
-                  {{ s.tw_world | replace('https://','') | truncate(35, true, '…') }}
-                </a>
-                {% else %}
-                <span style="color:var(--text-muted);font-style:italic;">nicht konfiguriert</span>
-                {% endif %}
-              </td>
-              <td style="text-align:center;">
-                {% if s.snap_count > 0 %}
-                <span style="font-weight:700;color:#22c55e;">{{ s.snap_count }}</span>
-                {% else %}
-                <span style="color:var(--text-muted);">—</span>
-                {% endif %}
-              </td>
-              <td style="text-align:center;">
-                {% if s.latest_village_count > 0 %}
-                <span style="font-weight:600;">
-                  {{ "{:,}".format(s.latest_village_count).replace(",",".") }}
-                </span>
-                {% if s.latest_village_count < 5000 %}
-                <span style="color:#f59e0b;font-size:0.75rem;margin-left:0.2rem;"
-                      title="Wenige Dörfer — Parser-Problem?">⚠️</span>
-                {% endif %}
-                {% else %}
-                <span style="color:var(--text-muted);">—</span>
-                {% endif %}
-              </td>
-              <td style="text-align:center;">
-                {% if s.member_count > 0 %}
-                <span>{{ s.member_count }}</span>
-                {% else %}
-                <span style="color:var(--text-muted);">—</span>
-                {% endif %}
-              </td>
-              <td style="font-size:0.82rem;">
-                {% if s.last_fetch %}
-                <span style="color:var(--text-muted);">{{ s.last_fetch[:16].replace('T',' ') }} UTC</span>
-                {% else %}
-                <span style="color:var(--text-muted);">—</span>
-                {% endif %}
-              </td>
-              <td style="font-size:0.82rem;">
-                {% if s.first_fetch %}
-                <span style="color:var(--text-muted);">{{ s.first_fetch[:16].replace('T',' ') }} UTC</span>
-                {% else %}
-                <span style="color:var(--text-muted);">—</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if s.snap_count > 0 %}
-                <form method="post"
-                      action="/admin/servers/{{ s.guild_id }}/clear-snapshots"
-                      onsubmit="return confirm('Snapshots für {{ s.guild_name }} löschen?')"
-                      style="margin:0;">
-                  <button type="submit" class="btn btn-danger"
-                          style="font-size:0.75rem;padding:0.25rem 0.6rem;">
-                    🗑
-                  </button>
-                </form>
-                {% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">
-                Noch keine Guilds registriert.
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="table" style="margin:0;">
+            <thead>
+              <tr>
+                <th>Guild</th>
+                <th>Travian-Welt</th>
+                <th style="text-align:center;">Snapshots</th>
+                <th style="text-align:center;">Dörfer (letzter)</th>
+                <th style="text-align:center;">Mitglieder</th>
+                <th>Letzter Fetch</th>
+                <th>Erster Fetch</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in servers %}
+              <tr>
+                <td>
+                  <a href="/guild/{{ s.guild_id }}" style="font-weight:600;color:var(--text);">
+                    {{ s.guild_name or s.guild_id }}
+                  </a>
+                  {% if s.subscription_status in ('active','trialing') %}
+                  <span style="font-size:0.72rem;background:rgba(34,197,94,0.15);color:#22c55e;
+                               border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.3rem;">
+                    {{ s.subscription_plan or 'aktiv' }}
+                  </span>
+                  {% endif %}
+                </td>
+                <td style="font-size:0.82rem;">
+                  {% if s.tw_world %}
+                  <a href="{{ s.tw_world }}" target="_blank"
+                     style="color:#93c5fd;text-decoration:none;font-family:monospace;">
+                    {{ s.tw_world | replace('https://','') | truncate(40, true, '…') }}
+                  </a>
+                  {% else %}
+                  <span style="color:var(--text-muted);font-style:italic;">nicht konfiguriert</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:center;">
+                  {% if s.snap_count > 0 %}
+                  <span style="font-weight:700;color:#22c55e;">{{ s.snap_count }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:center;">
+                  {% if s.latest_village_count > 0 %}
+                  <span style="font-weight:600;">
+                    {{ "{:,}".format(s.latest_village_count).replace(",",".") }}
+                  </span>
+                  {% if s.latest_village_count < 5000 %}
+                  <span style="color:#f59e0b;font-size:0.75rem;" title="Wenige Dörfer — Parser-Problem?">⚠️</span>
+                  {% endif %}
+                  {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:center;">
+                  {% if s.member_count > 0 %}{{ s.member_count }}
+                  {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+                </td>
+                <td style="font-size:0.82rem;color:var(--text-muted);">
+                  {{ s.last_fetch[:16].replace('T',' ') ~ ' UTC' if s.last_fetch else '—' }}
+                </td>
+                <td style="font-size:0.82rem;color:var(--text-muted);">
+                  {{ s.first_fetch[:16].replace('T',' ') ~ ' UTC' if s.first_fetch else '—' }}
+                </td>
+                <td>
+                  {% if s.snap_count > 0 %}
+                  <form method="post"
+                        action="/admin/servers/{{ s.guild_id }}/clear-snapshots"
+                        onsubmit="return confirm('Snapshots für {{ s.guild_name }} löschen?')"
+                        style="margin:0;">
+                    <button type="submit" class="btn btn-danger"
+                            style="font-size:0.75rem;padding:0.25rem 0.6rem;">🗑</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">
+                  Noch keine Guilds registriert.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

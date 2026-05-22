@@ -2612,6 +2612,66 @@ async def _init_alliance_members_table():
             )
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_am_guild ON alliance_members(guild_id)")
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS travian_servers (
+                url             TEXT PRIMARY KEY,
+                players_count   INTEGER DEFAULT 0,
+                speed           INTEGER DEFAULT 1,
+                region          TEXT DEFAULT '',
+                last_checked    TEXT,
+                last_snapshot   TEXT,
+                village_count   INTEGER DEFAULT 0,
+                is_active       INTEGER DEFAULT 1,
+                discovered_at   TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def upsert_travian_server(url: str, players: int, speed: int, region: str):
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO travian_servers (url, players_count, speed, region, last_checked, is_active, discovered_at)
+            VALUES (?, ?, ?, ?, ?, 1, COALESCE((SELECT discovered_at FROM travian_servers WHERE url=?), ?))
+            ON CONFLICT(url) DO UPDATE SET
+                players_count = excluded.players_count,
+                speed = excluded.speed,
+                region = excluded.region,
+                last_checked = excluded.last_checked,
+                is_active = 1
+        """, (url, players, speed, region, now, url, now))
+        await db.commit()
+
+
+async def mark_travian_server_snapshot(url: str, village_count: int):
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE travian_servers SET last_snapshot=?, village_count=? WHERE url=?
+        """, (now, village_count, url))
+        await db.commit()
+
+
+async def get_travian_servers() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT ts.*,
+                   COUNT(DISTINCT gc.guild_id) AS guilds_using
+            FROM travian_servers ts
+            LEFT JOIN guild_configs gc ON gc.tw_world = ts.url
+            GROUP BY ts.url
+            ORDER BY ts.players_count DESC
+        """) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_travian_server(url: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM travian_servers WHERE url=?", (url,))
         await db.commit()
 
 
