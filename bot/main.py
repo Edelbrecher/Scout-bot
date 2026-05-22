@@ -1,6 +1,9 @@
 import asyncio
+import json
 import os
 
+import aiohttp
+from aiohttp import web as aiohttp_web
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -121,9 +124,93 @@ class ScouterBot(commands.Bot):
 bot = ScouterBot()
 
 
+# ── Internal HTTP API ──────────────────────────────────────────────────────────
+async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Called by the web container to create a Discord report channel."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not guild_id:
+        return aiohttp_web.json_response({"ok": False, "error": "guild_id required"}, status=400)
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    config = await database.get_guild_config(guild_id)
+    if not config or not config.get("category_id"):
+        return aiohttp_web.json_response({"ok": False, "error": "category not configured"}, status=400)
+
+    category = guild.get_channel(int(config["category_id"]))
+    if not category or not isinstance(category, discord.CategoryChannel):
+        return aiohttp_web.json_response({"ok": False, "error": "category not found"}, status=400)
+
+    # Permissions: same pattern as scout channels
+    overwrites: dict = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True,
+            embed_links=True, attach_files=True, manage_channels=True,
+        ),
+    }
+    for role_id_str in (config.get("allowed_role_ids") or "").split(","):
+        role_id_str = role_id_str.strip()
+        if not role_id_str:
+            continue
+        role = guild.get_role(int(role_id_str))
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, attach_files=True
+            )
+
+    try:
+        channel = await guild.create_text_channel(
+            name="battle-reports",
+            category=category,
+            topic="Kampfberichte-Eingang — Bot scannt alle Bilder automatisch.",
+            overwrites=overwrites,
+        )
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    # Persist as report channel
+    await database.set_report_channel(guild_id, str(channel.id), channel.name)
+
+    # Welcome message in the new channel
+    try:
+        await channel.send(
+            "📋 **Bericht-Eingang aktiv** — Postet hier eure Kampfberichte als Screenshot. "
+            "Der Bot analysiert sie automatisch und trägt sie in die Gegner-Kartei ein."
+        )
+    except Exception:
+        pass
+
+    return aiohttp_web.json_response({
+        "ok": True,
+        "channel_id": str(channel.id),
+        "channel_name": channel.name,
+    })
+
+
+async def start_api_server():
+    app = aiohttp_web.Application()
+    app.router.add_post("/api/create-report-channel", handle_create_report_channel)
+    runner = aiohttp_web.AppRunner(app)
+    await runner.setup()
+    site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)
+    await site.start()
+    print("Internal API listening on :7777")
+
+
 async def main():
     async with bot:
-        await bot.start(os.environ["DISCORD_TOKEN"])
+        await asyncio.gather(
+            bot.start(os.environ["DISCORD_TOKEN"]),
+            start_api_server(),
+        )
 
 
 asyncio.run(main())

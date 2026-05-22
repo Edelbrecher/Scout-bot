@@ -4401,6 +4401,32 @@ async def clear_report_channel(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/enemies?saved=report_channel_cleared", status_code=303)
 
 
+@app.post("/guild/{guild_id}/enemies/report-channel/create")
+async def create_report_channel(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "http://bot:7777/api/create-report-channel",
+                json={"guild_id": guild_id},
+            )
+            data = resp.json()
+    except Exception as e:
+        return RedirectResponse(
+            f"/guild/{guild_id}/enemies?saved=channel_create_error&msg={str(e)[:80]}",
+            status_code=303,
+        )
+    if data.get("ok"):
+        return RedirectResponse(f"/guild/{guild_id}/enemies?saved=report_channel", status_code=303)
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies?saved=channel_create_error&msg={data.get('error','unknown')[:80]}",
+        status_code=303,
+    )
+
+
 @app.post("/guild/{guild_id}/enemies/{player_name}/notes")
 async def enemy_update_notes(
     request: Request, guild_id: str, player_name: str,
