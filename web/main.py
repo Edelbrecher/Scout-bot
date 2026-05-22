@@ -2207,6 +2207,7 @@ def parse_own_villages(text: str) -> list:
         "Catapult":            "Kriegsmaschine",
         "Stammesführer":       "Häuptling",
         "Chief":               "Häuptling",
+        "Chieftain":           "Häuptling",
         "Legionnaire":         "Legionär",
         "Praetorian":          "Prätorianer",
         "Imperian":            "Imperianer",
@@ -2245,7 +2246,16 @@ def parse_own_villages(text: str) -> list:
             continue
         first = parts[0].lower()
 
-        if first == 'dorfname' and len(parts) >= 3:
+        # Format 1a: German troops overview ("Dorfname" header)
+        # Format 1b: English troops overview ("Village" header with troop-name cols)
+        is_troop_col_header = (
+            (first == 'dorfname' and len(parts) >= 3) or
+            (first == 'village' and len(parts) >= 3 and not any(
+                p.strip().lower() in ('attacks', 'angriffe', 'troops', 'truppen',
+                                      'building', 'gebäude', 'merchants', 'händler')
+                for p in parts[1:]))
+        )
+        if is_troop_col_header:
             header_idx = i
             col_names  = [normalize(p) for p in parts[1:]]
             is_gaul = any(n in col_names for n in (
@@ -2266,7 +2276,7 @@ def parse_own_villages(text: str) -> list:
 
     # ── Step 2: Parse village rows ────────────────────────────────────────
     table_villages: dict = {}
-    stop_words = {'summe', 'total', 'gesamt', 'task overview', 'homepage'}
+    stop_words = {'summe', 'sum', 'total', 'gesamt', 'task overview', 'homepage'}
 
     if header_idx is not None and not fmt_village_overview:
         for line in lines[header_idx + 1:]:
