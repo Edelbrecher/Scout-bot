@@ -58,7 +58,10 @@ _RESOURCE_RE = re.compile(
     r"(?:korn|getreide|crop)[:\s]+([0-9.,]+)",
     re.IGNORECASE | re.DOTALL,
 )
-_COORD_RE   = re.compile(r"\((-?\d+)\|(-?\d+)\)")
+_COORD_RE   = re.compile(r"\((-?\d+)[|\]](-?\d+)\)")
+# "from village VillageName" — attacker line: "[Alliance] PlayerName from village VillageName"
+_FROM_VILLAGE_RE = re.compile(r"(.+?)\s+from village\s+(.+)", re.IGNORECASE)
+# Fallback: explicit label
 _PLAYER_RE  = re.compile(r"(?:spieler|player)[:\s]+(.+)", re.IGNORECASE)
 _VILLAGE_RE = re.compile(r"(?:dorf|village)[:\s]+(.+)", re.IGNORECASE)
 _EXP_RE     = re.compile(r"(?:erfahrung|experience)[:\s]+([0-9]+)", re.IGNORECASE)
@@ -97,17 +100,36 @@ def parse_scout_report(text: str) -> dict:
     if coords:
         result["target_coords"] = f"({coords[0][0]}|{coords[0][1]})"
 
-    # Player / Village names
-    players = _PLAYER_RE.findall(text)
-    villages = _VILLAGE_RE.findall(text)
-    if players:
-        result["target_player"] = players[0].strip()
-        if len(players) > 1:
-            result["attacker_player"] = players[1].strip()
-    if villages:
-        result["target_village"] = villages[0].strip()
-        if len(villages) > 1:
-            result["attacker_village"] = villages[1].strip()
+    # Player / Village names — Travian format: "[Alliance] PlayerName from village VillageName"
+    from_village_matches = _FROM_VILLAGE_RE.findall(text)
+    if from_village_matches:
+        # First match = attacker, second = defender
+        def _clean_player(raw: str) -> str:
+            # Strip alliance tag like "[TD] " or "(TD) "
+            raw = raw.strip()
+            raw = re.sub(r"^\[.*?\]\s*", "", raw)
+            raw = re.sub(r"^\(.*?\)\s*", "", raw)
+            return raw.strip()
+
+        attacker_raw, attacker_village = from_village_matches[0]
+        result["attacker_player"]  = _clean_player(attacker_raw)
+        result["attacker_village"] = attacker_village.strip()
+        if len(from_village_matches) > 1:
+            defender_raw, defender_village = from_village_matches[1]
+            result["target_player"]  = _clean_player(defender_raw)
+            result["target_village"] = defender_village.strip()
+    else:
+        # Fallback: explicit "Spieler:" / "Player:" labels
+        players = _PLAYER_RE.findall(text)
+        villages = _VILLAGE_RE.findall(text)
+        if players:
+            result["target_player"] = players[0].strip()
+            if len(players) > 1:
+                result["attacker_player"] = players[1].strip()
+        if villages:
+            result["target_village"] = villages[0].strip()
+            if len(villages) > 1:
+                result["attacker_village"] = villages[1].strip()
 
     # Experience
     m = _EXP_RE.search(text)
