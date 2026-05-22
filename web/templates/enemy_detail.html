@@ -103,16 +103,35 @@
       <!-- Troops -->
       {% if report.troops_json %}
       {% set troops = report.troops_json | from_json %}
+      {% set losses = report.losses_json | from_json if report.losses_json else {} %}
       {% if troops %}
+      {% set total_sent = troops.values() | sum %}
+      {% set total_lost = losses.values() | sum %}
+      {% set loss_pct   = ((total_lost / total_sent * 100) | round | int) if total_sent > 0 else 0 %}
+      {% set is_strike  = total_sent > 0 and total_lost >= total_sent %}
       <div>
-        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
-                    letter-spacing:.04em;margin-bottom:0.4rem;">⚔️ Truppen</div>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">
+          <span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">⚔️ Truppen</span>
+          {% if is_strike %}
+          <span style="background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.5);
+                       border-radius:5px;padding:0.1rem 0.6rem;font-size:0.75rem;font-weight:700;">
+            ⚡ STRIKE — Totalverlust
+          </span>
+          {% elif loss_pct > 0 %}
+          <span style="background:rgba(249,115,22,0.15);color:#f97316;border:1px solid rgba(249,115,22,0.3);
+                       border-radius:5px;padding:0.1rem 0.5rem;font-size:0.75rem;font-weight:600;">
+            {{ loss_pct }}% Verlust
+          </span>
+          {% endif %}
+        </div>
         <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
           {% for troop, count in troops.items() %}
           {% if count %}
-          <span style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);
+          {% set lost = losses[troop] if troop in losses else 0 %}
+          <span style="background:rgba(148,163,184,0.1);border:1px solid rgba(148,163,184,0.2);
                        border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
             {{ troop }}: <strong>{{ count }}</strong>
+            {% if lost %}<span style="color:#f87171;"> −{{ lost }}{% if lost >= count %} 💀{% endif %}</span>{% endif %}
           </span>
           {% endif %}
           {% endfor %}
@@ -134,27 +153,6 @@
           <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);
                        border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
             {{ k }}: <strong>{{ v }}</strong>
-          </span>
-          {% endif %}
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-      {% endif %}
-
-      <!-- Losses -->
-      {% if report.losses_json %}
-      {% set losses = report.losses_json | from_json %}
-      {% if losses %}
-      <div>
-        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
-                    letter-spacing:.04em;margin-bottom:0.4rem;">💀 Verluste</div>
-        <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
-          {% for troop, count in losses.items() %}
-          {% if count %}
-          <span style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);
-                       border-radius:5px;padding:0.15rem 0.45rem;font-size:0.8rem;">
-            {{ troop }}: <strong>{{ count }}</strong>
           </span>
           {% endif %}
           {% endfor %}

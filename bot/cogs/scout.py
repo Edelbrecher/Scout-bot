@@ -45,24 +45,25 @@ def _extract_troop_row(line: str) -> list[int]:
     # First token is likely the row icon text, skip if non-numeric word precedes
     return [int(n) for n in nums]
 
-def _parse_troop_section(text: str, section: str) -> list[int] | None:
-    """Extract the 'sent' row from ATTACKER or DEFENDER section."""
-    # Find section boundaries
+def _parse_troop_section(text: str, section: str) -> tuple[list[int] | None, list[int] | None]:
+    """Extract the 'sent' and 'losses' rows from ATTACKER or DEFENDER section.
+    Returns (sent_row, losses_row)."""
     sec_start = re.search(rf'\b{section}\b', text, re.IGNORECASE)
     if not sec_start:
-        return None
+        return None, None
     next_sec = re.search(r'\b(ATTACKER|DEFENDER|STATISTICS)\b',
                          text[sec_start.end():], re.IGNORECASE)
     block = text[sec_start.end(): sec_start.end() + next_sec.start()] if next_sec else text[sec_start.end():]
 
-    # Find rows that contain 5+ numbers (troop counts)
     rows = []
     for line in block.splitlines():
         nums = _extract_troop_row(line)
         if len(nums) >= 5:
             rows.append(nums)
-    # First such row = sent, second = losses
-    return rows[0] if rows else None
+    # Row 0 = sent, row 1 = losses (dead)
+    sent   = rows[0] if len(rows) > 0 else None
+    losses = rows[1] if len(rows) > 1 else None
+    return sent, losses
 
 # Troop-name aliases (DE + EN) → canonical name
 _TROOP_ALIASES: dict[str, str] = {
@@ -177,12 +178,16 @@ def parse_scout_report(text: str) -> dict:
         result["stats"]["supply_defender"] = _clean_num(m.group(2))
 
     # Raw troop rows (positions) — tribe resolved later in on_message
-    attacker_row = _parse_troop_section(text, "ATTACKER")
-    defender_row = _parse_troop_section(text, "DEFENDER")
-    if attacker_row:
-        result["attacker_troop_positions"] = attacker_row
-    if defender_row:
-        result["defender_troop_positions"] = defender_row
+    attacker_sent, attacker_losses = _parse_troop_section(text, "ATTACKER")
+    defender_sent, defender_losses = _parse_troop_section(text, "DEFENDER")
+    if attacker_sent:
+        result["attacker_troop_positions"] = attacker_sent
+    if attacker_losses:
+        result["attacker_loss_positions"] = attacker_losses
+    if defender_sent:
+        result["defender_troop_positions"] = defender_sent
+    if defender_losses:
+        result["defender_loss_positions"] = defender_losses
 
     # Coordinates — first match = target
     coords = _COORD_RE.findall(text)
@@ -665,30 +670,31 @@ class Scout(commands.Cog):
             enemy_village = (ch_info or {}).get("village") or parsed.get("target_village") or ""
 
             # Resolve troop positions → names using tribe from DB
-            troops_json = None
-            losses_json = None
+            async def _resolve(pos_key: str, player_name: str) -> dict:
+                positions = parsed.get(pos_key)
+                if not positions:
+                    return {}
+                tribe = await database.get_player_tribe(guild_id, player_name or "")
+                troop_names = _TRIBE_TROOPS.get(tribe, [])
+                if not troop_names:
+                    return {}
+                return {troop_names[i]: c for i, c in enumerate(positions[:len(troop_names)]) if c > 0}
+
             if not parsed.get("troops"):
-                # Try positional troop extraction
-                for role, player_name, pos_key in [
-                    ("attacker", parsed.get("attacker_player"), "attacker_troop_positions"),
-                    ("defender", enemy_player, "defender_troop_positions"),
-                ]:
-                    positions = parsed.get(pos_key)
-                    if not positions:
-                        continue
-                    tribe = await database.get_player_tribe(guild_id, player_name or "")
-                    troop_names = _TRIBE_TROOPS.get(tribe, [])
-                    if not troop_names:
-                        continue
-                    named = {}
-                    for i, count in enumerate(positions[:len(troop_names)]):
-                        if count > 0:
-                            named[troop_names[i]] = count
-                    if named:
-                        if role == "attacker":
-                            parsed["troops"] = named
-                        else:
-                            parsed["troops"] = {**parsed.get("troops", {}), **named}
+                attacker_troops = await _resolve("attacker_troop_positions", parsed.get("attacker_player") or "")
+                defender_troops = await _resolve("defender_troop_positions", enemy_player)
+                if attacker_troops:
+                    parsed["troops"] = attacker_troops
+                if defender_troops:
+                    parsed.setdefault("troops", {}).update(defender_troops)
+
+            if not parsed.get("losses"):
+                attacker_losses = await _resolve("attacker_loss_positions", parsed.get("attacker_player") or "")
+                defender_losses = await _resolve("defender_loss_positions", enemy_player)
+                if attacker_losses:
+                    parsed["losses"] = attacker_losses
+                if defender_losses:
+                    parsed.setdefault("losses", {}).update(defender_losses)
 
             troops_json = json.dumps(parsed["troops"]) if parsed.get("troops") else None
             losses_json = json.dumps(parsed["losses"]) if parsed.get("losses") else None
