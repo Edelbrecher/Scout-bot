@@ -2173,808 +2173,178 @@ def classify_own_village(troops: dict) -> tuple:
 
 def parse_own_villages(text: str) -> list:
     """
-    Parse Travian 'Eigene Truppen' overview copy-paste (Strg+A / Strg+C).
+    Parse Travian village/troop overview copy-paste (Strg+A / Strg+C).
 
-    Format: tab-delimited table with header "Dorfname\tTroop1\tTroop2\t..."
-    followed by village rows "VillageName\tN1\tN2\t..."
-    Village coordinates come from the sidebar section below the table.
+    Supports two formats:
+    1. Troops overview: header "Dorfname\tTroop1\tTroop2..." with counts per column
+    2. Village overview: header "Village\tAttacks\tBuilding\tTroops\tMerchants"
+       with troops as "Nx TroopName Nx TroopName …" in the Troops column
 
-    Also handles alternative Gaul troop names as used in the overview UI:
-    Theutates Blitz, Druidenreiter, Haeduaner, Rammholz, Kriegskatapult etc.
+    Coordinates are extracted from the sidebar section.
     """
     import re
-    text = re.sub(r'[​-‏‪-‮⁦-⁩﻿]', '', text)
+    text = re.sub(r'[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]', '', text)
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
-    # Canonical name aliases for troop names as they appear in the overview UI
     TROOP_ALIASES = {
-        # Gaul overview names → canonical
-        "Theutates Blitz":  "Theutates-Blitz",
-        "Theutates-Blitz":  "Theutates-Blitz",
-        "Druidenreiter":    "Druidentreiter",
-        "Haeduaner":        "Haeduer",
-        "Rammholz":         "Gallier-Rammbock",
-        "Kriegskatapult":   "Gallier-Kata",
-        # Gaul scout: "Späher" in overview = Pathfinder
-        # (only when other Gaul troops present — handled by context)
-        # Teuton overview names
-        "Kundschafter":     "Späher",
-        "Teutonen Reiter":  "Teut. Ritter",
-        "Ramme":            "Teutonen-Rammbock",
-        "Katapult":         "Kriegsmaschine",
-        "Stammesführer":    "Häuptling",
+        "Theutates Blitz":     "Theutates-Blitz",
+        "Theutates-Blitz":     "Theutates-Blitz",
+        "Theutates Thunder":   "Theutates-Blitz",
+        "Druidenreiter":       "Druidentreiter",
+        "Haeduan":             "Haeduer",
+        "Haeduaner":           "Haeduer",
+        "Rammholz":            "Gallier-Rammbock",
+        "Trebuchet":           "Gallier-Kata",
+        "Kriegskatapult":      "Gallier-Kata",
+        "Kundschafter":        "Späher",
+        "Scout":               "Späher",
+        "Pathfinder":          "Pathfinder",
+        "Teutonen Reiter":     "Teut. Ritter",
+        "Teutonic Knight":     "Teut. Ritter",
+        "Ramme":               "Teutonen-Rammbock",
+        "Battering Ram":       "Teutonen-Rammbock",
+        "Katapult":            "Kriegsmaschine",
+        "Catapult":            "Kriegsmaschine",
+        "Stammesführer":       "Häuptling",
+        "Chief":               "Häuptling",
+        "Legionnaire":         "Legionär",
+        "Praetorian":          "Prätorianer",
+        "Imperian":            "Imperianer",
+        "Equites Legati":      "Equites Legati",
+        "Equites Imperatoris": "Equites Imperatoris",
+        "Equites Caesaris":    "Equites Caesaris",
+        "Ram":                 "Rammbock",
+        "Fire Catapult":       "Feuerkatapult",
+        "Senator":             "Senator",
+        "Phalanx":             "Phalanx",
+        "Swordsman":           "Schwertkämpfer",
+        "Druidrider":          "Druidentreiter",
+        "Clubswinger":         "Keulenschwinger",
+        "Spearman":            "Speerkämpfer",
+        "Axeman":              "Axtkämpfer",
+        "Paladin":             "Paladin",
+        "Settler":             "Siedler",
+        "Hero":                "Held",
     }
 
     def normalize(name: str) -> str:
-        name = name.strip()
-        return TROOP_ALIASES.get(name, name)
+        return TROOP_ALIASES.get(name.strip(), name.strip())
 
     lines = text.split('\n')
     coord_re = re.compile(r'\((-?\d+)\|(-?\d+)\)')
 
-    # ── Step 1: Find the "Dorfname" header row ────────────────────────────
-    header_idx = None
-    col_names = []
+    # ── Step 1: Detect format and find header row ─────────────────────────
+    header_idx           = None
+    col_names            = []
+    troops_col           = None
+    fmt_village_overview = False
+
     for i, line in enumerate(lines):
         parts = [p.strip() for p in line.split('\t')]
-        if parts and parts[0].lower() == 'dorfname' and len(parts) >= 3:
+        if not parts or not parts[0]:
+            continue
+        first = parts[0].lower()
+
+        if first == 'dorfname' and len(parts) >= 3:
             header_idx = i
-            col_names = [normalize(p) for p in parts[1:]]  # skip "Dorfname"
+            col_names  = [normalize(p) for p in parts[1:]]
+            is_gaul = any(n in col_names for n in (
+                "Phalanx", "Theutates-Blitz", "Gallier-Rammbock",
+                "Druidentreiter", "Haeduer", "Gallier-Kata"))
+            if is_gaul:
+                col_names = ["Pathfinder" if n == "Späher" else n for n in col_names]
             break
 
-    # Detect if this is Gaul from header — "Späher" in Gaul context maps to Pathfinder
-    is_gaul = any(n in col_names for n in ("Phalanx", "Theutates-Blitz", "Gallier-Rammbock", "Druidentreiter", "Haeduer", "Gallier-Kata"))
-    if is_gaul:
-        col_names = ["Pathfinder" if n == "Späher" else n for n in col_names]
+        if first in ('village', 'dorf') and any(
+                p.strip().lower() in ('troops', 'truppen') for p in parts):
+            header_idx           = i
+            fmt_village_overview = True
+            header_lower         = [p.strip().lower() for p in parts]
+            troops_col           = next(
+                (j for j, h in enumerate(header_lower) if h in ('troops', 'truppen')), None)
+            break
 
-    # ── Step 2: Parse village rows from the table ─────────────────────────
-    # Each row: VillageName\tN1\tN2\t...  (stops at "Summe" row)
-    table_villages = {}  # name → troops dict
-    if header_idx is not None:
+    # ── Step 2: Parse village rows ────────────────────────────────────────
+    table_villages: dict = {}
+    stop_words = {'summe', 'total', 'gesamt', 'task overview', 'homepage'}
+
+    if header_idx is not None and not fmt_village_overview:
         for line in lines[header_idx + 1:]:
             parts = [p.strip() for p in line.split('\t')]
             if not parts or not parts[0]:
                 continue
             vname = parts[0]
-            if vname.lower() in ('summe', 'total', 'gesamt'):
+            if vname.lower() in stop_words:
                 break
-            # Check if row has numeric data
-            nums_raw = parts[1:]
             nums = []
-            for n in nums_raw:
-                n_clean = re.sub(r'[ \s., ]', '', n)
-                if re.match(r'^\d+$', n_clean):
-                    nums.append(int(n_clean))
-                else:
-                    nums.append(None)
+            for n in parts[1:]:
+                nc = re.sub(r'[\s.,]', '', n)
+                nums.append(int(nc) if re.match(r'^\d+$', nc) else None)
             if not any(isinstance(n, int) for n in nums):
                 continue
-            troops = {}
-            for k, n in enumerate(nums):
-                if k < len(col_names) and isinstance(n, int) and n > 0:
-                    troops[col_names[k]] = n
+            table_villages[vname] = {
+                col_names[k]: n for k, n in enumerate(nums)
+                if k < len(col_names) and isinstance(n, int) and n > 0
+            }
+
+    elif header_idx is not None and fmt_village_overview and troops_col is not None:
+        troop_re = re.compile(
+            r'(\d+)\s*x\s+([A-Za-z\u00c0-\u024f][A-Za-z\u00c0-\u024f\s\-\.]+?)' +
+            r'(?=\s+\d+\s*x|\s*$)'
+        )
+        for line in lines[header_idx + 1:]:
+            parts = [p.strip() for p in line.split('\t')]
+            if not parts or not parts[0]:
+                continue
+            vname = parts[0]
+            if vname.lower() in stop_words or len(parts) < 2:
+                break
+            troops_str = parts[troops_col] if troops_col < len(parts) else ""
+            troops: dict = {}
+            for m in troop_re.finditer(troops_str):
+                count = int(m.group(1))
+                tname = normalize(m.group(2))
+                if count > 0:
+                    troops[tname] = troops.get(tname, 0) + count
             table_villages[vname] = troops
 
     # ── Step 3: Parse sidebar for village coordinates ─────────────────────
-    # Sidebar format:
-    #   VillageName\n
-    #   (x|y)\n
-    #   [optional group label]\n
-    sidebar_coords = {}  # name → (x, y)
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        cm = coord_re.match(line)
+    sidebar_coords: dict = {}
+    for idx, line in enumerate(lines):
+        line_s = line.strip()
+        cm = coord_re.match(line_s)
         if cm:
             x, y = int(cm.group(1)), int(cm.group(2))
-            # Look back for the village name (line before coords)
-            if i > 0:
-                prev = lines[i - 1].strip()
+            if idx > 0:
+                prev = lines[idx - 1].strip()
                 if prev and not coord_re.search(prev) and '\t' not in prev:
                     sidebar_coords[prev] = (x, y)
-        # Also handle "VillageName\t(x|y)" on same line
-        elif '\t' in line:
-            for m in re.finditer(r'^([^\t]+)\t\((-?\d+)\|(-?\d+)\)', line):
+        elif '\t' in line_s:
+            for m in re.finditer(r'^([^\t]+)\t\((-?\d+)\|(-?\d+)\)', line_s):
                 sidebar_coords[m.group(1).strip()] = (int(m.group(2)), int(m.group(3)))
-        i += 1
 
-    # ── Step 4: Merge table rows with sidebar coords ──────────────────────
+    # ── Step 4: Merge ─────────────────────────────────────────────────────
     villages = []
     for vname, troops in table_villages.items():
         coords = sidebar_coords.get(vname)
-        x = coords[0] if coords else None
-        y = coords[1] if coords else None
         villages.append({
             "village_name": vname,
-            "x": x,
-            "y": y,
-            "population": 0,
-            "troops": troops,
+            "x":            coords[0] if coords else None,
+            "y":            coords[1] if coords else None,
+            "population":   0,
+            "troops":       troops,
         })
 
-    # Fallback: if no table found, try old coord-on-same-line format
     if not villages:
         for line in lines:
             cm = coord_re.search(line)
             if not cm:
                 continue
-            x, y = int(cm.group(1)), int(cm.group(2))
-            vname = line[:cm.start()].strip().rstrip('\t').strip() or f"({x}|{y})"
+            x, y   = int(cm.group(1)), int(cm.group(2))
+            vname  = line[:cm.start()].strip().rstrip('\t').strip() or f"({x}|{y})"
             villages.append({"village_name": vname, "x": x, "y": y, "population": 0, "troops": {}})
 
     return villages
-
-
-# ---------------------------------------------------------------------------
-# Routes — Attacks
-# ---------------------------------------------------------------------------
-
-@app.get("/guild/{guild_id}/attacks", response_class=HTMLResponse)
-async def attacks_page(request: Request, guild_id: str, saved: str = ""):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
-    import json as _jl, datetime as _dtl, math as _ml
-    is_admin = session.get("type") == "admin"
-    attack_reports = await database.get_attack_reports(guild_id, limit=50)
-    attack_stats = await database.get_attack_stats(guild_id)
-
-    # For each report: parse arrival times and detect zwischendef windows
-    def _parse_remaining(arrival_str):
-        import re as _re2
-        m = _re2.search(r"in\s+(\d+):(\d+):(\d+)", arrival_str or "")
-        return int(m.group(1))*3600+int(m.group(2))*60+int(m.group(3)) if m else None
-
-    enriched_reports = []
-    for rpt in attack_reports:
-        try:
-            waves = _jl.loads(rpt.get("attacks_json") or "[]")
-        except Exception:
-            waves = []
-        created_at = rpt.get("created_at", "")
-        try:
-            created_ts = _dtl.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-        except Exception:
-            created_ts = None
-        timed_waves = []
-        for w in waves:
-            rs = _parse_remaining(w.get("arrival", ""))
-            if created_ts and rs is not None:
-                timed_waves.append(created_ts + _dtl.timedelta(seconds=rs))
-            else:
-                timed_waves.append(None)
-        # Detect zwischendef
-        zw = []
-        valid = [(i, t) for i, t in enumerate(timed_waves) if t]
-        valid.sort(key=lambda x: x[1])
-        for j in range(len(valid)-1):
-            ia, ta = valid[j]
-            ib, tb = valid[j+1]
-            if ta != tb:
-                gap = int((tb - ta).total_seconds())
-                if gap > 60:
-                    gap_m = gap // 60
-                    zw.append({
-                        "wave_a": ia+1, "wave_b": ib+1,
-                        "gap_label": f"{gap_m//60}h {gap_m%60}min" if gap_m>=60 else f"{gap_m}min",
-                        "arrival_a": ta.strftime("%H:%M UTC"),
-                        "arrival_b": tb.strftime("%H:%M UTC"),
-                    })
-        enriched_reports.append({**dict(rpt), "zwischendef": zw, "wave_count": len(waves)})
-
-    return templates.TemplateResponse(
-        "attacks.html",
-        {
-            "request": request,
-            "guild": guild,
-            "saved": saved,
-            "is_admin": is_admin,
-            "attack_reports": enriched_reports,
-            "attack_stats": attack_stats,
-        },
-    )
-
-
-@app.get("/guild/{guild_id}/attacks/{report_id}/analyse", response_class=HTMLResponse)
-async def attacks_analyse(request: Request, guild_id: str, report_id: int):
-    import json as _json, math as _math
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-
-    report = await database.get_attack_report(guild_id, report_id)
-    if not report:
-        return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
-
-    try:
-        attacks = _json.loads(report["attacks_json"])
-    except Exception:
-        attacks = []
-
-    MAP_SIZE = 400
-
-    def travian_dist(x1, y1, x2, y2):
-        dx = abs(x1 - x2)
-        dy = abs(y1 - y2)
-        if dx > MAP_SIZE: dx = 2 * MAP_SIZE - dx
-        if dy > MAP_SIZE: dy = 2 * MAP_SIZE - dy
-        return _math.sqrt(dx * dx + dy * dy)
-
-    TROOP_DATA = {
-        # Romans
-        "Legionär":            {"speed": 6,  "atk": 40,  "def_inf": 35,  "def_cav": 50,  "tribe": "Römer",    "crop": 1, "tp": 40},
-        "Prätorianer":         {"speed": 5,  "atk": 5,   "def_inf": 65,  "def_cav": 35,  "tribe": "Römer",    "crop": 1, "tp": 30},
-        "Imperianer":          {"speed": 7,  "atk": 70,  "def_inf": 30,  "def_cav": 25,  "tribe": "Römer",    "crop": 1, "tp": 70},
-        "Equites Legati":      {"speed": 16, "atk": 40,  "def_inf": 20,  "def_cav": 10,  "tribe": "Römer",    "crop": 2, "tp": 80},
-        "Equites Imperatoris": {"speed": 14, "atk": 120, "def_inf": 65,  "def_cav": 50,  "tribe": "Römer",    "crop": 3, "tp": 260},
-        "Equites Caesaris":    {"speed": 10, "atk": 180, "def_inf": 80,  "def_cav": 105, "tribe": "Römer",    "crop": 4, "tp": 450},
-        "Rammbock":            {"speed": 4,  "atk": 60,  "def_inf": 30,  "def_cav": 75,  "tribe": "Römer",    "crop": 5, "tp": 300},
-        "Feuerkatapult":       {"speed": 3,  "atk": 75,  "def_inf": 60,  "def_cav": 10,  "tribe": "Römer",    "crop": 6, "tp": 600},
-        "Senator":             {"speed": 4,  "atk": 50,  "def_inf": 40,  "def_cav": 30,  "tribe": "Römer",    "crop": 5, "tp": 500},
-        # Teutons
-        "Keulenschwinger":     {"speed": 7,  "atk": 40,  "def_inf": 20,  "def_cav": 5,   "tribe": "Germanen", "crop": 1, "tp": 40},
-        "Speerkämpfer":        {"speed": 7,  "atk": 10,  "def_inf": 35,  "def_cav": 60,  "tribe": "Germanen", "crop": 1, "tp": 20},
-        "Axtkämpfer":          {"speed": 7,  "atk": 55,  "def_inf": 10,  "def_cav": 5,   "tribe": "Germanen", "crop": 1, "tp": 60},
-        "Späher":              {"speed": 9,  "atk": 0,   "def_inf": 10,  "def_cav": 10,  "tribe": "Germanen", "crop": 1, "tp": 20},
-        "Paladin":             {"speed": 10, "atk": 55,  "def_inf": 100, "def_cav": 40,  "tribe": "Germanen", "crop": 2, "tp": 160},
-        "Teut. Ritter":        {"speed": 11, "atk": 150, "def_inf": 50,  "def_cav": 75,  "tribe": "Germanen", "crop": 3, "tp": 400},
-        "Häuptling":           {"speed": 7,  "atk": 40,  "def_inf": 60,  "def_cav": 40,  "tribe": "Germanen", "crop": 4, "tp": 500},
-        "Teutonen-Rammbock":   {"speed": 5,  "atk": 65,  "def_inf": 30,  "def_cav": 80,  "tribe": "Germanen", "crop": 5, "tp": 350},
-        "Kriegsmaschine":      {"speed": 3,  "atk": 50,  "def_inf": 60,  "def_cav": 10,  "tribe": "Germanen", "crop": 6, "tp": 600},
-        # Gauls
-        "Phalanx":             {"speed": 7,  "atk": 15,  "def_inf": 40,  "def_cav": 50,  "tribe": "Gallier",  "crop": 1, "tp": 20},
-        "Schwertkämpfer":      {"speed": 6,  "atk": 65,  "def_inf": 35,  "def_cav": 20,  "tribe": "Gallier",  "crop": 1, "tp": 60},
-        "Pathfinder":          {"speed": 17, "atk": 0,   "def_inf": 10,  "def_cav": 10,  "tribe": "Gallier",  "crop": 2, "tp": 20},
-        "Theutates-Blitz":     {"speed": 19, "atk": 90,  "def_inf": 25,  "def_cav": 10,  "tribe": "Gallier",  "crop": 2, "tp": 160},
-        "Druidentreiter":      {"speed": 16, "atk": 45,  "def_inf": 115, "def_cav": 55,  "tribe": "Gallier",  "crop": 2, "tp": 240},
-        "Haeduer":             {"speed": 13, "atk": 200, "def_inf": 45,  "def_cav": 80,  "tribe": "Gallier",  "crop": 3, "tp": 500},
-        "Stammesältester":     {"speed": 5,  "atk": 40,  "def_inf": 50,  "def_cav": 50,  "tribe": "Gallier",  "crop": 5, "tp": 500},
-        "Gallier-Rammbock":    {"speed": 6,  "atk": 50,  "def_inf": 30,  "def_cav": 105, "tribe": "Gallier",  "crop": 5, "tp": 320},
-        "Gallier-Kata":        {"speed": 3,  "atk": 70,  "def_inf": 45,  "def_cav": 10,  "tribe": "Gallier",  "crop": 6, "tp": 600},
-    }
-    # Add aliases for alternate UI names (Teuton variants etc.)
-    TROOP_ALIASES = {
-        "Kundschafter":    "Späher",
-        "Teutonen Reiter": "Teut. Ritter",
-        "Ramme":           "Teutonen-Rammbock",
-        "Katapult":        "Kriegsmaschine",
-        "Stammesführer":   "Häuptling",
-        "Aufklärer":       "Pathfinder",
-    }
-    for alias, canonical in TROOP_ALIASES.items():
-        if canonical in TROOP_DATA:
-            TROOP_DATA[alias] = TROOP_DATA[canonical]
-    TROOP_SPEEDS = {name: d["speed"] for name, d in TROOP_DATA.items()}
-    TROOP_TRIBE  = {name: d["tribe"] for name, d in TROOP_DATA.items()}
-    TRIBE_EMOJI = {1: "🏛️", 2: "⚒️", 3: "🌿", 4: "🌑", 5: "⛩️"}
-
-    enriched = []
-    for atk in attacks:
-        troops = atk.get("troops", {})
-        total_troops = sum(troops.values()) if troops else 0
-
-        # Classify attack
-        has_siege = any(k in troops for k in ("Rammbock", "Feuerkatapult", "Teutonen-Rammbock",
-                                               "Kriegsmaschine", "Gallier-Rammbock", "Gallier-Kata",
-                                               "Ramme", "Katapult"))
-        has_cav   = any(k in troops for k in ("Equites Imperatoris", "Equites Caesaris", "Paladin",
-                                               "Teut. Ritter", "Teutonen Reiter", "Theutates-Blitz",
-                                               "Druidentreiter", "Haeduer"))
-        if total_troops == 0:
-            classification = "❓ Keine Truppendaten"
-            classification_color = "#888"
-        elif total_troops <= 3:
-            classification = "🪶 Fake / Probe"
-            classification_color = "#f59e0b"
-        elif has_siege:
-            classification = "💥 Echte Belagerung"
-            classification_color = "#dc2626"
-        elif has_cav and total_troops > 100:
-            classification = "⚡ Kavallerie-Angriff"
-            classification_color = "#f97316"
-        elif total_troops > 500:
-            classification = "⚔️ Großangriff"
-            classification_color = "#dc2626"
-        else:
-            classification = "🗡️ Normaler Angriff"
-            classification_color = "#ef4444"
-
-        # Detected tribe — prefer field stored by parser, fallback to vote from troop names
-        detected_tribe = atk.get("tribe")
-        if not detected_tribe:
-            tribe_votes = {}
-            for tname in troops:
-                t = TROOP_TRIBE.get(tname)
-                if t: tribe_votes[t] = tribe_votes.get(t, 0) + 1
-            detected_tribe = max(tribe_votes, key=tribe_votes.get) if tribe_votes else None
-
-        # Slowest troop = determines march speed
-        if troops:
-            slowest_speed = min(TROOP_SPEEDS.get(t, 6) for t in troops)
-        else:
-            slowest_speed = None
-
-        # Parse remaining march time from arrival string e.g. "in 22:00:28 Std. um 15:00:14"
-        import re as _re
-        remaining_seconds = None
-        arrival_str = atk.get("arrival", "")
-        rm = _re.search(r"in\s+(\d+):(\d+):(\d+)", arrival_str)
-        if rm:
-            remaining_seconds = int(rm.group(1)) * 3600 + int(rm.group(2)) * 60 + int(rm.group(3))
-
-        # Parse coords from attacker village "(x|y)"
-        atk_x = atk_y = None
-        cm = _re.search(r"\((-?\d+)\|(-?\d+)\)", atk.get("coords", ""))
-        if cm:
-            atk_x, atk_y = int(cm.group(1)), int(cm.group(2))
-
-        # Defender coords — stored in report by bot modal
-        def_x = atk.get("def_x")
-        def_y = atk.get("def_y")
-
-        # Offline time from report (user was offline this long → adds to possible march window)
-        offline_seconds = atk.get("offline_seconds", 0) or 0
-
-        # Server-side speed analysis if we have both coord sets + remaining time
-        speed_analysis = None
-        import datetime as _dt
-        try:
-            created_ts = _dt.datetime.fromisoformat(report["created_at"].replace("Z", "+00:00"))
-        except Exception:
-            created_ts = None
-
-        arrival_ts = None
-        if created_ts and remaining_seconds is not None:
-            arrival_ts = created_ts + _dt.timedelta(seconds=remaining_seconds)
-
-        if atk_x is not None and def_x is not None and remaining_seconds is not None:
-            dist = travian_dist(atk_x, atk_y, def_x, def_y)
-            # Total possible window = remaining + offline (attack could have been sent while offline)
-            total_window_seconds = remaining_seconds + offline_seconds
-            total_window_hours = total_window_seconds / 3600.0
-            # max_speed: if the attack was sent right as user went offline
-            max_speed = dist / total_window_hours if total_window_hours > 0 else 0
-            # min_speed: attack was sent as soon as it was visible (remaining only)
-            remaining_hours = remaining_seconds / 3600.0
-            min_speed = dist / remaining_hours if remaining_hours > 0 else 0
-
-            possible_speeds = []
-            seen_speeds = set()
-            for tname, tdata in TROOP_DATA.items():
-                s = tdata["speed"]
-                if s in seen_speeds:
-                    continue
-                # Possible if speed <= min_speed (certain) or <= max_speed (possible with offline window)
-                if s > max_speed + 0.01:
-                    continue
-                seen_speeds.add(s)
-                total_march_s = int(dist / s * 3600)
-                departure_ts = None
-                if arrival_ts:
-                    departure_ts = arrival_ts - _dt.timedelta(seconds=total_march_s)
-                certain = s <= min_speed + 0.01  # certain even without offline window
-                possible_speeds.append({
-                    "speed": s,
-                    "total_march_s": total_march_s,
-                    "departure": departure_ts.strftime("%H:%M:%S %d.%m.") if departure_ts else None,
-                    "certain": certain,
-                })
-            possible_speeds.sort(key=lambda x: x["speed"])
-
-            best_speed = max((p for p in possible_speeds if p["certain"]), key=lambda x: x["speed"])["speed"] if any(p["certain"] for p in possible_speeds) else (max(possible_speeds, key=lambda x: x["speed"])["speed"] if possible_speeds else None)
-
-            speed_to_troops = {}
-            for tname, tdata in TROOP_DATA.items():
-                s = tdata["speed"]
-                if s <= max_speed + 0.01:
-                    speed_to_troops.setdefault(s, []).append(tname)
-
-            speed_analysis = {
-                "dist": round(dist, 1),
-                "remaining_hours": round(remaining_hours, 2),
-                "offline_hours": round(offline_seconds / 3600, 2),
-                "total_window_hours": round(total_window_hours, 2),
-                "max_speed": round(max_speed, 2),
-                "min_speed": round(min_speed, 2),
-                "possible_speeds": possible_speeds,
-                "speed_to_troops": {str(k): v for k, v in speed_to_troops.items()},
-                "best_speed": best_speed,
-                "def_x": def_x,
-                "def_y": def_y,
-                "arrival_ts": arrival_ts.strftime("%d.%m. %H:%M:%S UTC") if arrival_ts else None,
-            }
-
-        # Map lookup: attacker player data + attacker village confirmation + defender village
-        attacker_data = await database.get_player_from_snapshot(guild_id, atk.get("attacker", ""))
-        # Confirm attacker village from map
-        attacker_village_data = None
-        if atk_x is not None and attacker_data:
-            for v in attacker_data.get("villages", []):
-                if v["x"] == atk_x and v["y"] == atk_y:
-                    attacker_village_data = v
-                    break
-        # Look up defender village from map by coords
-        defender_village_data = None
-        if def_x is not None and def_y is not None:
-            defender_village_data = await database.get_village_from_snapshot(guild_id, def_x, def_y)
-
-        enriched.append({
-            **atk,
-            "total_troops": total_troops,
-            "classification": classification,
-            "classification_color": classification_color,
-            "detected_tribe": detected_tribe,
-            "slowest_speed": slowest_speed,
-            "atk_x": atk_x,
-            "atk_y": atk_y,
-            "def_x": def_x,
-            "def_y": def_y,
-            "offline_seconds": offline_seconds,
-            "attacker_data": attacker_data,
-            "attacker_village_data": attacker_village_data,
-            "defender_village_data": defender_village_data,
-            "remaining_seconds": remaining_seconds,
-            "arrival_ts": arrival_ts,
-            "speed_analysis": speed_analysis,
-            "is_stack": False,
-            "stack_count": 1,
-        })
-
-    # Wave stack detection: same arrival → stack
-    from collections import defaultdict as _defaultdict
-    arrival_groups = _defaultdict(list)
-    for i, atk in enumerate(enriched):
-        key = atk.get("arrival", "")
-        if key:
-            arrival_groups[key].append(i)
-    for indices in arrival_groups.values():
-        if len(indices) > 1:
-            for i in indices:
-                enriched[i]["is_stack"] = True
-                enriched[i]["stack_count"] = len(indices)
-
-    # Zwischendef detection: multiple waves with DIFFERENT arrival times
-    import datetime as _dt2
-    zwischendef_windows = []
-    if len(enriched) > 1:
-        # Sort by arrival_ts
-        timed = [(i, e) for i, e in enumerate(enriched) if e.get("arrival_ts")]
-        timed.sort(key=lambda x: x[1]["arrival_ts"])
-        for j in range(len(timed) - 1):
-            idx_a, wave_a = timed[j]
-            idx_b, wave_b = timed[j + 1]
-            if wave_a["arrival_ts"] != wave_b["arrival_ts"]:
-                gap = (wave_b["arrival_ts"] - wave_a["arrival_ts"]).total_seconds()
-                if gap > 60:  # only meaningful gaps
-                    gap_m = int(gap // 60)
-                    zwischendef_windows.append({
-                        "wave_a": j + 1,
-                        "wave_b": j + 2,
-                        "arrival_a": wave_a["arrival_ts"].strftime("%H:%M:%S UTC"),
-                        "arrival_b": wave_b["arrival_ts"].strftime("%H:%M:%S UTC"),
-                        "gap_seconds": int(gap),
-                        "gap_label": f"{gap_m // 60}h {gap_m % 60}min" if gap_m >= 60 else f"{gap_m}min",
-                        "attacker_a": wave_a.get("attacker", "?"),
-                        "attacker_b": wave_b.get("attacker", "?"),
-                    })
-
-    import json as _json2
-    troop_data_json = _json2.dumps(TROOP_DATA)
-
-    # Historical reports from same attacker
-    all_attackers = {atk.get("attacker") for atk in attacks if atk.get("attacker")}
-    history = await database.get_reports_by_attackers(guild_id, list(all_attackers))
-
-    # Load own villages and cross-reference defender coords
-    own_villages_raw = await database.get_own_villages(guild_id)
-    own_by_coords = {}
-    for v in own_villages_raw:
-        try:
-            v["troops"] = _json2.loads(v.get("troops_json") or "{}")
-        except Exception:
-            v["troops"] = {}
-        if v.get("x") is not None and v.get("y") is not None:
-            own_by_coords[(v["x"], v["y"])] = v
-
-    # Attach own-village data to each attack wave
-    for atk in enriched:
-        dx, dy = atk.get("def_x"), atk.get("def_y")
-        if dx is not None and dy is not None:
-            atk["own_village"] = own_by_coords.get((int(dx), int(dy)))
-        else:
-            atk["own_village"] = None
-
-    return templates.TemplateResponse("attack_analysis.html", {
-        "request": request,
-        "guild": guild,
-        "report": report,
-        "attacks": enriched,
-        "history_count": len(history),
-        "history": history[:20],
-        "TRIBE_EMOJI": TRIBE_EMOJI,
-        "troop_data_json": troop_data_json,
-        "troop_data": TROOP_DATA,
-        "zwischendef_windows": zwischendef_windows,
-        "own_villages_count": len(own_villages_raw),
-    })
-
-
-@app.post("/guild/{guild_id}/attacks/config")
-async def attacks_config_save(
-    request: Request,
-    guild_id: str,
-    attack_channel_id: str = Form(""),
-):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    err = await _require_premium(guild, guild_id)
-    if err: return err
-    attack_channel_id = sanitize_snowflake(attack_channel_id)
-    await database.set_attack_channel_web(guild_id, attack_channel_id)
-    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
-
-
-@app.post("/guild/{guild_id}/attacks/delete/{report_id}")
-async def attacks_delete(request: Request, guild_id: str, report_id: int):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    if session.get("type") != "admin":
-        return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
-    await database.delete_attack_report(report_id)
-    return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
-
-
-@app.post("/guild/{guild_id}/attacks/auto-setup")
-async def attacks_auto_setup(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard", status_code=303)
-
-    token = os.environ.get("DISCORD_TOKEN", "")
-    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
-
-    async with httpx.AsyncClient() as client:
-        # Category
-        r = await client.post(
-            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-            headers=headers,
-            json={"name": "Angriff-Detection", "type": 4},
-        )
-        if r.status_code not in (200, 201):
-            return RedirectResponse(f"/guild/{guild_id}/attacks?error=category_{r.status_code}", status_code=303)
-        category_id = r.json()["id"]
-
-        # Get bot's own user ID
-        me = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
-        bot_id = me.json().get("id", "")
-
-        # Alert channel — hidden from @everyone, bot has full access
-        overwrites = [
-            {"id": guild_id, "type": 0, "allow": "0", "deny": "1024"},
-        ]
-        if bot_id:
-            overwrites.append({"id": bot_id, "type": 1, "allow": "52224", "deny": "0"})  # view+send+embed
-
-        r = await client.post(
-            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-            headers=headers,
-            json={
-                "name": "angriff-alarm",
-                "type": 0,
-                "parent_id": category_id,
-                "permission_overwrites": overwrites,
-            },
-        )
-        if r.status_code not in (200, 201):
-            return RedirectResponse(f"/guild/{guild_id}/attacks?error=channel_{r.status_code}", status_code=303)
-        channel_id = r.json()["id"]
-
-        # Post the persistent button message
-        button_payload = {
-            "content": "## ⚔️ Angriff melden\nWenn du einen Angriff siehst: klicke den Button, öffne deinen **Truppenplatz** in Travian, markiere alles (`Strg+A`), kopiere (`Strg+C`) und füge es in das Eingabefeld ein.",
-            "components": [{
-                "type": 1,
-                "components": [{
-                    "type": 2,
-                    "style": 4,
-                    "label": "⚔️ Angriff melden",
-                    "custom_id": "report_attack",
-                }]
-            }]
-        }
-        r = await client.post(
-            f"https://discord.com/api/v10/channels/{channel_id}/messages",
-            headers=headers,
-            json=button_payload,
-        )
-        message_id = r.json().get("id", "") if r.status_code in (200, 201) else ""
-
-    await database.set_attack_channel_web(guild_id, channel_id, message_id)
-    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
-
-
-@app.post("/guild/{guild_id}/attacks/reset")
-async def attacks_reset(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    await database.set_attack_channel_web(guild_id, "", "")
-    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
-
-
-# ---------------------------------------------------------------------------
-# Routes — Own Troops / Village Upload
-# ---------------------------------------------------------------------------
-
-@app.get("/guild/{guild_id}/attacks/own-troops", response_class=HTMLResponse)
-async def own_troops_page(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
-
-    import json as _json
-    own_villages = await database.get_own_villages(guild_id)
-    # Parse troops_json back to dict for display
-    CROP_MAP = {
-        "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
-        "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
-        "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
-        "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
-        "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3, "Teutonen Reiter": 3,
-        "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Ramme": 5, "Kriegsmaschine": 6, "Katapult": 6,
-        "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
-        "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
-        "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
-        "Siedler": 1, "Held": 0,
-    }
-    for v in own_villages:
-        try:
-            v["troops"] = _json.loads(v.get("troops_json") or "{}")
-        except Exception:
-            v["troops"] = {}
-        v["total_crop"] = sum(CROP_MAP.get(t, 1) * c for t, c in v["troops"].items())
-
-    # Load recent attack reports for defense priority cross-reference
-    attack_reports = await database.get_attack_reports(guild_id, limit=20)
-    # Build a set of defender coords from recent reports
-    import datetime as _dt
-    def_targets = []
-    for rpt in attack_reports:
-        try:
-            waves = _json.loads(rpt.get("attacks_json") or "[]")
-        except Exception:
-            waves = []
-        for w in waves:
-            dx, dy = w.get("def_x"), w.get("def_y")
-            if dx is not None and dy is not None:
-                def_targets.append({"x": int(dx), "y": int(dy), "report_id": rpt["id"],
-                                     "created_at": rpt.get("created_at","")[:16],
-                                     "arrival": w.get("arrival","")})
-
-    # For each def target, find matching own village or nearest
-    own_by_coords = {(v["x"], v["y"]): v for v in own_villages}
-    priority_rows = []
-    seen = set()
-    for t in def_targets:
-        key = (t["x"], t["y"])
-        if key in seen:
-            continue
-        seen.add(key)
-        match = own_by_coords.get(key)
-        if match:
-            priority_rows.append({**t, "own_village": match, "urgency": "red"})
-
-    history = await database.get_own_villages_history(guild_id)
-
-    return templates.TemplateResponse("own_troops.html", {
-        "request": request,
-        "guild": guild,
-        "own_villages": own_villages,
-        "priority_rows": priority_rows,
-        "history": history,
-        "upload_msg": None,
-    })
-
-
-@app.post("/guild/{guild_id}/attacks/own-troops")
-async def own_troops_upload(
-    request: Request,
-    guild_id: str,
-    troop_text: str = Form(""),
-):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
-
-    uploaded_by = session.get("username") or session.get("discord_username") or "unknown"
-    parsed = parse_own_villages(troop_text)
-    for v in parsed:
-        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}))
-        v["village_type"] = vtype
-        v["off_score"] = off_s
-        v["def_score"] = def_s
-        v["priority"] = prio
-
-    if parsed:
-        await database.save_own_villages(guild_id, parsed, uploaded_by)
-
-    return RedirectResponse(f"/guild/{guild_id}/attacks/own-troops?uploaded={len(parsed)}", status_code=303)
-
-
-@app.post("/guild/{guild_id}/attacks/own-troops/clear")
-async def own_troops_clear(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    err = _require_admin(session)
-    if err: return err
-    await database.delete_own_villages(guild_id)
-    return RedirectResponse(f"/guild/{guild_id}/attacks/own-troops", status_code=303)
-
-
-# ---------------------------------------------------------------------------
-# Routes — Mein Account (own villages / own troops — central data hub)
-# ---------------------------------------------------------------------------
-
-_CROP_MAP = {
-    "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
-    "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
-    "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
-    "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
-    "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3, "Teutonen Reiter": 3,
-    "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Ramme": 5, "Kriegsmaschine": 6, "Katapult": 6,
-    "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
-    "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
-    "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
-    "Siedler": 1, "Held": 0,
-}
 
 
 def _enrich_own_villages(own_villages: list) -> list:
