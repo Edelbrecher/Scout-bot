@@ -3396,54 +3396,49 @@ def parse_farmlist(text: str) -> list[dict]:
                 except Exception:
                     distance = 0.0
 
-                # --- read the 4 lines that follow the header line ----------
+                # --- state-machine: N×troops → time → res_last → res_total ----
+                # Some farms have multiple troop-type lines before the time,
+                # so we can't rely on fixed line positions.
                 troops    = 0
                 last_raid = ""
-                res_last  = 0   # resources stolen in last raid
-                res_total = 0   # total resources stolen (cumulative)
-                skip_next = 0   # how many extra lines to advance
+                res_last  = 0
+                res_total = 0
+                seen_time     = False
+                after_time    = 0   # 0=res_last not yet, 1=res_total not yet
+                last_j        = 0
 
-                for j in range(1, 6):
+                for j in range(1, 12):
                     if i + j >= len(lines):
                         break
-                    nxt = _UNI.sub('', lines[i + j]).strip()
+                    raw_sub = lines[i + j]
+                    nxt = _UNI.sub('', raw_sub).strip()
                     if not nxt:
-                        # blank separator → entry is done
                         break
-                    # stop if we hit the next farm entry
-                    if lines[i + j].startswith('\t\t'):
+                    if raw_sub.startswith('\t\t'):
                         break
 
-                    if j == 1:
-                        # troops (pure integer)
+                    last_j = j
+
+                    if _TIME.match(nxt) or _DATE.match(nxt):
+                        last_raid = nxt
+                        seen_time = True
+                    elif seen_time:
                         try:
-                            troops = int(_re.sub(r'\D', '', nxt))
+                            val = int(_re.sub(r'\D', '', nxt)) if nxt else 0
+                        except Exception:
+                            val = 0
+                        if after_time == 0:
+                            res_last = val
+                        else:
+                            res_total = val
+                            break
+                        after_time += 1
+                    else:
+                        # Pre-time integer(s) = troops (sum multiple troop types)
+                        try:
+                            troops += int(_re.sub(r'\D', '', nxt)) if nxt else 0
                         except Exception:
                             pass
-                        skip_next = 1
-
-                    elif j == 2:
-                        # time or date
-                        if _TIME.match(nxt) or _DATE.match(nxt):
-                            last_raid = nxt
-                        skip_next = 2
-
-                    elif j == 3:
-                        # resources stolen last raid
-                        try:
-                            res_last = int(_re.sub(r'\D', '', nxt)) if nxt else 0
-                        except Exception:
-                            pass
-                        skip_next = 3
-
-                    elif j == 4:
-                        # total resources (cumulative)
-                        try:
-                            res_total = int(_re.sub(r'\D', '', nxt)) if nxt else 0
-                        except Exception:
-                            pass
-                        skip_next = 4
-                        break  # entry complete
 
                 # Rating based on last-raid loot and efficiency
                 efficiency = round(res_last / distance, 1) if distance > 0 else 0.0
@@ -3476,7 +3471,7 @@ def parse_farmlist(text: str) -> list[dict]:
                     # backwards-compat alias
                     "resources":   res_last,
                 })
-                i += skip_next + 1
+                i += last_j + 1
                 continue
 
         i += 1
