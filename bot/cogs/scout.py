@@ -113,19 +113,22 @@ _RESOURCE_RE = re.compile(
     r"(?:korn|getreide|crop)[:\s]+([0-9.,]+)",
     re.IGNORECASE | re.DOTALL,
 )
-# 4 numbers on one line separated by spaces = stolen resources (wood clay iron crop)
+# 4 numbers on one line = stolen resources (wood clay iron crop)
 _RES_4NUM_RE = re.compile(r"(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)")
-# Statistics section
-_COMBAT_STR_RE   = re.compile(r"combat strength[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
-_RES_LOST_RE     = re.compile(r"resources lost[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
-_SUPPLY_BEFORE_RE= re.compile(r"supply before[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
+# Statistics — DE + EN
+_COMBAT_STR_RE   = re.compile(
+    r"(?:combat strength|kampfst[äa]rke)[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
+_RES_LOST_RE     = re.compile(
+    r"(?:resources lost|verlorene ressourcen|ressourcenverlust)[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
+_SUPPLY_BEFORE_RE= re.compile(
+    r"(?:supply before|versorgung vor)[^\d]*(\d[\d.,]*)[^\d]+(\d[\d.,]*)", re.IGNORECASE)
+# Experience DE + EN
 _COORD_RE   = re.compile(r"\((-?\d+)[|\]](-?\d+)\)")
 # EN: "from village" / DE: "aus Dorf"
 _FROM_VILLAGE_RE = re.compile(r"(.+?)\s+(?:from village|aus Dorf)\s+(.+)", re.IGNORECASE)
 # Fallback: explicit label
 _PLAYER_RE  = re.compile(r"(?:spieler|player)[:\s]+(.+)", re.IGNORECASE)
 _VILLAGE_RE = re.compile(r"(?:dorf|village)[:\s]+(.+)", re.IGNORECASE)
-_EXP_RE     = re.compile(r"(?:erfahrung|experience)[:\s]+([0-9]+)", re.IGNORECASE)
 _NUM_RE     = re.compile(r"[\d.,]+")
 # Strike detection via text
 _STRIKE_RE  = re.compile(
