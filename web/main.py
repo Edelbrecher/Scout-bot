@@ -2579,6 +2579,8 @@ async def settle_list_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     entries = await database.get_settle_list(guild_id)
     is_manager = _is_alliance_manager(session, guild)
     return templates.TemplateResponse("settle_list.html", {
@@ -2605,6 +2607,8 @@ async def settle_list_add(
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
     coords = coordinates.strip()[:30]
     if not coords:
         return RedirectResponse(f"/guild/{guild_id}/settle-list?error=coords_required", status_code=303)
