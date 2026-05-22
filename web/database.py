@@ -1131,6 +1131,12 @@ async def get_latest_snapshot_time(guild_id: str) -> str | None:
             return row[0] if row else None
 
 
+async def clear_all_snapshots(guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM map_snapshots WHERE guild_id = ?", (guild_id,))
+        await db.commit()
+
+
 async def prune_old_snapshots(guild_id: str, keep_days: int = 30):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -1162,12 +1168,12 @@ async def get_inactive_farms(
             SELECT village_id, x, y, village_name, player_name, population, tribe,
                    MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
                    COUNT(DISTINCT fetched_at) as snapshot_count,
-                   MIN(population) as min_pop, MAX(population) as max_pop
+                   MIN(population) as min_pop_val, MAX(population) as max_pop_val
             FROM map_snapshots
             WHERE guild_id = ?
             GROUP BY village_id
             HAVING snapshot_count >= 2
-               AND min_pop = max_pop
+               AND CAST(max_pop_val AS REAL) - CAST(min_pop_val AS REAL) <= 2
                AND julianday(last_seen) - julianday(first_seen) >= ?
                AND population >= ? AND population <= ?
             ORDER BY population DESC
@@ -1266,7 +1272,8 @@ async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
         cur = await db.execute(
             """SELECT player_id, player_name, SUM(population) as pop
                FROM map_snapshots
-               WHERE guild_id = ? AND fetched_at = ? AND player_id IS NOT NULL AND player_id != 0
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND player_id IS NOT NULL AND player_id != '' AND player_id != '0'
                GROUP BY player_id""",
             (guild_id, first_snap)
         )
@@ -1275,7 +1282,8 @@ async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
         cur = await db.execute(
             """SELECT player_id, player_name, SUM(population) as pop, COUNT(*) as villages
                FROM map_snapshots
-               WHERE guild_id = ? AND fetched_at = ? AND player_id IS NOT NULL AND player_id != 0
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND player_id IS NOT NULL AND player_id != '' AND player_id != '0'
                GROUP BY player_id""",
             (guild_id, last_snap)
         )

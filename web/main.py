@@ -313,64 +313,110 @@ async def _require_premium(guild: dict | None, guild_id: str):
 # App setup
 # ---------------------------------------------------------------------------
 
+def _parse_sql_tuple(s: str) -> list[str]:
+    """Parse a SQL VALUES tuple string into a list of tokens, respecting quoted strings."""
+    vals: list[str] = []
+    i = 0
+    L = len(s)
+    while i < L:
+        # skip whitespace
+        while i < L and s[i] in (' ', '\t'):
+            i += 1
+        if i >= L:
+            break
+        if s[i] == "'":
+            # quoted string — find closing quote ('' is escaped quote)
+            i += 1
+            buf = []
+            while i < L:
+                if s[i] == "'" and i + 1 < L and s[i + 1] == "'":
+                    buf.append("'"); i += 2
+                elif s[i] == "'":
+                    break
+                else:
+                    buf.append(s[i]); i += 1
+            vals.append("".join(buf))
+            i += 1  # skip closing quote
+        else:
+            # unquoted token (number, NULL, …)
+            j = i
+            while j < L and s[j] != ',':
+                j += 1
+            vals.append(s[i:j].strip())
+            i = j
+        # skip comma separator
+        while i < L and s[i] in (' ', '\t'):
+            i += 1
+        if i < L and s[i] == ',':
+            i += 1
+    return vals
+
+
+_VALUES_RE = re.compile(r"VALUES\s*\((.+)\);?\s*$", re.IGNORECASE)
+
+
 def _parse_map_sql(content: str) -> list[dict]:
-    """Parse map.sql CSV content into a list of village dicts."""
+    """Parse Travian map.sql into a list of village dicts.
+
+    Travian map.sql has two known column layouts (same as map.html parseSql):
+
+    Format X-first  (|v[0]| <= 800):
+        x, y, ?, tribe, vid, vname, pop, pname, pid, aname, aid, ?, isCapital
+        idx:  0  1  2    3    4      5    6    7      8     9    10  11   12
+
+    Format VID-first (|v[0]| > 800):
+        vid, x, y, ?, tribe, ?, vname, pop, pname, ?, aname, ?, ?, isCapital
+        idx:   0  1  2  3    4   5      6    7     8   9    10  11  12   13
+    """
     villages = []
-    for line in content.splitlines():
-        line = line.strip()
-        if not line or line.upper().startswith("INSERT") or line.startswith("--"):
+    for raw_line in content.splitlines():
+        m = _VALUES_RE.search(raw_line)
+        if not m:
             continue
-        # Strip SQL INSERT wrapper if present
-        if "VALUES" in line.upper():
-            # Extract just the values part after VALUES
-            idx = line.upper().find("VALUES")
-            line = line[idx + 6:].strip().lstrip("(").rstrip(");")
-        # Try comma separator
-        parts = [p.strip().strip("'\"") for p in line.split(",")]
-        if len(parts) < 8:
+        v = _parse_sql_tuple(m.group(1))
+        if len(v) < 7:
             continue
         try:
-            # Detect format: if first field is large number (>10000) → village_id first
-            first = parts[0].strip("'\" ")
-            if first.lstrip("-").isdigit() and abs(int(first)) > 10000:
-                # Format A: village_id, village_name, x, y, _, _, player_id, population, tribe, player_name, alliance_id, alliance_name
-                vid = parts[0]
-                vname = parts[1] if len(parts) > 1 else ""
-                x = int(parts[2]) if len(parts) > 2 else 0
-                y = int(parts[3]) if len(parts) > 3 else 0
-                player_id = parts[6] if len(parts) > 6 else ""
-                population = int(parts[7]) if len(parts) > 7 else 0
-                tribe = int(parts[8]) if len(parts) > 8 else 0
-                player_name = parts[9] if len(parts) > 9 else ""
-                alliance_id = parts[10] if len(parts) > 10 else ""
-                alliance_name = parts[11] if len(parts) > 11 else ""
+            f0 = float(v[0]) if v[0] not in ('NULL', '') else 0
+            if abs(f0) <= 800:
+                # x-first format
+                x     = int(float(v[0]))
+                y     = int(float(v[1]))
+                tribe = int(float(v[3])) if len(v) > 3 and v[3] not in ('NULL','') else 0
+                vname = v[5] if len(v) > 5 else ""
+                pop   = int(float(v[6])) if len(v) > 6 and v[6] not in ('NULL','') else 0
+                pname = v[7] if len(v) > 7 and v[7] not in ('NULL', '') else ""
+                aname = v[9] if len(v) > 9 and v[9] not in ('NULL', '') else ""
+                vid   = v[4] if len(v) > 4 else ""
+                pid   = v[8] if len(v) > 8 else ""
+                aid   = v[10] if len(v) > 10 else ""
             else:
-                # Format B: x, y, tribe, village_id, village_name, player_id, player_name, population, alliance_id, alliance_name
-                x = int(parts[0])
-                y = int(parts[1])
-                tribe = int(parts[2]) if len(parts) > 2 else 0
-                vid = parts[3] if len(parts) > 3 else ""
-                vname = parts[4] if len(parts) > 4 else ""
-                player_id = parts[5] if len(parts) > 5 else ""
-                player_name = parts[6] if len(parts) > 6 else ""
-                population = int(parts[7]) if len(parts) > 7 else 0
-                alliance_id = parts[8] if len(parts) > 8 else ""
-                alliance_name = parts[9] if len(parts) > 9 else ""
-            if not (-800 <= x <= 800 and -800 <= y <= 800):
-                continue
-            villages.append({
-                "village_id": vid,
-                "village_name": vname,
-                "x": x, "y": y,
-                "player_id": player_id,
-                "player_name": player_name,
-                "alliance_id": alliance_id,
-                "alliance_name": alliance_name,
-                "population": population,
-                "tribe": tribe,
-            })
+                # vid-first format
+                vid   = v[0]
+                x     = int(float(v[1]))
+                y     = int(float(v[2]))
+                tribe = int(float(v[4])) if len(v) > 4 and v[4] not in ('NULL','') else 0
+                vname = v[6] if len(v) > 6 else ""
+                pop   = int(float(v[7])) if len(v) > 7 and v[7] not in ('NULL','') else 0
+                pname = v[8] if len(v) > 8 and v[8] not in ('NULL', '') else ""
+                aname = v[10] if len(v) > 10 and v[10] not in ('NULL', '') else ""
+                pid   = v[8] if len(v) > 8 else ""
+                aid   = v[9] if len(v) > 9 else ""
         except (ValueError, IndexError):
             continue
+        if not (-800 <= x <= 800 and -800 <= y <= 800):
+            continue
+        villages.append({
+            "village_id": vid,
+            "village_name": vname,
+            "x": x, "y": y,
+            "player_id": pid,
+            "player_name": pname,
+            "alliance_id": aid,
+            "alliance_name": aname,
+            "population": pop,
+            "tribe": tribe,
+        })
     return villages
 
 
@@ -3158,6 +3204,16 @@ async def farming_snapshot(request: Request, guild_id: str):
     except Exception as e:
         return RedirectResponse(f"/guild/{guild_id}/farming?error=fetch_failed", status_code=303)
     return RedirectResponse(f"/guild/{guild_id}/farming?saved=snapshot", status_code=303)
+
+
+@app.post("/guild/{guild_id}/farming/snapshots/clear")
+async def farming_snapshots_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.clear_all_snapshots(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/farming?saved=snapshots_cleared", status_code=303)
 
 
 @app.post("/guild/{guild_id}/farming/farmlist/add")
