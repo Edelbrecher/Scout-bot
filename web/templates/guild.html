@@ -224,6 +224,16 @@
       {{ OK_ARROW }}
     </a>
 
+    <!-- Allianz-Lazarett (Pro) -->
+    <a href="/guild/{{ guild.guild_id }}/allianz/hospital" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+      <div class="feature-icon">🏥</div>
+      <div class="feature-body">
+        <div class="feature-title">Allianz-Lazarett {{ PRO_BADGE }}</div>
+        <div class="feature-desc">Heilende Truppen aller Mitglieder auf einen Blick koordinieren</div>
+      </div>
+      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+    </a>
+
     <!-- Statistics -->
     <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📊</div>

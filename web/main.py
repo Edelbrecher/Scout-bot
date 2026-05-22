@@ -2411,20 +2411,27 @@ async def mein_account_page(request: Request, guild_id: str):
     dual_links = await database.get_dual_links_for_owner(guild_id, session.get("uid", ""))
     dual_created = request.query_params.get("dual_created")
 
+    hospital_data    = await database.get_hospital_data(guild_id, session.get("uid", ""))
+    hospital_uploaded = request.query_params.get("hospital_uploaded")
+    hospital_cleared  = request.query_params.get("hospital_cleared")
+
     return templates.TemplateResponse("mein_account.html", {
-        "request":       request,
-        "guild":         guild,
-        "own_villages":  own_villages,
-        "history":       history,
-        "uploaded":      uploaded,
-        "cleared":       cleared,
-        "saved":         saved,
-        "total_off":     total_off,
-        "total_def":     total_def,
-        "total_crop":    total_crop,
-        "sitters":       sitters,
-        "dual_links":    dual_links,
-        "dual_created":  dual_created,
+        "request":            request,
+        "guild":              guild,
+        "own_villages":       own_villages,
+        "history":            history,
+        "uploaded":           uploaded,
+        "cleared":            cleared,
+        "saved":              saved,
+        "total_off":          total_off,
+        "total_def":          total_def,
+        "total_crop":         total_crop,
+        "sitters":            sitters,
+        "dual_links":         dual_links,
+        "dual_created":       dual_created,
+        "hospital_data":      hospital_data,
+        "hospital_uploaded":  hospital_uploaded,
+        "hospital_cleared":   hospital_cleared,
     })
 
 
@@ -3725,3 +3732,176 @@ async def api_popup_config():
     except Exception:
         return JSONResponse({"enabled": False})
     return JSONResponse(data)
+
+
+# ---------------------------------------------------------------------------
+# Hospital (Lazarett) Parser
+# ---------------------------------------------------------------------------
+
+def parse_hospital(text: str) -> list[dict]:
+    """Parse Travian hospital copy-paste into list of dicts.
+
+    Each dict: {village_name, troop_name, count, heal_finish}
+
+    Format:
+      Village name
+      TroopName\tCount\tHH:MM:SS  (or DD.MM.YYYY HH:MM:SS)
+    """
+    import re as _re
+
+    # Strip Unicode direction/formatting marks
+    text = _re.sub(r'[​-‏‪-‮⁦-⁩﻿]', '', text)
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+
+    _SKIP = _re.compile(
+        r'^Lazarett$|^Hospital$|^Krankenhaus$|^Heilung$|^Truppe$|^Anzahl$|'
+        r'^Fertig$|^Troop$|^Count$|^Healing finish$|^Finish$|'
+        r'^Dorf$|^Village$|^Overview$|^Übersicht$|'
+        r'^Homepage|^\© \d{4}|Discord|Support|Game rules|Terms|Imprint|'
+        r'^Server time|^TravOps|^Profile|^Rally|^Management|'
+        r'^\s*Troop\s+Count\s+|^\s*Truppe\s+Anzahl',
+        _re.IGNORECASE,
+    )
+
+    # Time-like patterns
+    _TIME_ONLY = _re.compile(r'^\d{1,2}:\d{2}:\d{2}$')
+    _DATETIME  = _re.compile(r'^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}:\d{2}$')
+
+    entries = []
+    current_village = None
+
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+
+        # Tab-separated data row?
+        if '\t' in stripped:
+            parts = [p.strip() for p in stripped.split('\t')]
+            parts = [p for p in parts if p]
+            # Expect: TroopName, Count, Time  (at least 2 parts, count is numeric)
+            if len(parts) >= 2:
+                troop_name = parts[0]
+                # Skip if first part looks like a header word
+                if _SKIP.match(troop_name):
+                    continue
+                try:
+                    count = int(_re.sub(r'\D', '', parts[1]))
+                except (ValueError, IndexError):
+                    continue
+                heal_finish = None
+                if len(parts) >= 3:
+                    t = parts[2].strip()
+                    if _TIME_ONLY.match(t) or _DATETIME.match(t):
+                        heal_finish = t
+                    elif len(parts) >= 4:
+                        # Maybe date and time split across columns
+                        combined = f"{parts[2]} {parts[3]}".strip()
+                        if _DATETIME.match(combined):
+                            heal_finish = combined
+                if current_village and troop_name:
+                    entries.append({
+                        "village_name": current_village,
+                        "troop_name": troop_name,
+                        "count": count,
+                        "heal_finish": heal_finish,
+                    })
+            continue
+
+        # Skip known UI chrome
+        if _SKIP.search(stripped):
+            continue
+
+        # Otherwise treat as village name (non-tab line)
+        current_village = stripped
+
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# Routes — Lazarett-Tracker (Hospital)
+# ---------------------------------------------------------------------------
+
+@app.post("/guild/{guild_id}/mein-account/hospital")
+async def hospital_upload(
+    request: Request,
+    guild_id: str,
+    hospital_text: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    entries = parse_hospital(hospital_text)
+    await database.save_hospital_data(
+        guild_id=guild_id,
+        discord_user_id=session.get("uid", ""),
+        discord_username=session.get("username"),
+        entries=entries,
+    )
+    return RedirectResponse(
+        f"/guild/{guild_id}/mein-account?hospital_uploaded={len(entries)}",
+        status_code=303,
+    )
+
+
+@app.post("/guild/{guild_id}/mein-account/hospital/clear")
+async def hospital_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    await database.delete_hospital_data(guild_id, session.get("uid", ""))
+    return RedirectResponse(f"/guild/{guild_id}/mein-account?hospital_cleared=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/allianz/hospital", response_class=HTMLResponse)
+async def allianz_hospital(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+
+    all_entries = await database.get_all_hospital_data(guild_id)
+
+    # Group by discord_user_id
+    from collections import OrderedDict
+    grouped: dict[str, dict] = OrderedDict()
+    for e in all_entries:
+        uid = e["discord_user_id"]
+        if uid not in grouped:
+            grouped[uid] = {
+                "discord_username": e.get("discord_username") or uid,
+                "uploaded_at": e.get("uploaded_at", ""),
+                "entries": [],
+                "total": 0,
+            }
+        grouped[uid]["entries"].append(e)
+        grouped[uid]["total"] += e["count"]
+        # Keep latest upload time
+        if e.get("uploaded_at", "") > grouped[uid]["uploaded_at"]:
+            grouped[uid]["uploaded_at"] = e["uploaded_at"]
+
+    return templates.TemplateResponse("allianz_hospital.html", {
+        "request": request,
+        "guild": guild,
+        "grouped": list(grouped.values()),
+        "all_entries": all_entries,
+    })

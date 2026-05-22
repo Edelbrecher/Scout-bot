@@ -314,6 +314,93 @@
   </div>
   {% endif %}
 
+  <!-- ── Lazarett ──────────────────────────────────────────────────────── -->
+
+  {% if hospital_uploaded %}
+  <div class="alert alert-success" style="margin-top:1.25rem;">✅ {{ hospital_uploaded }} Lazarett-Einträge erfolgreich importiert.</div>
+  {% endif %}
+  {% if hospital_cleared %}
+  <div class="alert alert-success" style="margin-top:1.25rem;">🗑️ Lazarett-Daten gelöscht.</div>
+  {% endif %}
+
+  <div class="card" style="margin-top:1.25rem;margin-bottom:1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;">
+      <h2 style="margin:0;">🏥 Lazarett</h2>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('hospitalModal').style.display='flex'">⬆️ Lazarett importieren</button>
+        {% if hospital_data %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/hospital/clear" style="margin:0;"
+              onsubmit="return confirm('Lazarett-Daten löschen?')">
+          <button type="submit" class="btn btn-danger">🗑 Löschen</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if hospital_data %}
+    {% set total_healing = hospital_data | sum(attribute='count') %}
+    <div style="margin-bottom:0.75rem;">
+      <span style="font-size:1.4rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(total_healing).replace(",",".") }}</span>
+      <span style="font-size:0.82rem;color:var(--text-muted);margin-left:0.4rem;">Truppen in Heilung</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Dorf</th>
+            <th>Truppe</th>
+            <th style="text-align:right;">Anzahl</th>
+            <th>Fertig um</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in hospital_data %}
+          <tr>
+            <td>{{ e.village_name }}</td>
+            <td>{{ e.troop_name }}</td>
+            <td style="text-align:right;font-weight:700;color:#ef4444;">{{ "{:,}".format(e.count).replace(",",".") }}</td>
+            <td style="font-family:monospace;font-size:0.85rem;color:var(--text-muted);">{{ e.heal_finish or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
+      Noch keine Lazarett-Daten. Öffne in Travian das <strong>Lazarett</strong>, markiere alles
+      (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und importiere hier.
+    </p>
+    {% endif %}
+  </div>
+
+  <!-- Hospital Import Modal -->
+  <div id="hospitalModal"
+       style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);
+              align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+                padding:1.5rem;width:100%;max-width:600px;position:relative;">
+      <button onclick="document.getElementById('hospitalModal').style.display='none'"
+              style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
+                     color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
+      <h2 style="margin:0 0 0.5rem;">🏥 Lazarett importieren</h2>
+      <p class="hint" style="margin-bottom:0.75rem;">
+        Öffne in Travian das <strong>Lazarett</strong>, markiere alles (<kbd>Strg+A</kbd>),
+        kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
+      </p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/hospital">
+        <textarea name="hospital_text" rows="10"
+          placeholder="Dorfname&#10;Legionär&#9;45&#9;08:32:15&#10;Prätorianer&#9;12&#9;09:15:00&#10;..."
+          style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;
+                 background:var(--bg-main);color:var(--text);border:1px solid var(--border);
+                 border-radius:6px;padding:0.5rem;box-sizing:border-box;"></textarea>
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+          <button type="submit" class="btn btn-primary">⬆️ Importieren</button>
+          <button type="button" class="btn" onclick="document.getElementById('hospitalModal').style.display='none'">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </div>
 
 <style>

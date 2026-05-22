@@ -217,6 +217,7 @@ async def init_db():
     await _init_settle_list_table()
     await _init_dual_links_table()
     await _init_farmlist_analyses_table()
+    await _init_hospital_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH) as db:
@@ -2332,3 +2333,80 @@ async def get_scout_stats(guild_id: str) -> list[dict]:
             ORDER BY scout_count DESC
         """, (guild_id,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Hospital (Lazarett) tables
+# ---------------------------------------------------------------------------
+
+async def _init_hospital_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS hospital_entries (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id         TEXT NOT NULL,
+                discord_user_id  TEXT NOT NULL,
+                discord_username TEXT,
+                uploaded_at      TEXT DEFAULT (datetime('now')),
+                village_name     TEXT NOT NULL,
+                troop_name       TEXT NOT NULL,
+                count            INTEGER NOT NULL,
+                heal_finish      TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def save_hospital_data(
+    guild_id: str,
+    discord_user_id: str,
+    discord_username: str | None,
+    entries: list[dict],
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM hospital_entries WHERE guild_id = ? AND discord_user_id = ?",
+            (guild_id, discord_user_id),
+        )
+        for e in entries:
+            await db.execute(
+                """INSERT INTO hospital_entries
+                   (guild_id, discord_user_id, discord_username, village_name, troop_name, count, heal_finish)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (guild_id, discord_user_id, discord_username,
+                 e["village_name"], e["troop_name"], e["count"], e.get("heal_finish")),
+            )
+        await db.commit()
+
+
+async def get_hospital_data(guild_id: str, discord_user_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM hospital_entries
+               WHERE guild_id = ? AND discord_user_id = ?
+               ORDER BY heal_finish ASC""",
+            (guild_id, discord_user_id),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_all_hospital_data(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM hospital_entries
+               WHERE guild_id = ?
+               ORDER BY discord_username ASC, heal_finish ASC""",
+            (guild_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_hospital_data(guild_id: str, discord_user_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM hospital_entries WHERE guild_id = ? AND discord_user_id = ?",
+            (guild_id, discord_user_id),
+        )
+        await db.commit()
