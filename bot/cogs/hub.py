@@ -5,6 +5,7 @@ Each button opens a modal and creates a specific channel in the configured categ
 """
 import asyncio
 import re
+from datetime import datetime, timedelta
 
 import discord
 from discord import app_commands
@@ -145,70 +146,159 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
         await interaction.followup.send(f"✅ Channel erstellt: {new_channel.mention}", ephemeral=True)
 
 
-class DefendModal(discord.ui.Modal):
-    attacker = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
-    arrival = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=60)
-    size = discord.ui.TextInput(label="Angriffsgröße (schätzen)", placeholder="z.B. klein / mittel / groß", required=False, max_length=60)
-    notes = discord.ui.TextInput(label="Notizen", required=False, style=discord.TextStyle.paragraph, max_length=300)
+def _parse_time(s: str) -> datetime | None:
+    """Try to parse HH:MM (or HH:MM:SS) from a string. Returns a datetime on today's date."""
+    m = re.search(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", s)
+    if not m:
+        return None
+    h, mi, sec = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+    if not (0 <= h < 24 and 0 <= mi < 60 and 0 <= sec < 60):
+        return None
+    now = datetime.utcnow().replace(second=0, microsecond=0)
+    return now.replace(hour=h, minute=mi, second=sec)
 
-    def __init__(self, timed: bool = False):
-        self.title = "⏱️ Timed-Defend Anfrage" if timed else "🛡️ Defend Anfrage"
-        super().__init__()
-        self.timed = timed
+
+def _between_time(t1: datetime, t2: datetime) -> str:
+    """Return HH:MM UTC of the midpoint between t1 and t2.
+    If t2 <= t1, assume t2 is the next day."""
+    if t2 <= t1:
+        t2 += timedelta(days=1)
+    mid = t1 + (t2 - t1) / 2
+    return mid.strftime("%H:%M") + " UTC"
+
+
+async def _create_defend_channel(
+    interaction: discord.Interaction,
+    attacker: str, coords: str, size: str, notes: str,
+    arrival_1: str, arrival_2: str, timed: bool,
+):
+    """Shared logic for both Defend and TimedDefend modals."""
+    guild = interaction.guild
+    config, category = await _get_config_and_category(guild)
+    if not config:
+        await interaction.response.send_message("⚠️ Bot nicht konfiguriert.", ephemeral=True)
+        return
+    if not category:
+        await interaction.response.send_message("⚠️ Kategorie nicht gefunden.", ephemeral=True)
+        return
+
+    # Validate & calculate between-time for timed defend
+    between_str = ""
+    if timed and arrival_2:
+        t1 = _parse_time(arrival_1)
+        t2 = _parse_time(arrival_2)
+        if t1 and t2:
+            if t2 <= t1:
+                t2 += timedelta(days=1)
+            if (t2 - t1).total_seconds() < 60:
+                await interaction.response.send_message(
+                    "⚠️ Die 2. Ankunftszeit muss mindestens 1 Minute nach der 1. liegen.",
+                    ephemeral=True,
+                )
+                return
+            between_str = _between_time(t1, t2)
+
+    await interaction.response.defer(ephemeral=True)
+
+    prefix = "timed-def" if timed else "defend"
+    channel_name = f"{prefix}-{_safe(attacker)}-{_safe(coords)}"[:100]
+    topic = (f"{'Timed-Defend' if timed else 'Defend'}: {attacker} @ {coords} | "
+             f"{arrival_1}{' → ' + arrival_2 if arrival_2 else ''}")
+
+    overwrites = _build_overwrites(guild, config, interaction.user)
+    new_channel = await guild.create_text_channel(
+        name=channel_name, category=category, topic=topic, overwrites=overwrites,
+    )
+
+    embed = discord.Embed(
+        title="⏱️ Timed-Defend" if timed else "🛡️ Defend",
+        color=discord.Color.from_rgb(239, 68, 68),
+    )
+    embed.add_field(name="Angreifer", value=attacker, inline=True)
+    embed.add_field(name="Ziel",      value=coords,   inline=True)
+
+    if timed and arrival_2:
+        embed.add_field(name="1. Welle ⚔️", value=arrival_1, inline=True)
+        embed.add_field(name="2. Welle ⚔️", value=arrival_2, inline=True)
+        if between_str:
+            embed.add_field(
+                name="🛡️ Zwischen-Defense — angestrebte Ankunft",
+                value=f"**{between_str}**\n"
+                      f"*Truppen so timen dass sie nach der 1. Welle, aber vor der 2. Welle ankommen*",
+                inline=False,
+            )
+    else:
+        embed.add_field(name="Ankunft ⚔️", value=arrival_1, inline=True)
+
+    if size:
+        embed.add_field(name="Größe", value=size, inline=True)
+    if notes:
+        embed.add_field(name="Notizen", value=notes, inline=False)
+    embed.set_footer(text=f"Gemeldet von {interaction.user.display_name}")
+
+    await new_channel.send(
+        content=f"🚨 {interaction.user.mention} — {'Timed-' if timed else ''}Defend-Anfrage!",
+        embed=embed,
+        view=DefendCloseView(),
+    )
+
+    arrival_db = arrival_1
+    if arrival_2:
+        arrival_db = f"{arrival_1} → {arrival_2}"
+        if between_str:
+            arrival_db += f" (Zwischen: {between_str})"
+
+    await database.add_defend_channel(
+        channel_id=str(new_channel.id), guild_id=str(guild.id),
+        type="timed_defend" if timed else "defend",
+        attacker=attacker, coords=coords,
+        arrival_time=arrival_db, notes=notes,
+        requested_by_id=str(interaction.user.id),
+        requested_by_name=interaction.user.display_name,
+    )
+    await interaction.followup.send(f"✅ Channel erstellt: {new_channel.mention}", ephemeral=True)
+
+
+class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
+    """Plain defend — single arrival time."""
+    attacker = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
+    coords   = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    arrival  = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=30)
+    size     = discord.ui.TextInput(label="Angriffsgröße", placeholder="z.B. klein / mittel / ~500 Axt", required=False, max_length=60)
+    notes    = discord.ui.TextInput(label="Notizen", required=False, style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        config, category = await _get_config_and_category(guild)
-        if not config:
-            await interaction.response.send_message("⚠️ Bot nicht konfiguriert.", ephemeral=True)
-            return
-        if not category:
-            await interaction.response.send_message("⚠️ Kategorie nicht gefunden.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
-
-        prefix = "timed-def" if self.timed else "defend"
-        channel_name = f"{prefix}-{_safe(self.attacker.value)}-{_safe(self.coords.value)}"[:100]
-
-        overwrites = _build_overwrites(guild, config, interaction.user)
-        new_channel = await guild.create_text_channel(
-            name=channel_name, category=category,
-            topic=f"{'Timed-Defend' if self.timed else 'Defend'}: {self.attacker.value} @ {self.coords.value} | Ankunft: {self.arrival.value}",
-            overwrites=overwrites,
+        await _create_defend_channel(
+            interaction,
+            attacker=self.attacker.value.strip(),
+            coords=self.coords.value.strip(),
+            size=self.size.value.strip(),
+            notes=self.notes.value.strip(),
+            arrival_1=self.arrival.value.strip(),
+            arrival_2="",
+            timed=False,
         )
 
-        color = discord.Color.from_rgb(239, 68, 68)
-        title = "⏱️ Timed-Defend" if self.timed else "🛡️ Defend"
-        embed = discord.Embed(title=title, color=color)
-        embed.add_field(name="Angreifer", value=self.attacker.value, inline=True)
-        embed.add_field(name="Ziel", value=self.coords.value, inline=True)
-        embed.add_field(name="Ankunft", value=self.arrival.value, inline=True)
-        if self.size.value:
-            embed.add_field(name="Größe", value=self.size.value, inline=True)
-        if self.notes.value:
-            embed.add_field(name="Notizen", value=self.notes.value, inline=False)
-        embed.set_footer(text=f"Gemeldet von {interaction.user.display_name}")
 
-        # Close button view
-        view = DefendCloseView()
-        await new_channel.send(
-            content=f"🚨 {interaction.user.mention} — Defend-Anfrage!",
-            embed=embed,
-            view=view,
+class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
+    """Timed defend — two arrival times, calculates between-defense window."""
+    attacker  = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
+    coords    = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    arrival   = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=30)
+    arrival_2 = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC (muss später sein)", max_length=30)
+    size      = discord.ui.TextInput(label="Angriffsgröße", placeholder="z.B. klein / mittel / ~500 Axt", required=False, max_length=60)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await _create_defend_channel(
+            interaction,
+            attacker=self.attacker.value.strip(),
+            coords=self.coords.value.strip(),
+            size=self.size.value.strip(),
+            notes="",
+            arrival_1=self.arrival.value.strip(),
+            arrival_2=self.arrival_2.value.strip(),
+            timed=True,
         )
-
-        await database.add_defend_channel(
-            channel_id=str(new_channel.id), guild_id=str(guild.id),
-            type="timed_defend" if self.timed else "defend",
-            attacker=self.attacker.value, coords=self.coords.value,
-            arrival_time=self.arrival.value, notes=self.notes.value or "",
-            requested_by_id=str(interaction.user.id),
-            requested_by_name=interaction.user.display_name,
-        )
-
-        await interaction.followup.send(f"✅ Defend-Channel erstellt: {new_channel.mention}", ephemeral=True)
 
 
 # ---------------------------------------------------------------------------
@@ -330,14 +420,14 @@ class RequestHubView(discord.ui.View):
         custom_id="persistent:hub_defend", row=1,
     )
     async def hub_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(DefendModal(timed=False))
+        await interaction.response.send_modal(DefendModal())
 
     @discord.ui.button(
         label="Timed-Defend", emoji="⏱️", style=discord.ButtonStyle.danger,
         custom_id="persistent:hub_timed_defend", row=1,
     )
     async def hub_timed_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(DefendModal(timed=True))
+        await interaction.response.send_modal(TimedDefendModal())
 
 
 # ---------------------------------------------------------------------------
