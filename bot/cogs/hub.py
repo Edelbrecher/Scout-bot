@@ -169,7 +169,7 @@ def _between_time(t1: datetime, t2: datetime) -> str:
 
 async def _create_defend_channel(
     interaction: discord.Interaction,
-    attacker: str, coords: str, size: str, notes: str,
+    defender: str, attacker: str, coords: str, size: str, notes: str,
     arrival_1: str, arrival_2: str, timed: bool,
 ):
     """Shared logic for both Defend and TimedDefend modals."""
@@ -206,8 +206,7 @@ async def _create_defend_channel(
     await interaction.response.defer(ephemeral=True)
 
     prefix = "timed-def" if timed else "defend"
-    defender_name = _safe(interaction.user.display_name)
-    channel_name = f"{prefix}-{defender_name}-{_safe(coords)}"[:100]
+    channel_name = f"{prefix}-{_safe(defender)}-{_safe(coords)}"[:100]
     topic = (f"{'Timed-Defend' if timed else 'Defend'}: {attacker} @ {coords} | "
              f"{arrival_1}{' → ' + arrival_2 if arrival_2 else ''}")
 
@@ -220,8 +219,9 @@ async def _create_defend_channel(
         title="⏱️ Timed-Defend" if timed else "🛡️ Defend",
         color=discord.Color.from_rgb(239, 68, 68),
     )
-    embed.add_field(name="Angreifer", value=attacker, inline=True)
-    embed.add_field(name="Ziel",      value=coords,   inline=True)
+    embed.add_field(name="Verteidiger", value=defender, inline=True)
+    embed.add_field(name="Angreifer",  value=attacker, inline=True)
+    embed.add_field(name="Ziel",       value=coords,   inline=True)
 
     if timed and arrival_2:
         embed.add_field(name="1. Welle ⚔️", value=arrival_1, inline=True)
@@ -267,19 +267,20 @@ async def _create_defend_channel(
 
 class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
     """Plain defend — single arrival time."""
+    defender = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
     attacker = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
     coords   = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
     arrival  = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=30)
     size     = discord.ui.TextInput(label="Angriffsgröße", placeholder="z.B. klein / mittel / ~500 Axt", required=False, max_length=60)
-    notes    = discord.ui.TextInput(label="Notizen", required=False, style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
         await _create_defend_channel(
             interaction,
+            defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
             coords=self.coords.value.strip(),
             size=self.size.value.strip(),
-            notes=self.notes.value.strip(),
+            notes="",
             arrival_1=self.arrival.value.strip(),
             arrival_2="",
             timed=False,
@@ -288,15 +289,16 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
 
 class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
     """Timed defend — two arrival times, calculates between-defense window."""
+    defender  = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
     attacker  = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
     coords    = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
     arrival   = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=30)
     arrival_2 = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC (muss später sein)", max_length=30)
-    size      = discord.ui.TextInput(label="Angriffsgröße", placeholder="z.B. klein / mittel / ~500 Axt", required=False, max_length=60)
 
     async def on_submit(self, interaction: discord.Interaction):
         await _create_defend_channel(
             interaction,
+            defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
             coords=self.coords.value.strip(),
             size=self.size.value.strip(),
