@@ -32,6 +32,10 @@ class ScouterBot(commands.Bot):
         await self.tree.sync()
         print("Slash commands synced.")
 
+    async def on_message(self, message: discord.Message):
+        print(f"[main][on_message] ch={message.channel.id} author={message.author} attachments={len(message.attachments)}", flush=True)
+        await self.process_commands(message)
+
     async def on_ready(self):
         print(f"Logged in as {self.user} ({self.user.id})")
         # Sync all current guilds to DB — include owner so slots_used is accurate
