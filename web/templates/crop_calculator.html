@@ -1,0 +1,792 @@
+{% extends "base.html" %}
+{% block title %}Getreidefeld-Rechner · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.cc-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.cc-section h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 1rem 0;
+}
+.cc-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.cc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.cc-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cc-field input[type="number"],
+.cc-field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.9rem;
+  min-width: 80px;
+}
+.cc-field input[type="number"]:focus,
+.cc-field select:focus {
+  outline: none;
+  border-color: #f59e0b;
+}
+.cc-radio-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.cc-radio-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cc-radio-btn input[type="radio"] { display: none; }
+.cc-radio-btn.selected {
+  border-color: #f59e0b;
+  background: rgba(245,158,11,0.12);
+  color: #f59e0b;
+  font-weight: 600;
+}
+.cc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.cc-toggle.active {
+  border-color: #22c55e;
+  background: rgba(34,197,94,0.12);
+  color: #22c55e;
+  font-weight: 600;
+}
+.cc-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.cc-fields-grid .cc-field input {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+.cc-fields-grid .cc-field label {
+  text-align: center;
+}
+
+/* Results table */
+.cc-table-wrap {
+  overflow-x: auto;
+}
+.cc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.cc-table th {
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.cc-table td {
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.cc-table tr:last-child td { border-bottom: none; }
+.cc-table tr:hover td { background: rgba(255,255,255,0.02); }
+.cc-action-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.cc-action-field { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.cc-action-mill  { background: rgba(99,102,241,0.15); color: #818cf8; }
+.cc-action-bakery { background: rgba(236,72,153,0.15); color: #f472b6; }
+.cc-action-oasis { background: rgba(34,197,94,0.15); color: #22c55e; }
+
+.cc-prod-value { font-family: monospace; font-weight: 600; color: #f59e0b; }
+.cc-roi-value  { font-family: monospace; }
+.cc-roi-good   { color: #22c55e; }
+.cc-roi-mid    { color: #f59e0b; }
+.cc-roi-bad    { color: #ef4444; }
+.cc-cost-res   { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; }
+
+.btn-calc {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #000;
+  border: none;
+  padding: 0.65rem 2rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-calc:hover { opacity: 0.88; }
+.btn-reset {
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 0.65rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.btn-reset:hover { border-color: #f59e0b; color: var(--text); }
+
+.cc-info-box {
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.cc-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.cc-kpi {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  min-width: 130px;
+}
+.cc-kpi-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+.cc-kpi-value { font-size: 1.15rem; font-weight: 700; color: #f59e0b; font-family: monospace; }
+</style>
+
+<div class="container-wide" style="max-width:1100px; margin: 0 auto;">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+    <div>
+      <a href="/guild/{{ guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>🌾 Getreidefeld-Effizienz-Rechner</h1>
+      <p class="subtitle">Optimale Upgrade-Reihenfolge für Getreidefelder — ROI-basiert (T4.4 Extended)</p>
+    </div>
+  </div>
+
+  <!-- Configuration -->
+  <div class="cc-section">
+    <h2>Konfiguration</h2>
+    <div class="cc-row" style="gap:1.5rem;">
+
+      <!-- Village type -->
+      <div class="cc-field">
+        <label>Dorftyp</label>
+        <div class="cc-radio-group" id="villageTypeGroup">
+          <label class="cc-radio-btn selected" onclick="setVillageType('15c',this)">
+            <input type="radio" name="villageType" value="15c" checked> 15-Getreide
+          </label>
+          <label class="cc-radio-btn" onclick="setVillageType('9c',this)">
+            <input type="radio" name="villageType" value="9c"> 9-Getreide
+          </label>
+          <label class="cc-radio-btn" onclick="setVillageType('7c',this)">
+            <input type="radio" name="villageType" value="7c"> 7-Getreide
+          </label>
+        </div>
+      </div>
+
+      <!-- Capital -->
+      <div class="cc-field">
+        <label>Hauptstadt?</label>
+        <div class="cc-radio-group">
+          <div class="cc-toggle" id="capitalToggle" onclick="toggleCapital()">
+            <span id="capitalIcon">✗</span> Nein
+          </div>
+        </div>
+      </div>
+
+      <!-- Egyptian -->
+      <div class="cc-field">
+        <label>Ägypter?</label>
+        <div class="cc-radio-group">
+          <div class="cc-toggle" id="egyptToggle" onclick="toggleEgypt()">
+            <span id="egyptIcon">✗</span> Nein
+          </div>
+        </div>
+      </div>
+
+      <!-- Gold bonus -->
+      <div class="cc-field">
+        <label>Gold-Bonus (+25%)?</label>
+        <div class="cc-radio-group">
+          <div class="cc-toggle" id="goldToggle" onclick="toggleGold()">
+            <span id="goldIcon">✗</span> Nein
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Oases -->
+    <div class="cc-row" style="margin-top:1rem; gap:1rem;">
+      <div class="cc-field">
+        <label>Oase 1</label>
+        <select id="oasis1">
+          <option value="0">Keine</option>
+          <option value="25">+25% Getreide</option>
+          <option value="50">+50% Getreide</option>
+        </select>
+      </div>
+      <div class="cc-field">
+        <label>Oase 2</label>
+        <select id="oasis2">
+          <option value="0">Keine</option>
+          <option value="25">+25% Getreide</option>
+          <option value="50">+50% Getreide</option>
+        </select>
+      </div>
+      <div class="cc-field">
+        <label>Oase 3</label>
+        <select id="oasis3">
+          <option value="0">Keine</option>
+          <option value="25">+25% Getreide</option>
+          <option value="50">+50% Getreide</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Starting state -->
+  <div class="cc-section">
+    <h2>Ausgangszustand (optional)</h2>
+    <div class="cc-row" style="gap:2rem; align-items:flex-start;">
+
+      <div>
+        <div class="cc-field" style="margin-bottom:0.75rem;">
+          <label>Getreidefelder (Level)</label>
+        </div>
+        <div class="cc-fields-grid" id="fieldLevelsGrid">
+          <!-- dynamically filled -->
+        </div>
+      </div>
+
+      <div class="cc-row" style="gap:1rem;">
+        <div class="cc-field">
+          <label>Mühle (Level)</label>
+          <select id="millLevel">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div class="cc-field">
+          <label>Bäckerei (Level)</label>
+          <select id="bakeryLevel">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div class="cc-field">
+          <label>Heldenvilla (Level)</label>
+          <select id="mansionLevel">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+            <option value="13">13</option>
+            <option value="14">14</option>
+            <option value="15">15</option>
+            <option value="16">16</option>
+            <option value="17">17</option>
+            <option value="18">18</option>
+            <option value="19">19</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+        <div class="cc-field">
+          <label>Max. Schritte</label>
+          <input type="number" id="maxSteps" value="30" min="1" max="200" style="width:80px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem;">
+    <button class="btn-calc" onclick="runCalculation()">🌾 Berechnen</button>
+    <button class="btn-reset" onclick="resetForm()">Zurücksetzen</button>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsSection" style="display:none;">
+    <div class="cc-section">
+      <h2>Ergebnis-Zusammenfassung</h2>
+      <div class="cc-summary-row" id="summaryRow"></div>
+      <div class="cc-info-box" id="infoBox"></div>
+    </div>
+
+    <div class="cc-section">
+      <h2>Upgrade-Reihenfolge</h2>
+      <div class="cc-table-wrap">
+        <table class="cc-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Aktion</th>
+              <th>Kosten (H/L/E/G)</th>
+              <th>Produktion nach Upgrade</th>
+              <th>Gewinn (G/h)</th>
+              <th>ROI (Tage)</th>
+              <th>Felder-Status</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Travian T4.4 extended data ───────────────────────────────────────────────
+
+// Crop production per field per hour at each level (index = level)
+const CROP_PROD = [1, 3, 6, 10, 15, 21, 31, 46, 70, 98, 140, 195, 280, 392, 546, 768, 1050, 1470, 2030, 2800, 3920, 5513];
+
+// Crop field upgrade costs [wood, clay, iron, wheat] per level (cost TO reach that level)
+// Index 1 = cost to upgrade from 0→1, index 2 = cost to upgrade from 1→2, etc.
+// Source: Travian T4.4 standard building costs
+const FIELD_COSTS = [
+  null,                            // lvl 0 (no cost)
+  [40,   40,   20,   10],         // 0→1
+  [65,   65,   40,   20],         // 1→2
+  [105,  105,  70,   35],         // 2→3
+  [175,  175,  115,  55],         // 3→4
+  [280,  280,  185,  90],         // 4→5
+  [460,  460,  300,  150],        // 5→6
+  [750,  750,  490,  245],        // 6→7
+  [1225, 1225, 795,  400],        // 7→8
+  [2000, 2000, 1300, 650],        // 8→9
+  [3275, 3275, 2120, 1060],       // 9→10
+  [5325, 5325, 3455, 1730],       // 10→11
+  [8670, 8670, 5625, 2810],       // 11→12
+  [14120,14120,9160, 4580],       // 12→13
+  [22990,22990,14915,7455],       // 13→14
+  [37430,37430,24285,12140],      // 14→15
+  [60950,60950,39510,19755],      // 15→16
+  [99235,99235,64365,32180],      // 16→17
+  [161545,161545,104780,52390],   // 17→18
+  [263060,263060,170600,85300],   // 18→19
+  [428380,428380,277870,138935],  // 19→20
+  [697660,697660,452480,226240],  // 20→21
+];
+
+// Mill/Bakery upgrade costs [wood, clay, iron, wheat] per level (1-5)
+const MILL_COSTS = [
+  null,
+  [400,   380,   360,   240],    // 0→1
+  [800,   750,   720,   480],    // 1→2
+  [1500,  1450,  1400,  900],    // 2→3
+  [3000,  2800,  2700,  1800],   // 3→4
+  [6000,  5600,  5200,  3500],   // 4→5
+];
+const BAKERY_COSTS = [
+  null,
+  [500,   440,   380,   250],    // 0→1
+  [1000,  880,   760,   500],    // 1→2
+  [1900,  1700,  1450,  950],    // 2→3
+  [3800,  3350,  2900,  1900],   // 3→4
+  [7500,  6700,  5800,  3800],   // 4→5
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let villageType = '15c';
+let isCapital   = false;
+let isEgypt     = false;
+let isGold      = false;
+
+function setVillageType(type, el) {
+  villageType = type;
+  document.querySelectorAll('#villageTypeGroup .cc-radio-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  buildFieldInputs();
+}
+function toggleCapital() {
+  isCapital = !isCapital;
+  const el = document.getElementById('capitalToggle');
+  el.classList.toggle('active', isCapital);
+  el.innerHTML = isCapital ? '<span>✓</span> Ja' : '<span>✗</span> Nein';
+  buildFieldInputs();
+}
+function toggleEgypt() {
+  isEgypt = !isEgypt;
+  const el = document.getElementById('egyptToggle');
+  el.classList.toggle('active', isEgypt);
+  el.innerHTML = isEgypt ? '<span>✓</span> Ja' : '<span>✗</span> Nein';
+}
+function toggleGold() {
+  isGold = !isGold;
+  const el = document.getElementById('goldToggle');
+  el.classList.toggle('active', isGold);
+  el.innerHTML = isGold ? '<span>✓</span> Ja' : '<span>✗</span> Nein';
+}
+
+function getFieldCount() {
+  if (villageType === '15c') return 15;
+  if (villageType === '9c')  return 9;
+  return 7;
+}
+
+function buildFieldInputs() {
+  const count = getFieldCount();
+  const maxLvl = isCapital ? 21 : 10;
+  const grid = document.getElementById('fieldLevelsGrid');
+  const existing = [];
+  grid.querySelectorAll('input').forEach(inp => existing.push(parseInt(inp.value)||0));
+  grid.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const val = (existing[i] !== undefined) ? Math.min(existing[i], maxLvl) : 0;
+    grid.innerHTML += `
+      <div class="cc-field">
+        <label>F${i+1}</label>
+        <input type="number" id="field${i}" value="${val}" min="0" max="${maxLvl}" style="width:100%;">
+      </div>`;
+  }
+}
+
+function resetForm() {
+  villageType = '15c';
+  isCapital = false;
+  isEgypt   = false;
+  isGold    = false;
+  document.querySelectorAll('#villageTypeGroup .cc-radio-btn').forEach((b,i) => b.classList.toggle('selected', i===0));
+  ['capitalToggle','egyptToggle','goldToggle'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('active');
+    const key = id.replace('Toggle','');
+    el.innerHTML = '<span>✗</span> Nein';
+  });
+  ['oasis1','oasis2','oasis3','millLevel','bakeryLevel','mansionLevel'].forEach(id => {
+    document.getElementById(id).value = '0';
+  });
+  document.getElementById('maxSteps').value = 30;
+  buildFieldInputs();
+  document.getElementById('resultsSection').style.display = 'none';
+}
+
+// ─── Core calculation ─────────────────────────────────────────────────────────
+
+function costToWheatEquiv(costs) {
+  // Simple 1:1 conversion (all resources treated equal weight)
+  // More advanced: use trade ratios or just sum all 4
+  return costs[0] + costs[1] + costs[2] + costs[3];
+}
+
+function calcTotalProduction(fieldLevels, millLvl, bakeryLvl, oasesBonusPct, goldBonus, egyptBonus) {
+  // Base production = sum of all field levels' individual production
+  const baseSum = fieldLevels.reduce((s, lvl) => s + CROP_PROD[lvl], 0);
+  // Mill: +5% per level, Bakery: +5% per level (Egyptians: +10% per bakery level)
+  const millBonus   = millLvl * 0.05;
+  const bakeryPctPerLevel = egyptBonus ? 0.10 : 0.05;
+  const bakeryBonus = bakeryLvl * bakeryPctPerLevel;
+  const goldBonusPct = goldBonus ? 0.25 : 0;
+  const oasisPct = oasesBonusPct / 100;
+  const multiplier = (1 + millBonus) * (1 + bakeryBonus) * (1 + goldBonusPct) * (1 + oasisPct);
+  return baseSum * multiplier;
+}
+
+function runCalculation() {
+  const fieldCount = getFieldCount();
+  const maxLvl = isCapital ? 21 : 10;
+  const millLvl    = parseInt(document.getElementById('millLevel').value)    || 0;
+  const bakeryLvl  = parseInt(document.getElementById('bakeryLevel').value)  || 0;
+  const mansionLvl = parseInt(document.getElementById('mansionLevel').value) || 0;
+  const maxSteps   = parseInt(document.getElementById('maxSteps').value)     || 30;
+  const oasis1Pct  = parseInt(document.getElementById('oasis1').value) || 0;
+  const oasis2Pct  = parseInt(document.getElementById('oasis2').value) || 0;
+  const oasis3Pct  = parseInt(document.getElementById('oasis3').value) || 0;
+
+  // Read starting field levels
+  let fieldLevels = [];
+  for (let i = 0; i < fieldCount; i++) {
+    const v = parseInt(document.getElementById(`field${i}`)?.value) || 0;
+    fieldLevels.push(Math.min(v, maxLvl));
+  }
+
+  // Current state
+  let state = {
+    fields:  [...fieldLevels],
+    mill:    millLvl,
+    bakery:  bakeryLvl,
+    mansion: mansionLvl,
+    oases:   [oasis1Pct, oasis2Pct, oasis3Pct].filter(v => v > 0),  // already captured
+    oasesPool: [oasis1Pct, oasis2Pct, oasis3Pct],
+    capturedOases: 0,
+  };
+  // Count how many oases are already captured based on mansion level
+  state.capturedOases = mansionLvl >= 20 ? 3 : mansionLvl >= 15 ? 2 : mansionLvl >= 10 ? 1 : 0;
+
+  const totalOasesBonusPct = () => state.oasesPool.slice(0, state.capturedOases).reduce((s,v)=>s+v, 0);
+
+  const steps = [];
+  let totalCostWE = 0;
+
+  for (let step = 0; step < maxSteps; step++) {
+    const currentProd = calcTotalProduction(state.fields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+
+    // Generate all possible actions
+    const candidates = [];
+
+    // Field upgrades
+    for (let fi = 0; fi < fieldCount; fi++) {
+      const curLvl = state.fields[fi];
+      if (curLvl >= maxLvl) continue;
+      const nextLvl = curLvl + 1;
+      const cost = FIELD_COSTS[nextLvl];
+      if (!cost) continue;
+      // New fields array with this field upgraded
+      const newFields = [...state.fields];
+      newFields[fi] = nextLvl;
+      const newProd = calcTotalProduction(newFields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+      const gain = newProd - currentProd;
+      if (gain <= 0) continue;
+      const we = costToWheatEquiv(cost);
+      const roi = we / (gain * 24);
+      candidates.push({ type: 'field', idx: fi, fromLvl: curLvl, toLvl: nextLvl, cost, gain, roi, we });
+    }
+
+    // Mill upgrade
+    if (state.mill < 5) {
+      const nextMill = state.mill + 1;
+      const cost = MILL_COSTS[nextMill];
+      const newProd = calcTotalProduction(state.fields, nextMill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+      const gain = newProd - currentProd;
+      if (gain > 0 && cost) {
+        const we = costToWheatEquiv(cost);
+        const roi = we / (gain * 24);
+        candidates.push({ type: 'mill', fromLvl: state.mill, toLvl: nextMill, cost, gain, roi, we });
+      }
+    }
+
+    // Bakery upgrade
+    if (state.bakery < 5) {
+      const nextBak = state.bakery + 1;
+      const cost = BAKERY_COSTS[nextBak];
+      const newProd = calcTotalProduction(state.fields, state.mill, nextBak, totalOasesBonusPct(), isGold, isEgypt);
+      const gain = newProd - currentProd;
+      if (gain > 0 && cost) {
+        const we = costToWheatEquiv(cost);
+        const roi = we / (gain * 24);
+        candidates.push({ type: 'bakery', fromLvl: state.bakery, toLvl: nextBak, cost, gain, roi, we });
+      }
+    }
+
+    // Oasis capture
+    const canCapture = state.capturedOases < state.oasesPool.filter(v=>v>0).length &&
+      ((state.capturedOases === 0 && state.mansion >= 10) ||
+       (state.capturedOases === 1 && state.mansion >= 15) ||
+       (state.capturedOases === 2 && state.mansion >= 20));
+    if (canCapture) {
+      const nextOasisPct = state.oasesPool[state.capturedOases];
+      if (nextOasisPct > 0) {
+        const newTotalOasis = totalOasesBonusPct() + nextOasisPct;
+        const newProd = calcTotalProduction(state.fields, state.mill, state.bakery, newTotalOasis, isGold, isEgypt);
+        const gain = newProd - currentProd;
+        if (gain > 0) {
+          // Oasis capture is "free" in terms of resource cost but requires hero actions
+          // ROI is effectively 0 / instant — put it as priority 0
+          candidates.push({ type: 'oasis', pct: nextOasisPct, cost: [0,0,0,0], gain, roi: 0, we: 0 });
+        }
+      }
+    }
+
+    if (candidates.length === 0) break;
+
+    // Pick best ROI (lowest value = fastest payback)
+    candidates.sort((a, b) => a.roi - b.roi);
+    const best = candidates[0];
+
+    totalCostWE += best.we;
+
+    // Apply action to state
+    if (best.type === 'field') {
+      state.fields[best.idx] = best.toLvl;
+    } else if (best.type === 'mill') {
+      state.mill = best.toLvl;
+    } else if (best.type === 'bakery') {
+      state.bakery = best.toLvl;
+    } else if (best.type === 'oasis') {
+      state.capturedOases++;
+    }
+
+    const newProd = calcTotalProduction(state.fields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+
+    steps.push({
+      step: step + 1,
+      action: best,
+      prodAfter: newProd,
+      gain: best.gain,
+      roi: best.roi,
+      fieldSnapshot: [...state.fields],
+      mill: state.mill,
+      bakery: state.bakery,
+      capturedOases: state.capturedOases,
+    });
+  }
+
+  renderResults(steps, state, totalOasesBonusPct());
+}
+
+function fmtCost(c) {
+  return `${fmtNum(c[0])} / ${fmtNum(c[1])} / ${fmtNum(c[2])} / ${fmtNum(c[3])}`;
+}
+function fmtNum(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if (n >= 1000) return (n/1000).toFixed(1)+'k';
+  return n.toString();
+}
+function roiClass(days) {
+  if (days < 1)  return 'cc-roi-good';
+  if (days < 3)  return 'cc-roi-mid';
+  return 'cc-roi-bad';
+}
+
+function renderResults(steps, finalState, totalOasisPct) {
+  if (steps.length === 0) {
+    document.getElementById('resultsSection').style.display = 'none';
+    alert('Keine weiteren Upgrades möglich — alles maximal ausgebaut.');
+    return;
+  }
+
+  const fieldCount = getFieldCount();
+  const maxLvl = isCapital ? 21 : 10;
+  const finalProd = calcTotalProduction(finalState.fields, finalState.mill, finalState.bakery, totalOasisPct, isGold, isEgypt);
+  const allMax = finalState.fields.every(l => l >= maxLvl) && finalState.mill >= 5 && finalState.bakery >= 5;
+
+  // Summary KPIs
+  const summaryRow = document.getElementById('summaryRow');
+  summaryRow.innerHTML = `
+    <div class="cc-kpi"><div class="cc-kpi-label">Endproduktion</div><div class="cc-kpi-value">${fmtNum(Math.round(finalProd))} G/h</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Schritte berechnet</div><div class="cc-kpi-value">${steps.length}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Mühle</div><div class="cc-kpi-value">Lvl ${finalState.mill}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Bäckerei</div><div class="cc-kpi-value">Lvl ${finalState.bakery}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Oasen-Bonus</div><div class="cc-kpi-value">+${totalOasisPct}%</div></div>
+  `;
+
+  const infoBox = document.getElementById('infoBox');
+  const bakeryPctPerLevel = isEgypt ? 10 : 5;
+  infoBox.innerHTML = `
+    <strong>Konfiguration:</strong>
+    ${getFieldCount()} Felder · ${isCapital ? 'Hauptstadt (max. Lvl 21)' : 'Normaldorf (max. Lvl 10)'} ·
+    ${isEgypt ? 'Ägypter (Bäckerei +10%/Lvl)' : 'Standard (Bäckerei +5%/Lvl)'} ·
+    ${isGold ? 'Gold-Bonus (+25%)' : 'Kein Gold-Bonus'} ·
+    Mühle +${finalState.mill * 5}% · Bäckerei +${finalState.bakery * bakeryPctPerLevel}% · Oasen +${totalOasisPct}%
+    ${allMax ? ' · <span style="color:#22c55e;font-weight:700;">✓ Vollständig ausgebaut!</span>' : ''}
+  `;
+
+  // Results table
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+  for (const s of steps) {
+    const a = s.action;
+    let actionBadge = '';
+    let actionDesc  = '';
+    if (a.type === 'field') {
+      actionBadge = `<span class="cc-action-badge cc-action-field">Feld ${a.idx+1}</span>`;
+      actionDesc  = `Lvl ${a.fromLvl} → ${a.toLvl}`;
+    } else if (a.type === 'mill') {
+      actionBadge = `<span class="cc-action-badge cc-action-mill">Mühle</span>`;
+      actionDesc  = `Lvl ${a.fromLvl} → ${a.toLvl}`;
+    } else if (a.type === 'bakery') {
+      actionBadge = `<span class="cc-action-badge cc-action-bakery">Bäckerei</span>`;
+      actionDesc  = `Lvl ${a.fromLvl} → ${a.toLvl}`;
+    } else if (a.type === 'oasis') {
+      actionBadge = `<span class="cc-action-badge cc-action-oasis">Oase</span>`;
+      actionDesc  = `+${a.pct}% Getreide`;
+    }
+
+    const roiTxt = a.roi === 0 ? '—' : a.roi.toFixed(2) + ' T';
+    const roiCls = a.roi === 0 ? 'cc-roi-good' : roiClass(a.roi);
+    const fieldStr = s.fieldSnapshot.join('-');
+
+    const costTxt = (a.cost[0]+a.cost[1]+a.cost[2]+a.cost[3]) === 0
+      ? '—'
+      : fmtCost(a.cost);
+
+    tbody.innerHTML += `
+      <tr>
+        <td style="color:var(--text-muted); font-size:0.8rem;">${s.step}</td>
+        <td>${actionBadge} <span style="font-size:0.82rem; color:var(--text-muted);">${actionDesc}</span></td>
+        <td><span class="cc-cost-res">${costTxt}</span></td>
+        <td><span class="cc-prod-value">${fmtNum(Math.round(s.prodAfter))}</span> <span style="font-size:0.75rem;color:var(--text-muted);">G/h</span></td>
+        <td><span style="font-size:0.82rem; color:#86efac;">+${fmtNum(Math.round(s.gain))}</span></td>
+        <td><span class="cc-roi-value ${roiCls}">${roiTxt}</span></td>
+        <td><span style="font-family:monospace; font-size:0.75rem; color:var(--text-muted);">${fieldStr}</span></td>
+      </tr>`;
+  }
+
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildFieldInputs();
+</script>
+{% endblock %}

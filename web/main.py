@@ -5195,3 +5195,23 @@ async def village_layout_delete(request: Request, guild_id: str, layout_id: int)
     if err: return err
     await database.delete_village_layout(guild_id, layout_id)
     return RedirectResponse(f"/guild/{guild_id}/blueprints/layouts", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Tools
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/tools/crop-calculator", response_class=HTMLResponse)
+async def crop_calculator_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    return templates.TemplateResponse("crop_calculator.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+    })
