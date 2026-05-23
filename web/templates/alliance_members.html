@@ -130,7 +130,8 @@
         <strong style="font-size:0.95rem;">{{ g.meta_name }}</strong>
         <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
           <button type="button" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;"
-                  onclick="openMetaStats({{ g.id }}, {{ g.meta_name | tojson }})">
+                  data-group-id="{{ g.id }}" data-meta-name="{{ g.meta_name | e }}"
+                  onclick="openMetaStats(this.dataset.groupId, this.dataset.metaName)">
             📊 Statistiken
           </button>
           <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
