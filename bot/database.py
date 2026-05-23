@@ -705,6 +705,18 @@ async def set_bot_active(guild_id: str):
         await db.commit()
 
 
+async def activate_guild_subscription(guild_id: str, status: str, plan: str):
+    """Copy user subscription status/plan onto the guild so the dashboard allows access."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """UPDATE guild_configs
+               SET subscription_status = ?, subscription_plan = ?, bot_status = 'active', bot_kicked_at = NULL
+               WHERE guild_id = ?""",
+            (status, plan, guild_id),
+        )
+        await db.commit()
+
+
 async def get_village_from_snapshot(guild_id: str, x: int, y: int) -> dict | None:
     """Look up a village by exact coords in the latest map snapshot."""
     async with aiosqlite.connect(DB_PATH) as db:

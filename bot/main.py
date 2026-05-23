@@ -55,6 +55,9 @@ class ScouterBot(commands.Bot):
                 if used_slots < max_slots:
                     # Auto-activate: register guild and mark as active via web DB (shared SQLite)
                     await database.upsert_guild_name(str(guild.id), guild.name, owner_discord_id=owner_id)
+                    sub_status = user_sub.get("subscription_status", "active")
+                    sub_plan = user_sub.get("plan") or f"{tier}_monthly"
+                    await database.activate_guild_subscription(str(guild.id), sub_status, sub_plan)
                     print(f"[on_guild_join] Auto-activated {guild.name} ({guild.id}) via user sub for {owner_id}")
                     try:
                         owner = guild.owner or await self.fetch_user(guild.owner_id)
