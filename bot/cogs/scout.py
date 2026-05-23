@@ -357,11 +357,11 @@ def parse_scout_report(text: str) -> dict:
     return result
 
 
-async def _try_ocr(image_bytes: bytes) -> str | None:
-    """Attempt OCR on image bytes with preprocessing for Travian dark-UI screenshots."""
+def _run_ocr_sync(image_bytes: bytes) -> str | None:
+    """Synchronous OCR — runs in a thread pool via _try_ocr."""
     try:
         import pytesseract
-        from PIL import Image, ImageFilter, ImageEnhance
+        from PIL import Image, ImageEnhance
         import io as _io
 
         img = Image.open(_io.BytesIO(image_bytes)).convert("RGB")
@@ -387,6 +387,14 @@ async def _try_ocr(image_bytes: bytes) -> str | None:
         return text if text.strip() else None
     except ImportError:
         return None  # tesseract not installed
+
+
+async def _try_ocr(image_bytes: bytes) -> str | None:
+    """Run OCR in a thread pool so the event loop stays free for other messages."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _run_ocr_sync, image_bytes)
     except Exception as e:
         print(f"[scout][ocr] error: {e}", flush=True)
         return None
