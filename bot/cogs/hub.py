@@ -190,13 +190,18 @@ async def _create_defend_channel(
         if t1 and t2:
             if t2 <= t1:
                 t2 += timedelta(days=1)
-            if (t2 - t1).total_seconds() < 60:
+            delta = (t2 - t1).total_seconds()
+            if delta <= 0:
                 await interaction.response.send_message(
-                    "⚠️ Die 2. Ankunftszeit muss mindestens 1 Minute nach der 1. liegen.",
+                    "⚠️ Die 2. Ankunftszeit muss nach der 1. Ankunftszeit liegen.",
                     ephemeral=True,
                 )
                 return
-            between_str = _between_time(t1, t2)
+            elif delta < 60:
+                # Gap too small for a between-wave — defend on the first wave
+                between_str = t1.strftime("%H:%M") + " UTC"
+            else:
+                between_str = _between_time(t1, t2)
 
     await interaction.response.defer(ephemeral=True)
 
@@ -312,19 +317,28 @@ class DefendCloseView(discord.ui.View):
     @discord.ui.button(
         label="✅ Defend erledigt",
         style=discord.ButtonStyle.success,
-        custom_id="persistent:defend_close",
+        custom_id="persistent:defend_done",
     )
-    async def close_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def done_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         await database.close_defend_channel(str(interaction.channel.id))
         await interaction.response.send_message(
-            f"✅ Defend als erledigt markiert von {interaction.user.mention}.\n"
-            "Channel wird in 2 Minuten gelöscht."
+            f"✅ Defend als erledigt markiert von {interaction.user.mention}."
         )
         button.disabled = True
         await interaction.message.edit(view=self)
-        await asyncio.sleep(120)
+
+    @discord.ui.button(
+        label="🔒 Channel schließen",
+        style=discord.ButtonStyle.danger,
+        custom_id="persistent:defend_channel_close",
+    )
+    async def close_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"🔒 Channel wird von {interaction.user.mention} geschlossen…"
+        )
+        await asyncio.sleep(5)
         try:
-            await interaction.channel.delete(reason="Defend erledigt")
+            await interaction.channel.delete(reason="Defend Channel geschlossen")
         except Exception:
             pass
 
