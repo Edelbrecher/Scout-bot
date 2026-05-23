@@ -28,6 +28,7 @@ class ScouterBot(commands.Bot):
         await self.load_extension("cogs.res_push")
         await self.load_extension("cogs.poll")
         await self.load_extension("cogs.attacks")
+        await self.load_extension("cogs.hub")
         await self.tree.sync()
         print("Slash commands synced.")
 
@@ -196,9 +197,83 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
     })
 
 
+async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Called by web container to create the Request Hub channel."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not guild_id:
+        return aiohttp_web.json_response({"ok": False, "error": "guild_id required"}, status=400)
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    config = await database.get_guild_config(guild_id)
+    if not config or not config.get("category_id"):
+        return aiohttp_web.json_response({"ok": False, "error": "category not configured"}, status=400)
+
+    category = guild.get_channel(int(config["category_id"]))
+    if not category or not isinstance(category, discord.CategoryChannel):
+        return aiohttp_web.json_response({"ok": False, "error": "category not found"}, status=400)
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True,
+            embed_links=True, attach_files=True, manage_channels=True,
+        ),
+    }
+    for role_id_str in (config.get("allowed_role_ids") or "").split(","):
+        role_id_str = role_id_str.strip()
+        if not role_id_str:
+            continue
+        role = guild.get_role(int(role_id_str))
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+
+    try:
+        channel = await guild.create_text_channel(
+            name="travops-anfragen",
+            category=category,
+            topic="Alle Anfragen auf einen Blick — Scout, Defend, Res-Push und mehr.",
+            overwrites=overwrites,
+        )
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    from cogs.hub import RequestHubView
+    embed = discord.Embed(
+        title="📋 TravOps Anfragen-Hub",
+        description=(
+            "Klicke einen Button um einen Kanal zu erstellen:\n\n"
+            "🔍 **Scout** — Gegner spähen lassen\n"
+            "🌾 **Kornspäh** — Korn eines Gegners ausspähen\n"
+            "📡 **Permanent-Scout** — Dauerhaft Späher im eigenen Dorf stationieren\n"
+            "🪖 **Res-Push** — Ressourcen anfordern\n"
+            "🛡️ **Defend** — Verteidigung koordinieren\n"
+            "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren"
+        ),
+        color=discord.Color.blurple(),
+    )
+    msg = await channel.send(embed=embed, view=RequestHubView())
+
+    await database.set_request_hub(guild_id, str(channel.id), channel.name, str(msg.id))
+
+    return aiohttp_web.json_response({
+        "ok": True,
+        "channel_id": str(channel.id),
+        "channel_name": channel.name,
+    })
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
+    app.router.add_post("/api/create-request-hub", handle_create_request_hub)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

@@ -36,6 +36,10 @@
   <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">
     ✅ Bot-Berechtigungen im Archive-Channel wurden erfolgreich gesetzt. Bilder werden ab sofort archiviert.
   </div>
+  {% elif _saved == "hub_created" %}
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Anfragen-Hub Channel erstellt.</div>
+  {% elif _saved == "hub_cleared" %}
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🗑️ Anfragen-Hub entfernt.</div>
   {% elif _saved %}
   <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Gespeichert.</div>
   {% endif %}
@@ -177,6 +181,16 @@
         <div class="feature-desc">Scout-Historie pro Gegner — Ressourcen, Truppen, Dörfer über Zeit</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+    </a>
+
+    <!-- Verteidigung -->
+    <a href="/guild/{{ guild.guild_id }}/verteidigung" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-body">
+        <div class="feature-title">Verteidigung</div>
+        <div class="feature-desc">Defend- und Timed-Defend Anfragen koordinieren und verwalten</div>
+      </div>
+      {{ OK_ARROW }}
     </a>
 
     <!-- Scout (Pro) -->
@@ -332,6 +346,34 @@
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
+
+    <!-- Request Hub -->
+    <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
+      <div style="display:flex;align-items:center;gap:1rem;width:100%;">
+        <div class="feature-icon">📋</div>
+        <div class="feature-body">
+          <div class="feature-title">Anfragen-Hub</div>
+          <div class="feature-desc">Ein Channel mit allen Buttons — Scout, Defend, Res-Push und mehr</div>
+        </div>
+      </div>
+      {% if request_hub and request_hub.channel_id %}
+      <div style="display:flex;align-items:center;gap:0.75rem;padding-left:3.4rem;flex-wrap:wrap;">
+        <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
+                     border-radius:20px;padding:0.2rem 0.75rem;font-size:0.82rem;font-family:monospace;color:#22c55e;">
+          ✅ #{{ request_hub.channel_name or request_hub.channel_id }}
+        </span>
+        <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/clear" style="margin:0;">
+          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;">Entfernen</button>
+        </form>
+      </div>
+      {% else %}
+      <div style="padding-left:3.4rem;">
+        <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/create" style="margin:0;">
+          <button type="submit" class="btn btn-primary" style="font-size:0.875rem;">➕ Hub-Channel erstellen</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
 
     <!-- Serververwaltung -->
     <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">

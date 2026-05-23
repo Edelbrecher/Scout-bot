@@ -812,10 +812,11 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
 
     is_admin = session.get("type") == "admin"
     is_owner = is_guild_owner(session, guild)
+    request_hub = await database.get_request_hub(guild_id)
     return templates.TemplateResponse(
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
-         "is_admin": is_admin, "is_owner": is_owner},
+         "is_admin": is_admin, "is_owner": is_owner, "request_hub": request_hub},
     )
 
 
@@ -4429,6 +4430,56 @@ async def create_report_channel(request: Request, guild_id: str):
         f"/guild/{guild_id}/enemies?saved=channel_create_error&msg={data.get('error','unknown')[:80]}",
         status_code=303,
     )
+
+
+# ── Request Hub ───────────────────────────────────────────────────────────────
+@app.post("/guild/{guild_id}/request-hub/create")
+async def create_request_hub(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "http://bot:7777/api/create-request-hub",
+                json={"guild_id": guild_id},
+            )
+            data = resp.json()
+    except Exception as e:
+        return RedirectResponse(f"/guild/{guild_id}?error=hub_create_failed", status_code=303)
+    if data.get("ok"):
+        return RedirectResponse(f"/guild/{guild_id}?saved=hub_created", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}?error=hub_create_failed", status_code=303)
+
+
+@app.post("/guild/{guild_id}/request-hub/clear")
+async def clear_request_hub(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.clear_request_hub(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}?saved=hub_cleared", status_code=303)
+
+
+# ── Verteidigung ──────────────────────────────────────────────────────────────
+@app.get("/guild/{guild_id}/verteidigung", response_class=HTMLResponse)
+async def verteidigung_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    channels = await database.get_defend_channels(guild_id)
+    return templates.TemplateResponse("verteidigung.html", {
+        "request": request,
+        "guild": guild,
+        "channels": channels,
+        "saved": request.query_params.get("saved", ""),
+    })
 
 
 @app.post("/guild/{guild_id}/enemies/{player_name}/notes")

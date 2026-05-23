@@ -219,6 +219,34 @@ async def init_db():
         """)
         await db.commit()
 
+    # Request Hub + Defend channels tables
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS request_hub (
+                guild_id    TEXT PRIMARY KEY,
+                channel_id  TEXT NOT NULL,
+                channel_name TEXT DEFAULT 'travops-anfragen',
+                message_id  TEXT
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS defend_channels (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id      TEXT UNIQUE NOT NULL,
+                guild_id        TEXT NOT NULL,
+                type            TEXT NOT NULL DEFAULT 'defend',
+                attacker        TEXT DEFAULT '',
+                coords          TEXT DEFAULT '',
+                arrival_time    TEXT DEFAULT '',
+                notes           TEXT DEFAULT '',
+                requested_by_id TEXT DEFAULT '',
+                requested_by_name TEXT DEFAULT '',
+                status          TEXT DEFAULT 'open',
+                created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
     await _init_farming_tables()
     await _init_einsatz_tables()
     await _init_admin_tables()
@@ -3309,3 +3337,46 @@ async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> lis
             LIMIT ?
         """, (guild_id, guild_id, limit)) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def set_request_hub(guild_id: str, channel_id: str, channel_name: str, message_id: str | None = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO request_hub (guild_id, channel_id, channel_name, message_id)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id=excluded.channel_id,
+                channel_name=excluded.channel_name,
+                message_id=COALESCE(excluded.message_id, message_id)
+        """, (guild_id, channel_id, channel_name, message_id))
+        await db.commit()
+
+
+async def get_request_hub(guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM request_hub WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def clear_request_hub(guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM request_hub WHERE guild_id=?", (guild_id,))
+        await db.commit()
+
+
+async def get_defend_channels(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM defend_channels WHERE guild_id=? ORDER BY created_at DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def close_defend_channel(channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE defend_channels SET status='closed' WHERE channel_id=?", (channel_id,))
+        await db.commit()

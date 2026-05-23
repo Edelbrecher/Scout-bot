@@ -220,6 +220,34 @@ async def init_db():
                 pass
         await db.commit()
 
+    # Request Hub + Defend channels tables
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS request_hub (
+                guild_id    TEXT PRIMARY KEY,
+                channel_id  TEXT NOT NULL,
+                channel_name TEXT DEFAULT 'travops-anfragen',
+                message_id  TEXT
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS defend_channels (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id      TEXT UNIQUE NOT NULL,
+                guild_id        TEXT NOT NULL,
+                type            TEXT NOT NULL DEFAULT 'defend',
+                attacker        TEXT DEFAULT '',
+                coords          TEXT DEFAULT '',
+                arrival_time    TEXT DEFAULT '',
+                notes           TEXT DEFAULT '',
+                requested_by_id TEXT DEFAULT '',
+                requested_by_name TEXT DEFAULT '',
+                status          TEXT DEFAULT 'open',
+                created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
 
 async def get_guild_config(guild_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -851,3 +879,54 @@ async def get_player_tribe(guild_id: str, player_name: str) -> int:
                 except (ValueError, TypeError):
                     return 0
     return 0
+
+
+async def set_request_hub(guild_id: str, channel_id: str, channel_name: str, message_id: str | None = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO request_hub (guild_id, channel_id, channel_name, message_id)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id=excluded.channel_id,
+                channel_name=excluded.channel_name,
+                message_id=COALESCE(excluded.message_id, message_id)
+        """, (guild_id, channel_id, channel_name, message_id))
+        await db.commit()
+
+
+async def get_request_hub(guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM request_hub WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def is_request_hub(channel_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT 1 FROM request_hub WHERE channel_id=?", (channel_id,)) as cur:
+            return await cur.fetchone() is not None
+
+
+async def add_defend_channel(
+    channel_id: str, guild_id: str, type: str,
+    attacker: str, coords: str, arrival_time: str,
+    notes: str, requested_by_id: str, requested_by_name: str
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO defend_channels
+                (channel_id, guild_id, type, attacker, coords, arrival_time,
+                 notes, requested_by_id, requested_by_name, status)
+            VALUES (?,?,?,?,?,?,?,?,?,'open')
+        """, (channel_id, guild_id, type, attacker, coords, arrival_time,
+              notes, requested_by_id, requested_by_name))
+        await db.commit()
+
+
+async def close_defend_channel(channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE defend_channels SET status='closed' WHERE channel_id=?", (channel_id,))
+        await db.commit()
