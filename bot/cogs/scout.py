@@ -866,6 +866,80 @@ class Scout(commands.Cog):
             await database.delete_scout_channel(str(channel.id))
             print(f"[scout] Channel {channel.id} deleted in Discord → removed from DB", flush=True)
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Catch up on missed messages in report/scout channels since last online."""
+        from datetime import datetime, timezone
+        last_online = await database.get_bot_last_online()
+        await database.set_bot_last_online()
+
+        if not last_online:
+            print("[scout][catchup] No last_online timestamp — skipping catch-up.", flush=True)
+            return
+
+        print(f"[scout][catchup] Catching up since {last_online.isoformat()} UTC", flush=True)
+        processed = 0
+
+        # Gather all channels to check
+        channels_to_check = []
+        for rc in await database.get_all_report_channels():
+            channels_to_check.append((rc["channel_id"], rc["guild_id"], True))
+        for sc in await database.get_all_active_scout_channels():
+            channels_to_check.append((sc["channel_id"], sc["guild_id"], False))
+
+        after_dt = last_online.replace(tzinfo=timezone.utc)
+
+        for channel_id, guild_id, is_report in channels_to_check:
+            ch = self.bot.get_channel(int(channel_id))
+            if not ch:
+                continue
+            try:
+                async for message in ch.history(after=after_dt, oldest_first=True, limit=50):
+                    if message.author.bot:
+                        continue
+                    if not message.attachments:
+                        continue
+                    for attachment in message.attachments:
+                        if not attachment.content_type or not attachment.content_type.startswith("image/"):
+                            continue
+                        try:
+                            img_bytes = await attachment.read()
+                            ocr_text = await _try_ocr(img_bytes)
+                            if not ocr_text:
+                                continue
+                            parsed = parse_scout_report(ocr_text)
+                            if not parsed.get("valid"):
+                                continue
+                            ch_info = await database.get_scout_channel_info(channel_id) if not is_report else None
+                            enemy_player  = parsed.get("target_player") or (ch_info or {}).get("player") or ""
+                            enemy_coords  = parsed.get("target_coords") or (ch_info or {}).get("coordinates") or ""
+                            enemy_village = parsed.get("target_village") or (ch_info or {}).get("village") or ""
+                            await database.save_scout_report(
+                                channel_id=channel_id, guild_id=guild_id, source="ocr_catchup",
+                                raw_text=ocr_text,
+                                target_player=enemy_player, target_village=enemy_village, target_coords=enemy_coords,
+                                attacker_player=parsed.get("attacker_player"),
+                                attacker_village=parsed.get("attacker_village"),
+                                resources_json=json.dumps(parsed["resources"]) if parsed.get("resources") else None,
+                                troops_json=json.dumps(parsed["troops"]) if parsed.get("troops") else None,
+                                losses_json=json.dumps(parsed["losses"]) if parsed.get("losses") else None,
+                                experience=parsed.get("experience", 0),
+                                stats_json=json.dumps(parsed.get("stats") or {}),
+                            )
+                            if enemy_player:
+                                await database.upsert_enemy(
+                                    guild_id=guild_id, player_name=enemy_player,
+                                    coordinates=enemy_coords, village=enemy_village,
+                                )
+                            processed += 1
+                            print(f"[scout][catchup] Saved missed report in ch {channel_id}: {enemy_player}", flush=True)
+                        except Exception as e:
+                            print(f"[scout][catchup] Error processing attachment: {e}", flush=True)
+            except Exception as e:
+                print(f"[scout][catchup] Error reading channel {channel_id}: {e}", flush=True)
+
+        print(f"[scout][catchup] Done — {processed} missed report(s) processed.", flush=True)
+
 
 async def setup(bot: commands.Bot):
     bot.add_view(ScoutRequestView())

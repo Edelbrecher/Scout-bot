@@ -883,6 +883,56 @@ async def is_report_channel(channel_id: str) -> bool:
             return await cur.fetchone() is not None
 
 
+async def get_all_report_channels() -> list[dict]:
+    """Return all registered report channels across all guilds."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT guild_id, channel_id FROM report_channels") as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_all_active_scout_channels() -> list[dict]:
+    """Return all open scout channels across all guilds."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT channel_id, guild_id, player, coordinates, village FROM scout_channels WHERE closed = 0"
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_bot_last_online() -> datetime | None:
+    """Return the last time the bot was online (stored in meta table)."""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS bot_meta (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        await db.commit()
+        async with db.execute("SELECT value FROM bot_meta WHERE key = 'last_online'") as cur:
+            row = await cur.fetchone()
+            if row:
+                try:
+                    return datetime.fromisoformat(row[0])
+                except Exception:
+                    return None
+    return None
+
+
+async def set_bot_last_online():
+    """Update last_online to now."""
+    from datetime import datetime
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS bot_meta (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO bot_meta (key, value) VALUES ('last_online', ?)",
+            (datetime.utcnow().isoformat(),),
+        )
+        await db.commit()
+
+
 async def get_player_tribe(guild_id: str, player_name: str) -> int:
     """Look up a player's tribe from map_snapshots. Returns 0 if unknown."""
     if not player_name:
