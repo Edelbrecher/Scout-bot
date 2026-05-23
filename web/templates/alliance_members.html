@@ -415,12 +415,27 @@
     <button onclick="document.getElementById('metaStatsModal').style.display='none'"
             style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
                    color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
-    <h3 id="metaStatsTitle" style="margin:0 0 1.25rem;font-size:1.05rem;">📊 Meta-Statistiken</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;">
+      <h3 id="metaStatsTitle" style="margin:0;font-size:1.05rem;">📊 Meta-Statistiken</h3>
+      {% if meta_groups | length > 1 %}
+      <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;">
+        <span style="color:var(--text-muted);">⚔️ Vergleichen mit:</span>
+        <select id="metaCompareSelect" onchange="onCompareChange()"
+                style="padding:0.3rem 0.5rem;border-radius:6px;border:1px solid var(--border);
+                       background:var(--bg-main);color:var(--text);font-size:0.82rem;">
+          <option value="">— keine —</option>
+          {% for g in meta_groups %}
+          <option value="{{ g.id }}" data-name="{{ g.meta_name | e }}">{{ g.meta_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
 
     <div id="metaStatsLoading" style="color:var(--text-muted);font-size:0.9rem;">Lade Daten…</div>
     <div id="metaStatsContent" style="display:none;">
       <!-- KPI Totals -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;">
+      <div id="ms-kpi-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;">
         <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
           <div id="ms-total-pop" style="font-size:1.4rem;font-weight:700;color:#6366f1;">—</div>
           <div style="font-size:0.78rem;color:var(--text-muted);">Gesamtpopulation</div>
@@ -751,22 +766,28 @@ async function saveNote(ta) {
 }
 
 // ── Meta Stats (dynamic, fetched per group) ───────────────────────────────────
-const _metaColors = ['rgba(99,102,241,0.8)', 'rgba(34,197,94,0.8)', 'rgba(245,158,11,0.8)'];
+const _metaColors  = ['rgba(99,102,241,0.8)', 'rgba(34,197,94,0.8)', 'rgba(245,158,11,0.8)'];
+const _cmpColor1   = 'rgba(99,102,241,0.8)';   // Meta 1 — blau
+const _cmpColor2   = 'rgba(34,197,94,0.8)';    // Meta 2 — grün
 let _metaCharts = [];
+let _currentGroupId = null;
+let _currentStats   = [];
+let _currentName    = '';
 
 function _destroyMetaCharts() {
   _metaCharts.forEach(c => { try { c.destroy(); } catch(e) {} });
   _metaCharts = [];
 }
 
-function _makeMetaBar(id, labels, data, label) {
+function _makeMetaBar(id, labels, datasets) {
   const ctx = document.getElementById(id);
   if (!ctx) return;
+  const comparing = datasets.length > 1;
   const chart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label, data, backgroundColor: _metaColors.slice(0, labels.length), borderRadius: 6 }] },
+    data: { labels, datasets },
     options: {
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: comparing, labels: { color: '#e2e8f0', font: { size: 11 } } } },
       scales: {
         x: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
         y: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
@@ -776,68 +797,135 @@ function _makeMetaBar(id, labels, data, label) {
   _metaCharts.push(chart);
 }
 
+function _renderCharts(stats1, name1, stats2, name2) {
+  const allLabels = [...new Set([...stats1.map(s=>s.alliance_name), ...(stats2||[]).map(s=>s.alliance_name)])];
+  const val = (arr, lbl, key) => { const r = (arr||[]).find(s=>s.alliance_name===lbl); return r ? Math.round(r[key]||0) : 0; };
+  const comparing = stats2 && stats2.length > 0;
+  const KEYS = [{id:'metaPopChart',key:'total_pop',lbl:'Population'},{id:'metaVillageChart',key:'village_count',lbl:'Dörfer'},{id:'metaMemberChart',key:'member_count',lbl:'Spieler'},{id:'metaAvgChart',key:'avg_pop',lbl:'Ø Pop/Spieler'}];
+  KEYS.forEach(({id,key,lbl}) => {
+    const d1 = { label: name1, data: allLabels.map(l=>val(stats1,l,key)), backgroundColor: comparing ? _cmpColor1 : _metaColors.slice(0,allLabels.length), borderRadius:4 };
+    const datasets = comparing ? [d1, { label: name2, data: allLabels.map(l=>val(stats2,l,key)), backgroundColor: _cmpColor2, borderRadius:4 }] : [d1];
+    _makeMetaBar(id, allLabels, datasets);
+  });
+}
+
+function _renderKpis(stats1, name1, stats2, name2) {
+  const sum = (arr, key) => (arr||[]).reduce((a,b) => a+(b[key]||0), 0);
+  const comparing = stats2 && stats2.length > 0;
+  const grid = document.getElementById('ms-kpi-grid');
+  if (comparing) {
+    grid.style.gridTemplateColumns = 'repeat(2,1fr)';
+    grid.innerHTML = ['🔵 '+name1,'🟢 '+name2].map((lbl,i) => {
+      const s = i===0 ? stats1 : stats2;
+      const col = i===0 ? 'rgba(99,102,241,0.1)' : 'rgba(34,197,94,0.1)';
+      const brd = i===0 ? 'rgba(99,102,241,0.4)' : 'rgba(34,197,94,0.4)';
+      const tc  = i===0 ? '#a5b4fc' : '#86efac';
+      return `<div style="padding:0.75rem;background:${col};border:1px solid ${brd};border-radius:8px;">
+        <div style="font-size:0.75rem;color:${tc};margin-bottom:0.4rem;">${lbl}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;text-align:center;">
+          <div><div style="font-weight:700;color:#6366f1;">${sum(s,'total_pop').toLocaleString('de-DE')}</div><div style="font-size:0.7rem;color:var(--text-muted);">Pop</div></div>
+          <div><div style="font-weight:700;color:#22c55e;">${sum(s,'village_count').toLocaleString('de-DE')}</div><div style="font-size:0.7rem;color:var(--text-muted);">Dörfer</div></div>
+          <div><div style="font-weight:700;color:#f59e0b;">${sum(s,'member_count').toLocaleString('de-DE')}</div><div style="font-size:0.7rem;color:var(--text-muted);">Spieler</div></div>
+        </div></div>`;
+    }).join('');
+  } else {
+    grid.style.gridTemplateColumns = 'repeat(3,1fr)';
+    grid.innerHTML = `
+      <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:1.4rem;font-weight:700;color:#6366f1;">${sum(stats1,'total_pop').toLocaleString('de-DE')}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Gesamtpopulation</div></div>
+      <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:1.4rem;font-weight:700;color:#22c55e;">${sum(stats1,'village_count').toLocaleString('de-DE')}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Dörfer gesamt</div></div>
+      <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:1.4rem;font-weight:700;color:#f59e0b;">${sum(stats1,'member_count').toLocaleString('de-DE')}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Spieler gesamt</div></div>`;
+  }
+}
+
+function _renderTable(stats1, name1, stats2, name2) {
+  const comparing = stats2 && stats2.length > 0;
+  const tbody = document.getElementById('metaStatsTableBody');
+  const thead = tbody.closest('table').querySelector('thead tr');
+  if (comparing) {
+    thead.innerHTML = `<th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);">Allianz</th><th style="text-align:right;padding:0.4rem 0.5rem;color:#a5b4fc;">${name1}<br><small>Spieler·Dörfer·Pop</small></th><th style="text-align:right;padding:0.4rem 0.5rem;color:#86efac;">${name2}<br><small>Spieler·Dörfer·Pop</small></th>`;
+    const allNames = [...new Set([...stats1.map(s=>s.alliance_name),...stats2.map(s=>s.alliance_name)])];
+    const find = (arr,n) => arr.find(s=>s.alliance_name===n) || {};
+    tbody.innerHTML = allNames.map(n => {
+      const a = find(stats1,n), b = find(stats2,n);
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+        <td style="padding:0.4rem 0.5rem;font-weight:500;">${n}</td>
+        <td style="padding:0.4rem 0.5rem;text-align:right;color:#a5b4fc;">${a.member_count||'—'} · ${a.village_count||'—'} · ${a.total_pop?(+a.total_pop).toLocaleString('de-DE'):'—'}</td>
+        <td style="padding:0.4rem 0.5rem;text-align:right;color:#86efac;">${b.member_count||'—'} · ${b.village_count||'—'} · ${b.total_pop?(+b.total_pop).toLocaleString('de-DE'):'—'}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    thead.innerHTML = `<th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);">Allianz</th><th style="text-align:right;padding:0.4rem 0.5rem;color:var(--text-muted);">Spieler</th><th style="text-align:right;padding:0.4rem 0.5rem;color:var(--text-muted);">Dörfer</th><th style="text-align:right;padding:0.4rem 0.5rem;color:var(--text-muted);">Population</th><th style="text-align:right;padding:0.4rem 0.5rem;color:var(--text-muted);">Ø Pop/Spieler</th>`;
+    tbody.innerHTML = stats1.map(s => `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+      <td style="padding:0.4rem 0.5rem;font-weight:500;">${s.alliance_name}</td>
+      <td style="padding:0.4rem 0.5rem;text-align:right;">${s.member_count}</td>
+      <td style="padding:0.4rem 0.5rem;text-align:right;">${s.village_count}</td>
+      <td style="padding:0.4rem 0.5rem;text-align:right;">${Number(s.total_pop).toLocaleString('de-DE')}</td>
+      <td style="padding:0.4rem 0.5rem;text-align:right;">${Math.round(s.member_count?s.total_pop/s.member_count:0).toLocaleString('de-DE')}</td>
+    </tr>`).join('');
+  }
+}
+
+async function onCompareChange() {
+  const sel = document.getElementById('metaCompareSelect');
+  _destroyMetaCharts();
+  if (!sel || !sel.value) {
+    _renderKpis(_currentStats, _currentName, null, null);
+    _renderTable(_currentStats, _currentName, null, null);
+    setTimeout(() => _renderCharts(_currentStats, _currentName, null, null), 50);
+    return;
+  }
+  const name2 = sel.options[sel.selectedIndex].dataset.name;
+  try {
+    const res = await fetch('/guild/{{ guild.guild_id }}/allianz/meta/' + sel.value + '/stats');
+    const stats2 = (await res.json()).stats || [];
+    _renderKpis(_currentStats, _currentName, stats2, name2);
+    _renderTable(_currentStats, _currentName, stats2, name2);
+    setTimeout(() => _renderCharts(_currentStats, _currentName, stats2, name2), 50);
+  } catch(e) { console.error('compare error:', e); }
+}
+
 async function openMetaStats(groupId, metaName) {
-    const modal = document.getElementById('metaStatsModal');
-    const loading = document.getElementById('metaStatsLoading');
-    const content = document.getElementById('metaStatsContent');
-    const empty   = document.getElementById('metaStatsEmpty');
+  const modal = document.getElementById('metaStatsModal');
+  const loading = document.getElementById('metaStatsLoading');
+  const content = document.getElementById('metaStatsContent');
+  const empty   = document.getElementById('metaStatsEmpty');
+  const sel     = document.getElementById('metaCompareSelect');
 
-    document.getElementById('metaStatsTitle').textContent = '📊 Meta: ' + metaName;
-    loading.style.display = '';
-    content.style.display = 'none';
-    empty.style.display = 'none';
-    modal.style.display = 'flex';
-    _destroyMetaCharts();
+  _currentGroupId = groupId;
+  _currentName    = metaName;
+  document.getElementById('metaStatsTitle').textContent = '📊 Meta: ' + metaName;
+  loading.style.display = '';
+  content.style.display = 'none';
+  empty.style.display   = 'none';
+  modal.style.display   = 'flex';
+  _destroyMetaCharts();
 
-    try {
-      const res = await fetch('/guild/{{ guild.guild_id }}/allianz/meta/' + groupId + '/stats');
-      const json = await res.json();
-      const stats = json.stats || [];
+  // Reset compare dropdown, filter out current meta
+  if (sel) {
+    Array.from(sel.options).forEach(o => { o.hidden = o.value == groupId; });
+    sel.value = '';
+  }
 
-      loading.style.display = 'none';
-
-      if (!stats.length) {
-        empty.style.display = '';
-        return;
-      }
-
-      const labels = stats.map(s => s.alliance_name);
-      const pops   = stats.map(s => s.total_pop);
-      const vils   = stats.map(s => s.village_count);
-      const mems   = stats.map(s => s.member_count);
-      const avgs   = stats.map(s => Math.round(s.avg_pop));
-
-      const totalPop  = pops.reduce((a,b) => a+b, 0);
-      const totalVil  = vils.reduce((a,b) => a+b, 0);
-      const totalMem  = mems.reduce((a,b) => a+b, 0);
-
-      document.getElementById('ms-total-pop').textContent     = totalPop.toLocaleString('de-DE');
-      document.getElementById('ms-total-villages').textContent = totalVil.toLocaleString('de-DE');
-      document.getElementById('ms-total-members').textContent  = totalMem.toLocaleString('de-DE');
-
-      const tbody = document.getElementById('metaStatsTableBody');
-      tbody.innerHTML = stats.map(s => `
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-          <td style="padding:0.4rem 0.5rem;font-weight:500;">${s.alliance_name}</td>
-          <td style="padding:0.4rem 0.5rem;text-align:right;">${s.member_count}</td>
-          <td style="padding:0.4rem 0.5rem;text-align:right;">${s.village_count}</td>
-          <td style="padding:0.4rem 0.5rem;text-align:right;">${Number(s.total_pop).toLocaleString('de-DE')}</td>
-          <td style="padding:0.4rem 0.5rem;text-align:right;">${Math.round(s.member_count ? s.total_pop / s.member_count : 0).toLocaleString('de-DE')}</td>
-        </tr>`).join('');
-
-      content.style.display = '';
-      // Charts need canvas to be visible
-      setTimeout(() => {
-        _makeMetaBar('metaPopChart',    labels, pops, 'Population');
-        _makeMetaBar('metaVillageChart',labels, vils, 'Dörfer');
-        _makeMetaBar('metaMemberChart', labels, mems, 'Spieler');
-        _makeMetaBar('metaAvgChart',    labels, avgs, 'Ø Pop/Spieler');
-      }, 50);
-
-    } catch(e) {
-      console.error('openMetaStats error:', e);
-      loading.textContent = 'Fehler: ' + e.message;
-    }
+  try {
+    const res = await fetch('/guild/{{ guild.guild_id }}/allianz/meta/' + groupId + '/stats');
+    const stats = (await res.json()).stats || [];
+    _currentStats = stats;
+    loading.style.display = 'none';
+    if (!stats.length) { empty.style.display = ''; return; }
+    _renderKpis(stats, metaName, null, null);
+    _renderTable(stats, metaName, null, null);
+    content.style.display = '';
+    setTimeout(() => _renderCharts(stats, metaName, null, null), 50);
+  } catch(e) {
+    console.error('openMetaStats error:', e);
+    loading.textContent = 'Fehler: ' + e.message;
+  }
 }
 </script>
 {% endblock %}
