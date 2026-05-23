@@ -76,7 +76,10 @@
     <div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
         <h2 style="font-size:1.1rem; font-weight:700;">📋 Blueprint-Vorlagen</h2>
-        <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new" class="btn btn-primary" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Neue Vorlage</a>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" onclick="openPresetModal()" style="font-size:0.85rem; padding:0.4rem 0.9rem;">📥 Preset importieren</button>
+          <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new" class="btn btn-primary" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Neue Vorlage</a>
+        </div>
       </div>
 
       {% if not templates_by_tribe %}
@@ -236,4 +239,74 @@ document.getElementById('assignModal').addEventListener('click', function(e) {
 });
 </script>
 {% endif %}
+
+<!-- Preset Import Modal -->
+<div class="modal-overlay" id="presetModal">
+  <div class="modal-box" style="max-width:540px;">
+    <button class="modal-close" onclick="closePresetModal()">×</button>
+    <h3>📥 Preset importieren</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">Wähle ein vorgefertigtes Blueprint-Preset aus und importiere es als neue Vorlage.</p>
+    <div id="presetList" style="display:flex; flex-direction:column; gap:0.75rem;">
+      <div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:1rem;">Lade Presets…</div>
+    </div>
+    <div style="margin-top:1.25rem;">
+      <button type="button" class="btn btn-secondary" onclick="closePresetModal()">Schließen</button>
+    </div>
+  </div>
+</div>
+<script>
+function openPresetModal() {
+  document.getElementById('presetModal').classList.add('open');
+  fetch('/guild/{{ guild.guild_id }}/blueprints/presets')
+    .then(r => r.json())
+    .then(data => {
+      const list = document.getElementById('presetList');
+      if (!data.presets || data.presets.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">Keine Presets verfügbar.</div>';
+        return;
+      }
+      list.innerHTML = data.presets.map((p, i) => `
+        <div style="background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:1rem;">
+          <div style="font-weight:600; font-size:0.95rem; margin-bottom:0.3rem;">${p.name}</div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.6rem;">${p.description}</div>
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;">${p.steps.length} Schritte · Stamm: ${p.tribe}</div>
+          <button class="btn btn-primary" style="font-size:0.82rem; padding:0.35rem 0.8rem;" onclick="importPreset(${i}, this)">📥 Importieren</button>
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      document.getElementById('presetList').innerHTML = '<div style="color:var(--text-muted);">Fehler beim Laden der Presets.</div>';
+    });
+}
+function closePresetModal() {
+  document.getElementById('presetModal').classList.remove('open');
+}
+document.getElementById('presetModal').addEventListener('click', function(e) {
+  if (e.target === this) closePresetModal();
+});
+function importPreset(index, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Importiere…';
+  fetch('/guild/{{ guild.guild_id }}/blueprints/import-preset', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({preset_index: index})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      window.location.href = data.redirect;
+    } else {
+      btn.disabled = false;
+      btn.textContent = '📥 Importieren';
+      alert('Fehler: ' + (data.error || 'Unbekannt'));
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = '📥 Importieren';
+    alert('Netzwerkfehler beim Importieren.');
+  });
+}
+</script>
 {% endblock %}

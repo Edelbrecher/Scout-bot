@@ -24,6 +24,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import database
+import presets as blueprint_presets
 
 load_dotenv()
 
@@ -5017,6 +5018,52 @@ async def blueprint_step_toggle(request: Request, guild_id: str, blueprint_id: i
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     new_state = await database.toggle_blueprint_step(blueprint_id, step_id)
     return JSONResponse({"completed": new_state})
+
+
+# ---------------------------------------------------------------------------
+# Blueprint Preset routes
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/blueprints/presets")
+async def blueprint_presets_list(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    return JSONResponse({"presets": blueprint_presets.PRESET_BLUEPRINTS})
+
+
+@app.post("/guild/{guild_id}/blueprints/import-preset")
+async def blueprint_import_preset(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    body = await request.json()
+    preset_index = int(body.get("preset_index", 0))
+    presets = blueprint_presets.PRESET_BLUEPRINTS
+    if preset_index < 0 or preset_index >= len(presets):
+        return JSONResponse({"error": "invalid preset_index"}, status_code=400)
+    preset = presets[preset_index]
+    tid = await database.create_blueprint_template(
+        guild_id, preset["tribe"], preset["name"], preset["description"]
+    )
+    for s in preset["steps"]:
+        await database.add_blueprint_step(
+            template_id=tid,
+            guild_id=guild_id,
+            step_type="task",
+            title=s["title"],
+            description=s.get("notes", ""),
+            target=s.get("target", ""),
+            order_num=s["step"],
+        )
+    return JSONResponse({"ok": True, "template_id": tid, "redirect": f"/guild/{guild_id}/blueprints"})
 
 
 # ---------------------------------------------------------------------------
