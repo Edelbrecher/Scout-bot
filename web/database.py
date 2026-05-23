@@ -2970,6 +2970,13 @@ async def _init_alliance_members_table():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_am_guild ON alliance_members(guild_id)")
 
+        # Migrate: add notes column if missing
+        try:
+            await db.execute("ALTER TABLE alliance_members ADD COLUMN notes TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass  # column already exists
+
         # Scout images table — stores Discord CDN URL + optional cached bytes
         await db.execute("""
             CREATE TABLE IF NOT EXISTS scout_images (
@@ -3271,3 +3278,34 @@ async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
             (guild_id, latest)
         )
         return [dict(r) for r in await cur.fetchall()]
+
+
+async def set_alliance_member_note(guild_id: str, player_name: str, notes: str) -> bool:
+    """Update the notes for a single alliance member. Returns True if row updated."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE alliance_members SET notes=? WHERE guild_id=? AND player_name=?",
+            (notes[:500], guild_id, player_name)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> list[dict]:
+    """Top alliances by total population from the latest snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT alliance_name,
+                   COUNT(DISTINCT player_id) as member_count,
+                   SUM(population) as total_pop
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND alliance_name != ''
+              AND alliance_name IS NOT NULL
+              AND fetched_at = (SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?)
+            GROUP BY alliance_name
+            ORDER BY total_pop DESC
+            LIMIT ?
+        """, (guild_id, guild_id, limit)) as cur:
+            return [dict(r) for r in await cur.fetchall()]

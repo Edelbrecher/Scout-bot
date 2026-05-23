@@ -4472,6 +4472,7 @@ async def alliance_members_page(request: Request, guild_id: str):
     snapshot_alliances = await database.get_alliance_names_from_snapshot(guild_id)
     player_names      = [m["player_name"] for m in members]
     strike_info       = await database.get_strike_info_for_players(guild_id, player_names)
+    top_alliances     = await database.get_top_alliances_from_snapshot(guild_id)
 
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
@@ -4481,6 +4482,7 @@ async def alliance_members_page(request: Request, guild_id: str):
         "alliance_name": alliance_name,
         "snapshot_alliances": snapshot_alliances,
         "strike_info": strike_info,
+        "top_alliances": top_alliances,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
         "synced": request.query_params.get("synced"),
@@ -4621,6 +4623,25 @@ async def alliance_player_detail(request: Request, guild_id: str, player_name: s
         "first_snap": first_ts[:16].replace("T", " ") + " UTC" if first_ts else None,
         "last_snap": latest_ts[:16].replace("T", " ") + " UTC" if latest_ts else None,
     })
+
+
+@app.post("/guild/{guild_id}/allianz/mitglieder/note")
+async def set_member_note(
+    request: Request, guild_id: str,
+    player_name: str = Form(""),
+    notes: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    # Sanitise
+    player_name = player_name.strip()[:100]
+    notes = notes.strip()[:500]
+    if not player_name:
+        return JSONResponse({"ok": False, "error": "missing player"}, status_code=400)
+    await database.set_alliance_member_note(guild_id, player_name, notes)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/allianz/mitglieder/clear")
