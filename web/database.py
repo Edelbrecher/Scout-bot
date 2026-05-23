@@ -3339,6 +3339,81 @@ async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> lis
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def init_alliance_meta_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_meta (
+                guild_id      TEXT NOT NULL,
+                alliance_name TEXT NOT NULL,
+                added_at      TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (guild_id, alliance_name)
+            )
+        """)
+        await db.commit()
+
+
+async def get_meta_alliances(guild_id: str) -> list[str]:
+    await init_alliance_meta_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT alliance_name FROM alliance_meta WHERE guild_id = ? ORDER BY added_at",
+            (guild_id,)
+        ) as cur:
+            return [r[0] for r in await cur.fetchall()]
+
+
+async def add_meta_alliance(guild_id: str, alliance_name: str) -> bool:
+    """Add alliance to meta. Returns False if already at limit (3)."""
+    await init_alliance_meta_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM alliance_meta WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            count = (await cur.fetchone())[0]
+        if count >= 3:
+            return False
+        await db.execute(
+            "INSERT OR IGNORE INTO alliance_meta (guild_id, alliance_name) VALUES (?, ?)",
+            (guild_id, alliance_name)
+        )
+        await db.commit()
+        return True
+
+
+async def remove_meta_alliance(guild_id: str, alliance_name: str):
+    await init_alliance_meta_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM alliance_meta WHERE guild_id = ? AND alliance_name = ?",
+            (guild_id, alliance_name)
+        )
+        await db.commit()
+
+
+async def get_meta_stats(guild_id: str) -> list[dict]:
+    """Return stats per meta alliance from latest snapshot."""
+    alliances = await get_meta_alliances(guild_id)
+    if not alliances:
+        return []
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        placeholders = ",".join("?" * len(alliances))
+        async with db.execute(f"""
+            SELECT alliance_name,
+                   COUNT(DISTINCT player_id)  AS member_count,
+                   COUNT(*)                   AS village_count,
+                   COALESCE(SUM(population),0) AS total_pop,
+                   COALESCE(MAX(population),0) AS max_pop,
+                   COALESCE(AVG(population),0) AS avg_pop
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND alliance_name IN ({placeholders})
+              AND fetched_at = (SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?)
+            GROUP BY alliance_name
+        """, [guild_id] + alliances + [guild_id]) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
 async def set_request_hub(guild_id: str, channel_id: str, channel_name: str, message_id: str | None = None):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""

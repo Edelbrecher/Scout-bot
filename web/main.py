@@ -4539,6 +4539,8 @@ async def alliance_members_page(request: Request, guild_id: str):
     player_names      = [m["player_name"] for m in members]
     strike_info       = await database.get_strike_info_for_players(guild_id, player_names)
     top_alliances     = await database.get_top_alliances_from_snapshot(guild_id)
+    meta_alliances    = await database.get_meta_alliances(guild_id)
+    meta_stats        = await database.get_meta_stats(guild_id)
 
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
@@ -4549,6 +4551,8 @@ async def alliance_members_page(request: Request, guild_id: str):
         "snapshot_alliances": snapshot_alliances,
         "strike_info": strike_info,
         "top_alliances": top_alliances,
+        "meta_alliances": meta_alliances,
+        "meta_stats": meta_stats,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
         "synced": request.query_params.get("synced"),
@@ -4708,6 +4712,30 @@ async def set_member_note(
         return JSONResponse({"ok": False, "error": "missing player"}, status_code=400)
     await database.set_alliance_member_note(guild_id, player_name, notes)
     return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/allianz/meta/add")
+async def meta_add(request: Request, guild_id: str, alliance_name: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if alliance_name:
+        ok = await database.add_meta_alliance(guild_id, alliance_name)
+        if not ok:
+            return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder?meta_error=limit", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+
+
+@app.post("/guild/{guild_id}/allianz/meta/remove")
+async def meta_remove(request: Request, guild_id: str, alliance_name: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if alliance_name:
+        await database.remove_meta_alliance(guild_id, alliance_name)
+    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
 
 
 @app.post("/guild/{guild_id}/allianz/mitglieder/clear")

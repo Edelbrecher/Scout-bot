@@ -92,6 +92,59 @@
     {% endif %}
   </div>
 
+  <!-- ── Meta-Allianzen ── -->
+  <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+      <h3 style="margin:0;font-size:1rem;">🤝 Meta-Allianzen <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">(max. 3)</span></h3>
+      {% if meta_alliances %}
+      <button type="button" class="btn btn-secondary" style="font-size:0.82rem;"
+              onclick="document.getElementById('metaStatsModal').style.display='flex'">
+        📊 Meta-Statistiken anzeigen
+      </button>
+      {% endif %}
+    </div>
+
+    {% if request.query_params.get('meta_error') == 'limit' %}
+    <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.75rem;color:#f87171;font-size:0.85rem;">
+      ⚠️ Maximal 3 Allianzen pro Meta erlaubt.
+    </div>
+    {% endif %}
+
+    <!-- Current meta alliances -->
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+      {% for a in meta_alliances %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/remove" style="margin:0;">
+        <input type="hidden" name="alliance_name" value="{{ a }}">
+        <button type="submit" style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.65rem;
+                background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:20px;
+                color:var(--text);font-size:0.85rem;cursor:pointer;">
+          {{ a }} <span style="color:#f87171;font-weight:bold;">✕</span>
+        </button>
+      </form>
+      {% else %}
+      <span style="color:var(--text-muted);font-size:0.85rem;">Noch keine Allianzen in der Meta.</span>
+      {% endfor %}
+    </div>
+
+    <!-- Add alliance -->
+    {% if meta_alliances | length < 3 and snapshot_alliances %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/add"
+          style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <select name="alliance_name" style="flex:1;min-width:200px;padding:0.4rem 0.65rem;
+              border-radius:6px;border:1px solid var(--border);background:var(--bg-main);
+              color:var(--text);font-size:0.875rem;">
+        <option value="">— Allianz wählen —</option>
+        {% for a in snapshot_alliances %}
+        {% if a.alliance_name not in meta_alliances %}
+        <option value="{{ a.alliance_name }}">{{ a.alliance_name }} ({{ a.member_count }} Spieler)</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">+ Zur Meta</button>
+    </form>
+    {% endif %}
+  </div>
+
   {% if members %}
 
   <!-- KPI strip -->
@@ -317,6 +370,85 @@
                 onclick="document.getElementById('importModal').style.display='none'">Abbrechen</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Meta Statistiken Modal -->
+<div id="metaStatsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
+     z-index:1000;align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div class="card" style="max-width:720px;width:100%;padding:1.5rem;position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="document.getElementById('metaStatsModal').style.display='none'"
+            style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
+                   color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
+    <h3 style="margin:0 0 1.25rem;font-size:1.05rem;">🤝 Meta-Statistiken</h3>
+
+    {% if meta_stats %}
+    <!-- KPI Totals -->
+    {% set total_pop = meta_stats | sum(attribute='total_pop') %}
+    {% set total_villages = meta_stats | sum(attribute='village_count') %}
+    {% set total_members = meta_stats | sum(attribute='member_count') %}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;">
+      <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:1.4rem;font-weight:700;color:#6366f1;">{{ "{:,}".format(total_pop) }}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Gesamtpopulation</div>
+      </div>
+      <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:1.4rem;font-weight:700;color:#22c55e;">{{ total_villages }}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Dörfer gesamt</div>
+      </div>
+      <div style="text-align:center;padding:0.75rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:1.4rem;font-weight:700;color:#f59e0b;">{{ total_members }}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Spieler gesamt</div>
+      </div>
+    </div>
+
+    <!-- Per-alliance table -->
+    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:1.25rem;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
+          <th style="text-align:left;padding:0.4rem 0.5rem;">Allianz</th>
+          <th style="text-align:right;padding:0.4rem 0.5rem;">Spieler</th>
+          <th style="text-align:right;padding:0.4rem 0.5rem;">Dörfer</th>
+          <th style="text-align:right;padding:0.4rem 0.5rem;">Population</th>
+          <th style="text-align:right;padding:0.4rem 0.5rem;">Ø Pop/Spieler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in meta_stats %}
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:0.4rem 0.5rem;font-weight:500;">{{ s.alliance_name }}</td>
+          <td style="padding:0.4rem 0.5rem;text-align:right;">{{ s.member_count }}</td>
+          <td style="padding:0.4rem 0.5rem;text-align:right;">{{ s.village_count }}</td>
+          <td style="padding:0.4rem 0.5rem;text-align:right;">{{ "{:,}".format(s.total_pop) }}</td>
+          <td style="padding:0.4rem 0.5rem;text-align:right;">{{ "{:,.0f}".format(s.total_pop / s.member_count if s.member_count else 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Charts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.4rem;">Population</p>
+        <canvas id="metaPopChart" height="180"></canvas>
+      </div>
+      <div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.4rem;">Dörfer</p>
+        <canvas id="metaVillageChart" height="180"></canvas>
+      </div>
+      <div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.4rem;">Spieler</p>
+        <canvas id="metaMemberChart" height="180"></canvas>
+      </div>
+      <div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.4rem;">Ø Pop/Spieler</p>
+        <canvas id="metaAvgChart" height="180"></canvas>
+      </div>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:0.9rem;">Keine Snapshot-Daten für die Meta-Allianzen vorhanden.</p>
+    {% endif %}
   </div>
 </div>
 
@@ -596,5 +728,60 @@ async function saveNote(ta) {
     setTimeout(() => ta.style.borderColor = '', 1500);
   } catch(e) {}
 }
+
+// ── Meta Charts ───────────────────────────────────────────────────────────────
+{% if meta_stats %}
+(function() {
+  const metaLabels = {{ meta_stats | map(attribute='alliance_name') | list | tojson }};
+  const metaPop    = {{ meta_stats | map(attribute='total_pop') | list | tojson }};
+  const metaVil    = {{ meta_stats | map(attribute='village_count') | list | tojson }};
+  const metaMem    = {{ meta_stats | map(attribute='member_count') | list | tojson }};
+  const metaAvg    = {{ meta_stats | map(attribute='avg_pop') | list | tojson }};
+  const COLORS     = ['rgba(99,102,241,0.8)', 'rgba(34,197,94,0.8)', 'rgba(245,158,11,0.8)'];
+
+  function makeBar(id, data, label, color) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: metaLabels,
+        datasets: [{ label, data, backgroundColor: COLORS, borderRadius: 6 }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        }
+      }
+    });
+  }
+
+  // Only init charts when modal opens
+  let metaChartsInit = false;
+  document.getElementById('metaStatsModal').addEventListener('click', function openMeta(e) {
+    if (!metaChartsInit) {
+      makeBar('metaPopChart',    metaPop, 'Population', COLORS);
+      makeBar('metaVillageChart',metaVil, 'Dörfer',    COLORS);
+      makeBar('metaMemberChart', metaMem, 'Spieler',   COLORS);
+      makeBar('metaAvgChart',    metaAvg.map(v => Math.round(v)), 'Ø Pop/Spieler', COLORS);
+      metaChartsInit = true;
+    }
+  }, { once: false });
+  // Also trigger on button click
+  document.querySelector('[onclick*="metaStatsModal"]')?.addEventListener('click', function() {
+    if (!metaChartsInit) {
+      setTimeout(() => {
+        makeBar('metaPopChart',    metaPop, 'Population', COLORS);
+        makeBar('metaVillageChart',metaVil, 'Dörfer',    COLORS);
+        makeBar('metaMemberChart', metaMem, 'Spieler',   COLORS);
+        makeBar('metaAvgChart',    metaAvg.map(v => Math.round(v)), 'Ø Pop/Spieler', COLORS);
+        metaChartsInit = true;
+      }, 50);
+    }
+  });
+})();
+{% endif %}
 </script>
 {% endblock %}
