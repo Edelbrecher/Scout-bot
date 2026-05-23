@@ -688,7 +688,7 @@ class Scout(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Listen for scout reports posted in scout channels or report channels."""
-if message.author.bot:
+        if message.author.bot:
             return
         channel_id = str(message.channel.id)
 
