@@ -3340,59 +3340,132 @@ async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> lis
 
 
 async def init_alliance_meta_table():
+    """Create alliance_meta_groups and alliance_meta_members tables."""
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS alliance_meta (
-                guild_id      TEXT NOT NULL,
-                alliance_name TEXT NOT NULL,
-                added_at      TEXT DEFAULT (datetime('now')),
-                PRIMARY KEY (guild_id, alliance_name)
+            CREATE TABLE IF NOT EXISTS alliance_meta_groups (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                meta_name   TEXT NOT NULL,
+                created_at  TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, meta_name)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_meta_members (
+                group_id        INTEGER NOT NULL REFERENCES alliance_meta_groups(id) ON DELETE CASCADE,
+                alliance_name   TEXT NOT NULL,
+                PRIMARY KEY (group_id, alliance_name)
             )
         """)
         await db.commit()
 
 
-async def get_meta_alliances(guild_id: str) -> list[str]:
+async def get_meta_groups(guild_id: str) -> list[dict]:
+    """Return all meta groups for a guild, each with their alliances list."""
     await init_alliance_meta_table()
     async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT alliance_name FROM alliance_meta WHERE guild_id = ? ORDER BY added_at",
+            "SELECT id, meta_name, created_at FROM alliance_meta_groups WHERE guild_id = ? ORDER BY created_at",
             (guild_id,)
         ) as cur:
-            return [r[0] for r in await cur.fetchall()]
+            groups = [dict(r) for r in await cur.fetchall()]
+        for g in groups:
+            async with db.execute(
+                "SELECT alliance_name FROM alliance_meta_members WHERE group_id = ?",
+                (g["id"],)
+            ) as cur:
+                g["alliances"] = [r[0] for r in await cur.fetchall()]
+        return groups
 
 
-async def add_meta_alliance(guild_id: str, alliance_name: str) -> bool:
-    """Add alliance to meta. Returns False if already at limit (3)."""
+async def create_meta_group(guild_id: str, meta_name: str) -> int | None:
+    """Create a new named meta group. Returns group_id or None if limit/duplicate."""
     await init_alliance_meta_table()
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT COUNT(*) FROM alliance_meta WHERE guild_id = ?", (guild_id,)
+            "SELECT COUNT(*) FROM alliance_meta_groups WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            count = (await cur.fetchone())[0]
+        if count >= 10:
+            return None
+        try:
+            await db.execute(
+                "INSERT INTO alliance_meta_groups (guild_id, meta_name) VALUES (?, ?)",
+                (guild_id, meta_name)
+            )
+            await db.commit()
+            async with db.execute("SELECT last_insert_rowid()") as cur:
+                return (await cur.fetchone())[0]
+        except Exception:
+            return None
+
+
+async def delete_meta_group(guild_id: str, group_id: int):
+    """Delete a meta group (cascades to members)."""
+    await init_alliance_meta_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA foreign_keys = ON")
+        await db.execute(
+            "DELETE FROM alliance_meta_groups WHERE id = ? AND guild_id = ?",
+            (group_id, guild_id)
+        )
+        await db.commit()
+
+
+async def add_alliance_to_meta(guild_id: str, group_id: int, alliance_name: str) -> bool:
+    """Add alliance to a meta group. Returns False if 3-alliance limit reached."""
+    await init_alliance_meta_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Verify group belongs to guild
+        async with db.execute(
+            "SELECT id FROM alliance_meta_groups WHERE id = ? AND guild_id = ?",
+            (group_id, guild_id)
+        ) as cur:
+            if not await cur.fetchone():
+                return False
+        async with db.execute(
+            "SELECT COUNT(*) FROM alliance_meta_members WHERE group_id = ?", (group_id,)
         ) as cur:
             count = (await cur.fetchone())[0]
         if count >= 3:
             return False
-        await db.execute(
-            "INSERT OR IGNORE INTO alliance_meta (guild_id, alliance_name) VALUES (?, ?)",
-            (guild_id, alliance_name)
-        )
-        await db.commit()
+        try:
+            await db.execute(
+                "INSERT OR IGNORE INTO alliance_meta_members (group_id, alliance_name) VALUES (?, ?)",
+                (group_id, alliance_name)
+            )
+            await db.commit()
+        except Exception:
+            pass
         return True
 
 
-async def remove_meta_alliance(guild_id: str, alliance_name: str):
+async def remove_alliance_from_meta(guild_id: str, group_id: int, alliance_name: str):
+    """Remove an alliance from a meta group."""
     await init_alliance_meta_table()
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "DELETE FROM alliance_meta WHERE guild_id = ? AND alliance_name = ?",
-            (guild_id, alliance_name)
-        )
+        await db.execute("""
+            DELETE FROM alliance_meta_members
+            WHERE group_id = (
+                SELECT id FROM alliance_meta_groups WHERE id = ? AND guild_id = ?
+            ) AND alliance_name = ?
+        """, (group_id, guild_id, alliance_name))
         await db.commit()
 
 
-async def get_meta_stats(guild_id: str) -> list[dict]:
-    """Return stats per meta alliance from latest snapshot."""
-    alliances = await get_meta_alliances(guild_id)
+async def get_meta_group_stats(guild_id: str, group_id: int) -> list[dict]:
+    """Return stats per alliance in a meta group from the latest snapshot."""
+    await init_alliance_meta_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT alliance_name FROM alliance_meta_members WHERE group_id = "
+            "(SELECT id FROM alliance_meta_groups WHERE id = ? AND guild_id = ?)",
+            (group_id, guild_id)
+        ) as cur:
+            alliances = [r[0] for r in await cur.fetchall()]
     if not alliances:
         return []
     async with aiosqlite.connect(DB_PATH) as db:
@@ -3400,10 +3473,9 @@ async def get_meta_stats(guild_id: str) -> list[dict]:
         placeholders = ",".join("?" * len(alliances))
         async with db.execute(f"""
             SELECT alliance_name,
-                   COUNT(DISTINCT player_id)  AS member_count,
-                   COUNT(*)                   AS village_count,
+                   COUNT(DISTINCT player_name) AS member_count,
+                   COUNT(*)                    AS village_count,
                    COALESCE(SUM(population),0) AS total_pop,
-                   COALESCE(MAX(population),0) AS max_pop,
                    COALESCE(AVG(population),0) AS avg_pop
             FROM map_snapshots
             WHERE guild_id = ?
@@ -3412,6 +3484,24 @@ async def get_meta_stats(guild_id: str) -> list[dict]:
             GROUP BY alliance_name
         """, [guild_id] + alliances + [guild_id]) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+# ── Backwards-compat stubs (kept so any remaining references don't crash) ──────
+
+async def get_meta_alliances(guild_id: str) -> list[str]:
+    return []
+
+
+async def add_meta_alliance(guild_id: str, alliance_name: str) -> bool:
+    return False
+
+
+async def remove_meta_alliance(guild_id: str, alliance_name: str):
+    pass
+
+
+async def get_meta_stats(guild_id: str) -> list[dict]:
+    return []
 
 
 async def set_request_hub(guild_id: str, channel_id: str, channel_name: str, message_id: str | None = None):

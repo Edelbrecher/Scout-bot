@@ -4539,8 +4539,7 @@ async def alliance_members_page(request: Request, guild_id: str):
     player_names      = [m["player_name"] for m in members]
     strike_info       = await database.get_strike_info_for_players(guild_id, player_names)
     top_alliances     = await database.get_top_alliances_from_snapshot(guild_id)
-    meta_alliances    = await database.get_meta_alliances(guild_id)
-    meta_stats        = await database.get_meta_stats(guild_id)
+    meta_groups       = await database.get_meta_groups(guild_id)
 
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
@@ -4551,8 +4550,7 @@ async def alliance_members_page(request: Request, guild_id: str):
         "snapshot_alliances": snapshot_alliances,
         "strike_info": strike_info,
         "top_alliances": top_alliances,
-        "meta_alliances": meta_alliances,
-        "meta_stats": meta_stats,
+        "meta_groups": meta_groups,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
         "synced": request.query_params.get("synced"),
@@ -4714,28 +4712,66 @@ async def set_member_note(
     return JSONResponse({"ok": True})
 
 
-@app.post("/guild/{guild_id}/allianz/meta/add")
-async def meta_add(request: Request, guild_id: str, alliance_name: str = Form("")):
+@app.post("/guild/{guild_id}/allianz/meta/create")
+async def meta_create(request: Request, guild_id: str, meta_name: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    meta_name = meta_name.strip()[:64]
+    if meta_name:
+        result = await database.create_meta_group(guild_id, meta_name)
+        if result is None:
+            return RedirectResponse(
+                f"/guild/{guild_id}/allianz/mitglieder?meta_error=limit", status_code=303
+            )
+    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+
+
+@app.post("/guild/{guild_id}/allianz/meta/{group_id}/delete")
+async def meta_delete(request: Request, guild_id: str, group_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_meta_group(guild_id, group_id)
+    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+
+
+@app.post("/guild/{guild_id}/allianz/meta/{group_id}/add-alliance")
+async def meta_add_alliance(
+    request: Request, guild_id: str, group_id: int, alliance_name: str = Form("")
+):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     if alliance_name:
-        ok = await database.add_meta_alliance(guild_id, alliance_name)
-        if not ok:
-            return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder?meta_error=limit", status_code=303)
+        await database.add_alliance_to_meta(guild_id, group_id, alliance_name)
     return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
 
 
-@app.post("/guild/{guild_id}/allianz/meta/remove")
-async def meta_remove(request: Request, guild_id: str, alliance_name: str = Form("")):
+@app.post("/guild/{guild_id}/allianz/meta/{group_id}/remove-alliance")
+async def meta_remove_alliance(
+    request: Request, guild_id: str, group_id: int, alliance_name: str = Form("")
+):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     if alliance_name:
-        await database.remove_meta_alliance(guild_id, alliance_name)
+        await database.remove_alliance_from_meta(guild_id, group_id, alliance_name)
     return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+
+
+@app.get("/guild/{guild_id}/allianz/meta/{group_id}/stats")
+async def meta_group_stats(request: Request, guild_id: str, group_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    stats = await database.get_meta_group_stats(guild_id, group_id)
+    return JSONResponse({"stats": stats})
 
 
 @app.post("/guild/{guild_id}/allianz/mitglieder/clear")
