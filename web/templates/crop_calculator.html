@@ -96,18 +96,41 @@
 }
 .cc-fields-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
-.cc-fields-grid .cc-field input {
-  width: 100%;
-  box-sizing: border-box;
-  text-align: center;
+/* Stepper card */
+.cc-stepper {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.4rem 0.3rem 0.5rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  user-select: none;
 }
-.cc-fields-grid .cc-field label {
-  text-align: center;
+.cc-stepper-label {
+  font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
 }
+.cc-stepper-val {
+  font-size: 1.3rem; font-weight: 700; color: var(--text-primary);
+  min-width: 2ch; text-align: center; line-height: 1;
+}
+.cc-stepper-btns {
+  display: flex; gap: 0.3rem;
+}
+.cc-stepper-btns button {
+  width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-primary); font-size: 1.1rem; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+  line-height: 1; padding: 0;
+}
+.cc-stepper-btns button:hover { background: #5865f2; border-color: #5865f2; color: #fff; }
+.cc-stepper-btns button:active { transform: scale(0.93); }
+.cc-stepper[data-val="0"] .cc-stepper-val { color: var(--text-muted); }
 
 /* Results table */
 .cc-table-wrap {
@@ -498,17 +521,34 @@ function buildFieldInputs() {
   const count = getFieldCount();
   const maxLvl = isCapital ? 21 : 10;
   const grid = document.getElementById('fieldLevelsGrid');
+  // Preserve existing values
   const existing = [];
-  grid.querySelectorAll('input').forEach(inp => existing.push(parseInt(inp.value)||0));
+  grid.querySelectorAll('.cc-stepper').forEach(s => existing.push(parseInt(s.dataset.val)||0));
   grid.innerHTML = '';
   for (let i = 0; i < count; i++) {
-    const val = (existing[i] !== undefined) ? Math.min(existing[i], maxLvl) : 0;
-    grid.innerHTML += `
-      <div class="cc-field">
-        <label>F${i+1}</label>
-        <input type="number" id="field${i}" value="${val}" min="0" max="${maxLvl}" style="width:100%;">
+    const val = Math.min((existing[i] !== undefined ? existing[i] : 0), maxLvl);
+    const div = document.createElement('div');
+    div.className = 'cc-stepper';
+    div.dataset.val = val;
+    div.dataset.max = maxLvl;
+    div.innerHTML = `
+      <div class="cc-stepper-label">F${i+1}</div>
+      <div class="cc-stepper-val">${val}</div>
+      <div class="cc-stepper-btns">
+        <button type="button" onclick="stepField(this,-1)">−</button>
+        <button type="button" onclick="stepField(this,+1)">+</button>
       </div>`;
+    grid.appendChild(div);
   }
+}
+
+function stepField(btn, delta) {
+  const card = btn.closest('.cc-stepper');
+  let val = parseInt(card.dataset.val) || 0;
+  const max = parseInt(card.dataset.max) || 10;
+  val = Math.max(0, Math.min(max, val + delta));
+  card.dataset.val = val;
+  card.querySelector('.cc-stepper-val').textContent = val;
 }
 
 function resetForm() {
@@ -563,12 +603,11 @@ function runCalculation() {
   const oasis2Pct  = parseInt(document.getElementById('oasis2').value) || 0;
   const oasis3Pct  = parseInt(document.getElementById('oasis3').value) || 0;
 
-  // Read starting field levels
+  // Read starting field levels from stepper cards
   let fieldLevels = [];
-  for (let i = 0; i < fieldCount; i++) {
-    const v = parseInt(document.getElementById(`field${i}`)?.value) || 0;
-    fieldLevels.push(Math.min(v, maxLvl));
-  }
+  document.querySelectorAll('#fieldLevelsGrid .cc-stepper').forEach(card => {
+    fieldLevels.push(Math.min(parseInt(card.dataset.val) || 0, maxLvl));
+  });
 
   // Current state
   let state = {
