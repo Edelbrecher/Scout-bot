@@ -705,6 +705,15 @@ async def set_bot_active(guild_id: str):
         await db.commit()
 
 
+async def set_category(guild_id: str, category_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET category_id = ? WHERE guild_id = ?",
+            (category_id, guild_id),
+        )
+        await db.commit()
+
+
 async def activate_guild_subscription(guild_id: str, status: str, plan: str):
     """Copy user subscription status/plan onto the guild so the dashboard allows access."""
     async with aiosqlite.connect(DB_PATH) as db:

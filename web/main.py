@@ -813,10 +813,25 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
     is_admin = session.get("type") == "admin"
     is_owner = is_guild_owner(session, guild)
     request_hub = await database.get_request_hub(guild_id)
+
+    # Check bot permissions in configured channels
+    perm_issues = []
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.post(
+                "http://bot:7777/api/check-permissions",
+                json={"guild_id": guild_id},
+            )
+            if resp.status_code == 200:
+                perm_issues = resp.json().get("issues", [])
+    except Exception:
+        pass
+
     return templates.TemplateResponse(
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
-         "is_admin": is_admin, "is_owner": is_owner, "request_hub": request_hub},
+         "is_admin": is_admin, "is_owner": is_owner, "request_hub": request_hub,
+         "perm_issues": perm_issues},
     )
 
 

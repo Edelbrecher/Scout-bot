@@ -146,12 +146,10 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
         return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 
     config = await database.get_guild_config(guild_id)
-    if not config or not config.get("category_id"):
-        return aiohttp_web.json_response({"ok": False, "error": "category not configured"}, status=400)
-
-    category = guild.get_channel(int(config["category_id"]))
-    if not category or not isinstance(category, discord.CategoryChannel):
-        return aiohttp_web.json_response({"ok": False, "error": "category not found"}, status=400)
+    try:
+        category = await _get_or_create_category(guild, config)
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": f"category error: {e}"}, status=500)
 
     # Permissions: same pattern as scout channels
     overwrites: dict = {
@@ -200,6 +198,23 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
     })
 
 
+async def _get_or_create_category(guild: discord.Guild, config: dict | None) -> discord.CategoryChannel:
+    """Return configured category or create a default 'TravOps' category."""
+    if config and config.get("category_id"):
+        cat = guild.get_channel(int(config["category_id"]))
+        if cat and isinstance(cat, discord.CategoryChannel):
+            return cat
+    # Auto-create category
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),
+    }
+    cat = await guild.create_category("TravOps", overwrites=overwrites)
+    # Save to config so future channels land here too
+    await database.set_category(guild_id=str(guild.id), category_id=str(cat.id))
+    return cat
+
+
 async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web.Response:
     """Called by web container to create the Request Hub channel."""
     try:
@@ -216,12 +231,10 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
         return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 
     config = await database.get_guild_config(guild_id)
-    if not config or not config.get("category_id"):
-        return aiohttp_web.json_response({"ok": False, "error": "category not configured"}, status=400)
-
-    category = guild.get_channel(int(config["category_id"]))
-    if not category or not isinstance(category, discord.CategoryChannel):
-        return aiohttp_web.json_response({"ok": False, "error": "category not found"}, status=400)
+    try:
+        category = await _get_or_create_category(guild, config)
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": f"category error: {e}"}, status=500)
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
@@ -273,10 +286,66 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
     })
 
 
+async def handle_check_permissions(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Check if bot has required permissions in configured channels."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    required = discord.Permissions(
+        view_channel=True, send_messages=True,
+        embed_links=True, attach_files=True, manage_channels=True,
+    )
+    issues = []
+
+    config = await database.get_guild_config(guild_id)
+    channels_to_check = []
+
+    if config:
+        for key in ("scout_channel_id", "res_request_channel_id", "attack_channel_id"):
+            ch_id = config.get(key)
+            if ch_id:
+                channels_to_check.append(ch_id)
+
+    # Also check report + hub channels
+    report = await database.get_report_channel(guild_id)
+    if report:
+        channels_to_check.append(report.get("channel_id"))
+
+    hub = await database.get_request_hub(guild_id)
+    if hub:
+        channels_to_check.append(hub.get("channel_id"))
+
+    for ch_id in channels_to_check:
+        if not ch_id:
+            continue
+        ch = guild.get_channel(int(ch_id))
+        if not ch:
+            issues.append({"channel_id": ch_id, "issue": "channel not found"})
+            continue
+        perms = ch.permissions_for(guild.me)
+        missing = []
+        if not perms.view_channel:   missing.append("view_channel")
+        if not perms.send_messages:  missing.append("send_messages")
+        if not perms.embed_links:    missing.append("embed_links")
+        if not perms.attach_files:   missing.append("attach_files")
+        if missing:
+            issues.append({"channel_id": ch_id, "channel_name": ch.name, "missing": missing})
+
+    return aiohttp_web.json_response({"ok": True, "issues": issues})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
     app.router.add_post("/api/create-request-hub", handle_create_request_hub)
+    app.router.add_post("/api/check-permissions", handle_check_permissions)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

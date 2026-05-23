@@ -50,6 +50,19 @@
   {% elif _error %}
   <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Fehler: {{ _error }}</div>
   {% endif %}
+  {% if perm_issues %}
+  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">
+    ⚠️ <strong>Bot-Berechtigungen fehlen</strong> — der Bot hat in folgenden Channels nicht alle nötigen Rechte:
+    <ul style="margin:0.5rem 0 0 1rem; padding:0;">
+      {% for issue in perm_issues %}
+      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>:
+        {% if issue.missing %}fehlende Rechte: {{ issue.missing | join(", ") }}{% else %}{{ issue.issue }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    Bitte gib dem Bot in diesen Channels die fehlenden Rechte zurück.
+  </div>
+  {% endif %}
 
   <!-- ── Setup-Wizard ── -->
   {% set needs_setup = not guild.tw_world %}
