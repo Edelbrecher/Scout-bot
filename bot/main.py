@@ -40,6 +40,18 @@ class ScouterBot(commands.Bot):
             await database.upsert_guild_name(str(guild.id), guild.name, owner_discord_id=owner_id)
         print(f"Synced {len(self.guilds)} guild(s) to database.")
 
+        # Detect deleted/left guilds: any active DB entry not in current guild list → free slot
+        active_ids = await database.get_all_active_guild_ids()
+        current_ids = {str(g.id) for g in self.guilds}
+        freed = 0
+        for guild_id in active_ids:
+            if guild_id not in current_ids:
+                await database.set_bot_kicked(guild_id)
+                freed += 1
+                print(f"[on_ready] Guild {guild_id} no longer exists → slot freed.")
+        if freed:
+            print(f"[on_ready] Freed {freed} stale guild slot(s).")
+
     async def on_guild_join(self, guild: discord.Guild):
         _TIER_LIMITS = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
         owner_id = str(guild.owner_id) if guild.owner_id else ""

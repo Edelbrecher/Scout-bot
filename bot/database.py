@@ -705,6 +705,15 @@ async def set_bot_active(guild_id: str):
         await db.commit()
 
 
+async def get_all_active_guild_ids() -> list[str]:
+    """Return all guild_ids with bot_status = 'active'."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT guild_id FROM guild_configs WHERE bot_status = 'active'"
+        ) as cur:
+            return [r[0] for r in await cur.fetchall()]
+
+
 async def set_category(guild_id: str, category_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
