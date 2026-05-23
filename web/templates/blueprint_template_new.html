@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Neue Vorlage · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:560px;">
+  <div class="page-header">
+    <a href="/guild/{{ guild.guild_id }}/blueprints" class="back-link">← Blueprints</a>
+    <h1>📋 Neue Blueprint-Vorlage</h1>
+    <p class="subtitle">{{ guild.guild_name }}</p>
+  </div>
+
+  <div class="card">
+    <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/new">
+      <div class="form-group">
+        <label for="tribe">Stamm</label>
+        <select name="tribe" id="tribe" required>
+          <option value="">— Stamm wählen —</option>
+          {% for tribe_name, ti in tribe_meta.items() %}
+          <option value="{{ tribe_name }}">{{ ti.emoji }} {{ ti.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="name">Name der Vorlage</label>
+        <input type="text" name="name" id="name" required placeholder="z.B. Early Game Aufbau" maxlength="100" />
+      </div>
+      <div class="form-group">
+        <label for="description">Beschreibung <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+        <textarea name="description" id="description" rows="3" placeholder="Kurze Beschreibung der Strategie…" style="resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex; gap:0.75rem; margin-top:1.25rem;">
+        <button type="submit" class="btn btn-primary">Vorlage erstellen</button>
+        <a href="/guild/{{ guild.guild_id }}/blueprints" class="btn btn-secondary">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

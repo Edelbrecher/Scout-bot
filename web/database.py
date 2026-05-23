@@ -255,6 +255,7 @@ async def init_db():
     await _init_own_villages_table()
     await _init_own_villages_history_table()
     await _init_sitter_table()
+    await init_blueprint_tables()
     await _init_settle_list_table()
     await _init_dual_links_table()
     await _init_farmlist_analyses_table()
@@ -3545,3 +3546,260 @@ async def close_defend_channel(channel_id: str):
         await db.execute(
             "UPDATE defend_channels SET status='closed' WHERE channel_id=?", (channel_id,))
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Blueprints
+# ---------------------------------------------------------------------------
+
+async def init_blueprint_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS blueprint_templates (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                tribe       TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                created_at  TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS blueprint_steps (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                template_id INTEGER NOT NULL REFERENCES blueprint_templates(id) ON DELETE CASCADE,
+                order_num   INTEGER NOT NULL DEFAULT 0,
+                step_type   TEXT NOT NULL DEFAULT 'building',
+                title       TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                target      TEXT DEFAULT ''
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS player_blueprints (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                player_name   TEXT NOT NULL,
+                village_name  TEXT NOT NULL,
+                village_coords TEXT DEFAULT '',
+                template_id   INTEGER REFERENCES blueprint_templates(id) ON DELETE SET NULL,
+                assigned_at   TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS blueprint_progress (
+                player_blueprint_id INTEGER NOT NULL,
+                step_id             INTEGER NOT NULL REFERENCES blueprint_steps(id) ON DELETE CASCADE,
+                completed           INTEGER DEFAULT 0,
+                completed_at        TEXT,
+                PRIMARY KEY (player_blueprint_id, step_id)
+            )
+        """)
+        await db.commit()
+
+
+async def get_blueprint_templates(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT bt.*, COUNT(bs.id) as step_count
+            FROM blueprint_templates bt
+            LEFT JOIN blueprint_steps bs ON bs.template_id = bt.id
+            WHERE bt.guild_id = ?
+            GROUP BY bt.id
+            ORDER BY bt.tribe, bt.name
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_blueprint_template(template_id: int, guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM blueprint_templates WHERE id=? AND guild_id=?",
+            (template_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return None
+            tmpl = dict(row)
+        async with db.execute(
+            "SELECT * FROM blueprint_steps WHERE template_id=? ORDER BY order_num",
+            (template_id,)
+        ) as cur:
+            tmpl["steps"] = [dict(r) for r in await cur.fetchall()]
+        return tmpl
+
+
+async def create_blueprint_template(guild_id: str, tribe: str, name: str, description: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO blueprint_templates (guild_id, tribe, name, description) VALUES (?,?,?,?)",
+            (guild_id, tribe, name, description)
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_blueprint_template(guild_id: str, template_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM blueprint_templates WHERE id=? AND guild_id=?",
+            (template_id, guild_id)
+        )
+        await db.commit()
+
+
+async def add_blueprint_step(
+    template_id: int, guild_id: str, step_type: str,
+    title: str, description: str, target: str, order_num: int
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Verify template belongs to guild
+        async with db.execute(
+            "SELECT id FROM blueprint_templates WHERE id=? AND guild_id=?",
+            (template_id, guild_id)
+        ) as cur:
+            if not await cur.fetchone():
+                return 0
+        cur = await db.execute(
+            """INSERT INTO blueprint_steps (template_id, order_num, step_type, title, description, target)
+               VALUES (?,?,?,?,?,?)""",
+            (template_id, order_num, step_type, title, description, target)
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_blueprint_step(guild_id: str, step_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Verify template belongs to guild
+        async with db.execute(
+            """SELECT bs.id FROM blueprint_steps bs
+               JOIN blueprint_templates bt ON bt.id = bs.template_id
+               WHERE bs.id=? AND bt.guild_id=?""",
+            (step_id, guild_id)
+        ) as cur:
+            if not await cur.fetchone():
+                return
+        await db.execute("DELETE FROM blueprint_steps WHERE id=?", (step_id,))
+        await db.commit()
+
+
+async def reorder_blueprint_steps(template_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT id FROM blueprint_steps WHERE template_id=? ORDER BY order_num, id",
+            (template_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+        for i, row in enumerate(rows, 1):
+            await db.execute(
+                "UPDATE blueprint_steps SET order_num=? WHERE id=?", (i, row[0])
+            )
+        await db.commit()
+
+
+async def get_player_blueprints(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT pb.id, pb.player_name, pb.village_name, pb.village_coords,
+                   pb.template_id, pb.assigned_at,
+                   bt.name as template_name, bt.tribe as tribe,
+                   COUNT(bs.id) as total_steps,
+                   SUM(CASE WHEN bp.completed=1 THEN 1 ELSE 0 END) as done_steps
+            FROM player_blueprints pb
+            LEFT JOIN blueprint_templates bt ON bt.id = pb.template_id
+            LEFT JOIN blueprint_steps bs ON bs.template_id = pb.template_id
+            LEFT JOIN blueprint_progress bp ON bp.player_blueprint_id = pb.id AND bp.step_id = bs.id
+            WHERE pb.guild_id = ?
+            GROUP BY pb.id
+            ORDER BY pb.player_name, pb.village_name
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_player_blueprint(blueprint_id: int, guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT pb.*, bt.name as template_name, bt.tribe as tribe,
+                      bt.description as template_description
+               FROM player_blueprints pb
+               LEFT JOIN blueprint_templates bt ON bt.id = pb.template_id
+               WHERE pb.id=? AND pb.guild_id=?""",
+            (blueprint_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return None
+            bp = dict(row)
+        # Get steps with completion status
+        async with db.execute(
+            """SELECT bs.*, COALESCE(bpr.completed, 0) as completed, bpr.completed_at
+               FROM blueprint_steps bs
+               LEFT JOIN blueprint_progress bpr
+                 ON bpr.step_id = bs.id AND bpr.player_blueprint_id = ?
+               WHERE bs.template_id = ?
+               ORDER BY bs.order_num""",
+            (blueprint_id, bp["template_id"])
+        ) as cur:
+            bp["steps"] = [dict(r) for r in await cur.fetchall()]
+        return bp
+
+
+async def create_player_blueprint(
+    guild_id: str, player_name: str, village_name: str,
+    village_coords: str, template_id: int
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """INSERT INTO player_blueprints
+               (guild_id, player_name, village_name, village_coords, template_id)
+               VALUES (?,?,?,?,?)""",
+            (guild_id, player_name, village_name, village_coords, template_id)
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_player_blueprint(guild_id: str, blueprint_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM player_blueprints WHERE id=? AND guild_id=?",
+            (blueprint_id, guild_id)
+        )
+        await db.commit()
+
+
+async def toggle_blueprint_step(blueprint_id: int, step_id: int) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT completed FROM blueprint_progress WHERE player_blueprint_id=? AND step_id=?",
+            (blueprint_id, step_id)
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            new_state = 1
+            await db.execute(
+                """INSERT INTO blueprint_progress (player_blueprint_id, step_id, completed, completed_at)
+                   VALUES (?, ?, 1, datetime('now'))""",
+                (blueprint_id, step_id)
+            )
+        else:
+            new_state = 0 if row[0] else 1
+            if new_state:
+                await db.execute(
+                    """UPDATE blueprint_progress SET completed=1, completed_at=datetime('now')
+                       WHERE player_blueprint_id=? AND step_id=?""",
+                    (blueprint_id, step_id)
+                )
+            else:
+                await db.execute(
+                    """UPDATE blueprint_progress SET completed=0, completed_at=NULL
+                       WHERE player_blueprint_id=? AND step_id=?""",
+                    (blueprint_id, step_id)
+                )
+        await db.commit()
+        return new_state

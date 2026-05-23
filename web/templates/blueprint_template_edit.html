@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ tmpl.name }} · Blueprints · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.step-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.step-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  transition: border-color 0.15s;
+}
+.step-row:hover { border-color: #5865f2; }
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--bg-card); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.78rem; font-weight: 700; color: var(--text-muted);
+  flex-shrink: 0;
+}
+.step-badge {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 99px; flex-shrink: 0;
+}
+.step-badge-building { background: rgba(59,130,246,0.18); color: #60a5fa; }
+.step-badge-troops   { background: rgba(239,68,68,0.18);  color: #f87171; }
+.step-title { flex: 1; font-weight: 600; font-size: 0.9rem; }
+.step-target { font-size: 0.82rem; color: var(--text-muted); }
+.step-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+.add-form { display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 0.75rem; align-items: end; }
+@media (max-width: 720px) { .add-form { grid-template-columns: 1fr 1fr; } }
+
+.tribe-tag {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.82rem; font-weight: 600; padding: 3px 10px;
+  border-radius: 99px; border: 1px solid;
+}
+</style>
+
+<div class="container" style="max-width:720px;">
+  <div class="page-header">
+    <a href="/guild/{{ guild.guild_id }}/blueprints" class="back-link">← Blueprints</a>
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      <h1 style="margin-bottom:0;">{{ tmpl.name }}</h1>
+      {% set ti = tribe_meta.get(tmpl.tribe, {}) %}
+      <span class="tribe-tag" style="color:{{ ti.color or '#fff' }}; border-color:{{ ti.color or '#fff' }}20; background:{{ ti.color or '#fff' }}15;">
+        {{ ti.emoji or '' }} {{ ti.label or tmpl.tribe }}
+      </span>
+    </div>
+    {% if tmpl.description %}
+    <p class="subtitle" style="margin-top:0.35rem;">{{ tmpl.description }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Steps list -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h2 style="font-size:1rem;">Schritte <span style="color:var(--text-muted); font-weight:400;">({{ tmpl.steps|length }})</span></h2>
+    </div>
+
+    {% if not tmpl.steps %}
+    <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted);">
+      <div style="font-size:2rem; margin-bottom:0.5rem;">📭</div>
+      <div>Noch keine Schritte. Füge unten den ersten Schritt hinzu.</div>
+    </div>
+    {% else %}
+    <div class="step-list">
+      {% for step in tmpl.steps %}
+      <div class="step-row">
+        <div class="step-num">{{ loop.index }}</div>
+        <span class="step-badge {% if step.step_type == 'troops' %}step-badge-troops{% else %}step-badge-building{% endif %}">
+          {% if step.step_type == 'troops' %}⚔️ Truppen{% else %}🏗️ Gebäude{% endif %}
+        </span>
+        <div style="flex:1; min-width:0;">
+          <div class="step-title">{{ step.title }}{% if step.target %} <span class="step-target">→ {{ step.target }}</span>{% endif %}</div>
+          {% if step.description %}<div class="step-desc">{{ step.description }}</div>{% endif %}
+        </div>
+        <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/step/{{ step.id }}/delete" onsubmit="return confirm('Schritt löschen?')">
+          <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.55rem;" title="Löschen">🗑️</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Add step form -->
+  <div class="card">
+    <h2 style="font-size:1rem; margin-bottom:1rem;">＋ Schritt hinzufügen</h2>
+    <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/step/add">
+      <div style="display:grid; grid-template-columns:160px 1fr 160px; gap:0.75rem; margin-bottom:0.75rem;">
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:0.8rem;">Typ</label>
+          <select name="step_type" id="step_type">
+            <option value="building">🏗️ Gebäude</option>
+            <option value="troops">⚔️ Truppen</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:0.8rem;">Titel <span style="color:var(--error);">*</span></label>
+          <input type="text" name="title" required placeholder="z.B. Kaserne ausbauen" maxlength="120" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:0.8rem;">Ziel</label>
+          <input type="text" name="target" placeholder="z.B. Lvl 5 / 200 Stück" maxlength="60" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.8rem;">Beschreibung <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+        <textarea name="description" rows="2" placeholder="Zusätzliche Hinweise…" style="resize:vertical;"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Hinzufügen</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

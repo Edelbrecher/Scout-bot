@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}{{ bp.village_name }} · Blueprint · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.bp-step-item {
+  display: flex; align-items: flex-start; gap: 1rem;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1rem 1.1rem;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer; user-select: none;
+}
+.bp-step-item.is-done {
+  background: rgba(34,197,94,0.07);
+  border-color: rgba(34,197,94,0.3);
+}
+.bp-step-item.is-current {
+  border-left: 3px solid #3b82f6;
+  background: rgba(59,130,246,0.06);
+  border-color: rgba(59,130,246,0.4);
+}
+.bp-step-item:hover { border-color: #5865f2; }
+.bp-step-item.is-done:hover { border-color: rgba(34,197,94,0.5); }
+
+.bp-checkbox {
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 2px solid var(--border); background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 0.2s, border-color 0.2s;
+  margin-top: 2px;
+}
+.bp-step-item.is-done .bp-checkbox {
+  background: #22c55e; border-color: #22c55e; color: #fff; font-size: 0.82rem;
+}
+.bp-step-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; color: var(--text-muted);
+  flex-shrink: 0; margin-top: 1px;
+}
+.bp-step-body { flex: 1; min-width: 0; }
+.bp-step-title {
+  font-weight: 600; font-size: 0.92rem;
+  transition: color 0.2s, text-decoration 0.2s;
+}
+.bp-step-item.is-done .bp-step-title {
+  color: var(--text-muted); text-decoration: line-through;
+}
+.bp-step-target { color: var(--text-muted); font-size: 0.82rem; margin-left: 0.4rem; }
+.bp-step-desc { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.3rem; }
+.bp-step-badge {
+  font-size: 0.7rem; font-weight: 700; padding: 2px 7px;
+  border-radius: 99px; flex-shrink: 0; margin-top: 3px;
+}
+.bp-step-badge-building { background: rgba(59,130,246,0.18); color: #60a5fa; }
+.bp-step-badge-troops   { background: rgba(239,68,68,0.18);  color: #f87171; }
+
+.progress-outer {
+  background: var(--bg); border-radius: 99px; height: 12px; overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+.progress-inner {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  transition: width 0.5s ease;
+}
+
+.toast {
+  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.75rem 1.1rem; font-size: 0.88rem; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  transform: translateY(20px); opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+</style>
+
+<div class="container" style="max-width:700px;">
+  <div class="page-header">
+    <a href="/guild/{{ guild.guild_id }}/blueprints" class="back-link">← Blueprints</a>
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      {% set ti = tribe_meta.get(bp.tribe, {}) %}
+      <h1 style="margin-bottom:0;">{{ ti.emoji or '' }} {{ bp.village_name }}</h1>
+    </div>
+    <p class="subtitle" style="margin-top:0.3rem;">
+      {{ bp.player_name }}
+      {% if bp.village_coords %}<span style="color:var(--text-muted);">· {{ bp.village_coords }}</span>{% endif %}
+      · <span style="color:{{ ti.color or 'var(--text-muted)' }};">{{ bp.template_name or '—' }}</span>
+    </p>
+  </div>
+
+  <!-- Overall progress -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <div>
+        <span style="font-size:1.05rem; font-weight:700;" id="progress-label">{{ done }} von {{ total }} Schritten abgeschlossen</span>
+      </div>
+      <div style="font-size:1.4rem; font-weight:800; color:{% if done == total and total > 0 %}#22c55e{% else %}var(--text){% endif %};" id="pct-label">
+        {% if total > 0 %}{{ ((done / total * 100) | int) }}%{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="progress-outer">
+      <div class="progress-inner" id="main-progress" style="width:{% if total > 0 %}{{ (done / total * 100) | int }}%{% else %}0%{% endif %};"></div>
+    </div>
+    {% if done == total and total > 0 %}
+    <div style="text-align:center; margin-top:1rem; font-size:1rem; color:#22c55e; font-weight:700;">
+      🎉 Alle Schritte abgeschlossen!
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Steps -->
+  <div style="display:flex; flex-direction:column; gap:0.5rem;" id="steps-container">
+    {% set ns = namespace(found_current=false) %}
+    {% for step in bp.steps %}
+    {% set is_done = step.completed == 1 %}
+    {% if not is_done and not ns.found_current %}
+      {% set is_current = true %}
+      {% set ns.found_current = true %}
+    {% else %}
+      {% set is_current = false %}
+    {% endif %}
+    <div class="bp-step-item {% if is_done %}is-done{% elif is_current %}is-current{% endif %}"
+         id="step-{{ step.id }}"
+         onclick="toggleStep({{ bp.id }}, {{ step.id }}, this)"
+         data-guild="{{ guild.guild_id }}"
+         data-blueprint="{{ bp.id }}"
+         data-step="{{ step.id }}"
+         data-done="{{ '1' if is_done else '0' }}">
+      <div class="bp-checkbox" id="cb-{{ step.id }}">{% if is_done %}✓{% endif %}</div>
+      <div class="bp-step-num">{{ loop.index }}</div>
+      <div class="bp-step-body">
+        <div>
+          <span class="bp-step-title">{{ step.title }}</span>
+          {% if step.target %}<span class="bp-step-target">→ {{ step.target }}</span>{% endif %}
+        </div>
+        {% if step.description %}<div class="bp-step-desc">{{ step.description }}</div>{% endif %}
+      </div>
+      <span class="bp-step-badge {% if step.step_type == 'troops' %}bp-step-badge-troops{% else %}bp-step-badge-building{% endif %}">
+        {% if step.step_type == 'troops' %}⚔️{% else %}🏗️{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if not bp.steps %}
+  <div class="card" style="text-align:center; padding:2rem; color:var(--text-muted);">
+    Diese Vorlage hat noch keine Schritte.
+  </div>
+  {% endif %}
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var _totalSteps = {{ total }};
+var _doneSteps  = {{ done }};
+var _guildId    = "{{ guild.guild_id }}";
+
+function toggleStep(blueprintId, stepId, el) {
+  var url = '/guild/' + _guildId + '/blueprints/player/' + blueprintId + '/step/' + stepId + '/toggle';
+  fetch(url, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var done = data.completed === 1;
+      var prevDone = el.dataset.done === '1';
+      el.dataset.done = done ? '1' : '0';
+      var cb = document.getElementById('cb-' + stepId);
+      if (done) {
+        el.classList.add('is-done');
+        el.classList.remove('is-current');
+        cb.textContent = '✓';
+        if (!prevDone) _doneSteps++;
+        showToast('✅ Schritt erledigt');
+      } else {
+        el.classList.remove('is-done');
+        cb.textContent = '';
+        if (prevDone) _doneSteps--;
+        showToast('↩️ Schritt zurückgesetzt');
+      }
+      updateCurrentHighlight();
+      updateProgress();
+    })
+    .catch(function() { showToast('❌ Fehler beim Speichern'); });
+}
+
+function updateCurrentHighlight() {
+  var found = false;
+  var items = document.querySelectorAll('.bp-step-item');
+  items.forEach(function(item) {
+    item.classList.remove('is-current');
+    if (!found && item.dataset.done !== '1') {
+      item.classList.add('is-current');
+      found = true;
+    }
+  });
+}
+
+function updateProgress() {
+  var pct = _totalSteps > 0 ? Math.round(_doneSteps / _totalSteps * 100) : 0;
+  var bar = document.getElementById('main-progress');
+  var lbl = document.getElementById('progress-label');
+  var pctLbl = document.getElementById('pct-label');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = _doneSteps + ' von ' + _totalSteps + ' Schritten abgeschlossen';
+  if (pctLbl) {
+    pctLbl.textContent = pct + '%';
+    pctLbl.style.color = (_doneSteps === _totalSteps && _totalSteps > 0) ? '#22c55e' : '';
+  }
+}
+
+var _toastTimer = null;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function() { t.classList.remove('show'); }, 2000);
+}
+</script>
+{% endblock %}

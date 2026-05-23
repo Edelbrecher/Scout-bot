@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Blueprints · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.bp-tribe-section { margin-bottom: 2rem; }
+.bp-tribe-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 1rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 0.75rem; padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.bp-template-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem;
+}
+.bp-template-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem; position: relative; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.bp-template-card:hover { border-color: #5865f2; box-shadow: 0 4px 16px rgba(88,101,242,0.15); }
+.bp-template-card .tribe-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px;
+}
+.bp-card-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
+.bp-card-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+.bp-card-actions { display: flex; gap: 0.4rem; }
+
+.bp-progress-bar-wrap {
+  background: var(--bg); border-radius: 99px; height: 8px; overflow: hidden; flex: 1;
+}
+.bp-progress-bar-fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  transition: width 0.4s ease;
+}
+.bp-player-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.bp-player-table th {
+  text-align: left; padding: 0.5rem 0.75rem;
+  color: var(--text-muted); font-weight: 600; font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+.bp-player-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.bp-player-table tr:last-child td { border-bottom: none; }
+.bp-player-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  z-index: 500; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 2rem; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.modal-box h3 { margin-bottom: 1.25rem; font-size: 1.1rem; }
+.modal-close { float: right; cursor: pointer; color: var(--text-muted); font-size: 1.4rem; line-height: 1; background: none; border: none; }
+</style>
+
+<div class="container-wide" style="max-width:1200px; margin: 0 auto;">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1>📋 Blueprints</h1>
+      <p class="subtitle">Build-Order Vorlagen & Spieler-Fortschritt</p>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+
+    <!-- LEFT: Templates -->
+    <div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h2 style="font-size:1.1rem; font-weight:700;">📋 Blueprint-Vorlagen</h2>
+        <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new" class="btn btn-primary" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Neue Vorlage</a>
+      </div>
+
+      {% if not templates_by_tribe %}
+      <div class="card" style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted);">
+        <div style="font-size:2.5rem; margin-bottom:0.75rem;">📋</div>
+        <div style="font-weight:600; margin-bottom:0.4rem;">Noch keine Vorlagen</div>
+        <div style="font-size:0.85rem;">Erstelle deine erste Blueprint-Vorlage für einen Stamm.</div>
+      </div>
+      {% else %}
+      {% for tribe_name, tribe_info in tribe_meta.items() %}
+        {% if tribe_name in templates_by_tribe %}
+        <div class="bp-tribe-section">
+          <div class="bp-tribe-header">
+            <span style="font-size:1.1rem;">{{ tribe_info.emoji }}</span>
+            <span style="color:{{ tribe_info.color }};">{{ tribe_info.label }}</span>
+            <span style="font-size:0.75rem; font-weight:400; color:var(--text-muted);">({{ templates_by_tribe[tribe_name]|length }})</span>
+          </div>
+          <div class="bp-template-grid">
+            {% for tmpl in templates_by_tribe[tribe_name] %}
+            <div class="bp-template-card">
+              <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.3rem;">
+                <span class="tribe-dot" style="background:{{ tribe_info.color }};"></span>
+                <div class="bp-card-name">{{ tmpl.name }}</div>
+              </div>
+              <div class="bp-card-meta">{{ tmpl.step_count }} Schritt{% if tmpl.step_count != 1 %}e{% endif %}</div>
+              <div class="bp-card-actions">
+                <a href="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">✏️ Bearbeiten</a>
+                <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/delete" style="display:inline;" onsubmit="return confirm('Vorlage &quot;{{ tmpl.name }}&quot; wirklich löschen?')">
+                  <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.65rem;">🗑️</button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- RIGHT: Player Blueprints -->
+    <div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h2 style="font-size:1.1rem; font-weight:700;">👥 Spieler-Fortschritt</h2>
+        {% if all_templates %}
+        <button class="btn btn-primary" onclick="openAssignModal()" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Blueprint zuweisen</button>
+        {% endif %}
+      </div>
+
+      {% if not player_blueprints %}
+      <div class="card" style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted);">
+        <div style="font-size:2.5rem; margin-bottom:0.75rem;">👥</div>
+        <div style="font-weight:600; margin-bottom:0.4rem;">Keine Spieler-Blueprints</div>
+        <div style="font-size:0.85rem;">Weise Spielern Blueprints zu, um ihren Fortschritt zu verfolgen.</div>
+      </div>
+      {% else %}
+      <div class="card" style="padding:0; overflow:hidden;">
+        <table class="bp-player-table">
+          <thead>
+            <tr>
+              <th>Spieler / Dorf</th>
+              <th>Vorlage</th>
+              <th>Fortschritt</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pb in player_blueprints %}
+            {% set total = pb.total_steps or 0 %}
+            {% set done = pb.done_steps or 0 %}
+            {% set pct = ((done / total * 100) | int) if total > 0 else 0 %}
+            <tr>
+              <td>
+                <div style="font-weight:600; font-size:0.9rem;">{{ pb.player_name }}</div>
+                <div style="font-size:0.78rem; color:var(--text-muted);">
+                  {{ pb.village_name }}{% if pb.village_coords %} <span style="opacity:0.6;">({{ pb.village_coords }})</span>{% endif %}
+                </div>
+              </td>
+              <td>
+                {% if pb.tribe and pb.tribe in tribe_meta %}
+                <span style="font-size:0.85rem;">{{ tribe_meta[pb.tribe].emoji }}</span>
+                {% endif %}
+                <span style="font-size:0.85rem;">{{ pb.template_name or '—' }}</span>
+              </td>
+              <td style="min-width:100px;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <div class="bp-progress-bar-wrap">
+                    <div class="bp-progress-bar-fill" style="width:{{ pct }}%;"></div>
+                  </div>
+                  <span style="font-size:0.78rem; color:var(--text-muted); white-space:nowrap;">{{ done }}/{{ total }}</span>
+                </div>
+              </td>
+              <td style="white-space:nowrap;">
+                <a href="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.6rem;">📋 Öffnen</a>
+                <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}/delete" style="display:inline;" onsubmit="return confirm('Blueprint für {{ pb.player_name }} löschen?')">
+                  <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.5rem;">🗑️</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- Assign Modal -->
+{% if all_templates %}
+<div class="modal-overlay" id="assignModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAssignModal()">×</button>
+    <h3>＋ Blueprint zuweisen</h3>
+    <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/new">
+      <div class="form-group">
+        <label>Spieler-Name</label>
+        <input type="text" name="player_name" required placeholder="z.B. MaxMuster" />
+      </div>
+      <div class="form-group">
+        <label>Dorfname</label>
+        <input type="text" name="village_name" required placeholder="z.B. Hauptdorf" />
+      </div>
+      <div class="form-group">
+        <label>Koordinaten <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+        <input type="text" name="village_coords" placeholder="z.B. (0|0)" />
+      </div>
+      <div class="form-group">
+        <label>Blueprint-Vorlage</label>
+        <select name="template_id" required>
+          <option value="">— Vorlage wählen —</option>
+          {% for tribe_name, tribe_info in tribe_meta.items() %}
+            {% set tribe_templates = all_templates | selectattr('tribe', 'eq', tribe_name) | list %}
+            {% if tribe_templates %}
+            <optgroup label="{{ tribe_info.emoji }} {{ tribe_info.label }}">
+              {% for t in tribe_templates %}
+              <option value="{{ t.id }}">{{ t.name }} ({{ t.step_count }} Schritte)</option>
+              {% endfor %}
+            </optgroup>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex; gap:0.75rem; margin-top:1.25rem;">
+        <button type="submit" class="btn btn-primary">Zuweisen</button>
+        <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openAssignModal() { document.getElementById('assignModal').classList.add('open'); }
+function closeAssignModal() { document.getElementById('assignModal').classList.remove('open'); }
+document.getElementById('assignModal').addEventListener('click', function(e) {
+  if (e.target === this) closeAssignModal();
+});
+</script>
+{% endif %}
+{% endblock %}

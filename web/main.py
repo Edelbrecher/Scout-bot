@@ -4787,3 +4787,233 @@ async def alliance_members_clear(request: Request, guild_id: str):
         f"/guild/{guild_id}/allianz/mitglieder?cleared=1",
         status_code=303
     )
+
+
+# ---------------------------------------------------------------------------
+# Blueprints
+# ---------------------------------------------------------------------------
+
+TRIBE_META = {
+    "Romans":   {"emoji": "🏛️", "label": "Römer",    "color": "#e2b96f"},
+    "Teutons":  {"emoji": "⚔️",  "label": "Teutonen", "color": "#ef4444"},
+    "Gauls":    {"emoji": "🌿", "label": "Gallier",  "color": "#22c55e"},
+    "Egyptians":{"emoji": "🏺", "label": "Ägypter",  "color": "#f59e0b"},
+    "Huns":     {"emoji": "🏹", "label": "Hunnen",   "color": "#8b5cf6"},
+    "Spartans": {"emoji": "🛡️", "label": "Spartaner","color": "#3b82f6"},
+}
+
+
+@app.get("/guild/{guild_id}/blueprints")
+async def blueprints_main(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    templates_list = await database.get_blueprint_templates(guild_id)
+    player_bps = await database.get_player_blueprints(guild_id)
+    # Group templates by tribe
+    from collections import defaultdict as _dd
+    by_tribe = _dd(list)
+    for t in templates_list:
+        by_tribe[t["tribe"]].append(t)
+    return templates.TemplateResponse("blueprints.html", {
+        "request": request,
+        "guild": guild,
+        "templates_by_tribe": dict(by_tribe),
+        "player_blueprints": player_bps,
+        "all_templates": templates_list,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.get("/guild/{guild_id}/blueprints/templates/new")
+async def blueprint_template_new_form(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    return templates.TemplateResponse("blueprint_template_new.html", {
+        "request": request,
+        "guild": guild,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.post("/guild/{guild_id}/blueprints/templates/new")
+async def blueprint_template_new_save(
+    request: Request,
+    guild_id: str,
+    tribe: str = Form(...),
+    name: str = Form(...),
+    description: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    if tribe not in TRIBE_META:
+        return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+    tid = await database.create_blueprint_template(guild_id, tribe, name.strip(), description.strip())
+    return RedirectResponse(f"/guild/{guild_id}/blueprints/templates/{tid}", status_code=303)
+
+
+@app.get("/guild/{guild_id}/blueprints/templates/{template_id}")
+async def blueprint_template_edit(request: Request, guild_id: str, template_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    tmpl = await database.get_blueprint_template(template_id, guild_id)
+    if not tmpl:
+        return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+    return templates.TemplateResponse("blueprint_template_edit.html", {
+        "request": request,
+        "guild": guild,
+        "tmpl": tmpl,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.post("/guild/{guild_id}/blueprints/templates/{template_id}/step/add")
+async def blueprint_step_add(
+    request: Request,
+    guild_id: str,
+    template_id: int,
+    step_type: str = Form("building"),
+    title: str = Form(...),
+    target: str = Form(""),
+    description: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    tmpl = await database.get_blueprint_template(template_id, guild_id)
+    if not tmpl:
+        return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+    order_num = len(tmpl["steps"]) + 1
+    await database.add_blueprint_step(
+        template_id, guild_id, step_type,
+        title.strip(), description.strip(), target.strip(), order_num
+    )
+    return RedirectResponse(f"/guild/{guild_id}/blueprints/templates/{template_id}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/blueprints/templates/{template_id}/step/{step_id}/delete")
+async def blueprint_step_delete(request: Request, guild_id: str, template_id: int, step_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    await database.delete_blueprint_step(guild_id, step_id)
+    await database.reorder_blueprint_steps(template_id)
+    return RedirectResponse(f"/guild/{guild_id}/blueprints/templates/{template_id}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/blueprints/templates/{template_id}/delete")
+async def blueprint_template_delete(request: Request, guild_id: str, template_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    await database.delete_blueprint_template(guild_id, template_id)
+    return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+
+
+@app.post("/guild/{guild_id}/blueprints/player/new")
+async def blueprint_player_new(
+    request: Request,
+    guild_id: str,
+    player_name: str = Form(...),
+    village_name: str = Form(...),
+    village_coords: str = Form(""),
+    template_id: int = Form(...),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    await database.create_player_blueprint(
+        guild_id, player_name.strip(), village_name.strip(),
+        village_coords.strip(), template_id
+    )
+    return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+
+
+@app.post("/guild/{guild_id}/blueprints/player/{blueprint_id}/delete")
+async def blueprint_player_delete(request: Request, guild_id: str, blueprint_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    await database.delete_player_blueprint(guild_id, blueprint_id)
+    return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+
+
+@app.get("/guild/{guild_id}/blueprints/player/{blueprint_id}")
+async def blueprint_player_detail(request: Request, guild_id: str, blueprint_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    bp = await database.get_player_blueprint(blueprint_id, guild_id)
+    if not bp:
+        return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+    total = len(bp["steps"])
+    done = sum(1 for s in bp["steps"] if s["completed"])
+    return templates.TemplateResponse("blueprint_player.html", {
+        "request": request,
+        "guild": guild,
+        "bp": bp,
+        "total": total,
+        "done": done,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.post("/guild/{guild_id}/blueprints/player/{blueprint_id}/step/{step_id}/toggle")
+async def blueprint_step_toggle(request: Request, guild_id: str, blueprint_id: int, step_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    new_state = await database.toggle_blueprint_step(blueprint_id, step_id)
+    return JSONResponse({"completed": new_state})
