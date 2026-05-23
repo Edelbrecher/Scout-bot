@@ -256,6 +256,7 @@ async def init_db():
     await _init_own_villages_history_table()
     await _init_sitter_table()
     await init_blueprint_tables()
+    await init_village_layout_tables()
     await _init_settle_list_table()
     await _init_dual_links_table()
     await _init_farmlist_analyses_table()
@@ -3803,3 +3804,130 @@ async def toggle_blueprint_step(blueprint_id: int, step_id: int) -> int:
                 )
         await db.commit()
         return new_state
+
+
+# ---------------------------------------------------------------------------
+# Village Layouts
+# ---------------------------------------------------------------------------
+
+async def init_village_layout_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_layouts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                tribe           TEXT NOT NULL DEFAULT '',
+                created_by      TEXT DEFAULT 'admin',
+                is_template     INTEGER DEFAULT 1,
+                description     TEXT DEFAULT '',
+                created_at      TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_slots (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                layout_id       INTEGER NOT NULL REFERENCES village_layouts(id) ON DELETE CASCADE,
+                slot_num        INTEGER NOT NULL,
+                slot_zone       TEXT NOT NULL,
+                building_type   TEXT DEFAULT '',
+                target_level    INTEGER DEFAULT 0,
+                notes           TEXT DEFAULT '',
+                UNIQUE(layout_id, slot_num)
+            )
+        """)
+        await db.commit()
+
+
+async def get_village_layouts(guild_id: str, is_template=None) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if is_template is None:
+            async with db.execute(
+                """SELECT vl.*, COUNT(vs.id) as slot_count
+                   FROM village_layouts vl
+                   LEFT JOIN village_slots vs ON vs.layout_id = vl.id AND vs.building_type != ''
+                   WHERE vl.guild_id = ?
+                   GROUP BY vl.id ORDER BY vl.created_at DESC""",
+                (guild_id,)
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        else:
+            async with db.execute(
+                """SELECT vl.*, COUNT(vs.id) as slot_count
+                   FROM village_layouts vl
+                   LEFT JOIN village_slots vs ON vs.layout_id = vl.id AND vs.building_type != ''
+                   WHERE vl.guild_id = ? AND vl.is_template = ?
+                   GROUP BY vl.id ORDER BY vl.created_at DESC""",
+                (guild_id, int(is_template))
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_village_layout(layout_id: int, guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM village_layouts WHERE id = ? AND guild_id = ?",
+            (layout_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return None
+        layout = dict(row)
+        async with db.execute(
+            "SELECT * FROM village_slots WHERE layout_id = ? ORDER BY slot_num",
+            (layout_id,)
+        ) as cur:
+            layout["slots"] = [dict(r) for r in await cur.fetchall()]
+        return layout
+
+
+async def create_village_layout(guild_id: str, name: str, tribe: str, created_by: str, is_template: int, description: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """INSERT INTO village_layouts (guild_id, name, tribe, created_by, is_template, description)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (guild_id, name, tribe, created_by, is_template, description)
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_village_layout(guild_id: str, layout_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM village_layouts WHERE id = ? AND guild_id = ?",
+            (layout_id, guild_id)
+        )
+        await db.commit()
+
+
+async def set_village_slot(layout_id: int, guild_id: str, slot_num: int, zone: str, building_type: str, target_level: int, notes: str):
+    # Verify layout belongs to guild
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
+            if not await cur.fetchone():
+                return
+        await db.execute(
+            """INSERT INTO village_slots (layout_id, slot_num, slot_zone, building_type, target_level, notes)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(layout_id, slot_num) DO UPDATE SET
+                 building_type=excluded.building_type,
+                 target_level=excluded.target_level,
+                 notes=excluded.notes""",
+            (layout_id, slot_num, zone, building_type, target_level, notes)
+        )
+        await db.commit()
+
+
+async def clear_village_slot(layout_id: int, guild_id: str, slot_num: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
+            if not await cur.fetchone():
+                return
+        await db.execute(
+            "DELETE FROM village_slots WHERE layout_id=? AND slot_num=?",
+            (layout_id, slot_num)
+        )
+        await db.commit()

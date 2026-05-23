@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Neues Dorf-Layout · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:540px; margin:0 auto;">
+  <a href="/guild/{{ guild.guild_id }}/blueprints/layouts" class="back-link">← Dorf-Layouts</a>
+  <h1 style="margin-top:0.5rem;">🏘️ Neues Dorf-Layout</h1>
+
+  <div class="card" style="margin-top:1.5rem;">
+    <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/layouts/new">
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input class="form-input" type="text" name="name" placeholder="z.B. Hauptdorf Römer Ausbau" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stamm</label>
+        <select class="form-input" name="tribe">
+          <option value="">— kein Stamm —</option>
+          {% for key, t in tribe_meta.items() %}
+          <option value="{{ key }}">{{ t.emoji }} {{ t.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Typ</label>
+        <select class="form-input" name="is_template">
+          <option value="1">📋 Admin-Vorlage</option>
+          <option value="0">👤 Spieler-Layout</option>
+        </select>
+      </div>
+      <div class="form-group" id="created_by_group" style="display:none;">
+        <label class="form-label">Spieler-Name</label>
+        <input class="form-input" type="text" name="created_by" placeholder="Name des Spielers" value="admin">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Beschreibung</label>
+        <textarea class="form-input" name="description" rows="3" placeholder="Optionale Beschreibung..."></textarea>
+      </div>
+      <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
+        <button type="submit" class="btn btn-primary" style="flex:1;">🏘️ Layout erstellen</button>
+        <a href="/guild/{{ guild.guild_id }}/blueprints/layouts" class="btn btn-secondary">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+const typeSelect = document.querySelector('select[name="is_template"]');
+const createdByGroup = document.getElementById('created_by_group');
+typeSelect.addEventListener('change', () => {
+  createdByGroup.style.display = typeSelect.value === '0' ? '' : 'none';
+});
+</script>
+{% endblock %}

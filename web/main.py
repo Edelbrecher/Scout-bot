@@ -5017,3 +5017,134 @@ async def blueprint_step_toggle(request: Request, guild_id: str, blueprint_id: i
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     new_state = await database.toggle_blueprint_step(blueprint_id, step_id)
     return JSONResponse({"completed": new_state})
+
+
+# ---------------------------------------------------------------------------
+# Village Layout Blueprint routes
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/blueprints/layouts")
+async def village_layouts_list(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    admin_layouts = await database.get_village_layouts(guild_id, is_template=True)
+    player_layouts = await database.get_village_layouts(guild_id, is_template=False)
+    return templates.TemplateResponse("village_layouts.html", {
+        "request": request,
+        "guild": guild,
+        "admin_layouts": admin_layouts,
+        "player_layouts": player_layouts,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.get("/guild/{guild_id}/blueprints/layouts/new")
+async def village_layout_new_form(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    return templates.TemplateResponse("village_layout_new.html", {
+        "request": request,
+        "guild": guild,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.post("/guild/{guild_id}/blueprints/layouts/new")
+async def village_layout_new_save(
+    request: Request,
+    guild_id: str,
+    name: str = Form(""),
+    tribe: str = Form(""),
+    created_by: str = Form("admin"),
+    is_template: int = Form(1),
+    description: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    if not name.strip():
+        return RedirectResponse(f"/guild/{guild_id}/blueprints/layouts/new", status_code=303)
+    lid = await database.create_village_layout(guild_id, name.strip(), tribe, created_by, is_template, description.strip())
+    return RedirectResponse(f"/guild/{guild_id}/blueprints/layouts/{lid}", status_code=303)
+
+
+@app.get("/guild/{guild_id}/blueprints/layouts/{layout_id}")
+async def village_layout_editor(request: Request, guild_id: str, layout_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    layout = await database.get_village_layout(layout_id, guild_id)
+    if not layout:
+        return RedirectResponse(f"/guild/{guild_id}/blueprints/layouts", status_code=303)
+    slots_by_num = {s["slot_num"]: s for s in layout["slots"]}
+    return templates.TemplateResponse("village_layout_editor.html", {
+        "request": request,
+        "guild": guild,
+        "layout": layout,
+        "slots_by_num": slots_by_num,
+        "tribe_meta": TRIBE_META,
+    })
+
+
+@app.post("/guild/{guild_id}/blueprints/layouts/{layout_id}/slot")
+async def village_layout_set_slot(request: Request, guild_id: str, layout_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    slot_num = int(body.get("slot_num", 0))
+    zone = body.get("zone", "")
+    building_type = body.get("building_type", "")
+    target_level = int(body.get("target_level", 0))
+    notes = body.get("notes", "")
+    await database.set_village_slot(layout_id, guild_id, slot_num, zone, building_type, target_level, notes)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/blueprints/layouts/{layout_id}/slot/clear")
+async def village_layout_clear_slot(request: Request, guild_id: str, layout_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    slot_num = int(body.get("slot_num", 0))
+    await database.clear_village_slot(layout_id, guild_id, slot_num)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/blueprints/layouts/{layout_id}/delete")
+async def village_layout_delete(request: Request, guild_id: str, layout_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_village_layout(guild_id, layout_id)
+    return RedirectResponse(f"/guild/{guild_id}/blueprints/layouts", status_code=303)
