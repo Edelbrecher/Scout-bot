@@ -206,7 +206,8 @@ async def _create_defend_channel(
     await interaction.response.defer(ephemeral=True)
 
     prefix = "timed-def" if timed else "defend"
-    channel_name = f"{prefix}-{_safe(attacker)}-{_safe(coords)}"[:100]
+    defender_name = _safe(interaction.user.display_name)
+    channel_name = f"{prefix}-{defender_name}-{_safe(coords)}"[:100]
     topic = (f"{'Timed-Defend' if timed else 'Defend'}: {attacker} @ {coords} | "
              f"{arrival_1}{' → ' + arrival_2 if arrival_2 else ''}")
 
