@@ -231,14 +231,17 @@ async def get_guild_config(guild_id: str) -> dict | None:
             return dict(row) if row else None
 
 
-async def upsert_guild_name(guild_id: str, guild_name: str):
-    """Register a guild without overwriting existing config."""
+async def upsert_guild_name(guild_id: str, guild_name: str, owner_discord_id: str | None = None):
+    """Register a guild without overwriting existing config.
+    If owner_discord_id is given it is only written when the column is currently NULL."""
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
-            INSERT INTO guild_configs (guild_id, guild_name)
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET guild_name = excluded.guild_name
-        """, (guild_id, guild_name))
+            INSERT INTO guild_configs (guild_id, guild_name, owner_discord_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                guild_name       = excluded.guild_name,
+                owner_discord_id = COALESCE(guild_configs.owner_discord_id, excluded.owner_discord_id)
+        """, (guild_id, guild_name, owner_discord_id))
         await db.commit()
 
 

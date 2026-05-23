@@ -33,9 +33,10 @@ class ScouterBot(commands.Bot):
 
     async def on_ready(self):
         print(f"Logged in as {self.user} ({self.user.id})")
-        # Sync all current guilds to DB
+        # Sync all current guilds to DB — include owner so slots_used is accurate
         for guild in self.guilds:
-            await database.upsert_guild_name(str(guild.id), guild.name)
+            owner_id = str(guild.owner_id) if guild.owner_id else None
+            await database.upsert_guild_name(str(guild.id), guild.name, owner_discord_id=owner_id)
         print(f"Synced {len(self.guilds)} guild(s) to database.")
 
     async def on_guild_join(self, guild: discord.Guild):
@@ -52,7 +53,7 @@ class ScouterBot(commands.Bot):
                 used_slots = await database.get_owner_guild_count(owner_id)
                 if used_slots < max_slots:
                     # Auto-activate: register guild and mark as active via web DB (shared SQLite)
-                    await database.upsert_guild_name(str(guild.id), guild.name)
+                    await database.upsert_guild_name(str(guild.id), guild.name, owner_discord_id=owner_id)
                     print(f"[on_guild_join] Auto-activated {guild.name} ({guild.id}) via user sub for {owner_id}")
                     try:
                         owner = guild.owner or await self.fetch_user(guild.owner_id)
@@ -111,7 +112,7 @@ class ScouterBot(commands.Bot):
             await guild.leave()
             return
 
-        await database.upsert_guild_name(str(guild.id), guild.name)
+        await database.upsert_guild_name(str(guild.id), guild.name, owner_discord_id=owner_id)
         await database.set_bot_active(str(guild.id))
         print(f"Joined guild: {guild.name} ({guild.id})")
 
