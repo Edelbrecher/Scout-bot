@@ -3473,7 +3473,7 @@ async def get_meta_group_stats(guild_id: str, group_id: int) -> list[dict]:
         placeholders = ",".join("?" * len(alliances))
         async with db.execute(f"""
             SELECT alliance_name,
-                   COUNT(DISTINCT player_name) AS member_count,
+                   COUNT(DISTINCT player_id) AS member_count,
                    COUNT(*)                    AS village_count,
                    COALESCE(SUM(population),0) AS total_pop,
                    COALESCE(AVG(population),0) AS avg_pop
