@@ -4971,6 +4971,33 @@ async def blueprint_player_new(
     return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
 
 
+@app.post("/guild/{guild_id}/blueprints/templates/{template_id}/activate")
+async def blueprint_self_activate(
+    request: Request,
+    guild_id: str,
+    template_id: int,
+    village_name: str = Form(""),
+    village_coords: str = Form(""),
+):
+    """Allow any logged-in user to activate a blueprint for themselves."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    player_name = session.get("username", "Unbekannt")
+    tmpl = await database.get_blueprint_template(template_id, guild_id)
+    if not tmpl:
+        return RedirectResponse(f"/guild/{guild_id}/blueprints", status_code=303)
+    bp_id = await database.create_player_blueprint(
+        guild_id, player_name, village_name.strip() or "Hauptdorf",
+        village_coords.strip(), template_id
+    )
+    return RedirectResponse(f"/guild/{guild_id}/blueprints/player/{bp_id}", status_code=303)
+
+
 @app.post("/guild/{guild_id}/blueprints/player/{blueprint_id}/delete")
 async def blueprint_player_delete(request: Request, guild_id: str, blueprint_id: int):
     session, err = _require_session(request)

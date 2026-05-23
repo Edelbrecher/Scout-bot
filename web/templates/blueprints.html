@@ -106,7 +106,8 @@
               </div>
               <div class="bp-card-meta">{{ tmpl.step_count }} Schritt{% if tmpl.step_count != 1 %}e{% endif %}</div>
               <div class="bp-card-actions">
-                <a href="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">✏️ Bearbeiten</a>
+                <button class="btn btn-primary" style="font-size:0.78rem; padding:0.3rem 0.65rem;" onclick="openActivateModal({{ tmpl.id }}, '{{ tmpl.name | e }}')">✅ Aktivieren</button>
+                <a href="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">✏️</a>
                 <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/delete" style="display:inline;" onsubmit="return confirm('Vorlage &quot;{{ tmpl.name }}&quot; wirklich löschen?')">
                   <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.65rem;">🗑️</button>
                 </form>
@@ -189,6 +190,31 @@
   </div>
 </div>
 
+<!-- Self-Activate Modal -->
+<div class="modal-overlay" id="activateModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeActivateModal()">×</button>
+    <h3 id="activateModalTitle">✅ Blueprint aktivieren</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">
+      Der Blueprint wird direkt für deinen Account aktiviert. Du kannst deinen Fortschritt danach selbst abhaken.
+    </p>
+    <form id="activateForm" method="post" action="#">
+      <div class="form-group">
+        <label class="form-label">Dorfname <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+        <input type="text" name="village_name" class="form-control" placeholder="z.B. Hauptdorf">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Koordinaten <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+        <input type="text" name="village_coords" class="form-control" placeholder="z.B. (123|456)">
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeActivateModal()">Abbrechen</button>
+        <button type="submit" class="btn btn-primary">✅ Aktivieren</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Assign Modal -->
 {% if all_templates %}
 <div class="modal-overlay" id="assignModal">
@@ -255,6 +281,23 @@ document.getElementById('assignModal').addEventListener('click', function(e) {
   </div>
 </div>
 <script>
+// ── Activate Modal ─────────────────────────────────────────
+let _activateTemplateId = null;
+function openActivateModal(templateId, templateName) {
+  _activateTemplateId = templateId;
+  document.getElementById('activateModalTitle').textContent = '✅ Blueprint aktivieren: ' + templateName;
+  document.getElementById('activateModal').classList.add('open');
+}
+function closeActivateModal() {
+  document.getElementById('activateModal').classList.remove('open');
+}
+document.getElementById('activateModal').addEventListener('click', function(e) {
+  if (e.target === this) closeActivateModal();
+});
+document.getElementById('activateForm').addEventListener('submit', function(e) {
+  this.action = '/guild/{{ guild.guild_id }}/blueprints/templates/' + _activateTemplateId + '/activate';
+});
+
 function openPresetModal() {
   document.getElementById('presetModal').classList.add('open');
   fetch('/guild/{{ guild.guild_id }}/blueprints/presets')
