@@ -595,7 +595,7 @@ async def login_page(request: Request, error: str = ""):
     # Generate OAuth state token and store in cookie
     state = secrets.token_urlsafe(32)
     response = templates.TemplateResponse("login.html", {"request": request, "error": error[:200]})
-    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax")
+    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax", secure=True)
     return response
 
 
@@ -630,7 +630,7 @@ async def auth_discord(request: Request):
         "state": state,
     })
     response = RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
-    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax")
+    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax", secure=True)
     return response
 
 
