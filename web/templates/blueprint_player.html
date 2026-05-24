@@ -55,6 +55,13 @@
 }
 .bp-step-badge-building { background: rgba(59,130,246,0.18); color: #60a5fa; }
 .bp-step-badge-troops   { background: rgba(239,68,68,0.18);  color: #f87171; }
+.bp-hero-reward {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.7rem; font-weight: 700; margin-top: 5px;
+  background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25);
+  border-radius: 6px; padding: 2px 7px; color: #f59e0b;
+}
+.bp-hero-reward .xp { color: #818cf8; margin-left: 4px; }
 
 .progress-outer {
   background: var(--bg); border-radius: 99px; height: 12px; overflow: hidden;
@@ -129,7 +136,9 @@
          data-guild="{{ guild.guild_id }}"
          data-blueprint="{{ bp.id }}"
          data-step="{{ step.id }}"
-         data-done="{{ '1' if is_done else '0' }}">
+         data-done="{{ '1' if is_done else '0' }}"
+         data-title="{{ step.title | e }}"
+         data-target="{{ step.target | e }}">
       <div class="bp-checkbox" id="cb-{{ step.id }}">{% if is_done %}✓{% endif %}</div>
       <div class="bp-step-num">{{ loop.index }}</div>
       <div class="bp-step-body">
@@ -138,6 +147,7 @@
           {% if step.target %}<span class="bp-step-target">→ {{ step.target }}</span>{% endif %}
         </div>
         {% if step.description %}<div class="bp-step-desc">{{ step.description }}</div>{% endif %}
+        <div id="reward-{{ step.id }}" class="bp-hero-reward" style="display:none;">🗡️ +<span class="res-val">0</span> Res <span class="xp">+<span class="xp-val">0</span> XP</span></div>
       </div>
       <span class="bp-step-badge {% if step.step_type == 'troops' %}bp-step-badge-troops{% else %}bp-step-badge-building{% endif %}">
         {% if step.step_type == 'troops' %}⚔️{% else %}🏗️{% endif %}
@@ -155,10 +165,26 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/static/hero_task_map.js"></script>
 <script>
 var _totalSteps = {{ total }};
 var _doneSteps  = {{ done }};
 var _guildId    = "{{ guild.guild_id }}";
+
+// Pre-compute and show hero task reward badges for each step
+document.querySelectorAll('.bp-step-item[data-title]').forEach(function(el) {
+  var title  = el.dataset.title  || '';
+  var target = el.dataset.target || '';
+  var ids = matchStepToHeroTasks(title, target);
+  if (!ids.length) return;
+  var r = htRewardsFor(ids);
+  var badge = document.getElementById('reward-' + el.dataset.step);
+  if (badge && r.res > 0) {
+    badge.querySelector('.res-val').textContent = r.res.toLocaleString();
+    badge.querySelector('.xp-val').textContent  = r.xp;
+    badge.style.display = 'inline-flex';
+  }
+});
 
 function toggleStep(blueprintId, stepId, el) {
   var url = '/guild/' + _guildId + '/blueprints/player/' + blueprintId + '/step/' + stepId + '/toggle';
@@ -169,12 +195,22 @@ function toggleStep(blueprintId, stepId, el) {
       var prevDone = el.dataset.done === '1';
       el.dataset.done = done ? '1' : '0';
       var cb = document.getElementById('cb-' + stepId);
+
+      // Sync hero tasks
+      var title  = el.dataset.title  || '';
+      var target = el.dataset.target || '';
+      var reward = htSyncFromBlueprint(_guildId, title, target, done);
+
       if (done) {
         el.classList.add('is-done');
         el.classList.remove('is-current');
         cb.textContent = '✓';
         if (!prevDone) _doneSteps++;
-        showToast('✅ Schritt erledigt');
+        if (reward.res > 0) {
+          showToast('✅ Schritt erledigt · 🗡️ +' + reward.res.toLocaleString() + ' Res +' + reward.xp + ' XP');
+        } else {
+          showToast('✅ Schritt erledigt');
+        }
       } else {
         el.classList.remove('is-done');
         cb.textContent = '';

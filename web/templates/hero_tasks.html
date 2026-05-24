@@ -51,6 +51,13 @@
 .ht-task-rewards { display:flex; gap:0.4rem; align-items:center; flex-shrink:0; }
 .ht-res  { font-size:0.72rem; font-weight:700; color:#f59e0b; white-space:nowrap; }
 .ht-xp   { font-size:0.72rem; font-weight:700; color:#818cf8; white-space:nowrap; }
+.ht-bp-badge {
+  font-size:0.65rem; font-weight:700; padding:1px 5px; border-radius:4px;
+  background:rgba(88,101,242,0.2); color:#818cf8; white-space:nowrap; flex-shrink:0;
+}
+.ht-task.bp-done { border-color: rgba(88,101,242,0.4); background: rgba(88,101,242,0.06); }
+.ht-task.bp-done .ht-task-name { text-decoration: line-through; color: var(--text-muted); }
+.ht-task.bp-done .ht-checkbox  { background: #818cf8; border-color: #818cf8; color: #fff; }
 
 .ht-reset-btn {
   background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#ef4444;
@@ -97,7 +104,9 @@
 <!-- Tasks container -->
 <div id="tasksContainer"></div>
 
+<script src="/static/hero_task_map.js"></script>
 <script>
+/* hero_task_map.js loaded above */
 // ── Data ──────────────────────────────────────────────────────────────
 const VILLAGES = {
   start: {
@@ -364,12 +373,13 @@ const VILLAGES = {
 };
 
 // ── State ─────────────────────────────────────────────────────────────
-const STORAGE_KEY = 'ht_done_{{ guild.guild_id }}';
-let done = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+const _GUILD_ID = '{{ guild.guild_id }}';
+let done = htGetDone(_GUILD_ID);
+let bpDone = htGetBp(_GUILD_ID);
 let currentVillage = 'start';
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...done]));
+  htSaveDone(_GUILD_ID, done);
 }
 
 // ── Render ────────────────────────────────────────────────────────────
@@ -390,10 +400,15 @@ function render() {
     section.tasks.forEach(task => {
       totalCount++;
       const isDone = done.has(task.id);
+      const isBp   = bpDone.has(task.id);
       if (isDone) { totalDone++; totalRes += task.res; totalXp += task.xp; }
 
+      let cls = 'ht-task';
+      if (isDone && isBp)  cls += ' done bp-done';
+      else if (isDone)     cls += ' done';
+
       const el = document.createElement('div');
-      el.className = 'ht-task' + (isDone ? ' done' : '');
+      el.className = cls;
       el.innerHTML = `
         <div class="ht-checkbox">${isDone ? '✓' : ''}</div>
         <div class="ht-task-info">
@@ -403,6 +418,7 @@ function render() {
         <div class="ht-task-rewards">
           <span class="ht-res">+${task.res.toLocaleString()}</span>
           <span class="ht-xp">${task.xp}xp</span>
+          ${isBp ? '<span class="ht-bp-badge">🔗 Blueprint</span>' : ''}
         </div>`;
       el.onclick = () => toggle(task, el);
       grid.appendChild(el);
@@ -418,7 +434,8 @@ function render() {
 function toggle(task, el) {
   if (done.has(task.id)) {
     done.delete(task.id);
-    el.classList.remove('done');
+    bpDone.delete(task.id);
+    el.classList.remove('done', 'bp-done');
     el.querySelector('.ht-checkbox').textContent = '';
   } else {
     done.add(task.id);
@@ -426,6 +443,7 @@ function toggle(task, el) {
     el.querySelector('.ht-checkbox').textContent = '✓';
   }
   save();
+  htSaveBp(_GUILD_ID, bpDone);
   // Update summary
   let totalDone = 0, totalRes = 0, totalXp = 0;
   const vdata = VILLAGES[currentVillage];
@@ -447,8 +465,9 @@ function switchVillage(key, btn) {
 function resetAll() {
   if (!confirm('Alle Heldenaufgaben für dieses Dorf zurücksetzen?')) return;
   const vdata = VILLAGES[currentVillage];
-  vdata.sections.forEach(s => s.tasks.forEach(t => done.delete(t.id)));
+  vdata.sections.forEach(s => s.tasks.forEach(t => { done.delete(t.id); bpDone.delete(t.id); }));
   save();
+  htSaveBp(_GUILD_ID, bpDone);
   render();
 }
 
