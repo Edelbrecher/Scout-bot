@@ -1,5 +1,8 @@
+import io
 import os
+import zipfile
 import asyncio
+from pathlib import Path
 import base64
 import re
 import secrets
@@ -17,7 +20,7 @@ import stripe
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
 from fastapi import Request as StarletteRequest
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -5244,3 +5247,29 @@ async def crop_calculator_page(request: Request, guild_id: str):
         "guild": guild,
         "guild_id": guild_id,
     })
+
+
+# ---------------------------------------------------------------------------
+# Routes — Chrome Extension download
+# ---------------------------------------------------------------------------
+
+@app.get("/extension", response_class=HTMLResponse)
+async def extension_page(request: Request):
+    return templates.TemplateResponse("extension_download.html", {"request": request})
+
+
+@app.get("/download/extension")
+async def download_extension():
+    """Serve the Chrome extension as a ZIP file."""
+    buf = io.BytesIO()
+    ext_dir = Path(__file__).parent / "static" / "extension"
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in ext_dir.rglob("*"):
+            if f.is_file():
+                zf.write(f, f.relative_to(ext_dir))
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=travops-extension.zip"},
+    )
