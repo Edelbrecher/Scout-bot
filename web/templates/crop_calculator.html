@@ -382,6 +382,10 @@
           </select>
         </div>
         <div class="cc-field">
+          <label>Held (G/h Bonus)</label>
+          <input type="number" id="heroWheat" value="0" min="0" max="99999" style="width:90px;" placeholder="z.B. 3000">
+        </div>
+        <div class="cc-field">
           <label>Max. Schritte</label>
           <input type="number" id="maxSteps" value="30" min="1" max="200" style="width:80px;">
         </div>
@@ -579,7 +583,7 @@ function costToWheatEquiv(costs) {
   return costs[0] + costs[1] + costs[2] + costs[3];
 }
 
-function calcTotalProduction(fieldLevels, millLvl, bakeryLvl, oasesBonusPct, goldBonus, egyptBonus) {
+function calcTotalProduction(fieldLevels, millLvl, bakeryLvl, oasesBonusPct, goldBonus, egyptBonus, heroWheatBonus) {
   // Base production = sum of all field levels' individual production
   const baseSum = fieldLevels.reduce((s, lvl) => s + CROP_PROD[lvl], 0);
   // Mill: +5% per level, Bakery: +5% per level (Egyptians: +10% per bakery level)
@@ -589,7 +593,8 @@ function calcTotalProduction(fieldLevels, millLvl, bakeryLvl, oasesBonusPct, gol
   const goldBonusPct = goldBonus ? 0.25 : 0;
   const oasisPct = oasesBonusPct / 100;
   const multiplier = (1 + millBonus) * (1 + bakeryBonus) * (1 + goldBonusPct) * (1 + oasisPct);
-  return baseSum * multiplier;
+  // Hero wheat is a flat bonus (not affected by mill/bakery/oasis multipliers)
+  return baseSum * multiplier + (heroWheatBonus || 0);
 }
 
 function runCalculation() {
@@ -598,6 +603,7 @@ function runCalculation() {
   const millLvl    = parseInt(document.getElementById('millLevel').value)    || 0;
   const bakeryLvl  = parseInt(document.getElementById('bakeryLevel').value)  || 0;
   const mansionLvl = parseInt(document.getElementById('mansionLevel').value) || 0;
+  const heroWheat  = parseInt(document.getElementById('heroWheat').value)    || 0;
   const maxSteps   = parseInt(document.getElementById('maxSteps').value)     || 30;
   const oasis1Pct  = parseInt(document.getElementById('oasis1').value) || 0;
   const oasis2Pct  = parseInt(document.getElementById('oasis2').value) || 0;
@@ -628,7 +634,7 @@ function runCalculation() {
   let totalCostWE = 0;
 
   for (let step = 0; step < maxSteps; step++) {
-    const currentProd = calcTotalProduction(state.fields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+    const currentProd = calcTotalProduction(state.fields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt, heroWheat);
 
     // Generate all possible actions
     const candidates = [];
@@ -643,7 +649,7 @@ function runCalculation() {
       // New fields array with this field upgraded
       const newFields = [...state.fields];
       newFields[fi] = nextLvl;
-      const newProd = calcTotalProduction(newFields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+      const newProd = calcTotalProduction(newFields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt, heroWheat);
       const gain = newProd - currentProd;
       if (gain <= 0) continue;
       const we = costToWheatEquiv(cost);
@@ -655,7 +661,7 @@ function runCalculation() {
     if (state.mill < 5) {
       const nextMill = state.mill + 1;
       const cost = MILL_COSTS[nextMill];
-      const newProd = calcTotalProduction(state.fields, nextMill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+      const newProd = calcTotalProduction(state.fields, nextMill, state.bakery, totalOasesBonusPct(), isGold, isEgypt, heroWheat);
       const gain = newProd - currentProd;
       if (gain > 0 && cost) {
         const we = costToWheatEquiv(cost);
@@ -668,7 +674,7 @@ function runCalculation() {
     if (state.bakery < 5) {
       const nextBak = state.bakery + 1;
       const cost = BAKERY_COSTS[nextBak];
-      const newProd = calcTotalProduction(state.fields, state.mill, nextBak, totalOasesBonusPct(), isGold, isEgypt);
+      const newProd = calcTotalProduction(state.fields, state.mill, nextBak, totalOasesBonusPct(), isGold, isEgypt, heroWheat);
       const gain = newProd - currentProd;
       if (gain > 0 && cost) {
         const we = costToWheatEquiv(cost);
@@ -686,7 +692,7 @@ function runCalculation() {
       const nextOasisPct = state.oasesPool[state.capturedOases];
       if (nextOasisPct > 0) {
         const newTotalOasis = totalOasesBonusPct() + nextOasisPct;
-        const newProd = calcTotalProduction(state.fields, state.mill, state.bakery, newTotalOasis, isGold, isEgypt);
+        const newProd = calcTotalProduction(state.fields, state.mill, state.bakery, newTotalOasis, isGold, isEgypt, heroWheat);
         const gain = newProd - currentProd;
         if (gain > 0) {
           // Oasis capture is "free" in terms of resource cost but requires hero actions
@@ -715,7 +721,7 @@ function runCalculation() {
       state.capturedOases++;
     }
 
-    const newProd = calcTotalProduction(state.fields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt);
+    const newProd = calcTotalProduction(state.fields, state.mill, state.bakery, totalOasesBonusPct(), isGold, isEgypt, heroWheat);
 
     steps.push({
       step: step + 1,
@@ -756,17 +762,33 @@ function renderResults(steps, finalState, totalOasisPct) {
 
   const fieldCount = getFieldCount();
   const maxLvl = isCapital ? 21 : 10;
-  const finalProd = calcTotalProduction(finalState.fields, finalState.mill, finalState.bakery, totalOasisPct, isGold, isEgypt);
+  const finalProd = calcTotalProduction(finalState.fields, finalState.mill, finalState.bakery, totalOasisPct, isGold, isEgypt, heroWheat);
   const allMax = finalState.fields.every(l => l >= maxLvl) && finalState.mill >= 5 && finalState.bakery >= 5;
 
   // Summary KPIs
+  const heroWheatVal = parseInt(document.getElementById('heroWheat').value) || 0;
+  const startFields = [];
+  document.querySelectorAll('#fieldLevelsGrid .cc-stepper').forEach(c => startFields.push(parseInt(c.dataset.val)||0));
+  const startMillLvl   = parseInt(document.getElementById('millLevel').value)   || 0;
+  const startBakeryLvl = parseInt(document.getElementById('bakeryLevel').value) || 0;
+  const startMansionLvl = parseInt(document.getElementById('mansionLevel').value) || 0;
+  const startCaptured = startMansionLvl >= 20 ? 3 : startMansionLvl >= 15 ? 2 : startMansionLvl >= 10 ? 1 : 0;
+  const startOasisPct = [
+    parseInt(document.getElementById('oasis1').value)||0,
+    parseInt(document.getElementById('oasis2').value)||0,
+    parseInt(document.getElementById('oasis3').value)||0,
+  ].slice(0, startCaptured).reduce((s,v)=>s+v,0);
+  const startProd = calcTotalProduction(startFields, startMillLvl, startBakeryLvl, startOasisPct, isGold, isEgypt, heroWheatVal);
+
   const summaryRow = document.getElementById('summaryRow');
   summaryRow.innerHTML = `
-    <div class="cc-kpi"><div class="cc-kpi-label">Endproduktion</div><div class="cc-kpi-value">${fmtNum(Math.round(finalProd))} G/h</div></div>
-    <div class="cc-kpi"><div class="cc-kpi-label">Schritte berechnet</div><div class="cc-kpi-value">${steps.length}</div></div>
-    <div class="cc-kpi"><div class="cc-kpi-label">Mühle</div><div class="cc-kpi-value">Lvl ${finalState.mill}</div></div>
-    <div class="cc-kpi"><div class="cc-kpi-label">Bäckerei</div><div class="cc-kpi-value">Lvl ${finalState.bakery}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Startproduktion</div><div class="cc-kpi-value">${fmtNum(Math.round(startProd))} G/h</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Endproduktion</div><div class="cc-kpi-value" style="color:#22c55e;">${fmtNum(Math.round(finalProd))} G/h</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Schritte</div><div class="cc-kpi-value">${steps.length}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Mühle → End</div><div class="cc-kpi-value">${startMillLvl} → ${finalState.mill}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Bäckerei → End</div><div class="cc-kpi-value">${startBakeryLvl} → ${finalState.bakery}</div></div>
     <div class="cc-kpi"><div class="cc-kpi-label">Oasen-Bonus</div><div class="cc-kpi-value">+${totalOasisPct}%</div></div>
+    ${heroWheatVal > 0 ? `<div class="cc-kpi"><div class="cc-kpi-label">Held-Bonus</div><div class="cc-kpi-value">+${fmtNum(heroWheatVal)} G/h</div></div>` : ''}
   `;
 
   const infoBox = document.getElementById('infoBox');
