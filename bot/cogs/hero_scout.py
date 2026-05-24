@@ -49,6 +49,9 @@ SLOT_BOXES = [
 
 SLOT_NAMES = ["helm", "armor", "boots", "weapon", "mount", "misc"]
 
+# XP-Schwellenwert ab dem eine Warnung ausgelöst wird
+XP_JUMP_THRESHOLD = 5000
+
 
 # ------------------------------------------------------------------
 # DB-Hilfsfunktionen
@@ -370,12 +373,22 @@ class HeroScoutCog(commands.Cog):
         if not data.get("player_name"):
             data["player_name"] = f"unbekannt_{datetime.utcnow().strftime('%H%M%S')}"
 
-        # Vorherigen Eintrag prüfen → Änderung erkannt?
+        # Vorherigen Eintrag prüfen → Änderungen erkennen
         prev = await get_last_entry_for_player(guild_id, data["player_name"])
-        if prev and prev.get("slots_hash") and data.get("slots_hash"):
-            data["changed"] = prev["slots_hash"] != data["slots_hash"]
-        else:
-            data["changed"] = False
+        equipment_changed = False
+        xp_jumped = False
+        xp_delta = 0
+
+        if prev:
+            if prev.get("slots_hash") and data.get("slots_hash"):
+                equipment_changed = prev["slots_hash"] != data["slots_hash"]
+            prev_xp = prev.get("hero_xp") or 0
+            cur_xp  = data.get("hero_xp") or 0
+            if prev_xp and cur_xp and cur_xp > prev_xp:
+                xp_delta = cur_xp - prev_xp
+                xp_jumped = xp_delta >= XP_JUMP_THRESHOLD
+
+        data["changed"] = equipment_changed or xp_jumped
 
         # Eintrag speichern
         entry_id = await save_entry(guild_id, data)
@@ -395,28 +408,60 @@ class HeroScoutCog(commands.Cog):
             except Exception as e:
                 print(f"[hero_scout] Slot save error: {e}")
 
-        # Bestätigung im Channel
-        changed_text = " ⚠️ **Ausrüstung geändert!**" if data.get("changed") else ""
-        player = data.get("player_name", "?")
-        tribe = data.get("tribe", "?")
-        hero_lvl = data.get("hero_level", "?")
-        alliance = data.get("alliance", "?")
+        # ── Bestätigung & Warnung im Channel ──────────────────────────
+        player     = data.get("player_name", "?")
+        tribe      = data.get("tribe", "?")
+        hero_lvl   = data.get("hero_level", "?")
+        alliance   = data.get("alliance", "?")
         server_time = data.get("server_time", "?")
 
-        embed = discord.Embed(
-            title=f"🗡️ Helden-Scout: {player}{changed_text}",
-            color=discord.Color.orange() if data.get("changed") else discord.Color.blurple(),
+        # Normales Bestätigungs-Embed (immer)
+        confirm_embed = discord.Embed(
+            title=f"🗡️ Helden-Scout gespeichert: {player}",
+            color=discord.Color.blurple(),
         )
-        embed.add_field(name="Stamm", value=tribe, inline=True)
-        embed.add_field(name="Allianz", value=alliance, inline=True)
-        embed.add_field(name="Heldenlvl", value=str(hero_lvl), inline=True)
-        embed.add_field(name="Serverzeit (Screenshot)", value=server_time, inline=False)
-        embed.set_footer(text=f"Gemeldet von {reporter_name}")
+        confirm_embed.add_field(name="Stamm", value=tribe, inline=True)
+        confirm_embed.add_field(name="Allianz", value=alliance, inline=True)
+        confirm_embed.add_field(name="Heldenlvl", value=str(hero_lvl), inline=True)
+        confirm_embed.add_field(name="Serverzeit", value=server_time, inline=False)
+        confirm_embed.set_footer(text=f"Gemeldet von {reporter_name}")
 
         try:
-            await message.reply(embed=embed, mention_author=False)
+            await message.reply(embed=confirm_embed, mention_author=False)
         except Exception as e:
             print(f"[hero_scout] Reply error: {e}")
+
+        # Warnungs-Embed wenn Änderung erkannt
+        if equipment_changed or xp_jumped:
+            warn_lines = []
+            if equipment_changed:
+                warn_lines.append("⚔️ **Ausrüstung wurde geändert** — mindestens ein Item-Slot ist anders als beim letzten Screenshot.")
+            if xp_jumped:
+                warn_lines.append(
+                    f"📈 **Starker XP-Zuwachs** — +{xp_delta:,} Erfahrung seit dem letzten Screenshot "
+                    f"(Schwelle: {XP_JUMP_THRESHOLD:,} XP)."
+                )
+
+            warn_embed = discord.Embed(
+                title=f"🚨 Helden-Warnung: {player}",
+                description="\n\n".join(warn_lines),
+                color=discord.Color.red(),
+            )
+            warn_embed.add_field(name="Stamm", value=tribe, inline=True)
+            warn_embed.add_field(name="Allianz", value=alliance, inline=True)
+            warn_embed.add_field(name="Heldenlvl", value=str(hero_lvl), inline=True)
+            if xp_jumped and data.get("hero_xp"):
+                warn_embed.add_field(
+                    name="Aktuelle XP",
+                    value=f"{data['hero_xp']:,}",
+                    inline=True,
+                )
+            warn_embed.set_footer(text=f"Screenshot von {reporter_name} · {server_time}")
+
+            try:
+                await message.channel.send(embed=warn_embed)
+            except Exception as e:
+                print(f"[hero_scout] Warning send error: {e}")
 
     # ------------------------------------------------------------------
     # Slash Command: /hero-scout setup

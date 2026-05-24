@@ -196,6 +196,16 @@
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
 
+    <!-- Helden-Scout -->
+    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🗡️</div>
+      <div class="feature-body">
+        <div class="feature-title">Helden-Scout</div>
+        <div class="feature-desc">Gegner-Helden beobachten — Ausrüstungswechsel & XP-Sprünge automatisch erkennen</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
+
     <!-- Verteidigung -->
     <a href="/guild/{{ guild.guild_id }}/verteidigung" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🛡️</div>
@@ -414,6 +424,36 @@
         <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/create" style="margin:0;">
           <button type="submit" class="btn btn-primary" style="font-size:0.875rem;">➕ Hub-Channel erstellen</button>
         </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Helden-Scout Setup -->
+    <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
+      <div style="display:flex;align-items:center;gap:1rem;width:100%;">
+        <div class="feature-icon">🗡️</div>
+        <div class="feature-body">
+          <div class="feature-title">Helden-Scout Channel</div>
+          <div class="feature-desc">Discord-Channel für Screenshots — Bot erkennt Ausrüstung & XP automatisch</div>
+        </div>
+      </div>
+      {% if hero_scout_channel %}
+      <div style="display:flex;align-items:center;gap:0.75rem;padding-left:3.4rem;flex-wrap:wrap;">
+        <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);
+                     border-radius:20px;padding:0.2rem 0.75rem;font-size:0.82rem;font-family:monospace;color:#f59e0b;">
+          ✅ Channel-ID: {{ hero_scout_channel }}
+        </span>
+        <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
+           style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;">Ändern →</a>
+      </div>
+      {% else %}
+      <div style="padding-left:3.4rem;">
+        <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
+           class="btn btn-primary" style="font-size:0.875rem;text-decoration:none;display:inline-block;
+           padding:0.4rem 1rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);
+           border-radius:8px;color:#f59e0b;font-weight:600;">
+          ➕ Channel konfigurieren
+        </a>
       </div>
       {% endif %}
     </div>

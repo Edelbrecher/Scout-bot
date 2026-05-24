@@ -284,7 +284,11 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
             "📡 **Permanent-Scout** — Dauerhaft Späher im eigenen Dorf stationieren\n"
             "🪖 **Res-Push** — Ressourcen anfordern\n"
             "🛡️ **Defend** — Verteidigung koordinieren\n"
-            "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren"
+            "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🗡️ **Helden-Scout** — Screenshots von Gegner-Helden in einem dedizierten Channel posten. "
+            "Der Bot erkennt automatisch Ausrüstungswechsel & XP-Sprünge.\n"
+            "→ Setup: `/hero-scout-setup #channel` oder [travops.online](https://travops.online)"
         ),
         color=discord.Color.blurple(),
     )

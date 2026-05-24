@@ -833,6 +833,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
     is_admin = session.get("type") == "admin"
     is_owner = is_guild_owner(session, guild)
     request_hub = await database.get_request_hub(guild_id)
+    hero_scout_channel = await _get_hero_scout_channel(guild_id)
 
     # Check bot permissions in configured channels
     perm_issues = []
@@ -851,6 +852,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
          "is_admin": is_admin, "is_owner": is_owner, "request_hub": request_hub,
+         "hero_scout_channel": hero_scout_channel,
          "perm_issues": perm_issues},
     )
 
