@@ -49,6 +49,22 @@
     </p>
   </div>
 
+  <!-- Item-Bibliothek Status -->
+  <div class="card" style="margin-bottom:1.5rem;" id="libraryCard">
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;">🔍 Item-Erkennung</h2>
+    <div id="libraryStatus" style="font-size:0.85rem;color:var(--text-muted);">Lade Status…</div>
+    <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+      <button onclick="buildLibrary()" id="buildBtn"
+              style="padding:0.45rem 1.1rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);
+                     border-radius:8px;color:#93c5fd;font-weight:600;cursor:pointer;font-size:0.85rem;">
+        📦 Item-Bibliothek aufbauen
+      </button>
+      <span style="font-size:0.78rem;color:var(--text-muted);">
+        Lädt alle Item-Icons von deinem Travian-Server und baut die Erkennungs-Bibliothek auf (~30 Sek.)
+      </span>
+    </div>
+  </div>
+
   <!-- Spieler-Übersicht -->
   {% if entries %}
   <h2 style="font-size:1rem;margin-bottom:0.75rem;color:var(--text-muted);">
@@ -149,4 +165,53 @@
   {% endif %}
 
 </div>
+
+<script>
+async function loadLibraryStatus() {
+  try {
+    const r = await fetch('/guild/{{ guild.guild_id }}/defense/hero-scout/library-status');
+    const d = await r.json();
+    const el = document.getElementById('libraryStatus');
+    if (d.ok && d.library_exists) {
+      el.innerHTML = `✅ Bibliothek aktiv — <strong>${d.item_count}</strong> Items geladen`;
+      el.style.color = '#22c55e';
+    } else if (d.ok) {
+      el.innerHTML = '⚠️ Noch nicht aufgebaut — klicke "Aufbauen" um Item-Erkennung zu aktivieren.';
+      el.style.color = '#f59e0b';
+    } else {
+      el.textContent = 'Status nicht verfügbar (Bot offline?)';
+    }
+  } catch(e) {
+    document.getElementById('libraryStatus').textContent = 'Bot nicht erreichbar.';
+  }
+}
+
+async function buildLibrary() {
+  const btn = document.getElementById('buildBtn');
+  const status = document.getElementById('libraryStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Wird aufgebaut…';
+  status.textContent = 'Lade Item-Icons vom Travian-Server… (30–60 Sekunden)';
+  status.style.color = '#f59e0b';
+  try {
+    const r = await fetch('/guild/{{ guild.guild_id }}/defense/hero-scout/build-library', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      status.textContent = '✅ Build gestartet — bitte 40 Sekunden warten, dann Status neu laden.';
+      status.style.color = '#22c55e';
+      setTimeout(loadLibraryStatus, 40000);
+    } else {
+      status.textContent = '❌ Fehler: ' + (d.error || 'Unbekannt');
+      status.style.color = '#f87171';
+    }
+  } catch(e) {
+    status.textContent = '❌ Verbindungsfehler';
+    status.style.color = '#f87171';
+  }
+  btn.disabled = false;
+  btn.textContent = '📦 Item-Bibliothek aufbauen';
+}
+
+loadLibraryStatus();
+</script>
 {% endblock %}

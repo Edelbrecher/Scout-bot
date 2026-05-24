@@ -28,6 +28,14 @@ except ImportError:
     OCR_AVAILABLE = False
     print("[hero_scout] pytesseract/Pillow not available — OCR disabled")
 
+try:
+    import hero_item_matcher
+    import hero_item_db
+    MATCHER_AVAILABLE = True
+except ImportError:
+    MATCHER_AVAILABLE = False
+    print("[hero_scout] hero_item_matcher not available")
+
 import database
 
 DB_PATH = database.DB_PATH
@@ -171,12 +179,19 @@ async def save_entry(guild_id: str, data: dict) -> int:
         return cur.lastrowid
 
 
-async def save_slot(entry_id: int, guild_id: str, idx: int, name: str, path: str, img_hash: str):
+async def save_slot(entry_id: int, guild_id: str, idx: int, name: str, path: str,
+                    img_hash: str, item_name: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
+        # Migration: item_name Spalte hinzufügen falls nicht vorhanden
+        try:
+            await db.execute("ALTER TABLE hero_scout_slots ADD COLUMN item_name TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
         await db.execute("""
-            INSERT INTO hero_scout_slots (entry_id, guild_id, slot_index, slot_name, image_path, img_hash)
-            VALUES (?,?,?,?,?,?)
-        """, (entry_id, guild_id, idx, name, path, img_hash))
+            INSERT INTO hero_scout_slots (entry_id, guild_id, slot_index, slot_name, image_path, img_hash, item_name)
+            VALUES (?,?,?,?,?,?,?)
+        """, (entry_id, guild_id, idx, name, path, img_hash, item_name))
         await db.commit()
 
 
@@ -373,6 +388,8 @@ class HeroScoutCog(commands.Cog):
     async def cog_load(self):
         await init_hero_scout_tables()
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        if MATCHER_AVAILABLE:
+            hero_item_matcher.load_library()
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -478,6 +495,8 @@ class HeroScoutCog(commands.Cog):
         guild_dir = IMAGES_DIR / guild_id / str(entry_id)
         guild_dir.mkdir(parents=True, exist_ok=True)
 
+        identified_items: dict[str, str] = {}   # slot_name → item display name
+
         for idx, (crop_img, img_hash) in enumerate(zip(slot_crops, slot_hashes)):
             if crop_img is None:
                 continue
@@ -485,7 +504,20 @@ class HeroScoutCog(commands.Cog):
             path = guild_dir / f"{slot_name}.png"
             try:
                 crop_img.save(str(path))
-                await save_slot(entry_id, guild_id, idx, slot_name, str(path), img_hash)
+
+                # Item-Erkennung per pHash
+                item_name_str = ""
+                if MATCHER_AVAILABLE:
+                    item_id, dist = hero_item_matcher.match_slot(crop_img)
+                    if item_id is not None:
+                        item_info = hero_item_db.get_item_by_id(item_id)
+                        if item_info:
+                            item_name_str = item_info.get("name", item_info.get("en", ""))
+                            identified_items[slot_name] = item_name_str
+                            print(f"[hero_scout] Slot {slot_name} → {item_name_str} (dist={dist})", flush=True)
+
+                await save_slot(entry_id, guild_id, idx, slot_name, str(path), img_hash,
+                                item_name=item_name_str)
             except Exception as e:
                 print(f"[hero_scout] Slot save error: {e}")
 
@@ -505,6 +537,24 @@ class HeroScoutCog(commands.Cog):
         confirm_embed.add_field(name="Allianz", value=alliance, inline=True)
         confirm_embed.add_field(name="Heldenlvl", value=str(hero_lvl), inline=True)
         confirm_embed.add_field(name="Serverzeit", value=server_time, inline=False)
+
+        if identified_items:
+            slot_labels = {"helm": "🪖 Helm", "armor": "🛡️ Rüstung", "boots": "👢 Schuhe",
+                           "weapon": "⚔️ Waffe", "mount": "🐴 Pferd", "misc": "💍 Sonstiges"}
+            items_text = "\n".join(
+                f"{slot_labels.get(s, s)}: **{n}**"
+                for s, n in identified_items.items()
+            )
+            confirm_embed.add_field(name="🔍 Erkannte Items", value=items_text, inline=False)
+        elif MATCHER_AVAILABLE:
+            lib_status = hero_item_matcher.get_library_status()
+            if not lib_status["library_exists"]:
+                confirm_embed.add_field(
+                    name="⚠️ Item-Erkennung",
+                    value="Bibliothek noch nicht aufgebaut — `!hero-scout-build-library` im Admin-Channel.",
+                    inline=False,
+                )
+
         confirm_embed.set_footer(text=f"Gemeldet von {reporter_name}")
 
         try:
@@ -547,6 +597,45 @@ class HeroScoutCog(commands.Cog):
     # ------------------------------------------------------------------
     # Slash Command: /hero-scout setup
     # ------------------------------------------------------------------
+
+    @commands.command(name="hero-scout-build-library")
+    @commands.has_permissions(manage_guild=True)
+    async def build_library_cmd(self, ctx: commands.Context):
+        """Baut die Item-Icon-Bibliothek für das aktuelle Travian-World auf."""
+        if not MATCHER_AVAILABLE:
+            await ctx.send("❌ `imagehash` nicht verfügbar.")
+            return
+
+        # Travian-World-URL aus DB holen
+        world_url = None
+        try:
+            import aiosqlite as _sq
+            async with _sq.connect(DB_PATH) as db:
+                async with db.execute(
+                    "SELECT tw_world FROM guild_configs WHERE guild_id=?",
+                    (str(ctx.guild.id),)
+                ) as cur:
+                    row = await cur.fetchone()
+                    if row:
+                        world_url = row[0]
+        except Exception:
+            pass
+
+        if not world_url:
+            await ctx.send("❌ Keine Travian-World-URL konfiguriert. Bitte erst im Dashboard eintragen.")
+            return
+
+        msg = await ctx.send(f"⏳ Lade Item-Icons von `{world_url}` …")
+        result = await hero_item_matcher.build_library(world_url)
+
+        if "error" in result:
+            await msg.edit(content=f"❌ Fehler: {result['error']}")
+        else:
+            await msg.edit(content=(
+                f"✅ Item-Bibliothek aufgebaut!\n"
+                f"📦 {result['downloaded']}/{result['total']} Icons geladen · "
+                f"❌ {result['failed']} fehlgeschlagen"
+            ))
 
     @app_commands.command(
         name="hero-scout-setup",

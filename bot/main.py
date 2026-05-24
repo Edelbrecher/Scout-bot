@@ -358,6 +358,33 @@ async def handle_check_permissions(request: aiohttp_web.Request) -> aiohttp_web.
     return aiohttp_web.json_response({"ok": True, "issues": issues})
 
 
+async def handle_build_hero_library(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Startet den Item-Bibliothek-Download im Hintergrund."""
+    try:
+        data = await request.json()
+        world_url = str(data.get("world_url", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not world_url:
+        return aiohttp_web.json_response({"ok": False, "error": "world_url required"}, status=400)
+
+    try:
+        import hero_item_matcher
+        asyncio.create_task(hero_item_matcher.build_library(world_url))
+        return aiohttp_web.json_response({"ok": True, "message": "Build gestartet"})
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
+async def handle_hero_library_status(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    try:
+        import hero_item_matcher
+        return aiohttp_web.json_response({"ok": True, **hero_item_matcher.get_library_status()})
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
 async def handle_list_channels(request: aiohttp_web.Request) -> aiohttp_web.Response:
     """Return text channels for a guild so the web dashboard can offer a dropdown."""
     try:
@@ -410,6 +437,8 @@ async def start_api_server():
     app.router.add_post("/api/check-permissions", handle_check_permissions)
     app.router.add_post("/api/set-hero-scout-channel", handle_set_hero_scout_channel)
     app.router.add_post("/api/list-channels", handle_list_channels)
+    app.router.add_post("/api/hero-scout-build-library", handle_build_hero_library)
+    app.router.add_get("/api/hero-scout-library-status", handle_hero_library_status)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

@@ -5385,6 +5385,41 @@ async def hero_scout_set_channel(request: Request, guild_id: str, channel_id: st
     )
 
 
+@app.get("/guild/{guild_id}/defense/hero-scout/library-status")
+async def hero_scout_library_status(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False, "error": "auth"})
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False, "error": "guild"})
+    bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"{bot_api}/api/hero-scout-library-status")
+            return JSONResponse(r.json())
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
+@app.post("/guild/{guild_id}/defense/hero-scout/build-library")
+async def hero_scout_build_library(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False, "error": "auth"})
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False, "error": "guild"})
+    guild = await database.get_guild(guild_id)
+    world_url = guild.get("tw_world", "") if guild else ""
+    if not world_url:
+        return JSONResponse({"ok": False, "error": "Keine Travian-World-URL konfiguriert"})
+    bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(f"{bot_api}/api/hero-scout-build-library",
+                                  json={"world_url": world_url})
+            return JSONResponse(r.json())
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
 @app.get("/guild/{guild_id}/defense/hero-scout/img/{entry_id}/{slot_name}")
 async def hero_scout_slot_image(request: Request, guild_id: str, entry_id: int, slot_name: str):
     session, err = _require_session(request)
