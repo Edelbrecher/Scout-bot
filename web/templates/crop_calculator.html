@@ -589,15 +589,15 @@ function costToWheatEquiv(costs) {
 function calcTotalProduction(fieldLevels, millLvl, bakeryLvl, oasesBonusPct, goldBonus, egyptBonus, heroWheatBonus) {
   // Base production = sum of all field levels' individual production
   const baseSum = fieldLevels.reduce((s, lvl) => s + CROP_PROD[lvl], 0);
-  // Mill: +5% per level, Bakery: +5% per level (Egyptians: +10% per bakery level)
-  const millBonus   = millLvl * 0.05;
+  // Travian formula: Mill, Bakery and Oasis bonuses are ADDITIVE with each other,
+  // then Gold (+25%) is applied multiplicatively on top.
+  // Source: verified from in-game production overview (Total bonus = sum of all three).
   const bakeryPctPerLevel = egyptBonus ? 0.10 : 0.05;
-  const bakeryBonus = bakeryLvl * bakeryPctPerLevel;
-  const goldBonusPct = goldBonus ? 0.25 : 0;
-  const oasisPct = oasesBonusPct / 100;
-  const multiplier = (1 + millBonus) * (1 + bakeryBonus) * (1 + goldBonusPct) * (1 + oasisPct);
-  // Hero wheat is a flat bonus (not affected by mill/bakery/oasis multipliers)
-  return baseSum * multiplier + (heroWheatBonus || 0);
+  const fieldBonus = (millLvl * 0.05) + (bakeryLvl * bakeryPctPerLevel) + (oasesBonusPct / 100);
+  const goldMultiplier = goldBonus ? 1.25 : 1.0;
+  const total = baseSum * (1 + fieldBonus) * goldMultiplier;
+  // Hero wheat is a flat bonus added on top (not multiplied by any bonus)
+  return total + (heroWheatBonus || 0);
 }
 
 function runCalculation() {
