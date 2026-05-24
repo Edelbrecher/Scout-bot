@@ -2,7 +2,7 @@
 
 const CIRCUMFERENCE = 2 * Math.PI * 52;
 
-// --- Timer Tab elements ---
+// --- Timer 1 Tab elements ---
 const timeText       = document.getElementById('timeText');
 const timeLabel      = document.getElementById('timeLabel');
 const ringProgress   = document.getElementById('ringProgress');
@@ -15,6 +15,19 @@ const inputMinutes   = document.getElementById('inputMinutes');
 const inputSeconds   = document.getElementById('inputSeconds');
 const loopCheckbox   = document.getElementById('loopCheckbox');
 
+// --- Timer 2 Tab elements ---
+const timeText2      = document.getElementById('timeText2');
+const timeLabel2     = document.getElementById('timeLabel2');
+const ringProgress2  = document.getElementById('ringProgress2');
+const btnStart2      = document.getElementById('btnStart2');
+const btnStop2       = document.getElementById('btnStop2');
+const statusText2    = document.getElementById('statusText2');
+const inputSection2  = document.getElementById('inputSection2');
+const inputHours2    = document.getElementById('inputHours2');
+const inputMinutes2  = document.getElementById('inputMinutes2');
+const inputSeconds2  = document.getElementById('inputSeconds2');
+const loopCheckbox2  = document.getElementById('loopCheckbox2');
+
 // --- Alarm Tab elements ---
 const alarmNextCountdown = document.getElementById('alarmNextCountdown');
 const alarmNextTime      = document.getElementById('alarmNextTime');
@@ -22,11 +35,15 @@ const alarmStatusText    = document.getElementById('alarmStatusText');
 const btnSaveAlarms      = document.getElementById('btnSaveAlarms');
 
 let updateInterval  = null;
+let updateInterval2 = null;
 let alarmInterval   = null;
-let currentDuration = 0;
+let currentDuration  = 0;
+let currentDuration2 = 0;
 
-ringProgress.style.strokeDasharray = CIRCUMFERENCE;
+ringProgress.style.strokeDasharray  = CIRCUMFERENCE;
 ringProgress.style.strokeDashoffset = 0;
+ringProgress2.style.strokeDasharray  = CIRCUMFERENCE;
+ringProgress2.style.strokeDashoffset = 0;
 
 // ===================== TAB SWITCHING =====================
 document.querySelectorAll('.tab').forEach(tab => {
@@ -34,13 +51,10 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById('tabContent' + capitalize(tab.dataset.tab)).classList.add('active');
+    const contentId = 'tabContent' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1);
+    document.getElementById(contentId).classList.add('active');
   });
 });
-
-function capitalize(s) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 // ===================== MESSAGING =====================
 function sendMessage(msg) {
@@ -49,7 +63,7 @@ function sendMessage(msg) {
   });
 }
 
-// ===================== COUNTDOWN TIMER =====================
+// ===================== TIMER 1 =====================
 async function init() {
   const status = await sendMessage({ action: 'getStatus' });
   updateUI(status);
@@ -100,17 +114,6 @@ function renderTimer(remaining, duration) {
   }
 }
 
-function formatTime(ms) {
-  if (ms <= 0) return '00:00';
-  const totalSec = Math.ceil(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
-
-function pad(n) { return String(n).padStart(2, '0'); }
-
 function startPolling() {
   if (updateInterval) clearInterval(updateInterval);
   updateInterval = setInterval(async () => {
@@ -157,9 +160,105 @@ btnStop.addEventListener('click', async () => {
   renderTimer(0, 0);
 });
 
+// ===================== TIMER 2 =====================
+async function init2() {
+  const status = await sendMessage({ action: 'getStatus2' });
+  updateUI2(status);
+  if (status.running) startPolling2();
+}
+
+function updateUI2(status) {
+  if (status.running) {
+    currentDuration2 = status.duration;
+    renderTimer2(status.remaining, status.duration);
+    showRunningState2();
+  } else {
+    renderTimer2(0, 0);
+    showIdleState2();
+  }
+}
+
+function showRunningState2() {
+  btnStart2.classList.add('hidden');
+  btnStop2.classList.remove('hidden');
+  inputSection2.classList.add('disabled');
+  statusText2.textContent = '⏳ Timer läuft im Hintergrund...';
+  statusText2.className = 'status-running';
+}
+
+function showIdleState2() {
+  btnStart2.classList.remove('hidden');
+  btnStop2.classList.add('hidden');
+  inputSection2.classList.remove('disabled');
+  statusText2.textContent = 'Bereit';
+  statusText2.className = 'status-stopped';
+  timeLabel2.textContent = 'Kein Timer';
+  ringProgress2.classList.remove('warning', 'danger');
+}
+
+function renderTimer2(remaining, duration) {
+  timeText2.textContent = formatTime(remaining);
+  if (duration > 0) {
+    const ratio = remaining / duration;
+    ringProgress2.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
+    ringProgress2.classList.remove('warning', 'danger');
+    if (ratio <= 0.1)       ringProgress2.classList.add('danger');
+    else if (ratio <= 0.25) ringProgress2.classList.add('warning');
+    timeLabel2.textContent = `${Math.round(ratio * 100)}% verbleibend`;
+  } else {
+    ringProgress2.style.strokeDashoffset = 0;
+    timeLabel2.textContent = 'Kein Timer';
+  }
+}
+
+function startPolling2() {
+  if (updateInterval2) clearInterval(updateInterval2);
+  updateInterval2 = setInterval(async () => {
+    const status = await sendMessage({ action: 'getStatus2' });
+    if (!status.running) {
+      clearInterval(updateInterval2);
+      updateInterval2 = null;
+      showIdleState2();
+      renderTimer2(0, 0);
+    } else {
+      renderTimer2(status.remaining, status.duration);
+    }
+  }, 250);
+}
+
+btnStart2.addEventListener('click', async () => {
+  const h = parseInt(inputHours2.value) || 0;
+  const m = parseInt(inputMinutes2.value) || 0;
+  const s = parseInt(inputSeconds2.value) || 0;
+  const totalMs = (h * 3600 + m * 60 + s) * 1000;
+
+  if (totalMs <= 0) {
+    statusText2.textContent = '⚠️ Bitte eine Zeit eingeben!';
+    statusText2.className = '';
+    setTimeout(() => { statusText2.textContent = 'Bereit'; }, 2000);
+    return;
+  }
+
+  await chrome.storage.local.set({
+    timer2Loop: loopCheckbox2.checked,
+    lastHours2: h, lastMinutes2: m, lastSeconds2: s
+  });
+  await sendMessage({ action: 'startTimer2', duration: totalMs });
+  currentDuration2 = totalMs;
+  renderTimer2(totalMs, totalMs);
+  showRunningState2();
+  startPolling2();
+});
+
+btnStop2.addEventListener('click', async () => {
+  if (updateInterval2) { clearInterval(updateInterval2); updateInterval2 = null; }
+  await sendMessage({ action: 'stopTimer2' });
+  showIdleState2();
+  renderTimer2(0, 0);
+});
+
 // ===================== ALARM TAB =====================
 
-// Returns ms until next occurrence of "HH:MM" today or tomorrow
 function msUntilTime(timeStr) {
   if (!timeStr) return null;
   const [hh, mm] = timeStr.split(':').map(Number);
@@ -167,7 +266,7 @@ function msUntilTime(timeStr) {
   const target = new Date(now);
   target.setHours(hh, mm, 0, 0);
   let diff = target - now;
-  if (diff <= 0) diff += 24 * 60 * 60 * 1000; // next day
+  if (diff <= 0) diff += 24 * 60 * 60 * 1000;
   return diff;
 }
 
@@ -196,7 +295,7 @@ function loadAlarms(callback) {
   chrome.storage.local.get(['clockAlarms'], (data) => {
     const alarms = data.clockAlarms || [{time:'',enabled:false},{time:'',enabled:false},{time:'',enabled:false},{time:'',enabled:false}];
     for (let i = 0; i < 4; i++) {
-      document.getElementById(`alarmTime${i}`).value    = alarms[i].time    || '';
+      document.getElementById(`alarmTime${i}`).value      = alarms[i].time    || '';
       document.getElementById(`alarmEnabled${i}`).checked = alarms[i].enabled || false;
       updateAlarmRowStyle(i, alarms[i].enabled);
     }
@@ -210,7 +309,6 @@ function updateAlarmRowStyle(i, enabled) {
   else         row.classList.remove('alarm-active');
 }
 
-// Toggle style live when checkbox changes
 for (let i = 0; i < 4; i++) {
   document.getElementById(`alarmEnabled${i}`).addEventListener('change', (e) => {
     updateAlarmRowStyle(i, e.target.checked);
@@ -219,7 +317,6 @@ for (let i = 0; i < 4; i++) {
 
 btnSaveAlarms.addEventListener('click', () => {
   const alarms = saveAlarms();
-  // Send to background
   chrome.runtime.sendMessage({ action: 'setClockAlarms', alarms });
   alarmStatusText.textContent = '✅ Alarme gespeichert & aktiv!';
   alarmStatusText.style.color = '#10b981';
@@ -251,25 +348,20 @@ function tickAlarms(alarms) {
     const ms = msUntilTime(a.time);
     miniEl.textContent = formatCountdown(ms);
 
-    // Fire check: exact minute match and not already fired this minute
     if (a.time === nowStr && lastFiredMinute[i] !== minuteKey) {
       lastFiredMinute[i] = minuteKey;
-      // Flash row
       const row = document.querySelector(`.alarm-row[data-index="${i}"]`);
       row.classList.add('fired');
       setTimeout(() => row.classList.remove('fired'), 1500);
-      // Play sound via background
       chrome.runtime.sendMessage({ action: 'playAlarmSound' });
     }
 
-    // Track nearest alarm for the top display
     if (nextMs === null || ms < nextMs) {
       nextMs = ms;
       nextTimeStr = a.time;
     }
   }
 
-  // Update top countdown
   if (nextMs !== null) {
     alarmNextCountdown.textContent = formatCountdown(nextMs);
     alarmNextTime.textContent = `Nächster Alarm: ${nextTimeStr} Uhr`;
@@ -284,7 +376,6 @@ function startAlarmTick() {
   loadAlarms((alarms) => {
     tickAlarms(alarms);
     alarmInterval = setInterval(() => {
-      // Always read from DOM (user might have changed without saving yet)
       const current = [];
       for (let i = 0; i < 4; i++) {
         current.push({
@@ -297,14 +388,34 @@ function startAlarmTick() {
   });
 }
 
+// ===================== HELPERS =====================
+function formatTime(ms) {
+  if (ms <= 0) return '00:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
 // ===================== STARTUP =====================
-chrome.storage.local.get(['timerLoop', 'lastHours', 'lastMinutes', 'lastSeconds'], (data) => {
-  if (data.timerLoop !== undefined)   loopCheckbox.checked  = data.timerLoop;
-  if (data.lastHours !== undefined)   inputHours.value      = data.lastHours;
-  if (data.lastMinutes !== undefined) inputMinutes.value    = data.lastMinutes;
-  if (data.lastSeconds !== undefined) inputSeconds.value    = data.lastSeconds;
+chrome.storage.local.get([
+  'timerLoop', 'lastHours', 'lastMinutes', 'lastSeconds',
+  'timer2Loop', 'lastHours2', 'lastMinutes2', 'lastSeconds2'
+], (data) => {
+  if (data.timerLoop !== undefined)    loopCheckbox.checked   = data.timerLoop;
+  if (data.lastHours !== undefined)    inputHours.value       = data.lastHours;
+  if (data.lastMinutes !== undefined)  inputMinutes.value     = data.lastMinutes;
+  if (data.lastSeconds !== undefined)  inputSeconds.value     = data.lastSeconds;
+
+  if (data.timer2Loop !== undefined)   loopCheckbox2.checked  = data.timer2Loop;
+  if (data.lastHours2 !== undefined)   inputHours2.value      = data.lastHours2;
+  if (data.lastMinutes2 !== undefined) inputMinutes2.value    = data.lastMinutes2;
+  if (data.lastSeconds2 !== undefined) inputSeconds2.value    = data.lastSeconds2;
 });
 
 init();
+init2();
 startAlarmTick();
-

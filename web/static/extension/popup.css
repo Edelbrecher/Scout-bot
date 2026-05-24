@@ -7,7 +7,7 @@
 body {
   width: 360px;
   min-height: 520px;
-  background: #0f0f1a;
+  background: #0f1117;
   color: #e0e0f0;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   overflow: hidden;
@@ -26,18 +26,18 @@ body {
   align-items: center;
   gap: 10px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(120, 100, 255, 0.2);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
 }
 
 .logo {
   font-size: 24px;
-  filter: drop-shadow(0 0 8px rgba(120, 100, 255, 0.8));
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.7));
 }
 
 h1 {
   font-size: 18px;
   font-weight: 700;
-  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -71,28 +71,35 @@ h1 {
 
 .ring-bg {
   fill: none;
-  stroke: rgba(120, 100, 255, 0.1);
+  stroke: rgba(245, 158, 11, 0.1);
   stroke-width: 8;
 }
 
 .ring-progress {
   fill: none;
-  stroke: url(#ringGradient);
-  stroke: #a78bfa;
+  stroke: #f59e0b;
   stroke-width: 8;
   stroke-linecap: round;
   stroke-dasharray: 326.73;
   stroke-dashoffset: 0;
   transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
-  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.7));
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
 }
 
-.ring-progress.warning {
+/* Timer 2 ring — amber/teal accent */
+.ring-progress-2 {
   stroke: #f59e0b;
   filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
 }
 
-.ring-progress.danger {
+.ring-progress.warning,
+.ring-progress-2.warning {
+  stroke: #fb923c;
+  filter: drop-shadow(0 0 6px rgba(251, 146, 60, 0.7));
+}
+
+.ring-progress.danger,
+.ring-progress-2.danger {
   stroke: #ef4444;
   filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
   animation: pulse-ring 0.5s ease-in-out infinite alternate;
@@ -109,7 +116,7 @@ h1 {
   letter-spacing: 2px;
   font-variant-numeric: tabular-nums;
   color: #e0e0f0;
-  text-shadow: 0 0 20px rgba(167, 139, 250, 0.4);
+  text-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
   z-index: 1;
   position: absolute;
   top: 50%;
@@ -121,7 +128,7 @@ h1 {
   position: absolute;
   bottom: 35px;
   font-size: 11px;
-  color: rgba(200, 190, 255, 0.6);
+  color: rgba(245, 200, 120, 0.6);
   letter-spacing: 1px;
   text-transform: uppercase;
   z-index: 1;
@@ -129,8 +136,8 @@ h1 {
 
 /* Input Section */
 .input-section {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(120, 100, 255, 0.15);
+  background: #1a1d2e;
+  border: 1px solid rgba(245, 158, 11, 0.18);
   border-radius: 12px;
   padding: 14px;
   display: flex;
@@ -140,7 +147,7 @@ h1 {
 
 .section-label {
   font-size: 11px;
-  color: rgba(200, 190, 255, 0.6);
+  color: rgba(245, 200, 120, 0.6);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -163,7 +170,7 @@ h1 {
   width: 62px;
   height: 48px;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(120, 100, 255, 0.25);
+  border: 1px solid rgba(245, 158, 11, 0.25);
   border-radius: 8px;
   color: #e0e0f0;
   font-size: 22px;
@@ -181,14 +188,14 @@ h1 {
 }
 
 .input-group input:focus {
-  border-color: rgba(167, 139, 250, 0.7);
-  background: rgba(167, 139, 250, 0.08);
-  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
+  border-color: rgba(245, 158, 11, 0.7);
+  background: rgba(245, 158, 11, 0.08);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
 }
 
 .input-label {
   font-size: 10px;
-  color: rgba(200, 190, 255, 0.5);
+  color: rgba(245, 200, 120, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -196,7 +203,7 @@ h1 {
 .separator {
   font-size: 24px;
   font-weight: 700;
-  color: rgba(167, 139, 250, 0.4);
+  color: rgba(245, 158, 11, 0.4);
   margin-bottom: 14px;
 }
 
@@ -235,24 +242,24 @@ h1 {
   left: 3px;
   width: 14px;
   height: 14px;
-  background: rgba(200, 190, 255, 0.5);
+  background: rgba(245, 200, 120, 0.4);
   border-radius: 50%;
   transition: all 0.3s ease;
 }
 
 .toggle-label input:checked + .toggle-switch {
-  background: rgba(167, 139, 250, 0.6);
+  background: rgba(245, 158, 11, 0.55);
 }
 
 .toggle-label input:checked + .toggle-switch::after {
   left: 21px;
-  background: #a78bfa;
-  box-shadow: 0 0 6px rgba(167, 139, 250, 0.8);
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);
 }
 
 .toggle-text {
   font-size: 12px;
-  color: rgba(200, 190, 255, 0.7);
+  color: rgba(245, 200, 120, 0.7);
 }
 
 /* Controls */
@@ -282,18 +289,29 @@ h1 {
 }
 
 .btn-start {
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  color: white;
-  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: #0f1117;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
 }
 
 .btn-start:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.6);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
 }
 
 .btn-start:active {
   transform: translateY(0);
+}
+
+.btn-start-2 {
+  background: linear-gradient(135deg, #b45309, #d97706);
+  color: #fef3c7;
+  box-shadow: 0 4px 15px rgba(180, 83, 9, 0.4);
+}
+
+.btn-start-2:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(180, 83, 9, 0.6);
 }
 
 .btn-stop {
@@ -318,25 +336,26 @@ h1 {
 /* Status Bar */
 .status-bar {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(120, 100, 255, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.1);
   border-radius: 8px;
   padding: 8px 12px;
   text-align: center;
 }
 
-#statusText {
+#statusText,
+#statusText2 {
   font-size: 12px;
-  color: rgba(200, 190, 255, 0.6);
+  color: rgba(245, 200, 120, 0.6);
   letter-spacing: 0.3px;
 }
 
 .status-running {
-  color: #a78bfa !important;
+  color: #f59e0b !important;
   animation: blink 1.5s ease-in-out infinite;
 }
 
 .status-stopped {
-  color: rgba(200, 190, 255, 0.5) !important;
+  color: rgba(245, 200, 120, 0.5) !important;
 }
 
 @keyframes blink {
@@ -352,15 +371,15 @@ h1 {
 
 /* Pulse animation on timer ring when running */
 .ring-active .ring-progress {
-  filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.9));
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.9));
 }
 
 /* ===== TABS ===== */
 .tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(120,100,255,0.15);
+  border: 1px solid rgba(245, 158, 11, 0.15);
   border-radius: 10px;
   padding: 4px;
 }
@@ -371,23 +390,23 @@ h1 {
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: rgba(200,190,255,0.5);
-  font-size: 12px;
+  color: rgba(245, 200, 120, 0.5);
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .tab:hover {
-  color: rgba(200,190,255,0.85);
-  background: rgba(167,139,250,0.07);
+  color: rgba(245, 200, 120, 0.85);
+  background: rgba(245, 158, 11, 0.07);
 }
 
 .tab.active {
-  background: linear-gradient(135deg, rgba(124,58,237,0.6), rgba(99,102,241,0.6));
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(124,58,237,0.3);
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.7), rgba(245, 158, 11, 0.7));
+  color: #0f1117;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
 }
 
 /* Tab content */
@@ -403,8 +422,8 @@ h1 {
 
 /* ===== ALARM TAB ===== */
 .alarm-next {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(120,100,255,0.2);
+  background: #1a1d2e;
+  border: 1px solid rgba(245, 158, 11, 0.2);
   border-radius: 12px;
   padding: 14px 16px;
   text-align: center;
@@ -415,7 +434,7 @@ h1 {
 
 .alarm-next-label {
   font-size: 10px;
-  color: rgba(200,190,255,0.5);
+  color: rgba(245, 200, 120, 0.5);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -425,13 +444,13 @@ h1 {
   font-weight: 800;
   letter-spacing: 3px;
   font-variant-numeric: tabular-nums;
-  color: #a78bfa;
-  text-shadow: 0 0 16px rgba(167,139,250,0.5);
+  color: #f59e0b;
+  text-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
 }
 
 .alarm-next-time {
   font-size: 12px;
-  color: rgba(200,190,255,0.55);
+  color: rgba(245, 200, 120, 0.55);
 }
 
 .alarm-list {
@@ -441,8 +460,8 @@ h1 {
 }
 
 .alarm-row {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(120,100,255,0.13);
+  background: #1a1d2e;
+  border: 1px solid rgba(245, 158, 11, 0.13);
   border-radius: 10px;
   padding: 10px 12px;
   display: flex;
@@ -452,13 +471,13 @@ h1 {
 }
 
 .alarm-row.alarm-active {
-  border-color: rgba(167,139,250,0.45);
-  background: rgba(167,139,250,0.06);
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.06);
 }
 
 .alarm-slot-label {
   font-size: 11px;
-  color: rgba(200,190,255,0.5);
+  color: rgba(245, 200, 120, 0.5);
   width: 46px;
   flex-shrink: 0;
   text-transform: uppercase;
@@ -476,7 +495,7 @@ h1 {
   flex: 1;
   height: 36px;
   background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(120,100,255,0.25);
+  border: 1px solid rgba(245, 158, 11, 0.25);
   border-radius: 8px;
   color: #e0e0f0;
   font-size: 16px;
@@ -489,9 +508,9 @@ h1 {
 }
 
 .alarm-time-input:focus {
-  border-color: rgba(167,139,250,0.7);
-  background: rgba(167,139,250,0.08);
-  box-shadow: 0 0 0 2px rgba(167,139,250,0.15);
+  border-color: rgba(245, 158, 11, 0.7);
+  background: rgba(245, 158, 11, 0.08);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
 }
 
 .alarm-toggle {
@@ -502,7 +521,7 @@ h1 {
 .alarm-countdown-mini {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(167,139,250,0.7);
+  color: rgba(245, 158, 11, 0.7);
   min-width: 54px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -541,11 +560,11 @@ h1 {
 }
 
 .alarm-row.fired {
-  border-color: rgba(167,139,250,0.8);
+  border-color: rgba(245, 158, 11, 0.8);
   animation: alarm-flash 0.4s ease-in-out 3;
 }
 
 @keyframes alarm-flash {
-  0%, 100% { background: rgba(167,139,250,0.06); }
-  50% { background: rgba(167,139,250,0.22); }
+  0%, 100% { background: rgba(245, 158, 11, 0.06); }
+  50% { background: rgba(245, 158, 11, 0.22); }
 }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Background Timer",
-  "version": "1.0",
-  "description": "Ein Timer der im Hintergrund weiterläuft und nach Ablauf einen Ton spielt.",
+  "name": "TravOps Timer",
+  "version": "1.1",
+  "description": "Dual background timers with distinct alarms for TravOps.",
   "permissions": [
     "alarms",
     "storage",

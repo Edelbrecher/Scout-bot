@@ -3,23 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Background Timer</title>
+  <title>TravOps Timer</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo">⏱</div>
-      <h1>Background Timer</h1>
+      <div class="logo">🌾</div>
+      <h1>TravOps Timer</h1>
     </div>
 
     <!-- Tab Navigation -->
     <div class="tabs">
-      <button class="tab active" id="tabTimer" data-tab="timer">⏱ Countdown</button>
+      <button class="tab active" id="tabTimer" data-tab="timer">⏱ Timer 1</button>
+      <button class="tab" id="tabTimer2" data-tab="timer2">⏱ Timer 2</button>
       <button class="tab" id="tabAlarm" data-tab="alarm">🔔 Uhrzeiten</button>
     </div>
 
-    <!-- ===== TAB: COUNTDOWN ===== -->
+    <!-- ===== TAB: TIMER 1 ===== -->
     <div class="tab-content active" id="tabContentTimer">
 
       <div class="timer-display">
@@ -71,6 +72,62 @@
 
       <div class="status-bar">
         <span id="statusText">Bereit</span>
+      </div>
+
+    </div>
+
+    <!-- ===== TAB: TIMER 2 ===== -->
+    <div class="tab-content" id="tabContentTimer2">
+
+      <div class="timer-display">
+        <div class="time-ring-wrapper">
+          <svg class="ring" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+            <circle class="ring-progress ring-progress-2" id="ringProgress2" cx="60" cy="60" r="52"/>
+          </svg>
+          <div class="time-text" id="timeText2">00:00</div>
+          <div class="time-label" id="timeLabel2">Kein Timer</div>
+        </div>
+      </div>
+
+      <div class="input-section" id="inputSection2">
+        <label class="section-label">Timer einstellen</label>
+        <div class="time-inputs">
+          <div class="input-group">
+            <input type="number" id="inputHours2" min="0" max="99" value="0" placeholder="0">
+            <span class="input-label">Std</span>
+          </div>
+          <div class="separator">:</div>
+          <div class="input-group">
+            <input type="number" id="inputMinutes2" min="0" max="59" value="0" placeholder="0">
+            <span class="input-label">Min</span>
+          </div>
+          <div class="separator">:</div>
+          <div class="input-group">
+            <input type="number" id="inputSeconds2" min="0" max="59" value="0" placeholder="0">
+            <span class="input-label">Sek</span>
+          </div>
+        </div>
+        <div class="loop-toggle">
+          <label class="toggle-label">
+            <input type="checkbox" id="loopCheckbox2" checked>
+            <span class="toggle-switch"></span>
+            <span class="toggle-text">Loop (automatisch wiederholen)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-start btn-start-2" id="btnStart2">
+          <span class="btn-icon">▶</span> Starten
+        </button>
+        <button class="btn btn-stop hidden" id="btnStop2">
+          <span class="btn-icon">■</span> Stoppen
+        </button>
+      </div>
+
+      <div class="status-bar">
+        <span id="statusText2">Bereit</span>
       </div>
 
     </div>

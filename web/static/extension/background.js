@@ -7,6 +7,11 @@ chrome.runtime.onInstalled.addListener(() => {
     timerRemaining: 0,
     timerStartedAt: null,
     timerLoop: true,
+    timer2Running: false,
+    timer2Duration: 0,
+    timer2Remaining: 0,
+    timer2StartedAt: null,
+    timer2Loop: true,
     clockAlarms: []
   });
 });
@@ -22,11 +27,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'getStatus') {
     getTimerStatus().then(status => sendResponse(status));
     return true;
+  } else if (message.action === 'startTimer2') {
+    startTimer2(message.duration);
+    sendResponse({ success: true });
+  } else if (message.action === 'stopTimer2') {
+    stopTimer2();
+    sendResponse({ success: true });
+  } else if (message.action === 'getStatus2') {
+    getTimerStatus2().then(status => sendResponse(status));
+    return true;
   } else if (message.action === 'setClockAlarms') {
     setClockAlarms(message.alarms);
     sendResponse({ success: true });
   } else if (message.action === 'playAlarmSound') {
-    triggerSound();
+    triggerSound(1);
     sendResponse({ success: true });
   }
   return true;
@@ -34,29 +48,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Listen for alarms (chrome.alarms API)
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'timerAlarm') {
-    await triggerSound();
+  if (alarm.name === 'timerAlarm1') {
+    await triggerSound(1);
     const data = await chrome.storage.local.get(['timerDuration', 'timerRunning', 'timerLoop']);
     if (data.timerRunning && data.timerLoop) {
       const now = Date.now();
       await chrome.storage.local.set({ timerRemaining: data.timerDuration, timerStartedAt: now });
-      chrome.alarms.create('timerAlarm', { delayInMinutes: data.timerDuration / 60000 });
+      chrome.alarms.create('timerAlarm1', { delayInMinutes: data.timerDuration / 60000 });
     } else {
       await chrome.storage.local.set({ timerRunning: false });
     }
   }
 
+  if (alarm.name === 'timerAlarm2') {
+    await triggerSound(2);
+    const data = await chrome.storage.local.get(['timer2Duration', 'timer2Running', 'timer2Loop']);
+    if (data.timer2Running && data.timer2Loop) {
+      const now = Date.now();
+      await chrome.storage.local.set({ timer2Remaining: data.timer2Duration, timer2StartedAt: now });
+      chrome.alarms.create('timerAlarm2', { delayInMinutes: data.timer2Duration / 60000 });
+    } else {
+      await chrome.storage.local.set({ timer2Running: false });
+    }
+  }
+
   // Clock alarm fired
   if (alarm.name.startsWith('clockAlarm_')) {
-    await triggerSound();
-    // Re-schedule for next day (24h later)
+    await triggerSound(1);
     chrome.alarms.create(alarm.name, { delayInMinutes: 24 * 60 });
   }
 });
 
-// ===================== COUNTDOWN TIMER =====================
+// ===================== COUNTDOWN TIMER 1 =====================
 async function startTimer(durationMs) {
-  await chrome.alarms.clear('timerAlarm');
+  await chrome.alarms.clear('timerAlarm1');
   const now = Date.now();
   await chrome.storage.local.set({
     timerRunning: true,
@@ -64,11 +89,11 @@ async function startTimer(durationMs) {
     timerRemaining: durationMs,
     timerStartedAt: now
   });
-  chrome.alarms.create('timerAlarm', { delayInMinutes: durationMs / 60000 });
+  chrome.alarms.create('timerAlarm1', { delayInMinutes: durationMs / 60000 });
 }
 
 async function stopTimer() {
-  await chrome.alarms.clear('timerAlarm');
+  await chrome.alarms.clear('timerAlarm1');
   await chrome.storage.local.set({ timerRunning: false, timerRemaining: 0, timerStartedAt: null });
 }
 
@@ -82,20 +107,45 @@ async function getTimerStatus() {
   return { running: false, duration: data.timerDuration || 0, remaining: 0 };
 }
 
+// ===================== COUNTDOWN TIMER 2 =====================
+async function startTimer2(durationMs) {
+  await chrome.alarms.clear('timerAlarm2');
+  const now = Date.now();
+  await chrome.storage.local.set({
+    timer2Running: true,
+    timer2Duration: durationMs,
+    timer2Remaining: durationMs,
+    timer2StartedAt: now
+  });
+  chrome.alarms.create('timerAlarm2', { delayInMinutes: durationMs / 60000 });
+}
+
+async function stopTimer2() {
+  await chrome.alarms.clear('timerAlarm2');
+  await chrome.storage.local.set({ timer2Running: false, timer2Remaining: 0, timer2StartedAt: null });
+}
+
+async function getTimerStatus2() {
+  const data = await chrome.storage.local.get(['timer2Running', 'timer2Duration', 'timer2Remaining', 'timer2StartedAt']);
+  if (data.timer2Running && data.timer2StartedAt) {
+    const elapsed = Date.now() - data.timer2StartedAt;
+    const remaining = Math.max(0, data.timer2Duration - elapsed);
+    return { running: true, duration: data.timer2Duration, remaining };
+  }
+  return { running: false, duration: data.timer2Duration || 0, remaining: 0 };
+}
+
 // ===================== CLOCK ALARMS =====================
 async function setClockAlarms(alarms) {
   await chrome.storage.local.set({ clockAlarms: alarms });
 
-  // Clear all existing clock alarms
   for (let i = 0; i < 4; i++) {
     await chrome.alarms.clear(`clockAlarm_${i}`);
   }
 
-  // Schedule enabled alarms
   for (let i = 0; i < alarms.length; i++) {
     const a = alarms[i];
     if (!a.enabled || !a.time) continue;
-
     const delayMs = msUntilTime(a.time);
     chrome.alarms.create(`clockAlarm_${i}`, { delayInMinutes: delayMs / 60000 });
   }
@@ -112,7 +162,7 @@ function msUntilTime(timeStr) {
 }
 
 // ===================== SOUND =====================
-async function triggerSound() {
+async function triggerSound(soundType) {
   try {
     const existingContexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
     if (existingContexts.length === 0) {
@@ -122,7 +172,7 @@ async function triggerSound() {
         justification: 'Timer/Alarm - Benachrichtigungston abspielen'
       });
     }
-    chrome.runtime.sendMessage({ action: 'playSound' });
+    chrome.runtime.sendMessage({ action: 'playSound', soundType: soundType || 1 });
   } catch (e) {
     console.error('Sound error:', e);
   }
