@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+{% block title %}Heldenaufgaben · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.ht-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
+.ht-tabs { display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+.ht-tab {
+  padding:0.5rem 1.2rem; border-radius:99px; font-size:0.88rem; font-weight:600;
+  cursor:pointer; border:2px solid var(--border); background:transparent;
+  color:var(--text-muted); transition:all 0.15s;
+}
+.ht-tab.active { border-color:#f59e0b; background:#f59e0b; color:#000; }
+.ht-tab:hover:not(.active) { border-color:#f59e0b; color:#f59e0b; }
+
+.ht-summary {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem;
+  margin-bottom:1.5rem;
+}
+.ht-stat {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
+  padding:0.85rem 1rem; text-align:center;
+}
+.ht-stat-val { font-size:1.35rem; font-weight:800; color:#f59e0b; }
+.ht-stat-label { font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem; text-transform:uppercase; letter-spacing:.05em; }
+
+.ht-section { margin-bottom:1.75rem; }
+.ht-section-title {
+  font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--text-muted); padding-bottom:0.4rem; border-bottom:1px solid var(--border);
+  margin-bottom:0.6rem;
+}
+.ht-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.45rem; }
+.ht-task {
+  display:flex; align-items:center; gap:0.6rem;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+  padding:0.5rem 0.75rem; cursor:pointer; transition:all 0.12s; user-select:none;
+}
+.ht-task:hover { border-color:#f59e0b44; }
+.ht-task.done { border-color:#22c55e55; background:rgba(34,197,94,0.07); }
+.ht-task.done .ht-task-name { text-decoration:line-through; color:var(--text-muted); }
+.ht-checkbox {
+  width:16px; height:16px; border-radius:4px; border:2px solid var(--border);
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  font-size:0.7rem; transition:all 0.12s;
+}
+.ht-task.done .ht-checkbox { background:#22c55e; border-color:#22c55e; color:#fff; }
+.ht-task-info { flex:1; min-width:0; }
+.ht-task-name { font-size:0.82rem; font-weight:600; color:var(--text); line-height:1.2; }
+.ht-task-sub  { font-size:0.72rem; color:var(--text-muted); margin-top:1px; }
+.ht-task-rewards { display:flex; gap:0.4rem; align-items:center; flex-shrink:0; }
+.ht-res  { font-size:0.72rem; font-weight:700; color:#f59e0b; white-space:nowrap; }
+.ht-xp   { font-size:0.72rem; font-weight:700; color:#818cf8; white-space:nowrap; }
+
+.ht-reset-btn {
+  background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#ef4444;
+  border-radius:8px; padding:0.35rem 0.85rem; font-size:0.78rem; font-weight:600;
+  cursor:pointer; transition:all 0.15s;
+}
+.ht-reset-btn:hover { background:rgba(239,68,68,0.2); }
+</style>
+
+<div class="ht-header">
+  <div>
+    <h1 style="font-size:1.4rem;font-weight:800;margin-bottom:0.2rem;">🗡️ Heldenaufgaben</h1>
+    <p style="font-size:0.85rem;color:var(--text-muted);">Meilensteine abhaken → Ressourcen & XP-Belohnungen tracken</p>
+  </div>
+  <button class="ht-reset-btn" onclick="resetAll()">🔄 Alles zurücksetzen</button>
+</div>
+
+<!-- Village tabs -->
+<div class="ht-tabs">
+  <button class="ht-tab active" onclick="switchVillage('start', this)">🏠 Startdorf</button>
+  <button class="ht-tab" onclick="switchVillage('settled', this)">🏘️ Gesiedeltes Dorf</button>
+</div>
+
+<!-- Summary bar -->
+<div class="ht-summary">
+  <div class="ht-stat">
+    <div class="ht-stat-val" id="statDone">0</div>
+    <div class="ht-stat-label">Erledigt</div>
+  </div>
+  <div class="ht-stat">
+    <div class="ht-stat-val" id="statTotal">0</div>
+    <div class="ht-stat-label">Gesamt</div>
+  </div>
+  <div class="ht-stat">
+    <div class="ht-stat-val" id="statRes">0</div>
+    <div class="ht-stat-label">Res verdient</div>
+  </div>
+  <div class="ht-stat">
+    <div class="ht-stat-val" id="statXp">0</div>
+    <div class="ht-stat-label">XP verdient</div>
+  </div>
+</div>
+
+<!-- Tasks container -->
+<div id="tasksContainer"></div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────
+const VILLAGES = {
+  start: {
+    label: "Startdorf",
+    sections: [
+      {
+        title: "🏆 Kulturpunktproduktion",
+        tasks: [
+          {id:"cp1",  name:"KP-Produktion",  sub:"50 KP/h",  res:1500,  xp:25},
+          {id:"cp2",  name:"KP-Produktion",  sub:"100 KP/h", res:3000,  xp:50},
+          {id:"cp3",  name:"KP-Produktion",  sub:"150 KP/h", res:4500,  xp:75},
+          {id:"cp4",  name:"KP-Produktion",  sub:"250 KP/h", res:6000,  xp:100},
+          {id:"cp5",  name:"KP-Produktion",  sub:"350 KP/h", res:7500,  xp:125},
+          {id:"cp6",  name:"KP-Produktion",  sub:"500 KP/h", res:9000,  xp:150},
+          {id:"cp7",  name:"KP-Produktion",  sub:"750 KP/h", res:10500, xp:175},
+        ]
+      },
+      {
+        title: "👥 Bevölkerung",
+        tasks: [
+          {id:"pop1", name:"Bevölkerung", sub:"50",  res:1500,  xp:25},
+          {id:"pop2", name:"Bevölkerung", sub:"100", res:3000,  xp:50},
+          {id:"pop3", name:"Bevölkerung", sub:"150", res:4500,  xp:75},
+          {id:"pop4", name:"Bevölkerung", sub:"250", res:6000,  xp:100},
+          {id:"pop5", name:"Bevölkerung", sub:"350", res:7500,  xp:125},
+          {id:"pop6", name:"Bevölkerung", sub:"500", res:9000,  xp:150},
+          {id:"pop7", name:"Bevölkerung", sub:"750", res:10500, xp:175},
+        ]
+      },
+      {
+        title: "🌾 Einzelne Felder",
+        tasks: [
+          {id:"crop1", name:"Getreidefeld", sub:"Stufe 2",  res:600,  xp:10},
+          {id:"crop2", name:"Getreidefeld", sub:"Stufe 4",  res:1200, xp:20},
+          {id:"crop3", name:"Getreidefeld", sub:"Stufe 7",  res:1800, xp:30},
+          {id:"crop4", name:"Getreidefeld", sub:"Stufe 10", res:2400, xp:40},
+          {id:"wood1", name:"Holzfäller",   sub:"Stufe 2",  res:600,  xp:10},
+          {id:"wood2", name:"Holzfäller",   sub:"Stufe 4",  res:1200, xp:20},
+          {id:"wood3", name:"Holzfäller",   sub:"Stufe 7",  res:1800, xp:30},
+          {id:"wood4", name:"Holzfäller",   sub:"Stufe 10", res:2400, xp:40},
+          {id:"clay1", name:"Lehmgrube",    sub:"Stufe 2",  res:600,  xp:10},
+          {id:"clay2", name:"Lehmgrube",    sub:"Stufe 4",  res:1200, xp:20},
+          {id:"clay3", name:"Lehmgrube",    sub:"Stufe 7",  res:1800, xp:30},
+          {id:"clay4", name:"Lehmgrube",    sub:"Stufe 10", res:2400, xp:40},
+          {id:"iron1", name:"Eisenmine",    sub:"Stufe 2",  res:600,  xp:10},
+          {id:"iron2", name:"Eisenmine",    sub:"Stufe 4",  res:1200, xp:20},
+          {id:"iron3", name:"Eisenmine",    sub:"Stufe 7",  res:1800, xp:30},
+          {id:"iron4", name:"Eisenmine",    sub:"Stufe 10", res:2400, xp:40},
+        ]
+      },
+      {
+        title: "🌾🌾 Alle Getreidefelder",
+        tasks: [
+          {id:"allcrop1", name:"Alle Getreidefelder", sub:"Stufe 2",  res:900,  xp:15},
+          {id:"allcrop2", name:"Alle Getreidefelder", sub:"Stufe 3",  res:1800, xp:30},
+          {id:"allcrop3", name:"Alle Getreidefelder", sub:"Stufe 5",  res:2700, xp:45},
+          {id:"allcrop4", name:"Alle Getreidefelder", sub:"Stufe 8",  res:3600, xp:60},
+          {id:"allcrop5", name:"Alle Getreidefelder", sub:"Stufe 10", res:4500, xp:75},
+        ]
+      },
+      {
+        title: "🪵🧱⛏️ Alle Rohstofffelder",
+        tasks: [
+          {id:"allwood1", name:"Alle Holzfäller", sub:"Stufe 2",  res:900,  xp:15},
+          {id:"allwood2", name:"Alle Holzfäller", sub:"Stufe 3",  res:1800, xp:30},
+          {id:"allwood3", name:"Alle Holzfäller", sub:"Stufe 5",  res:2700, xp:45},
+          {id:"allwood4", name:"Alle Holzfäller", sub:"Stufe 8",  res:3600, xp:60},
+          {id:"allwood5", name:"Alle Holzfäller", sub:"Stufe 10", res:4500, xp:75},
+          {id:"allclay1", name:"Alle Lehmgruben", sub:"Stufe 2",  res:900,  xp:15},
+          {id:"allclay2", name:"Alle Lehmgruben", sub:"Stufe 3",  res:1800, xp:30},
+          {id:"allclay3", name:"Alle Lehmgruben", sub:"Stufe 5",  res:2700, xp:45},
+          {id:"allclay4", name:"Alle Lehmgruben", sub:"Stufe 8",  res:3600, xp:60},
+          {id:"allclay5", name:"Alle Lehmgruben", sub:"Stufe 10", res:4500, xp:75},
+          {id:"alliron1", name:"Alle Eisenminen", sub:"Stufe 2",  res:900,  xp:15},
+          {id:"alliron2", name:"Alle Eisenminen", sub:"Stufe 3",  res:1800, xp:30},
+          {id:"alliron3", name:"Alle Eisenminen", sub:"Stufe 5",  res:2700, xp:45},
+          {id:"alliron4", name:"Alle Eisenminen", sub:"Stufe 8",  res:3600, xp:60},
+          {id:"alliron5", name:"Alle Eisenminen", sub:"Stufe 10", res:4500, xp:75},
+        ]
+      },
+      {
+        title: "📈 Gleichmäßiges Wachstum",
+        tasks: [
+          {id:"even1", name:"Even Growth", sub:"1× alle auf 2",  res:300,  xp:5},
+          {id:"even2", name:"Even Growth", sub:"1× alle auf 4",  res:600,  xp:10},
+          {id:"even3", name:"Even Growth", sub:"1× alle auf 7",  res:900,  xp:15},
+          {id:"even4", name:"Even Growth", sub:"1× alle auf 10", res:1200, xp:20},
+        ]
+      },
+      {
+        title: "🔄 Alle Ressourcen auf Level",
+        tasks: [
+          {id:"allres1", name:"Alle Res auf", sub:"Stufe 2",  res:2400,  xp:40},
+          {id:"allres2", name:"Alle Res auf", sub:"Stufe 4",  res:4800,  xp:80},
+          {id:"allres3", name:"Alle Res auf", sub:"Stufe 7",  res:7200,  xp:120},
+          {id:"allres4", name:"Alle Res auf", sub:"Stufe 8",  res:9600,  xp:160},
+          {id:"allres5", name:"Alle Res auf", sub:"Stufe 9",  res:12000, xp:200},
+          {id:"allres6", name:"Alle Res auf", sub:"Stufe 10", res:14400, xp:240},
+        ]
+      },
+      {
+        title: "🏗️ Infrastruktur",
+        tasks: [
+          {id:"wh1",  name:"Lager",        sub:"Stufe 1",  res:300,  xp:5},
+          {id:"wh2",  name:"Lager",        sub:"Stufe 3",  res:600,  xp:10},
+          {id:"wh3",  name:"Lager",        sub:"Stufe 7",  res:900,  xp:15},
+          {id:"wh4",  name:"Lager",        sub:"Stufe 12", res:1200, xp:20},
+          {id:"wh5",  name:"Lager",        sub:"Stufe 20", res:1500, xp:25},
+          {id:"gr1",  name:"Kornspeicher", sub:"Stufe 1",  res:300,  xp:5},
+          {id:"gr2",  name:"Kornspeicher", sub:"Stufe 3",  res:600,  xp:10},
+          {id:"gr3",  name:"Kornspeicher", sub:"Stufe 7",  res:900,  xp:15},
+          {id:"gr4",  name:"Kornspeicher", sub:"Stufe 12", res:1200, xp:20},
+          {id:"gr5",  name:"Kornspeicher", sub:"Stufe 20", res:1500, xp:25},
+          {id:"bar1", name:"Kaserne",      sub:"Stufe 1",  res:300,  xp:5},
+          {id:"bar2", name:"Kaserne",      sub:"Stufe 3",  res:600,  xp:10},
+          {id:"bar3", name:"Kaserne",      sub:"Stufe 7",  res:900,  xp:15},
+          {id:"bar4", name:"Kaserne",      sub:"Stufe 12", res:1200, xp:20},
+          {id:"bar5", name:"Kaserne",      sub:"Stufe 20", res:1500, xp:25},
+          {id:"sta1", name:"Stall",        sub:"Stufe 1",  res:600,  xp:10},
+          {id:"sta2", name:"Stall",        sub:"Stufe 3",  res:1200, xp:20},
+          {id:"sta3", name:"Stall",        sub:"Stufe 7",  res:1800, xp:30},
+          {id:"sta4", name:"Stall",        sub:"Stufe 12", res:2400, xp:40},
+          {id:"sta5", name:"Stall",        sub:"Stufe 20", res:3000, xp:50},
+          {id:"ac1",  name:"Akademie",     sub:"Stufe 1",  res:600,  xp:10},
+          {id:"ac2",  name:"Akademie",     sub:"Stufe 10", res:1200, xp:20},
+          {id:"ac3",  name:"Akademie",     sub:"Stufe 20", res:1800, xp:30},
+          {id:"sm1",  name:"Schmiede",     sub:"Stufe 1",  res:600,  xp:10},
+          {id:"sm2",  name:"Schmiede",     sub:"Stufe 10", res:1200, xp:20},
+          {id:"sm3",  name:"Schmiede",     sub:"Stufe 20", res:1800, xp:30},
+          {id:"th1",  name:"Rathaus",      sub:"Stufe 1",  res:2400, xp:40},
+          {id:"th2",  name:"Rathaus",      sub:"Stufe 10", res:4800, xp:80},
+          {id:"th3",  name:"Rathaus",      sub:"Stufe 20", res:7200, xp:120},
+          {id:"ws1",  name:"Werkstatt",    sub:"Stufe 1",  res:2400, xp:40},
+          {id:"mb1",  name:"Hauptgebäude", sub:"Stufe 1",  res:600,  xp:10},
+          {id:"mb2",  name:"Hauptgebäude", sub:"Stufe 3",  res:1200, xp:20},
+          {id:"mb3",  name:"Hauptgebäude", sub:"Stufe 7",  res:1800, xp:30},
+          {id:"mb4",  name:"Hauptgebäude", sub:"Stufe 12", res:2400, xp:40},
+          {id:"mb5",  name:"Hauptgebäude", sub:"Stufe 20", res:3000, xp:50},
+          {id:"cr1",  name:"Versteck",     sub:"Stufe 1",  res:300,  xp:5},
+          {id:"cr2",  name:"Versteck",     sub:"Stufe 3",  res:600,  xp:10},
+          {id:"cr3",  name:"Versteck",     sub:"Stufe 6",  res:900,  xp:15},
+          {id:"cr4",  name:"Versteck",     sub:"Stufe 10", res:1200, xp:20},
+          {id:"mk1",  name:"Marktplatz",   sub:"Stufe 1",  res:600,  xp:10},
+          {id:"mk2",  name:"Marktplatz",   sub:"Stufe 3",  res:1200, xp:20},
+          {id:"mk3",  name:"Marktplatz",   sub:"Stufe 7",  res:1800, xp:30},
+          {id:"mk4",  name:"Marktplatz",   sub:"Stufe 12", res:2400, xp:40},
+          {id:"mk5",  name:"Marktplatz",   sub:"Stufe 20", res:3000, xp:50},
+          {id:"em1",  name:"Botschaft",    sub:"Stufe 1",  res:1200, xp:20},
+          {id:"rp1",  name:"Residenz/Palast", sub:"Stufe 1",  res:1200, xp:20},
+          {id:"rp2",  name:"Residenz/Palast", sub:"Stufe 3",  res:2400, xp:40},
+          {id:"rp3",  name:"Residenz/Palast", sub:"Stufe 7",  res:3600, xp:60},
+          {id:"rp4",  name:"Residenz/Palast", sub:"Stufe 10", res:4800, xp:80},
+          {id:"rp5",  name:"Residenz/Palast", sub:"Stufe 20", res:6000, xp:100},
+          {id:"wa1",  name:"Mauer/Wall",   sub:"Stufe 1",  res:600,  xp:10},
+          {id:"wa2",  name:"Mauer/Wall",   sub:"Stufe 3",  res:1200, xp:20},
+          {id:"wa3",  name:"Mauer/Wall",   sub:"Stufe 7",  res:1800, xp:30},
+          {id:"wa4",  name:"Mauer/Wall",   sub:"Stufe 12", res:2400, xp:40},
+          {id:"wa5",  name:"Mauer/Wall",   sub:"Stufe 20", res:3000, xp:50},
+          {id:"raly1",name:"Versammlungsplatz", sub:"Stufe 1",  res:600,  xp:10},
+          {id:"raly2",name:"Versammlungsplatz", sub:"Stufe 10", res:1200, xp:20},
+          {id:"raly3",name:"Versammlungsplatz", sub:"Stufe 20", res:1800, xp:30},
+          {id:"saw1", name:"Sägewerk",     sub:"Stufe 1",  res:600,  xp:10},
+          {id:"saw2", name:"Sägewerk",     sub:"Stufe 5",  res:1200, xp:20},
+          {id:"bry1", name:"Ziegelei",     sub:"Stufe 1",  res:600,  xp:10},
+          {id:"bry2", name:"Ziegelei",     sub:"Stufe 5",  res:1200, xp:20},
+          {id:"if1",  name:"Eisengießerei",sub:"Stufe 1",  res:600,  xp:10},
+          {id:"if2",  name:"Eisengießerei",sub:"Stufe 5",  res:1200, xp:20},
+          {id:"gm1",  name:"Mühle",        sub:"Stufe 1",  res:600,  xp:10},
+          {id:"gm2",  name:"Mühle",        sub:"Stufe 5",  res:1200, xp:20},
+          {id:"bk1",  name:"Bäckerei",     sub:"Stufe 1",  res:600,  xp:10},
+          {id:"bk2",  name:"Bäckerei",     sub:"Stufe 5",  res:1200, xp:20},
+        ]
+      },
+      {
+        title: "🎉 Feste",
+        tasks: [
+          {id:"party1", name:"🎉 Fest feiern", sub:"1. Fest", res:2400, xp:40},
+        ]
+      }
+    ]
+  },
+  settled: {
+    label: "Gesiedeltes Dorf",
+    sections: [
+      {
+        title: "🏆 Kulturpunktproduktion",
+        tasks: [
+          {id:"s_cp1",  name:"KP-Produktion", sub:"50 KP/h",  res:1500,  xp:25},
+          {id:"s_cp2",  name:"KP-Produktion", sub:"100 KP/h", res:3000,  xp:50},
+          {id:"s_cp3",  name:"KP-Produktion", sub:"150 KP/h", res:4500,  xp:75},
+          {id:"s_cp4",  name:"KP-Produktion", sub:"250 KP/h", res:6000,  xp:100},
+          {id:"s_cp5",  name:"KP-Produktion", sub:"350 KP/h", res:7500,  xp:125},
+          {id:"s_cp6",  name:"KP-Produktion", sub:"500 KP/h", res:9000,  xp:150},
+          {id:"s_cp7",  name:"KP-Produktion", sub:"750 KP/h", res:10500, xp:175},
+        ]
+      },
+      {
+        title: "👥 Bevölkerung",
+        tasks: [
+          {id:"s_pop1", name:"Bevölkerung", sub:"50",  res:1500,  xp:25},
+          {id:"s_pop2", name:"Bevölkerung", sub:"100", res:3000,  xp:50},
+          {id:"s_pop3", name:"Bevölkerung", sub:"150", res:4500,  xp:75},
+          {id:"s_pop4", name:"Bevölkerung", sub:"250", res:6000,  xp:100},
+          {id:"s_pop5", name:"Bevölkerung", sub:"350", res:7500,  xp:125},
+          {id:"s_pop6", name:"Bevölkerung", sub:"500", res:9000,  xp:150},
+          {id:"s_pop7", name:"Bevölkerung", sub:"750", res:10500, xp:175},
+        ]
+      },
+      {
+        title: "📈 Gleichmäßiges Wachstum",
+        tasks: [
+          {id:"s_even1", name:"Even Growth", sub:"1× alle auf 2",  res:300,  xp:5},
+          {id:"s_even2", name:"Even Growth", sub:"1× alle auf 4",  res:600,  xp:10},
+          {id:"s_even3", name:"Even Growth", sub:"1× alle auf 7",  res:900,  xp:15},
+          {id:"s_even4", name:"Even Growth", sub:"1× alle auf 10", res:1200, xp:20},
+        ]
+      },
+      {
+        title: "🔄 Alle Ressourcen auf Level",
+        tasks: [
+          {id:"s_allres1", name:"Alle Res auf", sub:"Stufe 2",  res:2400,  xp:40},
+          {id:"s_allres2", name:"Alle Res auf", sub:"Stufe 4",  res:4800,  xp:80},
+          {id:"s_allres3", name:"Alle Res auf", sub:"Stufe 7",  res:7200,  xp:120},
+          {id:"s_allres4", name:"Alle Res auf", sub:"Stufe 8",  res:9600,  xp:160},
+          {id:"s_allres5", name:"Alle Res auf", sub:"Stufe 9",  res:12000, xp:200},
+          {id:"s_allres6", name:"Alle Res auf", sub:"Stufe 10", res:14400, xp:240},
+        ]
+      },
+      {
+        title: "🏗️ Infrastruktur",
+        tasks: [
+          {id:"s_wh1",  name:"Lager",           sub:"Stufe 1",  res:300,  xp:5},
+          {id:"s_wh2",  name:"Lager",           sub:"Stufe 10", res:600,  xp:10},
+          {id:"s_wh3",  name:"Lager",           sub:"Stufe 20", res:900,  xp:15},
+          {id:"s_gr1",  name:"Kornspeicher",    sub:"Stufe 1",  res:300,  xp:5},
+          {id:"s_gr2",  name:"Kornspeicher",    sub:"Stufe 10", res:600,  xp:10},
+          {id:"s_gr3",  name:"Kornspeicher",    sub:"Stufe 20", res:900,  xp:15},
+          {id:"s_bar1", name:"Kaserne",         sub:"Stufe 1",  res:300,  xp:5},
+          {id:"s_ac1",  name:"Akademie",        sub:"Stufe 1",  res:600,  xp:10},
+          {id:"s_th1",  name:"Rathaus",         sub:"Stufe 1",  res:2400, xp:40},
+          {id:"s_th2",  name:"Rathaus",         sub:"Stufe 10", res:4800, xp:80},
+          {id:"s_th3",  name:"Rathaus",         sub:"Stufe 20", res:7200, xp:120},
+          {id:"s_mb1",  name:"Hauptgebäude",    sub:"Stufe 1",  res:600,  xp:10},
+          {id:"s_mb2",  name:"Hauptgebäude",    sub:"Stufe 10", res:1200, xp:20},
+          {id:"s_mb3",  name:"Hauptgebäude",    sub:"Stufe 20", res:1800, xp:30},
+          {id:"s_cr1",  name:"Versteck",        sub:"Stufe 1",  res:300,  xp:5},
+          {id:"s_cr2",  name:"Versteck",        sub:"Stufe 10", res:600,  xp:10},
+          {id:"s_mk1",  name:"Marktplatz",      sub:"Stufe 1",  res:600,  xp:10},
+          {id:"s_mk2",  name:"Marktplatz",      sub:"Stufe 10", res:1200, xp:20},
+          {id:"s_mk3",  name:"Marktplatz",      sub:"Stufe 20", res:1800, xp:30},
+          {id:"s_rp1",  name:"Residenz/Palast", sub:"Stufe 1",  res:1200, xp:20},
+          {id:"s_rp2",  name:"Residenz/Palast", sub:"Stufe 10", res:2400, xp:40},
+          {id:"s_rp3",  name:"Residenz/Palast", sub:"Stufe 20", res:3600, xp:60},
+          {id:"s_wa1",  name:"Mauer/Wall",      sub:"Stufe 1",  res:600,  xp:10},
+          {id:"s_wa2",  name:"Mauer/Wall",      sub:"Stufe 10", res:1200, xp:20},
+          {id:"s_wa3",  name:"Mauer/Wall",      sub:"Stufe 20", res:1800, xp:30},
+          {id:"s_raly1",name:"Versammlungsplatz",sub:"Stufe 1", res:300,  xp:5},
+          {id:"s_raly2",name:"Versammlungsplatz",sub:"Stufe 10",res:600,  xp:10},
+          {id:"s_raly3",name:"Versammlungsplatz",sub:"Stufe 20",res:900,  xp:15},
+        ]
+      }
+    ]
+  }
+};
+
+// ── State ─────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'ht_done_{{ guild.guild_id }}';
+let done = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+let currentVillage = 'start';
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...done]));
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+function render() {
+  const vdata = VILLAGES[currentVillage];
+  const container = document.getElementById('tasksContainer');
+  container.innerHTML = '';
+
+  let totalDone = 0, totalCount = 0, totalRes = 0, totalXp = 0;
+
+  vdata.sections.forEach(section => {
+    const secEl = document.createElement('div');
+    secEl.className = 'ht-section';
+    secEl.innerHTML = `<div class="ht-section-title">${section.title}</div><div class="ht-grid" id="grid_${section.tasks[0].id}"></div>`;
+    container.appendChild(secEl);
+    const grid = secEl.querySelector('.ht-grid');
+
+    section.tasks.forEach(task => {
+      totalCount++;
+      const isDone = done.has(task.id);
+      if (isDone) { totalDone++; totalRes += task.res; totalXp += task.xp; }
+
+      const el = document.createElement('div');
+      el.className = 'ht-task' + (isDone ? ' done' : '');
+      el.innerHTML = `
+        <div class="ht-checkbox">${isDone ? '✓' : ''}</div>
+        <div class="ht-task-info">
+          <div class="ht-task-name">${task.name}</div>
+          <div class="ht-task-sub">${task.sub}</div>
+        </div>
+        <div class="ht-task-rewards">
+          <span class="ht-res">+${task.res.toLocaleString()}</span>
+          <span class="ht-xp">${task.xp}xp</span>
+        </div>`;
+      el.onclick = () => toggle(task, el);
+      grid.appendChild(el);
+    });
+  });
+
+  document.getElementById('statDone').textContent  = totalDone;
+  document.getElementById('statTotal').textContent = totalCount;
+  document.getElementById('statRes').textContent   = totalRes.toLocaleString();
+  document.getElementById('statXp').textContent    = totalXp.toLocaleString();
+}
+
+function toggle(task, el) {
+  if (done.has(task.id)) {
+    done.delete(task.id);
+    el.classList.remove('done');
+    el.querySelector('.ht-checkbox').textContent = '';
+  } else {
+    done.add(task.id);
+    el.classList.add('done');
+    el.querySelector('.ht-checkbox').textContent = '✓';
+  }
+  save();
+  // Update summary
+  let totalDone = 0, totalRes = 0, totalXp = 0;
+  const vdata = VILLAGES[currentVillage];
+  vdata.sections.forEach(s => s.tasks.forEach(t => {
+    if (done.has(t.id)) { totalDone++; totalRes += t.res; totalXp += t.xp; }
+  }));
+  document.getElementById('statDone').textContent = totalDone;
+  document.getElementById('statRes').textContent  = totalRes.toLocaleString();
+  document.getElementById('statXp').textContent   = totalXp.toLocaleString();
+}
+
+function switchVillage(key, btn) {
+  currentVillage = key;
+  document.querySelectorAll('.ht-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function resetAll() {
+  if (!confirm('Alle Heldenaufgaben für dieses Dorf zurücksetzen?')) return;
+  const vdata = VILLAGES[currentVillage];
+  vdata.sections.forEach(s => s.tasks.forEach(t => done.delete(t.id)));
+  save();
+  render();
+}
+
+render();
+</script>
+{% endblock %}
