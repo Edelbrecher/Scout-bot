@@ -3,6 +3,32 @@
 
 {% block content %}
 <style>
+/* ── Tribe filter bar ─────────────────────────────────── */
+.tribe-filter-bar {
+  display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+}
+.tribe-filter-btn {
+  padding: 0.55rem 1.1rem; border-radius: 99px; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; border: 2px solid transparent; transition: all 0.18s;
+  background: transparent;
+}
+.tribe-filter-btn.germanen  { border-color: #e53e3e; color: #e53e3e; }
+.tribe-filter-btn.roemer    { border-color: #d4af37; color: #d4af37; }
+.tribe-filter-btn.gallier   { border-color: #4299e1; color: #4299e1; }
+.tribe-filter-btn.aegypter  { border-color: #38b2ac; color: #38b2ac; }
+.tribe-filter-btn.hunnen    { border-color: #ed8936; color: #ed8936; }
+.tribe-filter-btn.natars    { border-color: #a0aec0; color: #a0aec0; }
+.tribe-filter-btn.alle      { border-color: var(--text-muted); color: var(--text-muted); }
+
+.tribe-filter-btn.active.germanen  { background: #e53e3e; color: #fff; border-color: #e53e3e; }
+.tribe-filter-btn.active.roemer    { background: #d4af37; color: #fff; border-color: #d4af37; }
+.tribe-filter-btn.active.gallier   { background: #4299e1; color: #fff; border-color: #4299e1; }
+.tribe-filter-btn.active.aegypter  { background: #38b2ac; color: #fff; border-color: #38b2ac; }
+.tribe-filter-btn.active.hunnen    { background: #ed8936; color: #fff; border-color: #ed8936; }
+.tribe-filter-btn.active.natars    { background: #a0aec0; color: #222; border-color: #a0aec0; }
+.tribe-filter-btn.active.alle      { background: var(--text-muted); color: var(--bg-card); border-color: var(--text-muted); }
+
+/* ── Blueprint sections & cards ───────────────────────── */
 .bp-tribe-section { margin-bottom: 2rem; }
 .bp-tribe-header {
   display: flex; align-items: center; gap: 0.5rem;
@@ -24,8 +50,9 @@
 }
 .bp-card-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
 .bp-card-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; }
-.bp-card-actions { display: flex; gap: 0.4rem; }
+.bp-card-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
+/* ── Progress bars ────────────────────────────────────── */
 .bp-progress-bar-wrap {
   background: var(--bg); border-radius: 99px; height: 8px; overflow: hidden; flex: 1;
 }
@@ -34,6 +61,8 @@
   background: linear-gradient(90deg, #22c55e, #16a34a);
   transition: width 0.4s ease;
 }
+
+/* ── Player table ─────────────────────────────────────── */
 .bp-player-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .bp-player-table th {
   text-align: left; padding: 0.5rem 0.75rem;
@@ -45,6 +74,22 @@
 .bp-player-table tr:last-child td { border-bottom: none; }
 .bp-player-table tr:hover td { background: rgba(255,255,255,0.03); }
 
+/* ── Meine Blueprints cards ───────────────────────────── */
+.my-bp-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem;
+}
+.my-bp-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;
+  transition: border-color 0.15s;
+}
+.my-bp-card:hover { border-color: #5865f2; }
+.my-bp-card-name { font-weight: 600; font-size: 0.92rem; }
+.my-bp-card-meta { font-size: 0.78rem; color: var(--text-muted); }
+.my-bp-progress-row { display: flex; align-items: center; gap: 0.5rem; }
+.my-bp-pct { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
+
+/* ── Modals ───────────────────────────────────────────── */
 .modal-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
   z-index: 500; align-items: center; justify-content: center;
@@ -56,6 +101,16 @@
 }
 .modal-box h3 { margin-bottom: 1.25rem; font-size: 1.1rem; }
 .modal-close { float: right; cursor: pointer; color: var(--text-muted); font-size: 1.4rem; line-height: 1; background: none; border: none; }
+
+/* ── Role chips ───────────────────────────────────────── */
+.role-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.role-chip {
+  padding: 0.45rem 0.9rem; border-radius: 99px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; border: 2px solid var(--border); background: transparent;
+  color: var(--text); transition: all 0.15s;
+}
+.role-chip:hover { border-color: #5865f2; background: rgba(88,101,242,0.12); color: #5865f2; }
+.role-chip.selected { background: #5865f2; border-color: #5865f2; color: #fff; }
 </style>
 
 <div class="container-wide" style="max-width:1200px; margin: 0 auto;">
@@ -68,6 +123,17 @@
     <a href="/guild/{{ guild.guild_id }}/blueprints/layouts" class="btn btn-secondary" style="display:flex; align-items:center; gap:0.4rem; font-size:0.9rem;">
       🏘️ Dorf-Layouts
     </a>
+  </div>
+
+  <!-- Tribe filter bar -->
+  <div class="tribe-filter-bar" id="tribeFilterBar">
+    <button class="tribe-filter-btn alle active" onclick="filterTribe('alle')">Alle</button>
+    <button class="tribe-filter-btn germanen" onclick="filterTribe('Germanen')">🪓 Germanen</button>
+    <button class="tribe-filter-btn roemer" onclick="filterTribe('Römer')">🛡️ Römer</button>
+    <button class="tribe-filter-btn gallier" onclick="filterTribe('Gallier')">🏹 Gallier</button>
+    <button class="tribe-filter-btn aegypter" onclick="filterTribe('Ägypter')">🔱 Ägypter</button>
+    <button class="tribe-filter-btn hunnen" onclick="filterTribe('Hunnen')">🐴 Hunnen</button>
+    <button class="tribe-filter-btn natars" onclick="filterTribe('Natars')">⚙️ Natars</button>
   </div>
 
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
@@ -91,7 +157,7 @@
       {% else %}
       {% for tribe_name, tribe_info in tribe_meta.items() %}
         {% if tribe_name in templates_by_tribe %}
-        <div class="bp-tribe-section">
+        <div class="bp-tribe-section" data-tribe="{{ tribe_name }}">
           <div class="bp-tribe-header">
             <span style="font-size:1.1rem;">{{ tribe_info.emoji }}</span>
             <span style="color:{{ tribe_info.color }};">{{ tribe_info.label }}</span>
@@ -105,8 +171,12 @@
                 <div class="bp-card-name">{{ tmpl.name }}</div>
               </div>
               <div class="bp-card-meta">{{ tmpl.step_count }} Schritt{% if tmpl.step_count != 1 %}e{% endif %}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.6rem;">
+                Du kannst diese Vorlage mehrfach aktivieren – z.B. für verschiedene Dörfer.
+              </div>
               <div class="bp-card-actions">
                 <button class="btn btn-primary" style="font-size:0.78rem; padding:0.3rem 0.65rem;" onclick="openActivateModal({{ tmpl.id }}, '{{ tmpl.name | e }}')">✅ Aktivieren</button>
+                <button class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.65rem;" onclick="openActivateModal({{ tmpl.id }}, '{{ tmpl.name | e }}')">✅ Weitere aktivieren</button>
                 <a href="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">✏️</a>
                 <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/delete" style="display:inline;" onsubmit="return confirm('Vorlage &quot;{{ tmpl.name }}&quot; wirklich löschen?')">
                   <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.65rem;">🗑️</button>
@@ -123,68 +193,112 @@
 
     <!-- RIGHT: Player Blueprints -->
     <div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 style="font-size:1.1rem; font-weight:700;">👥 Spieler-Fortschritt</h2>
-        {% if all_templates %}
-        <button class="btn btn-primary" onclick="openAssignModal()" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Blueprint zuweisen</button>
+
+      <!-- Meine Blueprints -->
+      {% set my_bps = player_blueprints | selectattr('player_name', 'eq', current_username) | list %}
+      <div style="margin-bottom:1.5rem;">
+        <h2 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">📋 Meine Blueprints</h2>
+        {% if not my_bps %}
+        <div class="card" style="text-align:center; padding:1.5rem 1rem; color:var(--text-muted);">
+          <div style="font-size:0.88rem;">Du hast noch keine Blueprints aktiviert. Klicke links auf <strong>Aktivieren</strong>, um zu starten.</div>
+        </div>
+        {% else %}
+        <div class="my-bp-grid">
+          {% for pb in my_bps %}
+          {% set total = pb.total_steps or 0 %}
+          {% set done = pb.done_steps or 0 %}
+          {% set pct = ((done / total * 100) | int) if total > 0 else 0 %}
+          <div class="my-bp-card">
+            <div class="my-bp-card-name">
+              {% if pb.tribe and pb.tribe in tribe_meta %}{{ tribe_meta[pb.tribe].emoji }} {% endif %}{{ pb.template_name or '—' }}
+            </div>
+            <div class="my-bp-card-meta">
+              {{ pb.village_name }}{% if pb.village_coords %} <span style="opacity:0.6;">({{ pb.village_coords }})</span>{% endif %}
+            </div>
+            <div class="my-bp-progress-row">
+              <div class="bp-progress-bar-wrap">
+                <div class="bp-progress-bar-fill" style="width:{{ pct }}%;"></div>
+              </div>
+              <span class="my-bp-pct">{{ done }}/{{ total }}</span>
+            </div>
+            <div style="margin-top:0.25rem;">
+              <a href="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}" class="btn btn-primary" style="font-size:0.78rem; padding:0.3rem 0.7rem;">📋 Öffnen</a>
+              <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}/delete" style="display:inline;" onsubmit="return confirm('Diesen Blueprint wirklich löschen?')">
+                <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.5rem;">🗑️</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
         {% endif %}
       </div>
 
-      {% if not player_blueprints %}
-      <div class="card" style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted);">
-        <div style="font-size:2.5rem; margin-bottom:0.75rem;">👥</div>
-        <div style="font-weight:600; margin-bottom:0.4rem;">Keine Spieler-Blueprints</div>
-        <div style="font-size:0.85rem;">Weise Spielern Blueprints zu, um ihren Fortschritt zu verfolgen.</div>
-      </div>
-      {% else %}
-      <div class="card" style="padding:0; overflow:hidden;">
-        <table class="bp-player-table">
-          <thead>
-            <tr>
-              <th>Spieler / Dorf</th>
-              <th>Vorlage</th>
-              <th>Fortschritt</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for pb in player_blueprints %}
-            {% set total = pb.total_steps or 0 %}
-            {% set done = pb.done_steps or 0 %}
-            {% set pct = ((done / total * 100) | int) if total > 0 else 0 %}
-            <tr>
-              <td>
-                <div style="font-weight:600; font-size:0.9rem;">{{ pb.player_name }}</div>
-                <div style="font-size:0.78rem; color:var(--text-muted);">
-                  {{ pb.village_name }}{% if pb.village_coords %} <span style="opacity:0.6;">({{ pb.village_coords }})</span>{% endif %}
-                </div>
-              </td>
-              <td>
-                {% if pb.tribe and pb.tribe in tribe_meta %}
-                <span style="font-size:0.85rem;">{{ tribe_meta[pb.tribe].emoji }}</span>
-                {% endif %}
-                <span style="font-size:0.85rem;">{{ pb.template_name or '—' }}</span>
-              </td>
-              <td style="min-width:100px;">
-                <div style="display:flex; align-items:center; gap:0.5rem;">
-                  <div class="bp-progress-bar-wrap">
-                    <div class="bp-progress-bar-fill" style="width:{{ pct }}%;"></div>
+      <!-- All guild blueprints (admin view) -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h2 style="font-size:1.1rem; font-weight:700;">👥 Alle Spieler-Blueprints <span style="font-size:0.78rem; font-weight:400; color:var(--text-muted);">(Admin-Ansicht)</span></h2>
+          {% if all_templates %}
+          <button class="btn btn-primary" onclick="openAssignModal()" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Blueprint zuweisen</button>
+          {% endif %}
+        </div>
+
+        {% if not player_blueprints %}
+        <div class="card" style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted);">
+          <div style="font-size:2.5rem; margin-bottom:0.75rem;">👥</div>
+          <div style="font-weight:600; margin-bottom:0.4rem;">Keine Spieler-Blueprints</div>
+          <div style="font-size:0.85rem;">Weise Spielern Blueprints zu, um ihren Fortschritt zu verfolgen.</div>
+        </div>
+        {% else %}
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="bp-player-table">
+            <thead>
+              <tr>
+                <th>Spieler / Dorf</th>
+                <th>Vorlage</th>
+                <th>Fortschritt</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pb in player_blueprints %}
+              {% set total = pb.total_steps or 0 %}
+              {% set done = pb.done_steps or 0 %}
+              {% set pct = ((done / total * 100) | int) if total > 0 else 0 %}
+              <tr>
+                <td>
+                  <div style="font-weight:600; font-size:0.9rem;">{{ pb.player_name }}</div>
+                  <div style="font-size:0.78rem; color:var(--text-muted);">
+                    {{ pb.village_name }}{% if pb.village_coords %} <span style="opacity:0.6;">({{ pb.village_coords }})</span>{% endif %}
                   </div>
-                  <span style="font-size:0.78rem; color:var(--text-muted); white-space:nowrap;">{{ done }}/{{ total }}</span>
-                </div>
-              </td>
-              <td style="white-space:nowrap;">
-                <a href="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.6rem;">📋 Öffnen</a>
-                <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}/delete" style="display:inline;" onsubmit="return confirm('Blueprint für {{ pb.player_name }} löschen?')">
-                  <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.5rem;">🗑️</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                </td>
+                <td>
+                  {% if pb.tribe and pb.tribe in tribe_meta %}
+                  <span style="font-size:0.85rem;">{{ tribe_meta[pb.tribe].emoji }}</span>
+                  {% endif %}
+                  <span style="font-size:0.85rem;">{{ pb.template_name or '—' }}</span>
+                </td>
+                <td style="min-width:100px;">
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <div class="bp-progress-bar-wrap">
+                      <div class="bp-progress-bar-fill" style="width:{{ pct }}%;"></div>
+                    </div>
+                    <span style="font-size:0.78rem; color:var(--text-muted); white-space:nowrap;">{{ done }}/{{ total }}</span>
+                  </div>
+                </td>
+                <td style="white-space:nowrap;">
+                  <a href="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.6rem;">📋 Öffnen</a>
+                  <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}/delete" style="display:inline;" onsubmit="return confirm('Blueprint für {{ pb.player_name }} löschen?')">
+                    <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.5rem;">🗑️</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
+
     </div>
 
   </div>
@@ -195,13 +309,25 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeActivateModal()">×</button>
     <h3 id="activateModalTitle">✅ Blueprint aktivieren</h3>
-    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">
-      Der Blueprint wird direkt für deinen Account aktiviert. Du kannst deinen Fortschritt danach selbst abhaken.
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+      Der Blueprint wird direkt für deinen Account aktiviert. Du kannst ihn mehrfach aktivieren – z.B. für verschiedene Dörfer.
     </p>
     <form id="activateForm" method="post" action="#">
+
+      <!-- Village role chips -->
+      <div style="margin-bottom:0.5rem;">
+        <label class="form-label" style="margin-bottom:0.4rem; display:block;">Dorf-Rolle</label>
+        <div class="role-chips" id="roleChips">
+          <button type="button" class="role-chip" onclick="selectRole('Hauptdorf')">🏠 Hauptdorf</button>
+          <button type="button" class="role-chip" onclick="selectRole('Supportdorf')">🌾 Supportdorf</button>
+          <button type="button" class="role-chip" onclick="selectRole('Off-Dorf')">⚔️ Off-Dorf</button>
+          <button type="button" class="role-chip" onclick="selectRole('Def-Dorf')">🛡️ Def-Dorf</button>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Dorfname <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
-        <input type="text" name="village_name" class="form-control" placeholder="z.B. Hauptdorf">
+        <input type="text" name="village_name" id="activateVillageName" class="form-control" placeholder="z.B. Hauptdorf">
       </div>
       <div class="form-group">
         <label class="form-label">Koordinaten <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
@@ -280,12 +406,42 @@ document.getElementById('assignModal').addEventListener('click', function(e) {
     </div>
   </div>
 </div>
+
 <script>
-// ── Activate Modal ─────────────────────────────────────────
+// ── Tribe filter ────────────────────────────────────────
+const tribeSlugMap = {
+  'Germanen': 'germanen',
+  'Römer':    'roemer',
+  'Gallier':  'gallier',
+  'Ägypter':  'aegypter',
+  'Hunnen':   'hunnen',
+  'Natars':   'natars',
+};
+function filterTribe(tribe) {
+  // Update button states
+  document.querySelectorAll('.tribe-filter-btn').forEach(btn => btn.classList.remove('active'));
+  const slug = tribe === 'alle' ? 'alle' : (tribeSlugMap[tribe] || tribe.toLowerCase());
+  const activeBtn = document.querySelector('.tribe-filter-btn.' + slug);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Show/hide tribe sections
+  document.querySelectorAll('.bp-tribe-section').forEach(section => {
+    if (tribe === 'alle' || section.dataset.tribe === tribe) {
+      section.style.display = '';
+    } else {
+      section.style.display = 'none';
+    }
+  });
+}
+
+// ── Activate Modal ──────────────────────────────────────
 let _activateTemplateId = null;
 function openActivateModal(templateId, templateName) {
   _activateTemplateId = templateId;
   document.getElementById('activateModalTitle').textContent = '✅ Blueprint aktivieren: ' + templateName;
+  // Reset chips and village name
+  document.querySelectorAll('.role-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('activateVillageName').value = '';
   document.getElementById('activateModal').classList.add('open');
 }
 function closeActivateModal() {
@@ -298,6 +454,18 @@ document.getElementById('activateForm').addEventListener('submit', function(e) {
   this.action = '/guild/{{ guild.guild_id }}/blueprints/templates/' + _activateTemplateId + '/activate';
 });
 
+function selectRole(role) {
+  document.querySelectorAll('.role-chip').forEach(c => c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  const nameInput = document.getElementById('activateVillageName');
+  if (!nameInput.value || document.querySelector('.role-chip.was-preset')) {
+    nameInput.value = role;
+  } else {
+    nameInput.value = role;
+  }
+}
+
+// ── Preset Modal ────────────────────────────────────────
 function openPresetModal() {
   document.getElementById('presetModal').classList.add('open');
   fetch('/guild/{{ guild.guild_id }}/blueprints/presets')

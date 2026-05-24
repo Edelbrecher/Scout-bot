@@ -4822,6 +4822,7 @@ async def blueprints_main(request: Request, guild_id: str):
     by_tribe = _dd(list)
     for t in templates_list:
         by_tribe[t["tribe"]].append(t)
+    current_username = session.get("username", "") if session else ""
     return templates.TemplateResponse("blueprints.html", {
         "request": request,
         "guild": guild,
@@ -4829,6 +4830,7 @@ async def blueprints_main(request: Request, guild_id: str):
         "player_blueprints": player_bps,
         "all_templates": templates_list,
         "tribe_meta": TRIBE_META,
+        "current_username": current_username,
     })
 
 
