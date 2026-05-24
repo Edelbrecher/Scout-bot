@@ -221,60 +221,53 @@ def _run_ocr(img: "Image.Image") -> str:
     return text
 
 
+KNOWN_TRIBES = {"romans", "teutons", "gauls", "egyptians", "huns", "spartans",
+                "römer", "germanen", "gallier", "ägypter", "hunnen", "spartaner"}
+
+
 def _parse_ocr_text(text: str) -> dict:
     """Extrahiert Felder aus dem OCR-Text des Helden-Profil-Modals."""
     result: dict = {}
 
-    # Debug-Log (wird im Container sichtbar)
-    print(f"[hero_scout] OCR raw ({len(text)} chars):\n{text[:600]}", flush=True)
+    # Debug-Log
+    print(f"[hero_scout] OCR raw ({len(text)} chars):\n{text[:700]}", flush=True)
 
     # Serverzeit: "Server time: 13:24:33 (UTC +01:00)"
     m = re.search(r"Server\s+time[:\s]+(\d{1,2}:\d{2}:\d{2}[^\n]*)", text, re.IGNORECASE)
     if m:
         result["server_time"] = m.group(1).strip()
 
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-
-    # Spielername: steht im Modal-Header, vor "Details"
-    # Suche nach "Details" oder "Tribe" und nehme Zeilen davor
-    SKIP_WORDS = {"details", "tribe", "stamm", "alliance", "allianz", "villages",
-                  "dörfer", "gender", "geschlecht", "days", "location", "ranks",
-                  "population", "attacker", "defender", "hero", "server", "the"}
-    for i, line in enumerate(lines):
-        if line.lower() in ("tribe", "stamm", "details"):
-            for j in range(i - 1, max(i - 6, -1), -1):
-                c = lines[j].strip()
-                if (c and len(c) >= 2
-                        and c.lower() not in SKIP_WORDS
-                        and not re.match(r"^\d+$", c)
-                        and not re.match(r"server\s+time", c, re.IGNORECASE)):
-                    result["player_name"] = c
-                    break
-            break
-
-    # Stamm: Zeile nach "Tribe" (direkt oder mit Leerzeile)
-    m = re.search(r"Tribe\s*[\n:]\s*([A-Za-z]+)", text, re.IGNORECASE)
+    # Stamm — Label + Wert auf gleicher Zeile ODER Wert auf nächster Zeile
+    # "Tribe  Teutons" oder "Tribe\nTeutons" oder einfach nur "Teutons" in der Nähe
+    m = re.search(r"Tribe\s+(Romans?|Teutons?|Gauls?|Egyptians?|Huns?|Spartans?|"
+                  r"Römer|Germanen|Gallier|Ägypter|Hunnen|Spartaner)", text, re.IGNORECASE)
     if m:
         result["tribe"] = m.group(1).strip()
+    else:
+        # Fallback: bekannten Stammnamen irgendwo im Text suchen
+        for word in text.split():
+            if word.lower().rstrip(",.") in KNOWN_TRIBES:
+                result["tribe"] = word.rstrip(",.")
+                break
 
-    # Allianz: kann Buchstaben/Zahlen sein
-    m = re.search(r"Alliance\s*[\n:]\s*([A-Za-z0-9_\-]+)", text, re.IGNORECASE)
+    # Allianz — "Alliance LR" oder "Alliance\nHM"
+    m = re.search(r"Alliance\s+([A-Za-z0-9_\-]{1,20})", text, re.IGNORECASE)
     if m:
         val = m.group(1).strip()
-        if val.lower() not in ("not", "none", "—"):
+        if val.lower() not in ("not", "none", "—", "lial", "lia", "li"):
             result["alliance"] = val
 
-    # Dörfer — Zahl nach "Villages"
-    m = re.search(r"Villages\s*[\n:]\s*(\d+)", text, re.IGNORECASE)
+    # Dörfer — "Villages 8" oder "Villages\n12"
+    m = re.search(r"Villages\s+(\d+)", text, re.IGNORECASE)
     if m:
         result["villages"] = int(m.group(1))
 
-    # Heldenlevel — "Hero level\n68" oder "Hero level: 68"
-    m = re.search(r"Hero\s+level\s*[\n:]\s*(\d+)", text, re.IGNORECASE)
+    # Heldenlevel — "Hero level 41 44930 Experience"
+    m = re.search(r"Hero\s+level\s+(\d+)", text, re.IGNORECASE)
     if m:
         result["hero_level"] = int(m.group(1))
 
-    # Hero XP — "119862 Experience" oder "119,862 Experience"
+    # Hero XP — "44930 Experience" oder "119,862 Experience"
     m = re.search(r"([\d,\.]+)\s*Experience", text, re.IGNORECASE)
     if m:
         try:
@@ -282,17 +275,51 @@ def _parse_ocr_text(text: str) -> dict:
         except ValueError:
             pass
 
-    # Attacker Rang — "Attacker  21  29655 Points"
-    m = re.search(r"Attacker\s+(\d+)\s+[\d,]+\s*Points?", text, re.IGNORECASE)
+    # Attacker Rang — "Attacker 626 1880 Points"
+    m = re.search(r"Attacker\s+(\d+)\s+[\d,\.]+\s*Points?", text, re.IGNORECASE)
     if m:
         result["attacker_rank"] = int(m.group(1))
 
-    # Defender Rang
-    m = re.search(r"Defender\s+(\d+)\s+[\d,]+\s*Points?", text, re.IGNORECASE)
+    # Defender Rang — "Defender 2053 329 Points"
+    m = re.search(r"Defender\s+(\d+)\s+[\d,\.]+\s*Points?", text, re.IGNORECASE)
     if m:
         result["defender_rank"] = int(m.group(1))
 
     return result
+
+
+def _ocr_modal_header(img: "Image.Image") -> str:
+    """
+    Croppt nur den Modal-Titel-Bereich (Spielername) und liest ihn separat.
+    Der Name steht im dekorativen Header-Banner des Heldenprofil-Modals.
+    Bereich ca. x:435-950, y:125-170 (bei 1101×709 Vollbild).
+    """
+    w, h = img.size
+    sx = w / 1101
+    sy = h / 709
+    x1 = int(435 * sx); y1 = int(125 * sy)
+    x2 = int(955 * sx); y2 = int(172 * sy)
+    x1 = max(0, x1); y1 = max(0, y1)
+    x2 = min(w, x2); y2 = min(h, y2)
+    if x2 <= x1 or y2 <= y1:
+        return ""
+
+    crop = img.crop((x1, y1, x2, y2))
+    # 4× hochskalieren für kleinen Bereich
+    cw, ch = crop.size
+    crop = crop.resize((cw * 4, ch * 4), Image.LANCZOS)
+
+    from PIL import ImageEnhance, ImageOps
+    gray = crop.convert("L")
+    inverted = ImageOps.invert(gray)
+    enhancer = ImageEnhance.Contrast(inverted)
+    contrasted = enhancer.enhance(3.0)
+
+    # PSM 7 = einzelne Zeile
+    name_raw = pytesseract.image_to_string(contrasted, config="--psm 7 -l eng").strip()
+    name_clean = re.sub(r"[^A-Za-z0-9\-_|çÇğĞıİöÖşŞüÜáéíóúäåæøñ ]", "", name_raw).strip()
+    print(f"[hero_scout] Header OCR: '{name_raw}' → cleaned: '{name_clean}'", flush=True)
+    return name_clean
 
 
 def _crop_slots(img: "Image.Image") -> list[tuple[str, str]]:
@@ -403,6 +430,12 @@ class HeroScoutCog(commands.Cog):
                 ocr_text = _run_ocr(img)
                 parsed = _parse_ocr_text(ocr_text)
                 data.update(parsed)
+
+                # Spielername separat aus Modal-Header lesen
+                if not data.get("player_name"):
+                    header_name = _ocr_modal_header(img)
+                    if header_name and len(header_name) >= 2:
+                        data["player_name"] = header_name
 
                 # Slot-Crops
                 raw_slots = _crop_slots(img)
