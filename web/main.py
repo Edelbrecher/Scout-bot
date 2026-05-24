@@ -616,12 +616,31 @@ async def login(request: Request, username: str = Form(...), password: str = For
     return RedirectResponse("/login?error=Invalid+credentials", status_code=303)
 
 
+import hmac as _hmac
+import hashlib as _hashlib
+
+def _make_oauth_state() -> str:
+    """Generate a self-validating HMAC state — no cookie needed."""
+    nonce = secrets.token_hex(20)
+    sig = _hmac.new(SECRET_KEY.encode(), nonce.encode(), _hashlib.sha256).hexdigest()[:24]
+    return f"{nonce}.{sig}"
+
+def _verify_oauth_state(state: str) -> bool:
+    """Verify a self-validating HMAC state."""
+    try:
+        nonce, sig = state.rsplit(".", 1)
+        expected = _hmac.new(SECRET_KEY.encode(), nonce.encode(), _hashlib.sha256).hexdigest()[:24]
+        return secrets.compare_digest(expected, sig)
+    except Exception:
+        return False
+
+
 @app.get("/auth/discord")
 async def auth_discord(request: Request):
     client_id = get_client_id()
     if not client_id or not DISCORD_CLIENT_SECRET:
         return RedirectResponse("/login?error=Discord+OAuth2+not+configured")
-    state = request.cookies.get("oauth_state") or secrets.token_urlsafe(32)
+    state = _make_oauth_state()
     params = urlencode({
         "client_id": client_id,
         "redirect_uri": DISCORD_REDIRECT_URI,
@@ -629,9 +648,7 @@ async def auth_discord(request: Request):
         "scope": "identify guilds",
         "state": state,
     })
-    response = RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
-    response.set_cookie("oauth_state", state, max_age=300, httponly=True, samesite="lax", secure=True)
-    return response
+    return RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
 
 
 @app.get("/auth/callback")
@@ -641,9 +658,8 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
         await database.log_auth(status="cancelled", ip=_ip, detail=error or "no_code")
         return RedirectResponse("/login?error=Discord+authentication+cancelled")
 
-    # Validate OAuth state to prevent CSRF
-    expected_state = request.cookies.get("oauth_state", "")
-    if not expected_state or not secrets.compare_digest(expected_state, state):
+    # Validate OAuth state (HMAC-signed, no cookie needed)
+    if not state or not _verify_oauth_state(state):
         await database.log_auth(status="csrf_error", ip=_ip, detail="state_mismatch")
         return RedirectResponse("/login?error=Invalid+OAuth+state.+Please+try+again.")
 
