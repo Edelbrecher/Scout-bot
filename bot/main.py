@@ -29,6 +29,7 @@ class ScouterBot(commands.Bot):
         await self.load_extension("cogs.poll")
         await self.load_extension("cogs.attacks")
         await self.load_extension("cogs.hub")
+        await self.load_extension("cogs.hero_scout")
         await self.tree.sync()
         print("Slash commands synced.")
 
@@ -353,11 +354,58 @@ async def handle_check_permissions(request: aiohttp_web.Request) -> aiohttp_web.
     return aiohttp_web.json_response({"ok": True, "issues": issues})
 
 
+async def handle_list_channels(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Return text channels for a guild so the web dashboard can offer a dropdown."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "channels": []})
+
+    channels = [
+        {"id": str(ch.id), "name": ch.name}
+        for ch in guild.text_channels
+        if ch.permissions_for(guild.me).view_channel
+    ]
+    return aiohttp_web.json_response({"ok": True, "channels": channels})
+
+
+async def handle_set_hero_scout_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Called by web container to configure the hero-scout channel."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+        channel_id = str(data.get("channel_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not guild_id or not channel_id:
+        return aiohttp_web.json_response({"ok": False, "error": "guild_id and channel_id required"}, status=400)
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    channel = guild.get_channel(int(channel_id))
+    channel_name = channel.name if channel else channel_id
+
+    from cogs.hero_scout import set_hero_scout_channel
+    await set_hero_scout_channel(guild_id, channel_id, channel_name, "web")
+
+    return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "channel_name": channel_name})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
     app.router.add_post("/api/create-request-hub", handle_create_request_hub)
     app.router.add_post("/api/check-permissions", handle_check_permissions)
+    app.router.add_post("/api/set-hero-scout-channel", handle_set_hero_scout_channel)
+    app.router.add_post("/api/list-channels", handle_list_channels)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

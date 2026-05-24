@@ -5251,6 +5251,151 @@ async def hero_tasks_page(request: Request, guild_id: str):
     })
 
 
+
+# ── Hero Scout ────────────────────────────────────────────────────────────────
+
+HERO_SCOUT_IMAGES_DIR = Path("/app/data/hero_scout_images")
+
+async def _get_hero_scout_channel(guild_id: str) -> str | None:
+    import aiosqlite
+    db_path = Path("/app/data/scouter.db")
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT channel_id FROM hero_scout_channels WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+async def _get_hero_scout_entries(guild_id: str) -> list:
+    import aiosqlite
+    db_path = Path("/app/data/scouter.db")
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        # Nur den neuesten Eintrag pro Spieler
+        async with db.execute("""
+            SELECT e.*, GROUP_CONCAT(s.img_hash ORDER BY s.slot_index) as slot_hashes,
+                   GROUP_CONCAT(s.image_path ORDER BY s.slot_index, '|||') as slot_paths
+            FROM hero_scout_entries e
+            LEFT JOIN hero_scout_slots s ON s.entry_id = e.id
+            WHERE e.id IN (
+                SELECT MAX(id) FROM hero_scout_entries
+                WHERE guild_id=? GROUP BY lower(player_name)
+            )
+            GROUP BY e.id
+            ORDER BY e.created_at DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+async def _get_hero_scout_history(guild_id: str, player_name: str) -> list:
+    import aiosqlite
+    db_path = Path("/app/data/scouter.db")
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT e.*, GROUP_CONCAT(s.image_path, '|||') as slot_paths_raw
+            FROM hero_scout_entries e
+            LEFT JOIN hero_scout_slots s ON s.entry_id = e.id
+            WHERE e.guild_id=? AND lower(e.player_name)=lower(?)
+            GROUP BY e.id
+            ORDER BY e.created_at DESC
+            LIMIT 20
+        """, (guild_id, player_name)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+async def _get_discord_channels(guild_id: str) -> list:
+    """Fragt die Bot-API nach verfügbaren Text-Channels."""
+    bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.post(f"{bot_api}/api/list-channels", json={"guild_id": guild_id})
+            if r.status_code == 200:
+                return r.json().get("channels", [])
+    except Exception:
+        pass
+    return []
+
+
+@app.get("/guild/{guild_id}/defense/hero-scout", response_class=HTMLResponse)
+async def hero_scout_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    entries = await _get_hero_scout_entries(guild_id)
+    scout_channel = await _get_hero_scout_channel(guild_id)
+
+    return templates.TemplateResponse("hero_scout.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "entries": entries,
+        "scout_channel": scout_channel,
+        "flash": request.query_params.get("flash", ""),
+    })
+
+
+@app.get("/guild/{guild_id}/defense/hero-scout/{player_name}", response_class=HTMLResponse)
+async def hero_scout_detail(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    history = await _get_hero_scout_history(guild_id, player_name)
+    return templates.TemplateResponse("hero_scout_detail.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "player_name": player_name,
+        "history": history,
+    })
+
+
+@app.post("/guild/{guild_id}/defense/hero-scout/set-channel")
+async def hero_scout_set_channel(request: Request, guild_id: str, channel_id: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.post(f"{bot_api}/api/set-hero-scout-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id})
+            if r.status_code == 200:
+                return RedirectResponse(
+                    f"/guild/{guild_id}/defense/hero-scout?flash=channel_saved",
+                    status_code=303
+                )
+    except Exception as e:
+        pass
+    return RedirectResponse(
+        f"/guild/{guild_id}/defense/hero-scout?flash=channel_error",
+        status_code=303
+    )
+
+
+@app.get("/guild/{guild_id}/defense/hero-scout/img/{entry_id}/{slot_name}")
+async def hero_scout_slot_image(request: Request, guild_id: str, entry_id: int, slot_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    path = HERO_SCOUT_IMAGES_DIR / guild_id / str(entry_id) / f"{slot_name}.png"
+    if not path.exists():
+        return Response(status_code=404)
+    return FileResponse(str(path), media_type="image/png")
+
+
 @app.get("/guild/{guild_id}/tools/crop-calculator", response_class=HTMLResponse)
 async def crop_calculator_page(request: Request, guild_id: str):
     session, err = _require_session(request)

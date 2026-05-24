@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Helden-Scout · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Verteidigung</a>
+      <h1 style="margin:0.25rem 0 0;">🗡️ Helden-Scout</h1>
+      <p class="subtitle" style="margin:0;">Gegnerische Helden beobachten — Ausrüstungsänderungen erkennen</p>
+    </div>
+  </div>
+
+  {% if flash == 'channel_saved' %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Scout-Channel gespeichert.</div>
+  {% elif flash == 'channel_error' %}
+  <div class="alert alert-danger" style="margin-bottom:1rem;">❌ Fehler beim Speichern — Bot erreichbar?</div>
+  {% endif %}
+
+  <!-- Channel-Konfiguration -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;">📡 Discord Channel konfigurieren</h2>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 0.75rem;">
+      Wähle den Discord-Channel aus, in dem Helden-Screenshots gepostet werden.
+      Der Bot liest die Screenshots automatisch aus.
+      {% if scout_channel %}
+      <br><span style="color:#22c55e;">✅ Aktuell konfiguriert: Channel-ID <code>{{ scout_channel }}</code></span>
+      {% else %}
+      <br><span style="color:#f59e0b;">⚠️ Noch kein Channel konfiguriert.</span>
+      {% endif %}
+    </p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/set-channel"
+          style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+      <div style="flex:1;min-width:200px;">
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Channel-ID (aus Discord kopieren)</label>
+        <input type="text" name="channel_id"
+               value="{{ scout_channel or '' }}"
+               placeholder="z.B. 1234567890123456789"
+               style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
+      </div>
+      <button type="submit"
+              style="padding:0.5rem 1.25rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);border-radius:8px;color:#93c5fd;font-weight:600;cursor:pointer;white-space:nowrap;">
+        💾 Speichern
+      </button>
+    </form>
+    <p style="font-size:0.78rem;color:var(--text-muted);margin:0.5rem 0 0;">
+      💡 Tipp: Alternativ direkt im Discord mit <code>/hero-scout-setup #channel</code>.
+    </p>
+  </div>
+
+  <!-- Spieler-Übersicht -->
+  {% if entries %}
+  <h2 style="font-size:1rem;margin-bottom:0.75rem;color:var(--text-muted);">
+    👥 Beobachtete Helden ({{ entries|length }})
+  </h2>
+  <div style="display:grid;gap:0.75rem;">
+    {% for e in entries %}
+    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/{{ e.player_name | urlencode }}"
+       style="text-decoration:none;color:inherit;">
+      <div class="card" style="cursor:pointer;transition:border-color 0.15s;
+        {% if e.changed %}border-left:3px solid #f59e0b;{% else %}border-left:3px solid rgba(59,130,246,0.3);{% endif %}">
+
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div style="font-size:1.2rem;">🗡️</div>
+            <div>
+              <div style="font-weight:700;font-size:1rem;">
+                {{ e.player_name }}
+                {% if e.changed %}
+                <span style="font-size:0.72rem;background:rgba(245,158,11,0.15);color:#f59e0b;
+                      border-radius:4px;padding:0.1rem 0.5rem;margin-left:0.4rem;font-weight:700;">
+                  ⚠️ Ausrüstung geändert
+                </span>
+                {% endif %}
+              </div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.1rem;">
+                {{ e.tribe or '?' }} · {{ e.alliance or '?' }} · Lvl {{ e.hero_level or '?' }}
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align:right;font-size:0.78rem;color:var(--text-muted);">
+            <div>{{ e.created_at[:16].replace('T',' ') }} UTC</div>
+            <div style="margin-top:0.15rem;">
+              von {{ e.reporter_name or '?' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Item-Slot-Vorschau -->
+        <div style="display:flex;gap:0.4rem;margin-top:0.75rem;flex-wrap:wrap;">
+          {% for slot_name in ['helm','armor','boots','weapon','mount','misc'] %}
+          <div style="width:44px;height:44px;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:rgba(0,0,0,0.3);">
+            <img src="/guild/{{ guild.guild_id }}/defense/hero-scout/img/{{ e.id }}/{{ slot_name }}"
+                 style="width:100%;height:100%;object-fit:cover;"
+                 onerror="this.style.display='none';this.parentNode.innerHTML='<div style=\'text-align:center;line-height:44px;font-size:1.1rem;\'>—</div>'">
+          </div>
+          {% endfor %}
+          <div style="display:flex;align-items:center;gap:0.3rem;margin-left:0.5rem;">
+            <span style="font-size:0.72rem;color:var(--text-muted);">
+              Helm · Rüstung · Schuhe · Waffe · Pferd · Sonstiges
+            </span>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div style="display:flex;gap:1.5rem;margin-top:0.6rem;flex-wrap:wrap;">
+          {% if e.villages %}
+          <div>
+            <span style="font-size:0.7rem;color:var(--text-muted);">Dörfer</span>
+            <span style="font-size:0.85rem;font-weight:600;margin-left:0.3rem;">{{ e.villages }}</span>
+          </div>
+          {% endif %}
+          {% if e.attacker_rank %}
+          <div>
+            <span style="font-size:0.7rem;color:var(--text-muted);">Attacker</span>
+            <span style="font-size:0.85rem;font-weight:600;margin-left:0.3rem;color:#f87171;">Rang {{ e.attacker_rank }}</span>
+          </div>
+          {% endif %}
+          {% if e.defender_rank %}
+          <div>
+            <span style="font-size:0.7rem;color:var(--text-muted);">Defender</span>
+            <span style="font-size:0.85rem;font-weight:600;margin-left:0.3rem;color:#93c5fd;">Rang {{ e.defender_rank }}</span>
+          </div>
+          {% endif %}
+          {% if e.server_time %}
+          <div>
+            <span style="font-size:0.7rem;color:var(--text-muted);">Screenshot-Zeit</span>
+            <span style="font-size:0.85rem;margin-left:0.3rem;color:var(--text-muted);">{{ e.server_time }}</span>
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="card" style="text-align:center;padding:2.5rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">🗡️</div>
+    <div style="font-weight:600;font-size:1.05rem;margin-bottom:0.4rem;">Noch keine Helden gescannt</div>
+    <div style="font-size:0.85rem;color:var(--text-muted);max-width:420px;margin:0 auto;">
+      Konfiguriere oben den Discord-Channel und poste dann Helden-Screenshots dort.
+      Der Bot erkennt automatisch Spielernamen, Stamm, Level und Ausrüstungsänderungen.
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
