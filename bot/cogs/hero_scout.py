@@ -184,63 +184,111 @@ async def save_slot(entry_id: int, guild_id: str, idx: int, name: str, path: str
 # OCR + Bild-Verarbeitung
 # ------------------------------------------------------------------
 
+def _preprocess_for_ocr(img: "Image.Image") -> "Image.Image":
+    """
+    Bereitet ein Screenshot-Bild für Tesseract vor.
+    Travian: heller Text auf dunklem Hintergrund → invertieren + kontrastverstärken.
+    """
+    from PIL import ImageEnhance, ImageFilter, ImageOps
+
+    # 2× hochskalieren (Tesseract mag größere Bilder)
+    w, h = img.size
+    img = img.resize((w * 2, h * 2), Image.LANCZOS)
+
+    # Graustufen
+    gray = img.convert("L")
+
+    # Invertieren: heller Text auf dunklem BG → dunkler Text auf hellem BG
+    inverted = ImageOps.invert(gray)
+
+    # Kontrast stark erhöhen
+    enhancer = ImageEnhance.Contrast(inverted)
+    contrasted = enhancer.enhance(2.5)
+
+    return contrasted
+
+
+def _run_ocr(img: "Image.Image") -> str:
+    """Führt Tesseract mit optimalen Einstellungen für Travian-Screenshots aus."""
+    processed = _preprocess_for_ocr(img)
+    # PSM 4: einzelne Textspalte (passt gut zum Modal-Layout)
+    # PSM 11: sparse text (wenn 4 nichts liefert, als Fallback)
+    config = "--psm 4 -l eng"
+    text = pytesseract.image_to_string(processed, config=config)
+    if len(text.strip()) < 20:
+        # Fallback: sparse text mode
+        text = pytesseract.image_to_string(processed, config="--psm 11 -l eng")
+    return text
+
+
 def _parse_ocr_text(text: str) -> dict:
     """Extrahiert Felder aus dem OCR-Text des Helden-Profil-Modals."""
     result: dict = {}
 
+    # Debug-Log (wird im Container sichtbar)
+    print(f"[hero_scout] OCR raw ({len(text)} chars):\n{text[:600]}", flush=True)
+
     # Serverzeit: "Server time: 13:24:33 (UTC +01:00)"
-    m = re.search(r"Server time[:\s]+(\d{1,2}:\d{2}:\d{2}[^\n]*)", text, re.IGNORECASE)
+    m = re.search(r"Server\s+time[:\s]+(\d{1,2}:\d{2}:\d{2}[^\n]*)", text, re.IGNORECASE)
     if m:
         result["server_time"] = m.group(1).strip()
 
-    # Spielername: Zeile direkt nach "Details" oder erste Großbuchstaben-Zeile im Modal
-    # Fallback: Versuche die erste Zeile die nach dem Trennbereich kommt
-    # Der Name erscheint im Modal-Titel (oft in Großbuchstaben bei HEMSINLI)
     lines = [l.strip() for l in text.split("\n") if l.strip()]
 
-    # Suche nach "Tribe" und nehme die Zeile davor als Namen
+    # Spielername: steht im Modal-Header, vor "Details"
+    # Suche nach "Details" oder "Tribe" und nehme Zeilen davor
+    SKIP_WORDS = {"details", "tribe", "stamm", "alliance", "allianz", "villages",
+                  "dörfer", "gender", "geschlecht", "days", "location", "ranks",
+                  "population", "attacker", "defender", "hero", "server", "the"}
     for i, line in enumerate(lines):
-        if line.lower() in ("tribe", "stamm"):
-            # Name ist 2-3 Zeilen davor
-            for j in range(i - 1, max(i - 5, -1), -1):
-                candidate = lines[j].strip()
-                if candidate and len(candidate) >= 2 and candidate not in ("Details", "Ranks and level", ""):
-                    result["player_name"] = candidate
+        if line.lower() in ("tribe", "stamm", "details"):
+            for j in range(i - 1, max(i - 6, -1), -1):
+                c = lines[j].strip()
+                if (c and len(c) >= 2
+                        and c.lower() not in SKIP_WORDS
+                        and not re.match(r"^\d+$", c)
+                        and not re.match(r"server\s+time", c, re.IGNORECASE)):
+                    result["player_name"] = c
                     break
             break
 
-    # Stamm: Zeile nach "Tribe"
-    m = re.search(r"Tribe\s*\n\s*(.+)", text, re.IGNORECASE)
+    # Stamm: Zeile nach "Tribe" (direkt oder mit Leerzeile)
+    m = re.search(r"Tribe\s*[\n:]\s*([A-Za-z]+)", text, re.IGNORECASE)
     if m:
         result["tribe"] = m.group(1).strip()
 
-    # Allianz: Zeile nach "Alliance"
-    m = re.search(r"Alliance\s*\n\s*(.+)", text, re.IGNORECASE)
+    # Allianz: kann Buchstaben/Zahlen sein
+    m = re.search(r"Alliance\s*[\n:]\s*([A-Za-z0-9_\-]+)", text, re.IGNORECASE)
     if m:
-        result["alliance"] = m.group(1).strip()
+        val = m.group(1).strip()
+        if val.lower() not in ("not", "none", "—"):
+            result["alliance"] = val
 
-    # Dörfer
-    m = re.search(r"Villages\s*\n\s*(\d+)", text, re.IGNORECASE)
+    # Dörfer — Zahl nach "Villages"
+    m = re.search(r"Villages\s*[\n:]\s*(\d+)", text, re.IGNORECASE)
     if m:
         result["villages"] = int(m.group(1))
 
-    # Heldenlevel
-    m = re.search(r"Hero level\s*\n\s*(\d+)", text, re.IGNORECASE)
+    # Heldenlevel — "Hero level\n68" oder "Hero level: 68"
+    m = re.search(r"Hero\s+level\s*[\n:]\s*(\d+)", text, re.IGNORECASE)
     if m:
         result["hero_level"] = int(m.group(1))
 
-    # Hero XP (steht in gleicher Zeile wie Hero level)
-    m = re.search(r"(\d[\d,\.]+)\s*Experience", text, re.IGNORECASE)
+    # Hero XP — "119862 Experience" oder "119,862 Experience"
+    m = re.search(r"([\d,\.]+)\s*Experience", text, re.IGNORECASE)
     if m:
-        result["hero_xp"] = int(m.group(1).replace(",", "").replace(".", ""))
+        try:
+            result["hero_xp"] = int(m.group(1).replace(",", "").replace(".", ""))
+        except ValueError:
+            pass
 
-    # Attacker Rang
-    m = re.search(r"Attacker\s+(\d+)\s+\d+ Points", text, re.IGNORECASE)
+    # Attacker Rang — "Attacker  21  29655 Points"
+    m = re.search(r"Attacker\s+(\d+)\s+[\d,]+\s*Points?", text, re.IGNORECASE)
     if m:
         result["attacker_rank"] = int(m.group(1))
 
     # Defender Rang
-    m = re.search(r"Defender\s+(\d+)\s+\d+ Points", text, re.IGNORECASE)
+    m = re.search(r"Defender\s+(\d+)\s+[\d,]+\s*Points?", text, re.IGNORECASE)
     if m:
         result["defender_rank"] = int(m.group(1))
 
@@ -351,8 +399,8 @@ class HeroScoutCog(commands.Cog):
             try:
                 img = Image.open(io.BytesIO(img_bytes))
 
-                # OCR
-                ocr_text = pytesseract.image_to_string(img, config="--psm 6")
+                # OCR mit Preprocessing
+                ocr_text = _run_ocr(img)
                 parsed = _parse_ocr_text(ocr_text)
                 data.update(parsed)
 
