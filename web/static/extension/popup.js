@@ -340,7 +340,7 @@ function tickAlarms(alarms) {
     const a = alarms[i];
     const miniEl = document.getElementById(`alarmCountdown${i}`);
 
-    if (!a.enabled || !a.time) {
+    if (!a || !a.enabled || !a.time) {
       miniEl.textContent = '–';
       continue;
     }
