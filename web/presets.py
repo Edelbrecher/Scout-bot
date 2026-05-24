@@ -1,7 +1,7 @@
 PRESET_BLUEPRINTS = [
     {
         "name": "Siedeln Route — Standard",
-        "tribe": "alle",
+        "tribe": "alle",  # shown under "Alle Stämme"
         "description": "Klassische Siedeln-Route für einen effizienten Start ins Runde. Ziel: 3. Dorf so schnell wie möglich.",
         "steps": [
             {"step": 1, "title": "Das erste Abenteuer machen", "target": "", "notes": ""},
@@ -80,7 +80,7 @@ PRESET_BLUEPRINTS = [
     },
     {
         "name": "4 Party Hero Farming — Germanen (T4.6)",
-        "tribe": "germanen",
+        "tribe": "Teutons",
         "description": "Effizienter Siedeln-Guide für Germanen mit 4 Festen. Fokus auf Hero-Raiding & Sim. Ziel: Siedeln in ~105-120h.",
         "steps": [
             {"step": 1, "title": "Held auf kürzestes Abenteuer schicken für Pferd, dann Tiere farmen", "target": "", "notes": "25% Ressproduktions-Bonus aktivieren sobald verfügbar"},

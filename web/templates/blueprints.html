@@ -127,13 +127,10 @@
 
   <!-- Tribe filter bar -->
   <div class="tribe-filter-bar" id="tribeFilterBar">
-    <button class="tribe-filter-btn alle active" onclick="filterTribe('alle')">Alle</button>
-    <button class="tribe-filter-btn germanen" onclick="filterTribe('Germanen')">🪓 Germanen</button>
-    <button class="tribe-filter-btn roemer" onclick="filterTribe('Römer')">🛡️ Römer</button>
-    <button class="tribe-filter-btn gallier" onclick="filterTribe('Gallier')">🏹 Gallier</button>
-    <button class="tribe-filter-btn aegypter" onclick="filterTribe('Ägypter')">🔱 Ägypter</button>
-    <button class="tribe-filter-btn hunnen" onclick="filterTribe('Hunnen')">🐴 Hunnen</button>
-    <button class="tribe-filter-btn natars" onclick="filterTribe('Natars')">⚙️ Natars</button>
+    <button class="tribe-filter-btn active" data-filter="__all__" onclick="filterTribe('__all__')">🌍 Alle</button>
+    {% for tribe_key, tribe_info in tribe_meta.items() %}
+    <button class="tribe-filter-btn" data-filter="{{ tribe_key }}" onclick="filterTribe('{{ tribe_key }}')">{{ tribe_info.emoji }} {{ tribe_info.label }}</button>
+    {% endfor %}
   </div>
 
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
@@ -424,13 +421,12 @@ const tribeSlugMap = {
 function filterTribe(tribe) {
   // Update button states
   document.querySelectorAll('.tribe-filter-btn').forEach(btn => btn.classList.remove('active'));
-  const slug = tribe === 'alle' ? 'alle' : (tribeSlugMap[tribe] || tribe.toLowerCase());
-  const activeBtn = document.querySelector('.tribe-filter-btn.' + slug);
+  const activeBtn = document.querySelector(`.tribe-filter-btn[data-filter="${tribe}"]`);
   if (activeBtn) activeBtn.classList.add('active');
 
   // Show/hide tribe sections
   document.querySelectorAll('.bp-tribe-section').forEach(section => {
-    if (tribe === 'alle' || section.dataset.tribe === tribe) {
+    if (tribe === '__all__' || section.dataset.tribe === tribe) {
       section.style.display = '';
     } else {
       section.style.display = 'none';

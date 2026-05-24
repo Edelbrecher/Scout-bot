@@ -4798,12 +4798,13 @@ async def alliance_members_clear(request: Request, guild_id: str):
 # ---------------------------------------------------------------------------
 
 TRIBE_META = {
-    "Romans":   {"emoji": "🏛️", "label": "Römer",    "color": "#e2b96f"},
-    "Teutons":  {"emoji": "⚔️",  "label": "Teutonen", "color": "#ef4444"},
-    "Gauls":    {"emoji": "🌿", "label": "Gallier",  "color": "#22c55e"},
-    "Egyptians":{"emoji": "🏺", "label": "Ägypter",  "color": "#f59e0b"},
-    "Huns":     {"emoji": "🏹", "label": "Hunnen",   "color": "#8b5cf6"},
-    "Spartans": {"emoji": "🛡️", "label": "Spartaner","color": "#3b82f6"},
+    "alle":      {"emoji": "🌍", "label": "Alle Stämme", "color": "#94a3b8"},
+    "Romans":    {"emoji": "🏛️", "label": "Römer",       "color": "#e2b96f"},
+    "Teutons":   {"emoji": "⚔️",  "label": "Germanen",    "color": "#ef4444"},
+    "Gauls":     {"emoji": "🌿", "label": "Gallier",     "color": "#22c55e"},
+    "Egyptians": {"emoji": "🏺", "label": "Ägypter",     "color": "#f59e0b"},
+    "Huns":      {"emoji": "🏹", "label": "Hunnen",      "color": "#8b5cf6"},
+    "Spartans":  {"emoji": "🛡️", "label": "Spartaner",   "color": "#3b82f6"},
 }
 
 
