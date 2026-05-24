@@ -127,9 +127,12 @@
 
   <!-- Tribe filter bar -->
   <div class="tribe-filter-bar" id="tribeFilterBar">
-    <button class="tribe-filter-btn active" data-filter="__all__" onclick="filterTribe('__all__')">🌍 Alle</button>
+    <button class="tribe-filter-btn active" data-filter="__all__" data-color="#94a3b8"
+      onclick="filterTribe('__all__')" style="border-color:#94a3b8;color:#94a3b8;">🌍 Alle</button>
     {% for tribe_key, tribe_info in tribe_meta.items() %}
-    <button class="tribe-filter-btn" data-filter="{{ tribe_key }}" onclick="filterTribe('{{ tribe_key }}')">{{ tribe_info.emoji }} {{ tribe_info.label }}</button>
+    <button class="tribe-filter-btn" data-filter="{{ tribe_key }}" data-color="{{ tribe_info.color }}"
+      onclick="filterTribe('{{ tribe_key }}')"
+      style="border-color:{{ tribe_info.color }};color:{{ tribe_info.color }};">{{ tribe_info.emoji }} {{ tribe_info.label }}</button>
     {% endfor %}
   </div>
 
@@ -419,10 +422,23 @@ const tribeSlugMap = {
   'Natars':   'natars',
 };
 function filterTribe(tribe) {
-  // Update button states
-  document.querySelectorAll('.tribe-filter-btn').forEach(btn => btn.classList.remove('active'));
+  // Reset all buttons to outline style
+  document.querySelectorAll('.tribe-filter-btn').forEach(btn => {
+    btn.classList.remove('active');
+    const c = btn.dataset.color || '#94a3b8';
+    btn.style.background = 'transparent';
+    btn.style.borderColor = c;
+    btn.style.color = c;
+  });
+  // Highlight active button
   const activeBtn = document.querySelector(`.tribe-filter-btn[data-filter="${tribe}"]`);
-  if (activeBtn) activeBtn.classList.add('active');
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    const c = activeBtn.dataset.color || '#94a3b8';
+    activeBtn.style.background = c;
+    activeBtn.style.borderColor = c;
+    activeBtn.style.color = '#fff';
+  }
 
   // Show/hide tribe sections
   document.querySelectorAll('.bp-tribe-section').forEach(section => {
