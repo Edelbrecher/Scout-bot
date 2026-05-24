@@ -439,6 +439,9 @@ let _activateTemplateId = null;
 function openActivateModal(templateId, templateName) {
   _activateTemplateId = templateId;
   document.getElementById('activateModalTitle').textContent = '✅ Blueprint aktivieren: ' + templateName;
+  // Set form action immediately (not in submit handler to avoid race conditions)
+  document.getElementById('activateForm').action =
+    '/guild/{{ guild.guild_id }}/blueprints/templates/' + templateId + '/activate';
   // Reset chips and village name
   document.querySelectorAll('.role-chip').forEach(c => c.classList.remove('selected'));
   document.getElementById('activateVillageName').value = '';
@@ -449,9 +452,6 @@ function closeActivateModal() {
 }
 document.getElementById('activateModal').addEventListener('click', function(e) {
   if (e.target === this) closeActivateModal();
-});
-document.getElementById('activateForm').addEventListener('submit', function(e) {
-  this.action = '/guild/{{ guild.guild_id }}/blueprints/templates/' + _activateTemplateId + '/activate';
 });
 
 function selectRole(role) {

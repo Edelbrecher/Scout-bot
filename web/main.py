@@ -4987,11 +4987,6 @@ async def blueprint_self_activate(
     """Allow any logged-in user to activate a blueprint for themselves."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    err = await _require_premium(guild, guild_id)
-    if err: return err
     player_name = session.get("username", "Unbekannt")
     tmpl = await database.get_blueprint_template(template_id, guild_id)
     if not tmpl:
