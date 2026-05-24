@@ -29,6 +29,24 @@ body {
   border-bottom: 1px solid rgba(245, 158, 11, 0.25);
 }
 
+.lang-btn {
+  margin-left: auto;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.lang-btn:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #f59e0b;
+}
+
 .logo {
   font-size: 24px;
   filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.7));

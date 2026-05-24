@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,13 +11,14 @@
     <div class="header">
       <div class="logo">🌾</div>
       <h1>TravOps Timer</h1>
+      <button id="langToggleBtn" class="lang-btn">🌐 DE</button>
     </div>
 
     <!-- Tab Navigation -->
     <div class="tabs">
-      <button class="tab active" id="tabTimer" data-tab="timer">⏱ Timer 1</button>
-      <button class="tab" id="tabTimer2" data-tab="timer2">⏱ Timer 2</button>
-      <button class="tab" id="tabAlarm" data-tab="alarm">🔔 Uhrzeiten</button>
+      <button class="tab active" id="tabTimer" data-tab="timer" data-i18n="tab_timer1">⏱ Timer 1</button>
+      <button class="tab" id="tabTimer2" data-tab="timer2" data-i18n="tab_timer2">⏱ Timer 2</button>
+      <button class="tab" id="tabAlarm" data-tab="alarm" data-i18n="tab_alarm">🔔 Alarms</button>
     </div>
 
     <!-- ===== TAB: TIMER 1 ===== -->
@@ -30,48 +31,48 @@
             <circle class="ring-progress" id="ringProgress" cx="60" cy="60" r="52"/>
           </svg>
           <div class="time-text" id="timeText">00:00</div>
-          <div class="time-label" id="timeLabel">Kein Timer</div>
+          <div class="time-label" id="timeLabel" data-i18n="no_timer">No Timer</div>
         </div>
       </div>
 
       <div class="input-section" id="inputSection">
-        <label class="section-label">Timer einstellen</label>
+        <label class="section-label" data-i18n="set_timer">Set Timer</label>
         <div class="time-inputs">
           <div class="input-group">
             <input type="number" id="inputHours" min="0" max="99" value="0" placeholder="0">
-            <span class="input-label">Std</span>
+            <span class="input-label" data-i18n="label_h">h</span>
           </div>
           <div class="separator">:</div>
           <div class="input-group">
             <input type="number" id="inputMinutes" min="0" max="59" value="0" placeholder="0">
-            <span class="input-label">Min</span>
+            <span class="input-label" data-i18n="label_min">min</span>
           </div>
           <div class="separator">:</div>
           <div class="input-group">
             <input type="number" id="inputSeconds" min="0" max="59" value="0" placeholder="0">
-            <span class="input-label">Sek</span>
+            <span class="input-label" data-i18n="label_sec">s</span>
           </div>
         </div>
         <div class="loop-toggle">
           <label class="toggle-label">
             <input type="checkbox" id="loopCheckbox" checked>
             <span class="toggle-switch"></span>
-            <span class="toggle-text">Loop (automatisch wiederholen)</span>
+            <span class="toggle-text" data-i18n="loop_label">Loop (auto repeat)</span>
           </label>
         </div>
       </div>
 
       <div class="controls">
         <button class="btn btn-start" id="btnStart">
-          <span class="btn-icon">▶</span> Starten
+          <span class="btn-icon">▶</span> <span data-i18n="btn_start">Start</span>
         </button>
         <button class="btn btn-stop hidden" id="btnStop">
-          <span class="btn-icon">■</span> Stoppen
+          <span class="btn-icon">■</span> <span data-i18n="btn_stop">Stop</span>
         </button>
       </div>
 
       <div class="status-bar">
-        <span id="statusText">Bereit</span>
+        <span id="statusText" data-i18n="status_ready">Ready</span>
       </div>
 
     </div>
@@ -86,63 +87,62 @@
             <circle class="ring-progress ring-progress-2" id="ringProgress2" cx="60" cy="60" r="52"/>
           </svg>
           <div class="time-text" id="timeText2">00:00</div>
-          <div class="time-label" id="timeLabel2">Kein Timer</div>
+          <div class="time-label" id="timeLabel2" data-i18n="no_timer">No Timer</div>
         </div>
       </div>
 
       <div class="input-section" id="inputSection2">
-        <label class="section-label">Timer einstellen</label>
+        <label class="section-label" data-i18n="set_timer">Set Timer</label>
         <div class="time-inputs">
           <div class="input-group">
             <input type="number" id="inputHours2" min="0" max="99" value="0" placeholder="0">
-            <span class="input-label">Std</span>
+            <span class="input-label" data-i18n="label_h">h</span>
           </div>
           <div class="separator">:</div>
           <div class="input-group">
             <input type="number" id="inputMinutes2" min="0" max="59" value="0" placeholder="0">
-            <span class="input-label">Min</span>
+            <span class="input-label" data-i18n="label_min">min</span>
           </div>
           <div class="separator">:</div>
           <div class="input-group">
             <input type="number" id="inputSeconds2" min="0" max="59" value="0" placeholder="0">
-            <span class="input-label">Sek</span>
+            <span class="input-label" data-i18n="label_sec">s</span>
           </div>
         </div>
         <div class="loop-toggle">
           <label class="toggle-label">
             <input type="checkbox" id="loopCheckbox2" checked>
             <span class="toggle-switch"></span>
-            <span class="toggle-text">Loop (automatisch wiederholen)</span>
+            <span class="toggle-text" data-i18n="loop_label">Loop (auto repeat)</span>
           </label>
         </div>
       </div>
 
       <div class="controls">
         <button class="btn btn-start btn-start-2" id="btnStart2">
-          <span class="btn-icon">▶</span> Starten
+          <span class="btn-icon">▶</span> <span data-i18n="btn_start">Start</span>
         </button>
         <button class="btn btn-stop hidden" id="btnStop2">
-          <span class="btn-icon">■</span> Stoppen
+          <span class="btn-icon">■</span> <span data-i18n="btn_stop">Stop</span>
         </button>
       </div>
 
       <div class="status-bar">
-        <span id="statusText2">Bereit</span>
+        <span id="statusText2" data-i18n="status_ready">Ready</span>
       </div>
 
     </div>
 
-    <!-- ===== TAB: UHRZEITEN-ALARM ===== -->
+    <!-- ===== TAB: ALARM ===== -->
     <div class="tab-content" id="tabContentAlarm">
 
       <div class="alarm-next" id="alarmNextBox">
-        <div class="alarm-next-label">Nächster Alarm in</div>
+        <div class="alarm-next-label" data-i18n="alarm_next_label">Next alarm in</div>
         <div class="alarm-next-countdown" id="alarmNextCountdown">--:--:--</div>
         <div class="alarm-next-time" id="alarmNextTime">–</div>
       </div>
 
       <div class="alarm-list" id="alarmList">
-        <!-- 4 alarm slots -->
         <div class="alarm-row" data-index="0">
           <div class="alarm-slot-label">Alarm 1</div>
           <div class="alarm-input-wrap">
@@ -191,18 +191,19 @@
 
       <div class="alarm-save-wrap">
         <button class="btn btn-save" id="btnSaveAlarms">
-          <span class="btn-icon">💾</span> Speichern &amp; Aktivieren
+          <span class="btn-icon">💾</span> <span data-i18n="alarm_save">Save &amp; Activate</span>
         </button>
       </div>
 
       <div class="status-bar">
-        <span id="alarmStatusText">Uhrzeiten eintragen und speichern</span>
+        <span id="alarmStatusText" data-i18n="alarm_hint">Enter times and save</span>
       </div>
 
     </div>
 
   </div>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -56,6 +56,24 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// ===================== LANGUAGE TOGGLE =====================
+document.getElementById('langToggleBtn').addEventListener('click', () => {
+  const newLang = currentLang === 'en' ? 'de' : 'en';
+  setLanguage(newLang);
+  // Re-apply dynamic status texts if timers are idle
+  if (!updateInterval)  { statusText.textContent  = t('status_ready'); }
+  if (!updateInterval2) { statusText2.textContent = t('status_ready'); }
+  // Update time labels if idle
+  const ringOff1 = parseFloat(ringProgress.style.strokeDashoffset) || 0;
+  if (ringOff1 === 0) timeLabel.textContent  = t('no_timer');
+  const ringOff2 = parseFloat(ringProgress2.style.strokeDashoffset) || 0;
+  if (ringOff2 === 0) timeLabel2.textContent = t('no_timer');
+  // Update alarm status hint if idle
+  if (alarmStatusText.dataset.i18n === 'alarm_hint') {
+    alarmStatusText.textContent = t('alarm_hint');
+  }
+});
+
 // ===================== MESSAGING =====================
 function sendMessage(msg) {
   return new Promise((resolve) => {
@@ -85,7 +103,7 @@ function showRunningState() {
   btnStart.classList.add('hidden');
   btnStop.classList.remove('hidden');
   inputSection.classList.add('disabled');
-  statusText.textContent = '⏳ Timer läuft im Hintergrund...';
+  statusText.textContent = t('status_running');
   statusText.className = 'status-running';
 }
 
@@ -93,9 +111,9 @@ function showIdleState() {
   btnStart.classList.remove('hidden');
   btnStop.classList.add('hidden');
   inputSection.classList.remove('disabled');
-  statusText.textContent = 'Bereit';
+  statusText.textContent = t('status_ready');
   statusText.className = 'status-stopped';
-  timeLabel.textContent = 'Kein Timer';
+  timeLabel.textContent = t('no_timer');
   ringProgress.classList.remove('warning', 'danger');
 }
 
@@ -107,10 +125,10 @@ function renderTimer(remaining, duration) {
     ringProgress.classList.remove('warning', 'danger');
     if (ratio <= 0.1)       ringProgress.classList.add('danger');
     else if (ratio <= 0.25) ringProgress.classList.add('warning');
-    timeLabel.textContent = `${Math.round(ratio * 100)}% verbleibend`;
+    timeLabel.textContent = `${Math.round(ratio * 100)}${t('pct_remaining')}`;
   } else {
     ringProgress.style.strokeDashoffset = 0;
-    timeLabel.textContent = 'Kein Timer';
+    timeLabel.textContent = t('no_timer');
   }
 }
 
@@ -136,9 +154,9 @@ btnStart.addEventListener('click', async () => {
   const totalMs = (h * 3600 + m * 60 + s) * 1000;
 
   if (totalMs <= 0) {
-    statusText.textContent = '⚠️ Bitte eine Zeit eingeben!';
+    statusText.textContent = t('status_no_time');
     statusText.className = '';
-    setTimeout(() => { statusText.textContent = 'Bereit'; }, 2000);
+    setTimeout(() => { statusText.textContent = t('status_ready'); }, 2000);
     return;
   }
 
@@ -182,7 +200,7 @@ function showRunningState2() {
   btnStart2.classList.add('hidden');
   btnStop2.classList.remove('hidden');
   inputSection2.classList.add('disabled');
-  statusText2.textContent = '⏳ Timer läuft im Hintergrund...';
+  statusText2.textContent = t('status_running');
   statusText2.className = 'status-running';
 }
 
@@ -190,9 +208,9 @@ function showIdleState2() {
   btnStart2.classList.remove('hidden');
   btnStop2.classList.add('hidden');
   inputSection2.classList.remove('disabled');
-  statusText2.textContent = 'Bereit';
+  statusText2.textContent = t('status_ready');
   statusText2.className = 'status-stopped';
-  timeLabel2.textContent = 'Kein Timer';
+  timeLabel2.textContent = t('no_timer');
   ringProgress2.classList.remove('warning', 'danger');
 }
 
@@ -204,10 +222,10 @@ function renderTimer2(remaining, duration) {
     ringProgress2.classList.remove('warning', 'danger');
     if (ratio <= 0.1)       ringProgress2.classList.add('danger');
     else if (ratio <= 0.25) ringProgress2.classList.add('warning');
-    timeLabel2.textContent = `${Math.round(ratio * 100)}% verbleibend`;
+    timeLabel2.textContent = `${Math.round(ratio * 100)}${t('pct_remaining')}`;
   } else {
     ringProgress2.style.strokeDashoffset = 0;
-    timeLabel2.textContent = 'Kein Timer';
+    timeLabel2.textContent = t('no_timer');
   }
 }
 
@@ -233,9 +251,9 @@ btnStart2.addEventListener('click', async () => {
   const totalMs = (h * 3600 + m * 60 + s) * 1000;
 
   if (totalMs <= 0) {
-    statusText2.textContent = '⚠️ Bitte eine Zeit eingeben!';
+    statusText2.textContent = t('status_no_time');
     statusText2.className = '';
-    setTimeout(() => { statusText2.textContent = 'Bereit'; }, 2000);
+    setTimeout(() => { statusText2.textContent = t('status_ready'); }, 2000);
     return;
   }
 
@@ -295,9 +313,9 @@ function loadAlarms(callback) {
   chrome.storage.local.get(['clockAlarms'], (data) => {
     const alarms = data.clockAlarms || [{time:'',enabled:false},{time:'',enabled:false},{time:'',enabled:false},{time:'',enabled:false}];
     for (let i = 0; i < 4; i++) {
-      document.getElementById(`alarmTime${i}`).value      = alarms[i].time    || '';
-      document.getElementById(`alarmEnabled${i}`).checked = alarms[i].enabled || false;
-      updateAlarmRowStyle(i, alarms[i].enabled);
+      document.getElementById(`alarmTime${i}`).value      = alarms[i] ? (alarms[i].time    || '') : '';
+      document.getElementById(`alarmEnabled${i}`).checked = alarms[i] ? (alarms[i].enabled || false) : false;
+      updateAlarmRowStyle(i, alarms[i] ? alarms[i].enabled : false);
     }
     if (callback) callback(alarms);
   });
@@ -318,10 +336,12 @@ for (let i = 0; i < 4; i++) {
 btnSaveAlarms.addEventListener('click', () => {
   const alarms = saveAlarms();
   chrome.runtime.sendMessage({ action: 'setClockAlarms', alarms });
-  alarmStatusText.textContent = '✅ Alarme gespeichert & aktiv!';
+  alarmStatusText.dataset.i18n = '';
+  alarmStatusText.textContent = t('alarm_saved');
   alarmStatusText.style.color = '#10b981';
   setTimeout(() => {
-    alarmStatusText.textContent = 'Uhrzeiten eintragen und speichern';
+    alarmStatusText.dataset.i18n = 'alarm_hint';
+    alarmStatusText.textContent = t('alarm_hint');
     alarmStatusText.style.color = '';
   }, 2500);
 });
@@ -364,10 +384,10 @@ function tickAlarms(alarms) {
 
   if (nextMs !== null) {
     alarmNextCountdown.textContent = formatCountdown(nextMs);
-    alarmNextTime.textContent = `Nächster Alarm: ${nextTimeStr} Uhr`;
+    alarmNextTime.textContent = `${t('alarm_next_prefix')} ${nextTimeStr}${t('alarm_oclock')}`;
   } else {
     alarmNextCountdown.textContent = '--:--:--';
-    alarmNextTime.textContent = 'Keine aktiven Alarme';
+    alarmNextTime.textContent = t('alarm_no_active');
   }
 }
 
@@ -416,6 +436,9 @@ chrome.storage.local.get([
   if (data.lastSeconds2 !== undefined) inputSeconds2.value    = data.lastSeconds2;
 });
 
-init();
-init2();
-startAlarmTick();
+// Init i18n first, then rest
+initI18n(() => {
+  init();
+  init2();
+  startAlarmTick();
+});
