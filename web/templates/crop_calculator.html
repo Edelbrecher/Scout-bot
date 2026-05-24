@@ -525,34 +525,39 @@ function buildFieldInputs() {
   const count = getFieldCount();
   const maxLvl = isCapital ? 21 : 10;
   const grid = document.getElementById('fieldLevelsGrid');
-  // Preserve existing values
   const existing = [];
-  grid.querySelectorAll('.cc-stepper').forEach(s => existing.push(parseInt(s.dataset.val)||0));
+  grid.querySelectorAll('[data-field]').forEach(s => existing.push(parseInt(s.dataset.val)||0));
   grid.innerHTML = '';
   for (let i = 0; i < count; i++) {
     const val = Math.min((existing[i] !== undefined ? existing[i] : 0), maxLvl);
     const div = document.createElement('div');
-    div.className = 'cc-stepper';
-    div.dataset.val = val;
-    div.dataset.max = maxLvl;
+    div.setAttribute('data-field', i);
+    div.setAttribute('data-val', val);
+    div.setAttribute('data-max', maxLvl);
+    div.style.cssText = 'background:#1e2130;border:1px solid #3a3f55;border-radius:10px;padding:6px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;';
     div.innerHTML = `
-      <div class="cc-stepper-label">F${i+1}</div>
-      <div class="cc-stepper-val">${val}</div>
-      <div class="cc-stepper-btns">
-        <button type="button" onclick="stepField(this,-1)">−</button>
-        <button type="button" onclick="stepField(this,+1)">+</button>
+      <div style="font-size:0.68rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">F${i+1}</div>
+      <div style="font-size:1.4rem;font-weight:800;color:#f9fafb;min-width:2ch;text-align:center;line-height:1;">${val}</div>
+      <div style="display:flex;gap:4px;">
+        <button type="button"
+          onclick="stepField(this,-1)"
+          style="width:30px;height:30px;border-radius:6px;border:1px solid #4b5563;background:#374151;color:#f9fafb;font-size:1.2rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;">−</button>
+        <button type="button"
+          onclick="stepField(this,+1)"
+          style="width:30px;height:30px;border-radius:6px;border:1px solid #4b5563;background:#374151;color:#f9fafb;font-size:1.2rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;">+</button>
       </div>`;
     grid.appendChild(div);
   }
 }
 
 function stepField(btn, delta) {
-  const card = btn.closest('.cc-stepper');
+  const card = btn.closest('[data-field]');
   let val = parseInt(card.dataset.val) || 0;
   const max = parseInt(card.dataset.max) || 10;
   val = Math.max(0, Math.min(max, val + delta));
   card.dataset.val = val;
-  card.querySelector('.cc-stepper-val').textContent = val;
+  card.querySelector('div:nth-child(2)').textContent = val;
+  card.style.borderColor = val > 0 ? '#f59e0b' : '#3a3f55';
 }
 
 function resetForm() {
@@ -611,7 +616,7 @@ function runCalculation() {
 
   // Read starting field levels from stepper cards
   let fieldLevels = [];
-  document.querySelectorAll('#fieldLevelsGrid .cc-stepper').forEach(card => {
+  document.querySelectorAll('#fieldLevelsGrid [data-field]').forEach(card => {
     fieldLevels.push(Math.min(parseInt(card.dataset.val) || 0, maxLvl));
   });
 
@@ -768,7 +773,7 @@ function renderResults(steps, finalState, totalOasisPct) {
   // Summary KPIs
   const heroWheatVal = parseInt(document.getElementById('heroWheat').value) || 0;
   const startFields = [];
-  document.querySelectorAll('#fieldLevelsGrid .cc-stepper').forEach(c => startFields.push(parseInt(c.dataset.val)||0));
+  document.querySelectorAll('#fieldLevelsGrid [data-field]').forEach(c => startFields.push(parseInt(c.dataset.val)||0));
   const startMillLvl   = parseInt(document.getElementById('millLevel').value)   || 0;
   const startBakeryLvl = parseInt(document.getElementById('bakeryLevel').value) || 0;
   const startMansionLvl = parseInt(document.getElementById('mansionLevel').value) || 0;
