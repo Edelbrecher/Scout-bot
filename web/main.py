@@ -5053,24 +5053,14 @@ async def blueprint_step_toggle(request: Request, guild_id: str, blueprint_id: i
 
 @app.get("/guild/{guild_id}/blueprints/presets")
 async def blueprint_presets_list(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    # No auth needed — static preset data
     return JSONResponse({"presets": blueprint_presets.PRESET_BLUEPRINTS})
 
 
 @app.post("/guild/{guild_id}/blueprints/import-preset")
 async def blueprint_import_preset(request: Request, guild_id: str):
     session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_premium(guild, guild_id)
-    if err: return err
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     body = await request.json()
     preset_index = int(body.get("preset_index", 0))
     presets = blueprint_presets.PRESET_BLUEPRINTS

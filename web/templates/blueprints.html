@@ -149,10 +149,14 @@
       </div>
 
       {% if not templates_by_tribe %}
-      <div class="card" style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted);">
+      <div class="card" style="text-align:center; padding:2.5rem 1rem;">
         <div style="font-size:2.5rem; margin-bottom:0.75rem;">📋</div>
-        <div style="font-weight:600; margin-bottom:0.4rem;">Noch keine Vorlagen</div>
-        <div style="font-size:0.85rem;">Erstelle deine erste Blueprint-Vorlage für einen Stamm.</div>
+        <div style="font-weight:600; margin-bottom:0.4rem; color:var(--text-primary);">Noch keine Vorlagen</div>
+        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.2rem;">Importiere einen vorgefertigten Bauplan oder erstelle eine eigene Vorlage.</div>
+        <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="openPresetModal()" style="font-size:0.88rem;">📥 Vorgefertigte Baupläne laden</button>
+          <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new" class="btn btn-secondary" style="font-size:0.88rem;">＋ Eigene Vorlage erstellen</a>
+        </div>
       </div>
       {% else %}
       {% for tribe_name, tribe_info in tribe_meta.items() %}
