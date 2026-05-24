@@ -83,6 +83,35 @@
   pointer-events: none;
 }
 .toast.show { transform: translateY(0); opacity: 1; }
+
+/* Accordion for completed steps */
+.bp-done-accordion {
+  border: 1px solid rgba(34,197,94,0.25);
+  border-radius: 12px; overflow: hidden; margin-bottom: 0.5rem;
+}
+.bp-done-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1.1rem; cursor: pointer; user-select: none;
+  background: rgba(34,197,94,0.07);
+  transition: background 0.15s;
+}
+.bp-done-header:hover { background: rgba(34,197,94,0.12); }
+.bp-done-header-left  { display: flex; align-items: center; gap: 0.6rem; }
+.bp-done-title { font-size: 0.88rem; font-weight: 700; color: #22c55e; }
+.bp-done-count {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 99px; background: rgba(34,197,94,0.2); color: #22c55e;
+}
+.bp-done-chevron {
+  font-size: 0.75rem; color: #22c55e; transition: transform 0.2s;
+}
+.bp-done-accordion.open .bp-done-chevron { transform: rotate(180deg); }
+.bp-done-body {
+  display: none; flex-direction: column; gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.6rem;
+  background: rgba(34,197,94,0.03);
+}
+.bp-done-accordion.open .bp-done-body { display: flex; }
 </style>
 
 <div class="container" style="max-width:700px;">
@@ -119,27 +148,68 @@
     {% endif %}
   </div>
 
-  <!-- Steps -->
+  <!-- Completed steps accordion -->
+  {% set done_steps = bp.steps | selectattr('completed', 'equalto', 1) | list %}
+  {% if done_steps %}
+  <div class="bp-done-accordion" id="doneAccordion">
+    <div class="bp-done-header" onclick="toggleAccordion()">
+      <div class="bp-done-header-left">
+        <span class="bp-done-title">✅ Erledigte Schritte</span>
+        <span class="bp-done-count" id="doneCount">{{ done_steps | length }}</span>
+      </div>
+      <span class="bp-done-chevron">▼</span>
+    </div>
+    <div class="bp-done-body" id="doneBody">
+      {% for step in done_steps %}
+      <div class="bp-step-item is-done"
+           id="step-{{ step.id }}"
+           onclick="toggleStep({{ bp.id }}, {{ step.id }}, this)"
+           data-guild="{{ guild.guild_id }}"
+           data-blueprint="{{ bp.id }}"
+           data-step="{{ step.id }}"
+           data-done="1"
+           data-title="{{ step.title | e }}"
+           data-target="{{ step.target | e }}">
+        <div class="bp-checkbox" id="cb-{{ step.id }}">✓</div>
+        <div class="bp-step-num">{{ loop.index }}</div>
+        <div class="bp-step-body">
+          <div>
+            <span class="bp-step-title">{{ step.title }}</span>
+            {% if step.target %}<span class="bp-step-target">→ {{ step.target }}</span>{% endif %}
+          </div>
+          {% if step.description %}<div class="bp-step-desc">{{ step.description }}</div>{% endif %}
+          <div id="reward-{{ step.id }}" class="bp-hero-reward" style="display:none;">🗡️ +<span class="res-val">0</span> Res <span class="xp">+<span class="xp-val">0</span> XP</span></div>
+        </div>
+        <span class="bp-step-badge {% if step.step_type == 'troops' %}bp-step-badge-troops{% else %}bp-step-badge-building{% endif %}">
+          {% if step.step_type == 'troops' %}⚔️{% else %}🏗️{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Open (todo) steps -->
   <div style="display:flex; flex-direction:column; gap:0.5rem;" id="steps-container">
     {% set ns = namespace(found_current=false) %}
     {% for step in bp.steps %}
-    {% set is_done = step.completed == 1 %}
-    {% if not is_done and not ns.found_current %}
+    {% if step.completed != 1 %}
+    {% if not ns.found_current %}
       {% set is_current = true %}
       {% set ns.found_current = true %}
     {% else %}
       {% set is_current = false %}
     {% endif %}
-    <div class="bp-step-item {% if is_done %}is-done{% elif is_current %}is-current{% endif %}"
+    <div class="bp-step-item {% if is_current %}is-current{% endif %}"
          id="step-{{ step.id }}"
          onclick="toggleStep({{ bp.id }}, {{ step.id }}, this)"
          data-guild="{{ guild.guild_id }}"
          data-blueprint="{{ bp.id }}"
          data-step="{{ step.id }}"
-         data-done="{{ '1' if is_done else '0' }}"
+         data-done="0"
          data-title="{{ step.title | e }}"
          data-target="{{ step.target | e }}">
-      <div class="bp-checkbox" id="cb-{{ step.id }}">{% if is_done %}✓{% endif %}</div>
+      <div class="bp-checkbox" id="cb-{{ step.id }}"></div>
       <div class="bp-step-num">{{ loop.index }}</div>
       <div class="bp-step-body">
         <div>
@@ -153,6 +223,7 @@
         {% if step.step_type == 'troops' %}⚔️{% else %}🏗️{% endif %}
       </span>
     </div>
+    {% endif %}
     {% endfor %}
   </div>
 
@@ -206,6 +277,8 @@ function toggleStep(blueprintId, stepId, el) {
         el.classList.remove('is-current');
         cb.textContent = '✓';
         if (!prevDone) _doneSteps++;
+        // Move to accordion
+        moveToDone(el);
         if (reward.res > 0) {
           showToast('✅ Schritt erledigt · 🗡️ +' + reward.res.toLocaleString() + ' Res +' + reward.xp + ' XP');
         } else {
@@ -215,6 +288,8 @@ function toggleStep(blueprintId, stepId, el) {
         el.classList.remove('is-done');
         cb.textContent = '';
         if (prevDone) _doneSteps--;
+        // Move back to todo list
+        moveToTodo(el);
         showToast('↩️ Schritt zurückgesetzt');
       }
       updateCurrentHighlight();
@@ -245,6 +320,55 @@ function updateProgress() {
   if (pctLbl) {
     pctLbl.textContent = pct + '%';
     pctLbl.style.color = (_doneSteps === _totalSteps && _totalSteps > 0) ? '#22c55e' : '';
+  }
+}
+
+function toggleAccordion() {
+  var acc = document.getElementById('doneAccordion');
+  if (acc) acc.classList.toggle('open');
+}
+
+function moveToDone(el) {
+  var body = document.getElementById('doneBody');
+  var acc  = document.getElementById('doneAccordion');
+  if (!body) {
+    // Create accordion if it doesn't exist yet
+    var container = document.getElementById('steps-container');
+    var html = '<div class="bp-done-accordion" id="doneAccordion">' +
+      '<div class="bp-done-header" onclick="toggleAccordion()">' +
+        '<div class="bp-done-header-left">' +
+          '<span class="bp-done-title">✅ Erledigte Schritte</span>' +
+          '<span class="bp-done-count" id="doneCount">0</span>' +
+        '</div>' +
+        '<span class="bp-done-chevron">▼</span>' +
+      '</div>' +
+      '<div class="bp-done-body" id="doneBody"></div>' +
+    '</div>';
+    container.insertAdjacentHTML('beforebegin', html);
+    body = document.getElementById('doneBody');
+    acc  = document.getElementById('doneAccordion');
+  }
+  body.appendChild(el);
+  // Update count
+  var count = body.querySelectorAll('.bp-step-item').length;
+  var countEl = document.getElementById('doneCount');
+  if (countEl) countEl.textContent = count;
+}
+
+function moveToTodo(el) {
+  var container = document.getElementById('steps-container');
+  // Insert at top of todo list
+  container.insertBefore(el, container.firstChild);
+  // Update accordion count
+  var body = document.getElementById('doneBody');
+  var countEl = document.getElementById('doneCount');
+  if (body && countEl) {
+    var count = body.querySelectorAll('.bp-step-item').length;
+    countEl.textContent = count;
+    if (count === 0) {
+      var acc = document.getElementById('doneAccordion');
+      if (acc) acc.remove();
+    }
   }
 }
 
