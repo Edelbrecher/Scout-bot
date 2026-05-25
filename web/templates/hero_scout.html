@@ -69,16 +69,11 @@
     </div>
 
     <div class="card" style="padding:0.85rem 1rem;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-        <div>
-          <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;">🔍 Item-Erkennung</div>
-          <div id="libraryStatus" style="font-size:0.78rem;color:var(--text-muted);">Lade…</div>
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;">💡 Tipp</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">
+          Items manuell zuweisen: Held anklicken → <strong>✏️ Neue Version anlegen</strong>
         </div>
-        <button onclick="buildLibrary()" id="buildBtn"
-                style="padding:0.35rem 0.75rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);
-                       border-radius:6px;color:#93c5fd;font-weight:600;cursor:pointer;font-size:0.82rem;white-space:nowrap;">
-          📦 Aufbauen
-        </button>
       </div>
     </div>
   </div>
@@ -279,54 +274,5 @@ function filterHeroes() {
   document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
 }
 
-// ── Item-Bibliothek Status ───────────────────────────────────────────
-async function loadLibraryStatus() {
-  try {
-    const r = await fetch('/guild/{{ guild.guild_id }}/defense/hero-scout/library-status');
-    const d = await r.json();
-    const el = document.getElementById('libraryStatus');
-    if (d.ok && d.library_exists) {
-      el.innerHTML = `✅ <strong>${d.item_count}</strong> Items geladen`;
-      el.style.color = '#22c55e';
-    } else if (d.ok) {
-      el.innerHTML = '⚠️ Nicht aufgebaut — klicke Aufbauen';
-      el.style.color = '#f59e0b';
-    } else {
-      el.textContent = 'Bot offline — automatische Erkennung inaktiv';
-      el.style.color = 'var(--text-muted)';
-    }
-  } catch(e) {
-    document.getElementById('libraryStatus').textContent = 'Bot nicht erreichbar — manuelle Einträge funktionieren trotzdem';
-    document.getElementById('libraryStatus').style.color = 'var(--text-muted)';
-  }
-}
-
-async function buildLibrary() {
-  const btn = document.getElementById('buildBtn');
-  const status = document.getElementById('libraryStatus');
-  btn.disabled = true;
-  btn.textContent = '⏳ …';
-  status.textContent = 'Lade Icons… (30–60 Sek.)';
-  status.style.color = '#f59e0b';
-  try {
-    const r = await fetch('/guild/{{ guild.guild_id }}/defense/hero-scout/build-library', {method:'POST'});
-    const d = await r.json();
-    if (d.ok) {
-      status.textContent = '✅ Build gestartet — bitte warten…';
-      status.style.color = '#22c55e';
-      setTimeout(loadLibraryStatus, 40000);
-    } else {
-      status.textContent = '❌ ' + (d.error || 'Unbekannt');
-      status.style.color = '#f87171';
-    }
-  } catch(e) {
-    status.textContent = '❌ Verbindungsfehler';
-    status.style.color = '#f87171';
-  }
-  btn.disabled = false;
-  btn.textContent = '📦 Aufbauen';
-}
-
-loadLibraryStatus();
 </script>
 {% endblock %}

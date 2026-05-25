@@ -639,22 +639,8 @@ class HeroScoutCog(commands.Cog):
         confirm_embed.add_field(name="Heldenlvl", value=str(hero_lvl), inline=True)
         confirm_embed.add_field(name="Serverzeit", value=server_time, inline=False)
 
-        if identified_items:
-            slot_labels = {"helm": "🪖 Helm", "armor": "🛡️ Rüstung", "boots": "👢 Schuhe",
-                           "weapon": "⚔️ Waffe", "mount": "🐴 Pferd", "misc": "💍 Sonstiges"}
-            items_text = "\n".join(
-                f"{slot_labels.get(s, s)}: **{n}**"
-                for s, n in identified_items.items()
-            )
-            confirm_embed.add_field(name="🔍 Erkannte Items", value=items_text, inline=False)
-        elif MATCHER_AVAILABLE:
-            lib_status = hero_item_matcher.get_library_status()
-            if not lib_status["library_exists"]:
-                confirm_embed.add_field(
-                    name="⚠️ Item-Erkennung",
-                    value="Bibliothek noch nicht aufgebaut — `!hero-scout-build-library` im Admin-Channel.",
-                    inline=False,
-                )
+        # Item-Erkennung via pHash deaktiviert (Library-Aufbau nicht zuverlässig)
+        # Items werden manuell im Dashboard zugewiesen
 
         confirm_embed.set_footer(text=f"Gemeldet von {reporter_name}")
 
