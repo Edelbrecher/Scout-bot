@@ -5272,6 +5272,12 @@ async def _get_hero_scout_entries(guild_id: str) -> list:
     import aiosqlite
     db_path = Path("/app/data/scouter.db")
     async with aiosqlite.connect(db_path) as db:
+        # Migration sicherstellen
+        try:
+            await db.execute("ALTER TABLE hero_scout_entries ADD COLUMN source TEXT DEFAULT 'screenshot'")
+            await db.commit()
+        except Exception:
+            pass
         db.row_factory = aiosqlite.Row
         # Nur den neuesten Eintrag pro Spieler
         async with db.execute("""
@@ -5293,6 +5299,12 @@ async def _get_hero_scout_history(guild_id: str, player_name: str) -> list:
     import aiosqlite
     db_path = Path("/app/data/scouter.db")
     async with aiosqlite.connect(db_path) as db:
+        # Migration sicherstellen
+        try:
+            await db.execute("ALTER TABLE hero_scout_entries ADD COLUMN source TEXT DEFAULT 'screenshot'")
+            await db.commit()
+        except Exception:
+            pass
         db.row_factory = aiosqlite.Row
         # Einträge laden
         async with db.execute("""
