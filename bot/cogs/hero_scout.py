@@ -202,25 +202,17 @@ async def save_slot(entry_id: int, guild_id: str, idx: int, name: str, path: str
 def _preprocess_for_ocr(img: "Image.Image") -> "Image.Image":
     """
     Bereitet ein Screenshot-Bild für Tesseract vor.
-    Travian: heller Text auf dunklem Hintergrund → invertieren + kontrastverstärken.
+    Travian: heller Text auf dunklem Hintergrund.
+    Strategie: 2× skalieren, grau, invertieren, Kontrast 2.5×
     """
-    from PIL import ImageEnhance, ImageFilter, ImageOps
+    from PIL import ImageEnhance, ImageOps
 
-    # 2× hochskalieren (Tesseract mag größere Bilder)
     w, h = img.size
     img = img.resize((w * 2, h * 2), Image.LANCZOS)
-
-    # Graustufen
     gray = img.convert("L")
-
-    # Invertieren: heller Text auf dunklem BG → dunkler Text auf hellem BG
     inverted = ImageOps.invert(gray)
-
-    # Kontrast stark erhöhen
     enhancer = ImageEnhance.Contrast(inverted)
-    contrasted = enhancer.enhance(2.5)
-
-    return contrasted
+    return enhancer.enhance(2.5)
 
 
 def _run_ocr(img: "Image.Image") -> str:
@@ -248,10 +240,16 @@ def _parse_ocr_text(text: str) -> dict:
     print(f"[hero_scout] OCR raw ({len(text)} chars):\n{text[:700]}", flush=True)
 
     # ── Serverzeit ───────────────────────────────────────────────────────
-    m = re.search(r"Server(?:\s*zeit|[-\s]*time)[:\s]+(\d{1,2}:\d{2}:\d{2}[^\n]*)",
+    # DE: "Serverzeit: 1:00:58 (UTC +01:00)"  EN: "Server time: 13:24:58 (UTC +01:00)"
+    m = re.search(r"Server(?:zeit|[-\s]*time)\s*:?\s*(\d{1,2}:\d{2}:\d{2}[^\n]*)",
                   text, re.IGNORECASE)
     if m:
         result["server_time"] = m.group(1).strip()
+    else:
+        # Fallback: einfach einen Zeitstempel im Format HH:MM:SS suchen
+        m = re.search(r"\b(\d{1,2}:\d{2}:\d{2})\s*\(UTC", text)
+        if m:
+            result["server_time"] = m.group(1).strip()
 
     # ── Stamm  (EN: Tribe / DE: Volk / Stamm) ───────────────────────────
     TRIBE_PATTERN = (r"(?:Tribe|Volk|Stamm)\s*:?\s*"
@@ -285,11 +283,15 @@ def _parse_ocr_text(text: str) -> dict:
     if m:
         result["hero_level"] = int(m.group(1))
 
-    # ── Hero XP  (EN: Experience / DE: Erfahrung) ────────────────────────
-    m = re.search(r"([\d,\.]+)\s*(?:Experience|Erfahrung)", text, re.IGNORECASE)
+    # ── Hero XP  (EN: Experience / DE: Erfahrung / OCR-Fehler: Erfahning etc.) ──
+    # Zahl kann direkt daneben stehen: "383390.Erfahrung" oder "383390 Erfahrung"
+    m = re.search(r"(\d[\d,\.]*)\s*[.\s]?\s*Erfahr\w*", text, re.IGNORECASE)
+    if not m:
+        m = re.search(r"(\d[\d,\.]*)\s*[.\s]?\s*Experi\w*", text, re.IGNORECASE)
     if m:
         try:
-            raw = m.group(1).replace(",", "").replace(".", "")
+            raw = re.sub(r"[,\.](?=\d{3})", "", m.group(1))  # Tausender-Trenner weg
+            raw = raw.replace(",", "").replace(".", "")
             result["hero_xp"] = int(raw)
         except ValueError:
             pass
@@ -311,36 +313,57 @@ def _parse_ocr_text(text: str) -> dict:
 
 def _ocr_modal_header(img: "Image.Image") -> str:
     """
-    Croppt nur den Modal-Titel-Bereich (Spielername) und liest ihn separat.
-    Der Name steht im dekorativen Header-Banner des Heldenprofil-Modals.
-    Bereich ca. x:435-950, y:125-170 (bei 1101×709 Vollbild).
+    Croppt den Modal-Titel (Spielername) und liest ihn via Farb-Extraktion.
+    Der Name ist goldener/oranger Text auf dunklem Ornament-Hintergrund.
+    Farb-Maske: Pixel mit hohem R-Kanal (> 160) und niedrigem B-Kanal (< 120)
+    → golden/orange Text isolieren, Rest weiß.
     """
     w, h = img.size
     sx = w / 1101
     sy = h / 709
-    x1 = int(435 * sx); y1 = int(125 * sy)
-    x2 = int(955 * sx); y2 = int(172 * sy)
+
+    # Etwas großzügiger Bereich um den Header
+    x1 = int(450 * sx); y1 = int(120 * sy)
+    x2 = int(965 * sx); y2 = int(175 * sy)
     x1 = max(0, x1); y1 = max(0, y1)
     x2 = min(w, x2); y2 = min(h, y2)
     if x2 <= x1 or y2 <= y1:
         return ""
 
     crop = img.crop((x1, y1, x2, y2))
-    # 4× hochskalieren für kleinen Bereich
+    # 4× skalieren
     cw, ch = crop.size
     crop = crop.resize((cw * 4, ch * 4), Image.LANCZOS)
 
-    from PIL import ImageEnhance, ImageOps
-    gray = crop.convert("L")
-    inverted = ImageOps.invert(gray)
-    enhancer = ImageEnhance.Contrast(inverted)
-    contrasted = enhancer.enhance(3.0)
+    # Farb-Extraktion: goldene/helle Pixel isolieren
+    # R > 160, G > 110, B < 130  → golden/orange Text
+    # R > 200, G > 200, B > 200  → weißer Text (Fallback)
+    rgb = crop.convert("RGB")
+    pixels = rgb.load()
+    cw2, ch2 = crop.size
+    from PIL import Image as _Img
+    result = _Img.new("L", (cw2, ch2), 255)  # weißer Hintergrund
+    rpx = result.load()
+    for y in range(ch2):
+        for x in range(cw2):
+            r, g, b = pixels[x, y]
+            is_golden = r > 160 and g > 110 and b < 130
+            is_white  = r > 200 and g > 200 and b > 200
+            if is_golden or is_white:
+                rpx[x, y] = 0  # schwarzer Text
 
-    # PSM 7 = einzelne Zeile
-    name_raw = pytesseract.image_to_string(contrasted, config="--psm 7 -l eng").strip()
-    name_clean = re.sub(r"[^A-Za-z0-9\-_|çÇğĞıİöÖşŞüÜáéíóúäåæøñ ]", "", name_raw).strip()
-    print(f"[hero_scout] Header OCR: '{name_raw}' → cleaned: '{name_clean}'", flush=True)
-    return name_clean
+    # Zweiter Versuch: einfach nur grau ohne Invertierung
+    gray_crop = crop.convert("L")
+
+    best = ""
+    for mode_img, label in [(result, "color"), (gray_crop, "gray")]:
+        raw = pytesseract.image_to_string(mode_img, config="--psm 7 -l eng").strip()
+        clean = re.sub(r"[^A-Za-z0-9\-_çÇğĞıİöÖşŞüÜáéíóúäåæøñ]", "", raw).strip()
+        print(f"[hero_scout] Header OCR ({label}): '{raw}' → '{clean}'", flush=True)
+        if len(clean) >= 2 and not best:
+            best = clean
+
+    return best
 
 
 def _crop_slots(img: "Image.Image") -> list[tuple[str, str]]:
@@ -573,8 +596,8 @@ class HeroScoutCog(commands.Cog):
         )
         if name_missing:
             confirm_embed.description = (
-                "💡 **Spielername nicht erkannt** — tippe den Namen als Nachricht beim nächsten Screenshot:\n"
-                "```ZalmecAwp```"
+                "💡 **Spielername nicht erkannt** — tippe den Spielernamen einfach als Nachricht "
+                "zusammen mit dem Screenshot, z.B.:\n```Currax```"
             )
         confirm_embed.add_field(name="Stamm", value=tribe, inline=True)
         confirm_embed.add_field(name="Allianz", value=alliance, inline=True)
