@@ -372,6 +372,31 @@ def _crop_slots(img: "Image.Image") -> list[tuple[str, str]]:
     return slots
 
 
+def _extract_name_from_message(content: str) -> str:
+    """
+    Extrahiert den Spielernamen aus dem Nachrichtentext.
+    Unterstützte Formate:
+      "ZalmecAwp"
+      "Scout: ZalmecAwp"
+      "Held: ZalmecAwp"
+      "ZalmecAwp (Teutons)"
+    Gibt leeren String zurück wenn nichts Sinnvolles gefunden.
+    """
+    if not content or not content.strip():
+        return ""
+    text = content.strip()
+    # Präfix entfernen: "Scout:", "Held:", "Hero:", "Name:" etc.
+    text = re.sub(r"^(scout|held|hero|name|spieler)[:\s]+", "", text, flags=re.IGNORECASE)
+    # Klammern-Suffix entfernen: "(Teutons)" etc.
+    text = re.sub(r"\s*\(.*\).*$", "", text)
+    # Nur den ersten "Token" nehmen (bis Leerzeichen/Zeilenumbruch)
+    first_word = text.split()[0] if text.split() else ""
+    # Plausibilitätsprüfung: 2-30 Zeichen, alphanumerisch+Sonderzeichen
+    if 2 <= len(first_word) <= 30 and re.match(r"^[A-Za-z0-9\-_çÇğĞıİöÖşŞüÜáéíóúäåæøñ]+$", first_word):
+        return first_word
+    return ""
+
+
 def _slots_combined_hash(slot_hashes: list[str]) -> str:
     combined = "".join(slot_hashes)
     return hashlib.md5(combined.encode()).hexdigest()
@@ -430,11 +455,17 @@ class HeroScoutCog(commands.Cog):
         # Bild herunterladen
         img_bytes = await attachment.read()
 
+        # Spielername aus Nachrichtentext extrahieren (höchste Priorität)
+        # User schreibt: "ZalmecAwp" oder "Scout: ZalmecAwp" oder einfach den Namen
+        name_from_text = _extract_name_from_message(message.content)
+
         data: dict = {
             "reporter_id": reporter_id,
             "reporter_name": reporter_name,
             "discord_url": attachment.url,
         }
+        if name_from_text:
+            data["player_name"] = name_from_text
 
         slot_crops = []
         slot_hashes = []
@@ -448,7 +479,7 @@ class HeroScoutCog(commands.Cog):
                 parsed = _parse_ocr_text(ocr_text)
                 data.update(parsed)
 
-                # Spielername separat aus Modal-Header lesen
+                # Spielername aus Modal-Header versuchen
                 if not data.get("player_name"):
                     header_name = _ocr_modal_header(img)
                     if header_name and len(header_name) >= 2:
@@ -529,10 +560,16 @@ class HeroScoutCog(commands.Cog):
         server_time = data.get("server_time", "?")
 
         # Normales Bestätigungs-Embed (immer)
+        name_missing = player.startswith("unbekannt_")
         confirm_embed = discord.Embed(
             title=f"🗡️ Helden-Scout gespeichert: {player}",
-            color=discord.Color.blurple(),
+            color=discord.Color.yellow() if name_missing else discord.Color.blurple(),
         )
+        if name_missing:
+            confirm_embed.description = (
+                "💡 **Spielername nicht erkannt** — tippe den Namen als Nachricht beim nächsten Screenshot:\n"
+                "```ZalmecAwp```"
+            )
         confirm_embed.add_field(name="Stamm", value=tribe, inline=True)
         confirm_embed.add_field(name="Allianz", value=alliance, inline=True)
         confirm_embed.add_field(name="Heldenlvl", value=str(hero_lvl), inline=True)
