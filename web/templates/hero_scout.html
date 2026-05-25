@@ -2,8 +2,9 @@
 {% block title %}Helden-Scout · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1100px;">
+<div class="container" style="max-width:1400px;">
 
+  <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Verteidigung</a>
@@ -18,7 +19,7 @@
       </a>
       {% if entries %}
       <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-all"
-            onsubmit="return confirm('Wirklich ALLE {{ entries|length }} Helden löschen? Das kann nicht rückgängig gemacht werden.')">
+            onsubmit="return confirm('Wirklich ALLE {{ entries|length }} Helden löschen?')">
         <button type="submit"
                 style="padding:0.5rem 1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);
                        border-radius:8px;color:#f87171;font-weight:600;cursor:pointer;font-size:0.88rem;white-space:nowrap;">
@@ -29,6 +30,7 @@
     </div>
   </div>
 
+  <!-- Flash-Meldungen -->
   {% if flash == 'channel_saved' %}
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Scout-Channel gespeichert.</div>
   {% elif flash == 'channel_error' %}
@@ -39,172 +41,196 @@
   <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Alle Helden gelöscht.</div>
   {% endif %}
 
-  <!-- Channel-Konfiguration -->
-  <div class="card" style="margin-bottom:1.5rem;">
-    <h2 style="margin:0 0 0.75rem;font-size:1rem;">📡 Discord Channel konfigurieren</h2>
-    <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 0.75rem;">
-      Wähle den Discord-Channel aus, in dem Helden-Screenshots gepostet werden.
-      Der Bot liest die Screenshots automatisch aus.
-      {% if scout_channel %}
-      <br><span style="color:#22c55e;">✅ Aktuell konfiguriert: Channel-ID <code>{{ scout_channel }}</code></span>
-      {% else %}
-      <br><span style="color:#f59e0b;">⚠️ Noch kein Channel konfiguriert.</span>
-      {% endif %}
-    </p>
-    <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/set-channel"
-          style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
-      <div style="flex:1;min-width:200px;">
-        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Channel-ID (aus Discord kopieren)</label>
-        <input type="text" name="channel_id"
-               value="{{ scout_channel or '' }}"
-               placeholder="z.B. 1234567890123456789"
-               style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
+  <!-- Channel + Library in einer Zeile (kollabiert) -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.25rem;">
+    <div class="card" style="padding:0.85rem 1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;">📡 Discord Channel</div>
+          {% if scout_channel %}
+          <div style="font-size:0.78rem;color:#22c55e;">✅ ID: <code>{{ scout_channel }}</code></div>
+          {% else %}
+          <div style="font-size:0.78rem;color:#f59e0b;">⚠️ Noch nicht konfiguriert</div>
+          {% endif %}
+        </div>
+        <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/set-channel"
+              style="display:flex;gap:0.4rem;align-items:center;">
+          <input type="text" name="channel_id" value="{{ scout_channel or '' }}"
+                 placeholder="Channel-ID"
+                 style="padding:0.35rem 0.6rem;background:var(--bg-main);border:1px solid var(--border);
+                        border-radius:6px;color:var(--text);font-size:0.82rem;width:180px;">
+          <button type="submit"
+                  style="padding:0.35rem 0.75rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);
+                         border-radius:6px;color:#93c5fd;font-weight:600;cursor:pointer;font-size:0.82rem;white-space:nowrap;">
+            💾
+          </button>
+        </form>
       </div>
-      <button type="submit"
-              style="padding:0.5rem 1.25rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);border-radius:8px;color:#93c5fd;font-weight:600;cursor:pointer;white-space:nowrap;">
-        💾 Speichern
-      </button>
-    </form>
-    <p style="font-size:0.78rem;color:var(--text-muted);margin:0.5rem 0 0;">
-      💡 Tipp: Alternativ direkt im Discord mit <code>/hero-scout-setup #channel</code>.
-    </p>
-  </div>
+    </div>
 
-  <!-- Item-Bibliothek Status -->
-  <div class="card" style="margin-bottom:1.5rem;" id="libraryCard">
-    <h2 style="margin:0 0 0.75rem;font-size:1rem;">🔍 Item-Erkennung</h2>
-    <div id="libraryStatus" style="font-size:0.85rem;color:var(--text-muted);">Lade Status…</div>
-    <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
-      <button onclick="buildLibrary()" id="buildBtn"
-              style="padding:0.45rem 1.1rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);
-                     border-radius:8px;color:#93c5fd;font-weight:600;cursor:pointer;font-size:0.85rem;">
-        📦 Item-Bibliothek aufbauen
-      </button>
-      <span style="font-size:0.78rem;color:var(--text-muted);">
-        Lädt alle Item-Icons von deinem Travian-Server und baut die Erkennungs-Bibliothek auf (~30 Sek.)
-      </span>
+    <div class="card" style="padding:0.85rem 1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;">🔍 Item-Erkennung</div>
+          <div id="libraryStatus" style="font-size:0.78rem;color:var(--text-muted);">Lade…</div>
+        </div>
+        <button onclick="buildLibrary()" id="buildBtn"
+                style="padding:0.35rem 0.75rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);
+                       border-radius:6px;color:#93c5fd;font-weight:600;cursor:pointer;font-size:0.82rem;white-space:nowrap;">
+          📦 Aufbauen
+        </button>
+      </div>
     </div>
   </div>
 
+  <!-- SVG-Icon-Definitionen (wiederverwendbar) -->
+  <svg style="display:none" id="slot-svgs">
+    <!-- Helm -->
+    <symbol id="icon-helm" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2C8 2 4 6 4 11v2l2 1v3h12v-3l2-1v-2C20 6 16 2 12 2z" fill="currentColor" opacity=".9"/>
+      <rect x="6" y="16" width="12" height="2" rx="1" fill="currentColor" opacity=".6"/>
+      <path d="M9 11 Q12 9 15 11" stroke="rgba(255,255,255,.3)" stroke-width="1" fill="none"/>
+    </symbol>
+    <!-- Rüstung / Brustpanzer -->
+    <symbol id="icon-armor" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L4 6v6c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V6L12 2z" fill="currentColor" opacity=".85"/>
+      <path d="M12 6v11M9 9l3-3 3 3" stroke="rgba(255,255,255,.35)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <!-- Stiefel / Schuhe -->
+    <symbol id="icon-boots" viewBox="0 0 24 24" fill="none">
+      <path d="M7 3h4v10l4 3v2H5v-2l2-1V3z" fill="currentColor" opacity=".9"/>
+      <path d="M5 16h14v2H5z" fill="currentColor" opacity=".6"/>
+      <path d="M11 13l4 3" stroke="rgba(255,255,255,.3)" stroke-width="1" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <!-- Waffe / Mainhand (Schwert) -->
+    <symbol id="icon-weapon" viewBox="0 0 24 24" fill="none">
+      <path d="M14.5 2.5l7 7-12 12-2-2 10-10-1-1-10 10-2-2 12-12z" fill="currentColor" opacity=".9"/>
+      <path d="M3 18l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+      <rect x="10" y="10" width="5" height="1.5" rx=".75" transform="rotate(45 10 10)" fill="rgba(255,255,255,.4)"/>
+    </symbol>
+    <!-- Pferd / Reittier -->
+    <symbol id="icon-mount" viewBox="0 0 24 24" fill="none">
+      <ellipse cx="12" cy="13" rx="7" ry="5" fill="currentColor" opacity=".85"/>
+      <circle cx="17" cy="8" r="3" fill="currentColor" opacity=".9"/>
+      <path d="M14 8.5 Q15 6 17 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".8"/>
+      <path d="M6 15 L5 20M10 17 L9.5 21M14 17 L14.5 21M18 15 L19 20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>
+    </symbol>
+    <!-- Off-Hand / Diverses (Schild) -->
+    <symbol id="icon-misc" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L4 5.5v6.5c0 4 2.8 7.5 8 9 5.2-1.5 8-5 8-9V5.5L12 2z" fill="currentColor" opacity=".8"/>
+      <path d="M9 12l2 2 4-4" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+  </svg>
+
   <!-- Spieler-Übersicht -->
   {% if entries %}
-  <h2 style="font-size:1rem;margin-bottom:0.75rem;color:var(--text-muted);">
-    👥 Beobachtete Helden ({{ entries|length }})
-  </h2>
-  <div style="display:grid;gap:0.75rem;">
+
+  <!-- Suche + Kachel-Steuerung -->
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.85rem;">
+    <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px;max-width:360px;">
+      <input type="text" id="heroSearch" placeholder="🔍 Held suchen…" oninput="filterHeroes()"
+             style="flex:1;padding:0.45rem 0.75rem;background:var(--bg-card);border:1px solid var(--border);
+                    border-radius:8px;color:var(--text);font-size:0.88rem;">
+      <span id="heroCount" style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">
+        {{ entries|length }} Helden
+      </span>
+    </div>
+    <!-- Kachel-Selektor -->
+    <div style="display:flex;align-items:center;gap:0.4rem;">
+      <span style="font-size:0.75rem;color:var(--text-muted);">Spalten:</span>
+      {% for cols in [3, 5, 7, 9] %}
+      <button onclick="setCols({{ cols }})" data-cols="{{ cols }}"
+              class="cols-btn {% if cols == 5 %}active{% endif %}"
+              style="padding:0.25rem 0.55rem;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border);background:{% if cols == 5 %}rgba(59,130,246,0.2){% else %}transparent{% endif %};
+                     color:{% if cols == 5 %}#93c5fd{% else %}var(--text-muted){% endif %};">
+        {{ cols }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Hero-Kacheln -->
+  <div id="heroGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.6rem;">
     {% for e in entries %}
-    <div style="position:relative;">
-      {# Löschen-Button außerhalb des Links, oben-rechts #}
+    <div class="hero-card" data-name="{{ e.player_name | lower }}" style="position:relative;">
+
+      <!-- Löschen-Button -->
       <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-player"
-            style="position:absolute;top:0.6rem;right:0.6rem;z-index:10;"
-            onsubmit="event.stopPropagation();return confirm('{{ e.player_name }} wirklich löschen?')">
+            style="position:absolute;top:0.4rem;right:0.4rem;z-index:10;"
+            onsubmit="event.stopPropagation();return confirm('{{ e.player_name }} löschen?')">
         <input type="hidden" name="player_name" value="{{ e.player_name }}">
         <button type="submit"
-                style="padding:0.25rem 0.55rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
-                       border-radius:6px;color:#f87171;cursor:pointer;font-size:0.75rem;line-height:1.4;"
-                title="{{ e.player_name }} löschen">
-          🗑️
-        </button>
+                style="padding:0.2rem 0.4rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);
+                       border-radius:5px;color:#f87171;cursor:pointer;font-size:0.7rem;line-height:1.3;"
+                title="Löschen">🗑️</button>
       </form>
-    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/{{ e.player_name | urlencode }}"
-       style="text-decoration:none;color:inherit;">
-      <div class="card" style="cursor:pointer;transition:border-color 0.15s;padding-right:3rem;
-        {% if e.changed %}border-left:3px solid #f59e0b;{% else %}border-left:3px solid rgba(59,130,246,0.3);{% endif %}">
 
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;">
-          <div style="display:flex;align-items:center;gap:0.75rem;">
-            <div style="font-size:1.2rem;">🗡️</div>
-            <div>
-              <div style="font-weight:700;font-size:1rem;">
-                {{ e.player_name }}
-                {% if e.changed %}
-                <span style="font-size:0.72rem;background:rgba(245,158,11,0.15);color:#f59e0b;
-                      border-radius:4px;padding:0.1rem 0.5rem;margin-left:0.4rem;font-weight:700;">
-                  ⚠️ Ausrüstung geändert
-                </span>
-                {% endif %}
-                {% if e.source == 'manual' %}
-                <span style="font-size:0.68rem;background:rgba(139,92,246,0.15);color:#c4b5fd;
-                      border-radius:4px;padding:0.1rem 0.45rem;margin-left:0.3rem;font-weight:600;">
-                  ✏️ Manuell
-                </span>
-                {% endif %}
-              </div>
-              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.1rem;">
-                {{ e.tribe or '?' }} · {{ e.alliance or '?' }} · Lvl {{ e.hero_level or '?' }}
-              </div>
-            </div>
+      <!-- Karte (klickbar) -->
+      <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/{{ e.player_name | urlencode }}"
+         style="text-decoration:none;color:inherit;display:block;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+                    padding:0.65rem 0.6rem 0.55rem;cursor:pointer;
+                    {% if e.changed %}border-left:3px solid #f59e0b;{% else %}border-left:3px solid rgba(59,130,246,0.25);{% endif %}">
+
+          <!-- Name + Badges -->
+          <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                      margin-bottom:0.15rem;padding-right:1.6rem;" title="{{ e.player_name }}">
+            {{ e.player_name }}
+          </div>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.4rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            {{ e.tribe or '?' }} · {{ e.alliance or '?' }} · Lvl {{ e.hero_level or '?' }}
           </div>
 
-          <div style="text-align:right;font-size:0.78rem;color:var(--text-muted);">
-            <div>{{ e.created_at[:16].replace('T',' ') }} UTC</div>
-            <div style="margin-top:0.15rem;">
-              von {{ e.reporter_name or '?' }}
-            </div>
-          </div>
-        </div>
+          {% if e.changed %}
+          <div style="font-size:0.62rem;color:#f59e0b;margin-bottom:0.35rem;">⚠️ Ausrüstung geändert</div>
+          {% endif %}
+          {% if e.source == 'manual' %}
+          <div style="font-size:0.62rem;color:#c4b5fd;margin-bottom:0.35rem;">✏️ Manuell</div>
+          {% endif %}
 
-        <!-- Item-Slot-Vorschau -->
-        {% set slot_icons = [
-          ('helm',   '🪖', 'Helm'),
-          ('armor',  '🛡️', 'Rüstung'),
-          ('boots',  '👢', 'Schuhe'),
-          ('weapon', '⚔️', 'Waffe'),
-          ('mount',  '🐴', 'Pferd'),
-          ('misc',   '💍', 'Sonstiges'),
-        ] %}
-        <div style="display:flex;gap:0.5rem;margin-top:0.85rem;flex-wrap:wrap;align-items:flex-end;">
-          {% for slot_name, slot_icon, slot_label in slot_icons %}
-          <div style="text-align:center;">
-            <div style="width:66px;height:66px;border:1px solid var(--border);border-radius:8px;
-                        overflow:hidden;background:rgba(0,0,0,0.35);position:relative;">
+          <!-- 6 Slot-Icons als 2×3 Grid -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.3rem;margin-top:0.3rem;">
+            {% set slot_defs = [
+              ('helm',   'icon-helm',   '#60a5fa', 'Helm'),
+              ('armor',  'icon-armor',  '#34d399', 'Rüstung'),
+              ('boots',  'icon-boots',  '#a78bfa', 'Schuhe'),
+              ('weapon', 'icon-weapon', '#f87171', 'Waffe'),
+              ('mount',  'icon-mount',  '#fbbf24', 'Pferd'),
+              ('misc',   'icon-misc',   '#94a3b8', 'Off-Hand'),
+            ] %}
+            {% for slot_name, icon_id, icon_color, slot_label in slot_defs %}
+            <div style="aspect-ratio:1;border:1px solid var(--border);border-radius:6px;
+                        overflow:hidden;background:rgba(0,0,0,0.3);position:relative;"
+                 title="{{ slot_label }}">
               <img src="/guild/{{ guild.guild_id }}/defense/hero-scout/img/{{ e.id }}/{{ slot_name }}"
                    style="width:100%;height:100%;object-fit:cover;"
                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-              {# Fallback: Icon + Label wenn kein Bild vorhanden #}
-              <div style="display:none;position:absolute;inset:0;flex-direction:column;
-                          align-items:center;justify-content:center;gap:0.1rem;">
-                <span style="font-size:1.6rem;line-height:1;">{{ slot_icon }}</span>
-                <span style="font-size:0.55rem;color:rgba(255,255,255,0.35);letter-spacing:.02em;">{{ slot_label }}</span>
+              <!-- SVG-Icon-Fallback -->
+              <div style="display:none;position:absolute;inset:0;align-items:center;
+                          justify-content:center;color:{{ icon_color }};opacity:0.5;">
+                <svg width="55%" height="55%" viewBox="0 0 24 24">
+                  <use href="#{{ icon_id }}"/>
+                </svg>
               </div>
             </div>
-            <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.25rem;">{{ slot_label }}</div>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
 
-        <!-- Stats -->
-        <div style="display:flex;gap:1.5rem;margin-top:0.6rem;flex-wrap:wrap;">
-          {% if e.villages %}
-          <div>
-            <span style="font-size:0.7rem;color:var(--text-muted);">Dörfer</span>
-            <span style="font-size:0.85rem;font-weight:600;margin-left:0.3rem;">{{ e.villages }}</span>
+          <!-- Datum -->
+          <div style="font-size:0.62rem;color:rgba(255,255,255,0.25);margin-top:0.4rem;text-align:right;">
+            {{ e.created_at[5:16].replace('T',' ') }}
           </div>
-          {% endif %}
-          {% if e.attacker_rank %}
-          <div>
-            <span style="font-size:0.7rem;color:var(--text-muted);">Attacker</span>
-            <span style="font-size:0.85rem;font-weight:600;margin-left:0.3rem;color:#f87171;">Rang {{ e.attacker_rank }}</span>
-          </div>
-          {% endif %}
-          {% if e.defender_rank %}
-          <div>
-            <span style="font-size:0.7rem;color:var(--text-muted);">Defender</span>
-            <span style="font-size:0.85rem;font-weight:600;margin-left:0.3rem;color:#93c5fd;">Rang {{ e.defender_rank }}</span>
-          </div>
-          {% endif %}
-          {% if e.server_time %}
-          <div>
-            <span style="font-size:0.7rem;color:var(--text-muted);">Screenshot-Zeit</span>
-            <span style="font-size:0.85rem;margin-left:0.3rem;color:var(--text-muted);">{{ e.server_time }}</span>
-          </div>
-          {% endif %}
-        </div>
 
-      </div>
-    </a>
-    </div>{# end position:relative wrapper #}
+        </div>
+      </a>
+    </div>
     {% endfor %}
+  </div>
+
+  <!-- Keine Treffer bei Suche -->
+  <div id="noResults" style="display:none;text-align:center;padding:2rem;color:var(--text-muted);font-size:0.9rem;">
+    🔍 Kein Held gefunden für diese Suche.
   </div>
 
   {% else %}
@@ -213,7 +239,7 @@
     <div style="font-weight:600;font-size:1.05rem;margin-bottom:0.4rem;">Noch keine Helden gescannt</div>
     <div style="font-size:0.85rem;color:var(--text-muted);max-width:420px;margin:0 auto;">
       Konfiguriere oben den Discord-Channel und poste dann Helden-Screenshots dort.
-      Der Bot erkennt automatisch Spielernamen, Stamm, Level und Ausrüstungsänderungen.
+      Oder lege Helden manuell an.
     </div>
   </div>
   {% endif %}
@@ -221,22 +247,57 @@
 </div>
 
 <script>
+// ── Kachel-Spalten ──────────────────────────────────────────────────
+function setCols(n) {
+  document.getElementById('heroGrid').style.gridTemplateColumns = `repeat(${n},1fr)`;
+  document.querySelectorAll('.cols-btn').forEach(b => {
+    const active = parseInt(b.dataset.cols) === n;
+    b.style.background = active ? 'rgba(59,130,246,0.2)' : 'transparent';
+    b.style.color = active ? '#93c5fd' : 'var(--text-muted)';
+  });
+  localStorage.setItem('heroScoutCols', n);
+}
+
+// Gespeicherte Spaltenanzahl wiederherstellen
+const savedCols = parseInt(localStorage.getItem('heroScoutCols') || '5');
+setCols(savedCols);
+
+// ── Suche ────────────────────────────────────────────────────────────
+function filterHeroes() {
+  const q = document.getElementById('heroSearch').value.toLowerCase().trim();
+  const cards = document.querySelectorAll('.hero-card');
+  let visible = 0;
+  cards.forEach(c => {
+    const name = c.dataset.name || '';
+    const show = !q || name.includes(q);
+    c.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('heroCount').textContent = q
+    ? `${visible} / {{ entries|length }} Helden`
+    : `{{ entries|length }} Helden`;
+  document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
+}
+
+// ── Item-Bibliothek Status ───────────────────────────────────────────
 async function loadLibraryStatus() {
   try {
     const r = await fetch('/guild/{{ guild.guild_id }}/defense/hero-scout/library-status');
     const d = await r.json();
     const el = document.getElementById('libraryStatus');
     if (d.ok && d.library_exists) {
-      el.innerHTML = `✅ Bibliothek aktiv — <strong>${d.item_count}</strong> Items geladen`;
+      el.innerHTML = `✅ <strong>${d.item_count}</strong> Items geladen`;
       el.style.color = '#22c55e';
     } else if (d.ok) {
-      el.innerHTML = '⚠️ Noch nicht aufgebaut — klicke "Aufbauen" um Item-Erkennung zu aktivieren.';
+      el.innerHTML = '⚠️ Nicht aufgebaut — klicke Aufbauen';
       el.style.color = '#f59e0b';
     } else {
-      el.textContent = 'Status nicht verfügbar (Bot offline?)';
+      el.textContent = 'Bot offline — automatische Erkennung inaktiv';
+      el.style.color = 'var(--text-muted)';
     }
   } catch(e) {
-    document.getElementById('libraryStatus').textContent = 'Bot nicht erreichbar.';
+    document.getElementById('libraryStatus').textContent = 'Bot nicht erreichbar — manuelle Einträge funktionieren trotzdem';
+    document.getElementById('libraryStatus').style.color = 'var(--text-muted)';
   }
 }
 
@@ -244,18 +305,18 @@ async function buildLibrary() {
   const btn = document.getElementById('buildBtn');
   const status = document.getElementById('libraryStatus');
   btn.disabled = true;
-  btn.textContent = '⏳ Wird aufgebaut…';
-  status.textContent = 'Lade Item-Icons vom Travian-Server… (30–60 Sekunden)';
+  btn.textContent = '⏳ …';
+  status.textContent = 'Lade Icons… (30–60 Sek.)';
   status.style.color = '#f59e0b';
   try {
     const r = await fetch('/guild/{{ guild.guild_id }}/defense/hero-scout/build-library', {method:'POST'});
     const d = await r.json();
     if (d.ok) {
-      status.textContent = '✅ Build gestartet — bitte 40 Sekunden warten, dann Status neu laden.';
+      status.textContent = '✅ Build gestartet — bitte warten…';
       status.style.color = '#22c55e';
       setTimeout(loadLibraryStatus, 40000);
     } else {
-      status.textContent = '❌ Fehler: ' + (d.error || 'Unbekannt');
+      status.textContent = '❌ ' + (d.error || 'Unbekannt');
       status.style.color = '#f87171';
     }
   } catch(e) {
@@ -263,7 +324,7 @@ async function buildLibrary() {
     status.style.color = '#f87171';
   }
   btn.disabled = false;
-  btn.textContent = '📦 Item-Bibliothek aufbauen';
+  btn.textContent = '📦 Aufbauen';
 }
 
 loadLibraryStatus();
