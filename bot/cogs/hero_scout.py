@@ -42,17 +42,19 @@ DB_PATH = database.DB_PATH
 IMAGES_DIR = Path("/app/data/hero_scout_images")
 
 # ------------------------------------------------------------------
-# Slot-Positionen (relativ zur Gesamt-Screenshot-Größe ~1100×710)
-# Sechs Slots auf der rechten Seite des Helden-Modals.
-# Geschätzte Koordinaten (x1, y1, x2, y2):
+# Slot-Positionen als RELATIVE Anteile des Gesamt-Screenshots (0.0–1.0)
+# Berechnet aus typischem 1101×709-Vollbild:
+#   Modal: x=435..1010, y=100..700 → Breite=575, Höhe=600
+#   Slots: rechte Seite des Modals, 6 Stück vertikal
 # ------------------------------------------------------------------
-SLOT_BOXES = [
-    (944, 178, 1000, 234),   # Helm
-    (944, 248, 1000, 304),   # Rüstung
-    (944, 318, 1000, 374),   # Schuhe
-    (944, 388, 1000, 444),   # Waffe
-    (944, 458, 1000, 514),   # Pferd
-    (944, 528, 1000, 584),   # Sonstiges
+SLOT_REL = [
+    # (x1_rel, y1_rel, x2_rel, y2_rel) — Anteile vom Gesamt-Screenshot
+    (0.857, 0.251, 0.908, 0.330),   # Helm
+    (0.857, 0.350, 0.908, 0.429),   # Rüstung
+    (0.857, 0.449, 0.908, 0.528),   # Schuhe
+    (0.857, 0.548, 0.908, 0.627),   # Waffe
+    (0.857, 0.647, 0.908, 0.726),   # Pferd
+    (0.857, 0.746, 0.908, 0.825),   # Sonstiges
 ]
 
 SLOT_NAMES = ["helm", "armor", "boots", "weapon", "mount", "misc"]
@@ -199,32 +201,43 @@ async def save_slot(entry_id: int, guild_id: str, idx: int, name: str, path: str
 # OCR + Bild-Verarbeitung
 # ------------------------------------------------------------------
 
-def _preprocess_for_ocr(img: "Image.Image") -> "Image.Image":
-    """
-    Bereitet ein Screenshot-Bild für Tesseract vor.
-    Travian: heller Text auf dunklem Hintergrund.
-    Strategie: 2× skalieren, grau, invertieren, Kontrast 2.5×
-    """
+def _prep_light_on_dark(img: "Image.Image", scale: int = 2) -> "Image.Image":
+    """Heller Text auf dunklem Hintergrund → invertieren + Kontrast."""
     from PIL import ImageEnhance, ImageOps
-
     w, h = img.size
-    img = img.resize((w * 2, h * 2), Image.LANCZOS)
+    img = img.resize((w * scale, h * scale), Image.LANCZOS)
     gray = img.convert("L")
-    inverted = ImageOps.invert(gray)
-    enhancer = ImageEnhance.Contrast(inverted)
-    return enhancer.enhance(2.5)
+    inv = ImageOps.invert(gray)
+    return ImageEnhance.Contrast(inv).enhance(2.5)
+
+
+def _ocr_serverzeit(img: "Image.Image") -> str:
+    """
+    Liest die Serverzeit aus dem Top-Left-Bereich (absolut ~erste 5% der Höhe).
+    Text ist hell auf dunklem Hintergrund, relativ einfache Schrift.
+    """
+    w, h = img.size
+    # Serverzeit-Banner: immer oben-links, ca. 28px hoch, ~270px breit
+    # Proportional: erste 5% der Höhe, erste 28% der Breite
+    y2 = max(30, int(h * 0.06))
+    x2 = max(300, int(w * 0.30))
+    crop = img.crop((0, 0, x2, y2))
+    processed = _prep_light_on_dark(crop, scale=4)
+    text = pytesseract.image_to_string(processed, config="--psm 7 -l eng+deu").strip()
+    print(f"[hero_scout] Serverzeit OCR: '{text}'", flush=True)
+    return text
 
 
 def _run_ocr(img: "Image.Image") -> str:
-    """Führt Tesseract mit optimalen Einstellungen für Travian-Screenshots aus."""
-    processed = _preprocess_for_ocr(img)
-    # PSM 4: einzelne Textspalte (passt gut zum Modal-Layout)
-    # PSM 11: sparse text (wenn 4 nichts liefert, als Fallback)
-    config = "--psm 4 -l eng"
-    text = pytesseract.image_to_string(processed, config=config)
+    """OCR auf dem Modal-Bereich (rechte Hälfte, ohne Top-Banner)."""
+    w, h = img.size
+    # Modal ist rechts — linke Sidebar (ca. 31%) und Top-Banner (ca. 6%) abschneiden
+    modal_crop = img.crop((int(w * 0.31), int(h * 0.06), w, h))
+    processed = _prep_light_on_dark(modal_crop, scale=2)
+    # PSM 4 = einzelne Textspalte, passt zum Modal
+    text = pytesseract.image_to_string(processed, config="--psm 4 -l eng+deu")
     if len(text.strip()) < 20:
-        # Fallback: sparse text mode
-        text = pytesseract.image_to_string(processed, config="--psm 11 -l eng")
+        text = pytesseract.image_to_string(processed, config="--psm 11 -l eng+deu")
     return text
 
 
@@ -366,25 +379,17 @@ def _ocr_modal_header(img: "Image.Image") -> str:
     return best
 
 
-def _crop_slots(img: "Image.Image") -> list[tuple[str, str]]:
+def _crop_slots(img: "Image.Image") -> list[tuple]:
     """
     Schneidet die 6 Ausrüstungsslots aus dem Screenshot.
-    Gibt Liste von (image_path_placeholder, hash) zurück.
-    Bilder werden noch nicht gespeichert — erst nach Entry-ID bekannt.
+    Koordinaten sind RELATIV zur Bildgröße → funktioniert für jede Auflösung.
     """
     slots = []
     w, h = img.size
-    scale_x = w / 1101
-    scale_y = h / 709
 
-    for (x1, y1, x2, y2) in SLOT_BOXES:
-        # Skaliere auf tatsächliche Bildgröße
-        bx1 = int(x1 * scale_x)
-        by1 = int(y1 * scale_y)
-        bx2 = int(x2 * scale_x)
-        by2 = int(y2 * scale_y)
-
-        # Bounds-Check
+    for (rx1, ry1, rx2, ry2) in SLOT_REL:
+        bx1 = int(rx1 * w); by1 = int(ry1 * h)
+        bx2 = int(rx2 * w); by2 = int(ry2 * h)
         bx1 = max(0, bx1); by1 = max(0, by1)
         bx2 = min(w, bx2); by2 = min(h, by2)
 
@@ -503,12 +508,21 @@ class HeroScoutCog(commands.Cog):
             try:
                 img = Image.open(io.BytesIO(img_bytes))
 
-                # OCR mit Preprocessing
+                # 1. Serverzeit separat aus Top-Left-Bereich
+                szeit_text = _ocr_serverzeit(img)
+                szeit_parsed = _parse_ocr_text(szeit_text)
+                if szeit_parsed.get("server_time"):
+                    data["server_time"] = szeit_parsed["server_time"]
+
+                # 2. Modal-OCR für alle anderen Felder
                 ocr_text = _run_ocr(img)
                 parsed = _parse_ocr_text(ocr_text)
+                # server_time nur überschreiben wenn noch nicht gesetzt
+                if data.get("server_time"):
+                    parsed.pop("server_time", None)
                 data.update(parsed)
 
-                # Spielername aus Modal-Header versuchen
+                # 3. Spielername aus Modal-Header
                 if not data.get("player_name"):
                     header_name = _ocr_modal_header(img)
                     if header_name and len(header_name) >= 2:
