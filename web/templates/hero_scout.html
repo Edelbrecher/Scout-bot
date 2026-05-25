@@ -145,19 +145,32 @@
         </div>
 
         <!-- Item-Slot-Vorschau -->
-        <div style="display:flex;gap:0.4rem;margin-top:0.75rem;flex-wrap:wrap;">
-          {% for slot_name in ['helm','armor','boots','weapon','mount','misc'] %}
-          <div style="width:44px;height:44px;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:rgba(0,0,0,0.3);">
-            <img src="/guild/{{ guild.guild_id }}/defense/hero-scout/img/{{ e.id }}/{{ slot_name }}"
-                 style="width:100%;height:100%;object-fit:cover;"
-                 onerror="this.style.display='none';this.parentNode.innerHTML='<div style=\'text-align:center;line-height:44px;font-size:1.1rem;\'>—</div>'">
+        {% set slot_icons = [
+          ('helm',   '🪖', 'Helm'),
+          ('armor',  '🛡️', 'Rüstung'),
+          ('boots',  '👢', 'Schuhe'),
+          ('weapon', '⚔️', 'Waffe'),
+          ('mount',  '🐴', 'Pferd'),
+          ('misc',   '💍', 'Sonstiges'),
+        ] %}
+        <div style="display:flex;gap:0.5rem;margin-top:0.85rem;flex-wrap:wrap;align-items:flex-end;">
+          {% for slot_name, slot_icon, slot_label in slot_icons %}
+          <div style="text-align:center;">
+            <div style="width:66px;height:66px;border:1px solid var(--border);border-radius:8px;
+                        overflow:hidden;background:rgba(0,0,0,0.35);position:relative;">
+              <img src="/guild/{{ guild.guild_id }}/defense/hero-scout/img/{{ e.id }}/{{ slot_name }}"
+                   style="width:100%;height:100%;object-fit:cover;"
+                   onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              {# Fallback: Icon + Label wenn kein Bild vorhanden #}
+              <div style="display:none;position:absolute;inset:0;flex-direction:column;
+                          align-items:center;justify-content:center;gap:0.1rem;">
+                <span style="font-size:1.6rem;line-height:1;">{{ slot_icon }}</span>
+                <span style="font-size:0.55rem;color:rgba(255,255,255,0.35);letter-spacing:.02em;">{{ slot_label }}</span>
+              </div>
+            </div>
+            <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.25rem;">{{ slot_label }}</div>
           </div>
           {% endfor %}
-          <div style="display:flex;align-items:center;gap:0.3rem;margin-left:0.5rem;">
-            <span style="font-size:0.72rem;color:var(--text-muted);">
-              Helm · Rüstung · Schuhe · Waffe · Pferd · Sonstiges
-            </span>
-          </div>
         </div>
 
         <!-- Stats -->
