@@ -8,11 +8,13 @@ Zusätzlich werden die 6 Ausrüstungsslots als Bild-Crops gespeichert (da Icons,
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import io
 import os
 import re
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import aiosqlite
@@ -406,29 +408,37 @@ def _crop_slots(img: "Image.Image") -> list[tuple]:
     return slots
 
 
-def _extract_name_from_message(content: str) -> str:
+def _extract_names_from_message(content: str) -> list[str]:
     """
-    Extrahiert den Spielernamen aus dem Nachrichtentext.
+    Extrahiert alle Spielernamen aus dem Nachrichtentext.
     Unterstützte Formate:
-      "ZalmecAwp"
-      "Scout: ZalmecAwp"
-      "Held: ZalmecAwp"
-      "ZalmecAwp (Teutons)"
-    Gibt leeren String zurück wenn nichts Sinnvolles gefunden.
+      "ZalmecAwp"                      → ["ZalmecAwp"]
+      "Scout: ZalmecAwp"               → ["ZalmecAwp"]
+      "ZalmecAwp Currax"               → ["ZalmecAwp", "Currax"]  (2 Bilder)
+      "ZalmecAwp (Teutons)"            → ["ZalmecAwp"]
+    Gibt leere Liste zurück wenn nichts Sinnvolles gefunden.
     """
     if not content or not content.strip():
-        return ""
+        return []
     text = content.strip()
     # Präfix entfernen: "Scout:", "Held:", "Hero:", "Name:" etc.
     text = re.sub(r"^(scout|held|hero|name|spieler)[:\s]+", "", text, flags=re.IGNORECASE)
-    # Klammern-Suffix entfernen: "(Teutons)" etc.
-    text = re.sub(r"\s*\(.*\).*$", "", text)
-    # Nur den ersten "Token" nehmen (bis Leerzeichen/Zeilenumbruch)
-    first_word = text.split()[0] if text.split() else ""
-    # Plausibilitätsprüfung: 2-30 Zeichen, alphanumerisch+Sonderzeichen
-    if 2 <= len(first_word) <= 30 and re.match(r"^[A-Za-z0-9\-_çÇğĞıİöÖşŞüÜáéíóúäåæøñ]+$", first_word):
-        return first_word
-    return ""
+    # Klammern-Inhalte entfernen: "(Teutons)" etc.
+    text = re.sub(r"\s*\([^)]*\)", "", text)
+    # Alle Token extrahieren
+    tokens = text.split()
+    names = []
+    for word in tokens:
+        word = word.strip(",.:-")
+        if 2 <= len(word) <= 30 and re.match(r"^[A-Za-z0-9\-_çÇğĞıİöÖşŞüÜáéíóúäåæøñ]+$", word):
+            names.append(word)
+    return names
+
+
+def _extract_name_from_message(content: str) -> str:
+    """Rückwärtskompatibel: ersten Namen aus Nachricht zurückgeben."""
+    names = _extract_names_from_message(content)
+    return names[0] if names else ""
 
 
 def _slots_combined_hash(slot_hashes: list[str]) -> str:
@@ -466,22 +476,35 @@ class HeroScoutCog(commands.Cog):
         if str(message.channel.id) != configured_channel:
             return
 
-        # Bilder verarbeiten
-        processed = 0
-        for attachment in message.attachments:
-            if not any(attachment.filename.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp")):
-                continue
-            await self._process_attachment(message, attachment, guild_id)
-            processed += 1
-
-        if processed == 0:
+        # Bilder sammeln
+        image_attachments = [
+            a for a in message.attachments
+            if any(a.filename.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp"))
+        ]
+        if not image_attachments:
             return
+
+        # Namen aus Nachrichtentext extrahieren — Unterstützung für mehrere Namen
+        # "ZalmecAwp Currax" → Bild 0 → ZalmecAwp, Bild 1 → Currax
+        names_in_text = _extract_names_from_message(message.content)
+
+        # Bilder NACHEINANDER (sequenziell) verarbeiten damit Tesseract nicht überlastet wird
+        for i, attachment in enumerate(image_attachments):
+            # Namen zuordnen: wenn genug Namen da sind, nimm Namen[i], sonst Namen[0]
+            if len(names_in_text) > i:
+                name_hint = names_in_text[i]
+            elif len(names_in_text) == 1:
+                name_hint = names_in_text[0]
+            else:
+                name_hint = ""
+            await self._process_attachment(message, attachment, guild_id, name_hint=name_hint)
 
     async def _process_attachment(
         self,
         message: discord.Message,
         attachment: discord.Attachment,
         guild_id: str,
+        name_hint: str = "",
     ):
         reporter_id = str(message.author.id)
         reporter_name = message.author.display_name
@@ -489,42 +512,39 @@ class HeroScoutCog(commands.Cog):
         # Bild herunterladen
         img_bytes = await attachment.read()
 
-        # Spielername aus Nachrichtentext extrahieren (höchste Priorität)
-        # User schreibt: "ZalmecAwp" oder "Scout: ZalmecAwp" oder einfach den Namen
-        name_from_text = _extract_name_from_message(message.content)
-
         data: dict = {
             "reporter_id": reporter_id,
             "reporter_name": reporter_name,
             "discord_url": attachment.url,
         }
-        if name_from_text:
-            data["player_name"] = name_from_text
+        if name_hint:
+            data["player_name"] = name_hint
 
         slot_crops = []
         slot_hashes = []
 
         if OCR_AVAILABLE:
             try:
+                loop = asyncio.get_event_loop()
                 img = Image.open(io.BytesIO(img_bytes))
 
-                # 1. Serverzeit separat aus Top-Left-Bereich
-                szeit_text = _ocr_serverzeit(img)
+                # 1. Serverzeit separat aus Top-Left-Bereich (in Thread-Pool)
+                szeit_text = await loop.run_in_executor(None, partial(_ocr_serverzeit, img))
                 szeit_parsed = _parse_ocr_text(szeit_text)
                 if szeit_parsed.get("server_time"):
                     data["server_time"] = szeit_parsed["server_time"]
 
-                # 2. Modal-OCR für alle anderen Felder
-                ocr_text = _run_ocr(img)
+                # 2. Modal-OCR für alle anderen Felder (in Thread-Pool)
+                ocr_text = await loop.run_in_executor(None, partial(_run_ocr, img))
                 parsed = _parse_ocr_text(ocr_text)
                 # server_time nur überschreiben wenn noch nicht gesetzt
                 if data.get("server_time"):
                     parsed.pop("server_time", None)
                 data.update(parsed)
 
-                # 3. Spielername aus Modal-Header
+                # 3. Spielername aus Modal-Header (nur wenn noch keiner da)
                 if not data.get("player_name"):
-                    header_name = _ocr_modal_header(img)
+                    header_name = await loop.run_in_executor(None, partial(_ocr_modal_header, img))
                     if header_name and len(header_name) >= 2:
                         data["player_name"] = header_name
 
@@ -537,7 +557,8 @@ class HeroScoutCog(commands.Cog):
                 data["slots_hash"] = _slots_combined_hash(slot_hashes)
 
             except Exception as e:
-                print(f"[hero_scout] OCR error: {e}")
+                import traceback
+                print(f"[hero_scout] OCR error: {e}\n{traceback.format_exc()}")
         else:
             # Kein OCR — nur URL speichern
             data["player_name"] = f"unbekannt_{datetime.utcnow().strftime('%H%M%S')}"
