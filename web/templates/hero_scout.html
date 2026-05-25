@@ -10,6 +10,12 @@
       <h1 style="margin:0.25rem 0 0;">🗡️ Helden-Scout</h1>
       <p class="subtitle" style="margin:0;">Gegnerische Helden beobachten — Ausrüstungsänderungen erkennen</p>
     </div>
+    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/new"
+       style="padding:0.5rem 1.1rem;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
+              border-radius:8px;color:#86efac;font-weight:600;text-decoration:none;font-size:0.88rem;
+              display:flex;align-items:center;gap:0.4rem;white-space:nowrap;">
+      ➕ Held manuell anlegen
+    </a>
   </div>
 
   {% if flash == 'channel_saved' %}
@@ -87,6 +93,12 @@
                 <span style="font-size:0.72rem;background:rgba(245,158,11,0.15);color:#f59e0b;
                       border-radius:4px;padding:0.1rem 0.5rem;margin-left:0.4rem;font-weight:700;">
                   ⚠️ Ausrüstung geändert
+                </span>
+                {% endif %}
+                {% if e.source == 'manual' %}
+                <span style="font-size:0.68rem;background:rgba(139,92,246,0.15);color:#c4b5fd;
+                      border-radius:4px;padding:0.1rem 0.45rem;margin-left:0.3rem;font-weight:600;">
+                  ✏️ Manuell
                 </span>
                 {% endif %}
               </div>

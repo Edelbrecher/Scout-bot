@@ -4002,8 +4002,8 @@ import datetime as _dt
 
 _IMPRESSUM = {
     "name":        os.environ.get("IMPRESSUM_NAME", "Maximilian Frischholz"),
-    "street":      os.environ.get("IMPRESSUM_STREET", "Musterstraße 1"),
-    "city":        os.environ.get("IMPRESSUM_CITY", "12345 Musterstadt"),
+    "street":      os.environ.get("IMPRESSUM_STREET", "Eberhard-Wildermuth-Straße 58"),
+    "city":        os.environ.get("IMPRESSUM_CITY", "34121 Kassel"),
     "country":     os.environ.get("IMPRESSUM_COUNTRY", "Deutschland"),
     "email":       os.environ.get("IMPRESSUM_EMAIL", "kontakt@travops.online"),
     "phone":       os.environ.get("IMPRESSUM_PHONE", ""),
@@ -5275,7 +5275,8 @@ async def _get_hero_scout_entries(guild_id: str) -> list:
         db.row_factory = aiosqlite.Row
         # Nur den neuesten Eintrag pro Spieler
         async with db.execute("""
-            SELECT e.*, GROUP_CONCAT(s.img_hash ORDER BY s.slot_index) as slot_hashes,
+            SELECT e.*, COALESCE(e.source, 'screenshot') as source,
+                   GROUP_CONCAT(s.img_hash ORDER BY s.slot_index) as slot_hashes,
                    GROUP_CONCAT(s.image_path ORDER BY s.slot_index, '|||') as slot_paths
             FROM hero_scout_entries e
             LEFT JOIN hero_scout_slots s ON s.entry_id = e.id
@@ -5293,16 +5294,28 @@ async def _get_hero_scout_history(guild_id: str, player_name: str) -> list:
     db_path = Path("/app/data/scouter.db")
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
+        # Einträge laden
         async with db.execute("""
-            SELECT e.*, GROUP_CONCAT(s.image_path, '|||') as slot_paths_raw
+            SELECT e.*, COALESCE(e.source, 'screenshot') as source
             FROM hero_scout_entries e
-            LEFT JOIN hero_scout_slots s ON s.entry_id = e.id
             WHERE e.guild_id=? AND lower(e.player_name)=lower(?)
-            GROUP BY e.id
             ORDER BY e.created_at DESC
-            LIMIT 20
+            LIMIT 40
         """, (guild_id, player_name)) as cur:
-            return [dict(r) for r in await cur.fetchall()]
+            rows = [dict(r) for r in await cur.fetchall()]
+
+        # Für jeden Eintrag die Slot-Item-Namen laden
+        for row in rows:
+            entry_id = row["id"]
+            async with db.execute("""
+                SELECT slot_name, item_name, image_path FROM hero_scout_slots
+                WHERE entry_id=? ORDER BY slot_index
+            """, (entry_id,)) as scur:
+                for s in await scur.fetchall():
+                    row[f"slot_{s['slot_name']}"] = s["item_name"] or ""
+                    row[f"img_{s['slot_name']}"] = s["image_path"] or ""
+
+        return rows
 
 async def _get_discord_channels(guild_id: str) -> list:
     """Fragt die Bot-API nach verfügbaren Text-Channels."""
@@ -5431,6 +5444,248 @@ async def hero_scout_slot_image(request: Request, guild_id: str, entry_id: int, 
     if not path.exists():
         return Response(status_code=404)
     return FileResponse(str(path), media_type="image/png")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Manueller Held-Scout
+# ──────────────────────────────────────────────────────────────────────
+
+# Alle bekannten Hero-Items (hardcoded, spiegelt hero_item_db.py im Bot)
+_HERO_ITEMS_BY_CAT = {
+    "helmet": [
+        ("helm_wood_1", "Helm des Holzfällers"), ("helm_clay_1", "Helm des Töpfers"),
+        ("helm_iron_1", "Helm des Schmieds"), ("helm_crop_1", "Helm des Bauern"),
+        ("helm_commander", "Helm des Kommandeurs"), ("helm_recon", "Helm des Aufklärers"),
+        ("helm_theutates", "Helm des Theutates"), ("helm_legionnaire", "Helm des Legionärs"),
+        ("helm_breastplate", "Helm des Brustpanzers"), ("helm_gold", "Goldener Helm"),
+        ("helm_artwork", "Kunstwerk"), ("helm_great_storage", "Großer Lagerhelm"),
+    ],
+    "armor": [
+        ("armor_wood_1", "Rüstung des Holzfällers"), ("armor_clay_1", "Rüstung des Töpfers"),
+        ("armor_iron_1", "Rüstung des Schmieds"), ("armor_crop_1", "Rüstung des Bauern"),
+        ("armor_hero", "Helden-Rüstung"), ("armor_leather", "Lederrüstung"),
+        ("armor_chain", "Kettenrüstung"), ("armor_plate", "Plattenrüstung"),
+        ("armor_gold", "Goldene Rüstung"),
+    ],
+    "boots": [
+        ("boots_wood_1", "Stiefel des Holzfällers"), ("boots_clay_1", "Stiefel des Töpfers"),
+        ("boots_iron_1", "Stiefel des Schmieds"), ("boots_crop_1", "Stiefel des Bauern"),
+        ("boots_traveller", "Wanderstiefel"), ("boots_hero", "Heldenstiefel"),
+        ("boots_gold", "Goldene Stiefel"),
+    ],
+    "weapon": [
+        ("weapon_club_1", "Keule"), ("weapon_spear_1", "Speer"), ("weapon_axe_1", "Axt"),
+        ("weapon_sword_1", "Schwert"), ("weapon_hammer_1", "Hammer"),
+        ("weapon_bow_1", "Bogen"), ("weapon_staff_1", "Stab"),
+        ("weapon_gold", "Goldene Waffe"), ("weapon_artwork", "Kunstwerk (Waffe)"),
+    ],
+    "mount": [
+        ("mount_horse", "Pferd"), ("mount_elephant", "Elefant"), ("mount_tiger", "Tiger"),
+        ("mount_camel", "Kamel"), ("mount_gold", "Goldenes Reittier"),
+    ],
+    "misc": [
+        ("misc_bandage_1", "Verband (25%)"), ("misc_bandage_2", "Verband (33%)"),
+        ("misc_bandage_3", "Verband (50%)"), ("misc_ointment_1", "Salbe"),
+        ("misc_scroll", "Pergament"), ("misc_bucket", "Eimer"),
+        ("misc_artwork", "Kunstwerk (Diverses)"), ("misc_cage", "Käfig"),
+        ("misc_gold", "Goldenes Diverses"),
+    ],
+}
+
+_SLOT_NAMES_DE = {
+    "helm": "Helm", "armor": "Rüstung", "boots": "Schuhe",
+    "weapon": "Waffe", "mount": "Pferd/Reittier", "misc": "Sonstiges",
+}
+_CAT_TO_SLOT = {
+    "helmet": "helm", "armor": "armor", "boots": "boots",
+    "weapon": "weapon", "mount": "mount", "misc": "misc",
+}
+
+
+async def _init_manual_hero_table():
+    import aiosqlite
+    db_path = Path("/app/data/scouter.db")
+    async with aiosqlite.connect(db_path) as db:
+        # hero_scout_entries hat bereits alle nötigen Felder.
+        # Wir ergänzen eine Spalte 'source' um manuelle von Screenshot-Einträgen zu unterscheiden.
+        try:
+            await db.execute("ALTER TABLE hero_scout_entries ADD COLUMN source TEXT DEFAULT 'screenshot'")
+            await db.commit()
+        except Exception:
+            pass
+        # item_name Spalte für hero_scout_slots (falls noch nicht vorhanden)
+        try:
+            await db.execute("ALTER TABLE hero_scout_slots ADD COLUMN item_name TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
+        await db.commit()
+
+
+@app.get("/guild/{guild_id}/defense/hero-scout/manual/new", response_class=HTMLResponse)
+async def hero_scout_manual_new(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    await _init_manual_hero_table()
+    flash = request.query_params.get("flash", "")
+    return templates.TemplateResponse("hero_scout_manual.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "items_by_cat": _HERO_ITEMS_BY_CAT,
+        "slot_names_de": _SLOT_NAMES_DE,
+        "cat_to_slot": _CAT_TO_SLOT,
+        "prefill": {},
+        "flash": flash,
+        "edit_player": None,
+    })
+
+
+@app.get("/guild/{guild_id}/defense/hero-scout/manual/{player_name}/add", response_class=HTMLResponse)
+async def hero_scout_manual_add_version(request: Request, guild_id: str, player_name: str):
+    """Neue Version für bestehenden Spieler anlegen — Felder vorausfüllen."""
+    from urllib.parse import unquote
+    player_name = unquote(player_name)
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    await _init_manual_hero_table()
+
+    # Letzten Eintrag laden zum Vorausfüllen
+    import aiosqlite
+    db_path = Path("/app/data/scouter.db")
+    prefill: dict = {}
+    prefill_slots: dict = {}
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM hero_scout_entries
+            WHERE guild_id=? AND lower(player_name)=lower(?)
+            ORDER BY created_at DESC LIMIT 1
+        """, (guild_id, player_name)) as cur:
+            row = await cur.fetchone()
+            if row:
+                prefill = dict(row)
+        if prefill.get("id"):
+            async with db.execute("""
+                SELECT slot_name, item_name FROM hero_scout_slots
+                WHERE entry_id=? ORDER BY slot_index
+            """, (prefill["id"],)) as cur:
+                for r in await cur.fetchall():
+                    prefill_slots[r["slot_name"]] = r["item_name"]
+    prefill["slots"] = prefill_slots
+
+    return templates.TemplateResponse("hero_scout_manual.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "items_by_cat": _HERO_ITEMS_BY_CAT,
+        "slot_names_de": _SLOT_NAMES_DE,
+        "cat_to_slot": _CAT_TO_SLOT,
+        "prefill": prefill,
+        "flash": "",
+        "edit_player": player_name,
+    })
+
+
+@app.post("/guild/{guild_id}/defense/hero-scout/manual/save")
+async def hero_scout_manual_save(
+    request: Request,
+    guild_id: str,
+    player_name: str = Form(""),
+    tribe: str = Form(""),
+    alliance: str = Form(""),
+    hero_level: int = Form(0),
+    hero_xp: int = Form(0),
+    villages: int = Form(0),
+    attacker_rank: int = Form(0),
+    defender_rank: int = Form(0),
+    server_time: str = Form(""),
+    slot_helm: str = Form(""),
+    slot_armor: str = Form(""),
+    slot_boots: str = Form(""),
+    slot_weapon: str = Form(""),
+    slot_mount: str = Form(""),
+    slot_misc: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await _init_manual_hero_table()
+
+    import aiosqlite, hashlib as _hl
+    db_path = Path("/app/data/scouter.db")
+    now = __import__("datetime").datetime.utcnow().isoformat()
+
+    reporter_name = session.get("username", "?")
+    reporter_id   = session.get("user_id", "")
+
+    # Slots zusammenfassen
+    slot_vals = {
+        "helm": slot_helm, "armor": slot_armor, "boots": slot_boots,
+        "weapon": slot_weapon, "mount": slot_mount, "misc": slot_misc,
+    }
+    slots_hash_str = _hl.md5("".join(slot_vals.values()).encode()).hexdigest()
+
+    # Änderung erkennen
+    changed = 0
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute("""
+            SELECT e.id, e.slots_hash FROM hero_scout_entries e
+            WHERE guild_id=? AND lower(player_name)=lower(?)
+            ORDER BY created_at DESC LIMIT 1
+        """, (guild_id, player_name.strip())) as cur:
+            prev = await cur.fetchone()
+            if prev and prev[1] and prev[1] != slots_hash_str:
+                changed = 1
+
+    # Eintrag speichern
+    async with aiosqlite.connect(db_path) as db:
+        cur = await db.execute("""
+            INSERT INTO hero_scout_entries
+                (guild_id, player_name, tribe, alliance, villages, hero_level, hero_xp,
+                 attacker_rank, defender_rank, server_time, reporter_id, reporter_name,
+                 discord_url, slots_hash, changed, created_at, source)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            guild_id, player_name.strip(), tribe.strip(), alliance.strip(),
+            villages, hero_level, hero_xp, attacker_rank, defender_rank,
+            server_time.strip(), reporter_id, reporter_name,
+            "", slots_hash_str, changed, now, "manual",
+        ))
+        await db.commit()
+        entry_id = cur.lastrowid
+
+        # item_name Spalte sicherstellen
+        try:
+            await db.execute("ALTER TABLE hero_scout_slots ADD COLUMN item_name TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
+
+        for idx, (sname, item_name) in enumerate(slot_vals.items()):
+            await db.execute("""
+                INSERT INTO hero_scout_slots (entry_id, guild_id, slot_index, slot_name,
+                    image_path, img_hash, item_name)
+                VALUES (?,?,?,?,?,?,?)
+            """, (entry_id, guild_id, idx, sname, "", "", item_name))
+        await db.commit()
+
+    from urllib.parse import quote
+    return RedirectResponse(
+        f"/guild/{guild_id}/defense/hero-scout/{quote(player_name.strip())}?flash=saved",
+        status_code=303,
+    )
 
 
 @app.get("/guild/{guild_id}/tools/crop-calculator", response_class=HTMLResponse)
