@@ -2,38 +2,130 @@
 {% block title %}Dashboard · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1100px;">
+<style>
+  /* ── Dashboard-Breite: 2/3 des Browser-Fensters ── */
+  .dash-wrap {
+    max-width: min(66vw, 1200px);
+    min-width: 320px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  /* ── Draggable Kacheln ── */
+  .guild-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 2rem;
+  }
+
+  .guild-tile {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    border-radius: 10px;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  }
+  .guild-tile:active { cursor: grabbing; }
+
+  .guild-tile.dragging {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  .guild-tile.drag-over {
+    box-shadow: 0 0 0 2px #3b82f6, 0 4px 20px rgba(59,130,246,0.25);
+    transform: scale(1.02);
+  }
+
+  .guild-tile a {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    height: 100%;
+    transition: border-color 0.15s;
+    pointer-events: none; /* verhindert Link-Klick während Drag */
+  }
+  .guild-tile:not(.dragging):not(.drag-over) a {
+    pointer-events: auto;
+  }
+  .guild-tile a:hover { border-color: #3b82f6; }
+
+  /* Drag-Handle-Indikator */
+  .guild-tile::before {
+    content: '⠿';
+    position: absolute;
+    top: 0.45rem;
+    right: 0.55rem;
+    color: rgba(255,255,255,0.15);
+    font-size: 0.9rem;
+    pointer-events: none;
+    transition: color 0.15s;
+  }
+  .guild-tile:hover::before { color: rgba(255,255,255,0.4); }
+  .guild-tile { position: relative; }
+
+  /* ── Mobile ── */
+  @media (max-width: 768px) {
+    .dash-wrap {
+      max-width: 100%;
+      padding: 0 0.75rem;
+    }
+    .guild-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+    .guild-tile a {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.85rem 0.85rem 0.75rem;
+    }
+    .guild-tile a .arrow { display: none; }
+    .benefits-grid {
+      grid-template-columns: 1fr !important;
+    }
+    h1.hero-title { font-size: 1.6rem !important; }
+    .hero-section { padding: 1.5rem 0.5rem 1rem !important; }
+    .stat-card { display: none !important; }
+  }
+  @media (max-width: 480px) {
+    .guild-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Drop-Zone-Feedback ── */
+  .drop-placeholder {
+    border: 2px dashed rgba(59,130,246,0.4);
+    border-radius: 10px;
+    background: rgba(59,130,246,0.05);
+    min-height: 80px;
+  }
+</style>
+
+<div class="dash-wrap">
 
   <!-- ── Payment Warning Banner ── -->
   {% set past_due_guilds = guilds | selectattr("subscription_status", "equalto", "past_due") | list %}
   {% if past_due_guilds %}
-  <div style="background:linear-gradient(135deg,rgba(220,38,38,0.15),rgba(153,27,27,0.1)); border:1px solid rgba(220,38,38,0.4); border-radius:12px; padding:1.25rem 1.5rem; margin:1.5rem 0 0.5rem; display:flex; gap:1rem; align-items:flex-start;">
-    <div style="font-size:1.8rem; flex-shrink:0;">⚠️</div>
+  <div style="background:linear-gradient(135deg,rgba(220,38,38,0.15),rgba(153,27,27,0.1));border:1px solid rgba(220,38,38,0.4);border-radius:12px;padding:1.25rem 1.5rem;margin:1.5rem 0 0.5rem;display:flex;gap:1rem;align-items:flex-start;">
+    <div style="font-size:1.8rem;flex-shrink:0;">⚠️</div>
     <div style="flex:1;">
-      <div style="font-weight:700; color:#fca5a5; margin-bottom:0.35rem; font-size:1rem;">
-        Zahlung fehlgeschlagen — Zugang wird bald auf Free heruntergestuft
-      </div>
-      <div style="font-size:0.85rem; color:#f87171; margin-bottom:0.75rem;">
-        {% if past_due_guilds | length == 1 %}
-          Für den Server <strong>{{ past_due_guilds[0].guild_name }}</strong> konnte keine Zahlung eingezogen werden.
+      <div style="font-weight:700;color:#fca5a5;margin-bottom:0.35rem;">Zahlung fehlgeschlagen — Zugang wird bald auf Free heruntergestuft</div>
+      <div style="font-size:0.85rem;color:#f87171;margin-bottom:0.75rem;">
+        {% if past_due_guilds|length == 1 %}
+          Für <strong>{{ past_due_guilds[0].guild_name }}</strong> konnte keine Zahlung eingezogen werden.
         {% else %}
-          Betroffen: {% for g in past_due_guilds %}<strong>{{ g.guild_name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}.
+          Betroffen: {% for g in past_due_guilds %}<strong>{{ g.guild_name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
         {% endif %}
-        Bitte aktualisiere deine Zahlungsdaten, um den Pro-Zugang zu behalten.
       </div>
-      <div style="font-size:0.82rem; color:#fca5a5; margin-bottom:0.75rem; line-height:1.6;">
-        <span style="font-weight:600; color:#f87171;">Diese Pro-Features fallen weg:</span><br>
-        🗺️ Automatische Karten-Snapshots &nbsp;·&nbsp;
-        🚨 Angriffserkennung &amp; Discord-Alerts &nbsp;·&nbsp;
-        ⏱️ Marschzeit-Kalkulator mit Erinnerungen<br>
-        📡 Inaktiv-Farm-Radar &nbsp;·&nbsp;
-        📊 Angriffsanalyse &amp; Berichte &nbsp;·&nbsp;
-        📦 Ressourcenanfragen-System &nbsp;·&nbsp;
-        🔔 Absende-Erinnerungen mit 'Go Troops GO' Link
-      </div>
-      <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
         {% for g in past_due_guilds %}
-        <a href="/guild/{{ g.guild_id }}/billing" style="display:inline-block; background:#dc2626; color:#fff; text-decoration:none; padding:0.4rem 1.1rem; border-radius:8px; font-size:0.85rem; font-weight:600;">
+        <a href="/guild/{{ g.guild_id }}/billing" style="background:#dc2626;color:#fff;text-decoration:none;padding:0.4rem 1.1rem;border-radius:8px;font-size:0.85rem;font-weight:600;">
           💳 Zahlung für {{ g.guild_name }} aktualisieren →
         </a>
         {% endfor %}
@@ -43,160 +135,305 @@
   {% endif %}
 
   <!-- ── Hero ── -->
-  <div style="text-align:center; padding:2.5rem 1rem 1.5rem; position:relative;">
-    <div style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:20px; padding:0.3rem 1rem; font-size:0.8rem; color:#93c5fd; margin-bottom:1rem;">
-      ⏱️ <span data-i18n="hero.tagline">Spare 3+ Stunden pro Woche — automatisch.</span>
+  <div class="hero-section" style="text-align:center;padding:2.5rem 1rem 1.5rem;">
+    <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:20px;padding:0.3rem 1rem;font-size:0.8rem;color:#93c5fd;margin-bottom:1rem;">
+      ⏱️ Spare 3+ Stunden pro Woche — automatisch.
     </div>
-    <h1 style="font-size:2rem; font-weight:800; margin:0 0 0.75rem; background:linear-gradient(135deg,#f1f5f9,#93c5fd); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">
+    <h1 class="hero-title" style="font-size:2rem;font-weight:800;margin:0 0 0.75rem;background:linear-gradient(135deg,#f1f5f9,#93c5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
       TravOps
     </h1>
-    <p style="color:var(--text-muted); font-size:1rem; max-width:560px; margin:0 auto 0;" data-i18n="hero.sub">
+    <p style="color:var(--text-muted);font-size:1rem;max-width:520px;margin:0 auto;">
       TravOps übernimmt die mühsame Arbeit, damit deine Allianz sich auf das Wesentliche konzentrieren kann: Gewinnen.
     </p>
   </div>
 
   <!-- ── Benefits Grid ── -->
-  <div style="margin:1.5rem 0 2rem;">
-    <h2 style="text-align:center; font-size:1rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:1.25rem;" data-i18n="benefits.title">
+  <div style="margin:1.25rem 0 1.75rem;">
+    <h2 style="text-align:center;font-size:0.9rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">
       Warum tausende Gilden auf TravOps vertrauen
     </h2>
+    <div class="benefits-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.85rem;">
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem;">
-
-      <!-- Benefit 1: Zeit sparen -->
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; display:flex; gap:1rem; align-items:flex-start;">
-        <div style="font-size:2rem; flex-shrink:0; width:2.5rem; text-align:center;">⏳</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
+        <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">⏳</div>
         <div>
-          <div style="font-weight:700; margin-bottom:0.3rem;" data-i18n="benefit.time.title">Stunden pro Woche sparen</div>
-          <div style="font-size:0.83rem; color:var(--text-muted); line-height:1.5;" data-i18n="benefit.time.body">
-            Automatische Karten-Snapshots, Angriffserkennung und Marschzeit-Kalkulator ersetzen stundenlange manuelle Arbeit — jeden einzelnen Tag.
-          </div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Stunden pro Woche sparen</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Automatische Karten-Snapshots, Angriffserkennung und Marschzeit-Kalkulator ersetzen stundenlange manuelle Arbeit.</div>
         </div>
       </div>
 
-      <!-- Benefit 2: Koordination -->
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; display:flex; gap:1rem; align-items:flex-start;">
-        <div style="font-size:2rem; flex-shrink:0; width:2.5rem; text-align:center;">🤝</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
+        <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">🤝</div>
         <div>
-          <div style="font-weight:700; margin-bottom:0.3rem;" data-i18n="benefit.coord.title">Perfekte Koordination</div>
-          <div style="font-size:0.83rem; color:var(--text-muted); line-height:1.5;" data-i18n="benefit.coord.body">
-            Ressourcenanfragen, Angriffsmeldungen und Einsatzplanung landen direkt im Discord — dein Team reagiert in Sekunden, nicht Minuten.
-          </div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Perfekte Koordination</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Ressourcenanfragen, Angriffsmeldungen und Einsatzplanung landen direkt im Discord.</div>
         </div>
       </div>
 
-      <!-- Benefit 3: Intel -->
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; display:flex; gap:1rem; align-items:flex-start;">
-        <div style="font-size:2rem; flex-shrink:0; width:2.5rem; text-align:center;">🔭</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
+        <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">🔭</div>
         <div>
-          <div style="font-weight:700; margin-bottom:0.3rem;" data-i18n="benefit.intel.title">Immer einen Schritt voraus</div>
-          <div style="font-size:0.83rem; color:var(--text-muted); line-height:1.5;" data-i18n="benefit.intel.body">
-            Interaktive Karte, Inaktiv-Farm-Radar und Angriffsanalyse liefern Informationen, die deine Gegner schlicht nicht haben.
-          </div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Immer einen Schritt voraus</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Interaktive Karte, Inaktiv-Farm-Radar und Angriffsanalyse liefern Infos, die deine Gegner nicht haben.</div>
         </div>
       </div>
 
-      <!-- Benefit 4: Erinnerungen -->
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; display:flex; gap:1rem; align-items:flex-start;">
-        <div style="font-size:2rem; flex-shrink:0; width:2.5rem; text-align:center;">🔔</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
+        <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">🔔</div>
         <div>
-          <div style="font-weight:700; margin-bottom:0.3rem;" data-i18n="benefit.never.title">Keinen Einsatz mehr verpassen</div>
-          <div style="font-size:0.83rem; color:var(--text-muted); line-height:1.5;" data-i18n="benefit.never.body">
-            Präzise Absende-Erinnerungen feuern genau dann, wenn du klicken musst — mit direktem 'Go Troops GO' Link im Alarm.
-          </div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Keinen Einsatz mehr verpassen</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Präzise Absende-Erinnerungen mit direktem 'Go Troops GO' Link im Alarm.</div>
         </div>
       </div>
 
-      <!-- Benefit 5: Setup -->
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; display:flex; gap:1rem; align-items:flex-start;">
-        <div style="font-size:2rem; flex-shrink:0; width:2.5rem; text-align:center;">⚡</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
+        <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">⚡</div>
         <div>
-          <div style="font-weight:700; margin-bottom:0.3rem;" data-i18n="benefit.setup.title">In unter 2 Minuten startklar</div>
-          <div style="font-size:0.83rem; color:var(--text-muted); line-height:1.5;" data-i18n="benefit.setup.body">
-            Ein-Klick Auto-Setup, kein technisches Wissen erforderlich. Alles funktioniert sofort.
-          </div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">In unter 2 Minuten startklar</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Ein-Klick Auto-Setup, kein technisches Wissen erforderlich.</div>
         </div>
       </div>
 
-      <!-- Stat card -->
-      <div style="background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.1)); border:1px solid rgba(59,130,246,0.3); border-radius:12px; padding:1.25rem; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:0.5rem;">
-        <div style="font-size:2.8rem; font-weight:800; color:#93c5fd; line-height:1;">3+</div>
-        <div style="font-size:0.85rem; color:var(--text-muted);">Stunden Ersparnis<br>pro Woche &amp; Server</div>
-        <div style="font-size:0.75rem; color:#3b82f6; margin-top:0.25rem;">≈ 150+ Stunden/Jahr</div>
+      <div class="stat-card" style="background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.1));border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:0.4rem;">
+        <div style="font-size:2.5rem;font-weight:800;color:#93c5fd;line-height:1;">3+</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);">Stunden Ersparnis<br>pro Woche &amp; Server</div>
+        <div style="font-size:0.72rem;color:#3b82f6;margin-top:0.15rem;">≈ 150+ Stunden/Jahr</div>
       </div>
 
     </div>
   </div>
 
   <!-- ── Divider ── -->
-  <div style="border-top:1px solid var(--border); margin:0.5rem 0 1.5rem;"></div>
+  <div style="border-top:1px solid var(--border);margin:0.5rem 0 1.25rem;"></div>
 
   <!-- ── Server-Liste ── -->
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-      <h2 style="margin:0; font-size:1.1rem;" data-i18n="dashboard.servers">Deine Server</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+      <h2 style="margin:0;font-size:1.05rem;">Deine Server</h2>
       {% if slots_max > 0 %}
-      <span style="font-size:0.78rem; padding:2px 10px; border-radius:20px; border:1px solid {% if slots_full %}rgba(220,38,38,0.5); background:rgba(220,38,38,0.1); color:#f87171;{% else %}var(--border); background:var(--bg-card); color:var(--text-muted);{% endif %}">
+      <span style="font-size:0.75rem;padding:2px 10px;border-radius:20px;border:1px solid {% if slots_full %}rgba(220,38,38,0.5);background:rgba(220,38,38,0.1);color:#f87171;{% else %}var(--border);background:var(--bg-card);color:var(--text-muted);{% endif %}">
         🖥️ {{ slots_used }}/{{ slots_max }} Server
       </span>
       {% endif %}
+      <span style="font-size:0.72rem;color:rgba(255,255,255,0.2);">⠿ Reihenfolge per Drag &amp; Drop ändern</span>
     </div>
     {% if invite_url %}
       {% if slots_full %}
-      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-        <span style="font-size:0.8rem; color:#f87171;">⚠️ Server-Limit erreicht — upgrade für mehr Slots</span>
-        <span class="btn btn-primary" style="opacity:0.4; cursor:not-allowed; pointer-events:none;" data-i18n="dashboard.invite">+ Bot einladen</span>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span style="font-size:0.8rem;color:#f87171;">⚠️ Limit erreicht</span>
+        <span class="btn btn-primary" style="opacity:0.4;cursor:not-allowed;pointer-events:none;">+ Bot einladen</span>
       </div>
       {% else %}
-      <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" data-i18n="dashboard.invite">+ Bot einladen</a>
+      <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Bot einladen</a>
       {% endif %}
     {% endif %}
   </div>
 
   {% if guilds %}
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:0.85rem; margin-bottom:2rem;">
+  <div class="guild-grid" id="guildGrid">
     {% for guild in guilds %}
     {% set sub = guild.subscription_status or 'free' %}
-    <a href="/guild/{{ guild.guild_id }}" style="text-decoration:none; display:flex; align-items:center; gap:1rem; padding:1rem 1.1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; transition:border-color 0.15s, transform 0.15s, box-shadow 0.15s; color:var(--text);"
-       onmouseover="this.style.borderColor='#3b82f6';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(59,130,246,0.12)'"
-       onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
-      <div style="font-size:2rem; flex-shrink:0;">{% if guild.bot_status == 'kicked' %}⚠️{% else %}🏰{% endif %}</div>
-      <div style="flex:1; min-width:0;">
-        <div style="font-weight:700; font-size:0.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ guild.guild_name }}</div>
-        <div style="display:flex; gap:0.4rem; margin-top:0.35rem; flex-wrap:wrap;">
-          {% if guild.bot_status == 'kicked' %}
-          <span style="font-size:0.7rem; padding:1px 6px; background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); border-radius:8px;">🚫 Bot gekickt</span>
-          {% elif guild.category_id and guild.archive_channel_id %}
-          <span class="badge badge-ok" style="font-size:0.7rem; padding:1px 6px;" data-i18n="status.configured">✅ Aktiv</span>
-          {% else %}
-          <span class="badge badge-warn" style="font-size:0.7rem; padding:1px 6px;" data-i18n="status.setup">⚠️ Einrichtung nötig</span>
-          {% endif %}
-
-          {% if sub == 'active' %}
-          <span style="font-size:0.7rem; padding:1px 6px; background:#14532d; color:#4ade80; border-radius:8px;" data-i18n="sub.active">✅ Pro</span>
-          {% elif sub == 'trialing' %}
-          <span style="font-size:0.7rem; padding:1px 6px; background:#1e3a5f; color:#93c5fd; border-radius:8px;" data-i18n="sub.trialing">🎁 Testphase</span>
-          {% elif sub == 'past_due' %}
-          <span style="font-size:0.7rem; padding:1px 6px; background:#431407; color:#fb923c; border-radius:8px;" data-i18n="sub.past_due">⚠️ Zahlung fällig</span>
-          {% else %}
-          <span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-main); color:var(--text-muted); border-radius:8px; border:1px solid var(--border);" data-i18n="sub.free">Free</span>
-          {% endif %}
+    <div class="guild-tile" draggable="true" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
+      <a href="/guild/{{ guild.guild_id }}">
+        <div style="font-size:1.8rem;flex-shrink:0;">{% if guild.bot_status == 'kicked' %}⚠️{% else %}🏰{% endif %}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:0.93rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ guild.guild_name }}</div>
+          <div style="display:flex;gap:0.35rem;margin-top:0.3rem;flex-wrap:wrap;">
+            {% if guild.bot_status == 'kicked' %}
+            <span style="font-size:0.67rem;padding:1px 6px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:8px;">🚫 Bot gekickt</span>
+            {% elif guild.category_id and guild.archive_channel_id %}
+            <span class="badge badge-ok" style="font-size:0.67rem;padding:1px 6px;">✅ Aktiv</span>
+            {% else %}
+            <span class="badge badge-warn" style="font-size:0.67rem;padding:1px 6px;">⚠️ Einrichtung nötig</span>
+            {% endif %}
+            {% if sub == 'active' %}
+            <span style="font-size:0.67rem;padding:1px 6px;background:#14532d;color:#4ade80;border-radius:8px;">✅ Pro</span>
+            {% elif sub == 'trialing' %}
+            <span style="font-size:0.67rem;padding:1px 6px;background:#1e3a5f;color:#93c5fd;border-radius:8px;">🎁 Test</span>
+            {% elif sub == 'past_due' %}
+            <span style="font-size:0.67rem;padding:1px 6px;background:#431407;color:#fb923c;border-radius:8px;">⚠️ Zahlung</span>
+            {% else %}
+            <span style="font-size:0.67rem;padding:1px 6px;background:var(--bg-main);color:var(--text-muted);border-radius:8px;border:1px solid var(--border);">Free</span>
+            {% endif %}
+          </div>
         </div>
-      </div>
-      <div style="color:var(--text-muted); font-size:1.1rem; flex-shrink:0;">→</div>
-    </a>
+        <div class="arrow" style="color:var(--text-muted);font-size:1rem;flex-shrink:0;">→</div>
+      </a>
+    </div>
     {% endfor %}
   </div>
+
   {% else %}
-  <div class="card" style="text-align:center; padding:2rem;">
-    <div style="font-size:2.5rem; margin-bottom:0.75rem;">🤖</div>
-    <p style="font-weight:600; margin-bottom:0.25rem;" data-i18n="dashboard.empty">Noch keine Server gefunden.</p>
-    <p style="color:var(--text-muted); font-size:0.88rem;" data-i18n="dashboard.empty.hint">Lade den Bot auf einen Discord-Server ein — er erscheint hier automatisch.</p>
+  <div class="card" style="text-align:center;padding:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">🤖</div>
+    <p style="font-weight:600;margin-bottom:0.25rem;">Noch keine Server gefunden.</p>
+    <p style="color:var(--text-muted);font-size:0.88rem;">Lade den Bot auf einen Discord-Server ein — er erscheint hier automatisch.</p>
     {% if invite_url %}
-    <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" style="margin-top:1rem;" data-i18n="dashboard.invite">+ Bot einladen</a>
+    <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" style="margin-top:1rem;">+ Bot einladen</a>
     {% endif %}
   </div>
   {% endif %}
 
-</div>
+</div><!-- /.dash-wrap -->
+
+<script>
+// ══════════════════════════════════════════════
+// Drag & Drop für Guild-Kacheln
+// ══════════════════════════════════════════════
+(function() {
+  const grid = document.getElementById('guildGrid');
+  if (!grid) return;
+
+  const STORAGE_KEY = 'dashGuildOrder_{{ user_id or "default" }}';
+  let dragged = null;
+  let placeholder = null;
+
+  // ── Reihenfolge aus localStorage wiederherstellen ──
+  function restoreOrder() {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (!saved.length) return;
+    saved.forEach(id => {
+      const el = document.getElementById('tile-' + id);
+      if (el) grid.appendChild(el);
+    });
+  }
+
+  // ── Reihenfolge speichern ──
+  function saveOrder() {
+    const ids = [...grid.querySelectorAll('.guild-tile')].map(el => el.dataset.id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  }
+
+  // ── Placeholder erstellen ──
+  function createPlaceholder(height) {
+    const ph = document.createElement('div');
+    ph.className = 'drop-placeholder';
+    ph.style.height = height + 'px';
+    return ph;
+  }
+
+  // ── Events ──
+  grid.addEventListener('dragstart', e => {
+    const tile = e.target.closest('.guild-tile');
+    if (!tile) return;
+    dragged = tile;
+    tile.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tile.dataset.id);
+
+    // Placeholder mit gleicher Höhe
+    placeholder = createPlaceholder(tile.offsetHeight);
+    requestAnimationFrame(() => tile.style.opacity = '0.35');
+  });
+
+  grid.addEventListener('dragend', e => {
+    if (!dragged) return;
+    dragged.classList.remove('dragging');
+    dragged.style.opacity = '';
+    if (placeholder && placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+    dragged = null;
+    placeholder = null;
+    // Alle drag-over Klassen entfernen
+    grid.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    saveOrder();
+  });
+
+  grid.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!dragged) return;
+
+    const target = e.target.closest('.guild-tile');
+    if (!target || target === dragged) return;
+
+    // Position bestimmen: oben oder unten der Zielkachel
+    const rect = target.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+
+    // Vorherigen drag-over entfernen
+    grid.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    target.classList.add('drag-over');
+
+    if (e.clientY < midY) {
+      grid.insertBefore(dragged, target);
+    } else {
+      grid.insertBefore(dragged, target.nextSibling);
+    }
+  });
+
+  grid.addEventListener('dragleave', e => {
+    const target = e.target.closest('.guild-tile');
+    if (target) target.classList.remove('drag-over');
+  });
+
+  grid.addEventListener('drop', e => {
+    e.preventDefault();
+    grid.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+
+  // ── Touch-Support (mobile) ──
+  let touchDragged = null;
+  let touchClone = null;
+  let touchOffX = 0, touchOffY = 0;
+
+  grid.addEventListener('touchstart', e => {
+    const tile = e.target.closest('.guild-tile');
+    if (!tile) return;
+    // Nur bei langem Drücken (300ms) Drag starten
+    tile._touchTimer = setTimeout(() => {
+      touchDragged = tile;
+      const t = e.touches[0];
+      const rect = tile.getBoundingClientRect();
+      touchOffX = t.clientX - rect.left;
+      touchOffY = t.clientY - rect.top;
+
+      // Visuellen Klon erstellen
+      touchClone = tile.cloneNode(true);
+      touchClone.style.cssText = `position:fixed;z-index:9999;width:${rect.width}px;opacity:0.8;pointer-events:none;
+        top:${t.clientY - touchOffY}px;left:${t.clientX - touchOffX}px;border-radius:10px;`;
+      document.body.appendChild(touchClone);
+      tile.style.opacity = '0.3';
+      e.preventDefault();
+    }, 300);
+  }, { passive: false });
+
+  grid.addEventListener('touchmove', e => {
+    const tile = e.target.closest('.guild-tile');
+    if (tile && tile._touchTimer) { clearTimeout(tile._touchTimer); tile._touchTimer = null; }
+    if (!touchDragged) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    if (touchClone) {
+      touchClone.style.top = (t.clientY - touchOffY) + 'px';
+      touchClone.style.left = (t.clientX - touchOffX) + 'px';
+    }
+    // Ziel ermitteln
+    touchClone && (touchClone.style.display = 'none');
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    touchClone && (touchClone.style.display = '');
+    const target = el && el.closest('.guild-tile');
+    if (target && target !== touchDragged) {
+      const rect = target.getBoundingClientRect();
+      if (t.clientY < rect.top + rect.height / 2) {
+        grid.insertBefore(touchDragged, target);
+      } else {
+        grid.insertBefore(touchDragged, target.nextSibling);
+      }
+    }
+  }, { passive: false });
+
+  grid.addEventListener('touchend', e => {
+    const tile = e.target.closest('.guild-tile');
+    if (tile && tile._touchTimer) { clearTimeout(tile._touchTimer); tile._touchTimer = null; }
+    if (!touchDragged) return;
+    touchDragged.style.opacity = '';
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    touchDragged = null;
+    saveOrder();
+  });
+
+  // Beim Laden Reihenfolge wiederherstellen
+  restoreOrder();
+})();
+</script>
 {% endblock %}
