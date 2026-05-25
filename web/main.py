@@ -5834,8 +5834,73 @@ async def hero_scout_manual_save(
         await db.commit()
 
     from urllib.parse import quote
+    flash_param = "changed" if changed else "saved"
     return RedirectResponse(
-        f"/guild/{guild_id}/defense/hero-scout/{quote(player_name.strip())}?flash=saved",
+        f"/guild/{guild_id}/defense/hero-scout/{quote(player_name.strip())}?flash={flash_param}",
+        status_code=303,
+    )
+
+
+# ── Held löschen (einzeln oder alle) ──────────────────────────────────────
+
+@app.post("/guild/{guild_id}/defense/hero-scout/delete-player")
+async def hero_scout_delete_player(
+    request: Request,
+    guild_id: str,
+    player_name: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    import aiosqlite, shutil
+    db_path = Path("/app/data/scouter.db")
+    async with aiosqlite.connect(db_path) as db:
+        # Alle Entry-IDs holen um Bilder zu löschen
+        async with db.execute(
+            "SELECT id FROM hero_scout_entries WHERE guild_id=? AND lower(player_name)=lower(?)",
+            (guild_id, player_name)
+        ) as cur:
+            ids = [r[0] for r in await cur.fetchall()]
+        # Slots + Einträge löschen
+        for eid in ids:
+            await db.execute("DELETE FROM hero_scout_slots WHERE entry_id=?", (eid,))
+            img_dir = HERO_SCOUT_IMAGES_DIR / guild_id / str(eid)
+            if img_dir.exists():
+                shutil.rmtree(str(img_dir), ignore_errors=True)
+        await db.execute(
+            "DELETE FROM hero_scout_entries WHERE guild_id=? AND lower(player_name)=lower(?)",
+            (guild_id, player_name)
+        )
+        await db.commit()
+
+    return RedirectResponse(
+        f"/guild/{guild_id}/defense/hero-scout?flash=deleted",
+        status_code=303,
+    )
+
+
+@app.post("/guild/{guild_id}/defense/hero-scout/delete-all")
+async def hero_scout_delete_all(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+
+    import aiosqlite, shutil
+    db_path = Path("/app/data/scouter.db")
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("DELETE FROM hero_scout_slots WHERE guild_id=?", (guild_id,))
+        await db.execute("DELETE FROM hero_scout_entries WHERE guild_id=?", (guild_id,))
+        await db.commit()
+    # Alle Bilder dieser Guild löschen
+    guild_img_dir = HERO_SCOUT_IMAGES_DIR / guild_id
+    if guild_img_dir.exists():
+        shutil.rmtree(str(guild_img_dir), ignore_errors=True)
+
+    return RedirectResponse(
+        f"/guild/{guild_id}/defense/hero-scout?flash=deleted_all",
         status_code=303,
     )
 

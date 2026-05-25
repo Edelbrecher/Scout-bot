@@ -10,18 +10,33 @@
       <h1 style="margin:0.25rem 0 0;">🗡️ Helden-Scout</h1>
       <p class="subtitle" style="margin:0;">Gegnerische Helden beobachten — Ausrüstungsänderungen erkennen</p>
     </div>
-    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/new"
-       style="padding:0.5rem 1.1rem;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
-              border-radius:8px;color:#86efac;font-weight:600;text-decoration:none;font-size:0.88rem;
-              display:flex;align-items:center;gap:0.4rem;white-space:nowrap;">
-      ➕ Held manuell anlegen
-    </a>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/new"
+         style="padding:0.5rem 1.1rem;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
+                border-radius:8px;color:#86efac;font-weight:600;text-decoration:none;font-size:0.88rem;white-space:nowrap;">
+        ➕ Held manuell anlegen
+      </a>
+      {% if entries %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-all"
+            onsubmit="return confirm('Wirklich ALLE {{ entries|length }} Helden löschen? Das kann nicht rückgängig gemacht werden.')">
+        <button type="submit"
+                style="padding:0.5rem 1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);
+                       border-radius:8px;color:#f87171;font-weight:600;cursor:pointer;font-size:0.88rem;white-space:nowrap;">
+          🗑️ Alle löschen
+        </button>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
   {% if flash == 'channel_saved' %}
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Scout-Channel gespeichert.</div>
   {% elif flash == 'channel_error' %}
   <div class="alert alert-danger" style="margin-bottom:1rem;">❌ Fehler beim Speichern — Bot erreichbar?</div>
+  {% elif flash == 'deleted' %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Held erfolgreich gelöscht.</div>
+  {% elif flash == 'deleted_all' %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Alle Helden gelöscht.</div>
   {% endif %}
 
   <!-- Channel-Konfiguration -->
@@ -78,9 +93,22 @@
   </h2>
   <div style="display:grid;gap:0.75rem;">
     {% for e in entries %}
+    <div style="position:relative;">
+      {# Löschen-Button außerhalb des Links, oben-rechts #}
+      <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-player"
+            style="position:absolute;top:0.6rem;right:0.6rem;z-index:10;"
+            onsubmit="event.stopPropagation();return confirm('{{ e.player_name }} wirklich löschen?')">
+        <input type="hidden" name="player_name" value="{{ e.player_name }}">
+        <button type="submit"
+                style="padding:0.25rem 0.55rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
+                       border-radius:6px;color:#f87171;cursor:pointer;font-size:0.75rem;line-height:1.4;"
+                title="{{ e.player_name }} löschen">
+          🗑️
+        </button>
+      </form>
     <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/{{ e.player_name | urlencode }}"
        style="text-decoration:none;color:inherit;">
-      <div class="card" style="cursor:pointer;transition:border-color 0.15s;
+      <div class="card" style="cursor:pointer;transition:border-color 0.15s;padding-right:3rem;
         {% if e.changed %}border-left:3px solid #f59e0b;{% else %}border-left:3px solid rgba(59,130,246,0.3);{% endif %}">
 
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;">
@@ -162,6 +190,7 @@
 
       </div>
     </a>
+    </div>{# end position:relative wrapper #}
     {% endfor %}
   </div>
 
