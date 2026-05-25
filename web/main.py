@@ -919,6 +919,15 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
     request_hub = await database.get_request_hub(guild_id)
     hero_scout_channel = await _get_hero_scout_channel(guild_id)
 
+    # For personal workspaces, check the user's own subscription instead of the guild's
+    if is_personal:
+        owner_discord_id = session.get("uid", "")
+        user_sub = await database.get_user_subscription(owner_discord_id) if owner_discord_id else None
+        user_sub_status = (user_sub or {}).get("status", "free")
+        # Inject subscription info into guild dict so template logic works unchanged
+        guild = dict(guild)
+        guild["subscription_status"] = user_sub_status
+
     return templates.TemplateResponse(
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
