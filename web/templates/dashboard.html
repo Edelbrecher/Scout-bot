@@ -221,33 +221,47 @@
   <!-- ── Divider ── -->
   <div style="border-top:1px solid var(--border);margin:0.5rem 0 1.25rem;"></div>
 
+  {% if flash == 'workspace_created' %}
+  <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
+    ✅ Workspace wurde erstellt — du kannst sofort loslegen!
+  </div>
+  {% endif %}
+
   <!-- ── Server-Liste ── -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-      <h2 style="margin:0;font-size:1.05rem;">Deine Server</h2>
+      <h2 style="margin:0;font-size:1.05rem;">Deine Workspaces &amp; Server</h2>
       {% if slots_max > 0 %}
       <span style="font-size:0.75rem;padding:2px 10px;border-radius:20px;border:1px solid {% if slots_full %}rgba(220,38,38,0.5);background:rgba(220,38,38,0.1);color:#f87171;{% else %}var(--border);background:var(--bg-card);color:var(--text-muted);{% endif %}">
-        🖥️ {{ slots_used }}/{{ slots_max }} Server
+        🖥️ {{ slots_used }}/{{ slots_max }} Discord-Server
       </span>
       {% endif %}
       <span style="font-size:0.72rem;color:rgba(255,255,255,0.2);">⠿ Reihenfolge per Drag &amp; Drop ändern</span>
     </div>
-    {% if invite_url %}
-      {% if slots_full %}
-      <div style="display:flex;align-items:center;gap:0.5rem;">
-        <span style="font-size:0.8rem;color:#f87171;">⚠️ Limit erreicht</span>
-        <span class="btn btn-primary" style="opacity:0.4;cursor:not-allowed;pointer-events:none;">+ Bot einladen</span>
-      </div>
-      {% else %}
-      <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Bot einladen</a>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+      <a href="/workspace/new"
+         style="padding:0.4rem 1rem;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);
+                border-radius:8px;color:#c4b5fd;text-decoration:none;font-size:0.83rem;font-weight:600;">
+        ➕ Workspace anlegen
+      </a>
+      {% if invite_url %}
+        {% if slots_full %}
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-size:0.8rem;color:#f87171;">⚠️ Limit erreicht</span>
+          <span class="btn btn-primary" style="opacity:0.4;cursor:not-allowed;pointer-events:none;">+ Bot einladen</span>
+        </div>
+        {% else %}
+        <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Bot einladen</a>
+        {% endif %}
       {% endif %}
-    {% endif %}
+    </div>
   </div>
 
   {% if guilds %}
   <div class="guild-grid" id="guildGrid">
     {% for guild in guilds %}
     {% set sub = guild.subscription_status or 'free' %}
+    {% set is_personal = guild.workspace_type == 'personal' %}
     <div class="guild-tile" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
       <!-- Sichtbarer Drag-Handle – hier anfassen zum Verschieben -->
       <div class="drag-handle" title="Kachel verschieben">
@@ -255,25 +269,31 @@
         <span>Verschieben</span>
       </div>
       <a href="/guild/{{ guild.guild_id }}">
-        <div style="font-size:1.8rem;flex-shrink:0;">{% if guild.bot_status == 'kicked' %}⚠️{% else %}🏰{% endif %}</div>
+        <div style="font-size:1.8rem;flex-shrink:0;">
+          {% if is_personal %}🗂️{% elif guild.bot_status == 'kicked' %}⚠️{% else %}🏰{% endif %}
+        </div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:0.93rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ guild.guild_name }}</div>
           <div style="display:flex;gap:0.35rem;margin-top:0.3rem;flex-wrap:wrap;">
-            {% if guild.bot_status == 'kicked' %}
+            {% if is_personal %}
+            <span style="font-size:0.67rem;padding:1px 6px;background:rgba(139,92,246,0.15);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);border-radius:8px;">📁 Persönlich</span>
+            {% elif guild.bot_status == 'kicked' %}
             <span style="font-size:0.67rem;padding:1px 6px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:8px;">🚫 Bot gekickt</span>
             {% elif guild.category_id and guild.archive_channel_id %}
             <span class="badge badge-ok" style="font-size:0.67rem;padding:1px 6px;">✅ Aktiv</span>
             {% else %}
             <span class="badge badge-warn" style="font-size:0.67rem;padding:1px 6px;">⚠️ Einrichtung nötig</span>
             {% endif %}
-            {% if sub == 'active' %}
-            <span style="font-size:0.67rem;padding:1px 6px;background:#14532d;color:#4ade80;border-radius:8px;">✅ Pro</span>
-            {% elif sub == 'trialing' %}
-            <span style="font-size:0.67rem;padding:1px 6px;background:#1e3a5f;color:#93c5fd;border-radius:8px;">🎁 Test</span>
-            {% elif sub == 'past_due' %}
-            <span style="font-size:0.67rem;padding:1px 6px;background:#431407;color:#fb923c;border-radius:8px;">⚠️ Zahlung</span>
-            {% else %}
-            <span style="font-size:0.67rem;padding:1px 6px;background:var(--bg-main);color:var(--text-muted);border-radius:8px;border:1px solid var(--border);">Free</span>
+            {% if not is_personal %}
+              {% if sub == 'active' %}
+              <span style="font-size:0.67rem;padding:1px 6px;background:#14532d;color:#4ade80;border-radius:8px;">✅ Pro</span>
+              {% elif sub == 'trialing' %}
+              <span style="font-size:0.67rem;padding:1px 6px;background:#1e3a5f;color:#93c5fd;border-radius:8px;">🎁 Test</span>
+              {% elif sub == 'past_due' %}
+              <span style="font-size:0.67rem;padding:1px 6px;background:#431407;color:#fb923c;border-radius:8px;">⚠️ Zahlung</span>
+              {% else %}
+              <span style="font-size:0.67rem;padding:1px 6px;background:var(--bg-main);color:var(--text-muted);border-radius:8px;border:1px solid var(--border);">Free</span>
+              {% endif %}
             {% endif %}
           </div>
         </div>

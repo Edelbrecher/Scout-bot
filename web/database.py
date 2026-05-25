@@ -1,6 +1,7 @@
 import aiosqlite
 import bcrypt
 import os
+import uuid
 from pathlib import Path
 
 DB_PATH = Path("/app/data/scouter.db")
@@ -144,6 +145,17 @@ async def init_db():
             "owner_discord_id TEXT",
             "bot_status TEXT DEFAULT 'active'",
             "bot_kicked_at TEXT",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
+        # Personal workspace support
+        for col in [
+            "workspace_type TEXT DEFAULT 'discord'",
+            "workspace_owner_id TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
@@ -343,6 +355,40 @@ async def update_guild_config(
         """, (category_id or None, archive_channel_id or None, allowed_role_ids or None,
               scout_channel_id, guild_id))
         await db.commit()
+
+
+async def create_personal_workspace(owner_discord_id: str, name: str) -> str:
+    """Create a personal (Discord-less) workspace and return its guild_id (UUID)."""
+    ws_id = "ws_" + uuid.uuid4().hex[:16]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO guild_configs (guild_id, guild_name, workspace_type, workspace_owner_id, owner_discord_id)
+            VALUES (?, ?, 'personal', ?, ?)
+        """, (ws_id, name, owner_discord_id, owner_discord_id))
+        await db.commit()
+    return ws_id
+
+
+async def get_personal_workspaces(owner_discord_id: str) -> list[dict]:
+    """Return all personal workspaces owned by a user."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM guild_configs
+            WHERE workspace_type = 'personal' AND workspace_owner_id = ?
+            ORDER BY guild_name
+        """, (owner_discord_id,)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+
+async def get_or_create_default_workspace(owner_discord_id: str, username: str) -> str:
+    """Return the first personal workspace ID, creating one if none exists."""
+    existing = await get_personal_workspaces(owner_discord_id)
+    if existing:
+        return existing[0]["guild_id"]
+    default_name = f"{username}'s Workspace"
+    return await create_personal_workspace(owner_discord_id, default_name)
 
 
 async def update_tw_world(guild_id: str, tw_world: str):

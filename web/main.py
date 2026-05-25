@@ -132,6 +132,11 @@ TIER_META = {
 
 # Discord snowflake: 17-20 digit numeric string
 SNOWFLAKE_RE = re.compile(r"^\d{17,20}$")
+WORKSPACE_RE = re.compile(r"^ws_[0-9a-f]{16}$")
+
+def is_valid_guild_id(value: str) -> bool:
+    """Accept both Discord snowflakes and personal workspace IDs."""
+    return bool(SNOWFLAKE_RE.match(value)) or bool(WORKSPACE_RE.match(value))
 
 def is_snowflake(value: str) -> bool:
     return bool(SNOWFLAKE_RE.match(value.strip())) if value.strip() else True
@@ -267,6 +272,22 @@ def get_session(request: Request) -> dict | None:
 def can_access_guild(session: dict, guild_id: str) -> bool:
     if session.get("guilds") is None:
         return True  # super-admin
+    # Personal workspaces: owned by the session user
+    if WORKSPACE_RE.match(guild_id):
+        return session.get("uid") == session.get("_ws_owner_" + guild_id, session.get("uid"))
+    return guild_id in session["guilds"]
+
+
+async def can_access_guild_async(session: dict, guild_id: str) -> bool:
+    """Like can_access_guild but also checks personal workspace ownership in DB."""
+    if session.get("guilds") is None:
+        return True  # super-admin
+    if WORKSPACE_RE.match(guild_id):
+        # Verify ownership against DB
+        guild = await database.get_guild(guild_id)
+        if not guild:
+            return False
+        return guild.get("workspace_owner_id") == session.get("uid")
     return guild_id in session["guilds"]
 
 
@@ -285,9 +306,20 @@ def _get_session(request: Request) -> dict | None:
 
 def _require_guild(session: dict, guild_id: str):
     """Returns error_response if guild access denied."""
-    if not SNOWFLAKE_RE.match(guild_id):
+    if not is_valid_guild_id(guild_id):
         return RedirectResponse("/dashboard", status_code=303)
+    # Personal workspace: sync check will be done async in route; pass here
+    if WORKSPACE_RE.match(guild_id):
+        return None  # async check done in route via _require_guild_async
     if not can_access_guild(session, guild_id):
+        return RedirectResponse("/dashboard", status_code=303)
+
+
+async def _require_guild_async(session: dict, guild_id: str):
+    """Async version for routes that need to check personal workspace ownership."""
+    if not is_valid_guild_id(guild_id):
+        return RedirectResponse("/dashboard", status_code=303)
+    if not await can_access_guild_async(session, guild_id):
         return RedirectResponse("/dashboard", status_code=303)
 
 
@@ -769,16 +801,32 @@ async def logout():
 # ---------------------------------------------------------------------------
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, flash: str = ""):
     session = get_session(request)
     if not session:
         return RedirectResponse("/login")
-    all_guilds = await database.get_all_guilds()
+
+    owner_discord_id = session.get("uid", "")
+    username = session.get("username", "Spieler")
+
+    # ── Personal workspaces ──
+    personal_workspaces = await database.get_personal_workspaces(owner_discord_id) if owner_discord_id else []
+
+    # Auto-create a default personal workspace on first visit if user has no guilds at all
+    all_guilds_db = await database.get_all_guilds()
     if session["guilds"] is not None:
         allowed = set(session["guilds"])
-        guilds = [g for g in all_guilds if g["guild_id"] in allowed]
+        discord_guilds = [g for g in all_guilds_db if g["guild_id"] in allowed and g.get("workspace_type", "discord") == "discord"]
     else:
-        guilds = all_guilds
+        discord_guilds = [g for g in all_guilds_db if g.get("workspace_type", "discord") == "discord"]
+
+    if not discord_guilds and not personal_workspaces and owner_discord_id:
+        ws_id = await database.get_or_create_default_workspace(owner_discord_id, username)
+        personal_workspaces = await database.get_personal_workspaces(owner_discord_id)
+
+    # Merge: personal workspaces first, then discord guilds
+    guilds = personal_workspaces + discord_guilds
+
     client_id = get_client_id()
     invite_url = (
         f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=805432336&scope=bot+applications.commands"
@@ -786,7 +834,6 @@ async def dashboard(request: Request):
     )
 
     # Server-slot limits for this user
-    owner_discord_id = session.get("uid", "")
     owner_active_guilds = await database.get_owner_active_guilds(owner_discord_id) if owner_discord_id else []
     slots_used = len(owner_active_guilds)
     slots_max = await database.get_owner_tier_limit(owner_discord_id) if owner_discord_id else 0
@@ -799,11 +846,34 @@ async def dashboard(request: Request):
             "guilds": guilds,
             "invite_url": invite_url,
             "session": session,
+            "user_id": owner_discord_id,
             "slots_used": slots_used,
             "slots_max": slots_max,
             "slots_full": slots_full,
+            "flash": flash,
         },
     )
+
+
+@app.get("/workspace/new", response_class=HTMLResponse)
+async def workspace_new_page(request: Request):
+    session, err = _require_session(request)
+    if err:
+        return err
+    return templates.TemplateResponse("workspace_new.html", {"request": request, "session": session})
+
+
+@app.post("/workspace/create")
+async def workspace_create(request: Request, name: str = Form(...)):
+    session, err = _require_session(request)
+    if err:
+        return err
+    owner_discord_id = session.get("uid", "")
+    if not owner_discord_id:
+        return RedirectResponse("/dashboard", status_code=303)
+    name = name.strip()[:64] or "Mein Workspace"
+    ws_id = await database.create_personal_workspace(owner_discord_id, name)
+    return RedirectResponse(f"/guild/{ws_id}?saved=workspace_created", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -814,46 +884,48 @@ async def dashboard(request: Request):
 async def guild_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
 
-    token = os.environ.get("DISCORD_TOKEN", "")
-    roles = []
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"https://discord.com/api/v10/guilds/{guild_id}/roles",
-            headers={"Authorization": f"Bot {token}"},
-        )
-        if r.status_code == 200:
-            roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
-
+    is_personal = guild.get("workspace_type") == "personal"
     is_admin = session.get("type") == "admin"
-    is_owner = is_guild_owner(session, guild)
+    is_owner = is_guild_owner(session, guild) or (is_personal and guild.get("workspace_owner_id") == session.get("uid"))
+
+    roles = []
+    perm_issues = []
+    if not is_personal:
+        token = os.environ.get("DISCORD_TOKEN", "")
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"https://discord.com/api/v10/guilds/{guild_id}/roles",
+                headers={"Authorization": f"Bot {token}"},
+            )
+            if r.status_code == 200:
+                roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.post(
+                    "http://bot:7777/api/check-permissions",
+                    json={"guild_id": guild_id},
+                )
+                if resp.status_code == 200:
+                    perm_issues = resp.json().get("issues", [])
+        except Exception:
+            pass
+
     request_hub = await database.get_request_hub(guild_id)
     hero_scout_channel = await _get_hero_scout_channel(guild_id)
-
-    # Check bot permissions in configured channels
-    perm_issues = []
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                "http://bot:7777/api/check-permissions",
-                json={"guild_id": guild_id},
-            )
-            if resp.status_code == 200:
-                perm_issues = resp.json().get("issues", [])
-    except Exception:
-        pass
 
     return templates.TemplateResponse(
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
          "is_admin": is_admin, "is_owner": is_owner, "request_hub": request_hub,
          "hero_scout_channel": hero_scout_channel,
-         "perm_issues": perm_issues},
+         "perm_issues": perm_issues,
+         "is_personal": is_personal},
     )
 
 
