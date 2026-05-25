@@ -4,6 +4,10 @@
 {% block content %}
 {% set is_premium = guild.subscription_status in ('active', 'trialing', 'past_due') %}
 {% set is_personal = guild.workspace_type == 'personal' %}
+{# Player Pro = any paid plan. Alliance Pro = any paid plan except player_pro #}
+{% set _plan = (guild.subscription_plan or '') | lower | replace('_monthly','') | replace('_annual','') %}
+{% set has_player_pro = is_premium %}
+{% set has_alliance_pro = is_premium and _plan != 'player_pro' %}
 <div class="container" style="max-width:1100px;">
 
   <!-- ── Header ── -->
@@ -21,7 +25,7 @@
     </div>
     <!-- Abo-Badge -->
     {% set sub = guild.subscription_status or 'free' %}
-    <a href="/guild/{{ guild.guild_id }}/billing" style="text-decoration:none; align-self:flex-start;">
+    <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="text-decoration:none; align-self:flex-start;">
       {% if sub == 'active' %}
         <span class="badge" style="background:#14532d; color:#4ade80; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #4ade80;">✅ Pro aktiv</span>
       {% elif sub == 'trialing' %}
@@ -85,6 +89,8 @@
 
   {# Reusable badge macros #}
   {%- set PRO_BADGE -%}<span style="font-size:0.72rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Pro</span>{%- endset -%}
+  {%- set PLAYER_BADGE -%}<span style="font-size:0.72rem;background:#2563eb;color:#bfdbfe;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Player Pro</span>{%- endset -%}
+  {%- set ALLIANCE_BADGE -%}<span style="font-size:0.72rem;background:#7c3aed;color:#e9d5ff;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Alliance</span>{%- endset -%}
   {%- set WIP_BADGE -%}<span style="font-size:0.72rem;background:#92400e;color:#fcd34d;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">🚧 Beta</span>{%- endset -%}
   {%- set LOCK_ARROW -%}<span class="feature-arrow">🔒</span>{%- endset -%}
   {%- set OK_ARROW -%}<span class="feature-arrow">→</span>{%- endset -%}
@@ -99,43 +105,43 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
 
     <!-- Mein Account (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/mein-account" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/mein-account" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🏰</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.account.title">Mein Account</span> {{ PRO_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.account.title">Mein Account</span> {{ PLAYER_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.account.desc">Eigene Dörfer & Truppen importieren — Datenbasis für alle Features</div>
       </div>
-      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
 
     <!-- Farming (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">⚜️</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.farming.title">Farming Intelligence</span> {{ PRO_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.farming.title">Farming Intelligence</span> {{ PLAYER_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.farming.desc">Inaktive Farmen erkennen, Farmlisten verwalten und analysieren</div>
       </div>
-      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
 
     <!-- Farmlist-Analyst (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/farmlist-analyst" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/farmlist-analyst" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">📋</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.farmlist.title">Farmlist-Analyst</span> {{ PRO_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.farmlist.title">Farmlist-Analyst</span> {{ PLAYER_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.farmlist.desc">Farmlisten auswerten — gute, mittelmäßige und sinnlose Farmen erkennen</div>
       </div>
-      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
 
     <!-- Einsatzplanung (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🎯</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.einsatz.title">Einsatzplanung</span> {{ PRO_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.einsatz.title">Einsatzplanung</span> {{ PLAYER_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.einsatz.desc">Angriffe koordinieren, Marschzeit berechnen und direkt absenden</div>
       </div>
-      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
 
     <!-- Timer -->
@@ -233,7 +239,7 @@
     <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">🗺️</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.map.title">Karte</span> {{ PRO_BADGE }} {{ WIP_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.map.title">Karte</span> {{ ALLIANCE_BADGE }} {{ WIP_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.map.desc">Interaktive Travian-Karte mit Allianz-Heatmap und Spieler-Suche</div>
       </div>
       {{ OK_ARROW }}
@@ -283,23 +289,23 @@
     </a>
 
     <!-- Allianz-Lazarett (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/allianz/hospital" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/allianz/hospital" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🏥</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.hospital.title">Allianz-Lazarett</span> {{ PRO_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.hospital.title">Allianz-Lazarett</span> {{ ALLIANCE_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.hospital.desc">Heilende Truppen aller Mitglieder auf einen Blick koordinieren</div>
       </div>
-      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+      {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
     </a>
 
     <!-- Gegner-Kartei -->
-    <a href="/guild/{{ guild.guild_id }}/enemies" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/enemies" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🎯</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.enemies.title">Gegner-Kartei</span> {{ PRO_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.enemies.title">Gegner-Kartei</span> {{ ALLIANCE_BADGE }}</div>
         <div class="feature-desc" data-i18n="guild.feature.enemies.desc">Scout-Historie pro Gegner — Ressourcen, Truppen, Dörfer über Zeit</div>
       </div>
-      {{ LOCK_ARROW if not is_premium else OK_ARROW }}
+      {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
     </a>
 
     <!-- Helden-Scout -->
@@ -323,13 +329,13 @@
     </a>
 
     <!-- Scout (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/scout" class="feature-card" style="text-decoration:none;{% if not is_premium or is_personal %}opacity:0.65;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/scout" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro or is_personal %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🔍</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.scout.title">Scout</span> {{ PRO_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.scout.title">Scout</span> {{ ALLIANCE_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
         <div class="feature-desc" data-i18n="guild.feature.scout.desc">Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte</div>
       </div>
-      {{ LOCK_ARROW if (not is_premium or is_personal) else OK_ARROW }}
+      {{ LOCK_ARROW if (not has_alliance_pro or is_personal) else OK_ARROW }}
     </a>
 
   </div>

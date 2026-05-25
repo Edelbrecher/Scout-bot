@@ -55,8 +55,12 @@ STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
-# Pricing tiers: Starter / Clan / Alliance / Imperium
+# Pricing tiers: Player Pro / Starter / Clan / Alliance / Imperium
 STRIPE_PRICES: dict[str, dict[str, str]] = {
+    "player_pro": {
+        "monthly": os.environ.get("STRIPE_PRICE_PLAYER_PRO_M", ""),
+        "annual":  os.environ.get("STRIPE_PRICE_PLAYER_PRO_A", ""),
+    },
     "starter": {
         "monthly": os.environ.get("STRIPE_PRICE_STARTER_M", "price_1TZBc13rAqb4qtRxOuJbuV8P"),
         "annual":  os.environ.get("STRIPE_PRICE_STARTER_A", "price_1TZBdb3rAqb4qtRxfyiH8bLx"),
@@ -74,6 +78,11 @@ STRIPE_PRICES: dict[str, dict[str, str]] = {
         "annual":  os.environ.get("STRIPE_PRICE_IMPERIUM_A", "price_1TZKdO3rAqb4qtRxTio11mmP"),
     },
 }
+
+# Tiers that include player/solo features (all paid tiers)
+PLAYER_PRO_TIERS = {"player_pro", "starter", "clan", "alliance", "imperium"}
+# Tiers that include alliance/discord features (all except player_pro)
+ALLIANCE_TIERS = {"starter", "clan", "alliance", "imperium"}
 # Keep legacy vars as aliases for Starter
 STRIPE_PRICE_MONTHLY = STRIPE_PRICES["starter"]["monthly"]
 STRIPE_PRICE_ANNUAL  = STRIPE_PRICES["starter"]["annual"]
@@ -124,6 +133,9 @@ async def _notify(subject: str, body: str) -> None:
 
 
 TIER_META = {
+    "player_pro": {"name": "Player Pro", "servers": 0, "monthly": 2.99, "annual": 23.99,
+                   "desc": "Solo-Features für Einzelspieler — kein Discord-Server nötig",
+                   "player_only": True},
     "starter":  {"name": "Starter",  "servers": 1, "monthly": 6.99,  "annual": 55.99},
     "clan":     {"name": "Clan",     "servers": 2, "monthly": 10.99, "annual": 87.99},
     "alliance": {"name": "Alliance", "servers": 3, "monthly": 14.99, "annual": 119.99},
@@ -334,15 +346,49 @@ def is_guild_owner(session: dict, guild: dict) -> bool:
 PREMIUM_STATUSES = ("active", "trialing")
 
 
+def _guild_plan(guild: dict) -> str:
+    """Return the subscription plan key, normalising legacy values."""
+    raw = (guild.get("subscription_plan") or "").lower()
+    # strip interval suffixes like 'starter_monthly'
+    for sep in ("_monthly", "_annual"):
+        if raw.endswith(sep):
+            raw = raw[: -len(sep)]
+    return raw or "free"
+
+
+def _has_player_pro(guild: dict) -> bool:
+    """True if the guild/workspace has a paid subscription (any tier)."""
+    status = guild.get("subscription_status") or "free"
+    if status not in (*PREMIUM_STATUSES, "past_due"):
+        return False
+    return True  # any active paid plan unlocks player features
+
+
+def _has_alliance_pro(guild: dict) -> bool:
+    """True if the guild has a paid subscription that is NOT player_pro-only."""
+    if not _has_player_pro(guild):
+        return False
+    plan = _guild_plan(guild)
+    return plan in ALLIANCE_TIERS or plan == ""  # empty plan = legacy starter
+
+
 async def _require_premium(guild: dict | None, guild_id: str):
-    """Returns redirect to billing if guild does not have an active subscription.
-    past_due guilds are allowed through (grace period).
-    Returns None if access is granted."""
+    """Player-Pro gate: any paid plan is sufficient.
+    Returns redirect if access denied, None if granted."""
     if guild is None:
         return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
-    status = guild.get("subscription_status") or "free"
-    if status not in PREMIUM_STATUSES and status != "past_due":
+    if not _has_player_pro(guild):
         return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
+    return None
+
+
+async def _require_alliance(guild: dict | None, guild_id: str):
+    """Alliance gate: requires a Starter/Clan/Alliance/Imperium plan (not player_pro).
+    Returns redirect if access denied, None if granted."""
+    if guild is None:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=alliance_required", status_code=303)
+    if not _has_alliance_pro(guild):
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=alliance_required", status_code=303)
     return None
 
 
@@ -877,6 +923,97 @@ async def workspace_create(request: Request, name: str = Form(...)):
 
 
 # ---------------------------------------------------------------------------
+# Routes — user billing (Player Pro, no Discord server required)
+# ---------------------------------------------------------------------------
+
+@app.get("/billing", response_class=HTMLResponse)
+async def user_billing_page(request: Request):
+    """Standalone billing page for Player Pro (personal workspace users)."""
+    session, err = _require_session(request)
+    if err: return err
+    owner_discord_id = session.get("uid", "")
+    user_sub = await database.get_user_subscription(owner_discord_id) if owner_discord_id else None
+    stripe_configured = bool(STRIPE_SECRET_KEY)
+    return templates.TemplateResponse("user_billing.html", {
+        "request": request,
+        "session": session,
+        "user_sub": user_sub,
+        "stripe_pk": STRIPE_PUBLISHABLE_KEY,
+        "stripe_configured": stripe_configured,
+        "tier_meta": TIER_META,
+        "error": request.query_params.get("error", ""),
+        "saved": request.query_params.get("saved", ""),
+    })
+
+
+@app.post("/billing/checkout")
+async def user_billing_checkout(
+    request: Request,
+    plan: str = Form("monthly"),
+    tier: str = Form("player_pro"),
+):
+    """Checkout for Player Pro — attaches to user, not a guild."""
+    session, err = _require_session(request)
+    if err: return err
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse("/billing?error=stripe_not_configured", status_code=303)
+    owner_discord_id = session.get("uid", "")
+    if not owner_discord_id:
+        return RedirectResponse("/billing?error=not_logged_in", status_code=303)
+
+    if tier not in ("player_pro",):
+        tier = "player_pro"
+    interval = "monthly" if plan == "monthly" else "annual"
+    price_id = STRIPE_PRICES[tier][interval]
+    if not price_id:
+        return RedirectResponse("/billing?error=price_not_configured", status_code=303)
+
+    user_sub = await database.get_user_subscription(owner_discord_id)
+    customer_id = (user_sub or {}).get("stripe_customer_id") or None
+
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+    checkout_kwargs = dict(
+        mode="subscription",
+        line_items=[{"price": price_id, "quantity": 1}],
+        allow_promotion_codes=True,
+        subscription_data={"trial_period_days": 7},
+        success_url=f"{base_url}/billing?saved=1",
+        cancel_url=f"{base_url}/billing?error=cancelled",
+        metadata={"owner_discord_id": owner_discord_id, "tier": tier, "personal": "1"},
+    )
+    if customer_id:
+        checkout_kwargs["customer"] = customer_id
+
+    try:
+        checkout_session = s.checkout.Session.create(**checkout_kwargs)
+    except Exception as e:
+        return RedirectResponse(f"/billing?error={str(e)[:80].replace(chr(32), '+')}", status_code=303)
+    return RedirectResponse(checkout_session.url, status_code=303)
+
+
+@app.post("/billing/portal")
+async def user_billing_portal(request: Request):
+    """Stripe Customer Portal for Player Pro users."""
+    session, err = _require_session(request)
+    if err: return err
+    s = _stripe_client()
+    if not s:
+        return RedirectResponse("/billing?error=stripe_not_configured", status_code=303)
+    owner_discord_id = session.get("uid", "")
+    user_sub = await database.get_user_subscription(owner_discord_id) if owner_discord_id else None
+    customer_id = (user_sub or {}).get("stripe_customer_id")
+    if not customer_id:
+        return RedirectResponse("/billing?error=no_subscription", status_code=303)
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+    portal = s.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=f"{base_url}/billing",
+    )
+    return RedirectResponse(portal.url, status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Routes — guild
 # ---------------------------------------------------------------------------
 
@@ -947,7 +1084,7 @@ async def scout_page(request: Request, guild_id: str, saved: str = ""):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
+    err = await _require_alliance(guild, guild_id)
     if err: return err
     scout_channels = await database.get_scout_channels(guild_id)
     return templates.TemplateResponse(
@@ -970,7 +1107,7 @@ async def scout_save(
     err = _require_guild(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
-    err = await _require_premium(guild, guild_id)
+    err = await _require_alliance(guild, guild_id)
     if err: return err
 
     category_id = sanitize_snowflake(category_id)
@@ -2221,9 +2358,16 @@ async def stripe_webhook(request: Request):
                 print(f"[webhook] guild sub updated: {guild['guild_id']} → {plan_str} ({status})", flush=True)
 
     elif event["type"] == "checkout.session.completed":
-        # Handle user-level checkout completions (source=plans)
+        # Handle user-level checkout completions (source=plans OR personal Player Pro)
         meta = obj.get("metadata") or {}
-        if meta.get("source") == "plans" and meta.get("discord_user_id"):
+        _is_user_checkout = (
+            (meta.get("source") == "plans" and meta.get("discord_user_id"))
+            or (meta.get("personal") == "1" and meta.get("owner_discord_id"))
+        )
+        # Normalise discord_user_id field
+        if not meta.get("discord_user_id") and meta.get("owner_discord_id"):
+            meta = dict(meta, discord_user_id=meta["owner_discord_id"])
+        if _is_user_checkout and meta.get("discord_user_id"):
             discord_user_id = meta["discord_user_id"]
             tier = meta.get("tier", "starter")
             import datetime
@@ -4317,7 +4461,7 @@ async def allianz_hospital(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_premium(guild, guild_id)
+    err = await _require_alliance(guild, guild_id)
     if err: return err
 
     all_entries = await database.get_all_hospital_data(guild_id)
@@ -4468,6 +4612,8 @@ async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_alliance(guild, guild_id)
+    if err: return err
     enemies = await database.get_enemies(guild_id)
     report_channel = await database.get_report_channel(guild_id)
     return templates.TemplateResponse("enemies.html", {
@@ -4591,6 +4737,8 @@ async def verteidigung_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    err = await _require_alliance(guild, guild_id)
+    if err: return err
     channels = await database.get_defend_channels(guild_id)
     return templates.TemplateResponse("verteidigung.html", {
         "request": request,
@@ -4634,6 +4782,8 @@ async def alliance_members_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
+    err = await _require_alliance(guild, guild_id)
+    if err: return err
 
     members           = await database.get_alliance_members(guild_id)
     meta              = await database.get_alliance_members_meta(guild_id)

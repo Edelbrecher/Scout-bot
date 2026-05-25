@@ -103,9 +103,15 @@
 <script>
 (function() {
   var m = window.location.pathname.match(/^\/guild\/([^\/]+)/);
-  if (m) {
-    var el = document.getElementById('nav-billing-link');
-    if (el) { el.href = '/guild/' + m[1] + '/billing'; el.style.display = 'flex'; }
+  var el = document.getElementById('nav-billing-link');
+  if (el) {
+    if (m && !/^ws_/.test(m[1])) {
+      // Discord guild → guild billing
+      el.href = '/guild/' + m[1] + '/billing'; el.style.display = 'flex';
+    } else {
+      // Personal workspace or dashboard → user billing
+      el.href = '/billing'; el.style.display = 'flex';
+    }
   }
 })();
 // Load payment alerts
