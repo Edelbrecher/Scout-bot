@@ -237,66 +237,72 @@ def _run_ocr(img: "Image.Image") -> str:
 
 
 KNOWN_TRIBES = {"romans", "teutons", "gauls", "egyptians", "huns", "spartans",
-                "römer", "germanen", "gallier", "ägypter", "hunnen", "spartaner"}
+                "römer", "romer", "germanen", "gallier", "ägypter", "agypter",
+                "hunnen", "spartaner", "roman", "teuton", "gaul"}
 
 
 def _parse_ocr_text(text: str) -> dict:
-    """Extrahiert Felder aus dem OCR-Text des Helden-Profil-Modals."""
+    """Extrahiert Felder aus dem OCR-Text — unterstützt EN und DE."""
     result: dict = {}
 
-    # Debug-Log
     print(f"[hero_scout] OCR raw ({len(text)} chars):\n{text[:700]}", flush=True)
 
-    # Serverzeit: "Server time: 13:24:33 (UTC +01:00)"
-    m = re.search(r"Server\s+time[:\s]+(\d{1,2}:\d{2}:\d{2}[^\n]*)", text, re.IGNORECASE)
+    # ── Serverzeit ───────────────────────────────────────────────────────
+    m = re.search(r"Server(?:\s*zeit|[-\s]*time)[:\s]+(\d{1,2}:\d{2}:\d{2}[^\n]*)",
+                  text, re.IGNORECASE)
     if m:
         result["server_time"] = m.group(1).strip()
 
-    # Stamm — Label + Wert auf gleicher Zeile ODER Wert auf nächster Zeile
-    # "Tribe  Teutons" oder "Tribe\nTeutons" oder einfach nur "Teutons" in der Nähe
-    m = re.search(r"Tribe\s+(Romans?|Teutons?|Gauls?|Egyptians?|Huns?|Spartans?|"
-                  r"Römer|Germanen|Gallier|Ägypter|Hunnen|Spartaner)", text, re.IGNORECASE)
+    # ── Stamm  (EN: Tribe / DE: Volk / Stamm) ───────────────────────────
+    TRIBE_PATTERN = (r"(?:Tribe|Volk|Stamm)\s*:?\s*"
+                     r"(Romans?|Teutons?|Gauls?|Egyptians?|Huns?|Spartans?|"
+                     r"R[oö]mer|Germanen|Gallier|[AÄ]gypter|Hunnen|Spartaner)")
+    m = re.search(TRIBE_PATTERN, text, re.IGNORECASE)
     if m:
         result["tribe"] = m.group(1).strip()
     else:
-        # Fallback: bekannten Stammnamen irgendwo im Text suchen
         for word in text.split():
-            if word.lower().rstrip(",.") in KNOWN_TRIBES:
-                result["tribe"] = word.rstrip(",.")
+            if word.lower().rstrip(",.:-") in KNOWN_TRIBES:
+                result["tribe"] = word.rstrip(",.:-")
                 break
 
-    # Allianz — "Alliance LR" oder "Alliance\nHM"
-    m = re.search(r"Alliance\s+([A-Za-z0-9_\-]{1,20})", text, re.IGNORECASE)
+    # ── Allianz  (EN: Alliance / DE: Allianz) ────────────────────────────
+    m = re.search(r"(?:Alliance|Allianz)\s*:?\s*([A-Za-z0-9_\-]{1,20})",
+                  text, re.IGNORECASE)
     if m:
         val = m.group(1).strip()
-        if val.lower() not in ("not", "none", "—", "lial", "lia", "li"):
+        BAD = {"not", "none", "—", "lial", "lia", "li", "nicht", "angegeben"}
+        if val.lower() not in BAD:
             result["alliance"] = val
 
-    # Dörfer — "Villages 8" oder "Villages\n12"
-    m = re.search(r"Villages\s+(\d+)", text, re.IGNORECASE)
+    # ── Dörfer  (EN: Villages / DE: Dörfer / Dorfer) ─────────────────────
+    m = re.search(r"(?:Villages|D[oö]rfer)\s*:?\s*(\d+)", text, re.IGNORECASE)
     if m:
         result["villages"] = int(m.group(1))
 
-    # Heldenlevel — "Hero level 41 44930 Experience"
-    m = re.search(r"Hero\s+level\s+(\d+)", text, re.IGNORECASE)
+    # ── Heldenlevel  (EN: Hero level / DE: Heldenstufe) ──────────────────
+    m = re.search(r"(?:Hero\s+level|Heldenstufe)\s*:?\s*(\d+)", text, re.IGNORECASE)
     if m:
         result["hero_level"] = int(m.group(1))
 
-    # Hero XP — "44930 Experience" oder "119,862 Experience"
-    m = re.search(r"([\d,\.]+)\s*Experience", text, re.IGNORECASE)
+    # ── Hero XP  (EN: Experience / DE: Erfahrung) ────────────────────────
+    m = re.search(r"([\d,\.]+)\s*(?:Experience|Erfahrung)", text, re.IGNORECASE)
     if m:
         try:
-            result["hero_xp"] = int(m.group(1).replace(",", "").replace(".", ""))
+            raw = m.group(1).replace(",", "").replace(".", "")
+            result["hero_xp"] = int(raw)
         except ValueError:
             pass
 
-    # Attacker Rang — "Attacker 626 1880 Points"
-    m = re.search(r"Attacker\s+(\d+)\s+[\d,\.]+\s*Points?", text, re.IGNORECASE)
+    # ── Attacker Rang  (EN: Attacker / DE: Angreifer) ────────────────────
+    m = re.search(r"(?:Attacker|Angreifer)\s+(\d+)\s+[\d,\.]+\s*(?:Points?|Punkte?)",
+                  text, re.IGNORECASE)
     if m:
         result["attacker_rank"] = int(m.group(1))
 
-    # Defender Rang — "Defender 2053 329 Points"
-    m = re.search(r"Defender\s+(\d+)\s+[\d,\.]+\s*Points?", text, re.IGNORECASE)
+    # ── Defender Rang  (EN: Defender / DE: Verteidiger) ──────────────────
+    m = re.search(r"(?:Defender|Verteidiger)\s+(\d+)\s+[\d,\.]+\s*(?:Points?|Punkte?)",
+                  text, re.IGNORECASE)
     if m:
         result["defender_rank"] = int(m.group(1))
 
