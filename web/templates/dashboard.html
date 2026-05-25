@@ -20,13 +20,17 @@
   }
 
   .guild-tile {
-    cursor: grab;
     user-select: none;
     touch-action: none;
     border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
     transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
   }
-  .guild-tile:active { cursor: grabbing; }
 
   .guild-tile.dragging {
     opacity: 0.35;
@@ -37,38 +41,49 @@
     transform: scale(1.02);
   }
 
+  /* ── Sichtbarer Drag-Handle oben ── */
+  .drag-handle {
+    cursor: grab;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--border);
+    padding: 0.3rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.3);
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .drag-handle:hover {
+    background: rgba(59,130,246,0.08);
+    color: rgba(255,255,255,0.65);
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle .grip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .drag-handle .grip span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+  }
+
   .guild-tile a {
     text-decoration: none;
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem 1.1rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    padding: 0.85rem 1.1rem 1rem;
     color: var(--text);
-    height: 100%;
-    transition: border-color 0.15s;
-    pointer-events: none; /* verhindert Link-Klick während Drag */
+    flex: 1;
+    transition: background 0.15s;
   }
-  .guild-tile:not(.dragging):not(.drag-over) a {
-    pointer-events: auto;
-  }
-  .guild-tile a:hover { border-color: #3b82f6; }
-
-  /* Drag-Handle-Indikator */
-  .guild-tile::before {
-    content: '⠿';
-    position: absolute;
-    top: 0.45rem;
-    right: 0.55rem;
-    color: rgba(255,255,255,0.15);
-    font-size: 0.9rem;
-    pointer-events: none;
-    transition: color 0.15s;
-  }
-  .guild-tile:hover::before { color: rgba(255,255,255,0.4); }
-  .guild-tile { position: relative; }
+  .guild-tile a:hover { background: rgba(255,255,255,0.03); }
 
   /* ── Mobile ── */
   @media (max-width: 768px) {
@@ -233,7 +248,12 @@
   <div class="guild-grid" id="guildGrid">
     {% for guild in guilds %}
     {% set sub = guild.subscription_status or 'free' %}
-    <div class="guild-tile" draggable="true" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
+    <div class="guild-tile" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
+      <!-- Sichtbarer Drag-Handle – hier anfassen zum Verschieben -->
+      <div class="drag-handle" title="Kachel verschieben">
+        <div class="grip"><span></span><span></span><span></span></div>
+        <span>Verschieben</span>
+      </div>
       <a href="/guild/{{ guild.guild_id }}">
         <div style="font-size:1.8rem;flex-shrink:0;">{% if guild.bot_status == 'kicked' %}⚠️{% else %}🏰{% endif %}</div>
         <div style="flex:1;min-width:0;">
@@ -312,6 +332,22 @@
     return ph;
   }
 
+  // ── Drag nur über Handle starten ──
+  // Tiles sind NICHT mehr draggable="true" per default;
+  // mousedown/touchstart auf Handle setzt draggable dynamisch.
+  grid.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('mousedown', () => {
+      const tile = handle.closest('.guild-tile');
+      if (tile) tile.setAttribute('draggable', 'true');
+    });
+  });
+  grid.addEventListener('mouseup', () => {
+    grid.querySelectorAll('.guild-tile').forEach(t => t.removeAttribute('draggable'));
+  });
+  document.addEventListener('mouseup', () => {
+    grid.querySelectorAll('.guild-tile').forEach(t => t.removeAttribute('draggable'));
+  });
+
   // ── Events ──
   grid.addEventListener('dragstart', e => {
     const tile = e.target.closest('.guild-tile');
@@ -377,9 +413,11 @@
   let touchOffX = 0, touchOffY = 0;
 
   grid.addEventListener('touchstart', e => {
-    const tile = e.target.closest('.guild-tile');
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const tile = handle.closest('.guild-tile');
     if (!tile) return;
-    // Nur bei langem Drücken (300ms) Drag starten
+    // Sofort Drag starten (Handle ist explizit)
     tile._touchTimer = setTimeout(() => {
       touchDragged = tile;
       const t = e.touches[0];
@@ -398,7 +436,8 @@
   }, { passive: false });
 
   grid.addEventListener('touchmove', e => {
-    const tile = e.target.closest('.guild-tile');
+    const handle = e.target.closest('.drag-handle');
+    const tile = handle ? handle.closest('.guild-tile') : e.target.closest('.guild-tile');
     if (tile && tile._touchTimer) { clearTimeout(tile._touchTimer); tile._touchTimer = null; }
     if (!touchDragged) return;
     e.preventDefault();
