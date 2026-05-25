@@ -30,9 +30,7 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
 
         <div>
-          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">
-            Spielername *
-          </label>
+          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Spielername *</label>
           <input type="text" name="player_name" required
                  value="{{ prefill.player_name or edit_player or '' }}"
                  placeholder="z.B. ZalmecAwp"
@@ -41,7 +39,7 @@
 
         <div>
           <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">Stamm</label>
-          <select name="tribe"
+          <select name="tribe" id="tribeSelect" onchange="filterWeapons()"
                   style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
             <option value="">– unbekannt –</option>
             {% for t in ['Römer','Germanen','Gallier','Ägypter','Hunnen','Spartaner'] %}
@@ -108,33 +106,64 @@
     <div class="card" style="margin-bottom:1.25rem;">
       <h2 style="font-size:1rem;margin:0 0 0.25rem;">⚔️ Ausrüstung</h2>
       <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 1rem;">
-        Wähle für jeden Slot das Item aus — oder lasse es leer wenn unbekannt.
+        Tier 1 = Bronze · Tier 2 = Silber · Tier 3 = Gold. Wähle Stamm oben um Waffen zu filtern.
       </p>
 
-      <div style="display:grid;gap:0.75rem;">
+      <div style="display:grid;gap:1rem;">
 
-        {% set slot_items = [
+        {# Slot-Konfiguration: (form_name, cat_key, icon, label) #}
+        {% set slots_cfg = [
           ('helm',   'helmet', '🪖', 'Helm'),
           ('armor',  'armor',  '🛡️', 'Rüstung'),
-          ('boots',  'boots',  '👢', 'Schuhe'),
+          ('boots',  'boots',  '👢', 'Stiefel'),
           ('weapon', 'weapon', '⚔️', 'Waffe'),
           ('mount',  'mount',  '🐴', 'Pferd / Reittier'),
-          ('misc',   'misc',   '💍', 'Sonstiges'),
+          ('misc',   'misc',   '💍', 'Linke Hand / Diverses'),
         ] %}
 
-        {% for slot_key, cat_key, icon, label in slot_items %}
-        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-          <div style="width:36px;text-align:center;font-size:1.3rem;flex-shrink:0;">{{ icon }}</div>
-          <div style="min-width:120px;font-size:0.88rem;font-weight:600;flex-shrink:0;">{{ label }}</div>
+        {% for slot_key, cat_key, icon, label in slots_cfg %}
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:0.4rem;">
+            {{ icon }} {{ label }}
+          </label>
           <select name="slot_{{ slot_key }}"
-                  style="flex:1;min-width:220px;padding:0.45rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.88rem;">
+                  {% if cat_key == 'weapon' %}id="weaponSelect"{% endif %}
+                  style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);
+                         border-radius:8px;color:var(--text);font-size:0.85rem;">
             <option value="">– kein Item / unbekannt –</option>
-            {% for item_id, item_name in items_by_cat.get(cat_key, []) %}
-            <option value="{{ item_name }}"
-              {% if prefill.slots is defined and prefill.slots.get(slot_key) == item_name %}selected{% endif %}>
-              {{ item_name }}
-            </option>
-            {% endfor %}
+
+            {% if cat_key == 'weapon' %}
+              {# Waffen nach Stamm gruppiert #}
+              {% set tribe_groups = [
+                ('🏛️ Römer',    '🏛️'),
+                ('⚒️ Germanen', '⚒️'),
+                ('🍀 Gallier',  '🍀'),
+                ('🏹 Hunnen',   '🏹'),
+                ('☀️ Ägypter',  '☀️'),
+              ] %}
+              {% for group_label, marker in tribe_groups %}
+              <optgroup label="{{ group_label }}" class="weapon-group" data-tribe="{{ group_label }}">
+                {% for item_id, item_name in items_by_cat.get('weapon', []) %}
+                  {% if marker in item_name %}
+                  <option value="{{ item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') }}"
+                    {% set clean = item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') %}
+                    {% if prefill.slots is defined and prefill.slots.get(slot_key) == clean %}selected{% endif %}>
+                    {{ item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') }}
+                  </option>
+                  {% endif %}
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+
+            {% else %}
+              {% for item_id, item_name in items_by_cat.get(cat_key, []) %}
+              <option value="{{ item_name }}"
+                {% if prefill.slots is defined and prefill.slots.get(slot_key) == item_name %}selected{% endif %}>
+                {{ item_name }}
+              </option>
+              {% endfor %}
+            {% endif %}
+
           </select>
         </div>
         {% endfor %}
@@ -159,4 +188,40 @@
   </form>
 
 </div>
+
+<script>
+// Stamm-Filter für Waffen: zeigt passende optgroup hervor
+const TRIBE_MAP = {
+  'Römer':    '🏛️ Römer',
+  'Germanen': '⚒️ Germanen',
+  'Gallier':  '🍀 Gallier',
+  'Hunnen':   '🏹 Hunnen',
+  'Ägypter':  '☀️ Ägypter',
+};
+
+function filterWeapons() {
+  const tribe = document.getElementById('tribeSelect').value;
+  const sel = document.getElementById('weaponSelect');
+  if (!sel) return;
+
+  const groups = sel.querySelectorAll('optgroup');
+  groups.forEach(g => {
+    const matchLabel = TRIBE_MAP[tribe] || '';
+    if (!tribe || g.label === matchLabel) {
+      g.style.display = '';
+      // Styling: aktiver Stamm hervorheben
+      if (tribe && g.label === matchLabel) {
+        g.style.fontWeight = 'bold';
+      } else {
+        g.style.fontWeight = '';
+      }
+    } else {
+      g.style.display = tribe ? 'none' : '';
+    }
+  });
+}
+
+// Beim Laden Stamm-Filter anwenden
+filterWeapons();
+</script>
 {% endblock %}

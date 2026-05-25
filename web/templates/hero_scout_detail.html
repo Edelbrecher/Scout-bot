@@ -100,56 +100,70 @@
       </div>
 
       <!-- Ausrüstungs-Slots -->
+      {% set slot_cfg = [
+        ('helm',   '🪖', 'Helm'),
+        ('armor',  '🛡️', 'Rüstung'),
+        ('boots',  '👢', 'Schuhe'),
+        ('weapon', '⚔️', 'Waffe'),
+        ('mount',  '🐴', 'Pferd'),
+        ('misc',   '💍', 'Sonstiges'),
+      ] %}
       <div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.4rem;">Ausrüstung</div>
-        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
-          {% for slot_name, slot_label in [
-            ('helm','Helm'),('armor','Rüstung'),('boots','Schuhe'),
-            ('weapon','Waffe'),('mount','Pferd'),('misc','Sonstiges')
-          ] %}
-          <div style="text-align:center;">
-            <div style="width:52px;height:52px;border:1px solid var(--border);border-radius:8px;overflow:hidden;
-                        background:rgba(0,0,0,0.3);margin-bottom:0.25rem;position:relative;"
-                 {% if e.source == 'manual' %}title="{{ e.get('slot_' + slot_name, '') or '—' }}"{% endif %}>
-              {% if e.source == 'manual' %}
-                {# Manuelle Einträge haben keine Bilder — Item-Name als Text #}
-                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-                            font-size:0.55rem;color:var(--text-muted);padding:2px;text-align:center;line-height:1.2;">
-                  {{ e.get('slot_' + slot_name, '') or '—' }}
-                </div>
-              {% else %}
-                <img src="/guild/{{ guild.guild_id }}/defense/hero-scout/img/{{ e.id }}/{{ slot_name }}"
-                     style="width:100%;height:100%;object-fit:cover;"
-                     onerror="this.style.display='none';this.parentNode.innerHTML='<div style=\'text-align:center;line-height:52px;font-size:1.2rem;color:rgba(255,255,255,0.15);\'>?</div>'">
-              {% endif %}
-            </div>
-            <div style="font-size:0.65rem;color:var(--text-muted);">{{ slot_label }}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:.04em;">Ausrüstung</div>
+
+        {% if e.source == 'manual' %}
+        {# Manuelle Einträge: Item-Namen als Zeilen-Badges #}
+        <div style="display:flex;flex-direction:column;gap:0.35rem;">
+          {% for slot_key, icon, slot_label in slot_cfg %}
+          {% set item_val = e.get('slot_' + slot_key, '') %}
+          <div style="display:flex;align-items:center;gap:0.6rem;font-size:0.83rem;">
+            <span style="width:22px;text-align:center;font-size:1rem;">{{ icon }}</span>
+            <span style="color:var(--text-muted);min-width:70px;font-size:0.75rem;">{{ slot_label }}</span>
+            {% if item_val %}
+            {# Tier-Farbe aus Name ableiten #}
+            {% if '[T3]' in item_val %}
+              {% set tier_color = '#fbbf24' %}
+            {% elif '[T2]' in item_val %}
+              {% set tier_color = '#94a3b8' %}
+            {% else %}
+              {% set tier_color = '#b45309' %}
+            {% endif %}
+            <span style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;
+                         padding:0.15rem 0.55rem;color:{{ tier_color }};font-weight:600;font-size:0.8rem;">
+              {{ item_val }}
+            </span>
+            {% else %}
+            <span style="color:rgba(255,255,255,0.2);font-size:0.78rem;">— unbekannt —</span>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
-      </div>
 
-      {% if e.source == 'manual' %}
-      <!-- Manuelle Item-Namen als Text-Liste -->
-      {% set slot_items = [
-        ('helm','🪖 Helm'),('armor','🛡️ Rüstung'),('boots','👢 Schuhe'),
-        ('weapon','⚔️ Waffe'),('mount','🐴 Pferd'),('misc','💍 Sonstiges')
-      ] %}
-      {% set has_items = namespace(v=false) %}
-      {% for sk, sl in slot_items %}{% if e.get('slot_' + sk) %}{% set has_items.v = true %}{% endif %}{% endfor %}
-      {% if has_items.v %}
-      <div style="margin-top:0.6rem;font-size:0.8rem;color:var(--text-muted);">
-        {% for sk, sl in slot_items %}
-        {% set item_val = e.get('slot_' + sk, '') %}
-        {% if item_val %}
-        <span style="display:inline-block;margin-right:0.75rem;margin-bottom:0.2rem;">
-          {{ sl }}: <strong style="color:var(--text);">{{ item_val }}</strong>
-        </span>
+        {% else %}
+        {# Screenshot-Einträge: Bild-Slots #}
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
+          {% for slot_key, icon, slot_label in slot_cfg %}
+          {% set item_val = e.get('slot_' + slot_key, '') %}
+          <div style="text-align:center;">
+            <div style="width:52px;height:52px;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+                        background:rgba(0,0,0,0.3);margin-bottom:0.25rem;"
+                 {% if item_val %}title="{{ item_val }}"{% endif %}>
+              <img src="/guild/{{ guild.guild_id }}/defense/hero-scout/img/{{ e.id }}/{{ slot_key }}"
+                   style="width:100%;height:100%;object-fit:cover;"
+                   onerror="this.style.display='none';this.parentNode.innerHTML='<div style=\'text-align:center;line-height:52px;font-size:1.2rem;color:rgba(255,255,255,0.15);\'>?</div>'">
+            </div>
+            <div style="font-size:0.62rem;color:var(--text-muted);">{{ slot_label }}</div>
+            {% if item_val %}
+            <div style="font-size:0.6rem;color:#93c5fd;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ item_val }}">
+              {{ item_val.split('[')[0].strip() if '[' in item_val else item_val }}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
         {% endif %}
-        {% endfor %}
+
       </div>
-      {% endif %}
-      {% endif %}
 
       <!-- Original-Link (nur bei Screenshot) -->
       {% if e.discord_url %}
