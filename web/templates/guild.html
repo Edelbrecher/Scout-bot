@@ -8,7 +8,7 @@
   <!-- ── Header ── -->
   <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
     <div>
-      <a href="/dashboard" class="back-link">← Dashboard</a>
+      <a href="/dashboard" class="back-link" data-i18n="guild.back">← Dashboard</a>
       <h1 style="margin:0.25rem 0 0.25rem; font-size:1.75rem; display:flex; align-items:center; gap:0.5rem;">
         🏰 {{ guild.guild_name }}
       </h1>
@@ -71,9 +71,9 @@
     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSetup()">
       <h2 style="margin:0; display:flex; align-items:center; gap:0.5rem;">
         {% if needs_setup %}
-          <span style="color:#f59e0b;">⚙️ Ersteinrichtung erforderlich</span>
+          <span style="color:#f59e0b;" data-i18n="guild.setup.title">⚙️ Ersteinrichtung erforderlich</span>
         {% else %}
-          <span>⚙️ Server-Einstellungen</span>
+          <span data-i18n="guild.settings.title">⚙️ Server-Einstellungen</span>
         {% endif %}
       </h2>
       <span id="setupChevron" style="font-size:1.2rem; transition:transform 0.2s; {% if not needs_setup %}transform:rotate(-90deg);{% endif %}">▼</span>
@@ -81,16 +81,16 @@
 
     <div id="setupBody" style="{% if not needs_setup %}display:none;{% endif %} margin-top:1rem;">
       {% if needs_setup %}
-      <p style="color:#f59e0b; margin-bottom:1rem;">
+      <p style="color:#f59e0b; margin-bottom:1rem;" data-i18n="guild.setup.hint">
         Bitte trage einmal die Travian-Server-URL ein. Diese wird für Karten-Snapshots, Farming-Analyse und alle Deep-Links benötigt.
       </p>
       {% else %}
-      <p class="hint">Travian-Server-Einstellungen für diesen Discord-Server.</p>
+      <p class="hint" data-i18n="guild.settings.hint">Travian-Server-Einstellungen für diesen Discord-Server.</p>
       {% endif %}
 
       <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
         <div class="form-group" style="margin:0; flex:1; min-width:260px;">
-          <label>Travian World URL</label>
+          <label data-i18n="guild.world.label">Travian World URL</label>
           <input type="url" name="server_url" required
             placeholder="https://ts2.x1.europe.travian.com"
             list="worldlist"
@@ -126,9 +126,9 @@
             <option value="https://ts1.x1.arabia.travian.com">ts1.x1.arabia</option>
             <option value="https://ts2.x1.arabia.travian.com">ts2.x1.arabia</option>
           </datalist>
-          <p style="margin:0.4rem 0 0;font-size:0.8rem;color:var(--text-muted);">Oder URL direkt eingeben — muss auf /map.sql enden können.</p>
+          <p style="margin:0.4rem 0 0;font-size:0.8rem;color:var(--text-muted);" data-i18n="guild.world.hint">Oder URL direkt eingeben — muss auf /map.sql enden können.</p>
         </div>
-        <button type="submit" class="btn btn-primary">💾 Speichern</button>
+        <button type="submit" class="btn btn-primary" data-i18n="guild.world.save">💾 Speichern</button>
       </form>
 
       {% if guild.tw_world %}
@@ -151,7 +151,7 @@
   <!-- ── Allianz ── -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
     <span style="font-size:1.1rem;">🛡️</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Allianz</h2>
+    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.alliance">Allianz</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
@@ -160,8 +160,8 @@
     <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">👥</div>
       <div class="feature-body">
-        <div class="feature-title">Allianz-Mitglieder</div>
-        <div class="feature-desc">Mitgliederliste importieren — Übersicht, Stämme, Bevölkerung, Punkte</div>
+        <div class="feature-title" data-i18n="guild.feature.members.title">Allianz-Mitglieder</div>
+        <div class="feature-desc" data-i18n="guild.feature.members.desc">Mitgliederliste importieren — Übersicht, Stämme, Bevölkerung, Punkte</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -170,8 +170,8 @@
     <a href="/guild/{{ guild.guild_id }}/allianz/sitter-liste" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🤝</div>
       <div class="feature-body">
-        <div class="feature-title">Allianz-Listen</div>
-        <div class="feature-desc">Freigegebene Sitter- und Dual-Listen aller Mitglieder auf einen Blick</div>
+        <div class="feature-title" data-i18n="guild.feature.sitter.title">Allianz-Listen</div>
+        <div class="feature-desc" data-i18n="guild.feature.sitter.desc">Freigegebene Sitter- und Dual-Listen aller Mitglieder auf einen Blick</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -180,8 +180,8 @@
     <a href="/guild/{{ guild.guild_id }}/allianz/hospital" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🏥</div>
       <div class="feature-body">
-        <div class="feature-title">Allianz-Lazarett {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Heilende Truppen aller Mitglieder auf einen Blick koordinieren</div>
+        <div class="feature-title"><span data-i18n="guild.feature.hospital.title">Allianz-Lazarett</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.hospital.desc">Heilende Truppen aller Mitglieder auf einen Blick koordinieren</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -190,8 +190,8 @@
     <a href="/guild/{{ guild.guild_id }}/enemies" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🎯</div>
       <div class="feature-body">
-        <div class="feature-title">Gegner-Kartei {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Scout-Historie pro Gegner — Ressourcen, Truppen, Dörfer über Zeit</div>
+        <div class="feature-title"><span data-i18n="guild.feature.enemies.title">Gegner-Kartei</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.enemies.desc">Scout-Historie pro Gegner — Ressourcen, Truppen, Dörfer über Zeit</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -200,8 +200,8 @@
     <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🗡️</div>
       <div class="feature-body">
-        <div class="feature-title">Helden-Scout</div>
-        <div class="feature-desc">Gegner-Helden beobachten — Ausrüstungswechsel & XP-Sprünge automatisch erkennen</div>
+        <div class="feature-title" data-i18n="guild.feature.heroscout.title">Helden-Scout</div>
+        <div class="feature-desc" data-i18n="guild.feature.heroscout.desc">Gegner-Helden beobachten — Ausrüstungswechsel & XP-Sprünge automatisch erkennen</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -210,8 +210,8 @@
     <a href="/guild/{{ guild.guild_id }}/verteidigung" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🛡️</div>
       <div class="feature-body">
-        <div class="feature-title">Verteidigung</div>
-        <div class="feature-desc">Defend- und Timed-Defend Anfragen koordinieren und verwalten</div>
+        <div class="feature-title" data-i18n="guild.feature.defense.title">Verteidigung</div>
+        <div class="feature-desc" data-i18n="guild.feature.defense.desc">Defend- und Timed-Defend Anfragen koordinieren und verwalten</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -220,8 +220,8 @@
     <a href="/guild/{{ guild.guild_id }}/scout" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🔍</div>
       <div class="feature-body">
-        <div class="feature-title">Scout {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte</div>
+        <div class="feature-title"><span data-i18n="guild.feature.scout.title">Scout</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.scout.desc">Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -231,7 +231,7 @@
   <!-- ── Spieler ── -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
     <span style="font-size:1.1rem;">👤</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Spieler</h2>
+    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.player">Spieler</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
@@ -240,8 +240,8 @@
     <a href="/guild/{{ guild.guild_id }}/mein-account" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🏰</div>
       <div class="feature-body">
-        <div class="feature-title">Mein Account {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Eigene Dörfer & Truppen importieren — Datenbasis für alle Features</div>
+        <div class="feature-title"><span data-i18n="guild.feature.account.title">Mein Account</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.account.desc">Eigene Dörfer & Truppen importieren — Datenbasis für alle Features</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -250,8 +250,8 @@
     <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">⚜️</div>
       <div class="feature-body">
-        <div class="feature-title">Farming Intelligence {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Inaktive Farmen erkennen, Farmlisten verwalten und analysieren</div>
+        <div class="feature-title"><span data-i18n="guild.feature.farming.title">Farming Intelligence</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.farming.desc">Inaktive Farmen erkennen, Farmlisten verwalten und analysieren</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -260,8 +260,8 @@
     <a href="/guild/{{ guild.guild_id }}/farmlist-analyst" class="feature-card" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">📋</div>
       <div class="feature-body">
-        <div class="feature-title">Farmlist-Analyst {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Farmlisten auswerten — gute, mittelmäßige und sinnlose Farmen erkennen</div>
+        <div class="feature-title"><span data-i18n="guild.feature.farmlist.title">Farmlist-Analyst</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.farmlist.desc">Farmlisten auswerten — gute, mittelmäßige und sinnlose Farmen erkennen</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -270,8 +270,8 @@
     <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not is_premium %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🎯</div>
       <div class="feature-body">
-        <div class="feature-title">Einsatzplanung {{ PRO_BADGE }}</div>
-        <div class="feature-desc">Angriffe koordinieren, Marschzeit berechnen und direkt absenden</div>
+        <div class="feature-title"><span data-i18n="guild.feature.einsatz.title">Einsatzplanung</span> {{ PRO_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.einsatz.desc">Angriffe koordinieren, Marschzeit berechnen und direkt absenden</div>
       </div>
       {{ LOCK_ARROW if not is_premium else OK_ARROW }}
     </a>
@@ -280,8 +280,8 @@
     <a href="/guild/{{ guild.guild_id }}/timer" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">⏱️</div>
       <div class="feature-body">
-        <div class="feature-title">Timer & Erinnerungen</div>
-        <div class="feature-desc">Farmlisten-Timer, Angriffs-Erinnerungen und akustische Alarme</div>
+        <div class="feature-title" data-i18n="guild.feature.timer.title">Timer & Erinnerungen</div>
+        <div class="feature-desc" data-i18n="guild.feature.timer.desc">Farmlisten-Timer, Angriffs-Erinnerungen und akustische Alarme</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -290,8 +290,8 @@
     <a href="/guild/{{ guild.guild_id }}/settle-list" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📍</div>
       <div class="feature-body">
-        <div class="feature-title">Settle-Liste</div>
-        <div class="feature-desc">Nächste Siedlungen koordinieren — verhindert Konflikte beim Worldstart</div>
+        <div class="feature-title" data-i18n="guild.feature.settle.title">Settle-Liste</div>
+        <div class="feature-desc" data-i18n="guild.feature.settle.desc">Nächste Siedlungen koordinieren — verhindert Konflikte beim Worldstart</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -300,8 +300,8 @@
     <a href="/guild/{{ guild.guild_id }}/polls" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📅</div>
       <div class="feature-body">
-        <div class="feature-title">Abstimmungen</div>
-        <div class="feature-desc">Team-Polls erstellen, Termine koordinieren und Ergebnisse auswerten</div>
+        <div class="feature-title" data-i18n="guild.feature.polls.title">Abstimmungen</div>
+        <div class="feature-desc" data-i18n="guild.feature.polls.desc">Team-Polls erstellen, Termine koordinieren und Ergebnisse auswerten</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -310,8 +310,8 @@
     <a href="/guild/{{ guild.guild_id }}/res-push" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🪖</div>
       <div class="feature-body">
-        <div class="feature-title">Res-Push</div>
-        <div class="feature-desc">Ressourcen-Anfragen verwalten, annehmen und koordinieren</div>
+        <div class="feature-title" data-i18n="guild.feature.respush.title">Res-Push</div>
+        <div class="feature-desc" data-i18n="guild.feature.respush.desc">Ressourcen-Anfragen verwalten, annehmen und koordinieren</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -320,8 +320,8 @@
     <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📊</div>
       <div class="feature-body">
-        <div class="feature-title">Statistiken</div>
-        <div class="feature-desc">Aktivität, Scout-Verlauf und Teamleistung auf einen Blick</div>
+        <div class="feature-title" data-i18n="guild.feature.stats.title">Statistiken</div>
+        <div class="feature-desc" data-i18n="guild.feature.stats.desc">Aktivität, Scout-Verlauf und Teamleistung auf einen Blick</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -330,8 +330,8 @@
     <a href="/guild/{{ guild.guild_id }}/tools/hero-tasks" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🗡️</div>
       <div class="feature-body">
-        <div class="feature-title">Heldenaufgaben</div>
-        <div class="feature-desc">Meilensteine tracken, Ressourcen & XP-Belohnungen sammeln</div>
+        <div class="feature-title" data-i18n="guild.feature.herotasks.title">Heldenaufgaben</div>
+        <div class="feature-desc" data-i18n="guild.feature.herotasks.desc">Meilensteine tracken, Ressourcen & XP-Belohnungen sammeln</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -340,8 +340,8 @@
     <a href="/guild/{{ guild.guild_id }}/tools/crop-calculator" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🌾</div>
       <div class="feature-body">
-        <div class="feature-title">Getreidefeld-Rechner</div>
-        <div class="feature-desc">Optimale Upgrade-Reihenfolge für Getreidefelder — ROI-basiert (T4.4 Extended)</div>
+        <div class="feature-title" data-i18n="guild.feature.crop.title">Getreidefeld-Rechner</div>
+        <div class="feature-desc" data-i18n="guild.feature.crop.desc">Optimale Upgrade-Reihenfolge für Getreidefelder — ROI-basiert (T4.4 Extended)</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -350,8 +350,8 @@
     <a href="/guild/{{ guild.guild_id }}/blueprints" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📐</div>
       <div class="feature-body">
-        <div class="feature-title">Blueprints</div>
-        <div class="feature-desc">Schritt-für-Schritt Bauanleitung für alle Völker — bis zu den Artefakten</div>
+        <div class="feature-title" data-i18n="guild.feature.blueprints.title">Blueprints</div>
+        <div class="feature-desc" data-i18n="guild.feature.blueprints.desc">Schritt-für-Schritt Bauanleitung für alle Völker — bis zu den Artefakten</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -360,8 +360,8 @@
     <a href="/extension" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🧩</div>
       <div class="feature-body">
-        <div class="feature-title">Chrome Extension</div>
-        <div class="feature-desc">Background Timer mit Countdown und Uhrzeiten-Alarmen — für Farmlist-Erinnerungen</div>
+        <div class="feature-title" data-i18n="guild.feature.extension.title">Chrome Extension</div>
+        <div class="feature-desc" data-i18n="guild.feature.extension.desc">Background Timer mit Countdown und Uhrzeiten-Alarmen — für Farmlist-Erinnerungen</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -371,8 +371,8 @@
     <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">🗺️</div>
       <div class="feature-body">
-        <div class="feature-title">Karte {{ PRO_BADGE }} {{ WIP_BADGE }}</div>
-        <div class="feature-desc">Interaktive Travian-Karte mit Allianz-Heatmap und Spieler-Suche</div>
+        <div class="feature-title"><span data-i18n="guild.feature.map.title">Karte</span> {{ PRO_BADGE }} {{ WIP_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.map.desc">Interaktive Travian-Karte mit Allianz-Heatmap und Spieler-Suche</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -383,8 +383,8 @@
     <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title">Angriff-Detection {{ WIP_BADGE }}</div>
-        <div class="feature-desc">Eingehende Angriffe per Discord-Modal melden und auswerten</div>
+        <div class="feature-title"><span data-i18n="guild.feature.attacks.title">Angriff-Detection</span> {{ WIP_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.attacks.desc">Eingehende Angriffe per Discord-Modal melden und auswerten</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -395,7 +395,7 @@
   <!-- ── Einstellungen ── -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
     <span style="font-size:1.1rem;">⚙️</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Einstellungen</h2>
+    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.settings">Einstellungen</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
@@ -405,8 +405,8 @@
       <div style="display:flex;align-items:center;gap:1rem;width:100%;">
         <div class="feature-icon">📋</div>
         <div class="feature-body">
-          <div class="feature-title">Anfragen-Hub</div>
-          <div class="feature-desc">Ein Channel mit allen Buttons — Scout, Defend, Res-Push und mehr</div>
+          <div class="feature-title" data-i18n="guild.settings.hub.title">Anfragen-Hub</div>
+          <div class="feature-desc" data-i18n="guild.settings.hub.desc">Ein Channel mit allen Buttons — Scout, Defend, Res-Push und mehr</div>
         </div>
       </div>
       {% if request_hub and request_hub.channel_id %}
@@ -416,13 +416,13 @@
           ✅ #{{ request_hub.channel_name or request_hub.channel_id }}
         </span>
         <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/clear" style="margin:0;">
-          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;">Entfernen</button>
+          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;" data-i18n="guild.settings.hub.remove">Entfernen</button>
         </form>
       </div>
       {% else %}
       <div style="padding-left:3.4rem;">
         <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/create" style="margin:0;">
-          <button type="submit" class="btn btn-primary" style="font-size:0.875rem;">➕ Hub-Channel erstellen</button>
+          <button type="submit" class="btn btn-primary" style="font-size:0.875rem;" data-i18n="guild.settings.hub.create">➕ Hub-Channel erstellen</button>
         </form>
       </div>
       {% endif %}
@@ -433,8 +433,8 @@
       <div style="display:flex;align-items:center;gap:1rem;width:100%;">
         <div class="feature-icon">🗡️</div>
         <div class="feature-body">
-          <div class="feature-title">Helden-Scout Channel</div>
-          <div class="feature-desc">Discord-Channel für Screenshots — Bot erkennt Ausrüstung & XP automatisch</div>
+          <div class="feature-title" data-i18n="guild.settings.heroscout.title">Helden-Scout Channel</div>
+          <div class="feature-desc" data-i18n="guild.settings.heroscout.desc">Discord-Channel für Screenshots — Bot erkennt Ausrüstung & XP automatisch</div>
         </div>
       </div>
       {% if hero_scout_channel %}
@@ -444,14 +444,14 @@
           ✅ Channel-ID: {{ hero_scout_channel }}
         </span>
         <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
-           style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;">Ändern →</a>
+           style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;" data-i18n="guild.settings.heroscout.change">Ändern →</a>
       </div>
       {% else %}
       <div style="padding-left:3.4rem;">
         <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
            class="btn btn-primary" style="font-size:0.875rem;text-decoration:none;display:inline-block;
            padding:0.4rem 1rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);
-           border-radius:8px;color:#f59e0b;font-weight:600;">
+           border-radius:8px;color:#f59e0b;font-weight:600;" data-i18n="guild.settings.heroscout.configure">
           ➕ Channel konfigurieren
         </a>
       </div>
@@ -462,8 +462,8 @@
     <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">⚙️</div>
       <div class="feature-body">
-        <div class="feature-title">Server-Verwaltung</div>
-        <div class="feature-desc">Dashboard-Zugang, Berechtigungen und Bot-Einstellungen</div>
+        <div class="feature-title" data-i18n="guild.settings.server.title">Server-Verwaltung</div>
+        <div class="feature-desc" data-i18n="guild.settings.server.desc">Dashboard-Zugang, Berechtigungen und Bot-Einstellungen</div>
       </div>
       {{ OK_ARROW }}
     </a>

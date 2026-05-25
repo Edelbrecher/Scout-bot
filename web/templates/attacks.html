@@ -6,76 +6,76 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1>⚔️ Angriff-Detection</h1>
+      <h1 data-i18n="attacks.title">⚔️ Angriff-Detection</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
     <div style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.25rem;">
-      <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
+      <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;" data-i18n="attacks.own_troops">
         🏰 Eigene Dörfer
       </a>
     </div>
   </div>
 
   {% if saved %}
-  <div class="alert alert-success">✅ Einstellungen gespeichert.</div>
+  <div class="alert alert-success" data-i18n="attacks.flash.saved">✅ Einstellungen gespeichert.</div>
   {% endif %}
 
   <!-- Config + Status -->
   <div class="grid-2">
     <!-- Config -->
     <div class="card">
-      <h2>Konfiguration</h2>
-      <p class="hint">Copy ID from Discord: right-click a channel → <strong>Copy ID</strong> (Developer Mode must be on).</p>
+      <h2 data-i18n="attacks.config.title">Konfiguration</h2>
+      <p class="hint" data-i18n-html="attacks.config.hint">Copy ID from Discord: right-click a channel → <strong>Copy ID</strong> (Developer Mode must be on).</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/attacks/config">
         <div class="form-group">
-          <label for="attack_channel_id">Alarm-Kanal ID</label>
-          <p class="field-hint">Channel wo Angriff-Meldungen gepostet werden.</p>
+          <label for="attack_channel_id" data-i18n="attacks.config.channel_label">Alarm-Kanal ID</label>
+          <p class="field-hint" data-i18n="attacks.config.channel_hint">Channel wo Angriff-Meldungen gepostet werden.</p>
           <input type="text" id="attack_channel_id" name="attack_channel_id"
             value="{{ guild.attack_channel_id or '' }}"
-            placeholder="z.B. 1234567890123456789" />
+            placeholder="z.B. 1234567890123456789" data-i18n-placeholder="attacks.config.channel_placeholder" />
         </div>
-        <button type="submit" class="btn btn-primary">Speichern</button>
+        <button type="submit" class="btn btn-primary" data-i18n="attacks.config.save">Speichern</button>
       </form>
 
       <hr style="margin:1.5rem 0;">
       {% if not guild.attack_channel_id %}
-      <h3>1-Click Auto Setup</h3>
-      <p class="hint">Bot erstellt automatisch eine Kategorie <strong>Angriff-Detection</strong> und den Channel <strong>#angriff-alarm</strong> mit dem Melde-Button.</p>
+      <h3 data-i18n="attacks.autosetup.title">1-Click Auto Setup</h3>
+      <p class="hint" data-i18n-html="attacks.autosetup.hint">Bot erstellt automatisch eine Kategorie <strong>Angriff-Detection</strong> und den Channel <strong>#angriff-alarm</strong> mit dem Melde-Button.</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/attacks/auto-setup">
-        <button type="submit" class="btn btn-primary">⚡ Auto Setup</button>
+        <button type="submit" class="btn btn-primary" data-i18n="attacks.autosetup.btn">⚡ Auto Setup</button>
       </form>
       {% else %}
-      <h3>Reset Setup</h3>
-      <p class="hint">Channel ID aus der Datenbank entfernen. Löscht nichts in Discord.</p>
+      <h3 data-i18n="attacks.reset.title">Reset Setup</h3>
+      <p class="hint" data-i18n="attacks.reset.hint">Channel ID aus der Datenbank entfernen. Löscht nichts in Discord.</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/attacks/reset"
-            onsubmit="return confirm('Angriff-Konfiguration zurücksetzen?')">
-        <button type="submit" class="btn btn-danger">🔄 Reset</button>
+            onsubmit="return confirm(window.T&&window.T['confirm.reset_attacks']||'Angriff-Konfiguration zurücksetzen?')">
+        <button type="submit" class="btn btn-danger" data-i18n="attacks.reset.btn">🔄 Reset</button>
       </form>
       {% endif %}
     </div>
 
     <!-- Status -->
     <div class="card">
-      <h2>Status</h2>
+      <h2 data-i18n="attacks.status.title">Status</h2>
       <ul class="status-list">
         <li>
-          <span class="status-label">Alarm-Kanal</span>
+          <span class="status-label" data-i18n="attacks.status.alarm_channel">Alarm-Kanal</span>
           {% if guild.attack_channel_id %}
           <span class="badge badge-ok">✅ {{ guild.attack_channel_id }}</span>
           {% else %}
-          <span class="badge badge-warn">⚠️ Nicht konfiguriert</span>
+          <span class="badge badge-warn" data-i18n="attacks.status.not_configured">⚠️ Nicht konfiguriert</span>
           {% endif %}
         </li>
         <li>
-          <span class="status-label">Melde-Button</span>
+          <span class="status-label" data-i18n="attacks.status.report_btn">Melde-Button</span>
           {% if guild.attack_button_message_id %}
           <span class="badge badge-ok">✅ Aktiv</span>
           {% else %}
-          <span class="badge badge-warn">⚠️ Kein Button</span>
+          <span class="badge badge-warn" data-i18n="attacks.status.no_button">⚠️ Kein Button</span>
           {% endif %}
         </li>
         <li>
-          <span class="status-label">Gesamt-Meldungen</span>
+          <span class="status-label" data-i18n="attacks.status.total_reports">Gesamt-Meldungen</span>
           <span class="badge">{{ attack_stats.total_reports }}</span>
         </li>
       </ul>
@@ -86,11 +86,11 @@
   <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem; margin-bottom:1.25rem;">
     <div class="card text-center" style="padding:1rem 0.5rem;">
       <div class="stat-number" style="font-size:2rem;">{{ attack_stats.total_reports }}</div>
-      <div class="stat-label">Total Meldungen</div>
+      <div class="stat-label" data-i18n="attacks.kpi.total">Total Meldungen</div>
     </div>
     <div class="card text-center" style="padding:1rem 0.5rem;">
       <div class="stat-number" style="font-size:2rem;">{{ attack_stats.top_attackers | length }}</div>
-      <div class="stat-label">Einzigartige Angreifer</div>
+      <div class="stat-label" data-i18n="attacks.kpi.attackers">Einzigartige Angreifer</div>
     </div>
     <div class="card text-center" style="padding:1rem 0.5rem;">
       <div class="stat-number" style="font-size:1.1rem;">
@@ -100,26 +100,26 @@
         —
         {% endif %}
       </div>
-      <div class="stat-label">Letzte Meldung</div>
+      <div class="stat-label" data-i18n="attacks.kpi.last">Letzte Meldung</div>
     </div>
   </div>
 
   <!-- Chart -->
   <div class="card" style="margin-bottom:1.25rem;">
-    <h2>Angriffe nach Uhrzeit (UTC)</h2>
+    <h2 data-i18n="attacks.chart.title">Angriffe nach Uhrzeit (UTC)</h2>
     <canvas id="chartHours" height="80"></canvas>
   </div>
 
   <!-- Top Angreifer -->
   {% if attack_stats.top_attackers %}
   <div class="card" style="margin-bottom:1.25rem;">
-    <h2>Top Angreifer</h2>
+    <h2 data-i18n="attacks.top_attackers.title">Top Angreifer</h2>
     <table class="table">
       <thead>
         <tr>
-          <th>Rang</th>
-          <th>Angreifer</th>
-          <th>Meldungen</th>
+          <th data-i18n="attacks.top_attackers.rank">Rang</th>
+          <th data-i18n="attacks.top_attackers.name">Angreifer</th>
+          <th data-i18n="attacks.top_attackers.count">Meldungen</th>
         </tr>
       </thead>
       <tbody>
@@ -137,7 +137,7 @@
 
   <!-- Recent reports -->
   <div class="card">
-    <h2>Letzte Meldungen</h2>
+    <h2 data-i18n="attacks.recent.title">Letzte Meldungen</h2>
     {% if attack_reports %}
     <div style="display:flex; flex-direction:column; gap:0.75rem;">
       {% for report in attack_reports %}
@@ -148,19 +148,19 @@
             <strong>{{ report.reporter_name }}</strong>
             <span style="color:var(--text-muted); font-size:0.85rem;">{{ report.created_at[:16].replace('T', ' ') }} UTC</span>
             <span style="color:var(--text-muted); font-size:0.8rem;">#{{ report.id }}</span>
-            <span style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem;">{{ report.wave_count }} Welle(n)</span>
+            <span style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem;">{{ report.wave_count }} <span data-i18n="attacks.recent.waves">Welle(n)</span></span>
             {% if report.zwischendef %}
             <span style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.5); color:#fbbf24; border-radius:4px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:700;">
-              ⚠️ Zwischendef möglich
+              <span data-i18n="attacks.recent.zwischendef">⚠️ Zwischendef möglich</span>
             </span>
             {% endif %}
           </div>
           <div style="display:flex; gap:0.4rem; align-items:center;">
             <a href="/guild/{{ guild.guild_id }}/attacks/{{ report.id }}/analyse"
-               class="btn btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.8rem;">🔬 Analyse</a>
+               class="btn btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.8rem;" data-i18n="attacks.recent.analyse">🔬 Analyse</a>
             {% if is_admin %}
             <form method="post" action="/guild/{{ guild.guild_id }}/attacks/delete/{{ report.id }}"
-                  onsubmit="return confirm('Meldung löschen?')" style="margin:0;">
+                  onsubmit="return confirm(window.T&&window.T['confirm.delete_report']||'Meldung löschen?')" style="margin:0;">
               <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.6rem; font-size:0.8rem;">🗑</button>
             </form>
             {% endif %}
@@ -188,7 +188,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="empty">Noch keine Angriffs-Meldungen vorhanden.</p>
+    <p class="empty" data-i18n="attacks.empty">Noch keine Angriffs-Meldungen vorhanden.</p>
     {% endif %}
   </div>
 </div>

@@ -7,15 +7,15 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🛡️ Verteidigung</h1>
-      <p class="subtitle" style="margin:0;">Defend- und Timed-Defend Anfragen dieser Allianz</p>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="defense.title">🛡️ Verteidigung</h1>
+      <p class="subtitle" style="margin:0;" data-i18n="defense.subtitle">Defend- und Timed-Defend Anfragen dieser Allianz</p>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
          style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
                 background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);
                 border-radius:8px;font-size:0.85rem;font-weight:600;color:#f59e0b;text-decoration:none;">
-        🗡️ Helden-Scout
+        <span data-i18n="defense.heroscout_btn">🗡️ Helden-Scout</span>
       </a>
     </div>
   </div>
@@ -38,10 +38,10 @@
           </span>
           {% if ch.status == 'closed' %}
           <span style="font-size:0.75rem;background:rgba(34,197,94,0.1);color:#22c55e;
-                       border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem;">✅ Erledigt</span>
+                       border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem;" data-i18n="defense.status.done">✅ Erledigt</span>
           {% else %}
           <span style="font-size:0.75rem;background:rgba(239,68,68,0.1);color:#f87171;
-                       border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem;">🔴 Offen</span>
+                       border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem;" data-i18n="defense.status.open">🔴 Offen</span>
           {% endif %}
         </div>
         <span style="font-size:0.78rem;color:var(--text-muted);">
@@ -51,19 +51,19 @@
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;margin-top:0.75rem;">
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Angreifer</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.attacker">Angreifer</div>
           <div style="font-weight:600;color:#f87171;">{{ ch.attacker or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ziel</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.target">Ziel</div>
           <div style="font-family:monospace;color:#93c5fd;">{{ ch.coords or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ankunft</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.arrival">Ankunft</div>
           <div style="font-weight:600;color:#f59e0b;">{{ ch.arrival_time or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Gemeldet von</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.reported_by">Gemeldet von</div>
           <div style="font-size:0.85rem;">{{ ch.requested_by_name or '—' }}</div>
         </div>
       </div>
@@ -81,8 +81,7 @@
   {% else %}
   <div class="card">
     <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
-      Noch keine Defend-Anfragen. Sobald jemand im Discord einen Defend- oder
-      Timed-Defend-Channel über den Anfragen-Hub erstellt, erscheint er hier.
+      <span data-i18n="defense.empty">Noch keine Defend-Anfragen. Sobald jemand im Discord einen Defend- oder Timed-Defend-Channel über den Anfragen-Hub erstellt, erscheint er hier.</span>
     </p>
   </div>
   {% endif %}

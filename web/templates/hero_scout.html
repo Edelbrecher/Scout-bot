@@ -7,23 +7,23 @@
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Verteidigung</a>
-      <h1 style="margin:0.25rem 0 0;">🗡️ Helden-Scout</h1>
-      <p class="subtitle" style="margin:0;">Gegnerische Helden beobachten — Ausrüstungsänderungen erkennen</p>
+      <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link" data-i18n="scout.back">← Verteidigung</a>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="scout.title">🗡️ Helden-Scout</h1>
+      <p class="subtitle" style="margin:0;" data-i18n="scout.subtitle">Gegnerische Helden beobachten — Ausrüstungsänderungen erkennen</p>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/new"
          style="padding:0.5rem 1.1rem;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
                 border-radius:8px;color:#86efac;font-weight:600;text-decoration:none;font-size:0.88rem;white-space:nowrap;">
-        ➕ Held manuell anlegen
+        <span data-i18n="scout.add_manual">➕ Held manuell anlegen</span>
       </a>
       {% if entries %}
       <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-all"
-            onsubmit="return confirm('Wirklich ALLE {{ entries|length }} Helden löschen?')">
+            onsubmit="return confirm((window.T&&window.T['confirm.delete_all_heroes']||'Wirklich ALLE {count} Helden löschen?').replace('{count}','{{ entries|length }}'))">
         <button type="submit"
                 style="padding:0.5rem 1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);
                        border-radius:8px;color:#f87171;font-weight:600;cursor:pointer;font-size:0.88rem;white-space:nowrap;">
-          🗑️ Alle löschen
+          <span data-i18n="scout.delete_all">🗑️ Alle löschen</span>
         </button>
       </form>
       {% endif %}
@@ -32,13 +32,13 @@
 
   <!-- Flash-Meldungen -->
   {% if flash == 'channel_saved' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Scout-Channel gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;" data-i18n="scout.flash.channel_saved">✅ Scout-Channel gespeichert.</div>
   {% elif flash == 'channel_error' %}
-  <div class="alert alert-danger" style="margin-bottom:1rem;">❌ Fehler beim Speichern — Bot erreichbar?</div>
+  <div class="alert alert-danger" style="margin-bottom:1rem;" data-i18n="scout.flash.channel_error">❌ Fehler beim Speichern — Bot erreichbar?</div>
   {% elif flash == 'deleted' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Held erfolgreich gelöscht.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;" data-i18n="scout.flash.deleted">🗑️ Held erfolgreich gelöscht.</div>
   {% elif flash == 'deleted_all' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Alle Helden gelöscht.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;" data-i18n="scout.flash.deleted_all">🗑️ Alle Helden gelöscht.</div>
   {% endif %}
 
   <!-- Channel + Library in einer Zeile (kollabiert) -->
@@ -46,17 +46,17 @@
     <div class="card" style="padding:0.85rem 1rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <div>
-          <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;">📡 Discord Channel</div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;" data-i18n="scout.channel.title">📡 Discord Channel</div>
           {% if scout_channel %}
-          <div style="font-size:0.78rem;color:#22c55e;">✅ ID: <code>{{ scout_channel }}</code></div>
+          <div style="font-size:0.78rem;color:#22c55e;"><span data-i18n="scout.channel.configured">✅ ID:</span> <code>{{ scout_channel }}</code></div>
           {% else %}
-          <div style="font-size:0.78rem;color:#f59e0b;">⚠️ Noch nicht konfiguriert</div>
+          <div style="font-size:0.78rem;color:#f59e0b;" data-i18n="scout.channel.not_configured">⚠️ Noch nicht konfiguriert</div>
           {% endif %}
         </div>
         <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/set-channel"
               style="display:flex;gap:0.4rem;align-items:center;">
           <input type="text" name="channel_id" value="{{ scout_channel or '' }}"
-                 placeholder="Channel-ID"
+                 placeholder="Channel-ID" data-i18n-placeholder="scout.channel.placeholder"
                  style="padding:0.35rem 0.6rem;background:var(--bg-main);border:1px solid var(--border);
                         border-radius:6px;color:var(--text);font-size:0.82rem;width:180px;">
           <button type="submit"
@@ -70,8 +70,8 @@
 
     <div class="card" style="padding:0.85rem 1rem;">
       <div>
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;">💡 Tipp</div>
-        <div style="font-size:0.78rem;color:var(--text-muted);">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;" data-i18n="scout.tip.title">💡 Tipp</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n-html="scout.tip.body">
           Items manuell zuweisen: Held anklicken → <strong>✏️ Neue Version anlegen</strong>
         </div>
       </div>
@@ -123,7 +123,7 @@
   <!-- Suche + Kachel-Steuerung -->
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.85rem;">
     <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px;max-width:360px;">
-      <input type="text" id="heroSearch" placeholder="🔍 Held suchen…" oninput="filterHeroes()"
+      <input type="text" id="heroSearch" placeholder="🔍 Held suchen…" data-i18n-placeholder="scout.search.placeholder" oninput="filterHeroes()"
              style="flex:1;padding:0.45rem 0.75rem;background:var(--bg-card);border:1px solid var(--border);
                     border-radius:8px;color:var(--text);font-size:0.88rem;">
       <span id="heroCount" style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">
@@ -132,7 +132,7 @@
     </div>
     <!-- Kachel-Selektor -->
     <div style="display:flex;align-items:center;gap:0.4rem;">
-      <span style="font-size:0.75rem;color:var(--text-muted);">Spalten:</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);" data-i18n="scout.cols_label">Spalten:</span>
       {% for cols in [3, 5, 7, 9] %}
       <button onclick="setCols({{ cols }})" data-cols="{{ cols }}"
               class="cols-btn {% if cols == 5 %}active{% endif %}"
@@ -153,7 +153,7 @@
       <!-- Löschen-Button -->
       <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-player"
             style="position:absolute;top:0.4rem;right:0.4rem;z-index:10;"
-            onsubmit="event.stopPropagation();return confirm('{{ e.player_name }} löschen?')">
+            onsubmit="event.stopPropagation();return confirm((window.T&&window.T['confirm.delete_hero']||'{name} löschen?').replace('{name}','{{ e.player_name }}'))">
         <input type="hidden" name="player_name" value="{{ e.player_name }}">
         <button type="submit"
                 style="padding:0.2rem 0.4rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);
@@ -178,10 +178,10 @@
           </div>
 
           {% if e.changed %}
-          <div style="font-size:0.62rem;color:#f59e0b;margin-bottom:0.35rem;">⚠️ Ausrüstung geändert</div>
+          <div style="font-size:0.62rem;color:#f59e0b;margin-bottom:0.35rem;" data-i18n="scout.badge.changed">⚠️ Ausrüstung geändert</div>
           {% endif %}
           {% if e.source == 'manual' %}
-          <div style="font-size:0.62rem;color:#c4b5fd;margin-bottom:0.35rem;">✏️ Manuell</div>
+          <div style="font-size:0.62rem;color:#c4b5fd;margin-bottom:0.35rem;" data-i18n="scout.badge.manual">✏️ Manuell</div>
           {% endif %}
 
           <!-- 6 Slot-Icons als 2×3 Grid -->
@@ -224,15 +224,15 @@
   </div>
 
   <!-- Keine Treffer bei Suche -->
-  <div id="noResults" style="display:none;text-align:center;padding:2rem;color:var(--text-muted);font-size:0.9rem;">
+  <div id="noResults" style="display:none;text-align:center;padding:2rem;color:var(--text-muted);font-size:0.9rem;" data-i18n="scout.no_results">
     🔍 Kein Held gefunden für diese Suche.
   </div>
 
   {% else %}
   <div class="card" style="text-align:center;padding:2.5rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🗡️</div>
-    <div style="font-weight:600;font-size:1.05rem;margin-bottom:0.4rem;">Noch keine Helden gescannt</div>
-    <div style="font-size:0.85rem;color:var(--text-muted);max-width:420px;margin:0 auto;">
+    <div style="font-weight:600;font-size:1.05rem;margin-bottom:0.4rem;" data-i18n="scout.empty.title">Noch keine Helden gescannt</div>
+    <div style="font-size:0.85rem;color:var(--text-muted);max-width:420px;margin:0 auto;" data-i18n="scout.empty.desc">
       Konfiguriere oben den Discord-Channel und poste dann Helden-Screenshots dort.
       Oder lege Helden manuell an.
     </div>

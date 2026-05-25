@@ -36,7 +36,7 @@
             <div class="nav-avatar nav-avatar-lg">{{ _username[0] | upper }}</div>
             <div>
               <div style="font-weight:600;">{{ _username }}</div>
-              <div style="font-size:0.78rem; color:var(--text-muted);">Eingeloggt</div>
+              <div style="font-size:0.78rem; color:var(--text-muted);" data-i18n="nav.logged_in">Eingeloggt</div>
             </div>
           </div>
           {% if _is_admin %}
@@ -46,14 +46,14 @@
           <div id="nav-past-due-block" style="display:none;">
             <div class="nav-profile-divider"></div>
             <div id="nav-past-due-content" style="padding:0.6rem 1rem; background:rgba(220,38,38,0.1);">
-              <div style="font-size:0.78rem; font-weight:700; color:#f87171; margin-bottom:0.3rem;">⚠️ Zahlung fehlgeschlagen</div>
+              <div style="font-size:0.78rem; font-weight:700; color:#f87171; margin-bottom:0.3rem;" data-i18n="nav.payment_failed">⚠️ Zahlung fehlgeschlagen</div>
               <div id="nav-past-due-text" style="font-size:0.75rem; color:#fca5a5; line-height:1.4; margin-bottom:0.4rem;"></div>
               <div id="nav-past-due-links"></div>
             </div>
           </div>
           <div class="nav-profile-divider"></div>
           <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem;">
-            <span style="font-size:0.8rem; color:var(--text-muted);">Sprache:</span>
+            <span style="font-size:0.8rem; color:var(--text-muted);" data-i18n="nav.language_label">Sprache:</span>
             <button class="lang-btn" data-lang="de" onclick="setLanguage('de')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="Deutsch">🇩🇪 DE</button>
             <button class="lang-btn" data-lang="en" onclick="setLanguage('en')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="English">🇬🇧 EN</button>
           </div>
@@ -203,15 +203,14 @@ document.addEventListener('click', e => {
   <div id="cookie-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:10000; background:#1a1a2e; border-top:1px solid #334155; padding:1rem 1.5rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
     <div style="flex:1; min-width:0;">
       <span style="font-size:0.88rem; color:#e2e8f0;">
-        🍪 Wir verwenden technisch notwendige Cookies für den Login sowie lokalen Browser-Speicher für deine Einstellungen.
-        Keine Tracking- oder Werbe-Cookies.
-        <a href="/cookies" style="color:#3b82f6; margin-left:0.3rem;">Mehr erfahren</a>
+        <span data-i18n="cookie.text">🍪 Wir verwenden technisch notwendige Cookies für den Login sowie lokalen Browser-Speicher für deine Einstellungen. Keine Tracking- oder Werbe-Cookies.</span>
+        <a href="/cookies" style="color:#3b82f6; margin-left:0.3rem;" data-i18n="cookie.learn_more">Mehr erfahren</a>
       </span>
     </div>
     <div style="display:flex; gap:0.5rem; flex-shrink:0;">
-      <a href="/cookies" style="padding:0.4rem 0.9rem; border:1px solid #475569; border-radius:6px; color:#94a3b8; text-decoration:none; font-size:0.83rem;">Details</a>
-      <button onclick="declineCookies()" style="padding:0.4rem 0.9rem; background:none; border:1px solid #475569; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:0.83rem;">Ablehnen</button>
-      <button onclick="acceptCookies()" style="padding:0.4rem 1.1rem; background:#3b82f6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.83rem; font-weight:600;">Akzeptieren</button>
+      <a href="/cookies" style="padding:0.4rem 0.9rem; border:1px solid #475569; border-radius:6px; color:#94a3b8; text-decoration:none; font-size:0.83rem;" data-i18n="cookie.details">Details</a>
+      <button onclick="declineCookies()" style="padding:0.4rem 0.9rem; background:none; border:1px solid #475569; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:0.83rem;" data-i18n="cookie.decline">Ablehnen</button>
+      <button onclick="acceptCookies()" style="padding:0.4rem 1.1rem; background:#3b82f6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.83rem; font-weight:600;" data-i18n="cookie.accept">Akzeptieren</button>
     </div>
   </div>
   <script>
@@ -240,11 +239,11 @@ document.addEventListener('click', e => {
   <!-- Footer -->
   <footer style="text-align:center; padding:1.5rem 1rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.8rem; margin-top:2rem;">
     <div style="display:flex; justify-content:center; gap:1.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
-      <a href="/impressum" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Impressum</a>
-      <a href="/datenschutz" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Datenschutz</a>
-      <a href="/agb" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">AGB</a>
-      <a href="/cookies" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Cookies</a>
-      <a href="/kontakt" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">Kontakt</a>
+      <a href="/impressum" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.imprint">Impressum</a>
+      <a href="/datenschutz" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.privacy">Datenschutz</a>
+      <a href="/agb" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.terms">AGB</a>
+      <a href="/cookies" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.cookies">Cookies</a>
+      <a href="/kontakt" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.contact">Kontakt</a>
     </div>
     © {{ current_year }} TravOps · Alle Rechte vorbehalten
   </footer>

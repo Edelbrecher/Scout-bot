@@ -5,21 +5,21 @@
 <div class="container" style="max-width:960px;">
   <div style="margin-bottom:1.5rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;">💳 Abonnement</h1>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="billing.title">💳 Abonnement</h1>
     <p class="subtitle">{{ guild.guild_name }}</p>
   </div>
 
   {% if saved %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a3a2a;border:1px solid #4caf82;border-radius:8px;color:#4caf82;">
-    ✅ Abonnement aktiviert – danke! Deine Features sind jetzt freigeschaltet.
+    <span data-i18n="billing.flash.saved">✅ Abonnement aktiviert – danke! Deine Features sind jetzt freigeschaltet.</span>
   </div>
   {% endif %}
   {% if error == 'premium_required' %}
   <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
-    🔒 <strong>Diese Funktion erfordert ein Pro-Abonnement.</strong> Wähle einen Plan um fortzufahren.
+    <span data-i18n="billing.error.premium_required">🔒 Diese Funktion erfordert ein Pro-Abonnement. Wähle einen Plan um fortzufahren.</span>
   </div>
   {% elif error == 'cancelled' %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ Zahlung abgebrochen.</div>
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;" data-i18n="billing.error.cancelled">❌ Zahlung abgebrochen.</div>
   {% elif error %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ {{ error }}</div>
   {% endif %}
@@ -32,34 +32,34 @@
 
   <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
     <div>
-      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;">Aktueller Plan</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;" data-i18n="billing.current_plan">Aktueller Plan</div>
       {% if sub_status == 'trialing' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;">🎁 7-Tage Testphase</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;" data-i18n="billing.plan.trialing">🎁 7-Tage Testphase</span>
         {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ sub_tier|capitalize }}</span>{% endif %}
       {% elif sub_status == 'active' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#4ade80;">✅ Aktiv</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#4ade80;" data-i18n="billing.plan.active">✅ Aktiv</span>
         {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get(sub_tier, sub_tier) }}</span>{% endif %}
         {% if sub_int %}<span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.3rem;">({{ 'Jährlich' if sub_int == 'annual' else 'Monatlich' }})</span>{% endif %}
       {% elif sub_status == 'past_due' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#fb923c;">⚠️ Zahlung überfällig</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#fb923c;" data-i18n="billing.plan.past_due">⚠️ Zahlung überfällig</span>
       {% elif sub_status == 'cancelled' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#6b7280;">🔒 Gekündigt</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#6b7280;" data-i18n="billing.plan.cancelled">🔒 Gekündigt</span>
       {% else %}
-        <span style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">🆓 Kein aktives Abo</span>
+        <span style="font-size:1.1rem;font-weight:700;color:var(--text-muted);" data-i18n="billing.plan.free">🆓 Kein aktives Abo</span>
       {% endif %}
       {% if guild.subscription_expires_at %}
-      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;">Läuft bis: {{ guild.subscription_expires_at[:10] }}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;"><span data-i18n="billing.expires">Läuft bis:</span> {{ guild.subscription_expires_at[:10] }}</div>
       {% endif %}
     </div>
     {% if guild.stripe_customer_id and sub_status in ('active','trialing','past_due') %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
-        <button type="submit" class="btn btn-secondary">🔧 Verwalten</button>
+        <button type="submit" class="btn btn-secondary" data-i18n="billing.manage">🔧 Verwalten</button>
       </form>
       {% if is_owner %}
       <form method="post" action="/guild/{{ guild.guild_id }}/billing/cancel"
-            onsubmit="return confirm('Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.')">
-        <button type="submit" class="btn btn-danger">❌ Abo kündigen</button>
+            onsubmit="return confirm(window.T&&window.T['confirm.cancel_sub']||'Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.')">
+        <button type="submit" class="btn btn-danger" data-i18n="billing.cancel">❌ Abo kündigen</button>
       </form>
       {% endif %}
     </div>
@@ -68,7 +68,7 @@
 
   {% if cancelled %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;">
-    ✅ Dein Abo wurde gekündigt und läuft bis zum Ende der bezahlten Periode weiter.
+    <span data-i18n="billing.cancelled_info">✅ Dein Abo wurde gekündigt und läuft bis zum Ende der bezahlten Periode weiter.</span>
   </div>
   {% endif %}
 
@@ -82,13 +82,13 @@
   <div style="display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:1.75rem;">
     <div style="display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:30px;padding:4px;gap:4px;">
       <button id="btnMonthly" onclick="setBilling('monthly')" type="button"
-        style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:#3b82f6;color:#fff;transition:all 0.15s;">
+        style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:#3b82f6;color:#fff;transition:all 0.15s;" data-i18n="billing.toggle.monthly">
         Monatlich
       </button>
       <button id="btnAnnual" onclick="setBilling('annual')" type="button"
         style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:transparent;color:var(--text-muted);transition:all 0.15s;display:flex;align-items:center;gap:0.4rem;">
-        Jährlich
-        <span style="background:#f59e0b;color:#000;font-size:0.68rem;font-weight:800;padding:1px 7px;border-radius:8px;">3 Mon. GRATIS</span>
+        <span data-i18n="billing.toggle.annual">Jährlich</span>
+        <span style="background:#f59e0b;color:#000;font-size:0.68rem;font-weight:800;padding:1px 7px;border-radius:8px;" data-i18n="billing.toggle.free_months">3 Mon. GRATIS</span>
       </button>
     </div>
   </div>
@@ -110,7 +110,7 @@
 
       {% if is_popular %}
       <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#f59e0b;color:#000;font-size:0.7rem;font-weight:800;padding:2px 12px;border-radius:10px;white-space:nowrap;">
-        ⭐ BELIEBTESTE WAHL
+        <span data-i18n="billing.popular">⭐ BELIEBTESTE WAHL</span>
       </div>
       {% endif %}
 
@@ -123,12 +123,12 @@
 
       <div class="price-monthly" style="margin-bottom:0.75rem;">
         <span style="font-size:1.8rem;font-weight:800;color:{% if is_popular %}#f59e0b{% else %}#3b82f6{% endif %};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
-        <span style="font-size:0.82rem;color:var(--text-muted);">/Monat</span>
+        <span style="font-size:0.82rem;color:var(--text-muted);" data-i18n="billing.per_month">/Monat</span>
       </div>
       <div class="price-annual" style="margin-bottom:0.75rem;display:none;">
         <span style="font-size:1.8rem;font-weight:800;color:{% if is_popular %}#f59e0b{% else %}#3b82f6{% endif %};">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
-        <span style="font-size:0.82rem;color:var(--text-muted);">/Monat</span>
-        <div style="font-size:0.75rem;color:#4ade80;margin-top:0.1rem;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/Jahr · ~33% gespart</div>
+        <span style="font-size:0.82rem;color:var(--text-muted);" data-i18n="billing.per_month">/Monat</span>
+        <div style="font-size:0.75rem;color:#4ade80;margin-top:0.1rem;">€{{ '%.2f'|format(price_a)|replace('.',',') }}<span data-i18n="billing.per_year">/Jahr</span> · <span data-i18n="billing.saved_pct">~33% gespart</span></div>
       </div>
 
       <ul style="list-style:none;padding:0;margin:0;font-size:0.8rem;color:var(--text-muted);display:flex;flex-direction:column;gap:0.3rem;">
@@ -153,7 +153,7 @@
       </button>
     </form>
     <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.75rem;">
-      🎟️ Gutschein beim Checkout eingeben &nbsp;·&nbsp; 🔒 Zahlung via Stripe &nbsp;·&nbsp; Jederzeit kündbar
+      <span data-i18n="billing.checkout.voucher">🎟️ Gutschein beim Checkout eingeben</span> &nbsp;·&nbsp; <span data-i18n="billing.checkout.stripe">🔒 Zahlung via Stripe</span> &nbsp;·&nbsp; <span data-i18n="billing.checkout.cancel_anytime">Jederzeit kündbar</span>
     </p>
   </div>
 
