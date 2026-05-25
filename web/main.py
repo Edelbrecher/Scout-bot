@@ -33,7 +33,7 @@ load_dotenv()
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me")
 SESSION_COOKIE = "scouter_session"
-SESSION_MAX_AGE = 60 * 60 * 8  # 8 hours
+SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 
 signer = URLSafeTimedSerializer(SECRET_KEY)
 
@@ -4305,6 +4305,74 @@ async def api_my_alerts(request: Request):
         if g.get("subscription_status") == "past_due"
     ]
     return JSONResponse({"past_due": past_due})
+
+
+@app.get("/api/my-blueprints")
+async def api_my_blueprints(request: Request):
+    """Return player blueprints for the logged-in user across all guilds — for the Chrome Extension."""
+    session = get_session(request)
+    if not session:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    uid = session.get("uid", "")
+    username = session.get("username", "")
+
+    # Collect blueprints from all guilds the user has access to
+    all_guilds = await database.get_all_guilds()
+    if session.get("guilds") is not None:
+        allowed = set(session["guilds"])
+        user_guilds = [g for g in all_guilds if g["guild_id"] in allowed or g.get("workspace_owner_id") == uid]
+    else:
+        user_guilds = all_guilds
+
+    results = []
+    for g in user_guilds:
+        bps = await database.get_player_blueprints(g["guild_id"])
+        for bp in bps:
+            if bp.get("player_name", "").lower() == username.lower() or not bp.get("player_name"):
+                full = await database.get_player_blueprint(bp["id"], g["guild_id"])
+                if full:
+                    results.append({
+                        "id": full["id"],
+                        "guild_id": g["guild_id"],
+                        "guild_name": g["guild_name"],
+                        "player_name": full.get("player_name", ""),
+                        "village_name": full.get("village_name", ""),
+                        "village_coords": full.get("village_coords", ""),
+                        "template_name": full.get("template_name", ""),
+                        "tribe": full.get("tribe", ""),
+                        "steps": [
+                            {
+                                "id": s["id"],
+                                "order_num": s["order_num"],
+                                "step_type": s["step_type"],
+                                "title": s["title"],
+                                "description": s.get("description", ""),
+                                "target": s.get("target", ""),
+                                "completed": bool(s.get("completed", 0)),
+                                "completed_at": s.get("completed_at", ""),
+                            }
+                            for s in full.get("steps", [])
+                        ],
+                        "total_steps": full.get("total_steps", len(full.get("steps", []))),
+                        "done_steps": sum(1 for s in full.get("steps", []) if s.get("completed")),
+                    })
+    return JSONResponse({"blueprints": results})
+
+
+@app.post("/api/blueprint-step/toggle")
+async def api_blueprint_step_toggle(request: Request):
+    """Toggle a blueprint step from the Chrome Extension."""
+    session = get_session(request)
+    if not session:
+        return JSONResponse({"error": "not_authenticated"}, status_code=401)
+    body = await request.json()
+    blueprint_id = int(body.get("blueprint_id", 0))
+    step_id = int(body.get("step_id", 0))
+    guild_id = body.get("guild_id", "")
+    if not blueprint_id or not step_id or not guild_id:
+        return JSONResponse({"error": "missing_params"}, status_code=400)
+    new_state = await database.toggle_blueprint_step(blueprint_id, step_id)
+    return JSONResponse({"completed": bool(new_state)})
 
 
 @app.get("/api/popup-config")

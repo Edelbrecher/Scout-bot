@@ -19,6 +19,7 @@
       <button class="tab active" id="tabTimer" data-tab="timer" data-i18n="tab_timer1">⏱ Timer 1</button>
       <button class="tab" id="tabTimer2" data-tab="timer2" data-i18n="tab_timer2">⏱ Timer 2</button>
       <button class="tab" id="tabAlarm" data-tab="alarm" data-i18n="tab_alarm">🔔 Alarms</button>
+      <button class="tab" id="tabBlueprint" data-tab="blueprint" data-i18n="tab_blueprint">📐 Blueprints</button>
     </div>
 
     <!-- ===== TAB: TIMER 1 ===== -->
@@ -198,6 +199,32 @@
       <div class="status-bar">
         <span id="alarmStatusText" data-i18n="alarm_hint">Enter times and save</span>
       </div>
+
+    </div>
+
+  </div>
+
+    <!-- ===== TAB: BLUEPRINTS ===== -->
+    <div class="tab-content" id="tabContentBlueprint">
+
+      <div class="bp-header">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span id="bpServerLabel" style="font-size:0.75rem;color:var(--text-muted);">travops.online</span>
+        </div>
+        <button id="btnBpRefresh" class="btn-icon-sm" title="Neu laden">↻</button>
+      </div>
+
+      <div id="bpLoginHint" class="bp-hint hidden">
+        🔒 Bitte zuerst auf <a href="https://travops.online" target="_blank">travops.online</a> einloggen.
+      </div>
+      <div id="bpLoading" class="bp-hint">⏳ Lade Blueprints…</div>
+      <div id="bpEmpty" class="bp-hint hidden">
+        📐 Keine aktiven Blueprints gefunden.<br>
+        <a href="https://travops.online/dashboard" target="_blank" style="color:#93c5fd;">→ Im Dashboard anlegen</a>
+      </div>
+
+      <!-- Blueprint list -->
+      <div id="bpList"></div>
 
     </div>
 

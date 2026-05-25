@@ -5,6 +5,7 @@ const TRANSLATIONS = {
     tab_timer1:          '⏱ Timer 1',
     tab_timer2:          '⏱ Timer 2',
     tab_alarm:           '🔔 Alarms',
+    tab_blueprint:       '📐 Blueprints',
     no_timer:            'No Timer',
     set_timer:           'Set Timer',
     label_h:             'h',

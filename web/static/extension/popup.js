@@ -442,3 +442,138 @@ initI18n(() => {
   init2();
   startAlarmTick();
 });
+
+// ===================== BLUEPRINTS =====================
+const TRAVOPS_BASE = 'https://travops.online';
+
+const bpList       = document.getElementById('bpList');
+const bpLoading    = document.getElementById('bpLoading');
+const bpLoginHint  = document.getElementById('bpLoginHint');
+const bpEmpty      = document.getElementById('bpEmpty');
+const btnBpRefresh = document.getElementById('btnBpRefresh');
+
+let bpData = [];        // [{id, guild_id, template_name, steps, ...}]
+let bpOpenCard = null;  // currently expanded blueprint id
+
+// Load blueprints from TravOps API
+async function loadBlueprints() {
+  bpLoading.classList.remove('hidden');
+  bpLoginHint.classList.add('hidden');
+  bpEmpty.classList.add('hidden');
+  bpList.innerHTML = '';
+
+  try {
+    const resp = await fetch(TRAVOPS_BASE + '/api/my-blueprints', { credentials: 'include' });
+    if (resp.status === 401) {
+      bpLoading.classList.add('hidden');
+      bpLoginHint.classList.remove('hidden');
+      return;
+    }
+    const data = await resp.json();
+    bpData = data.blueprints || [];
+    bpLoading.classList.add('hidden');
+    if (!bpData.length) {
+      bpEmpty.classList.remove('hidden');
+      return;
+    }
+    renderBlueprints();
+  } catch (e) {
+    bpLoading.classList.add('hidden');
+    bpLoginHint.classList.remove('hidden');
+  }
+}
+
+function renderBlueprints() {
+  bpList.innerHTML = '';
+  bpData.forEach(bp => {
+    const done  = bp.steps.filter(s => s.completed).length;
+    const total = bp.steps.length;
+    const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+    const isOpen = bpOpenCard === bp.id;
+
+    const card = document.createElement('div');
+    card.className = 'bp-card' + (isOpen ? ' open' : '');
+    card.dataset.bpId = bp.id;
+
+    card.innerHTML = `
+      <div class="bp-card-header">
+        <div style="flex:1;min-width:0;">
+          <div class="bp-card-title">${esc(bp.village_name || bp.player_name)}</div>
+          <div class="bp-card-sub">${esc(bp.template_name)} · ${esc(bp.guild_name)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.35rem;flex-shrink:0;">
+          <span style="font-size:0.7rem;color:#6b7280;">${done}/${total}</span>
+          <span class="bp-chevron">▶</span>
+        </div>
+      </div>
+      <div class="bp-progress-bar"><div class="bp-progress-fill" style="width:${pct}%"></div></div>
+      <div class="bp-progress-label">${pct}% abgehakt</div>
+      <div class="bp-steps ${isOpen ? 'open' : ''}" id="bpSteps-${bp.id}">
+        ${bp.steps.map(s => renderStep(s, bp)).join('')}
+      </div>
+    `;
+
+    // Toggle expand/collapse on header click
+    card.querySelector('.bp-card-header').addEventListener('click', () => {
+      bpOpenCard = (bpOpenCard === bp.id) ? null : bp.id;
+      renderBlueprints();
+    });
+
+    // Step toggle clicks
+    card.querySelectorAll('.bp-step').forEach(stepEl => {
+      stepEl.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const stepId     = parseInt(stepEl.dataset.stepId);
+        const blueprintId = bp.id;
+        // Optimistic toggle
+        const step = bp.steps.find(s => s.id === stepId);
+        if (step) step.completed = !step.completed;
+        renderBlueprints();
+        // Persist via API
+        try {
+          await fetch(TRAVOPS_BASE + '/api/blueprint-step/toggle', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blueprint_id: blueprintId, step_id: stepId, guild_id: bp.guild_id }),
+          });
+        } catch(e) {
+          // Revert on error
+          if (step) step.completed = !step.completed;
+          renderBlueprints();
+        }
+      });
+    });
+
+    bpList.appendChild(card);
+  });
+}
+
+function renderStep(s, bp) {
+  const done = s.completed;
+  const typeIcon = { build: '🏗️', research: '🔬', recruit: '⚔️', note: '📝' }[s.step_type] || '•';
+  return `
+    <div class="bp-step ${done ? 'done' : ''}" data-step-id="${s.id}">
+      <div class="bp-step-check">${done ? '✓' : ''}</div>
+      <div>
+        <div class="bp-step-title">${typeIcon} ${esc(s.title)}</div>
+        ${s.description ? `<div class="bp-step-desc">${esc(s.description)}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Load blueprints when tab is opened
+document.getElementById('tabBlueprint').addEventListener('click', () => {
+  if (!bpData.length) loadBlueprints();
+});
+btnBpRefresh.addEventListener('click', () => loadBlueprints());
+
+// Auto-load if blueprint tab is somehow active on open
+if (document.getElementById('tabBlueprint').classList.contains('active')) {
+  loadBlueprints();
+}

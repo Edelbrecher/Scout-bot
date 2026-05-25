@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
   "name": "TravOps Timer",
-  "version": "1.2",
-  "description": "Dual background timers with distinct alarms for TravOps.",
+  "version": "1.3",
+  "description": "Dual background timers, alarms and Blueprint tracker for TravOps.",
   "permissions": [
     "alarms",
     "storage",
     "offscreen"
+  ],
+  "host_permissions": [
+    "https://travops.online/*",
+    "https://*.travops.online/*",
+    "http://localhost:*/*"
   ],
   "background": {
     "service_worker": "background.js"
