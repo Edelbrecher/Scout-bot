@@ -163,6 +163,13 @@ async def init_db():
             except Exception:
                 pass
 
+        # workspace_status (active / archived)
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN workspace_status TEXT DEFAULT 'active'")
+            await db.commit()
+        except Exception:
+            pass
+
         # Trial system
         try:
             await db.execute("ALTER TABLE guild_configs ADD COLUMN trial_expires_at TEXT")
@@ -369,7 +376,7 @@ async def verify_password(username: str, password: str) -> bool:
 async def get_all_guilds() -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM guild_configs ORDER BY guild_name") as cursor:
+        async with db.execute("SELECT * FROM guild_configs WHERE COALESCE(workspace_status,'active') != 'archived' ORDER BY guild_name") as cursor:
             rows = await cursor.fetchall()
             return [dict(r) for r in rows]
 
@@ -421,6 +428,7 @@ async def get_personal_workspaces(owner_discord_id: str) -> list[dict]:
         async with db.execute("""
             SELECT * FROM guild_configs
             WHERE workspace_type = 'personal' AND workspace_owner_id = ?
+              AND COALESCE(workspace_status,'active') != 'archived'
             ORDER BY guild_name
         """, (owner_discord_id,)) as cursor:
             rows = await cursor.fetchall()
@@ -4259,3 +4267,43 @@ async def get_scout_report_by_id(report_id: int, guild_id: str) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+# ─────────────────────────────────────────────
+#  WORKSPACE ARCHIVE
+# ─────────────────────────────────────────────
+
+async def archive_workspace(guild_id: str) -> bool:
+    """Mark a workspace as archived (data preserved, bot kicked)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET workspace_status='archived', bot_status='kicked' WHERE guild_id=?",
+            (guild_id,),
+        )
+        await db.commit()
+    return True
+
+
+async def restore_workspace(guild_id: str) -> bool:
+    """Restore an archived workspace to active."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET workspace_status='active' WHERE guild_id=?",
+            (guild_id,),
+        )
+        await db.commit()
+    return True
+
+
+async def get_archived_workspaces(owner_discord_id: str) -> list[dict]:
+    """Return archived workspaces for a user (as owner or discord member)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM guild_configs
+               WHERE workspace_status = 'archived'
+                 AND (owner_discord_id = ? OR workspace_owner_id = ?)
+               ORDER BY guild_name""",
+            (owner_discord_id, owner_discord_id),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]

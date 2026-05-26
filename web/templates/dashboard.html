@@ -221,13 +221,22 @@
   <!-- ── Divider ── -->
   <div style="border-top:1px solid var(--border);margin:0.5rem 0 1.25rem;"></div>
 
-  {% if request.query_params.get("removed") == "1" %}
-  <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
-    ✅ Server wurde entfernt und der Bot hat den Discord-Server verlassen.
+  {% set _qp = request.query_params %}
+  {% if _qp.get("removed") == "1" %}
+  <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#fbbf24;">
+    📦 Server archiviert — deine Daten sind erhalten. Du kannst ihn jederzeit reaktivieren.
   </div>
-  {% elif request.query_params.get("error") == "not_owner" %}
+  {% elif _qp.get("restored") == "1" %}
+  <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
+    ✅ Server reaktiviert! Lade den Bot erneut ein um ihn zu nutzen.
+  </div>
+  {% elif _qp.get("invited") == "1" %}
+  <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
+    🎉 Bot erfolgreich eingeladen! Der Server erscheint gleich hier.
+  </div>
+  {% elif _qp.get("error") == "not_owner" %}
   <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#f87171;">
-    ⚠️ Nur der Server-Owner kann den Server entfernen.
+    ⚠️ Nur der Workspace-Owner kann diesen Server entfernen.
   </div>
   {% endif %}
 
@@ -527,8 +536,8 @@ function confirmRemove(e, btn) {
   const isPersonal = btn.dataset.personal === 'true';
 
   const msg = isPersonal
-    ? `Workspace „${guildName}" wirklich löschen?\n\nAlle Daten dieses Workspaces werden entfernt.`
-    : `Server „${guildName}" wirklich entfernen?\n\nDer Bot verlässt den Discord-Server sofort. Deine gespeicherten Daten (Scouts, Reports etc.) bleiben erhalten — du kannst den Bot jederzeit wieder einladen.`;
+    ? `Workspace „${guildName}" archivieren?\n\nDer Workspace wird archiviert — Daten bleiben erhalten, jederzeit reaktivierbar.`
+    : `Server „${guildName}" archivieren?\n\nDer Bot verlässt den Discord-Server sofort. Alle Daten (Scouts, Reports, Blueprints) bleiben erhalten. Du kannst den Server jederzeit reaktivieren.`;
 
   if (!confirm(msg)) return;
 
@@ -542,4 +551,44 @@ function confirmRemove(e, btn) {
 <form id="removeServerForm" method="post" action="/dashboard/remove-server" style="display:none;">
   <input type="hidden" name="guild_id" value="">
 </form>
+
+{% if archived_workspaces %}
+<div style="max-width:860px;margin:0 auto;padding:0 1rem;">
+  <details style="margin-top:2rem;">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:0.6rem;padding:0.65rem 0.85rem;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-size:0.88rem;user-select:none;">
+      <span style="font-size:1rem;">📦</span>
+      <span>Archiv <span style="background:rgba(255,255,255,0.08);padding:1px 8px;border-radius:10px;font-size:0.78rem;margin-left:0.25rem;">{{ archived_workspaces|length }}</span></span>
+      <span style="margin-left:auto;font-size:0.75rem;opacity:0.5;">▼ aufklappen</span>
+    </summary>
+    <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
+      {% for ws in archived_workspaces %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;border-bottom:1px solid rgba(255,255,255,0.04);gap:1rem;flex-wrap:wrap;opacity:0.65;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span style="font-size:1.3rem;">{{ '🗂️' if ws.workspace_type == 'personal' else '🏰' }}</span>
+          <div>
+            <div style="font-weight:600;font-size:0.9rem;">{{ ws.guild_name }}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">Archiviert · Daten erhalten</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          {% if ws.workspace_type != 'personal' %}
+          <a href="{{ invite_url }}" target="_blank"
+             style="font-size:0.78rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:0.3rem 0.8rem;border-radius:7px;text-decoration:none;white-space:nowrap;">
+            🤖 Bot neu einladen
+          </a>
+          {% endif %}
+          <form method="post" action="/dashboard/restore-server" style="display:inline;">
+            <input type="hidden" name="guild_id" value="{{ ws.guild_id }}">
+            <button type="submit"
+              style="font-size:0.78rem;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:0.3rem 0.8rem;border-radius:7px;cursor:pointer;white-space:nowrap;">
+              ↩ Reaktivieren
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+</div>
+{% endif %}
 {% endblock %}

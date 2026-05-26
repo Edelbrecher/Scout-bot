@@ -887,10 +887,25 @@ async def dashboard(request: Request, flash: str = ""):
     guilds = personal_workspaces + discord_guilds
 
     client_id = get_client_id()
-    invite_url = (
-        f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=805432336&scope=bot+applications.commands"
-        if client_id else ""
-    )
+    # Signed invite URL — encodes the inviting user so they become workspace owner
+    if client_id and owner_discord_id:
+        invite_token = signer.dumps({"uid": owner_discord_id}, salt="bot-invite")
+        base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+        callback_url = f"{base_url}/bot-invite/callback"
+        invite_url = (
+            f"https://discord.com/oauth2/authorize?client_id={client_id}"
+            f"&permissions=805432336&scope=bot+applications.commands"
+            f"&redirect_uri={callback_url}&response_type=code&state={invite_token}"
+        )
+    elif client_id:
+        invite_url = (
+            f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=805432336&scope=bot+applications.commands"
+        )
+    else:
+        invite_url = ""
+
+    # Archived workspaces
+    archived_workspaces = await database.get_archived_workspaces(owner_discord_id) if owner_discord_id else []
 
     # Server-slot limits for this user
     owner_active_guilds = await database.get_owner_active_guilds(owner_discord_id) if owner_discord_id else []
@@ -910,6 +925,7 @@ async def dashboard(request: Request, flash: str = ""):
             "slots_max": slots_max,
             "slots_full": slots_full,
             "flash": flash,
+            "archived_workspaces": archived_workspaces,
         },
     )
 
@@ -939,47 +955,104 @@ async def workspace_create(request: Request, name: str = Form(...)):
 # Routes — Dashboard: remove server
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Routes — Bot invite callback (invite-as-owner)
+# ---------------------------------------------------------------------------
+
+@app.get("/bot-invite/callback")
+async def bot_invite_callback(request: Request, guild_id: str = "", state: str = "", code: str = ""):
+    """Discord redirects here after bot invite. We use state to identify the inviting user."""
+    uid = None
+    if state:
+        try:
+            data = signer.loads(state, salt="bot-invite", max_age=3600)
+            uid = data.get("uid")
+        except Exception:
+            pass
+
+    if not uid:
+        # Fallback: if user is logged in, use their session
+        session = get_session(request)
+        if session:
+            uid = session.get("uid")
+
+    if guild_id and uid:
+        # Register or update the guild with the inviting user as owner
+        await database.upsert_guild_name(guild_id, guild_id, owner_discord_id=uid)
+        # Restore if archived
+        import aiosqlite as _aio
+        async with _aio.connect(database.DB_PATH) as db:
+            await db.execute(
+                """UPDATE guild_configs SET workspace_status='active', owner_discord_id=?
+                   WHERE guild_id=?""",
+                (uid, guild_id),
+            )
+            await db.commit()
+        print(f"[bot-invite] Guild {guild_id} claimed by {uid}", flush=True)
+
+    return RedirectResponse("/dashboard?invited=1", status_code=303)
+
+
 @app.post("/dashboard/remove-server")
 async def dashboard_remove_server(request: Request, guild_id: str = Form("")):
-    """Remove a Discord server from the dashboard and make the bot leave."""
+    """Archive a server/workspace and make the bot leave Discord."""
     session, err = _require_session(request)
     if err: return err
     if not guild_id or not is_valid_guild_id(guild_id):
         return RedirectResponse("/dashboard?error=invalid", status_code=303)
 
-    # Security: only owner / workspace-owner can remove
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
+    # Also check archived guilds
+    if not guild:
+        import aiosqlite as _aio
+        async with _aio.connect(database.DB_PATH) as db:
+            db.row_factory = _aio.Row
+            async with db.execute("SELECT * FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+                row = await cur.fetchone()
+                guild = dict(row) if row else None
     if not guild:
         return RedirectResponse("/dashboard?error=not_found", status_code=303)
 
-    # For Discord guilds: owner_discord_id must match session uid
-    # For personal workspaces: workspace_owner_id must match
     is_personal = guild.get("workspace_type") == "personal"
     owner_field = "workspace_owner_id" if is_personal else "owner_discord_id"
     if guild.get(owner_field) != uid:
-        # Also allow if user is in the allowed guilds list (admin can remove)
-        if uid not in (session.get("guilds") or []):
-            return RedirectResponse("/dashboard?error=not_owner", status_code=303)
+        return RedirectResponse("/dashboard?error=not_owner", status_code=303)
 
     if not is_personal:
-        # Tell the bot to leave the Discord server
+        # Tell the bot to leave Discord
         bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
         try:
             async with httpx.AsyncClient(timeout=8) as client:
                 await client.post(f"{bot_api}/api/leave-guild", json={"guild_id": guild_id})
         except Exception as e:
             print(f"[remove-server] Bot leave error for {guild_id}: {e}", flush=True)
-        # set_bot_kicked marks it inactive so it won't show up
-        await database.set_bot_kicked(guild_id)
-    else:
-        # Personal workspace: just delete it
-        async with __import__('aiosqlite').connect(database.DB_PATH) as db:
-            await db.execute("DELETE FROM guild_configs WHERE guild_id=? AND workspace_owner_id=?",
-                             (guild_id, uid))
-            await db.commit()
 
+    # Archive instead of delete — data is preserved
+    await database.archive_workspace(guild_id)
     return RedirectResponse("/dashboard?removed=1", status_code=303)
+
+
+@app.post("/dashboard/restore-server")
+async def dashboard_restore_server(request: Request, guild_id: str = Form("")):
+    """Restore an archived workspace back to active."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    import aiosqlite as _aio
+    async with _aio.connect(database.DB_PATH) as db:
+        db.row_factory = _aio.Row
+        async with db.execute("SELECT * FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            guild = dict(row) if row else None
+    if not guild:
+        return RedirectResponse("/dashboard?error=not_found", status_code=303)
+    is_personal = guild.get("workspace_type") == "personal"
+    owner_field = "workspace_owner_id" if is_personal else "owner_discord_id"
+    if guild.get(owner_field) != uid:
+        return RedirectResponse("/dashboard?error=not_owner", status_code=303)
+    await database.restore_workspace(guild_id)
+    return RedirectResponse("/dashboard?restored=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------
