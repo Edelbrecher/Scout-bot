@@ -735,9 +735,20 @@ class RequestHubView(discord.ui.View):
     async def hub_private_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await require_premium(interaction):
             return
-        # Defer immediately — DB calls below can take > 3s on slow disk
+        # Defer immediately so Discord doesn't time out while we do DB + API calls
         await interaction.response.defer(ephemeral=True)
 
+        try:
+            await self._create_private_channel(interaction)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                await interaction.followup.send(f"⚠️ Fehler: {e}", ephemeral=True)
+            except Exception:
+                pass
+
+    async def _create_private_channel(self, interaction: discord.Interaction):
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
 
@@ -755,12 +766,8 @@ class RequestHubView(discord.ui.View):
 
         config = await database.get_guild_config(str(guild.id))
 
-        # Get or create Private-Channels category
-        try:
-            category = await _get_or_create_private_category(guild, lang)
-        except Exception as e:
-            await interaction.followup.send(f"⚠️ Kategorie konnte nicht erstellt werden: {e}", ephemeral=True)
-            return
+        # Get or create 'Privat Channels' category
+        category = await _get_or_create_private_category(guild, lang)
 
         # Build permission overwrites
         overwrites: dict = {
@@ -773,7 +780,7 @@ class RequestHubView(discord.ui.View):
                 view_channel=True, send_messages=True, attach_files=True,
             ),
         }
-        # Grant access to all configured allowed roles
+        # Grant access to all configured allowed roles (Leads etc.)
         for role_id_str in ((config or {}).get("allowed_role_ids") or "").split(","):
             role_id_str = role_id_str.strip()
             if not role_id_str:
@@ -785,16 +792,14 @@ class RequestHubView(discord.ui.View):
                 )
 
         channel_name = f"private-{_safe(interaction.user.display_name)}"[:100]
-        try:
-            new_channel = await guild.create_text_channel(
-                name=channel_name,
-                category=category,
-                topic=f"private:{interaction.user.id}",
-                overwrites=overwrites,
-            )
-        except Exception as e:
-            await interaction.followup.send(f"⚠️ Channel konnte nicht erstellt werden: {e}", ephemeral=True)
-            return
+        print(f"[hub] Creating private channel '{channel_name}' for {interaction.user} in guild {guild.id}", flush=True)
+
+        new_channel = await guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            topic=f"private:{interaction.user.id}",
+            overwrites=overwrites,
+        )
 
         # Save to DB
         await database.set_private_channel(str(guild.id), str(interaction.user.id), str(new_channel.id))
