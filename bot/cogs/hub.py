@@ -554,77 +554,70 @@ def _find_member(guild: discord.Guild, name: str) -> discord.Member | None:
     return None
 
 
-class GrantAccessModal(discord.ui.Modal):
-    name_input = discord.ui.TextInput(
-        label="Spieler-Name oder @Mention",
-        placeholder="z.B. Currax oder @Currax",
-        max_length=100,
-    )
+class GrantAccessSelect(discord.ui.View):
+    """Ephemeral view with a UserSelect — shown when owner clicks 'Zugriff gewähren'."""
 
     def __init__(self, lang: str = "de"):
-        super().__init__(title="Zugriff gewähren" if lang == "de" else "Grant Access")
+        super().__init__(timeout=60)
         self.lang = lang
-        self.name_input.label = t(lang, "private.grant.field_label")
-        self.name_input.placeholder = t(lang, "private.grant.field_placeholder")
+        placeholder = "Spieler auswählen…" if lang == "de" else "Select a member…"
+        select = discord.ui.UserSelect(
+            placeholder=placeholder,
+            min_values=1,
+            max_values=1,
+            custom_id="private_grant_select",
+        )
+        select.callback = self._on_select
+        self.add_item(select)
 
-    async def on_submit(self, interaction: discord.Interaction):
-        guild = interaction.guild
+    async def _on_select(self, interaction: discord.Interaction):
         lang = self.lang
-        # Only the channel owner may grant access (owner_id stored as channel topic metadata)
-        rec = await database.get_private_channel_by_channel_id(str(interaction.channel.id))
-        if not rec or str(interaction.user.id) != rec["owner_id"]:
-            await interaction.response.send_message(t(lang, "private.grant.not_owner"), ephemeral=True)
-            return
-
-        member = _find_member(guild, self.name_input.value)
+        selected: discord.Member = interaction.data["resolved"]["members"]
+        # interaction.data gives us the member via the select values
+        user_id = interaction.data["values"][0]
+        member = interaction.guild.get_member(int(user_id))
         if not member:
             await interaction.response.send_message(
-                t(lang, "private.grant.not_found", name=self.name_input.value), ephemeral=True
+                "❌ Mitglied nicht gefunden." if lang == "de" else "❌ Member not found.", ephemeral=True
             )
             return
-
-        # Check existing perms
         overwrite = interaction.channel.overwrites_for(member)
         if overwrite.view_channel is True:
             await interaction.response.send_message(
                 t(lang, "private.grant.already", mention=member.mention), ephemeral=True
             )
             return
-
         await interaction.channel.set_permissions(member, view_channel=True, send_messages=True)
         await interaction.response.send_message(
             t(lang, "private.grant.success", mention=member.mention)
         )
 
 
-class RevokeAccessModal(discord.ui.Modal):
-    name_input = discord.ui.TextInput(
-        label="Spieler-Name oder @Mention",
-        placeholder="z.B. Currax oder @Currax",
-        max_length=100,
-    )
+class RevokeAccessSelect(discord.ui.View):
+    """Ephemeral view with a UserSelect — shown when owner clicks 'Zugriff entziehen'."""
 
     def __init__(self, lang: str = "de"):
-        super().__init__(title="Zugriff entziehen" if lang == "de" else "Revoke Access")
+        super().__init__(timeout=60)
         self.lang = lang
-        self.name_input.label = t(lang, "private.revoke.field_label")
-        self.name_input.placeholder = t(lang, "private.grant.field_placeholder")
+        placeholder = "Zugriff entziehen für…" if lang == "de" else "Revoke access for…"
+        select = discord.ui.UserSelect(
+            placeholder=placeholder,
+            min_values=1,
+            max_values=1,
+            custom_id="private_revoke_select",
+        )
+        select.callback = self._on_select
+        self.add_item(select)
 
-    async def on_submit(self, interaction: discord.Interaction):
-        guild = interaction.guild
+    async def _on_select(self, interaction: discord.Interaction):
         lang = self.lang
-        rec = await database.get_private_channel_by_channel_id(str(interaction.channel.id))
-        if not rec or str(interaction.user.id) != rec["owner_id"]:
-            await interaction.response.send_message(t(lang, "private.revoke.not_owner"), ephemeral=True)
-            return
-
-        member = _find_member(guild, self.name_input.value)
+        user_id = interaction.data["values"][0]
+        member = interaction.guild.get_member(int(user_id))
         if not member:
             await interaction.response.send_message(
-                t(lang, "private.revoke.not_found", name=self.name_input.value), ephemeral=True
+                "❌ Mitglied nicht gefunden." if lang == "de" else "❌ Member not found.", ephemeral=True
             )
             return
-
         await interaction.channel.set_permissions(member, overwrite=None)
         await interaction.response.send_message(
             t(lang, "private.revoke.success", mention=member.mention)
@@ -648,7 +641,10 @@ class PrivateChannelView(discord.ui.View):
         if not rec or str(interaction.user.id) != rec["owner_id"]:
             await interaction.response.send_message(t(lang, "private.grant.not_owner"), ephemeral=True)
             return
-        await interaction.response.send_modal(GrantAccessModal(lang=lang))
+        # Send ephemeral UserSelect picker
+        view = GrantAccessSelect(lang=lang)
+        label = "Wähle ein Mitglied aus der Liste:" if lang == "de" else "Select a member from the list:"
+        await interaction.response.send_message(label, view=view, ephemeral=True)
 
     @discord.ui.button(
         label="➖ Zugriff entziehen",
@@ -661,7 +657,9 @@ class PrivateChannelView(discord.ui.View):
         if not rec or str(interaction.user.id) != rec["owner_id"]:
             await interaction.response.send_message(t(lang, "private.revoke.not_owner"), ephemeral=True)
             return
-        await interaction.response.send_modal(RevokeAccessModal(lang=lang))
+        view = RevokeAccessSelect(lang=lang)
+        label = "Wähle ein Mitglied aus der Liste:" if lang == "de" else "Select a member from the list:"
+        await interaction.response.send_message(label, view=view, ephemeral=True)
 
 
 async def _get_or_create_private_category(guild: discord.Guild, lang: str) -> discord.CategoryChannel:
