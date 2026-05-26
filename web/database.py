@@ -163,6 +163,51 @@ async def init_db():
             except Exception:
                 pass
 
+        # Trial system
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN trial_expires_at TEXT")
+            await db.commit()
+        except Exception:
+            pass
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS trial_links (
+                code            TEXT PRIMARY KEY,
+                created_by      TEXT NOT NULL,
+                created_at      TEXT NOT NULL,
+                activated_at    TEXT,
+                activated_guild_id TEXT
+            )
+        """)
+        await db.commit()
+
+        # Referral system
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS referral_codes (
+                discord_user_id TEXT PRIMARY KEY,
+                code            TEXT UNIQUE NOT NULL,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS referral_events (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                referrer_discord_id   TEXT NOT NULL,
+                referred_discord_id   TEXT NOT NULL UNIQUE,
+                awarded_at            TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
+        # travops_points on user_subscriptions
+        try:
+            await db.execute("ALTER TABLE user_subscriptions ADD COLUMN travops_points INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS attack_reports (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3977,3 +4022,228 @@ async def clear_village_slot(layout_id: int, guild_id: str, slot_num: int):
             (layout_id, slot_num)
         )
         await db.commit()
+
+
+# ─────────────────────────────────────────────
+#  TRIAL LINKS
+# ─────────────────────────────────────────────
+
+async def create_trial_link(code: str, created_by: str) -> str:
+    """Insert a new one-time trial link. Returns the code."""
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO trial_links (code, created_by, created_at) VALUES (?, ?, ?)",
+            (code, created_by, _dt.utcnow().isoformat()),
+        )
+        await db.commit()
+    return code
+
+
+async def get_trial_link(code: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM trial_links WHERE code=?", (code,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def activate_trial_link(code: str, guild_id: str) -> bool:
+    """Mark the link used and set trial_expires_at (+14 days) on the guild. Returns False if already used."""
+    from datetime import datetime as _dt, timedelta as _td
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM trial_links WHERE code=?", (code,)) as cur:
+            link = await cur.fetchone()
+        if not link or link["activated_guild_id"]:
+            return False
+        expires = (_dt.utcnow() + _td(days=14)).isoformat()
+        now = _dt.utcnow().isoformat()
+        await db.execute(
+            "UPDATE trial_links SET activated_at=?, activated_guild_id=? WHERE code=?",
+            (now, guild_id, code),
+        )
+        await db.execute(
+            """UPDATE guild_configs SET
+                 trial_expires_at=?,
+                 subscription_status='trialing',
+                 subscription_plan='trial'
+               WHERE guild_id=?""",
+            (expires, guild_id),
+        )
+        await db.commit()
+    return True
+
+
+async def get_all_trial_links() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM trial_links ORDER BY created_at DESC") as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def expire_overdue_trials():
+    """Downgrade guilds whose trial has expired. Returns list of expired guild_ids."""
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT guild_id FROM guild_configs
+               WHERE trial_expires_at IS NOT NULL
+                 AND trial_expires_at <= ?
+                 AND subscription_status = 'trialing'""",
+            (now,),
+        ) as cur:
+            rows = await cur.fetchall()
+        expired = [r["guild_id"] for r in rows]
+        if expired:
+            placeholders = ",".join("?" * len(expired))
+            await db.execute(
+                f"""UPDATE guild_configs SET subscription_status='free', subscription_plan=NULL
+                    WHERE guild_id IN ({placeholders})""",
+                expired,
+            )
+            await db.commit()
+    return expired
+
+
+async def get_expiring_trials(days: int = 3) -> list[dict]:
+    """Return guilds whose trial expires within `days` days."""
+    from datetime import datetime as _dt, timedelta as _td
+    now = _dt.utcnow().isoformat()
+    soon = (_dt.utcnow() + _td(days=days)).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT guild_id, trial_expires_at FROM guild_configs
+               WHERE trial_expires_at IS NOT NULL
+                 AND trial_expires_at > ?
+                 AND trial_expires_at <= ?
+                 AND subscription_status = 'trialing'""",
+            (now, soon),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+# ─────────────────────────────────────────────
+#  REFERRAL SYSTEM
+# ─────────────────────────────────────────────
+
+async def get_or_create_referral_code(discord_user_id: str) -> str:
+    """Return existing ref code or create a new one (8-char hex)."""
+    import secrets
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT code FROM referral_codes WHERE discord_user_id=?", (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if row:
+            return row["code"]
+        from datetime import datetime as _dt
+        code = secrets.token_hex(5)  # 10 hex chars
+        # ensure uniqueness
+        while True:
+            async with db.execute("SELECT 1 FROM referral_codes WHERE code=?", (code,)) as cur:
+                if not await cur.fetchone():
+                    break
+            code = secrets.token_hex(5)
+        await db.execute(
+            "INSERT INTO referral_codes (discord_user_id, code, created_at) VALUES (?,?,?)",
+            (discord_user_id, code, _dt.utcnow().isoformat()),
+        )
+        await db.commit()
+        return code
+
+
+async def get_referral_code_owner(code: str) -> str | None:
+    """Return discord_user_id for a ref code, or None."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT discord_user_id FROM referral_codes WHERE code=?", (code,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row["discord_user_id"] if row else None
+
+
+async def award_referral_point(referrer_discord_id: str, referred_discord_id: str) -> bool:
+    """Award 1 TravOps-Point to referrer. Returns False if already awarded for this referred user."""
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Check if already awarded
+        async with db.execute(
+            "SELECT 1 FROM referral_events WHERE referred_discord_id=?", (referred_discord_id,)
+        ) as cur:
+            if await cur.fetchone():
+                return False
+        await db.execute(
+            "INSERT INTO referral_events (referrer_discord_id, referred_discord_id, awarded_at) VALUES (?,?,?)",
+            (referrer_discord_id, referred_discord_id, _dt.utcnow().isoformat()),
+        )
+        # Ensure user_subscriptions row exists
+        await db.execute(
+            """INSERT INTO user_subscriptions (discord_user_id, travops_points)
+               VALUES (?, 1)
+               ON CONFLICT(discord_user_id) DO UPDATE SET
+                 travops_points = COALESCE(travops_points, 0) + 1""",
+            (referrer_discord_id,),
+        )
+        await db.commit()
+    return True
+
+
+async def get_referral_stats(discord_user_id: str) -> dict:
+    """Return {code, points, referred_count} for a user."""
+    code = await get_or_create_referral_code(discord_user_id)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT COALESCE(travops_points,0) AS pts FROM user_subscriptions WHERE discord_user_id=?",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            points = row["pts"] if row else 0
+        async with db.execute(
+            "SELECT COUNT(*) AS cnt FROM referral_events WHERE referrer_discord_id=?",
+            (discord_user_id,),
+        ) as cur:
+            cnt_row = await cur.fetchone()
+            referred_count = cnt_row["cnt"] if cnt_row else 0
+    return {"code": code, "points": points, "referred_count": referred_count}
+
+
+async def redeem_travops_points(discord_user_id: str) -> bool:
+    """Deduct 10 points and extend user Pro by 1 month. Returns False if not enough points."""
+    from datetime import datetime as _dt, timedelta as _td
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT COALESCE(travops_points,0) AS pts, subscription_status, expires_at FROM user_subscriptions WHERE discord_user_id=?",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row or row["pts"] < 10:
+            return False
+        # Calculate new expiry: extend from now or from current expiry
+        base = _dt.utcnow()
+        if row["expires_at"]:
+            try:
+                existing = _dt.fromisoformat(row["expires_at"])
+                if existing > base:
+                    base = existing
+            except Exception:
+                pass
+        new_expiry = (base + _td(days=30)).isoformat()
+        await db.execute(
+            """UPDATE user_subscriptions SET
+                 travops_points = travops_points - 10,
+                 subscription_status = 'active',
+                 plan = COALESCE(NULLIF(plan,''), 'player_pro'),
+                 expires_at = ?
+               WHERE discord_user_id = ?""",
+            (new_expiry, discord_user_id),
+        )
+        await db.commit()
+    return True

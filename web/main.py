@@ -576,6 +576,19 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(6 * 3600)
 
     asyncio.create_task(_snapshot_loop())
+
+    async def _trial_expiry_loop():
+        """Every hour: expire trials and log."""
+        while True:
+            try:
+                expired = await database.expire_overdue_trials()
+                if expired:
+                    print(f"[trials] Expired {len(expired)} trial(s): {expired}", flush=True)
+            except Exception as e:
+                print(f"[trials] ERROR: {e}", flush=True)
+            await asyncio.sleep(3600)
+
+    asyncio.create_task(_trial_expiry_loop())
     yield
 
 
@@ -923,6 +936,82 @@ async def workspace_create(request: Request, name: str = Form(...)):
 
 
 # ---------------------------------------------------------------------------
+# Routes — Trial links
+# ---------------------------------------------------------------------------
+
+@app.get("/trial/{code}", response_class=HTMLResponse)
+async def activate_trial(request: Request, code: str):
+    """Activate a 14-day trial for the current user's default workspace."""
+    session, err = _require_session(request)
+    if err: return err
+    owner_discord_id = session.get("uid", "")
+    if not owner_discord_id:
+        return RedirectResponse("/login")
+    link = await database.get_trial_link(code)
+    if not link:
+        return templates.TemplateResponse("error.html", {
+            "request": request, "error": "Ungültiger oder abgelaufener Trial-Link."
+        }, status_code=404)
+    if link.get("activated_guild_id"):
+        return templates.TemplateResponse("error.html", {
+            "request": request, "error": "Dieser Trial-Link wurde bereits eingelöst."
+        }, status_code=410)
+    username = session.get("username") or session.get("discord_username") or "User"
+    guild_id = await database.get_or_create_default_workspace(owner_discord_id, username)
+    ok = await database.activate_trial_link(code, guild_id)
+    if not ok:
+        return templates.TemplateResponse("error.html", {
+            "request": request, "error": "Trial konnte nicht aktiviert werden."
+        }, status_code=400)
+    return RedirectResponse(f"/guild/{guild_id}?trial_activated=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Referral system
+# ---------------------------------------------------------------------------
+
+@app.get("/ref/{code}")
+async def referral_redirect(request: Request, code: str):
+    """Store ref code in cookie and redirect to dashboard/login."""
+    owner = await database.get_referral_code_owner(code)
+    response = RedirectResponse("/dashboard", status_code=302)
+    if owner:
+        response.set_cookie("_ref", code, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    """User profile page with referral stats and TravOps-Points."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    ref_stats = await database.get_referral_stats(uid) if uid else {"code": "", "points": 0, "referred_count": 0}
+    user_sub = await database.get_user_subscription(uid) if uid else None
+    redeemed = request.query_params.get("redeemed")
+    return templates.TemplateResponse("profile.html", {
+        "request": request,
+        "session": session,
+        "ref_stats": ref_stats,
+        "user_sub": user_sub,
+        "redeemed": redeemed,
+        "base_url": str(request.base_url).rstrip("/"),
+    })
+
+
+@app.post("/profile/redeem")
+async def redeem_points(request: Request):
+    """Redeem 10 TravOps-Points for 1 month Pro."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    ok = await database.redeem_travops_points(uid)
+    if ok:
+        return RedirectResponse("/profile?redeemed=1", status_code=303)
+    return RedirectResponse("/profile?redeemed=0", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Routes — user billing (Player Pro, no Discord server required)
 # ---------------------------------------------------------------------------
 
@@ -980,7 +1069,12 @@ async def user_billing_checkout(
         subscription_data={"trial_period_days": 7},
         success_url=f"{base_url}/billing?saved=1",
         cancel_url=f"{base_url}/billing?error=cancelled",
-        metadata={"owner_discord_id": owner_discord_id, "tier": tier, "personal": "1"},
+        metadata={
+            "owner_discord_id": owner_discord_id,
+            "tier": tier,
+            "personal": "1",
+            "ref_code": request.cookies.get("_ref", ""),
+        },
     )
     if customer_id:
         checkout_kwargs["customer"] = customer_id
@@ -1071,7 +1165,9 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "is_admin": is_admin, "is_owner": is_owner, "request_hub": request_hub,
          "hero_scout_channel": hero_scout_channel,
          "perm_issues": perm_issues,
-         "is_personal": is_personal},
+         "is_personal": is_personal,
+         "trial_expires_at": guild.get("trial_expires_at"),
+         },
     )
 
 
@@ -2398,6 +2494,14 @@ async def stripe_webhook(request: Request):
                 expires_at=expires_at,
             )
             print(f"[webhook] checkout.completed: {discord_user_id} → {plan_str} ({status})", flush=True)
+            # Referral: award point to referrer if this user was referred
+            ref_code = meta.get("ref_code", "")
+            if ref_code and discord_user_id:
+                referrer_id = await database.get_referral_code_owner(ref_code)
+                if referrer_id and referrer_id != discord_user_id:
+                    awarded = await database.award_referral_point(referrer_id, discord_user_id)
+                    if awarded:
+                        print(f"[referral] +1 point to {referrer_id} for referring {discord_user_id}", flush=True)
             # Lookup cached username for notification
             _uname = (await database.get_user_subscription(discord_user_id) or {}).get("discord_username", discord_user_id)
             asyncio.create_task(_notify(
@@ -3845,6 +3949,29 @@ async def admin_set_user_plan(
         plan = ""
     await database.update_user_subscription_admin(discord_user_id, status, plan)
     return RedirectResponse("/admin/customers?saved=1", status_code=303)
+
+
+@app.get("/admin/trial-links", response_class=HTMLResponse)
+async def admin_trial_links(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    import secrets as _sec
+    links = await database.get_all_trial_links()
+    created = request.query_params.get("created")
+    return templates.TemplateResponse("admin_trial_links.html", {
+        "request": request, "links": links, "created": created,
+    })
+
+
+@app.post("/admin/trial-links/create")
+async def admin_trial_links_create(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    import secrets as _sec
+    code = _sec.token_urlsafe(10)
+    admin_name = session.get("username", "admin")
+    await database.create_trial_link(code=code, created_by=admin_name)
+    return RedirectResponse(f"/admin/trial-links?created={code}", status_code=303)
 
 
 @app.get("/admin/promos", response_class=HTMLResponse)
