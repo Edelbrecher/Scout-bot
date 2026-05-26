@@ -353,6 +353,96 @@ class DefendCloseView(discord.ui.View):
 # Res-Push Modal
 # ---------------------------------------------------------------------------
 
+class HubResAnswerView(discord.ui.View):
+    """Admin Accept/Reject/Hold view posted directly in the hub-created res-push channel."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _get_req_and_lang(self, interaction: discord.Interaction):
+        from cogs.res_push import _is_authorized
+        if not await _is_authorized(interaction):
+            lang = await get_guild_lang(str(interaction.guild_id))
+            await interaction.response.send_message(
+                "⛔ Keine Berechtigung." if lang == "de" else "⛔ No permission.", ephemeral=True
+            )
+            return None, None
+        req = await database.get_res_request_by_answer_msg(str(interaction.message.id))
+        lang = await get_guild_lang(str(interaction.guild_id))
+        if not req:
+            await interaction.response.send_message("⚠️ Anfrage nicht gefunden." if lang == "de" else "⚠️ Request not found.", ephemeral=True)
+            return None, lang
+        return req, lang
+
+    @discord.ui.button(label="✅ Annehmen", style=discord.ButtonStyle.success, custom_id="persistent:hub_res_accept")
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.res_push import _build_push_embed, ResPushChannelView
+        req, lang = await self._get_req_and_lang(interaction)
+        if not req:
+            return
+
+        await interaction.response.defer()
+
+        # Transform this channel into the push tracking channel
+        await database.update_res_request_status(
+            answer_message_id=str(interaction.message.id),
+            status="accepted",
+            push_channel_id=str(interaction.channel.id),
+        )
+
+        # Fetch updated req (now has push_channel_id)
+        req = await database.get_res_request_by_answer_msg(str(interaction.message.id))
+        push_embed = _build_push_embed(req, [])
+
+        accepted_label = "✅ Angenommen" if lang == "de" else "✅ Accepted"
+        done_view = discord.ui.View()
+        done_view.add_item(discord.ui.Button(label=accepted_label, style=discord.ButtonStyle.success, disabled=True))
+
+        # Replace the pending embed/view with a simple accepted note
+        from cogs.res_push import _build_request_embed
+        accepted_embed = _build_request_embed(req, "accepted")
+        await interaction.message.edit(
+            content=(f"✅ Angenommen von {interaction.user.mention}" if lang == "de" else f"✅ Accepted by {interaction.user.mention}"),
+            embed=accepted_embed,
+            view=done_view,
+        )
+
+        # Post the live push tracking embed below
+        await interaction.channel.send(embed=push_embed, view=ResPushChannelView())
+
+    @discord.ui.button(label="❌ Ablehnen", style=discord.ButtonStyle.danger, custom_id="persistent:hub_res_reject")
+    async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.res_push import _build_request_embed
+        req, lang = await self._get_req_and_lang(interaction)
+        if not req:
+            return
+
+        await database.update_res_request_status(str(interaction.message.id), "rejected")
+
+        updated = _build_request_embed(req, "rejected")
+        rejected_label = "❌ Abgelehnt" if lang == "de" else "❌ Rejected"
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label=rejected_label, style=discord.ButtonStyle.danger, disabled=True))
+        await interaction.response.edit_message(
+            content=(f"❌ Abgelehnt von {interaction.user.mention}" if lang == "de" else f"❌ Rejected by {interaction.user.mention}"),
+            embed=updated, view=view,
+        )
+
+    @discord.ui.button(label="⏸️ Zurückstellen", style=discord.ButtonStyle.secondary, custom_id="persistent:hub_res_hold")
+    async def hold(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.res_push import _build_request_embed
+        req, lang = await self._get_req_and_lang(interaction)
+        if not req:
+            return
+
+        await database.update_res_request_status(str(interaction.message.id), "hold")
+        updated = _build_request_embed(req, "hold")
+        await interaction.response.edit_message(
+            content=(f"⏸️ Zurückgestellt von {interaction.user.mention}" if lang == "de" else f"⏸️ Put on hold by {interaction.user.mention}"),
+            embed=updated, view=HubResAnswerView(),
+        )
+
+
 class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
     village = discord.ui.TextInput(label="Dein Dorf (Empfänger)", placeholder="z.B. Hauptdorf (102|47)", max_length=100)
     resources = discord.ui.TextInput(
@@ -364,49 +454,54 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
     notes = discord.ui.TextInput(label="Weitere Infos", required=False, style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
-        from cogs.res_push import ResAnswerView, _build_request_embed
+        from cogs.res_push import _build_request_embed
         from datetime import datetime
 
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
-        config = await database.get_guild_config(str(guild.id))
-
-        if not config or not config.get("res_answer_channel_id"):
-            await interaction.response.send_message(
-                "⚠️ Res-Push ist nicht konfiguriert. Bitte den Admin bitten, den Answer-Channel im Dashboard einzustellen."
-                if lang == "de" else
-                "⚠️ Res-Push is not configured. Please ask an admin to set up the answer channel in the dashboard.",
-                ephemeral=True,
-            )
+        config, category = await _get_config_and_category(guild)
+        if not config or not category:
+            await interaction.response.send_message(t(lang, "not_configured"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
 
-        answer_channel = guild.get_channel(int(config["res_answer_channel_id"]))
-        if not answer_channel:
-            await interaction.followup.send("⚠️ Answer-Channel nicht gefunden." if lang == "de" else "⚠️ Answer channel not found.", ephemeral=True)
-            return
+        # Build channel + overwrites
+        channel_name = f"res-push-{_safe(interaction.user.display_name)}"[:100]
+        overwrites = _build_overwrites(guild, config, interaction.user)
+        new_channel = await guild.create_text_channel(
+            name=channel_name, category=category,
+            topic=f"Res-Push: {interaction.user.display_name}: {self.resources.value[:80]}",
+            overwrites=overwrites,
+        )
+
+        # Build request data
+        reason_parts = []
+        if lang == "de":
+            reason_parts.append(f"Bis wann: {self.until.value}")
+        else:
+            reason_parts.append(f"Until: {self.until.value}")
+        if self.notes.value:
+            reason_parts.append(self.notes.value)
 
         data = {
             "player_name": interaction.user.display_name,
             "coordinates": self.village.value,
             "push_height": self.resources.value,
-            "reason": (f"Bis wann: {self.until.value}" + (f"\n{self.notes.value}" if self.notes.value else ""))
-                      if lang == "de" else
-                      (f"Until: {self.until.value}" + (f"\n{self.notes.value}" if self.notes.value else "")),
+            "reason": "\n".join(reason_parts),
             "user_name": interaction.user.display_name,
             "user_id": str(interaction.user.id),
             "created_at": datetime.utcnow().isoformat(),
         }
 
+        # Post the pending embed with admin buttons in the new channel
         embed = _build_request_embed(data, "pending")
         content = (
-            f"🪖 Neue Res-Push Anfrage von {interaction.user.mention}"
-            if lang == "de" else
-            f"🪖 New res-push request from {interaction.user.mention}"
+            f"🪖 {interaction.user.mention} — {'Neue Res-Push Anfrage' if lang == 'de' else 'New Res-Push Request'}"
         )
-        msg = await answer_channel.send(content=content, embed=embed, view=ResAnswerView())
+        msg = await new_channel.send(content=content, embed=embed, view=HubResAnswerView())
 
+        # Save to DB (using the in-channel message id as the answer_message_id)
         await database.add_res_request(
             guild_id=str(guild.id),
             answer_message_id=str(msg.id),
@@ -419,10 +514,7 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
         )
 
         await interaction.followup.send(
-            "✅ Deine Res-Push Anfrage wurde eingereicht! Ein Admin wird sie in Kürze bearbeiten."
-            if lang == "de" else
-            "✅ Your res-push request has been submitted! An admin will process it shortly.",
-            ephemeral=True,
+            t(lang, "res_push.channel_created", channel=new_channel.mention), ephemeral=True
         )
 
 
@@ -745,3 +837,4 @@ async def setup(bot: commands.Bot):
     bot.add_view(RequestHubView())
     bot.add_view(DefendCloseView())
     bot.add_view(PrivateChannelView())
+    bot.add_view(HubResAnswerView())
