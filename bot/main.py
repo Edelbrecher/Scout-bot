@@ -458,11 +458,38 @@ async def handle_set_hero_scout_channel(request: aiohttp_web.Request) -> aiohttp
 
 async def start_api_server():
     app = aiohttp_web.Application()
+async def handle_leave_guild(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Leave a Discord guild on request from the web dashboard."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not guild_id:
+        return aiohttp_web.json_response({"ok": False, "error": "guild_id required"}, status=400)
+
+    guild = bot.get_guild(int(guild_id)) if guild_id.isdigit() else None
+    if not guild:
+        # Already not in the guild — still mark as kicked
+        await database.set_bot_kicked(guild_id)
+        return aiohttp_web.json_response({"ok": True, "note": "not_in_guild"})
+
+    try:
+        await guild.leave()
+        await database.set_bot_kicked(guild_id)
+        print(f"[leave_guild] Left {guild.name} ({guild_id}) via dashboard request")
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
     app.router.add_post("/api/create-request-hub", handle_create_request_hub)
     app.router.add_post("/api/check-permissions", handle_check_permissions)
     app.router.add_post("/api/set-hero-scout-channel", handle_set_hero_scout_channel)
     app.router.add_post("/api/list-channels", handle_list_channels)
+    app.router.add_post("/api/leave-guild", handle_leave_guild)
     app.router.add_post("/api/hero-scout-build-library", handle_build_hero_library)
     app.router.add_get("/api/hero-scout-library-status", handle_hero_library_status)
     runner = aiohttp_web.AppRunner(app)

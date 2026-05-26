@@ -936,6 +936,53 @@ async def workspace_create(request: Request, name: str = Form(...)):
 
 
 # ---------------------------------------------------------------------------
+# Routes — Dashboard: remove server
+# ---------------------------------------------------------------------------
+
+@app.post("/dashboard/remove-server")
+async def dashboard_remove_server(request: Request, guild_id: str = Form("")):
+    """Remove a Discord server from the dashboard and make the bot leave."""
+    session, err = _require_session(request)
+    if err: return err
+    if not guild_id or not is_valid_guild_id(guild_id):
+        return RedirectResponse("/dashboard?error=invalid", status_code=303)
+
+    # Security: only owner / workspace-owner can remove
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard?error=not_found", status_code=303)
+
+    # For Discord guilds: owner_discord_id must match session uid
+    # For personal workspaces: workspace_owner_id must match
+    is_personal = guild.get("workspace_type") == "personal"
+    owner_field = "workspace_owner_id" if is_personal else "owner_discord_id"
+    if guild.get(owner_field) != uid:
+        # Also allow if user is in the allowed guilds list (admin can remove)
+        if uid not in (session.get("guilds") or []):
+            return RedirectResponse("/dashboard?error=not_owner", status_code=303)
+
+    if not is_personal:
+        # Tell the bot to leave the Discord server
+        bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                await client.post(f"{bot_api}/api/leave-guild", json={"guild_id": guild_id})
+        except Exception as e:
+            print(f"[remove-server] Bot leave error for {guild_id}: {e}", flush=True)
+        # set_bot_kicked marks it inactive so it won't show up
+        await database.set_bot_kicked(guild_id)
+    else:
+        # Personal workspace: just delete it
+        async with __import__('aiosqlite').connect(database.DB_PATH) as db:
+            await db.execute("DELETE FROM guild_configs WHERE guild_id=? AND workspace_owner_id=?",
+                             (guild_id, uid))
+            await db.commit()
+
+    return RedirectResponse("/dashboard?removed=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Routes — Trial links
 # ---------------------------------------------------------------------------
 
