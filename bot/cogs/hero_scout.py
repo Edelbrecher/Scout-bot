@@ -1,4 +1,3 @@
-from utils import travops_footer
 """
 hero_scout.py — Scannt Helden-Screenshots aus Discord und speichert die Daten.
 
@@ -8,6 +7,7 @@ Zusätzlich werden die 6 Ausrüstungsslots als Bild-Crops gespeichert (da Icons,
 """
 
 from __future__ import annotations
+from utils import travops_footer
 
 import asyncio
 import hashlib
