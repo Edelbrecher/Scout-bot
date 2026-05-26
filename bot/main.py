@@ -456,8 +456,6 @@ async def handle_set_hero_scout_channel(request: aiohttp_web.Request) -> aiohttp
     return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "channel_name": channel_name})
 
 
-async def start_api_server():
-    app = aiohttp_web.Application()
 async def handle_guild_info(request: aiohttp_web.Request) -> aiohttp_web.Response:
     """Return basic info (name, icon) for a guild."""
     try:
@@ -497,6 +495,8 @@ async def handle_leave_guild(request: aiohttp_web.Request) -> aiohttp_web.Respon
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
+async def start_api_server():
+    app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
     app.router.add_post("/api/create-request-hub", handle_create_request_hub)
     app.router.add_post("/api/check-permissions", handle_check_permissions)
