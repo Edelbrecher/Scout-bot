@@ -1,6 +1,6 @@
 // popup.js
 
-const CIRCUMFERENCE = 2 * Math.PI * 52;
+const CIRCUMFERENCE = 2 * Math.PI * 68;
 
 // --- Timer 1 Tab elements ---
 const timeText       = document.getElementById('timeText');
