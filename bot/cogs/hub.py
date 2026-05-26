@@ -735,6 +735,9 @@ class RequestHubView(discord.ui.View):
     async def hub_private_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await require_premium(interaction):
             return
+        # Defer immediately — DB calls below can take > 3s on slow disk
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
 
@@ -743,7 +746,7 @@ class RequestHubView(discord.ui.View):
         if existing:
             ch = guild.get_channel(int(existing["channel_id"]))
             if ch:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     t(lang, "private.already_exists", channel=ch.mention), ephemeral=True
                 )
                 return
@@ -751,7 +754,6 @@ class RequestHubView(discord.ui.View):
             await database.delete_private_channel_by_id(existing["channel_id"])
 
         config = await database.get_guild_config(str(guild.id))
-        await interaction.response.defer(ephemeral=True)
 
         # Get or create Private-Channels category
         try:
