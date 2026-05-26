@@ -297,7 +297,7 @@
               {% endif %}
             </td>
             <td style="color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">
-              {{ v.uploaded_at[:16] if v.uploaded_at else '—' }}<br>
+              {{ v.uploaded_at[:10] if v.uploaded_at else '—' }}<br>
               <span>{{ v.uploaded_by or '' }}</span>
             </td>
           </tr>
@@ -516,7 +516,7 @@ function copyDualLink() {
   const history = {{ history | tojson }};
   const labels = history.map(h => {
     const d = new Date((h.uploaded_at||'').replace(' ','T')+'Z');
-    return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    return (h.uploaded_at||'').slice(0,10).split('-').slice(1).reverse().join('.');
   });
   const ctx = document.getElementById('historyChart');
   if (!ctx) return;
