@@ -4307,3 +4307,17 @@ async def get_archived_workspaces(owner_discord_id: str) -> list[dict]:
             (owner_discord_id, owner_discord_id),
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def upsert_guild_name(guild_id: str, guild_name: str, owner_discord_id: str | None = None):
+    """Register a guild without overwriting existing config.
+    Only sets owner_discord_id when the column is currently NULL."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO guild_configs (guild_id, guild_name, owner_discord_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                guild_name       = excluded.guild_name,
+                owner_discord_id = COALESCE(guild_configs.owner_discord_id, excluded.owner_discord_id)
+        """, (guild_id, guild_name, owner_discord_id))
+        await db.commit()
