@@ -977,20 +977,50 @@ async def bot_invite_callback(request: Request, guild_id: str = "", state: str =
             uid = session.get("uid")
 
     if guild_id and uid:
-        # Register or update the guild with the inviting user as owner
-        await database.upsert_guild_name(guild_id, guild_id, owner_discord_id=uid)
-        # Restore if archived
+        # Try to fetch real guild name from bot API
+        real_name = guild_id  # fallback
+        bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                r = await client.post(f"{bot_api}/api/guild-info", json={"guild_id": guild_id})
+                if r.status_code == 200:
+                    real_name = r.json().get("name", guild_id)
+        except Exception:
+            pass
+
+        await database.upsert_guild_name(guild_id, real_name, owner_discord_id=uid)
         import aiosqlite as _aio
         async with _aio.connect(database.DB_PATH) as db:
             await db.execute(
-                """UPDATE guild_configs SET workspace_status='active', owner_discord_id=?
-                   WHERE guild_id=?""",
-                (uid, guild_id),
+                """UPDATE guild_configs SET workspace_status='active', owner_discord_id=?,
+                   guild_name=? WHERE guild_id=?""",
+                (uid, real_name, guild_id),
             )
             await db.commit()
-        print(f"[bot-invite] Guild {guild_id} claimed by {uid}", flush=True)
+        print(f"[bot-invite] Guild {guild_id} ('{real_name}') claimed by {uid}", flush=True)
 
-    return RedirectResponse("/dashboard?invited=1", status_code=303)
+    return RedirectResponse(f"/dashboard?invited=1&new_guild={guild_id}", status_code=303)
+
+
+@app.post("/dashboard/rename-guild")
+async def dashboard_rename_guild(request: Request, guild_id: str = Form(""), name: str = Form("")):
+    """Rename a guild/workspace from the dashboard."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    name = name.strip()[:64]
+    if not name or not guild_id or not is_valid_guild_id(guild_id):
+        return RedirectResponse("/dashboard", status_code=303)
+    import aiosqlite as _aio
+    async with _aio.connect(database.DB_PATH) as db:
+        db.row_factory = _aio.Row
+        async with db.execute("SELECT owner_discord_id, workspace_owner_id FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+        if not row or (row["owner_discord_id"] != uid and row["workspace_owner_id"] != uid):
+            return RedirectResponse("/dashboard", status_code=303)
+        await db.execute("UPDATE guild_configs SET guild_name=? WHERE guild_id=?", (name, guild_id))
+        await db.commit()
+    return RedirectResponse("/dashboard?renamed=1", status_code=303)
 
 
 @app.post("/dashboard/remove-server")

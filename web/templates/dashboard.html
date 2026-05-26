@@ -232,7 +232,11 @@
   </div>
   {% elif _qp.get("invited") == "1" %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
-    🎉 Bot erfolgreich eingeladen! Der Server erscheint gleich hier.
+    🎉 Bot erfolgreich eingeladen!
+  </div>
+  {% elif _qp.get("renamed") == "1" %}
+  <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
+    ✅ Server umbenannt.
   </div>
   {% elif _qp.get("error") == "not_owner" %}
   <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#f87171;">
@@ -545,6 +549,52 @@ function confirmRemove(e, btn) {
   form.querySelector('input[name="guild_id"]').value = guildId;
   form.submit();
 }
+</script>
+
+<!-- Rename modal -->
+<div id="renameModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#1a1d2e;border:1px solid var(--border);border-radius:16px;padding:2rem;width:min(420px,90vw);box-shadow:0 25px 60px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 0.5rem;font-size:1.1rem;">✏️ Server benennen</h3>
+    <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 1.25rem;">Gib deinem Server einen Namen wie er im Dashboard erscheinen soll.</p>
+    <form method="post" action="/dashboard/rename-guild">
+      <input type="hidden" name="guild_id" id="renameGuildId" value="">
+      <input type="text" name="name" id="renameInput" placeholder="z.B. Meine Allianz"
+        style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.85rem;color:var(--text-primary);font-size:0.95rem;margin-bottom:1rem;box-sizing:border-box;"
+        maxlength="64">
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+        <button type="button" onclick="closeRenameModal()"
+          style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text-muted);padding:0.55rem 1.1rem;border-radius:8px;cursor:pointer;font-size:0.88rem;">
+          Überspringen
+        </button>
+        <button type="submit"
+          style="background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;padding:0.55rem 1.4rem;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.88rem;">
+          Speichern
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openRenameModal(guildId, currentName) {
+  document.getElementById('renameGuildId').value = guildId;
+  document.getElementById('renameInput').value = /^\d+$/.test(currentName) ? '' : (currentName || '');
+  const m = document.getElementById('renameModal');
+  m.style.display = 'flex';
+  setTimeout(() => document.getElementById('renameInput').focus(), 50);
+}
+function closeRenameModal() {
+  document.getElementById('renameModal').style.display = 'none';
+}
+(function() {
+  const params = new URLSearchParams(location.search);
+  const guildId = params.get('new_guild');
+  if (params.get('invited') === '1' && guildId) {
+    // Find the tile name to pre-fill
+    const tile = document.getElementById('tile-' + guildId);
+    const name = tile ? tile.querySelector('div[style*="font-weight:700"]')?.textContent?.trim() : '';
+    openRenameModal(guildId, name || '');
+  }
+})();
 </script>
 
 <!-- Hidden form for server removal -->
