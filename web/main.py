@@ -5112,11 +5112,13 @@ async def create_request_hub(request: Request, guild_id: str):
                 json={"guild_id": guild_id},
             )
             data = resp.json()
+            if data.get("ok"):
+                return RedirectResponse(f"/guild/{guild_id}?saved=hub_created", status_code=303)
+            print(f"[hub_create] bot error: {data}")
+            return RedirectResponse(f"/guild/{guild_id}?error=hub_create_failed&detail={data.get('error','')}", status_code=303)
     except Exception as e:
+        print(f"[hub_create] exception: {type(e).__name__}: {e}")
         return RedirectResponse(f"/guild/{guild_id}?error=hub_create_failed", status_code=303)
-    if data.get("ok"):
-        return RedirectResponse(f"/guild/{guild_id}?saved=hub_created", status_code=303)
-    return RedirectResponse(f"/guild/{guild_id}?error=hub_create_failed", status_code=303)
 
 
 @app.post("/guild/{guild_id}/request-hub/clear")
