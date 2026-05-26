@@ -10,6 +10,71 @@ import database
 
 
 # ---------------------------------------------------------------------------
+# Amount parser — supports "90k", "1.5m", "50.000", "50,000", plain ints
+# ---------------------------------------------------------------------------
+
+def _parse_amount(s: str) -> int | None:
+    """Parse a human-friendly number string into an integer.
+
+    Supported formats:
+      90k / 90K         → 90 000
+      1.5k / 1,5k       → 1 500
+      1m / 1.5m / 1,5m  → 1 000 000 / 1 500 000
+      50.000 / 50,000   → 50 000  (thousand-separator dot/comma)
+      50000             → 50 000
+    Returns None if the string cannot be parsed.
+    """
+    s = s.strip().replace(" ", "").replace("_", "")
+    if not s:
+        return None
+
+    multiplier = 1
+    lower = s.lower()
+    if lower.endswith("k"):
+        multiplier = 1_000
+        s = s[:-1]
+    elif lower.endswith("m"):
+        multiplier = 1_000_000
+        s = s[:-1]
+
+    # Normalise decimal separator: if both . and , appear, the one with
+    # exactly 3 digits after it is the thousands separator.
+    # Simple heuristic: if there's exactly one separator and ≤ 3 digits follow
+    # it → decimal; if 3 digits follow it → thousands separator.
+    # Replace European thousands sep (dot with 3 trailing digits) with nothing,
+    # then replace comma decimal sep with dot.
+    # E.g.  "50.000" → "50000"   "1.5" → "1.5"   "1,5" → "1.5"
+    if "." in s and "," in s:
+        # Both present — the one before the other is thousands sep
+        if s.index(".") < s.index(","):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif "." in s:
+        # Dot: thousands sep if exactly 3 digits follow each dot
+        parts = s.split(".")
+        if all(len(p) == 3 for p in parts[1:]):
+            s = s.replace(".", "")   # thousands sep → remove
+        # else leave as decimal point
+    elif "," in s:
+        parts = s.split(",")
+        if all(len(p) == 3 for p in parts[1:]):
+            s = s.replace(",", "")   # thousands sep → remove
+        else:
+            s = s.replace(",", ".")  # decimal comma → dot
+
+    try:
+        return int(float(s) * multiplier)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _fmt(n: int) -> str:
+    """Format integer with dot as thousands separator: 90000 → '90.000'."""
+    return f"{n:,}".replace(",", ".")
+
+
+# ---------------------------------------------------------------------------
 # Permission check
 # ---------------------------------------------------------------------------
 
@@ -59,48 +124,60 @@ def _build_request_embed(data: dict, status: str) -> discord.Embed:
         title="🪖 Res-Push Request",
         color=colors.get(status, discord.Color.default()),
     )
-    embed.add_field(name="Player", value=data["player_name"], inline=True)
-    embed.add_field(name="Coordinates", value=data["coordinates"], inline=True)
-    embed.add_field(name="Push Height", value=data["push_height"], inline=True)
+    parsed_goal = _parse_amount(data["push_height"]) if data.get("push_height") else None
+    goal_display = _fmt(parsed_goal) if parsed_goal else (data.get("push_height") or "—")
+    embed.add_field(name="Spieler", value=data["player_name"], inline=True)
+    embed.add_field(name="Ort / Dorf", value=data["coordinates"], inline=True)
+    embed.add_field(name="Ziel", value=goal_display, inline=True)
     if data.get("reason"):
-        embed.add_field(name="Reason", value=data["reason"], inline=False)
+        embed.add_field(name="Grund / Details", value=data["reason"], inline=False)
     embed.add_field(name="Status", value=status_labels.get(status, status), inline=False)
-    embed.set_footer(**travops_footer(f"Requested by {data['user_name']} • {data['created_at'][:16]}"))
+    embed.set_footer(**travops_footer(f"Angefragt von {data['user_name']} • {data['created_at'][:16]}"))
     return embed
 
 
 def _build_push_embed(data: dict, contributions: list[dict], status: str = "active") -> discord.Embed:
-    total = sum(int(c["amount"]) for c in contributions if c["amount"].isdigit())
-    try:
-        target = int(data["push_height"])
-        progress = min(int(total / target * 100), 100) if target > 0 else 0
-        bar_filled = progress // 10
-        progress_bar = "█" * bar_filled + "░" * (10 - bar_filled)
-        progress_text = f"{progress_bar} {progress}%  ({total:,} / {target:,})"
-    except (ValueError, ZeroDivisionError):
-        progress_text = f"Sent so far: {total:,}"
+    total = sum((_parse_amount(c["amount"]) or 0) for c in contributions)
+    target = _parse_amount(data["push_height"]) if data.get("push_height") else None
+
+    if target and target > 0:
+        progress_pct = int(total / target * 100)
+        # Bar always shows real 0-100%, but label shows actual % (can exceed 100)
+        bar_filled = min(progress_pct, 100) // 10
+        bar_color  = "🟩" if progress_pct >= 100 else "🟦"
+        bar_empty  = "⬜"
+        progress_bar = bar_color * bar_filled + bar_empty * (10 - bar_filled)
+        overshoot = f" (+{_fmt(total - target)})" if total > target else ""
+        progress_text = f"{progress_bar} **{progress_pct}%**  ({_fmt(total)} / {_fmt(target)}{overshoot})"
+    else:
+        progress_text = f"Gesendet: **{_fmt(total)}**"
+
+    goal_reached = target and total >= target
 
     color = discord.Color.gold() if status == "completed" else \
             discord.Color.dark_grey() if status == "inactive" else \
+            discord.Color.from_rgb(34, 197, 94) if goal_reached else \
             discord.Color.green()
 
-    title = "🏆 Res-Push — COMPLETED!" if status == "completed" else \
-            "🔒 Res-Push — Inactive" if status == "inactive" else \
+    title = "🏆 Res-Push — Ziel erreicht!" if (goal_reached and status == "active") else \
+            "🏆 Res-Push — ABGESCHLOSSEN!" if status == "completed" else \
+            "🔒 Res-Push — Inaktiv" if status == "inactive" else \
             "🪖 Res-Push"
 
     embed = discord.Embed(title=title, color=color)
-    embed.add_field(name="Player", value=data["player_name"], inline=True)
-    embed.add_field(name="Coordinates", value=data["coordinates"], inline=True)
-    embed.add_field(name="Push Goal", value=data["push_height"], inline=True)
-    embed.add_field(name="Progress", value=progress_text, inline=False)
+    embed.add_field(name="Spieler", value=data["player_name"], inline=True)
+    embed.add_field(name="Ort / Dorf", value=data["coordinates"], inline=True)
+    goal_display = _fmt(target) if target else data.get("push_height", "—")
+    embed.add_field(name="Ziel", value=goal_display, inline=True)
+    embed.add_field(name="Fortschritt", value=progress_text, inline=False)
     if contributions:
         contrib_lines = "\n".join(
-            f"• **{c['user_name']}**: {int(c['amount']):,}" if c["amount"].isdigit()
+            f"• **{c['user_name']}**: {_fmt(_parse_amount(c['amount']))} " if _parse_amount(c['amount']) is not None
             else f"• **{c['user_name']}**: {c['amount']}"
             for c in contributions[-10:]
         )
-        embed.add_field(name="Contributions", value=contrib_lines, inline=False)
-    embed.set_footer(**travops_footer(f"Requested by {data['user_name']}"))
+        embed.add_field(name=f"Beiträge ({len(contributions)})", value=contrib_lines, inline=False)
+    embed.set_footer(**travops_footer(f"Angefragt von {data['user_name']}"))
     return embed
 
 
@@ -190,44 +267,40 @@ class ResSentModal(discord.ui.Modal, title="How much did you send?"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
+        raw = self.amount.value.strip()
+        parsed = _parse_amount(raw)
+        # Store the parsed integer as string; fall back to raw if unrecognised
+        store_value = str(parsed) if parsed is not None else raw
+
         await database.add_res_contribution(
             request_id=self.request_id,
             user_id=str(interaction.user.id),
             user_name=interaction.user.display_name,
-            amount=self.amount.value.strip(),
+            amount=store_value,
         )
 
         req = await database.get_res_request_by_id(self.request_id)
         contribs = await database.get_res_contributions(self.request_id)
 
         if not req or not interaction.message:
-            await interaction.followup.send(f"✅ Recorded: **{self.amount.value}** sent. Thanks!", ephemeral=True)
+            display = _fmt(parsed) if parsed is not None else raw
+            await interaction.followup.send(f"✅ Eingetragen: **{display}** gesendet. Danke!", ephemeral=True)
             return
 
-        # Check if goal is reached
-        total = sum(int(c["amount"]) for c in contribs if c["amount"].isdigit())
-        try:
-            target = int(req["push_height"])
-            if total >= target:
-                await database.update_res_request_status(
-                    answer_message_id=req["answer_message_id"],
-                    status="completed",
-                )
-                completed_embed = _build_push_embed(req, contribs, status="completed")
-                await interaction.message.edit(
-                    content="🏆 **Push goal reached! This push is now complete.**",
-                    embed=completed_embed,
-                    view=_disabled_push_view("Goal Reached!"),
-                )
-                await interaction.followup.send(
-                    f"✅ Recorded: **{self.amount.value}** sent. 🏆 **Push complete!**", ephemeral=True
-                )
-                return
-        except (ValueError, ZeroDivisionError):
-            pass
+        total = sum((_parse_amount(c["amount"]) or 0) for c in contribs)
+        target = _parse_amount(req["push_height"]) if req.get("push_height") else None
+        goal_reached = target and total >= target
 
-        await interaction.message.edit(embed=_build_push_embed(req, contribs))
-        await interaction.followup.send(f"✅ Recorded: **{self.amount.value}** sent. Thanks!", ephemeral=True)
+        # Keep the view active even after goal — allow further contributions
+        updated_embed = _build_push_embed(req, contribs)
+        edit_kwargs: dict = {"embed": updated_embed}
+        if goal_reached:
+            edit_kwargs["content"] = "🏆 **Ziel erreicht! Weitere Beiträge werden weiterhin gezählt.**"
+        await interaction.message.edit(**edit_kwargs)
+
+        display = _fmt(parsed) if parsed is not None else raw
+        suffix = " 🏆 **Ziel erreicht!**" if goal_reached else ""
+        await interaction.followup.send(f"✅ Eingetragen: **{display}** gesendet. Danke!{suffix}", ephemeral=True)
 
 
 # ---------------------------------------------------------------------------
