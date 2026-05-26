@@ -523,18 +523,31 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
 # ---------------------------------------------------------------------------
 
 def _find_member(guild: discord.Guild, name: str) -> discord.Member | None:
-    """Find a guild member by display name, username, or bare <@id> mention."""
+    """Find a guild member by display name, username, @name, or <@id> mention."""
     name = name.strip()
-    # Bare mention: <@123456> or <@!123456>
+    # Real Discord mention: <@123456> or <@!123456>
     m = re.match(r"<@!?(\d+)>", name)
     if m:
         return guild.get_member(int(m.group(1)))
-    # Exact match on display name or global name
+    # Plain user ID
+    if name.isdigit():
+        return guild.get_member(int(name))
+    # Strip leading @ if user typed "@matze"
+    if name.startswith("@"):
+        name = name[1:]
     low = name.lower()
+    # 1. Exact match on display name, global name, or username
     for member in guild.members:
-        if member.display_name.lower() == low or member.name.lower() == low:
+        if (member.display_name.lower() == low
+                or member.name.lower() == low
+                or (member.global_name or "").lower() == low):
             return member
-    # Partial fallback
+    # 2. Starts-with match
+    for member in guild.members:
+        if (member.display_name.lower().startswith(low)
+                or member.name.lower().startswith(low)):
+            return member
+    # 3. Contains match
     for member in guild.members:
         if low in member.display_name.lower() or low in member.name.lower():
             return member
