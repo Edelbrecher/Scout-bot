@@ -3920,6 +3920,7 @@ async def farming_farmlist_add(
     player_name: str = Form(""),
     population: str = Form(""),
     notes: str = Form(""),
+    tab: str = Form("myfarms"),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -3937,7 +3938,7 @@ async def farming_farmlist_add(
         pop_int,
         notes.strip() or None,
     )
-    return RedirectResponse(f"/guild/{guild_id}/farming?saved=added", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/farming?saved=added&tab={tab}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/farming/farmlist/delete/{entry_id}")
@@ -3947,7 +3948,7 @@ async def farming_farmlist_delete(request: Request, guild_id: str, entry_id: int
     err = _require_guild(session, guild_id)
     if err: return err
     await database.delete_farm_list_entry(guild_id, entry_id)
-    return RedirectResponse(f"/guild/{guild_id}/farming", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/farming?tab=myfarms&saved=deleted", status_code=303)
 
 
 # ── Einsatzplanung ────────────────────────────────────────────────────────────
