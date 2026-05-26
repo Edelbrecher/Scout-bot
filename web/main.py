@@ -5131,6 +5131,26 @@ async def clear_request_hub(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}?saved=hub_cleared", status_code=303)
 
 
+@app.post("/guild/{guild_id}/clear-stale-channels")
+async def clear_stale_channels(request: Request, guild_id: str):
+    """Remove DB entries for channels that no longer exist in Discord."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    # Ask bot which channels are stale
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.post("http://bot:7777/api/check-permissions", json={"guild_id": guild_id})
+            issues = resp.json().get("issues", []) if resp.status_code == 200 else []
+    except Exception:
+        issues = []
+    stale_ids = {i["channel_id"] for i in issues if not i.get("missing")}
+    if stale_ids:
+        await database.clear_stale_channel_refs(guild_id, stale_ids)
+    return RedirectResponse(f"/guild/{guild_id}?saved=channels_cleaned", status_code=303)
+
+
 # ── Verteidigung ──────────────────────────────────────────────────────────────
 @app.get("/guild/{guild_id}/verteidigung", response_class=HTMLResponse)
 async def verteidigung_page(request: Request, guild_id: str):

@@ -47,6 +47,8 @@
   </div>
   {% elif _saved == "hub_created" %}
   <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Anfragen-Hub Channel erstellt.</div>
+  {% elif _saved == "channels_cleaned" %}
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Veraltete Kanal-Einträge wurden bereinigt.</div>
   {% elif _saved == "hub_cleared" %}
   <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🗑️ Anfragen-Hub entfernt.</div>
   {% elif _saved %}
@@ -110,17 +112,29 @@
   {% endif %}
 
   {% if perm_issues %}
+  {% set missing_perms = perm_issues | selectattr('missing') | list %}
+  {% set stale_channels = perm_issues | rejectattr('missing') | list %}
+  {% if missing_perms %}
   <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">
     ⚠️ <strong>Bot-Berechtigungen fehlen</strong> — der Bot hat in folgenden Channels nicht alle nötigen Rechte:
     <ul style="margin:0.5rem 0 0 1rem; padding:0;">
-      {% for issue in perm_issues %}
-      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>:
-        {% if issue.missing %}fehlende Rechte: {{ issue.missing | join(", ") }}{% else %}{{ issue.issue }}{% endif %}
-      </li>
+      {% for issue in missing_perms %}
+      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>: fehlende Rechte: {{ issue.missing | join(", ") }}</li>
       {% endfor %}
     </ul>
     Bitte gib dem Bot in diesen Channels die fehlenden Rechte zurück.
   </div>
+  {% endif %}
+  {% if stale_channels %}
+  <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#fbbf24; font-size:0.9rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+    <span>🗑️ <strong>Veraltete Kanal-Einträge</strong> — diese Channels existieren im Discord nicht mehr:
+      {% for issue in stale_channels %}<strong>#{{ issue.channel_id }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
+    </span>
+    <form method="post" action="/guild/{{ guild.guild_id }}/clear-stale-channels" style="margin:0;">
+      <button type="submit" class="btn" style="font-size:0.8rem;padding:0.3rem 0.75rem;border-color:rgba(245,158,11,0.5);color:#fbbf24;">🗑️ Einträge bereinigen</button>
+    </form>
+  </div>
+  {% endif %}
   {% endif %}
 
   <!-- ── Feature-Grid ── -->

@@ -3645,6 +3645,30 @@ async def clear_request_hub(guild_id: str):
         await db.commit()
 
 
+async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
+    """Remove DB references to Discord channels that no longer exist."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        # report_channels table
+        await db.execute(
+            f"DELETE FROM report_channels WHERE guild_id=? AND channel_id IN ({','.join('?'*len(stale_ids))})",
+            (guild_id, *stale_ids),
+        )
+        # request_hub table
+        await db.execute(
+            f"DELETE FROM request_hub WHERE guild_id=? AND channel_id IN ({','.join('?'*len(stale_ids))})",
+            (guild_id, *stale_ids),
+        )
+        # guild_configs: null out matching channel columns
+        for col in ("scout_channel_id", "res_request_channel_id", "attack_channel_id",
+                    "archive_channel_id", "res_push_channel_id", "poll_channel_id", "hero_scout_channel_id"):
+            for stale_id in stale_ids:
+                await db.execute(
+                    f"UPDATE guild_configs SET {col}=NULL WHERE guild_id=? AND {col}=?",
+                    (guild_id, stale_id),
+                )
+        await db.commit()
+
+
 async def get_defend_channels(guild_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
