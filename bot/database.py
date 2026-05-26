@@ -220,6 +220,43 @@ async def init_db():
                 pass
         await db.commit()
 
+    # Migrations: guild_configs extra columns
+    async with aiosqlite.connect(DB_PATH) as db:
+        for col in [
+            "subscription_status TEXT DEFAULT 'free'",
+            "subscription_plan TEXT",
+            "subscription_expires_at TEXT",
+            "stripe_customer_id TEXT",
+            "stripe_subscription_id TEXT",
+            "owner_discord_id TEXT",
+            "bot_status TEXT DEFAULT 'active'",
+            "bot_kicked_at TEXT",
+            "workspace_type TEXT DEFAULT 'discord'",
+            "workspace_owner_id TEXT",
+            "workspace_status TEXT DEFAULT 'active'",
+            "trial_expires_at TEXT",
+            "tw_world TEXT",
+            "poll_channel_id TEXT",
+            "hero_scout_channel_id TEXT",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
+        # trial_links table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS trial_links (
+                code                TEXT PRIMARY KEY,
+                created_by          TEXT NOT NULL,
+                created_at          TEXT NOT NULL,
+                activated_at        TEXT,
+                activated_guild_id  TEXT
+            )
+        """)
+        await db.commit()
+
     # Request Hub + Defend channels tables
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -1010,3 +1047,52 @@ async def close_defend_channel(channel_id: str):
         await db.execute(
             "UPDATE defend_channels SET status='closed' WHERE channel_id=?", (channel_id,))
         await db.commit()
+
+
+async def get_guild(guild_id: str) -> dict | None:
+    """Return guild_configs row for guild_id, or None."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def create_trial_link(code: str, created_by: str) -> str:
+    """Insert a new one-time trial link. Returns the code."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO trial_links (code, created_by, created_at) VALUES (?, ?, ?)",
+            (code, created_by, datetime.utcnow().isoformat()),
+        )
+        await db.commit()
+    return code
+
+
+async def activate_trial_link(code: str, guild_id: str, days: int = 14) -> bool:
+    """Mark the link used and set trial_expires_at on the guild. Returns False if already used."""
+    from datetime import timedelta
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM trial_links WHERE code=?", (code,)) as cur:
+            link = await cur.fetchone()
+        if not link or (link["activated_guild_id"] if "activated_guild_id" in link.keys() else None):
+            return False
+        expires = (datetime.utcnow() + timedelta(days=days)).isoformat()
+        now = datetime.utcnow().isoformat()
+        await db.execute(
+            "UPDATE trial_links SET activated_at=?, activated_guild_id=? WHERE code=?",
+            (now, guild_id, code),
+        )
+        await db.execute(
+            """UPDATE guild_configs SET
+                 trial_expires_at=?,
+                 subscription_status='trialing',
+                 subscription_plan='trial'
+               WHERE guild_id=?""",
+            (expires, guild_id),
+        )
+        await db.commit()
+    return True
