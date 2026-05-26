@@ -652,15 +652,22 @@ class PrivateChannelView(discord.ui.View):
 
 
 async def _get_or_create_private_category(guild: discord.Guild, lang: str) -> discord.CategoryChannel:
-    """Return or create the 'Private-Channels' category."""
+    """Return or create the 'Privat Channels' category.
+
+    The category itself is visible to everyone so members can see the channels
+    they personally have access to. Each individual channel has its own strict
+    overwrites (view_channel=False for @everyone), so only the owner and
+    explicitly granted members can see each channel inside.
+    """
     cat_name = t(lang, "private.category_name")
     for cat in guild.categories:
         if cat.name.lower() == cat_name.lower():
             return cat
-    # Create it — only the bot can see it by default; channels inherit overwrites
+    # Category visible to all (so members can find their own channels),
+    # but channels inside will deny @everyone individually.
     overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),
+        guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True, send_messages=True),
     }
     return await guild.create_category(cat_name, overwrites=overwrites)
 

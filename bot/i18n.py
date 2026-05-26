@@ -370,8 +370,8 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "✅ Your private channel has been created: {channel}",
     },
     "private.category_name": {
-        "de": "Private-Channels",
-        "en": "Private-Channels",
+        "de": "Privat Channels",
+        "en": "Private Channels",
     },
     "private.welcome_title": {
         "de": "🔒 Privater Channel — {user}",
