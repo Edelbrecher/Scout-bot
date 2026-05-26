@@ -167,7 +167,8 @@ _STRINGS: dict[str, dict[str, str]] = {
             "📡 **Permanent-Scout** — Dauerhaft Späher im eigenen Dorf stationieren\n"
             "🪖 **Res-Push** — Ressourcen anfordern\n"
             "🛡️ **Defend** — Verteidigung koordinieren\n"
-            "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren\n\n"
+            "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren\n"
+            "🔒 **Privater Channel** — Eigener permanenter Channel, nur für dich & die Leads\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━\n"
             "🗡️ **Helden-Scout** — Screenshots von Gegner-Helden in einem dedizierten Channel posten. "
             "Der Bot erkennt automatisch Ausrüstungswechsel & XP-Sprünge.\n"
@@ -180,7 +181,8 @@ _STRINGS: dict[str, dict[str, str]] = {
             "📡 **Permanent Scout** — Station scouts permanently in a village\n"
             "🪖 **Res Push** — Request resources\n"
             "🛡️ **Defend** — Coordinate defense\n"
-            "⏱️ **Timed Defend** — Coordinate timed defense\n\n"
+            "⏱️ **Timed Defend** — Coordinate timed defense\n"
+            "🔒 **Private Channel** — Your own permanent channel, visible only to you & the leads\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━\n"
             "🗡️ **Hero Scout** — Post enemy hero screenshots in a dedicated channel. "
             "The bot automatically detects equipment changes & XP jumps.\n"
@@ -356,6 +358,92 @@ _STRINGS: dict[str, dict[str, str]] = {
     "hub.scout.new_request": {
         "de": "Scout-Anfrage von {user}",
         "en": "Scout request from {user}",
+    },
+
+    # ── Private Channel ───────────────────────────────────────────────────────
+    "private.already_exists": {
+        "de": "📌 Du hast bereits einen privaten Channel: {channel}",
+        "en": "📌 You already have a private channel: {channel}",
+    },
+    "private.created": {
+        "de": "✅ Dein privater Channel wurde erstellt: {channel}",
+        "en": "✅ Your private channel has been created: {channel}",
+    },
+    "private.category_name": {
+        "de": "Private-Channels",
+        "en": "Private-Channels",
+    },
+    "private.welcome_title": {
+        "de": "🔒 Privater Channel — {user}",
+        "en": "🔒 Private Channel — {user}",
+    },
+    "private.welcome_desc": {
+        "de": (
+            "Dies ist dein persönlicher privater Channel.\n"
+            "Nur du, die Leads und von dir freigegebene Mitglieder haben Zugriff.\n\n"
+            "Nutze den Button unten um anderen Spielern Zugriff zu gewähren."
+        ),
+        "en": (
+            "This is your personal private channel.\n"
+            "Only you, the leads and members you grant access to can see it.\n\n"
+            "Use the button below to grant other players access."
+        ),
+    },
+    "private.btn.grant": {
+        "de": "➕ Zugriff gewähren",
+        "en": "➕ Grant Access",
+    },
+    "private.btn.revoke": {
+        "de": "➖ Zugriff entziehen",
+        "en": "➖ Revoke Access",
+    },
+    "private.grant.modal_title": {
+        "de": "Zugriff gewähren",
+        "en": "Grant Access",
+    },
+    "private.grant.field_label": {
+        "de": "Spieler-Name oder @Mention",
+        "en": "Player Name or @Mention",
+    },
+    "private.grant.field_placeholder": {
+        "de": "z.B. Currax oder @Currax",
+        "en": "e.g. Currax or @Currax",
+    },
+    "private.grant.not_owner": {
+        "de": "⚠️ Nur der Channel-Besitzer kann Zugriff gewähren.",
+        "en": "⚠️ Only the channel owner can grant access.",
+    },
+    "private.grant.not_found": {
+        "de": "❌ Mitglied `{name}` nicht gefunden. Bitte den genauen Nicknamen oder eine @Erwähnung verwenden.",
+        "en": "❌ Member `{name}` not found. Please use the exact nickname or an @mention.",
+    },
+    "private.grant.success": {
+        "de": "✅ {mention} hat jetzt Zugriff auf diesen Channel.",
+        "en": "✅ {mention} now has access to this channel.",
+    },
+    "private.grant.already": {
+        "de": "ℹ️ {mention} hat bereits Zugriff.",
+        "en": "ℹ️ {mention} already has access.",
+    },
+    "private.revoke.not_owner": {
+        "de": "⚠️ Nur der Channel-Besitzer kann Zugriff entziehen.",
+        "en": "⚠️ Only the channel owner can revoke access.",
+    },
+    "private.revoke.modal_title": {
+        "de": "Zugriff entziehen",
+        "en": "Revoke Access",
+    },
+    "private.revoke.field_label": {
+        "de": "Spieler-Name oder @Mention",
+        "en": "Player Name or @Mention",
+    },
+    "private.revoke.not_found": {
+        "de": "❌ Mitglied `{name}` nicht gefunden.",
+        "en": "❌ Member `{name}` not found.",
+    },
+    "private.revoke.success": {
+        "de": "✅ Zugriff für {mention} wurde entzogen.",
+        "en": "✅ Access revoked for {mention}.",
     },
 
     # ── Report channel welcome ────────────────────────────────────────────────

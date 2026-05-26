@@ -205,6 +205,18 @@ async def init_db():
         """)
         await db.commit()
 
+        # Private channels (one per user per guild)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS private_channels (
+                channel_id  TEXT PRIMARY KEY,
+                guild_id    TEXT NOT NULL,
+                owner_id    TEXT NOT NULL,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(guild_id, owner_id)
+            )
+        """)
+        await db.commit()
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS referral_events (
                 id                    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4367,3 +4379,47 @@ async def upsert_guild_name(guild_id: str, guild_name: str, owner_discord_id: st
                 owner_discord_id = COALESCE(guild_configs.owner_discord_id, excluded.owner_discord_id)
         """, (guild_id, guild_name, owner_discord_id))
         await db.commit()
+
+
+# ── Private Channels ─────────────────────────────────────────────────────────
+
+async def get_private_channel(guild_id: str, owner_id: str) -> dict | None:
+    """Return the private channel record for a user, or None."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM private_channels WHERE guild_id = ? AND owner_id = ?",
+            (guild_id, owner_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def set_private_channel(guild_id: str, owner_id: str, channel_id: str):
+    """Insert or replace a private channel record."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO private_channels (channel_id, guild_id, owner_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(guild_id, owner_id) DO UPDATE SET channel_id = excluded.channel_id
+        """, (channel_id, guild_id, owner_id))
+        await db.commit()
+
+
+async def delete_private_channel_by_id(channel_id: str):
+    """Remove a private channel record when the channel is deleted."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM private_channels WHERE channel_id = ?", (channel_id,))
+        await db.commit()
+
+
+async def get_private_channel_by_channel_id(channel_id: str) -> dict | None:
+    """Return the private channel record by channel_id."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM private_channels WHERE channel_id = ?",
+            (channel_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None

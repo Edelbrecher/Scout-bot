@@ -395,7 +395,154 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
 
 
 # ---------------------------------------------------------------------------
-# Request Hub View (6 buttons, persistent)
+# Private Channel — Grant / Revoke Access
+# ---------------------------------------------------------------------------
+
+def _find_member(guild: discord.Guild, name: str) -> discord.Member | None:
+    """Find a guild member by display name, username, or bare <@id> mention."""
+    name = name.strip()
+    # Bare mention: <@123456> or <@!123456>
+    m = re.match(r"<@!?(\d+)>", name)
+    if m:
+        return guild.get_member(int(m.group(1)))
+    # Exact match on display name or global name
+    low = name.lower()
+    for member in guild.members:
+        if member.display_name.lower() == low or member.name.lower() == low:
+            return member
+    # Partial fallback
+    for member in guild.members:
+        if low in member.display_name.lower() or low in member.name.lower():
+            return member
+    return None
+
+
+class GrantAccessModal(discord.ui.Modal):
+    name_input = discord.ui.TextInput(
+        label="Spieler-Name oder @Mention",
+        placeholder="z.B. Currax oder @Currax",
+        max_length=100,
+    )
+
+    def __init__(self, lang: str = "de"):
+        super().__init__(title="Zugriff gewähren" if lang == "de" else "Grant Access")
+        self.lang = lang
+        self.name_input.label = t(lang, "private.grant.field_label")
+        self.name_input.placeholder = t(lang, "private.grant.field_placeholder")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        lang = self.lang
+        # Only the channel owner may grant access (owner_id stored as channel topic metadata)
+        rec = await database.get_private_channel_by_channel_id(str(interaction.channel.id))
+        if not rec or str(interaction.user.id) != rec["owner_id"]:
+            await interaction.response.send_message(t(lang, "private.grant.not_owner"), ephemeral=True)
+            return
+
+        member = _find_member(guild, self.name_input.value)
+        if not member:
+            await interaction.response.send_message(
+                t(lang, "private.grant.not_found", name=self.name_input.value), ephemeral=True
+            )
+            return
+
+        # Check existing perms
+        overwrite = interaction.channel.overwrites_for(member)
+        if overwrite.view_channel is True:
+            await interaction.response.send_message(
+                t(lang, "private.grant.already", mention=member.mention), ephemeral=True
+            )
+            return
+
+        await interaction.channel.set_permissions(member, view_channel=True, send_messages=True)
+        await interaction.response.send_message(
+            t(lang, "private.grant.success", mention=member.mention)
+        )
+
+
+class RevokeAccessModal(discord.ui.Modal):
+    name_input = discord.ui.TextInput(
+        label="Spieler-Name oder @Mention",
+        placeholder="z.B. Currax oder @Currax",
+        max_length=100,
+    )
+
+    def __init__(self, lang: str = "de"):
+        super().__init__(title="Zugriff entziehen" if lang == "de" else "Revoke Access")
+        self.lang = lang
+        self.name_input.label = t(lang, "private.revoke.field_label")
+        self.name_input.placeholder = t(lang, "private.grant.field_placeholder")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        lang = self.lang
+        rec = await database.get_private_channel_by_channel_id(str(interaction.channel.id))
+        if not rec or str(interaction.user.id) != rec["owner_id"]:
+            await interaction.response.send_message(t(lang, "private.revoke.not_owner"), ephemeral=True)
+            return
+
+        member = _find_member(guild, self.name_input.value)
+        if not member:
+            await interaction.response.send_message(
+                t(lang, "private.revoke.not_found", name=self.name_input.value), ephemeral=True
+            )
+            return
+
+        await interaction.channel.set_permissions(member, overwrite=None)
+        await interaction.response.send_message(
+            t(lang, "private.revoke.success", mention=member.mention)
+        )
+
+
+class PrivateChannelView(discord.ui.View):
+    """Persistent view pinned in a private channel — owner can grant/revoke access."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="➕ Zugriff gewähren",
+        style=discord.ButtonStyle.success,
+        custom_id="persistent:private_grant",
+    )
+    async def grant_access(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
+        rec = await database.get_private_channel_by_channel_id(str(interaction.channel.id))
+        if not rec or str(interaction.user.id) != rec["owner_id"]:
+            await interaction.response.send_message(t(lang, "private.grant.not_owner"), ephemeral=True)
+            return
+        await interaction.response.send_modal(GrantAccessModal(lang=lang))
+
+    @discord.ui.button(
+        label="➖ Zugriff entziehen",
+        style=discord.ButtonStyle.danger,
+        custom_id="persistent:private_revoke",
+    )
+    async def revoke_access(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
+        rec = await database.get_private_channel_by_channel_id(str(interaction.channel.id))
+        if not rec or str(interaction.user.id) != rec["owner_id"]:
+            await interaction.response.send_message(t(lang, "private.revoke.not_owner"), ephemeral=True)
+            return
+        await interaction.response.send_modal(RevokeAccessModal(lang=lang))
+
+
+async def _get_or_create_private_category(guild: discord.Guild, lang: str) -> discord.CategoryChannel:
+    """Return or create the 'Private-Channels' category."""
+    cat_name = t(lang, "private.category_name")
+    for cat in guild.categories:
+        if cat.name.lower() == cat_name.lower():
+            return cat
+    # Create it — only the bot can see it by default; channels inherit overwrites
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),
+    }
+    return await guild.create_category(cat_name, overwrites=overwrites)
+
+
+# ---------------------------------------------------------------------------
+# Request Hub View (7 buttons, persistent)
 # ---------------------------------------------------------------------------
 
 class RequestHubView(discord.ui.View):
@@ -450,6 +597,96 @@ class RequestHubView(discord.ui.View):
     async def hub_timed_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TimedDefendModal())
 
+    @discord.ui.button(
+        label="Privater Channel", emoji="🔒", style=discord.ButtonStyle.secondary,
+        custom_id="persistent:hub_private_channel", row=2,
+    )
+    async def hub_private_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await require_premium(interaction):
+            return
+        guild = interaction.guild
+        lang = await get_guild_lang(str(guild.id))
+
+        # Check if the user already has a private channel
+        existing = await database.get_private_channel(str(guild.id), str(interaction.user.id))
+        if existing:
+            ch = guild.get_channel(int(existing["channel_id"]))
+            if ch:
+                await interaction.response.send_message(
+                    t(lang, "private.already_exists", channel=ch.mention), ephemeral=True
+                )
+                return
+            # Channel was deleted externally — clean up and recreate
+            await database.delete_private_channel_by_id(existing["channel_id"])
+
+        config = await database.get_guild_config(str(guild.id))
+        await interaction.response.defer(ephemeral=True)
+
+        # Get or create Private-Channels category
+        try:
+            category = await _get_or_create_private_category(guild, lang)
+        except Exception as e:
+            await interaction.followup.send(f"⚠️ Kategorie konnte nicht erstellt werden: {e}", ephemeral=True)
+            return
+
+        # Build permission overwrites
+        overwrites: dict = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True,
+                embed_links=True, manage_channels=True,
+            ),
+            interaction.user: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, attach_files=True,
+            ),
+        }
+        # Grant access to all configured allowed roles
+        for role_id_str in ((config or {}).get("allowed_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = guild.get_role(int(role_id_str))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, attach_files=True,
+                )
+
+        channel_name = f"private-{_safe(interaction.user.display_name)}"[:100]
+        try:
+            new_channel = await guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                topic=f"private:{interaction.user.id}",
+                overwrites=overwrites,
+            )
+        except Exception as e:
+            await interaction.followup.send(f"⚠️ Channel konnte nicht erstellt werden: {e}", ephemeral=True)
+            return
+
+        # Save to DB
+        await database.set_private_channel(str(guild.id), str(interaction.user.id), str(new_channel.id))
+
+        # Post welcome embed with grant/revoke buttons
+        embed = discord.Embed(
+            title=t(lang, "private.welcome_title", user=interaction.user.display_name),
+            description=t(lang, "private.welcome_desc"),
+            color=discord.Color.from_rgb(124, 58, 237),
+        )
+        embed.set_footer(**travops_footer(interaction.user.display_name))
+        msg = await new_channel.send(
+            content=interaction.user.mention,
+            embed=embed,
+            view=PrivateChannelView(),
+        )
+        try:
+            await msg.pin()
+        except Exception:
+            pass
+
+        await interaction.followup.send(
+            t(lang, "private.created", channel=new_channel.mention), ephemeral=True
+        )
+
 
 # ---------------------------------------------------------------------------
 # Hub Cog
@@ -461,17 +698,18 @@ class Hub(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
-        """Mark defend channel as closed when deleted in Discord."""
+        """Mark defend/private channel as closed when deleted in Discord."""
         await database.close_defend_channel(str(channel.id))
+        await database.delete_private_channel_by_id(str(channel.id))
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Restore persistent hub views on startup."""
-        # The views are registered globally via setup(), nothing else needed
-        print("[hub] RequestHubView registered.", flush=True)
+        print("[hub] RequestHubView + PrivateChannelView registered.", flush=True)
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Hub(bot))
     bot.add_view(RequestHubView())
     bot.add_view(DefendCloseView())
+    bot.add_view(PrivateChannelView())
