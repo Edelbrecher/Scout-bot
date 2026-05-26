@@ -2558,14 +2558,14 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
             await db.execute("""
                 UPDATE guild_own_villages_history
                 SET total_off = ?, total_def = ?, total_crop = ?,
-                    village_count = ?, uploaded_by = ?, uploaded_at = datetime('now')
+                    village_count = ?, uploaded_by = ?, uploaded_at = date('now')
                 WHERE id = ?
             """, (total_off, total_def, total_crop, len(villages), uploaded_by, existing[0]))
         else:
             await db.execute("""
                 INSERT INTO guild_own_villages_history
                     (guild_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
-                VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
+                VALUES (?, date('now'), ?, ?, ?, ?, ?)
             """, (guild_id, total_off, total_def, total_crop, len(villages), uploaded_by))
         await db.commit()
 
