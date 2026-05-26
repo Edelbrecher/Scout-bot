@@ -1,3 +1,4 @@
+from utils import travops_footer
 import asyncio
 import re
 import discord
@@ -64,7 +65,7 @@ def _build_request_embed(data: dict, status: str) -> discord.Embed:
     if data.get("reason"):
         embed.add_field(name="Reason", value=data["reason"], inline=False)
     embed.add_field(name="Status", value=status_labels.get(status, status), inline=False)
-    embed.set_footer(text=f"Requested by {data['user_name']} • {data['created_at'][:16]}")
+    embed.set_footer(**travops_footer(f"Requested by {data['user_name']} • {data['created_at'][:16]}"))
     return embed
 
 
@@ -99,7 +100,7 @@ def _build_push_embed(data: dict, contributions: list[dict], status: str = "acti
             for c in contributions[-10:]
         )
         embed.add_field(name="Contributions", value=contrib_lines, inline=False)
-    embed.set_footer(text=f"Requested by {data['user_name']}")
+    embed.set_footer(**travops_footer(f"Requested by {data['user_name']}"))
     return embed
 
 

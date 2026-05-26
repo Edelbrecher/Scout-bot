@@ -133,6 +133,32 @@ class ScouterBot(commands.Bot):
         await database.set_bot_active(str(guild.id))
         print(f"Joined guild: {guild.name} ({guild.id})")
 
+        # ── Auto-Trial: 7 days for new guilds without any subscription ──
+        existing = await database.get_guild(str(guild.id))
+        existing_status = (existing or {}).get("subscription_status", "free") if existing else "free"
+        if existing_status in ("free", None, ""):
+            import secrets as _sec
+            trial_code = _sec.token_urlsafe(10)
+            await database.create_trial_link(code=trial_code, created_by="auto-bot-invite")
+            activated = await database.activate_trial_link(trial_code, str(guild.id), days=7)
+            if activated:
+                print(f"[on_guild_join] Auto-trial activated for {guild.name} ({guild.id})")
+                try:
+                    owner = guild.owner or await self.fetch_user(guild.owner_id)
+                    if owner:
+                        await owner.send(
+                            f"🎉 **Willkommen bei TravOps, {guild.name}!**\n\n"
+                            f"Du hast automatisch **7 Tage vollen Pro-Zugang** erhalten — "
+                            f"kein Kreditkarte, kein Abo nötig.\n\n"
+                            f"**Was jetzt?**\n"
+                            f"➡️ Richte deinen Server unter https://travops.online/dashboard ein\n"
+                            f"➡️ Alle Features freischalten: https://travops.online/plans\n\n"
+                            f"_Dein Trial endet in 7 Tagen automatisch — danach kannst du "
+                            f"auf ein Pro-Paket upgraden oder mit dem kostenlosen Plan weitermachen._"
+                        )
+                except Exception as dm_err:
+                    print(f"[on_guild_join] Could not DM owner for trial: {dm_err}")
+
     async def on_guild_remove(self, guild: discord.Guild):
         """Bot was kicked or left a guild — mark as kicked in DB."""
         await database.set_bot_kicked(str(guild.id))

@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import database
-from utils import require_premium
+from utils import require_premium, travops_footer
 
 # ---------------------------------------------------------------------------
 # Travian Scout-Report Parser
@@ -615,7 +615,7 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             embed.add_field(name="🌾🌾 Kornspäh", value="Ja", inline=True)
         if self.additional_info.value:
             embed.add_field(name="Additional Info", value=self.additional_info.value, inline=False)
-        embed.set_footer(text=f"Requested by {interaction.user.display_name}")
+        embed.set_footer(**travops_footer(f"Requested by {interaction.user.display_name}"))
 
         await new_channel.send(
             content=f"New scout request from {interaction.user.mention}",

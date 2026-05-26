@@ -12,7 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import database
-from utils import require_premium
+from utils import require_premium, travops_footer
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
         embed.add_field(name="Bis wann", value=self.time.value, inline=True)
         if self.additional_info.value:
             embed.add_field(name="Infos", value=self.additional_info.value, inline=False)
-        embed.set_footer(text=f"Angefragt von {interaction.user.display_name}")
+        embed.set_footer(**travops_footer(f"Angefragt von {interaction.user.display_name}"))
 
         from cogs.scout import ScoutActionView
         await new_channel.send(
@@ -240,7 +240,7 @@ async def _create_defend_channel(
         embed.add_field(name="Größe", value=size, inline=True)
     if notes:
         embed.add_field(name="Notizen", value=notes, inline=False)
-    embed.set_footer(text=f"Gemeldet von {interaction.user.display_name}")
+    embed.set_footer(**travops_footer(f"Gemeldet von {interaction.user.display_name}"))
 
     await new_channel.send(
         content=f"🚨 {interaction.user.mention} — {'Timed-' if timed else ''}Defend-Anfrage!",
@@ -384,7 +384,7 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
         embed.add_field(name="Benötigt", value=self.resources.value, inline=False)
         if self.notes.value:
             embed.add_field(name="Notizen", value=self.notes.value, inline=False)
-        embed.set_footer(text=f"Angefragt von {interaction.user.display_name}")
+        embed.set_footer(**travops_footer(f"Angefragt von {interaction.user.display_name}"))
 
         await new_channel.send(content=f"🪖 {interaction.user.mention}", embed=embed)
         await interaction.followup.send(f"✅ Res-Push Channel erstellt: {new_channel.mention}", ephemeral=True)

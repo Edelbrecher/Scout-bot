@@ -4048,8 +4048,8 @@ async def get_trial_link(code: str) -> dict | None:
             return dict(row) if row else None
 
 
-async def activate_trial_link(code: str, guild_id: str) -> bool:
-    """Mark the link used and set trial_expires_at (+14 days) on the guild. Returns False if already used."""
+async def activate_trial_link(code: str, guild_id: str, days: int = 14) -> bool:
+    """Mark the link used and set trial_expires_at (+days) on the guild. Returns False if already used."""
     from datetime import datetime as _dt, timedelta as _td
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -4057,7 +4057,7 @@ async def activate_trial_link(code: str, guild_id: str) -> bool:
             link = await cur.fetchone()
         if not link or link["activated_guild_id"]:
             return False
-        expires = (_dt.utcnow() + _td(days=14)).isoformat()
+        expires = (_dt.utcnow() + _td(days=days)).isoformat()
         now = _dt.utcnow().isoformat()
         await db.execute(
             "UPDATE trial_links SET activated_at=?, activated_guild_id=? WHERE code=?",
@@ -4247,3 +4247,15 @@ async def redeem_travops_points(discord_user_id: str) -> bool:
         )
         await db.commit()
     return True
+
+
+async def get_scout_report_by_id(report_id: int, guild_id: str) -> dict | None:
+    """Return a single scout report row, verified to belong to guild_id."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM scout_reports WHERE id=? AND guild_id=?",
+            (report_id, guild_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None

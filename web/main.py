@@ -1684,6 +1684,26 @@ async def scout_channel_detail(request: Request, guild_id: str, channel_id: str)
     return JSONResponse({"ch": dict(ch), "reports": reports})
 
 
+@app.get("/guild/{guild_id}/scout/report/{report_id}/card")
+async def scout_share_card(request: Request, guild_id: str, report_id: int):
+    """Return a PNG share card for a single scout report."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    report = await database.get_scout_report_by_id(report_id, guild_id)
+    if not report:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    try:
+        from scout_card import generate_scout_card
+        png_bytes = generate_scout_card(report)
+        from fastapi.responses import Response as _Resp
+        return _Resp(content=png_bytes, media_type="image/png",
+                     headers={"Content-Disposition": f'attachment; filename="scout_{report_id}.png"'})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/guild/{guild_id}/scout/stats", response_class=HTMLResponse)
 async def scout_stats_page(request: Request, guild_id: str):
     session, err = _require_session(request)
@@ -2289,6 +2309,17 @@ async def plans_cancel(request: Request):
 # ---------------------------------------------------------------------------
 # Routes — Plans (subscribe without a server)
 # ---------------------------------------------------------------------------
+
+@app.get("/fuer-allianz-leader", response_class=HTMLResponse)
+async def alliance_leader_page(request: Request):
+    """Dedicated landing page for alliance leaders."""
+    session = _get_session(request)
+    return templates.TemplateResponse("alliance_leader.html", {
+        "request": request,
+        "session": session,
+        "base_url": str(request.base_url).rstrip("/"),
+    })
+
 
 @app.get("/plans", response_class=HTMLResponse)
 async def plans_page(request: Request, error: str = "", cancelled: str = ""):

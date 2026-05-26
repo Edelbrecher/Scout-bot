@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 import database
-from utils import require_premium, PREMIUM_STATUSES
+from utils import require_premium, PREMIUM_STATUSES, travops_footer
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
             )
             embed.add_field(name="Gemeldet von", value=interaction.user.mention, inline=True)
             embed.add_field(name="Anzahl Angriffe", value=str(len(attacks)), inline=True)
-            embed.set_footer(text=f"Report ID: {report_id}")
+            embed.set_footer(**travops_footer(f"Report ID: {report_id}"))
 
             TYPE_EMOJI = {"raid": "🪖", "attack": "⚔️", "reinforce": "🛡️", "spy": "🕵️", "settle": "🏘️"}
             for i, atk in enumerate(attacks[:10], 1):

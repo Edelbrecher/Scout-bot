@@ -303,6 +303,15 @@ function renderDetail(data) {
       html += `<div style="margin-top:0.4rem;font-size:0.78rem;color:#f59e0b;">⭐ Erfahrung: ${r.experience}</div>`;
     }
 
+    // Share button
+    html += `<div style="margin-top:0.6rem;text-align:right;">
+      <a href="/guild/${guildId}/scout/report/${r.id}/card" target="_blank"
+         style="font-size:0.75rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;padding:0.25rem 0.65rem;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;"
+         title="Scout-Karte als PNG herunterladen &amp; teilen">
+        📤 Teilen
+      </a>
+    </div>`;
+
     html += `</div>`;
   }
   return html;

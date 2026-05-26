@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 
 import database
-from utils import PREMIUM_STATUSES
+from utils import PREMIUM_STATUSES, travops_footer
 
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
@@ -69,7 +69,7 @@ class Archiver(commands.Cog):
             embed.add_field(name="Channel", value=message.channel.mention, inline=True)
         else:
             embed.description = f"📁 From {message.channel.mention} · by {message.author.mention}"
-        embed.set_footer(text=f"Requested {scout['created_at'][:16] if scout else ''} · Jump → {message.jump_url}")
+        embed.set_footer(**travops_footer(f"Requested {scout['created_at'][:16] if scout else ''} · Jump → {message.jump_url}"))
 
         files = []
         for attachment in images:

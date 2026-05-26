@@ -15,3 +15,18 @@ async def require_premium(interaction) -> bool:
         )
         return False
     return True
+
+
+# ── TravOps Branding ──────────────────────────────────────────────────────────
+
+TRAVOPS_FOOTER_ICON = "https://travops.online/static/img/logo32.png"
+TRAVOPS_FOOTER_SUFFIX = " · travops.online"
+
+
+def travops_footer(text: str = "") -> dict:
+    """Return kwargs for embed.set_footer() with TravOps branding appended."""
+    combined = (text + TRAVOPS_FOOTER_SUFFIX).strip(" ·")
+    # Ensure suffix is always at end, clean up double ·
+    if not combined.endswith("travops.online"):
+        combined = combined + TRAVOPS_FOOTER_SUFFIX
+    return {"text": combined, "icon_url": TRAVOPS_FOOTER_ICON}

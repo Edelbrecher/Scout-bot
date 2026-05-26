@@ -1,3 +1,4 @@
+from utils import travops_footer
 """
 hero_scout.py — Scannt Helden-Screenshots aus Discord und speichert die Daten.
 
@@ -642,7 +643,7 @@ class HeroScoutCog(commands.Cog):
         # Item-Erkennung via pHash deaktiviert (Library-Aufbau nicht zuverlässig)
         # Items werden manuell im Dashboard zugewiesen
 
-        confirm_embed.set_footer(text=f"Gemeldet von {reporter_name}")
+        confirm_embed.set_footer(**travops_footer(f"Gemeldet von {reporter_name}"))
 
         try:
             await message.reply(embed=confirm_embed, mention_author=False)
@@ -674,7 +675,7 @@ class HeroScoutCog(commands.Cog):
                     value=f"{data['hero_xp']:,}",
                     inline=True,
                 )
-            warn_embed.set_footer(text=f"Screenshot von {reporter_name} · {server_time}")
+            warn_embed.set_footer(**travops_footer(f"Screenshot von {reporter_name} · {server_time}"))
 
             try:
                 await message.channel.send(embed=warn_embed)
