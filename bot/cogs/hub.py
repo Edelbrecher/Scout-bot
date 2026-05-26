@@ -364,34 +364,66 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
     notes = discord.ui.TextInput(label="Weitere Infos", required=False, style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
+        from cogs.res_push import ResAnswerView, _build_request_embed
+        from datetime import datetime
+
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
-        config, category = await _get_config_and_category(guild)
-        if not config or not category:
-            await interaction.response.send_message(t(lang, "not_configured"), ephemeral=True)
+        config = await database.get_guild_config(str(guild.id))
+
+        if not config or not config.get("res_answer_channel_id"):
+            await interaction.response.send_message(
+                "⚠️ Res-Push ist nicht konfiguriert. Bitte den Admin bitten, den Answer-Channel im Dashboard einzustellen."
+                if lang == "de" else
+                "⚠️ Res-Push is not configured. Please ask an admin to set up the answer channel in the dashboard.",
+                ephemeral=True,
+            )
             return
 
         await interaction.response.defer(ephemeral=True)
 
-        channel_name = f"res-push-{_safe(interaction.user.display_name)}"[:100]
-        overwrites = _build_overwrites(guild, config, interaction.user)
-        new_channel = await guild.create_text_channel(
-            name=channel_name, category=category,
-            topic=f"Res-Push: {interaction.user.display_name}: {self.resources.value[:80]}",
-            overwrites=overwrites,
+        answer_channel = guild.get_channel(int(config["res_answer_channel_id"]))
+        if not answer_channel:
+            await interaction.followup.send("⚠️ Answer-Channel nicht gefunden." if lang == "de" else "⚠️ Answer channel not found.", ephemeral=True)
+            return
+
+        data = {
+            "player_name": interaction.user.display_name,
+            "coordinates": self.village.value,
+            "push_height": self.resources.value,
+            "reason": (f"Bis wann: {self.until.value}" + (f"\n{self.notes.value}" if self.notes.value else ""))
+                      if lang == "de" else
+                      (f"Until: {self.until.value}" + (f"\n{self.notes.value}" if self.notes.value else "")),
+            "user_name": interaction.user.display_name,
+            "user_id": str(interaction.user.id),
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+        embed = _build_request_embed(data, "pending")
+        content = (
+            f"🪖 Neue Res-Push Anfrage von {interaction.user.mention}"
+            if lang == "de" else
+            f"🪖 New res-push request from {interaction.user.mention}"
+        )
+        msg = await answer_channel.send(content=content, embed=embed, view=ResAnswerView())
+
+        await database.add_res_request(
+            guild_id=str(guild.id),
+            answer_message_id=str(msg.id),
+            user_id=data["user_id"],
+            user_name=data["user_name"],
+            player_name=data["player_name"],
+            coordinates=data["coordinates"],
+            push_height=data["push_height"],
+            reason=data["reason"],
         )
 
-        embed = discord.Embed(title=t(lang, "res_push.title"), color=discord.Color.orange())
-        embed.add_field(name=t(lang, "res_push.field.recipient"), value=interaction.user.mention, inline=True)
-        embed.add_field(name=t(lang, "res_push.field.village"), value=self.village.value, inline=True)
-        embed.add_field(name=t(lang, "res_push.field.until"), value=self.until.value, inline=True)
-        embed.add_field(name=t(lang, "res_push.field.needed"), value=self.resources.value, inline=False)
-        if self.notes.value:
-            embed.add_field(name=t(lang, "res_push.field.notes"), value=self.notes.value, inline=False)
-        embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
-
-        await new_channel.send(content=f"🪖 {interaction.user.mention}", embed=embed)
-        await interaction.followup.send(t(lang, "res_push.channel_created", channel=new_channel.mention), ephemeral=True)
+        await interaction.followup.send(
+            "✅ Deine Res-Push Anfrage wurde eingereicht! Ein Admin wird sie in Kürze bearbeiten."
+            if lang == "de" else
+            "✅ Your res-push request has been submitted! An admin will process it shortly.",
+            ephemeral=True,
+        )
 
 
 # ---------------------------------------------------------------------------
