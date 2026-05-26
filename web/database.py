@@ -2548,12 +2548,25 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
                 v.get("priority", 0),
                 uploaded_by,
             ))
-        # Record history snapshot
-        await db.execute("""
-            INSERT INTO guild_own_villages_history
-                (guild_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
-            VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
-        """, (guild_id, total_off, total_def, total_crop, len(villages), uploaded_by))
+        # Record history snapshot — update today's entry if it already exists
+        async with db.execute("""
+            SELECT id FROM guild_own_villages_history
+            WHERE guild_id = ? AND date(uploaded_at) = date('now')
+        """, (guild_id,)) as cur:
+            existing = await cur.fetchone()
+        if existing:
+            await db.execute("""
+                UPDATE guild_own_villages_history
+                SET total_off = ?, total_def = ?, total_crop = ?,
+                    village_count = ?, uploaded_by = ?, uploaded_at = datetime('now')
+                WHERE id = ?
+            """, (total_off, total_def, total_crop, len(villages), uploaded_by, existing[0]))
+        else:
+            await db.execute("""
+                INSERT INTO guild_own_villages_history
+                    (guild_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
+                VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
+            """, (guild_id, total_off, total_def, total_crop, len(villages), uploaded_by))
         await db.commit()
 
 
