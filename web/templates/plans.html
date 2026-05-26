@@ -3,189 +3,199 @@
 
 {% block content %}
 <style>
-/* ── Hero ── */
 .plans-hero {
   text-align: center;
-  padding: 3rem 1rem 1.5rem;
+  padding: 2.5rem 1rem 1.25rem;
 }
 .plans-hero h1 {
-  font-size: 2.6rem;
-  font-weight: 900;
-  margin: 0 0 0.6rem;
+  font-size: 2.4rem; font-weight: 900; margin: 0 0 0.5rem;
   background: linear-gradient(135deg, #e2e8f0 30%, #94a3b8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
-/* ── Toggle ── */
 .billing-toggle {
   display: inline-flex;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 30px;
-  padding: 4px;
-  gap: 4px;
+  padding: 4px; gap: 4px;
 }
 .toggle-btn {
-  padding: 0.45rem 1.5rem;
-  border-radius: 24px;
-  border: none;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-  transition: all 0.15s;
+  padding: 0.45rem 1.5rem; border-radius: 24px; border: none;
+  cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.15s;
 }
-/* ── Cards ── */
-.plan-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-  margin: 0 0 2rem;
-  align-items: start;
-}
-.plan-card {
+
+/* ── Player Pro Hero Card ── */
+.pp-hero-card {
   position: relative;
-  border-radius: 16px;
-  padding: 1.5rem 1.25rem;
+  background: linear-gradient(120deg, #1e1040 0%, #0f172a 45%, #1a0a2e 100%);
+  border: 2px solid #7c3aed;
+  border-radius: 18px;
+  padding: 2rem 2.5rem;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 2rem;
+  align-items: center;
+}
+.pp-hero-card::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 280px; height: 280px;
+  background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.pp-solo-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: rgba(124,58,237,0.18); border: 1px solid rgba(124,58,237,0.4);
+  border-radius: 20px; padding: 0.25rem 0.9rem;
+  font-size: 0.72rem; font-weight: 700; color: #c4b5fd;
+  margin-bottom: 0.5rem;
+}
+.pp-feat-chips {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem;
+}
+.pp-chip {
+  background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.25);
+  border-radius: 8px; padding: 0.25rem 0.65rem;
+  font-size: 0.75rem; color: #c4b5fd; white-space: nowrap;
+}
+.pp-price-box { text-align: center; }
+.pp-cta-box { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; min-width: 180px; }
+.pp-cta-btn {
+  display: block; width: 100%;
+  padding: 0.85rem 1.5rem;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border: none; border-radius: 11px;
+  color: #fff; font-size: 0.95rem; font-weight: 700;
+  cursor: pointer; text-align: center; text-decoration: none;
+  box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.pp-cta-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ── Tier Cards ── */
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: stretch;
+}
+.tier-card {
+  position: relative;
+  border-radius: 14px;
+  padding: 1.35rem 1.1rem 1.25rem;
   border: 2px solid var(--border);
   background: var(--bg-card);
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-  cursor: default;
+  display: flex; flex-direction: column;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.plan-card:hover { transform: translateY(-3px); }
-.plan-card.highlight {
+.tier-card:hover { transform: translateY(-3px); }
+.tier-card.popular {
   border-color: #f59e0b;
   background: linear-gradient(160deg, var(--bg-card), #1c1500);
 }
-.plan-card.player-pro {
-  border-color: #7c3aed;
-  background: linear-gradient(160deg, var(--bg-card), #1a0a2e);
-}
 .popular-badge {
-  position: absolute;
-  top: -13px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
   background: #f59e0b; color: #000;
-  font-size: 0.68rem; font-weight: 900;
-  padding: 2px 14px; border-radius: 10px;
-  white-space: nowrap; letter-spacing: .04em;
+  font-size: 0.66rem; font-weight: 900;
+  padding: 2px 13px; border-radius: 10px; white-space: nowrap;
 }
 .trial-badge {
-  position: absolute;
-  top: 12px; right: 12px;
+  position: absolute; top: 10px; right: 10px;
   background: #16a34a; color: #fff;
-  font-size: 0.64rem; font-weight: 700;
-  padding: 2px 8px; border-radius: 6px;
+  font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 6px;
 }
-.plan-icon-wrap {
-  width: 44px; height: 44px;
-  border-radius: 11px;
+.tier-icon {
+  width: 40px; height: 40px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.3rem;
-  margin-bottom: 0.85rem;
+  font-size: 1.2rem; margin-bottom: 0.7rem;
 }
-.plan-name { font-size: 1.15rem; font-weight: 800; margin-bottom: 0.15rem; }
-.plan-tag  { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; }
-.plan-price-wrap { margin-bottom: 1rem; }
-.plan-price-num {
-  font-size: 2.1rem; font-weight: 900; line-height: 1;
-}
-.plan-price-unit { font-size: 0.8rem; color: var(--text-muted); }
-.plan-divider {
-  height: 1px;
-  margin: 0.9rem 0;
-}
-.plan-feat-list {
-  list-style: none; padding: 0; margin: 0 0 1.25rem;
-  display: flex; flex-direction: column; gap: 0.38rem;
-  font-size: 0.8rem; color: var(--text-muted);
+.tier-name  { font-size: 1.05rem; font-weight: 800; margin-bottom: 0.1rem; }
+.tier-tag   { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.85rem; }
+.tier-price { margin-bottom: 0.85rem; }
+.tier-price-num { font-size: 1.9rem; font-weight: 900; line-height: 1; }
+.tier-price-unit { font-size: 0.78rem; color: var(--text-muted); }
+.tier-divider { height: 1px; margin: 0 0 0.8rem; }
+.tier-feat-list {
+  list-style: none; padding: 0; margin: 0 0 1.1rem;
   flex: 1;
+  display: flex; flex-direction: column; gap: 0.32rem;
+  font-size: 0.79rem; color: var(--text-muted);
 }
-.plan-feat-list li {
-  display: flex; align-items: flex-start; gap: 0.45rem;
-}
-.plan-feat-list li .fi { width: 16px; text-align: center; flex-shrink: 0; margin-top: 0.1rem; }
-.plan-cta {
+.tier-feat-list li { display: flex; align-items: flex-start; gap: 0.4rem; }
+.tier-feat-list li .fi { width: 15px; text-align: center; flex-shrink: 0; margin-top: 0.08rem; font-size: 0.85rem; }
+.tier-cta {
   display: block; width: 100%;
-  padding: 0.7rem 1rem;
-  border-radius: 10px;
-  border: none;
-  font-size: 0.92rem; font-weight: 700;
-  cursor: pointer;
-  text-align: center;
-  text-decoration: none;
+  padding: 0.65rem 1rem;
+  border-radius: 9px; border: none;
+  font-size: 0.88rem; font-weight: 700;
+  cursor: pointer; text-align: center; text-decoration: none;
   transition: opacity 0.15s, transform 0.15s;
+  margin-top: auto;
 }
-.plan-cta:hover { opacity: 0.88; transform: translateY(-1px); }
-/* ── Feature comparison ── */
-.compare-section { margin: 1rem 0 3rem; }
-.compare-section h2 {
-  text-align: center;
-  font-size: 1.3rem; font-weight: 800;
-  margin-bottom: 1.25rem;
-}
+.tier-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+
 .trust-row {
-  display: flex; justify-content: center; gap: 2rem;
-  flex-wrap: wrap; margin-bottom: 2.5rem;
-  font-size: 0.85rem; color: var(--text-muted);
+  display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;
+  margin-bottom: 2rem; font-size: 0.82rem; color: var(--text-muted);
 }
-.trust-row span { display: flex; align-items: center; gap: 0.35rem; }
+.trust-row span { display: flex; align-items: center; gap: 0.3rem; }
+
+@media (max-width: 820px) {
+  .pp-hero-card { grid-template-columns: 1fr; text-align: center; }
+  .pp-feat-chips { justify-content: center; }
+  .pp-price-box, .pp-cta-box { margin: 0 auto; }
+  .tier-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .tier-grid { grid-template-columns: 1fr; }
+}
 </style>
 
 <div class="container" style="max-width:1060px;">
 
-  <!-- ── Flash ── -->
+  <!-- Flash -->
   {% if cancelled %}
-  <div style="margin:1rem auto;max-width:600px;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;text-align:center;">
+  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;text-align:center;">
     ✅ Dein Abo wurde gekündigt und läuft bis zum Ende der Periode weiter.
   </div>
   {% elif error == 'cancelled' %}
-  <div style="margin:1rem auto;max-width:600px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">
-    ❌ Zahlung abgebrochen.
-  </div>
+  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">❌ Zahlung abgebrochen.</div>
   {% elif error %}
-  <div style="margin:1rem auto;max-width:600px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">
-    ⚠️ {{ error }}
-  </div>
+  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">⚠️ {{ error }}</div>
   {% endif %}
 
-  <!-- ── Aktives Abo Banner ── -->
+  <!-- Aktives Abo -->
   {% if user_sub and user_sub.subscription_status in ('active','trialing') %}
-  <div style="margin:0 auto 1.5rem;max-width:680px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+  {% set active_plan_label = {'player_pro':'Player Pro','starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get((user_sub.plan or '').split('_')[0], 'Pro') %}
+  <div style="margin:1rem auto 0;max-width:640px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:0.85rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
     <div>
       <span style="color:#4ade80;font-weight:700;">✅ Aktives Abo:</span>
-      <span style="color:var(--text-muted);margin-left:0.5rem;">
-        {{ {'player_pro':'Player Pro','starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get((user_sub.plan or '').split('_')[0], 'Pro') }}
-        {{ '· Jährlich' if 'annual' in (user_sub.plan or '') else '· Monatlich' }}
-      </span>
-      {% if user_sub.expires_at %}<span style="color:var(--text-muted);font-size:0.82rem;margin-left:0.5rem;">bis {{ user_sub.expires_at[:10] }}</span>{% endif %}
+      <span style="color:var(--text-muted);margin-left:0.5rem;">{{ active_plan_label }} · {{ 'Jährlich' if 'annual' in (user_sub.plan or '') else 'Monatlich' }}</span>
+      {% if user_sub.expires_at %}<span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.5rem;">bis {{ user_sub.expires_at[:10] }}</span>{% endif %}
     </div>
     <form method="post" action="/plans/cancel" onsubmit="return confirm('Abo wirklich kündigen?')">
-      <button type="submit" class="btn btn-danger" style="font-size:0.82rem;padding:0.3rem 0.8rem;">❌ Kündigen</button>
+      <button type="submit" class="btn btn-danger" style="font-size:0.82rem;padding:0.3rem 0.75rem;">❌ Kündigen</button>
     </form>
   </div>
   {% endif %}
 
-  <!-- ── Hero ── -->
+  <!-- Hero -->
   <div class="plans-hero">
-    <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:0.3rem 1rem;font-size:0.78rem;color:#fbbf24;font-weight:600;margin-bottom:1rem;">
+    <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:0.25rem 0.9rem;font-size:0.75rem;color:#fbbf24;font-weight:700;margin-bottom:0.9rem;">
       ⚔️ TRAVOPS PRO
     </div>
     <h1>Wähle deinen Plan</h1>
-    <p style="color:var(--text-muted);font-size:1rem;max-width:520px;margin:0 auto 2rem;line-height:1.65;">
-      Starte mit <strong style="color:#4ade80;">7 Tagen kostenlos</strong>. Keine Kreditkarte bis zum Ende der Testphase nötig.
+    <p style="color:var(--text-muted);font-size:0.95rem;max-width:500px;margin:0 auto 1.75rem;line-height:1.6;">
+      Starte mit <strong style="color:#4ade80;">7 Tagen kostenlos</strong> — keine Kreditkarte bis zum Ende der Testphase nötig.
     </p>
-
-    <!-- Billing Toggle -->
     <div class="billing-toggle">
-      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">
-        Monatlich
-      </button>
-      <button id="btnAnnual" onclick="setBilling('annual')" class="toggle-btn" style="background:transparent;color:var(--text-muted);display:flex;align-items:center;gap:0.4rem;">
-        Jährlich
-        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 8px;border-radius:8px;">~33% GÜNSTIGER</span>
+      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">Monatlich</button>
+      <button id="btnAnnual"  onclick="setBilling('annual')"  class="toggle-btn" style="background:transparent;color:var(--text-muted);display:flex;align-items:center;gap:0.4rem;">
+        Jährlich <span style="background:#22c55e;color:#000;font-size:0.62rem;font-weight:800;padding:1px 7px;border-radius:7px;">~33% GÜNSTIGER</span>
       </button>
     </div>
   </div>
@@ -195,132 +205,144 @@
     {% set active_tier = (user_sub.plan or '').split('_')[0] %}
   {% endif %}
 
-  <!-- ── Plan Cards ── -->
-  <div class="plan-grid">
-
-    <!-- Player Pro -->
-    {% set pp = tier_meta.get('player_pro', {}) %}
-    <div class="plan-card player-pro">
-      <div class="trial-badge">7T GRATIS</div>
-      <div class="plan-icon-wrap" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);">⚔️</div>
-      <div class="plan-name" style="color:#c4b5fd;">Player Pro</div>
-      <div class="plan-tag">Solo · kein Discord-Server nötig</div>
-      <div class="plan-price-wrap">
-        <span class="plan-price-num price-monthly" style="color:#a78bfa;">€2,99</span>
-        <span class="plan-price-num price-annual"  style="color:#a78bfa;display:none;">€23,99</span>
-        <span class="plan-price-unit price-monthly">/Monat</span>
-        <span class="plan-price-unit price-annual" style="display:none;">/Jahr</span>
-        <div class="price-annual" style="font-size:0.72rem;color:#4ade80;margin-top:0.2rem;display:none;">ca. €2,00/Monat</div>
+  <!-- ══ PLAYER PRO — Solo Hero ══ -->
+  <div class="pp-hero-card">
+    <!-- Left: info -->
+    <div>
+      <div class="pp-solo-badge">⚔️ SOLO · KEIN DISCORD-SERVER NÖTIG</div>
+      <div style="font-size:1.7rem;font-weight:900;color:#c4b5fd;margin-bottom:0.15rem;">Player Pro</div>
+      <div style="font-size:0.85rem;color:#94a3b8;max-width:360px;line-height:1.5;">
+        Alle persönlichen Features auf einmal — sofort nutzbar, jederzeit kündbar.
       </div>
-      <div class="plan-divider" style="background:rgba(124,58,237,0.2);"></div>
-      <ul class="plan-feat-list">
-        <li><span class="fi">📊</span><span><strong style="color:var(--text);">Mein Account</strong><br>Dörfer & Truppen importieren</span></li>
-        <li><span class="fi">⚜️</span><span><strong style="color:var(--text);">Farming Intelligence</strong><br>Inaktive Farmen erkennen</span></li>
-        <li><span class="fi">📋</span><span><strong style="color:var(--text);">Farmlist-Analyst</strong><br>Farmlisten auswerten</span></li>
-        <li><span class="fi">🗺️</span><span><strong style="color:var(--text);">Einsatzplanung & Karte</strong></span></li>
-        <li><span class="fi">⏱️</span><span><strong style="color:var(--text);">Timer & Erinnerungen</strong></span></li>
-        <li><span class="fi">📐</span><span><strong style="color:var(--text);">Blueprints alle Völker</strong></span></li>
-        <li><span class="fi">🧩</span><span><strong style="color:var(--text);">Chrome Extension</strong></span></li>
-        <li style="opacity:.4;"><span class="fi">🤖</span><span>Discord Bot (nicht enthalten)</span></li>
-      </ul>
-      {% if active_tier == 'player_pro' %}
-      <button class="plan-cta" style="background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border);cursor:default;" disabled>Aktiver Plan</button>
-      {% elif not logged_in %}
-      <a href="/login" class="plan-cta" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;display:flex;align-items:center;justify-content:center;">Mit Discord starten →</a>
-      {% else %}
-      <form method="post" action="/plans/checkout">
-        <input type="hidden" name="tier" value="player_pro">
-        <input type="hidden" class="input-plan" name="plan" value="monthly">
-        <button type="submit" class="plan-cta" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;">🚀 7 Tage kostenlos testen</button>
-      </form>
-      {% endif %}
+      <div class="pp-feat-chips">
+        <span class="pp-chip">📊 Mein Account</span>
+        <span class="pp-chip">⚜️ Farming Intelligence</span>
+        <span class="pp-chip">📋 Farmlist-Analyst</span>
+        <span class="pp-chip">🗺️ Einsatzplanung</span>
+        <span class="pp-chip">⏱️ Timer & Alarme</span>
+        <span class="pp-chip">📐 Blueprints</span>
+        <span class="pp-chip">🧩 Chrome Extension</span>
+        <span class="pp-chip">📈 Statistiken</span>
+      </div>
     </div>
 
-    <!-- Alliance Plans -->
-    {% set alliance_tiers = [
-      ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, 'Für einzelne Gilden', False, [
-        ('🔭','Scout-System','Späh-Berichte & Bots'),
+    <!-- Center: price -->
+    <div class="pp-price-box">
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:.05em;">Ab</div>
+      <div>
+        <span class="price-monthly" style="font-size:2.8rem;font-weight:900;color:#a78bfa;line-height:1;">€2,99</span>
+        <span class="price-annual"  style="font-size:2.8rem;font-weight:900;color:#a78bfa;line-height:1;display:none;">€23,99</span>
+      </div>
+      <div>
+        <span class="price-monthly" style="font-size:0.82rem;color:#6b7280;">/Monat</span>
+        <span class="price-annual"  style="font-size:0.82rem;color:#6b7280;display:none;">/Jahr</span>
+      </div>
+      <div class="price-annual" style="font-size:0.72rem;color:#4ade80;margin-top:0.3rem;display:none;">ca. €2,00/Monat</div>
+    </div>
+
+    <!-- Right: CTA -->
+    <div class="pp-cta-box">
+      {% if active_tier == 'player_pro' %}
+      <button class="pp-cta-btn" style="background:rgba(255,255,255,0.06);box-shadow:none;cursor:default;color:var(--text-muted);" disabled>Aktiver Plan ✓</button>
+      {% elif not logged_in %}
+      <a href="/login" class="pp-cta-btn">Mit Discord starten →</a>
+      {% else %}
+      <form method="post" action="/plans/checkout" style="width:100%;">
+        <input type="hidden" name="tier" value="player_pro">
+        <input type="hidden" class="input-plan" name="plan" value="monthly">
+        <button type="submit" class="pp-cta-btn">🚀 7 Tage kostenlos testen</button>
+      </form>
+      {% endif %}
+      <div style="font-size:0.72rem;color:#475569;text-align:center;">Keine Bindung · Kreditkarte oder PayPal</div>
+    </div>
+  </div>
+
+  <!-- ══ ALLIANCE PLANS ══ -->
+  <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+    <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Discord + Allianz</div>
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+  </div>
+
+  <div class="tier-grid">
+    {% set tiers = [
+      ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, '1 Server · Für einzelne Gilden', False, [
+        ('🔭','Scout-System','Späh-Berichte & Bot'),
         ('🌾','Res-Push','Ressourcen-Anfragen'),
-        ('🗺️','Einsatzplanung','Marschzeiten & Angriffe'),
-        ('⚜️','Farming Intel','Inaktive Farmen erkennen'),
-        ('🚨','Angriff-Detection','Incoming-Erkennung'),
-        ('🤖','Discord Bot','Screenshots & Benachrichtigungen'),
+        ('🗺️','Einsatzplanung',''),
+        ('⚜️','Farming Intel','Inaktive Farmen'),
+        ('🚨','Angriff-Detection',''),
+        ('🤖','Discord Bot',''),
       ]),
-      ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, 'Für aktive Gilden', True, [
+      ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, '2 Server · Für aktive Gilden', True, [
         ('✅','Alles aus Starter',''),
-        ('🏰','2 Discord-Server','Mehrere Welten gleichzeitig'),
+        ('🏰','2 Discord-Server','Mehrere Welten'),
         ('🤝','Allianz-Übersicht','Mitglieder & Aktivität'),
-        ('⚡','Prioritäts-Support','Schnellere Antwortzeiten'),
+        ('⚡','Prioritäts-Support',''),
       ]),
-      ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99,'Für Allianzen', False, [
+      ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99,'3 Server · Für Allianzen', False, [
         ('✅','Alles aus Clan',''),
         ('🌐','3 Discord-Server',''),
         ('📊','Erweiterte Statistiken',''),
       ]),
-      ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99,'Für große Communities', False, [
+      ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99,'5 Server · Für Communities', False, [
         ('✅','Alles aus Alliance',''),
         ('🏛️','5 Discord-Server',''),
         ('🎯','Dedicated Support','Direkter Kontakt'),
       ]),
     ] %}
 
-    {% for tid, tname, temoji, tcolor, servers, price_m, price_a, tagline, is_popular, features in alliance_tiers %}
+    {% for tid, tname, temoji, tcolor, servers, price_m, price_a, tagline, is_popular, features in tiers %}
     {% set is_current = (active_tier == tid) %}
-    <div class="plan-card {% if is_popular %}highlight{% endif %}" {% if is_current %}style="border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.2);"{% endif %}>
+    <div class="tier-card {% if is_popular %}popular{% endif %}" {% if is_current %}style="border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.2);"{% endif %}>
 
-      {% if is_popular %}
-      <div class="popular-badge">⭐ BELIEBTESTE WAHL</div>
-      {% endif %}
-      {% if is_current %}
-      <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#3b82f6;color:#fff;font-size:0.68rem;font-weight:900;padding:2px 14px;border-radius:10px;white-space:nowrap;">Aktueller Plan</div>
-      {% endif %}
-
+      {% if is_popular %}<div class="popular-badge">⭐ BELIEBTESTE WAHL</div>{% endif %}
+      {% if is_current %}<div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#3b82f6;color:#fff;font-size:0.65rem;font-weight:900;padding:2px 12px;border-radius:10px;white-space:nowrap;">Aktueller Plan</div>{% endif %}
       <div class="trial-badge">7T GRATIS</div>
-      <div class="plan-icon-wrap" style="background:{{ tcolor }}18;border:1px solid {{ tcolor }}33;">{{ temoji }}</div>
-      <div class="plan-name" style="color:{{ tcolor }};">{{ tname }}</div>
-      <div class="plan-tag">{{ servers }} Server · {{ tagline }}</div>
 
-      <div class="plan-price-wrap">
-        <span class="plan-price-num price-monthly" style="color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
-        <span class="plan-price-num price-annual"  style="color:{{ tcolor }};display:none;">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
-        <span class="plan-price-unit price-monthly">/Monat</span>
-        <span class="plan-price-unit price-annual" style="display:none;">/Monat</span>
-        <div class="price-annual" style="font-size:0.72rem;color:#4ade80;margin-top:0.2rem;display:none;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/Jahr · ~33% gespart</div>
+      <div class="tier-icon" style="background:{{ tcolor }}18;border:1px solid {{ tcolor }}33;">{{ temoji }}</div>
+      <div class="tier-name" style="color:{{ tcolor }};">{{ tname }}</div>
+      <div class="tier-tag">{{ tagline }}</div>
+
+      <div class="tier-price">
+        <span class="tier-price-num price-monthly" style="color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
+        <span class="tier-price-num price-annual"  style="color:{{ tcolor }};display:none;">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
+        <span class="tier-price-unit price-monthly">/Mo.</span>
+        <span class="tier-price-unit price-annual" style="display:none;">/Mo.</span>
+        <div class="price-annual" style="font-size:0.7rem;color:#4ade80;margin-top:0.15rem;display:none;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/Jahr</div>
       </div>
 
-      <div class="plan-divider" style="background:{{ tcolor }}22;"></div>
+      <div class="tier-divider" style="background:{{ tcolor }}22;"></div>
 
-      <ul class="plan-feat-list">
+      <ul class="tier-feat-list">
         {% for ficon, fname, fdesc in features %}
         <li>
           <span class="fi">{{ ficon }}</span>
           <span>
             <strong style="color:{% if fname.startswith('Alles') %}{{ tcolor }}{% else %}var(--text){% endif %};">{{ fname }}</strong>
-            {% if fdesc %}<br><span style="font-size:0.72rem;">{{ fdesc }}</span>{% endif %}
+            {% if fdesc %}<br><span style="font-size:0.7rem;">{{ fdesc }}</span>{% endif %}
           </span>
         </li>
         {% endfor %}
       </ul>
 
       {% if is_current %}
-      <button class="plan-cta" style="background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border);cursor:default;" disabled>Aktiver Plan</button>
+      <button class="tier-cta" style="background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border);cursor:default;" disabled>Aktiver Plan ✓</button>
       {% elif not logged_in %}
-      <a href="/login" class="plan-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">Mit Discord starten →</a>
+      <a href="/login" class="tier-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">Mit Discord starten →</a>
       {% else %}
       <form method="post" action="/plans/checkout" style="margin:0;">
         <input type="hidden" name="tier" value="{{ tid }}">
         <input type="hidden" class="input-plan" name="plan" value="monthly">
-        <button type="submit" class="plan-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">
+        <button type="submit" class="tier-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">
           🚀 7 Tage gratis testen
         </button>
       </form>
       {% endif %}
     </div>
     {% endfor %}
-
   </div>
 
-  <!-- ── Trust Row ── -->
+  <!-- Trust -->
   <div class="trust-row">
     <span>🔒 Zahlung via Stripe</span>
     <span>🎟️ Gutschein beim Checkout einlösbar</span>
@@ -328,11 +350,9 @@
     <span>🎁 7 Tage gratis — keine Kreditkarte nötig</span>
   </div>
 
-  <!-- ── FAQ ── -->
-  <div style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-bottom:2.5rem;">
-    Fragen? <a href="mailto:support@travops.online" style="color:#3b82f6;">support@travops.online</a>
+  <div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin-bottom:2.5rem;">
+    Fragen? <a href="mailto:support@travops.online" style="color:#3b82f6;text-decoration:none;">support@travops.online</a>
   </div>
-
 </div>
 
 <script>
