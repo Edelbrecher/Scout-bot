@@ -9,6 +9,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 import database
+from i18n import t, get_guild_lang
 
 load_dotenv()
 
@@ -208,11 +209,12 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
                 view_channel=True, send_messages=True, attach_files=True
             )
 
+    lang = await get_guild_lang(guild_id)
     try:
         channel = await guild.create_text_channel(
-            name="battle-reports",
+            name=t(lang, "report_channel.name"),
             category=category,
-            topic="Kampfberichte-Eingang — Bot scannt alle Bilder automatisch.",
+            topic=t(lang, "report_channel.topic"),
             overwrites=overwrites,
         )
     except Exception as e:
@@ -223,10 +225,7 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
 
     # Welcome message in the new channel
     try:
-        await channel.send(
-            "📋 **Bericht-Eingang aktiv** — Postet hier eure Kampfberichte als Screenshot. "
-            "Der Bot analysiert sie automatisch und trägt sie in die Gegner-Kartei ein."
-        )
+        await channel.send(t(lang, "report_channel.welcome"))
     except Exception:
         pass
 
@@ -290,11 +289,12 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
         if role:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
 
+    lang = await get_guild_lang(guild_id)
     try:
         channel = await guild.create_text_channel(
-            name="travops-anfragen",
+            name=t(lang, "hub.channel_name"),
             category=category,
-            topic="Alle Anfragen auf einen Blick — Scout, Defend, Res-Push und mehr.",
+            topic=t(lang, "hub.channel_topic"),
             overwrites=overwrites,
         )
     except Exception as e:
@@ -302,20 +302,8 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
 
     from cogs.hub import RequestHubView
     embed = discord.Embed(
-        title="📋 TravOps Anfragen-Hub",
-        description=(
-            "Klicke einen Button um einen Kanal zu erstellen:\n\n"
-            "🔍 **Scout** — Gegner spähen lassen\n"
-            "🌾 **Kornspäh** — Korn eines Gegners ausspähen\n"
-            "📡 **Permanent-Scout** — Dauerhaft Späher im eigenen Dorf stationieren\n"
-            "🪖 **Res-Push** — Ressourcen anfordern\n"
-            "🛡️ **Defend** — Verteidigung koordinieren\n"
-            "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🗡️ **Helden-Scout** — Screenshots von Gegner-Helden in einem dedizierten Channel posten. "
-            "Der Bot erkennt automatisch Ausrüstungswechsel & XP-Sprünge.\n"
-            "→ Setup: `/hero-scout-setup #channel` oder [travops.online](https://travops.online)"
-        ),
+        title=t(lang, "hub.title"),
+        description=t(lang, "hub.description"),
         color=discord.Color.blurple(),
     )
     msg = await channel.send(embed=embed, view=RequestHubView())

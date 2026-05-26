@@ -1406,6 +1406,7 @@ async def guild_save(
     archive_channel_id: str = Form(""),
     allowed_role_ids: str = Form(""),
     scout_channel_id: str = Form(""),
+    bot_language: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -1416,6 +1417,8 @@ async def guild_save(
     archive_channel_id = sanitize_snowflake(archive_channel_id)
     scout_channel_id = sanitize_snowflake(scout_channel_id)
     normalized_roles = sanitize_snowflake_list(allowed_role_ids)
+    if bot_language not in ("de", "en"):
+        bot_language = ""
 
     await database.update_guild_config(
         guild_id=guild_id,
@@ -1423,6 +1426,7 @@ async def guild_save(
         archive_channel_id=archive_channel_id,
         allowed_role_ids=normalized_roles,
         scout_channel_id=scout_channel_id,
+        bot_language=bot_language,
     )
     if archive_channel_id:
         await _sync_archive_permissions(guild_id, archive_channel_id, normalized_roles)

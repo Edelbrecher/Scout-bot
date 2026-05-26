@@ -177,6 +177,13 @@ async def init_db():
         except Exception:
             pass
 
+        # Bot language (de / en)
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN bot_language TEXT DEFAULT 'de'")
+            await db.commit()
+        except Exception:
+            pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS trial_links (
                 code            TEXT PRIMARY KEY,
@@ -397,15 +404,17 @@ async def update_guild_config(
     archive_channel_id: str,
     allowed_role_ids: str,
     scout_channel_id: str = "",
+    bot_language: str = "",
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             UPDATE guild_configs
             SET category_id = ?, archive_channel_id = ?, allowed_role_ids = ?,
-                scout_channel_id = COALESCE(NULLIF(?, ''), scout_channel_id)
+                scout_channel_id = COALESCE(NULLIF(?, ''), scout_channel_id),
+                bot_language = COALESCE(NULLIF(?, ''), COALESCE(bot_language, 'de'))
             WHERE guild_id = ?
         """, (category_id or None, archive_channel_id or None, allowed_role_ids or None,
-              scout_channel_id, guild_id))
+              scout_channel_id, bot_language, guild_id))
         await db.commit()
 
 

@@ -9,6 +9,7 @@ from discord.ext import commands
 
 import database
 from utils import require_premium, travops_footer
+from i18n import t, get_guild_lang
 
 # ---------------------------------------------------------------------------
 # Travian Scout-Report Parser
@@ -416,9 +417,9 @@ async def _delete_channel_after(channel: discord.TextChannel, delay: int = 120):
 
 async def _do_close(interaction: discord.Interaction, label: str):
     await interaction.message.edit(view=_all_disabled_view())
+    lang = await get_guild_lang(str(interaction.guild_id))
     await interaction.response.send_message(
-        f"🔒 **{label}** by {interaction.user.mention}.\n"
-        "This channel will be **deleted in 2 minutes**."
+        t(lang, "scout.channel_delete_msg", label=label, user=interaction.user.mention)
     )
     asyncio.create_task(_delete_channel_after(interaction.channel, delay=120))
 
@@ -459,9 +460,10 @@ class ScoutTakenView(discord.ui.View):
     )
     async def cant_do(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Release the job back to open."""
+        lang = await get_guild_lang(str(interaction.guild_id))
         await interaction.message.edit(view=ScoutActionView())
         await interaction.response.send_message(
-            f"↩️ {interaction.user.mention} can't do this job. The request is **open again**!"
+            t(lang, "scout.released", user=interaction.user.mention)
         )
 
     @discord.ui.button(
@@ -497,11 +499,12 @@ class ScoutActionView(discord.ui.View):
         custom_id="persistent:scout_taken",
     )
     async def taken_by(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
         taken_view = ScoutTakenView()
-        taken_view.taken_label.label = f"Taken by {interaction.user.display_name}"
+        taken_view.taken_label.label = f"{t(lang, 'scout.btn.taken')} {interaction.user.display_name}"
         await interaction.message.edit(view=taken_view)
         await interaction.response.send_message(
-            f"✋ **{interaction.user.mention}** has taken this scout job!"
+            t(lang, "scout.taken", user=interaction.user.mention)
         )
 
     @discord.ui.button(
@@ -510,8 +513,9 @@ class ScoutActionView(discord.ui.View):
         custom_id="persistent:scout_cant",
     )
     async def cant_do(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
         await interaction.response.send_message(
-            f"❌ **{interaction.user.mention}** can't do this job. Still looking for a scout..."
+            t(lang, "scout.cant_do", user=interaction.user.mention)
         )
 
     @discord.ui.button(
@@ -553,11 +557,12 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
         if not await require_premium(interaction):
             return
         guild = interaction.guild
+        lang = await get_guild_lang(str(guild.id))
         config = await database.get_guild_config(str(guild.id))
 
         if not config or not config.get("category_id"):
             await interaction.response.send_message(
-                "⚠️ The bot is not fully configured yet. Ask an admin to set it up in the web panel.",
+                t(lang, "not_configured"),
                 ephemeral=True,
             )
             return
@@ -604,25 +609,25 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
         )
 
         embed = discord.Embed(
-            title="🌾🌾 Kornspäh-Anfrage" if self.corn_scout else "📡 Scout Request",
+            title=t(lang, "corn.title") if self.corn_scout else t(lang, "scout.title"),
             color=discord.Color.gold() if self.corn_scout else discord.Color.blurple(),
         )
-        embed.add_field(name="Player", value=self.player.value, inline=True)
-        embed.add_field(name="Village", value=self.village.value, inline=True)
-        embed.add_field(name="Coordinates", value=self.coordinates.value, inline=True)
-        embed.add_field(name="Time", value=self.time.value, inline=True)
+        embed.add_field(name=t(lang, "scout.field.player"), value=self.player.value, inline=True)
+        embed.add_field(name=t(lang, "scout.field.village"), value=self.village.value, inline=True)
+        embed.add_field(name=t(lang, "scout.field.coords"), value=self.coordinates.value, inline=True)
+        embed.add_field(name=t(lang, "scout.field.time"), value=self.time.value, inline=True)
         if self.corn_scout:
-            embed.add_field(name="🌾🌾 Kornspäh", value="Ja", inline=True)
+            embed.add_field(name="🌾 Corn Scout", value=t(lang, "corn.yes"), inline=True)
         if self.additional_info.value:
-            embed.add_field(name="Additional Info", value=self.additional_info.value, inline=False)
-        embed.set_footer(**travops_footer(f"Requested by {interaction.user.display_name}"))
+            embed.add_field(name=t(lang, "scout.field.info"), value=self.additional_info.value, inline=False)
+        embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
 
         await new_channel.send(
-            content=f"New scout request from {interaction.user.mention}",
+            content=t(lang, "scout.new_request", user=interaction.user.mention),
             embed=embed,
             view=ScoutActionView(),
         )
-        await interaction.followup.send(f"✅ Scout channel created: {new_channel.mention}", ephemeral=True)
+        await interaction.followup.send(t(lang, "channel_created", channel=new_channel.mention), ephemeral=True)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         try:
@@ -672,17 +677,18 @@ class Scout(commands.Cog):
     async def setup_scout(self, interaction: discord.Interaction):
         if not await require_premium(interaction):
             return
+        lang = await get_guild_lang(str(interaction.guild.id))
         config = await database.get_guild_config(str(interaction.guild.id))
         if not config or not config.get("category_id") or not config.get("archive_channel_id"):
             await interaction.response.send_message(
-                "⚠️ Please configure **Category ID** and **Archive Channel ID** in the web admin panel first.",
+                t(lang, "scout.setup_missing"),
                 ephemeral=True,
             )
             return
 
         embed = discord.Embed(
-            title="📡 Scout Request",
-            description="Click the button below to submit a scout request.\nFill in the coordinates, player, village and time.",
+            title=t(lang, "scout.title"),
+            description=t(lang, "scout.embed.description"),
             color=discord.Color.blurple(),
         )
         msg = await interaction.channel.send(embed=embed, view=ScoutRequestView())
@@ -691,7 +697,7 @@ class Scout(commands.Cog):
             scout_channel_id=str(interaction.channel.id),
             button_message_id=str(msg.id),
         )
-        await interaction.response.send_message("✅ Scout Request button posted!", ephemeral=True)
+        await interaction.response.send_message(t(lang, "scout.setup_done"), ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

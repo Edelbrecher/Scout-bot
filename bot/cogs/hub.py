@@ -13,6 +13,7 @@ from discord.ext import commands
 
 import database
 from utils import require_premium, travops_footer
+from i18n import t, get_guild_lang
 
 
 # ---------------------------------------------------------------------------
@@ -79,55 +80,54 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
         if not await require_premium(interaction):
             return
         guild = interaction.guild
+        lang = await get_guild_lang(str(guild.id))
         config, category = await _get_config_and_category(guild)
         if not config:
-            await interaction.response.send_message("⚠️ Bot nicht vollständig konfiguriert.", ephemeral=True)
+            await interaction.response.send_message(t(lang, "not_configured"), ephemeral=True)
             return
         if not category:
-            await interaction.response.send_message("⚠️ Kategorie nicht gefunden.", ephemeral=True)
+            await interaction.response.send_message(t(lang, "category_not_found"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
 
-        prefix = "perm-scout" if self.permanent else ("kornspäh" if self.corn else "scout")
+        prefix = "perm-scout" if self.permanent else ("corn-scout" if self.corn else "scout")
         channel_name = f"{prefix}-{_safe(self.player.value)}-{_safe(self.coordinates.value)}"[:100]
 
         overwrites = _build_overwrites(guild, config, interaction.user)
         new_channel = await guild.create_text_channel(
             name=channel_name, category=category,
-            topic=f"{'Permanent-Scout' if self.permanent else ('Kornspäh' if self.corn else 'Scout')}: {self.player.value} @ {self.coordinates.value}",
+            topic=f"{'Permanent-Scout' if self.permanent else ('Corn-Scout' if self.corn else 'Scout')}: {self.player.value} @ {self.coordinates.value}",
             overwrites=overwrites,
         )
 
         if self.permanent:
             color = discord.Color.teal()
-            title = "📡 Permanent-Scout Anfrage"
-            desc = (
-                f"Dauerhaft stationierte Späher für Dorf **{self.village.value or '—'}** werden benötigt.\n"
-                f"Spieler: **{self.player.value}** | Koords: **{self.coordinates.value}**"
-            )
+            title = t(lang, "perm_scout.title")
+            desc = t(lang, "perm_scout.desc", village=self.village.value or "—",
+                     player=self.player.value, coords=self.coordinates.value)
         elif self.corn:
             color = discord.Color.gold()
-            title = "🌾 Kornspäh-Anfrage"
-            desc = f"Kornspäh-Request für **{self.player.value}** @ {self.coordinates.value}"
+            title = t(lang, "corn.title")
+            desc = t(lang, "corn.desc", player=self.player.value, coords=self.coordinates.value)
         else:
             color = discord.Color.blurple()
-            title = "🔍 Scout-Request"
-            desc = f"Scout-Request für **{self.player.value}** @ {self.coordinates.value}"
+            title = t(lang, "scout.title")
+            desc = t(lang, "hub.scout.desc", player=self.player.value, coords=self.coordinates.value)
 
         embed = discord.Embed(title=title, description=desc, color=color)
-        embed.add_field(name="Spieler", value=self.player.value, inline=True)
-        embed.add_field(name="Koordinaten", value=self.coordinates.value, inline=True)
+        embed.add_field(name=t(lang, "hub.scout.field.player_embed"), value=self.player.value, inline=True)
+        embed.add_field(name=t(lang, "hub.scout.field.coords_embed"), value=self.coordinates.value, inline=True)
         if self.village.value:
-            embed.add_field(name="Dorf", value=self.village.value, inline=True)
-        embed.add_field(name="Bis wann", value=self.time.value, inline=True)
+            embed.add_field(name=t(lang, "hub.scout.field.village_embed"), value=self.village.value, inline=True)
+        embed.add_field(name=t(lang, "hub.scout.field.time_embed"), value=self.time.value, inline=True)
         if self.additional_info.value:
-            embed.add_field(name="Infos", value=self.additional_info.value, inline=False)
-        embed.set_footer(**travops_footer(f"Angefragt von {interaction.user.display_name}"))
+            embed.add_field(name=t(lang, "hub.scout.field.info_embed"), value=self.additional_info.value, inline=False)
+        embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
 
         from cogs.scout import ScoutActionView
         await new_channel.send(
-            content=f"Scout-Anfrage von {interaction.user.mention}",
+            content=t(lang, "hub.scout.new_request", user=interaction.user.mention),
             embed=embed,
             view=ScoutActionView(),
         )
@@ -143,7 +143,7 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
             corn_scout=self.corn,
         )
 
-        await interaction.followup.send(f"✅ Channel erstellt: {new_channel.mention}", ephemeral=True)
+        await interaction.followup.send(t(lang, "channel_created", channel=new_channel.mention), ephemeral=True)
 
 
 def _parse_time(s: str) -> datetime | None:
@@ -174,12 +174,13 @@ async def _create_defend_channel(
 ):
     """Shared logic for both Defend and TimedDefend modals."""
     guild = interaction.guild
+    lang = await get_guild_lang(str(guild.id))
     config, category = await _get_config_and_category(guild)
     if not config:
-        await interaction.response.send_message("⚠️ Bot nicht konfiguriert.", ephemeral=True)
+        await interaction.response.send_message(t(lang, "not_configured"), ephemeral=True)
         return
     if not category:
-        await interaction.response.send_message("⚠️ Kategorie nicht gefunden.", ephemeral=True)
+        await interaction.response.send_message(t(lang, "category_not_found"), ephemeral=True)
         return
 
     # Validate & calculate between-time for timed defend
@@ -193,7 +194,7 @@ async def _create_defend_channel(
             delta = (t2 - t1).total_seconds()
             if delta <= 0:
                 await interaction.response.send_message(
-                    "⚠️ Die 2. Ankunftszeit muss nach der 1. Ankunftszeit liegen.",
+                    t(lang, "time_order_error"),
                     ephemeral=True,
                 )
                 return
@@ -216,34 +217,34 @@ async def _create_defend_channel(
     )
 
     embed = discord.Embed(
-        title="⏱️ Timed-Defend" if timed else "🛡️ Defend",
+        title=t(lang, "defend.timed_title") if timed else t(lang, "defend.title"),
         color=discord.Color.from_rgb(239, 68, 68),
     )
-    embed.add_field(name="Verteidiger", value=defender, inline=True)
-    embed.add_field(name="Angreifer",  value=attacker, inline=True)
-    embed.add_field(name="Ziel",       value=coords,   inline=True)
+    embed.add_field(name=t(lang, "defend.field.defender"), value=defender, inline=True)
+    embed.add_field(name=t(lang, "defend.field.attacker"), value=attacker, inline=True)
+    embed.add_field(name=t(lang, "defend.field.target"),   value=coords,   inline=True)
 
     if timed and arrival_2:
-        embed.add_field(name="1. Welle ⚔️", value=arrival_1, inline=True)
-        embed.add_field(name="2. Welle ⚔️", value=arrival_2, inline=True)
+        embed.add_field(name=t(lang, "defend.field.wave1"), value=arrival_1, inline=True)
+        embed.add_field(name=t(lang, "defend.field.wave2"), value=arrival_2, inline=True)
         if between_str:
             embed.add_field(
-                name="🛡️ Zwischen-Defense — angestrebte Ankunft",
-                value=f"**{between_str}**\n"
-                      f"*Truppen so timen dass sie nach der 1. Welle, aber vor der 2. Welle ankommen*",
+                name=t(lang, "defend.field.between"),
+                value=t(lang, "defend.between_desc", time=between_str),
                 inline=False,
             )
     else:
-        embed.add_field(name="Ankunft ⚔️", value=arrival_1, inline=True)
+        embed.add_field(name=t(lang, "defend.field.arrival"), value=arrival_1, inline=True)
 
     if size:
-        embed.add_field(name="Größe", value=size, inline=True)
+        embed.add_field(name=t(lang, "defend.field.size"), value=size, inline=True)
     if notes:
-        embed.add_field(name="Notizen", value=notes, inline=False)
-    embed.set_footer(**travops_footer(f"Gemeldet von {interaction.user.display_name}"))
+        embed.add_field(name=t(lang, "defend.field.notes"), value=notes, inline=False)
+    embed.set_footer(**travops_footer(t(lang, "reported_by", user=interaction.user.display_name)))
 
+    timed_prefix = t(lang, "defend.timed_prefix") if timed else ""
     await new_channel.send(
-        content=f"🚨 {interaction.user.mention} — {'Timed-' if timed else ''}Defend-Anfrage!",
+        content=t(lang, "defend.ping", user=interaction.user.mention, prefix=timed_prefix),
         embed=embed,
         view=DefendCloseView(),
     )
@@ -262,7 +263,7 @@ async def _create_defend_channel(
         requested_by_id=str(interaction.user.id),
         requested_by_name=interaction.user.display_name,
     )
-    await interaction.followup.send(f"✅ Channel erstellt: {new_channel.mention}", ephemeral=True)
+    await interaction.followup.send(t(lang, "channel_created", channel=new_channel.mention), ephemeral=True)
 
 
 class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
@@ -318,30 +319,32 @@ class DefendCloseView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="✅ Defend erledigt",
+        label="✅ Defend done",
         style=discord.ButtonStyle.success,
         custom_id="persistent:defend_done",
     )
     async def done_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
         await database.close_defend_channel(str(interaction.channel.id))
         await interaction.response.send_message(
-            f"✅ Defend als erledigt markiert von {interaction.user.mention}."
+            t(lang, "defend.done", user=interaction.user.mention)
         )
         button.disabled = True
         await interaction.message.edit(view=self)
 
     @discord.ui.button(
-        label="🔒 Channel schließen",
+        label="🔒 Close channel",
         style=discord.ButtonStyle.danger,
         custom_id="persistent:defend_channel_close",
     )
     async def close_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
         await interaction.response.send_message(
-            f"🔒 Channel wird von {interaction.user.mention} geschlossen…"
+            t(lang, "defend.closing", user=interaction.user.mention)
         )
         await asyncio.sleep(5)
         try:
-            await interaction.channel.delete(reason="Defend Channel geschlossen")
+            await interaction.channel.delete(reason=t(lang, "defend.channel_closed_reason"))
         except Exception:
             pass
 
@@ -362,9 +365,10 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
 
     async def on_submit(self, interaction: discord.Interaction):
         guild = interaction.guild
+        lang = await get_guild_lang(str(guild.id))
         config, category = await _get_config_and_category(guild)
         if not config or not category:
-            await interaction.response.send_message("⚠️ Bot nicht konfiguriert.", ephemeral=True)
+            await interaction.response.send_message(t(lang, "not_configured"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -373,21 +377,21 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
         overwrites = _build_overwrites(guild, config, interaction.user)
         new_channel = await guild.create_text_channel(
             name=channel_name, category=category,
-            topic=f"Res-Push für {interaction.user.display_name}: {self.resources.value[:80]}",
+            topic=f"Res-Push: {interaction.user.display_name}: {self.resources.value[:80]}",
             overwrites=overwrites,
         )
 
-        embed = discord.Embed(title="🪖 Res-Push Anfrage", color=discord.Color.orange())
-        embed.add_field(name="Empfänger", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Dorf", value=self.village.value, inline=True)
-        embed.add_field(name="Bis wann", value=self.until.value, inline=True)
-        embed.add_field(name="Benötigt", value=self.resources.value, inline=False)
+        embed = discord.Embed(title=t(lang, "res_push.title"), color=discord.Color.orange())
+        embed.add_field(name=t(lang, "res_push.field.recipient"), value=interaction.user.mention, inline=True)
+        embed.add_field(name=t(lang, "res_push.field.village"), value=self.village.value, inline=True)
+        embed.add_field(name=t(lang, "res_push.field.until"), value=self.until.value, inline=True)
+        embed.add_field(name=t(lang, "res_push.field.needed"), value=self.resources.value, inline=False)
         if self.notes.value:
-            embed.add_field(name="Notizen", value=self.notes.value, inline=False)
-        embed.set_footer(**travops_footer(f"Angefragt von {interaction.user.display_name}"))
+            embed.add_field(name=t(lang, "res_push.field.notes"), value=self.notes.value, inline=False)
+        embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
 
         await new_channel.send(content=f"🪖 {interaction.user.mention}", embed=embed)
-        await interaction.followup.send(f"✅ Res-Push Channel erstellt: {new_channel.mention}", ephemeral=True)
+        await interaction.followup.send(t(lang, "res_push.channel_created", channel=new_channel.mention), ephemeral=True)
 
 
 # ---------------------------------------------------------------------------
