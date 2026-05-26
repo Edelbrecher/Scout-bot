@@ -388,6 +388,13 @@ async def _enrich_guild_subscription(guild: dict) -> dict:
     return guild
 
 
+def _billing_url(guild: dict | None, guild_id: str, error: str) -> str:
+    """Return the correct billing URL — /billing for personal workspaces, /guild/.../billing otherwise."""
+    if guild and guild.get("workspace_type") == "personal":
+        return f"/billing?error={error}"
+    return f"/guild/{guild_id}/billing?error={error}"
+
+
 async def _require_premium(guild: dict | None, guild_id: str):
     """Player-Pro gate: any paid plan is sufficient.
     Returns redirect if access denied, None if granted."""
@@ -395,7 +402,7 @@ async def _require_premium(guild: dict | None, guild_id: str):
         return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
     guild = await _enrich_guild_subscription(guild)
     if not _has_player_pro(guild):
-        return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
+        return RedirectResponse(_billing_url(guild, guild_id, "premium_required"), status_code=303)
     return None
 
 
@@ -406,7 +413,7 @@ async def _require_alliance(guild: dict | None, guild_id: str):
         return RedirectResponse(f"/guild/{guild_id}/billing?error=alliance_required", status_code=303)
     guild = await _enrich_guild_subscription(guild)
     if not _has_alliance_pro(guild):
-        return RedirectResponse(f"/guild/{guild_id}/billing?error=alliance_required", status_code=303)
+        return RedirectResponse(_billing_url(guild, guild_id, "alliance_required"), status_code=303)
     return None
 
 
