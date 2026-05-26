@@ -372,11 +372,28 @@ def _has_alliance_pro(guild: dict) -> bool:
     return plan in ALLIANCE_TIERS or plan == ""  # empty plan = legacy starter
 
 
+async def _enrich_guild_subscription(guild: dict) -> dict:
+    """For personal workspaces, inject the owner's user-subscription status into the guild dict
+    so all feature-gates work correctly regardless of which route calls them."""
+    if not guild:
+        return guild
+    if guild.get("workspace_type") == "personal":
+        owner = guild.get("workspace_owner_id") or guild.get("owner_discord_id") or ""
+        if owner:
+            user_sub = await database.get_user_subscription(owner)
+            if user_sub:
+                guild = dict(guild)
+                guild["subscription_status"] = user_sub.get("subscription_status", "free")
+                guild["subscription_plan"]   = user_sub.get("plan", "")
+    return guild
+
+
 async def _require_premium(guild: dict | None, guild_id: str):
     """Player-Pro gate: any paid plan is sufficient.
     Returns redirect if access denied, None if granted."""
     if guild is None:
         return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
+    guild = await _enrich_guild_subscription(guild)
     if not _has_player_pro(guild):
         return RedirectResponse(f"/guild/{guild_id}/billing?error=premium_required", status_code=303)
     return None
@@ -387,6 +404,7 @@ async def _require_alliance(guild: dict | None, guild_id: str):
     Returns redirect if access denied, None if granted."""
     if guild is None:
         return RedirectResponse(f"/guild/{guild_id}/billing?error=alliance_required", status_code=303)
+    guild = await _enrich_guild_subscription(guild)
     if not _has_alliance_pro(guild):
         return RedirectResponse(f"/guild/{guild_id}/billing?error=alliance_required", status_code=303)
     return None
