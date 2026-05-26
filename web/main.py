@@ -3799,7 +3799,7 @@ async def farming_page(
     request: Request,
     guild_id: str,
     saved: str = "",
-    min_days: int = 3,
+    min_days: int = 1,
     min_pop: int = 0,
     max_pop: int = 9999,
     tab: str = "inactive",
