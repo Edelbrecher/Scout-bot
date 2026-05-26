@@ -1096,3 +1096,43 @@ async def activate_trial_link(code: str, guild_id: str, days: int = 14) -> bool:
         )
         await db.commit()
     return True
+
+
+# ── Private Channels ──────────────────────────────────────────────────────────
+
+async def get_private_channel(guild_id: str, owner_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM private_channels WHERE guild_id = ? AND owner_id = ?",
+            (guild_id, owner_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def set_private_channel(guild_id: str, owner_id: str, channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO private_channels (channel_id, guild_id, owner_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(guild_id, owner_id) DO UPDATE SET channel_id = excluded.channel_id
+        """, (channel_id, guild_id, owner_id))
+        await db.commit()
+
+
+async def delete_private_channel_by_id(channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM private_channels WHERE channel_id = ?", (channel_id,))
+        await db.commit()
+
+
+async def get_private_channel_by_channel_id(channel_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM private_channels WHERE channel_id = ?",
+            (channel_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
