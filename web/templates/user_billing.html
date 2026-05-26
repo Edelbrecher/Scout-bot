@@ -1,144 +1,254 @@
 {% extends "base.html" %}
-{% block title %}Player Pro · Billing · TravOps{% endblock %}
+{% block title %}Player Pro · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:680px;">
+{% set sub_status = (user_sub or {}).get('status', 'free') %}
+{% set sub_plan   = (user_sub or {}).get('plan', '') %}
+{% set is_active  = sub_status in ('active', 'trialing') %}
+
+<style>
+.pp-hero {
+  background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #1a0533 100%);
+  border: 1px solid rgba(139,92,246,0.3);
+  border-radius: 18px;
+  padding: 3rem 2rem 2.5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+.pp-hero::before {
+  content: '';
+  position: absolute;
+  top: -60px; left: 50%; transform: translateX(-50%);
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.pp-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.pp-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pp-feature-item:hover {
+  background: rgba(139,92,246,0.07);
+  border-color: rgba(139,92,246,0.3);
+}
+.pp-feature-item.locked {
+  opacity: 0.35;
+}
+.pp-feature-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.pp-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  vertical-align: middle;
+  margin-left: 5px;
+}
+.pp-badge-pro   { background: rgba(139,92,246,0.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.4); }
+.pp-badge-free  { background: rgba(100,116,139,0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+.plan-btn {
+  padding: 0.55rem 1.5rem;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.plan-btn.active {
+  background: rgba(139,92,246,0.25);
+  border-color: #7c3aed;
+  color: #c4b5fd;
+}
+.plan-btn.inactive {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.plan-btn.inactive:hover { color: var(--text); }
+.checkout-btn {
+  display: block; width: 100%; max-width: 380px; margin: 0 auto;
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border: none; border-radius: 12px;
+  color: #fff; font-size: 1.05rem; font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 28px rgba(124,58,237,0.35);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.checkout-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+</style>
+
+<div class="container" style="max-width:820px;">
 
   <div style="margin-bottom:1.5rem;">
     <a href="/dashboard" class="back-link">← Dashboard</a>
-    <h1 style="margin:0.25rem 0 0;">💳 Player Pro</h1>
-    <p class="subtitle" style="margin:0;">Solo-Features für Einzelspieler — kein Discord-Server nötig.</p>
   </div>
 
+  <!-- ── Flash messages ── -->
   {% if error == 'price_not_configured' %}
-  <div class="alert" style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#f87171;">
+  <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#f87171;">
     ⚠️ Stripe-Preis noch nicht konfiguriert. Bitte den Admin kontaktieren.
   </div>
   {% elif error == 'cancelled' %}
-  <div class="alert" style="background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#fcd34d;">
+  <div style="background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#fcd34d;">
     Zahlung abgebrochen.
   </div>
   {% elif error %}
-  <div class="alert" style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#f87171;">
+  <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#f87171;">
     ⚠️ {{ error }}
   </div>
   {% endif %}
 
   {% if saved %}
-  <div class="alert" style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#4ade80;">
-    ✅ Abo erfolgreich abgeschlossen! Deine Features sind sofort freigeschaltet.
+  <div style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#4ade80;">
+    ✅ Abo erfolgreich! Alle Features sind jetzt freigeschaltet.
   </div>
   {% endif %}
 
-  {# Current subscription status #}
-  {% set sub_status = (user_sub or {}).get('status', 'free') %}
-  {% set sub_plan = (user_sub or {}).get('plan', '') %}
-  {% set is_active = sub_status in ('active', 'trialing') %}
-
   {% if is_active %}
-  <!-- ── Active subscription ── -->
-  <div class="card" style="margin-bottom:1.5rem;border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.05);">
-    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-      <div style="font-size:2rem;">✅</div>
-      <div style="flex:1;">
-        <div style="font-weight:700;color:#4ade80;margin-bottom:0.2rem;">
-          {% if sub_status == 'trialing' %}🎁 Testphase aktiv{% else %}Player Pro aktiv{% endif %}
-        </div>
-        <div style="font-size:0.85rem;color:var(--text-muted);">
-          Plan: <strong>{{ sub_plan or 'Player Pro' }}</strong>
-          {% if (user_sub or {}).get('expires_at') %}
-          · Nächste Verlängerung: {{ (user_sub.expires_at or '')[:10] }}
-          {% endif %}
-        </div>
+  <!-- ── Aktiv ── -->
+  <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.3);border-radius:14px;padding:1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+    <div style="font-size:2.5rem;">✅</div>
+    <div style="flex:1;">
+      <div style="font-size:1.15rem;font-weight:700;color:#4ade80;margin-bottom:0.2rem;">
+        {% if sub_status == 'trialing' %}🎁 Testphase aktiv{% else %}Player Pro aktiv{% endif %}
       </div>
-      <form method="post" action="/billing/portal">
-        <button type="submit" style="padding:0.5rem 1.1rem;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">
-          🔧 Abo verwalten →
-        </button>
-      </form>
+      <div style="font-size:0.85rem;color:var(--text-muted);">
+        Plan: <strong>{{ sub_plan or 'Player Pro' }}</strong>
+        {% if (user_sub or {}).get('expires_at') %} · Verlängerung: {{ (user_sub.expires_at or '')[:10] }}{% endif %}
+      </div>
     </div>
+    <form method="post" action="/billing/portal">
+      <button type="submit" style="padding:0.55rem 1.25rem;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:9px;color:var(--text-muted);cursor:pointer;font-size:0.88rem;">
+        🔧 Abo verwalten →
+      </button>
+    </form>
   </div>
 
   {% else %}
-  <!-- ── Upgrade CTA ── -->
-  <div class="card" style="margin-bottom:1.5rem;border:1px solid rgba(59,130,246,0.3);">
-    <div style="text-align:center;padding:0.5rem 0 1rem;">
-      <div style="font-size:2.5rem;margin-bottom:0.5rem;">⚔️</div>
-      <h2 style="margin:0 0 0.4rem;font-size:1.3rem;">Player Pro</h2>
-      <p style="color:var(--text-muted);font-size:0.9rem;max-width:400px;margin:0 auto 1.25rem;">
-        Alle Solo-Features freigeschaltet — ohne Discord-Server, sofort nutzbar.
-      </p>
-
-      <!-- Plan toggle -->
-      <div id="planToggle" style="display:inline-flex;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:1.5rem;">
-        <button id="btnMonthly" onclick="selectPlan('monthly')"
-          style="padding:0.35rem 1.1rem;border-radius:6px;border:none;cursor:pointer;font-size:0.88rem;font-weight:600;
-                 background:rgba(59,130,246,0.2);color:#93c5fd;transition:all 0.15s;">
-          Monatlich · €2,99
-        </button>
-        <button id="btnAnnual" onclick="selectPlan('annual')"
-          style="padding:0.35rem 1.1rem;border-radius:6px;border:none;cursor:pointer;font-size:0.88rem;font-weight:600;
-                 background:transparent;color:var(--text-muted);transition:all 0.15s;">
-          Jährlich · €23,99 <span style="font-size:0.75rem;color:#4ade80;">–33%</span>
-        </button>
-      </div>
-
-      {% if stripe_configured %}
-      <form method="post" action="/billing/checkout" id="checkoutForm">
-        <input type="hidden" name="tier" value="player_pro">
-        <input type="hidden" name="plan" id="planInput" value="monthly">
-        <button type="submit"
-          style="display:block;width:100%;max-width:320px;margin:0 auto;padding:0.75rem 1.5rem;
-                 background:linear-gradient(135deg,rgba(59,130,246,0.3),rgba(139,92,246,0.2));
-                 border:1px solid rgba(59,130,246,0.5);border-radius:10px;color:#93c5fd;
-                 font-weight:700;font-size:1rem;cursor:pointer;">
-          🚀 7 Tage kostenlos testen, dann <span id="priceLabel">€2,99/Monat</span>
-        </button>
-      </form>
-      <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.6rem;">Keine Bindung · jederzeit kündbar · Kreditkarte oder PayPal</p>
-      {% else %}
-      <div style="color:var(--text-muted);font-size:0.88rem;">Stripe noch nicht konfiguriert.</div>
-      {% endif %}
+  <!-- ── Hero CTA ── -->
+  <div class="pp-hero">
+    <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.35);border-radius:20px;padding:0.3rem 1rem;font-size:0.78rem;color:#c4b5fd;font-weight:600;margin-bottom:1rem;">
+      ⚔️ SPIELER PAKET
     </div>
+    <h1 style="margin:0 0 0.5rem;font-size:2.2rem;font-weight:900;background:linear-gradient(135deg,#c4b5fd,#818cf8,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+      Player Pro
+    </h1>
+    <p style="color:#94a3b8;font-size:1rem;max-width:460px;margin:0 auto 2rem;line-height:1.6;">
+      Alle Solo-Features auf einmal — kein Discord-Server nötig.<br>
+      Sofort nutzbar, jederzeit kündbar.
+    </p>
+
+    <!-- Plan Toggle -->
+    <div style="display:inline-flex;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:4px;gap:4px;margin-bottom:1.75rem;">
+      <button id="btnMonthly" class="plan-btn active" onclick="selectPlan('monthly')">
+        Monatlich &nbsp;<strong>€2,99</strong>
+      </button>
+      <button id="btnAnnual" class="plan-btn inactive" onclick="selectPlan('annual')">
+        Jährlich &nbsp;<strong>€23,99</strong>
+        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;">–33%</span>
+      </button>
+    </div>
+
+    {% if stripe_configured %}
+    <form method="post" action="/billing/checkout" id="checkoutForm">
+      <input type="hidden" name="tier" value="player_pro">
+      <input type="hidden" name="plan" id="planInput" value="monthly">
+      <button type="submit" class="checkout-btn">
+        🚀 7 Tage kostenlos testen → dann <span id="priceLabel">€2,99/Monat</span>
+      </button>
+    </form>
+    <p style="font-size:0.75rem;color:#475569;margin-top:0.85rem;">
+      🔒 Zahlung via Stripe &nbsp;·&nbsp; Keine Bindung &nbsp;·&nbsp; Kreditkarte oder PayPal
+    </p>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:0.9rem;">Stripe noch nicht konfiguriert.</p>
+    {% endif %}
   </div>
   {% endif %}
 
-  <!-- ── Feature list ── -->
-  <div class="card">
-    <h3 style="margin:0 0 1rem;font-size:0.95rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Was ist enthalten?</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;">
-      {% for f in [
-        ('✅', 'Mein Account', 'Dörfer & Truppen importieren'),
-        ('✅', 'Farming Intelligence', 'Inaktive Farmen erkennen'),
-        ('✅', 'Farmlist-Analyst', 'Farmlisten auswerten'),
-        ('✅', 'Einsatzplanung', 'Marschzeit berechnen & absenden'),
-        ('✅', 'Heldenaufgaben', 'XP & Ressourcen tracken'),
-        ('✅', 'Statistiken', 'Aktivität & Leistung'),
-        ('✅', 'Abstimmungen', 'Team-Polls & Termine'),
-        ('✅', 'Res-Push', 'Ressourcen-Anfragen'),
-        ('✅', 'Timer & Erinnerungen', 'Farmlist-Alarme'),
-        ('✅', 'Settle-Liste', 'Siedlungskoordination'),
-        ('✅', 'Blueprints', 'Bauanleitungen alle Völker'),
-        ('✅', 'Getreidefeld-Rechner', 'ROI-basierte Optimierung'),
-        ('✅', 'Hero Scout (manuell)', 'Gegner-Helden anlegen'),
-        ('✅', 'Chrome Extension', 'Background Timer & Alarme'),
-        ('❌', 'Allianz-Features', 'Mitglieder, Lazarett, Gegner-Kartei'),
-        ('❌', 'Discord Bot', 'Screenshots, Benachrichtigungen'),
-      ] %}
-      <div style="display:flex;gap:0.5rem;align-items:flex-start;font-size:0.85rem;">
-        <span style="flex-shrink:0;{% if f[0] == '❌' %}opacity:0.35;{% endif %}">{{ f[0] }}</span>
-        <div style="{% if f[0] == '❌' %}opacity:0.35;{% endif %}">
-          <div style="font-weight:600;">{{ f[1] }}</div>
-          <div style="color:var(--text-muted);font-size:0.78rem;">{{ f[2] }}</div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
+  <!-- ── Features Header ── -->
+  <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+    <h2 style="margin:0;font-size:1rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;">Was ist enthalten?</h2>
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+    <span class="pp-badge pp-badge-pro">Player Pro</span>
+  </div>
 
-    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);">
-      Brauchst du Allianz-Features oder Discord-Bot-Integration?
-      <a href="/dashboard" style="color:#93c5fd;text-decoration:none;">→ Discord-Server hinzufügen &amp; Alliance Pro wählen</a>
+  <!-- ── Feature Grid ── -->
+  <div class="pp-feature-grid">
+
+    {% set features = [
+      ('📊', '#6366f1', 'Mein Account', 'Dörfer & Truppen importieren, Timeline verfolgen', True),
+      ('⚜️', '#f59e0b', 'Farming Intelligence', 'Inaktive Farmen erkennen, Wachstum tracken', True),
+      ('📋', '#f59e0b', 'Farmlist-Analyst', 'Farmlisten einfügen & automatisch auswerten', True),
+      ('🗺️', '#22c55e', 'Einsatzplanung', 'Marschzeit berechnen & Angriffe planen', True),
+      ('🧭', '#22c55e', 'Karte & Koordinaten', 'Interaktive Weltkarte, Distanzrechner', True),
+      ('🦸', '#a78bfa', 'Heldenaufgaben', 'XP & Ressourcen tracken', True),
+      ('📈', '#38bdf8', 'Statistiken', 'Aktivität & Leistungsauswertung', True),
+      ('🗳️', '#38bdf8', 'Abstimmungen', 'Team-Polls & Terminkoordination', True),
+      ('🌾', '#f59e0b', 'Res-Push', 'Ressourcen-Anfragen verwalten', True),
+      ('⏱️', '#ef4444', 'Timer & Erinnerungen', 'Farmlist-Alarme & Aktions-Timer', True),
+      ('🏘️', '#22c55e', 'Settle-Liste', 'Siedlungskoordination', True),
+      ('📐', '#a78bfa', 'Blueprints', 'Bauanleitungen für alle Völker', True),
+      ('🌾', '#f59e0b', 'Getreidefeld-Rechner', 'ROI-basierte Optimierung', True),
+      ('🔭', '#38bdf8', 'Hero Scout (manuell)', 'Gegner-Helden anlegen & verfolgen', True),
+      ('🧩', '#6366f1', 'Chrome Extension', 'Background Timer & Alarme direkt im Browser', True),
+      ('🤝', '#94a3b8', 'Allianz-Features', 'Mitglieder, Lazarett, Gegner-Kartei', False),
+      ('🤖', '#94a3b8', 'Discord Bot', 'Screenshots, Channel-Benachrichtigungen', False),
+    ] %}
+
+    {% for icon, color, name, desc, included in features %}
+    <div class="pp-feature-item {% if not included %}locked{% endif %}">
+      <div class="pp-feature-icon" style="background:{{ color }}1a;border:1px solid {{ color }}33;">
+        {{ icon }}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:0.875rem;display:flex;align-items:center;flex-wrap:wrap;gap:0.25rem;">
+          {{ name }}
+          {% if included %}
+          <span class="pp-badge pp-badge-pro">✓ Pro</span>
+          {% else %}
+          <span class="pp-badge pp-badge-free">nicht enthalten</span>
+          {% endif %}
+        </div>
+        <div style="font-size:0.775rem;color:var(--text-muted);margin-top:0.1rem;">{{ desc }}</div>
+      </div>
     </div>
+    {% endfor %}
+
+  </div>
+
+  <!-- ── Upsell hint ── -->
+  <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <div style="font-size:1.5rem;">🤖</div>
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.15rem;">Auch Discord-Bot & Allianz-Features nutzen?</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);">Mit einem Alliance-Plan bekommst du zusätzlich den Bot, Allianz-Übersichten, Lazarett und mehr.</div>
+    </div>
+    <a href="/dashboard" style="white-space:nowrap;padding:0.5rem 1.1rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.85rem;font-weight:600;">
+      Discord-Server hinzufügen →
+    </a>
   </div>
 
 </div>
@@ -146,22 +256,12 @@
 <script>
 function selectPlan(plan) {
   document.getElementById('planInput').value = plan;
-  const monthly = document.getElementById('btnMonthly');
-  const annual = document.getElementById('btnAnnual');
+  const mBtn = document.getElementById('btnMonthly');
+  const aBtn = document.getElementById('btnAnnual');
   const label = document.getElementById('priceLabel');
-  if (plan === 'monthly') {
-    monthly.style.background = 'rgba(59,130,246,0.2)';
-    monthly.style.color = '#93c5fd';
-    annual.style.background = 'transparent';
-    annual.style.color = 'var(--text-muted)';
-    if (label) label.textContent = '€2,99/Monat';
-  } else {
-    annual.style.background = 'rgba(59,130,246,0.2)';
-    annual.style.color = '#93c5fd';
-    monthly.style.background = 'transparent';
-    monthly.style.color = 'var(--text-muted)';
-    if (label) label.textContent = '€23,99/Jahr';
-  }
+  mBtn.className = 'plan-btn ' + (plan === 'monthly' ? 'active' : 'inactive');
+  aBtn.className = 'plan-btn ' + (plan === 'annual'  ? 'active' : 'inactive');
+  if (label) label.textContent = plan === 'annual' ? '€23,99/Jahr' : '€2,99/Monat';
 }
 </script>
 {% endblock %}

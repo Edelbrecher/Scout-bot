@@ -2,24 +2,103 @@
 {% block title %}Abonnement · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:960px;">
-  <div style="margin-bottom:1.5rem;">
+<style>
+.billing-header {
+  text-align: center;
+  padding: 2rem 1rem 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.tier-card {
+  position: relative;
+  border-radius: 16px;
+  padding: 1.5rem 1.25rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+}
+.tier-card:hover { transform: translateY(-3px); }
+.tier-card.selected { box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
+.tier-card.popular.selected { box-shadow: 0 0 0 3px rgba(245,158,11,0.35); }
+.tier-check {
+  display: none;
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 24px; height: 24px;
+  background: #3b82f6;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #fff;
+  font-weight: 700;
+}
+.tier-card.selected .tier-check { display: flex; }
+.tier-feat-list {
+  list-style: none;
+  padding: 0; margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+.billing-toggle {
+  display: inline-flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 4px;
+  gap: 4px;
+}
+.toggle-btn {
+  padding: 0.45rem 1.4rem;
+  border-radius: 24px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.checkout-main {
+  padding: 1rem 2.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.checkout-main:hover { opacity: .88; transform: translateY(-1px); }
+</style>
+
+<div class="container" style="max-width:1020px;">
+
+  <div style="margin-bottom:1rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;" data-i18n="billing.title">💳 Abonnement</h1>
-    <p class="subtitle">{{ guild.guild_name }}</p>
   </div>
 
+  <!-- ── Flash ── -->
   {% if saved %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a3a2a;border:1px solid #4caf82;border-radius:8px;color:#4caf82;">
-    <span data-i18n="billing.flash.saved">✅ Abonnement aktiviert – danke! Deine Features sind jetzt freigeschaltet.</span>
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:8px;color:#4ade80;">
+    ✅ Abonnement aktiviert – danke! Deine Features sind jetzt freigeschaltet.
   </div>
   {% endif %}
   {% if error == 'premium_required' %}
   <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
-    <span data-i18n="billing.error.premium_required">🔒 Diese Funktion erfordert ein Pro-Abonnement. Wähle einen Plan um fortzufahren.</span>
+    🔒 Diese Funktion erfordert ein Pro-Abonnement. Wähle einen Plan um fortzufahren.
+  </div>
+  {% elif error == 'alliance_required' %}
+  <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
+    🛡️ Diese Funktion erfordert einen Alliance-Plan. Wähle Starter oder höher.
   </div>
   {% elif error == 'cancelled' %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;" data-i18n="billing.error.cancelled">❌ Zahlung abgebrochen.</div>
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ Zahlung abgebrochen.</div>
   {% elif error %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ {{ error }}</div>
   {% endif %}
@@ -30,36 +109,36 @@
   {% set sub_tier   = sub_plan.split('_')[0] if '_' in sub_plan else '' %}
   {% set sub_int    = sub_plan.split('_')[1] if '_' in sub_plan else '' %}
 
-  <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+  <div class="card" style="margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
     <div>
-      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;" data-i18n="billing.current_plan">Aktueller Plan</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;">Aktueller Plan</div>
       {% if sub_status == 'trialing' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;" data-i18n="billing.plan.trialing">🎁 7-Tage Testphase</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;">🎁 Testphase</span>
         {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ sub_tier|capitalize }}</span>{% endif %}
       {% elif sub_status == 'active' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#4ade80;" data-i18n="billing.plan.active">✅ Aktiv</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#4ade80;">✅ Aktiv</span>
         {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get(sub_tier, sub_tier) }}</span>{% endif %}
         {% if sub_int %}<span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.3rem;">({{ 'Jährlich' if sub_int == 'annual' else 'Monatlich' }})</span>{% endif %}
       {% elif sub_status == 'past_due' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#fb923c;" data-i18n="billing.plan.past_due">⚠️ Zahlung überfällig</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#fb923c;">⚠️ Zahlung überfällig</span>
       {% elif sub_status == 'cancelled' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#6b7280;" data-i18n="billing.plan.cancelled">🔒 Gekündigt</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#6b7280;">🔒 Gekündigt</span>
       {% else %}
-        <span style="font-size:1.1rem;font-weight:700;color:var(--text-muted);" data-i18n="billing.plan.free">🆓 Kein aktives Abo</span>
+        <span style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">🆓 Kein aktives Abo</span>
       {% endif %}
       {% if guild.subscription_expires_at %}
-      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;"><span data-i18n="billing.expires">Läuft bis:</span> {{ guild.subscription_expires_at[:10] }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem;">Läuft bis: {{ guild.subscription_expires_at[:10] }}</div>
       {% endif %}
     </div>
     {% if guild.stripe_customer_id and sub_status in ('active','trialing','past_due') %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
-        <button type="submit" class="btn btn-secondary" data-i18n="billing.manage">🔧 Verwalten</button>
+        <button type="submit" class="btn btn-secondary">🔧 Verwalten</button>
       </form>
       {% if is_owner %}
       <form method="post" action="/guild/{{ guild.guild_id }}/billing/cancel"
-            onsubmit="return confirm(window.T&&window.T['confirm.cancel_sub']||'Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.')">
-        <button type="submit" class="btn btn-danger" data-i18n="billing.cancel">❌ Abo kündigen</button>
+            onsubmit="return confirm('Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.')">
+        <button type="submit" class="btn btn-danger">❌ Kündigen</button>
       </form>
       {% endif %}
     </div>
@@ -68,7 +147,7 @@
 
   {% if cancelled %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;">
-    <span data-i18n="billing.cancelled_info">✅ Dein Abo wurde gekündigt und läuft bis zum Ende der bezahlten Periode weiter.</span>
+    ✅ Dein Abo wurde gekündigt und läuft bis zum Ende der bezahlten Periode weiter.
   </div>
   {% endif %}
 
@@ -78,134 +157,182 @@
   </div>
   {% else %}
 
-  <!-- ── Billing Toggle ── -->
-  <div style="display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:1.75rem;">
-    <div style="display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:30px;padding:4px;gap:4px;">
-      <button id="btnMonthly" onclick="setBilling('monthly')" type="button"
-        style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:#3b82f6;color:#fff;transition:all 0.15s;" data-i18n="billing.toggle.monthly">
+  <!-- ── Header ── -->
+  <div class="billing-header">
+    <h1 style="margin:0 0 0.4rem;font-size:1.8rem;font-weight:900;">Wähle deinen Plan</h1>
+    <p style="color:var(--text-muted);margin:0 0 1.5rem;font-size:0.95rem;">Alle Pläne mit 7-Tage Gratis-Testphase · Jederzeit kündbar</p>
+
+    <!-- Billing Toggle -->
+    <div class="billing-toggle">
+      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn"
+              style="background:#3b82f6;color:#fff;">
         Monatlich
       </button>
-      <button id="btnAnnual" onclick="setBilling('annual')" type="button"
-        style="padding:0.45rem 1.4rem;border-radius:24px;border:none;cursor:pointer;font-size:0.92rem;font-weight:600;background:transparent;color:var(--text-muted);transition:all 0.15s;display:flex;align-items:center;gap:0.4rem;">
-        <span data-i18n="billing.toggle.annual">Jährlich</span>
-        <span style="background:#f59e0b;color:#000;font-size:0.68rem;font-weight:800;padding:1px 7px;border-radius:8px;" data-i18n="billing.toggle.free_months">3 Mon. GRATIS</span>
+      <button id="btnAnnual" onclick="setBilling('annual')" class="toggle-btn"
+              style="background:transparent;color:var(--text-muted);display:flex;align-items:center;gap:0.4rem;">
+        Jährlich
+        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 8px;border-radius:8px;">3 Mon. GRATIS</span>
       </button>
     </div>
   </div>
 
-  <!-- ── Tier-Karten ── -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin-bottom:1.5rem;">
-    {% set tiers = [
-      ('starter',  'Starter',  '⚡', 1, 6.99,  55.99,  'Für einzelne Gilden',    ['Scout-System','Res-Push','Einsatzplanung','Farming Intel','Karte & Timer','Angriff-Detection']),
-      ('clan',     'Clan',     '⚔️', 2, 10.99, 87.99,  'Für aktive Gilden',      ['Alles aus Starter','2 Discord-Server','Prioritäts-Support']),
-      ('alliance', 'Alliance', '🛡️', 3, 14.99, 119.99, 'Für Allianzen',          ['Alles aus Clan','3 Discord-Server']),
-      ('imperium', 'Imperium', '👑', 5, 19.99, 159.99, 'Für große Communities',  ['Alles aus Alliance','5 Discord-Server','Dedicated Support']),
-    ] %}
+  <!-- ── Tier Cards ── -->
+  {% set tiers = [
+    ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, 'Für einzelne Gilden', [
+      ('🔭', 'Scout-System', 'Späh-Berichte & Auswertung'),
+      ('🌾', 'Res-Push', 'Ressourcen-Anfragen'),
+      ('🗺️', 'Einsatzplanung', 'Marschzeiten & Angriffe'),
+      ('⚜️', 'Farming Intel', 'Inaktive Farmen erkennen'),
+      ('🗂️', 'Karte & Timer', 'Weltkarte & Aktions-Timer'),
+      ('🚨', 'Angriff-Detection', 'Incoming-Erkennung'),
+    ]),
+    ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, 'Für aktive Gilden', [
+      ('✅', 'Alles aus Starter', ''),
+      ('🏰', '2 Discord-Server', 'Mehrere Welten gleichzeitig'),
+      ('⚡', 'Prioritäts-Support', 'Schnellere Antwortzeiten'),
+    ]),
+    ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99, 'Für Allianzen', [
+      ('✅', 'Alles aus Clan', ''),
+      ('🌐', '3 Discord-Server', ''),
+      ('🤝', 'Allianz-Übersicht', 'Mitglieder & Aktivität'),
+    ]),
+    ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99, 'Für große Communities', [
+      ('✅', 'Alles aus Alliance', ''),
+      ('🏛️', '5 Discord-Server', ''),
+      ('🎯', 'Dedicated Support', 'Direkter Kontakt'),
+    ]),
+  ] %}
 
-    {% for tid, tname, temoji, servers, price_m, price_a, tagline, features in tiers %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.75rem;">
+    {% for tid, tname, temoji, tcolor, servers, price_m, price_a, tagline, features in tiers %}
     {% set is_popular = tid == 'clan' %}
-    <div class="tier-card {% if is_popular %}tier-popular{% endif %}" data-tier="{{ tid }}"
+
+    <div class="tier-card {% if is_popular %}popular{% endif %}"
+         data-tier="{{ tid }}"
          onclick="selectTier('{{ tid }}')"
-         style="position:relative;border:2px solid {% if is_popular %}#f59e0b{% else %}var(--border){% endif %};border-radius:14px;padding:1.25rem;background:{% if is_popular %}linear-gradient(160deg,var(--bg-card),#1c1600){% else %}var(--bg-card){% endif %};cursor:pointer;transition:border-color 0.15s,transform 0.15s,box-shadow 0.15s;user-select:none;">
+         style="border:2px solid {% if is_popular %}{{ tcolor }}{% else %}var(--border){% endif %};
+                background:{% if is_popular %}linear-gradient(160deg,var(--bg-card),#1c1500){% else %}var(--bg-card){% endif %};">
 
       {% if is_popular %}
-      <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#f59e0b;color:#000;font-size:0.7rem;font-weight:800;padding:2px 12px;border-radius:10px;white-space:nowrap;">
-        <span data-i18n="billing.popular">⭐ BELIEBTESTE WAHL</span>
+      <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+                  background:{{ tcolor }};color:#000;font-size:0.68rem;font-weight:900;
+                  padding:2px 14px;border-radius:10px;white-space:nowrap;letter-spacing:.04em;">
+        ⭐ BELIEBTESTE WAHL
       </div>
       {% endif %}
 
-      <!-- Selected indicator -->
-      <div class="tier-check" style="display:none;position:absolute;top:10px;right:10px;width:22px;height:22px;background:#3b82f6;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:0.75rem;color:#fff;font-weight:700;">✓</div>
+      <div class="tier-check" style="background:{{ tcolor }};color:{% if is_popular %}#000{% else %}#fff{% endif %};">✓</div>
 
-      <div style="font-size:1.6rem;margin-bottom:0.3rem;">{{ temoji }}</div>
-      <div style="font-size:1.1rem;font-weight:800;">{{ tname }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;">{{ servers }} Server · {{ tagline }}</div>
-
-      <div class="price-monthly" style="margin-bottom:0.75rem;">
-        <span style="font-size:1.8rem;font-weight:800;color:{% if is_popular %}#f59e0b{% else %}#3b82f6{% endif %};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
-        <span style="font-size:0.82rem;color:var(--text-muted);" data-i18n="billing.per_month">/Monat</span>
-      </div>
-      <div class="price-annual" style="margin-bottom:0.75rem;display:none;">
-        <span style="font-size:1.8rem;font-weight:800;color:{% if is_popular %}#f59e0b{% else %}#3b82f6{% endif %};">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
-        <span style="font-size:0.82rem;color:var(--text-muted);" data-i18n="billing.per_month">/Monat</span>
-        <div style="font-size:0.75rem;color:#4ade80;margin-top:0.1rem;">€{{ '%.2f'|format(price_a)|replace('.',',') }}<span data-i18n="billing.per_year">/Jahr</span> · <span data-i18n="billing.saved_pct">~33% gespart</span></div>
+      <!-- Icon + Name -->
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
+        <div style="width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+                    font-size:1.3rem;background:{{ tcolor }}18;border:1px solid {{ tcolor }}33;">{{ temoji }}</div>
+        <div>
+          <div style="font-size:1.05rem;font-weight:800;">{{ tname }}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">{{ servers }} Server · {{ tagline }}</div>
+        </div>
       </div>
 
-      <ul style="list-style:none;padding:0;margin:0;font-size:0.8rem;color:var(--text-muted);display:flex;flex-direction:column;gap:0.3rem;">
-        {% for feat in features %}
-        <li style="display:flex;align-items:center;gap:0.35rem;"><span style="color:#4ade80;">✓</span> {{ feat }}</li>
+      <!-- Price -->
+      <div class="price-monthly" style="margin-bottom:1rem;">
+        <span style="font-size:2rem;font-weight:900;color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);">/Monat</span>
+      </div>
+      <div class="price-annual" style="margin-bottom:1rem;display:none;">
+        <span style="font-size:2rem;font-weight:900;color:{{ tcolor }};">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);">/Monat</span>
+        <div style="font-size:0.72rem;color:#4ade80;margin-top:0.2rem;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/Jahr · ~33% gespart</div>
+      </div>
+
+      <!-- Divider -->
+      <div style="height:1px;background:{{ tcolor }}22;margin-bottom:0.85rem;"></div>
+
+      <!-- Features -->
+      <ul class="tier-feat-list">
+        {% for ficon, fname, fdesc in features %}
+        <li style="display:flex;align-items:flex-start;gap:0.5rem;">
+          <span style="width:18px;text-align:center;flex-shrink:0;margin-top:0.05rem;">{{ ficon }}</span>
+          <div>
+            <span style="color:var(--text);font-weight:{% if fname.startswith('Alles') %}700{% else %}500{% endif %};">{{ fname }}</span>
+            {% if fdesc %}<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.05rem;">{{ fdesc }}</div>{% endif %}
+          </div>
+        </li>
         {% endfor %}
       </ul>
     </div>
     {% endfor %}
   </div>
 
-  <!-- ── Checkout Button ── -->
-  <div style="text-align:center;margin-bottom:1.5rem;">
+  <!-- ── Checkout ── -->
+  <div style="text-align:center;margin-bottom:2rem;">
     <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout" id="checkoutForm">
       <input type="hidden" name="tier" id="selectedTier" value="clan">
       <input type="hidden" name="plan" id="selectedPlan" value="monthly">
-      <button type="submit" id="checkoutBtn"
-        style="padding:0.85rem 2.5rem;font-size:1.05rem;font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 20px rgba(245,158,11,0.3);transition:opacity 0.15s,transform 0.15s;"
-        onmouseover="this.style.opacity='.88';this.style.transform='translateY(-1px)'"
-        onmouseout="this.style.opacity='1';this.style.transform=''">
+      <button type="submit" class="checkout-main" id="checkoutBtn">
         🚀 Clan · 7 Tage gratis testen
       </button>
     </form>
     <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.75rem;">
-      <span data-i18n="billing.checkout.voucher">🎟️ Gutschein beim Checkout eingeben</span> &nbsp;·&nbsp; <span data-i18n="billing.checkout.stripe">🔒 Zahlung via Stripe</span> &nbsp;·&nbsp; <span data-i18n="billing.checkout.cancel_anytime">Jederzeit kündbar</span>
+      🎟️ Gutschein beim Checkout eingeben &nbsp;·&nbsp; 🔒 Zahlung via Stripe &nbsp;·&nbsp; Jederzeit kündbar
     </p>
+  </div>
+
+  <!-- ── Comparison Footer ── -->
+  <div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);border-radius:12px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <div style="font-size:1.4rem;">⚔️</div>
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.15rem;">Nur Solo-Features gesucht?</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);">Player Pro ab €2,99/Monat — alle persönlichen Features ohne Discord-Server.</div>
+    </div>
+    <a href="/billing" style="white-space:nowrap;padding:0.5rem 1.1rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.85rem;font-weight:600;">
+      Player Pro ansehen →
+    </a>
   </div>
 
   {% endif %}
 </div>
 
-<style>
-.tier-card:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(59,130,246,0.12); }
-.tier-card.selected { border-color:#3b82f6 !important; box-shadow:0 0 0 3px rgba(59,130,246,0.2); }
-.tier-card.selected .tier-check { display:flex !important; }
-.tier-popular.selected { border-color:#f59e0b !important; box-shadow:0 0 0 3px rgba(245,158,11,0.25); }
-</style>
-
 <script>
 let currentTier = 'clan';
 let currentPlan = 'monthly';
 
-const TIER_LABELS = {
-  starter: 'Starter', clan: 'Clan', alliance: 'Alliance', imperium: 'Imperium'
-};
+const TIER_COLORS = { starter:'#22c55e', clan:'#f59e0b', alliance:'#a855f7', imperium:'#ef4444' };
+const TIER_LABELS = { starter:'Starter', clan:'Clan', alliance:'Alliance', imperium:'Imperium' };
 
 function selectTier(tid) {
   currentTier = tid;
-  document.querySelectorAll('.tier-card').forEach(c => c.classList.toggle('selected', c.dataset.tier === tid));
+  document.querySelectorAll('.tier-card').forEach(c => {
+    const sel = c.dataset.tier === tid;
+    c.classList.toggle('selected', sel);
+    if (sel) c.style.borderColor = TIER_COLORS[tid];
+    else c.style.borderColor = c.classList.contains('popular') ? TIER_COLORS[c.dataset.tier] : 'var(--border)';
+  });
   document.getElementById('selectedTier').value = tid;
-  updateCheckoutBtn();
+  updateBtn();
 }
 
 function setBilling(mode) {
   currentPlan = mode;
   document.getElementById('selectedPlan').value = mode;
-
   const mBtn = document.getElementById('btnMonthly');
   const aBtn = document.getElementById('btnAnnual');
   mBtn.style.background = mode === 'monthly' ? '#3b82f6' : 'transparent';
   mBtn.style.color      = mode === 'monthly' ? '#fff' : 'var(--text-muted)';
   aBtn.style.background = mode === 'annual'  ? '#3b82f6' : 'transparent';
   aBtn.style.color      = mode === 'annual'  ? '#fff' : 'var(--text-muted)';
-
   document.querySelectorAll('.price-monthly').forEach(el => el.style.display = mode === 'monthly' ? '' : 'none');
   document.querySelectorAll('.price-annual').forEach(el  => el.style.display = mode === 'annual'  ? '' : 'none');
-
-  updateCheckoutBtn();
+  updateBtn();
 }
 
-function updateCheckoutBtn() {
+function updateBtn() {
+  const btn = document.getElementById('checkoutBtn');
   const label = TIER_LABELS[currentTier] || currentTier;
-  const planLabel = currentPlan === 'annual' ? 'Jährlich' : '7 Tage gratis testen';
-  document.getElementById('checkoutBtn').textContent = `🚀 ${label} · ${planLabel}`;
+  btn.textContent = currentPlan === 'annual'
+    ? `🚀 ${label} · Jährlich starten`
+    : `🚀 ${label} · 7 Tage gratis testen`;
 }
 
-// Pre-select Clan
 selectTier('clan');
 </script>
 {% endblock %}
