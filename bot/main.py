@@ -16,6 +16,7 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.members = True   # needed for guild.members lookup (grant/revoke access)
 
 
 class ScouterBot(commands.Bot):
