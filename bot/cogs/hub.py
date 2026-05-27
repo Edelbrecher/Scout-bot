@@ -260,8 +260,9 @@ async def _create_defend_channel(
 
     timed_prefix = t(lang, "defend.timed_prefix") if timed else ""
     ping_content = t(lang, "defend.ping", user=interaction.user.mention, prefix=timed_prefix)
+    # Always show Travian map link as plain URL so Discord renders it clickable
     if travian_link:
-        ping_content += f"\n🗺️ **Karte:** {travian_link}"
+        ping_content += f"\n\n🗺️ **Ziel-Dorf auf der Karte:**\n{travian_link}"
     await new_channel.send(
         content=ping_content,
         embed=embed,
@@ -287,71 +288,120 @@ async def _create_defend_channel(
     await interaction.followup.send(t(lang, "channel_created", channel=new_channel.mention), ephemeral=True)
 
 
-class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
-    """Plain defend — single arrival time."""
-    defender     = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
-    attacker     = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords_time  = discord.ui.TextInput(label="Koords · Ankunftszeit", placeholder="z.B. (102|47) · 23:45 UTC", max_length=60)
-    troop_goal   = discord.ui.TextInput(
-        label="Benötigte Truppen (Ziel)", required=False,
+# ---------------------------------------------------------------------------
+# Defend — 2-step modal flow
+# Step 1: Attacker/defender/coords/arrival  →  ephemeral button  →  Step 2: goal/ratio
+# ---------------------------------------------------------------------------
+
+# In-memory store for step-1 data while the user completes step 2
+# keyed by (guild_id, user_id) so multiple users can run the flow simultaneously
+_defend_pending: dict[tuple[int, int], dict] = {}
+
+
+def _parse_coords_time(raw: str) -> tuple[str, str]:
+    """Split a combined 'coords · arrival' string into (coords, arrival)."""
+    coord_m = re.search(r'(\(?\s*-?\d+\s*\|\s*-?\d+\s*\)?)', raw)
+    if coord_m:
+        coords  = coord_m.group(1).strip()
+        arrival = raw[coord_m.end():].strip(' ·-,')
+    else:
+        coords  = raw
+        arrival = ""
+    return coords, arrival
+
+
+class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Truppenziel"):
+    troop_goal = discord.ui.TextInput(
+        label="Benötigte Truppen (Ziel)",
         placeholder="z.B. 10k oder 5000",
-        max_length=20,
+        required=False, max_length=20,
     )
-    ratio        = discord.ui.TextInput(
-        label="Verteilung Fuß/Pferd (optional)", required=False,
+    ratio = discord.ui.TextInput(
+        label="Verteilung Fuß/Pferd (optional)",
         placeholder="z.B. 60/40  oder  reine Imps",
-        max_length=60,
+        required=False, max_length=80,
     )
 
+    def __init__(self, key: tuple[int, int]):
+        super().__init__()
+        self._key = key
+
     async def on_submit(self, interaction: discord.Interaction):
-        raw = self.coords_time.value.strip()
-        # Extract coord part "(102|47)" and arrival time from combined field
-        coord_m = re.search(r'(\(?\s*-?\d+\s*\|\s*-?\d+\s*\)?)', raw)
-        coords  = coord_m.group(1).strip() if coord_m else raw
-        arrival = raw[coord_m.end():].strip(' ·-,') if coord_m else ""
+        data = _defend_pending.pop(self._key, None)
+        if not data:
+            await interaction.response.send_message(
+                "❌ Session abgelaufen — bitte Defend-Anfrage neu starten.", ephemeral=True
+            )
+            return
         await _create_defend_channel(
             interaction,
-            defender=self.defender.value.strip(),
-            attacker=self.attacker.value.strip(),
-            coords=coords,
+            **data,
             troop_goal=self.troop_goal.value.strip(),
             ratio=self.ratio.value.strip(),
-            notes="",
-            arrival_1=arrival,
-            arrival_2="",
-            timed=False,
         )
 
 
-class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
-    """Timed defend — two arrival times, calculates between-defense window."""
-    defender     = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
-    attacker     = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords       = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
-    arrivals     = discord.ui.TextInput(label="Ankunftszeiten (Welle1 · Welle2)", placeholder="z.B. 23:45 UTC · 00:10 UTC", max_length=60)
-    troop_goal   = discord.ui.TextInput(
-        label="Benötigte Truppen (Ziel)", required=False,
-        placeholder="z.B. 10k oder 5000",
-        max_length=20,
-    )
+class DefendStep2View(discord.ui.View):
+    """Ephemeral view shown after step 1 — opens the step-2 modal."""
+    def __init__(self, key: tuple[int, int]):
+        super().__init__(timeout=300)
+        self._key = key
+
+    @discord.ui.button(label="⚔️ Weiter: Truppenziel →", style=discord.ButtonStyle.primary)
+    async def open_step2(self, interaction: discord.Interaction, _btn: discord.ui.Button):
+        await interaction.response.send_modal(DefendStep2Modal(self._key))
+
+
+class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
+    """Step 1 — basic defend info."""
+    defender    = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
+    attacker    = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
+    coords      = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    arrival     = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=40)
+    notes       = discord.ui.TextInput(label="Notizen (optional)", required=False,
+                                       style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Split "23:45 UTC · 00:10 UTC" into two arrival times
-        raw_arr = self.arrivals.value.strip()
-        arr_parts = re.split(r'\s*[·|/]\s*', raw_arr, maxsplit=1)
-        arrival_1 = arr_parts[0].strip() if arr_parts else raw_arr
-        arrival_2 = arr_parts[1].strip() if len(arr_parts) > 1 else ""
-        await _create_defend_channel(
-            interaction,
-            defender=self.defender.value.strip(),
-            attacker=self.attacker.value.strip(),
-            coords=self.coords.value.strip(),
-            troop_goal=self.troop_goal.value.strip(),
-            ratio="",
-            notes="",
-            arrival_1=arrival_1,
-            arrival_2=arrival_2,
-            timed=True,
+        key = (interaction.guild_id, interaction.user.id)
+        _defend_pending[key] = dict(
+            defender  = self.defender.value.strip(),
+            attacker  = self.attacker.value.strip(),
+            coords    = self.coords.value.strip(),
+            notes     = self.notes.value.strip(),
+            arrival_1 = self.arrival.value.strip(),
+            arrival_2 = "",
+            timed     = False,
+        )
+        await interaction.response.send_message(
+            "✅ **Schritt 1 gespeichert!**\nJetzt Truppenziel & Verteilung eingeben:",
+            view=DefendStep2View(key),
+            ephemeral=True,
+        )
+
+
+class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend (1/2)"):
+    """Step 1 — timed defend with two arrival times."""
+    defender  = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
+    attacker  = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
+    coords    = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    arrival   = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=40)
+    arrival_2 = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC", max_length=40)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        key = (interaction.guild_id, interaction.user.id)
+        _defend_pending[key] = dict(
+            defender  = self.defender.value.strip(),
+            attacker  = self.attacker.value.strip(),
+            coords    = self.coords.value.strip(),
+            notes     = "",
+            arrival_1 = self.arrival.value.strip(),
+            arrival_2 = self.arrival_2.value.strip(),
+            timed     = True,
+        )
+        await interaction.response.send_message(
+            "✅ **Schritt 1 gespeichert!**\nJetzt Truppenziel eingeben:",
+            view=DefendStep2View(key),
+            ephemeral=True,
         )
 
 
