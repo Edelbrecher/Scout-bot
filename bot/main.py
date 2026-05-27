@@ -369,6 +369,73 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
     })
 
 
+async def handle_refresh_request_hub(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Refresh the hub message embed + view without recreating the channel."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    hub = await database.get_request_hub(guild_id)
+    if not hub:
+        return aiohttp_web.json_response({"ok": False, "error": "no hub configured"}, status=404)
+
+    channel = guild.get_channel(int(hub["channel_id"]))
+    if not channel:
+        try:
+            channel = await guild.fetch_channel(int(hub["channel_id"]))
+        except Exception:
+            return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+
+    lang = await get_guild_lang(guild_id)
+    from cogs.hub import RequestHubView
+    embed = discord.Embed(
+        title=t(lang, "hub.title"),
+        description=t(lang, "hub.description"),
+        color=discord.Color.blurple(),
+    )
+
+    # Try to edit existing message; fall back to deleting + sending new
+    old_msg_id = hub.get("message_id")
+    new_msg = None
+    if old_msg_id:
+        try:
+            old_msg = await channel.fetch_message(int(old_msg_id))
+            await old_msg.delete()
+        except Exception:
+            pass
+
+    try:
+        new_msg = await channel.send(embed=embed, view=RequestHubView())
+        await database.set_request_hub(guild_id, str(channel.id), channel.name, str(new_msg.id))
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    # Also ensure archive channel is in the correct category
+    config = await database.get_guild_config(guild_id)
+    try:
+        category = await _get_or_create_category(guild, config)
+        archive_channel_id = (config or {}).get("archive_channel_id")
+        if archive_channel_id:
+            existing = guild.get_channel(int(archive_channel_id))
+            if not existing:
+                try:
+                    existing = await guild.fetch_channel(int(archive_channel_id))
+                except Exception:
+                    existing = None
+            if existing and isinstance(existing, discord.TextChannel) and existing.category_id != category.id:
+                await existing.edit(category=category)
+    except Exception:
+        pass
+
+    return aiohttp_web.json_response({"ok": True})
+
+
 async def handle_check_permissions(request: aiohttp_web.Request) -> aiohttp_web.Response:
     """Check if bot has required permissions in configured channels."""
     try:
@@ -589,6 +656,7 @@ async def start_api_server():
     app.router.add_post("/api/hero-scout-build-library", handle_build_hero_library)
     app.router.add_get("/api/hero-scout-library-status", handle_hero_library_status)
     app.router.add_post("/api/refresh-res-push", handle_refresh_res_push)
+    app.router.add_post("/api/refresh-request-hub", handle_refresh_request_hub)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

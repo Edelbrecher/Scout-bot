@@ -5318,6 +5318,26 @@ async def create_request_hub(request: Request, guild_id: str):
         return RedirectResponse(f"/guild/{guild_id}?error=hub_create_failed", status_code=303)
 
 
+@app.post("/guild/{guild_id}/request-hub/refresh")
+async def refresh_request_hub(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "http://bot:7777/api/refresh-request-hub",
+                json={"guild_id": guild_id},
+            )
+            data = resp.json()
+            if data.get("ok"):
+                return RedirectResponse(f"/guild/{guild_id}?saved=hub_refreshed", status_code=303)
+            return RedirectResponse(f"/guild/{guild_id}?error=hub_refresh_failed&detail={data.get('error','')}", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/guild/{guild_id}?error=hub_refresh_failed", status_code=303)
+
+
 @app.post("/guild/{guild_id}/request-hub/clear")
 async def clear_request_hub(request: Request, guild_id: str):
     session, err = _require_session(request)
