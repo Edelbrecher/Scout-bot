@@ -343,13 +343,21 @@ class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Truppen
                 "❌ Session abgelaufen — bitte Defend-Anfrage neu starten.", ephemeral=True
             )
             return
-        await _create_defend_channel(
-            interaction,
-            **data,
-            troop_goal=self.troop_goal.value.strip(),
-            ratio=self.ratio.value.strip(),
-        )
-
+        try:
+            await _create_defend_channel(
+                interaction,
+                **data,
+                troop_goal=self.troop_goal.value.strip(),
+                ratio=self.ratio.value.strip(),
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[DefendStep2Modal] ERROR in _create_defend_channel: {e}")
+            try:
+                await interaction.followup.send(f"❌ Fehler: {e}", ephemeral=True)
+            except Exception:
+                pass
 
 
 class DefendStep2View(discord.ui.View):
