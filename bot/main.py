@@ -238,12 +238,24 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
 
 
 async def _get_or_create_category(guild: discord.Guild, config: dict | None) -> discord.CategoryChannel:
-    """Return configured category or create a default 'TravOps' category."""
+    """Return configured category (by ID or name), or create a default 'TravOps' category."""
     if config and config.get("category_id"):
         cat = guild.get_channel(int(config["category_id"]))
         if cat and isinstance(cat, discord.CategoryChannel):
             return cat
-    # Auto-create category
+        # Try API fetch for stale cache
+        try:
+            cat = await guild.fetch_channel(int(config["category_id"]))
+            if cat and isinstance(cat, discord.CategoryChannel):
+                return cat
+        except Exception:
+            pass
+    # Search existing categories by name before creating
+    for ch in guild.categories:
+        if ch.name.lower() == "travops":
+            await database.set_category(guild_id=str(guild.id), category_id=str(ch.id))
+            return ch
+    # Auto-create category as last resort
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),

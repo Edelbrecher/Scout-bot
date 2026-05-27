@@ -25,17 +25,22 @@ async def _get_config_and_category(guild: discord.Guild) -> tuple[dict | None, d
     if not config:
         return None, None
     category_id = config.get("category_id")
-    if not category_id:
-        return config, None
-    # Try cache first, then API fetch (handles stale cache / bot restart)
-    category = guild.get_channel(int(category_id))
-    if not category:
-        try:
-            category = await guild.fetch_channel(int(category_id))
-        except Exception:
-            category = None
-    if category and isinstance(category, discord.CategoryChannel):
-        return config, category
+    if category_id:
+        # Try cache first, then API fetch (handles stale cache / bot restart)
+        category = guild.get_channel(int(category_id))
+        if not category:
+            try:
+                category = await guild.fetch_channel(int(category_id))
+            except Exception:
+                category = None
+        if category and isinstance(category, discord.CategoryChannel):
+            return config, category
+    # Fallback: find existing TravOps category by name (no new creation)
+    for ch in guild.categories:
+        if ch.name.lower() == "travops":
+            # Persist so future lookups are fast
+            await database.set_category(guild_id=str(guild.id), category_id=str(ch.id))
+            return config, ch
     return config, None
 
 
