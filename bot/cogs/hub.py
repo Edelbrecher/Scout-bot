@@ -684,6 +684,37 @@ async def _get_or_create_private_category(guild: discord.Guild, lang: str) -> di
 
 
 # ---------------------------------------------------------------------------
+# Private Channel Name Modal
+# ---------------------------------------------------------------------------
+
+class PrivateChannelNameModal(discord.ui.Modal):
+    """Ask user for a channel name (usually their Travian player name)."""
+
+    channel_label = discord.ui.TextInput(
+        label="Channel-Name / Travian-Spielername",
+        placeholder="z.B. Currax",
+        max_length=40,
+    )
+
+    def __init__(self, lang: str = "de"):
+        title = "🔒 Privaten Channel erstellen" if lang == "de" else "🔒 Create Private Channel"
+        super().__init__(title=title)
+        self.lang = lang
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await _do_create_private_channel(interaction, self.channel_label.value.strip())
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                await interaction.followup.send(f"⚠️ Fehler: {e}", ephemeral=True)
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
 # Request Hub View (7 buttons, persistent)
 # ---------------------------------------------------------------------------
 
@@ -746,95 +777,93 @@ class RequestHubView(discord.ui.View):
     async def hub_private_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await require_premium(interaction):
             return
-        # Defer immediately so Discord doesn't time out while we do DB + API calls
-        await interaction.response.defer(ephemeral=True)
+        lang = await get_guild_lang(str(interaction.guild_id))
+        await interaction.response.send_modal(PrivateChannelNameModal(lang=lang))
 
-        try:
-            await self._create_private_channel(interaction)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            try:
-                await interaction.followup.send(f"⚠️ Fehler: {e}", ephemeral=True)
-            except Exception:
-                pass
+    async def _create_private_channel(self, interaction: discord.Interaction, channel_label: str):
+        await _do_create_private_channel(interaction, channel_label)
 
-    async def _create_private_channel(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        lang = await get_guild_lang(str(guild.id))
 
-        # Check if the user already has a private channel
-        existing = await database.get_private_channel(str(guild.id), str(interaction.user.id))
-        if existing:
-            ch = guild.get_channel(int(existing["channel_id"]))
-            if ch:
-                await interaction.followup.send(
-                    t(lang, "private.already_exists", channel=ch.mention), ephemeral=True
-                )
-                return
-            # Channel was deleted externally — clean up and recreate
-            await database.delete_private_channel_by_id(existing["channel_id"])
+async def _do_create_private_channel(interaction: discord.Interaction, channel_label: str):
+    """Standalone helper — called from both PrivateChannelNameModal and RequestHubView."""
+    guild = interaction.guild
+    lang = await get_guild_lang(str(guild.id))
 
-        config = await database.get_guild_config(str(guild.id))
+    # Check if the user already has a private channel
+    existing = await database.get_private_channel(str(guild.id), str(interaction.user.id))
+    if existing:
+        ch = guild.get_channel(int(existing["channel_id"]))
+        if ch:
+            await interaction.followup.send(
+                t(lang, "private.already_exists", channel=ch.mention), ephemeral=True
+            )
+            return
+        # Channel was deleted externally — clean up and recreate
+        await database.delete_private_channel_by_id(existing["channel_id"])
 
-        # Get or create 'Privat Channels' category
-        category = await _get_or_create_private_category(guild, lang)
+    config = await database.get_guild_config(str(guild.id))
 
-        # Build permission overwrites
-        overwrites: dict = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            guild.me: discord.PermissionOverwrite(
-                view_channel=True, send_messages=True,
-                embed_links=True, manage_channels=True,
-            ),
-            interaction.user: discord.PermissionOverwrite(
+    # Get or create 'Privat Channels' category
+    category = await _get_or_create_private_category(guild, lang)
+
+    # Build permission overwrites
+    overwrites: dict = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True,
+            embed_links=True, manage_channels=True,
+        ),
+        interaction.user: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, attach_files=True,
+        ),
+    }
+    # Grant access to configured private-channel roles (Lead, Co-Lead…)
+    # Falls back to allowed_role_ids if private_channel_role_ids is not set.
+    priv_role_ids = ((config or {}).get("private_channel_role_ids") or "").strip()
+    role_source = priv_role_ids if priv_role_ids else ((config or {}).get("allowed_role_ids") or "")
+    for role_id_str in role_source.split(","):
+        role_id_str = role_id_str.strip()
+        if not role_id_str:
+            continue
+        role = guild.get_role(int(role_id_str))
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(
                 view_channel=True, send_messages=True, attach_files=True,
-            ),
-        }
-        # Grant access to all configured allowed roles (Leads etc.)
-        for role_id_str in ((config or {}).get("allowed_role_ids") or "").split(","):
-            role_id_str = role_id_str.strip()
-            if not role_id_str:
-                continue
-            role = guild.get_role(int(role_id_str))
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(
-                    view_channel=True, send_messages=True, attach_files=True,
-                )
+            )
 
-        channel_name = f"private-{_safe(interaction.user.display_name)}"[:100]
-        print(f"[hub] Creating private channel '{channel_name}' for {interaction.user} in guild {guild.id}", flush=True)
+    channel_name = f"private-{_safe(channel_label)}"[:100]
+    print(f"[hub] Creating private channel '{channel_name}' for {interaction.user} in guild {guild.id}", flush=True)
 
-        new_channel = await guild.create_text_channel(
-            name=channel_name,
-            category=category,
-            topic=f"private:{interaction.user.id}",
-            overwrites=overwrites,
-        )
+    new_channel = await guild.create_text_channel(
+        name=channel_name,
+        category=category,
+        topic=f"private:{interaction.user.id}",
+        overwrites=overwrites,
+    )
 
-        # Save to DB
-        await database.set_private_channel(str(guild.id), str(interaction.user.id), str(new_channel.id))
+    # Save to DB
+    await database.set_private_channel(str(guild.id), str(interaction.user.id), str(new_channel.id))
 
-        # Post welcome embed with grant/revoke buttons
-        embed = discord.Embed(
-            title=t(lang, "private.welcome_title", user=interaction.user.display_name),
-            description=t(lang, "private.welcome_desc"),
-            color=discord.Color.from_rgb(124, 58, 237),
-        )
-        embed.set_footer(**travops_footer(interaction.user.display_name))
-        msg = await new_channel.send(
-            content=interaction.user.mention,
-            embed=embed,
-            view=PrivateChannelView(),
-        )
-        try:
-            await msg.pin()
-        except Exception:
-            pass
+    # Post welcome embed with grant/revoke buttons
+    embed = discord.Embed(
+        title=t(lang, "private.welcome_title", user=interaction.user.display_name),
+        description=t(lang, "private.welcome_desc"),
+        color=discord.Color.from_rgb(124, 58, 237),
+    )
+    embed.set_footer(**travops_footer(interaction.user.display_name))
+    msg = await new_channel.send(
+        content=interaction.user.mention,
+        embed=embed,
+        view=PrivateChannelView(),
+    )
+    try:
+        await msg.pin()
+    except Exception:
+        pass
 
-        await interaction.followup.send(
-            t(lang, "private.created", channel=new_channel.mention), ephemeral=True
-        )
+    await interaction.followup.send(
+        t(lang, "private.created", channel=new_channel.mention), ephemeral=True
+    )
 
 
 # ---------------------------------------------------------------------------

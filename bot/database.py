@@ -238,6 +238,7 @@ async def init_db():
             "tw_world TEXT",
             "poll_channel_id TEXT",
             "hero_scout_channel_id TEXT",
+            "private_channel_role_ids TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")

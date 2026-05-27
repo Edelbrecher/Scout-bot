@@ -1439,7 +1439,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-    if field not in {"allowed_role_ids", "res_manager_role_ids"}:
+    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
@@ -3838,6 +3838,8 @@ async def farming_page(
     farm_list = await database.get_farm_list(guild_id)
     cross_reference = await database.get_farming_cross_reference(guild_id, min_days=min_days)
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
+    # All coords the user has on their farmlist (active or inactive)
+    farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
 
     # Growth analysis
     growth_data = await database.get_player_growth(guild_id, limit=100)
@@ -3869,6 +3871,7 @@ async def farming_page(
         "farm_list": farm_list,
         "cross_reference": cross_reference,
         "cross_ref_coords": cross_ref_coords,
+        "farm_list_coords": farm_list_coords,
         "min_days": min_days,
         "min_pop": min_pop,
         "max_pop": max_pop,

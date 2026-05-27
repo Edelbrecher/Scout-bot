@@ -44,8 +44,13 @@
     </h2>
     <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem;" data-i18n="settings.roles.hint">Bestimme welche Rollen auf welche Bereiche zugreifen dürfen. Änderungen wirken sofort.</p>
     {% if roles %}
-    {% set scout_roles = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
-    {% set res_roles   = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+    {% set scout_roles   = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+    {% set res_roles     = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+    {% set private_roles = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
+    <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">
+      🔒 <strong>Privater Channel</strong>: Rollen die automatisch Zugriff auf alle privaten Channels erhalten.<br>
+      Falls keine Rolle gesetzt ist, werden die <em>Scout</em>-Rollen als Fallback verwendet.
+    </p>
     <div style="overflow-x:auto;">
       <table class="table">
         <thead>
@@ -54,6 +59,7 @@
             <th data-i18n="settings.roles.col.id">ID</th>
             <th data-i18n="settings.roles.col.scout">📁 Scout</th>
             <th data-i18n="settings.roles.col.res">🪖 Res-Answer</th>
+            <th>🔒 Privat</th>
           </tr>
         </thead>
         <tbody>
@@ -76,6 +82,11 @@
               <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"
                 data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_manager_role_ids"
               >{{ '✅' if role.id in res_roles else '○' }}</button>
+            </td>
+            <td style="text-align:center;">
+              <button class="role-toggle {% if role.id in private_roles %}active{% endif %}"
+                data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="private_channel_role_ids"
+              >{{ '✅' if role.id in private_roles else '○' }}</button>
             </td>
           </tr>
           {% endif %}
