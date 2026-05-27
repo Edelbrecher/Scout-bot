@@ -782,6 +782,15 @@ async def set_category(guild_id: str, category_id: str):
         await db.commit()
 
 
+async def set_archive_channel_id(guild_id: str, archive_channel_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET archive_channel_id = ? WHERE guild_id = ?",
+            (archive_channel_id, guild_id),
+        )
+        await db.commit()
+
+
 async def activate_guild_subscription(guild_id: str, status: str, plan: str):
     """Copy user subscription status/plan onto the guild so the dashboard allows access."""
     async with aiosqlite.connect(DB_PATH) as db:

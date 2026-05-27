@@ -311,6 +311,32 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
 
     await database.set_request_hub(guild_id, str(channel.id), channel.name, str(msg.id))
 
+    # Ensure archive channel exists in the same category
+    archive_channel_id = (config or {}).get("archive_channel_id")
+    archive_exists = False
+    if archive_channel_id:
+        existing = guild.get_channel(int(archive_channel_id))
+        archive_exists = existing is not None and existing.category_id == category.id
+    if not archive_exists:
+        try:
+            archive_overwrites = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                guild.me: discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True,
+                    embed_links=True, attach_files=True, manage_channels=True,
+                ),
+            }
+            archive_ch = await guild.create_text_channel(
+                name="scout-archive",
+                category=category,
+                topic="Scout-Archiv — automatisch befüllt",
+                overwrites=archive_overwrites,
+            )
+            await database.set_archive_channel_id(guild_id, str(archive_ch.id))
+            print(f"[hub] Created scout-archive channel {archive_ch.id} in category {category.id}")
+        except Exception as e:
+            print(f"[hub] Could not create archive channel: {e}")
+
     return aiohttp_web.json_response({
         "ok": True,
         "channel_id": str(channel.id),
