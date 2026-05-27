@@ -340,6 +340,11 @@ class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Truppen
             ratio=self.ratio.value.strip(),
         )
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        import traceback
+        print(f"[DefendStep2Modal] ERROR: {error}")
+        traceback.print_exc()
+
 
 class DefendStep2View(discord.ui.View):
     """Ephemeral view shown after step 1 — opens the step-2 modal."""
@@ -377,6 +382,11 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
             view=DefendStep2View(key),
             ephemeral=True,
         )
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        import traceback
+        print(f"[DefendModal] ERROR: {error}")
+        traceback.print_exc()
 
 
 class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend (1/2)"):
