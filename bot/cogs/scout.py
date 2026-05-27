@@ -294,43 +294,52 @@ def parse_scout_report(text: str) -> dict:
     result["defender_troop_positions"] = defender_sent
     if defender_losses: result["defender_loss_positions"] = defender_losses
 
-    # Resources — label-based first, then context-aware 4-number fallback
-    m = _RESOURCE_RE.search(text)
-    if m:
-        w, c, i, cr = [_clean_num(x) for x in m.groups()]
-        result["resources"] = {"wood": w, "clay": c, "iron": i, "crop": cr, "total": w+c+i+cr}
-    else:
-        # Fallback: look for 4-number group near a resource-related keyword,
-        # OR in a "Loot" / "Beute" / "Haul" section.
-        # Avoid picking troop rows (which are usually in a table with many columns).
-        _RES_CONTEXT_RE = re.compile(
-            r"(?:ressourcen|resources|beute|loot|haul|stolen|gestohlen)[^\n]*\n?"
-            r"[^\n]*?(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)",
-            re.IGNORECASE,
-        )
+    # Resources — try multiple strategies in order of confidence
+    def _extract_resources_from_text(t: str) -> dict | None:
+        # Strategy 1: explicit labels (Holz/Wood + Lehm/Clay + Eisen/Iron + Korn/Crop)
+        m = _RESOURCE_RE.search(t)
+        if m:
+            w, c, i, cr = [_clean_num(x) for x in m.groups()]
+            return {"wood": w, "clay": c, "iron": i, "crop": cr, "total": w+c+i+cr}
+
+        # Strategy 2: "Beute" / "Loot" keyword → grab the next 4 numbers
+        # (icons between numbers are ignored — OCR renders them as misc chars)
+        beute_m = re.search(r"(?:beute|loot|haul|stolen|gestohlen)", t, re.IGNORECASE)
+        if beute_m:
+            # Take up to 300 chars after "Beute", find first 4 numbers
+            window = t[beute_m.end(): beute_m.end() + 300]
+            nums = re.findall(r"\d[\d.,]*", window)
+            # Skip "capacity" fraction: e.g. "92/1550" → skip pairs separated by /
+            # Remove slash-pairs
+            window_clean = re.sub(r"\d[\d.,]*/\d[\d.,]*", "", window)
+            nums = re.findall(r"\d[\d.,]*", window_clean)
+            if len(nums) >= 4:
+                vals = [_clean_num(n) for n in nums[:4]]
+                # Sanity: resources should be >= 0 and total < 5_000_000
+                if sum(vals) < 5_000_000:
+                    return {"wood": vals[0], "clay": vals[1], "iron": vals[2],
+                            "crop": vals[3], "total": sum(vals)}
+
+        # Strategy 3: generic 4-number line, skip troop rows (>5 numbers on same line)
         best, best_total = None, 0
-        # Prefer context match
-        for mm in _RES_CONTEXT_RE.finditer(text):
+        for mm in _RES_4NUM_RE.finditer(t):
+            line_start = t.rfind("\n", 0, mm.start()) + 1
+            line_end   = t.find("\n", mm.end())
+            line = t[line_start: line_end if line_end != -1 else len(t)]
+            if len(re.findall(r"\d[\d.,]*", line)) > 5:
+                continue  # troop row
             vals = [_clean_num(x) for x in mm.groups()]
-            t = sum(vals)
-            if t > best_total:
-                best, best_total = vals, t
-        # Generic fallback only if no context match — skip rows that look like
-        # troop tables (line has more than 4 numbers = troop row)
-        if not best:
-            for mm in _RES_4NUM_RE.finditer(text):
-                line_start = text.rfind("\n", 0, mm.start()) + 1
-                line_end   = text.find("\n", mm.end())
-                line = text[line_start: line_end if line_end != -1 else len(text)]
-                if len(re.findall(r"\d[\d.,]*", line)) > 5:
-                    continue  # too many numbers → troop row, skip
-                vals = [_clean_num(x) for x in mm.groups()]
-                t = sum(vals)
-                if t > best_total:
-                    best, best_total = vals, t
+            s = sum(vals)
+            if s > best_total:
+                best, best_total = vals, s
         if best and best_total > 0:
-            result["resources"] = {"wood": best[0], "clay": best[1],
-                                   "iron": best[2], "crop": best[3], "total": best_total}
+            return {"wood": best[0], "clay": best[1],
+                    "iron": best[2], "crop": best[3], "total": best_total}
+        return None
+
+    res = _extract_resources_from_text(text)
+    if res:
+        result["resources"] = res
 
     # Statistics (search full text — usually in its own section below)
     m = _COMBAT_STR_RE.search(text)
@@ -884,7 +893,10 @@ class Scout(commands.Cog):
                     await message.add_reaction("📋" if is_report else "🔍")
                 except discord.HTTPException:
                     pass
-                print(f"[scout] {'report' if is_report else 'ocr'} report saved for ch {channel_id}, enemy={enemy_player}", flush=True)
+                res_dbg = parsed.get("resources")
+                print(f"[scout] {'report' if is_report else 'ocr'} report saved for ch {channel_id}, enemy={enemy_player}, resources={res_dbg}", flush=True)
+                if not res_dbg:
+                    print(f"[scout][ocr_dump]\n{ocr_text}\n[/ocr_dump]", flush=True)
 
             except Exception as e:
                 import traceback
