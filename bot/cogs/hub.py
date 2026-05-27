@@ -49,6 +49,28 @@ def _build_overwrites(guild: discord.Guild, config: dict, requester: discord.Mem
     return overwrites
 
 
+def _build_defend_overwrites(guild: discord.Guild, config: dict, requester: discord.Member) -> dict:
+    """Like _build_overwrites but uses defend_role_ids (fallback: allowed_role_ids)."""
+    defend_ids = (config.get("defend_role_ids") or "").strip()
+    role_source = defend_ids if defend_ids else (config.get("allowed_role_ids") or "")
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True,
+            embed_links=True, attach_files=True, manage_channels=True,
+        ),
+        requester: discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True),
+    }
+    for role_id_str in role_source.split(","):
+        role_id_str = role_id_str.strip()
+        if not role_id_str:
+            continue
+        role = guild.get_role(int(role_id_str))
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True)
+    return overwrites
+
+
 def _safe(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "-", s.lower())[:40].strip("-")
 
@@ -212,7 +234,7 @@ async def _create_defend_channel(
     topic = (f"{'Timed-Defend' if timed else 'Defend'}: {attacker} @ {coords} | "
              f"{arrival_1}{' → ' + arrival_2 if arrival_2 else ''}")
 
-    overwrites = _build_overwrites(guild, config, interaction.user)
+    overwrites = _build_defend_overwrites(guild, config, interaction.user)
     new_channel = await guild.create_text_channel(
         name=channel_name, category=category, topic=topic, overwrites=overwrites,
     )
