@@ -169,7 +169,8 @@ def _between_time(t1: datetime, t2: datetime) -> str:
 
 async def _create_defend_channel(
     interaction: discord.Interaction,
-    defender: str, attacker: str, coords: str, goal: str, notes: str,
+    defender: str, attacker: str, coords: str,
+    troop_goal: str, ratio: str, notes: str,
     arrival_1: str, arrival_2: str, timed: bool,
 ):
     """Shared logic for both Defend and TimedDefend modals."""
@@ -249,9 +250,10 @@ async def _create_defend_channel(
     else:
         embed.add_field(name=t(lang, "defend.field.arrival"), value=arrival_1, inline=True)
 
-    if goal:
-        # goal = free-text requirements field (e.g. "10k · 60/40 Fuß/Pferd")
-        embed.add_field(name="🎯 Anforderungen", value=goal, inline=False)
+    if troop_goal:
+        embed.add_field(name="🎯 Truppenziel", value=f"**{troop_goal}**", inline=True)
+    if ratio:
+        embed.add_field(name="⚖️ Verteilung Fuß/Pferd", value=ratio, inline=True)
     if notes:
         embed.add_field(name=t(lang, "defend.field.notes"), value=notes, inline=False)
     embed.set_footer(**travops_footer(t(lang, "reported_by", user=interaction.user.display_name)))
@@ -277,7 +279,8 @@ async def _create_defend_channel(
         type="timed_defend" if timed else "defend",
         attacker=attacker, coords=coords,
         arrival_time=arrival_db, notes=notes,
-        goal=goal,
+        goal=troop_goal,
+        ratio=ratio,
         requested_by_id=str(interaction.user.id),
         requested_by_name=interaction.user.display_name,
     )
@@ -288,23 +291,33 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
     """Plain defend — single arrival time."""
     defender     = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
     attacker     = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords       = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
-    arrival      = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=30)
-    requirements = discord.ui.TextInput(
-        label="Anforderungen (optional)", required=False,
-        placeholder="z.B. 10k · 60/40 Fuß/Pferd  oder  5k reine Imps",
-        max_length=80,
+    coords_time  = discord.ui.TextInput(label="Koords · Ankunftszeit", placeholder="z.B. (102|47) · 23:45 UTC", max_length=60)
+    troop_goal   = discord.ui.TextInput(
+        label="Benötigte Truppen (Ziel)", required=False,
+        placeholder="z.B. 10k oder 5000",
+        max_length=20,
+    )
+    ratio        = discord.ui.TextInput(
+        label="Verteilung Fuß/Pferd (optional)", required=False,
+        placeholder="z.B. 60/40  oder  reine Imps",
+        max_length=60,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        raw = self.coords_time.value.strip()
+        # Extract coord part "(102|47)" and arrival time from combined field
+        coord_m = re.search(r'(\(?\s*-?\d+\s*\|\s*-?\d+\s*\)?)', raw)
+        coords  = coord_m.group(1).strip() if coord_m else raw
+        arrival = raw[coord_m.end():].strip(' ·-,') if coord_m else ""
         await _create_defend_channel(
             interaction,
             defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
-            coords=self.coords.value.strip(),
-            goal=self.requirements.value.strip(),
+            coords=coords,
+            troop_goal=self.troop_goal.value.strip(),
+            ratio=self.ratio.value.strip(),
             notes="",
-            arrival_1=self.arrival.value.strip(),
+            arrival_1=arrival,
             arrival_2="",
             timed=False,
         )
@@ -315,19 +328,29 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
     defender     = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
     attacker     = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
     coords       = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
-    arrival      = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=30)
-    arrival_2    = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC (muss später sein)", max_length=30)
+    arrivals     = discord.ui.TextInput(label="Ankunftszeiten (Welle1 · Welle2)", placeholder="z.B. 23:45 UTC · 00:10 UTC", max_length=60)
+    troop_goal   = discord.ui.TextInput(
+        label="Benötigte Truppen (Ziel)", required=False,
+        placeholder="z.B. 10k oder 5000",
+        max_length=20,
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
+        # Split "23:45 UTC · 00:10 UTC" into two arrival times
+        raw_arr = self.arrivals.value.strip()
+        arr_parts = re.split(r'\s*[·|/]\s*', raw_arr, maxsplit=1)
+        arrival_1 = arr_parts[0].strip() if arr_parts else raw_arr
+        arrival_2 = arr_parts[1].strip() if len(arr_parts) > 1 else ""
         await _create_defend_channel(
             interaction,
             defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
             coords=self.coords.value.strip(),
-            goal="",
+            troop_goal=self.troop_goal.value.strip(),
+            ratio="",
             notes="",
-            arrival_1=self.arrival.value.strip(),
-            arrival_2=self.arrival_2.value.strip(),
+            arrival_1=arrival_1,
+            arrival_2=arrival_2,
             timed=True,
         )
 
@@ -401,7 +424,7 @@ def _fmt_troops(n: int) -> str:
 
 def _build_defend_tracking_embed(
     contributions: list[dict], lang: str, coords: str, tw_world: str | None,
-    goal_raw: str = "",
+    goal_raw: str = "", ratio: str = "",
 ) -> discord.Embed:
     from cogs.res_push import _parse_amount
     total_troops = sum(c.get("amount_parsed", 0) for c in contributions)
@@ -409,8 +432,8 @@ def _build_defend_tracking_embed(
         (c.get("amount_parsed") or 0) * (c.get("grain_per_unit") or 1)
         for c in contributions
     )
-    _num_match  = re.search(r'(\d[\d.,]*\s*[km]?)\b', goal_raw, re.IGNORECASE) if goal_raw else None
-    goal_parsed = _parse_amount(_num_match.group(1).strip()) if _num_match else None
+    # goal_raw is now always a plain numeric string (e.g. "10k")
+    goal_parsed = _parse_amount(goal_raw.strip()) if goal_raw and goal_raw.strip() else None
 
     # ── Progress bar ──────────────────────────────────────────────────────────
     BAR_LEN = 20
@@ -460,6 +483,8 @@ def _build_defend_tracking_embed(
         value=f"**{_fmt_troops(total_grain)}** /h",
         inline=True,
     )
+    if ratio:
+        embed.add_field(name="⚖️ Verteilung", value=ratio, inline=True)
 
     # Individual contributions (newest 15)
     if contributions:
@@ -502,8 +527,9 @@ async def _save_and_update_tracking(
     tw_world      = (config or {}).get("tw_world") or ""
     coords        = (defend_rec or {}).get("coords", "")
     goal_raw      = (defend_rec or {}).get("goal", "") or ""
+    ratio         = (defend_rec or {}).get("ratio", "") or ""
 
-    tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world, goal_raw)
+    tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world, goal_raw, ratio)
 
     tracking_msg_id = (defend_rec or {}).get("tracking_msg_id")
     if tracking_msg_id:
