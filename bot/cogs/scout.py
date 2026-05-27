@@ -629,10 +629,17 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             embed.add_field(name=t(lang, "scout.field.info"), value=self.additional_info.value, inline=False)
         embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
 
+        tw_world = (config or {}).get("tw_world") or ""
+        coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", self.coordinates.value)
+        scout_troop_link = ""
+        if coord_match and tw_world:
+            cx, cy = coord_match.group(1), coord_match.group(2)
+            scout_troop_link = f"{tw_world.rstrip('/')}/build.php?gid=16&tt=2&eventType=4&x={cx}&y={cy}"
+
         await new_channel.send(
             content=t(lang, "scout.new_request", user=interaction.user.mention),
             embed=embed,
-            view=ScoutActionView(),
+            view=ScoutActionView(troop_link=scout_troop_link),
         )
         await interaction.followup.send(t(lang, "channel_created", channel=new_channel.mention), ephemeral=True)
 
