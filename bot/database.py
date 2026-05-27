@@ -297,11 +297,12 @@ async def init_db():
                 sent_at         TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
-        # Add tracking_msg_id column to defend_channels if not present
-        try:
-            await db.execute("ALTER TABLE defend_channels ADD COLUMN tracking_msg_id TEXT")
-        except Exception:
-            pass
+        # Add new columns to defend_channels if not present
+        for col in ("tracking_msg_id TEXT", "goal TEXT DEFAULT ''"):
+            try:
+                await db.execute(f"ALTER TABLE defend_channels ADD COLUMN {col}")
+            except Exception:
+                pass
         await db.commit()
 
 
@@ -1048,16 +1049,17 @@ async def is_request_hub(channel_id: str) -> bool:
 async def add_defend_channel(
     channel_id: str, guild_id: str, type: str,
     attacker: str, coords: str, arrival_time: str,
-    notes: str, requested_by_id: str, requested_by_name: str
+    notes: str, requested_by_id: str, requested_by_name: str,
+    goal: str = "",
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT INTO defend_channels
                 (channel_id, guild_id, type, attacker, coords, arrival_time,
-                 notes, requested_by_id, requested_by_name, status)
-            VALUES (?,?,?,?,?,?,?,?,?,'open')
+                 notes, goal, requested_by_id, requested_by_name, status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,'open')
         """, (channel_id, guild_id, type, attacker, coords, arrival_time,
-              notes, requested_by_id, requested_by_name))
+              notes, goal or "", requested_by_id, requested_by_name))
         await db.commit()
 
 

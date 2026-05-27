@@ -169,7 +169,7 @@ def _between_time(t1: datetime, t2: datetime) -> str:
 
 async def _create_defend_channel(
     interaction: discord.Interaction,
-    defender: str, attacker: str, coords: str, size: str, notes: str,
+    defender: str, attacker: str, coords: str, goal: str, notes: str,
     arrival_1: str, arrival_2: str, timed: bool,
 ):
     """Shared logic for both Defend and TimedDefend modals."""
@@ -219,19 +219,20 @@ async def _create_defend_channel(
     # Build Travian direct link to the target village
     tw_world = (config or {}).get("tw_world") or ""
     coord_match = re.search(r"(-?\d+)\s*[|]\s*(-?\d+)", coords)
+    travian_link = ""
     if coord_match and tw_world:
         cx, cy = coord_match.group(1), coord_match.group(2)
         travian_link = f"{tw_world.rstrip('/')}/karte.php?x={cx}&y={cy}"
-        coords_display = f"[{coords}]({travian_link})"
-    else:
-        coords_display = coords
 
     embed = discord.Embed(
         title=t(lang, "defend.timed_title") if timed else t(lang, "defend.title"),
+        url=travian_link or discord.utils.MISSING,   # clickable title
         color=discord.Color.from_rgb(239, 68, 68),
     )
     embed.add_field(name=t(lang, "defend.field.defender"), value=defender, inline=True)
     embed.add_field(name=t(lang, "defend.field.attacker"), value=attacker, inline=True)
+    # Target coords — show as hyperlink if we have a Travian URL
+    coords_display = f"[{coords}]({travian_link})" if travian_link else coords
     embed.add_field(name=t(lang, "defend.field.target"),   value=coords_display, inline=True)
 
     if timed and arrival_2:
@@ -246,8 +247,11 @@ async def _create_defend_channel(
     else:
         embed.add_field(name=t(lang, "defend.field.arrival"), value=arrival_1, inline=True)
 
-    if size:
-        embed.add_field(name=t(lang, "defend.field.size"), value=size, inline=True)
+    if goal:
+        from cogs.res_push import _parse_amount, _fmt as _fmt_res
+        goal_parsed = _parse_amount(goal)
+        goal_display = _fmt_res(goal_parsed) if goal_parsed else goal
+        embed.add_field(name="🎯 Truppen-Ziel", value=goal_display, inline=True)
     if notes:
         embed.add_field(name=t(lang, "defend.field.notes"), value=notes, inline=False)
     embed.set_footer(**travops_footer(t(lang, "reported_by", user=interaction.user.display_name)))
@@ -270,6 +274,7 @@ async def _create_defend_channel(
         type="timed_defend" if timed else "defend",
         attacker=attacker, coords=coords,
         arrival_time=arrival_db, notes=notes,
+        goal=goal,
         requested_by_id=str(interaction.user.id),
         requested_by_name=interaction.user.display_name,
     )
@@ -282,7 +287,11 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
     attacker = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
     coords   = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
     arrival  = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=30)
-    size     = discord.ui.TextInput(label="Angriffsgröße", placeholder="z.B. klein / mittel / ~500 Axt", required=False, max_length=60)
+    goal     = discord.ui.TextInput(
+        label="Truppen-Ziel (optional)", required=False,
+        placeholder="z.B. 5k, 10.000 — wie viele Truppen werden gebraucht?",
+        max_length=20,
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         await _create_defend_channel(
@@ -290,7 +299,7 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
             defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
             coords=self.coords.value.strip(),
-            size=self.size.value.strip(),
+            goal=self.goal.value.strip(),
             notes="",
             arrival_1=self.arrival.value.strip(),
             arrival_2="",
@@ -312,7 +321,7 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
             defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
             coords=self.coords.value.strip(),
-            size=self.size.value.strip(),
+            goal="",
             notes="",
             arrival_1=self.arrival.value.strip(),
             arrival_2=self.arrival_2.value.strip(),
@@ -337,29 +346,57 @@ def _fmt_troops(n: int) -> str:
 
 
 def _build_defend_tracking_embed(
-    contributions: list[dict], lang: str, coords: str, tw_world: str | None
+    contributions: list[dict], lang: str, coords: str, tw_world: str | None,
+    goal_raw: str = "",
 ) -> discord.Embed:
+    from cogs.res_push import _parse_amount
     total = sum(c.get("amount_parsed", 0) for c in contributions)
-    bar_blocks = min(20, max(1, len(contributions)))
-    bar = "🟥" * bar_blocks
+    goal_parsed = _parse_amount(goal_raw) if goal_raw else None
 
+    # ── Progress bar ──────────────────────────────────────────────────────────
+    BAR_LEN = 20
+    if goal_parsed and goal_parsed > 0:
+        pct = min(total / goal_parsed, 1.0)
+        filled = round(pct * BAR_LEN)
+        goal_reached = total >= goal_parsed
+        fill_emoji = "🟩" if goal_reached else "🟥"
+        bar = fill_emoji * filled + "⬜" * (BAR_LEN - filled)
+        pct_text = f"**{int(pct * 100)}%**  ({_fmt_troops(total)} / {_fmt_troops(goal_parsed)})"
+        if total > goal_parsed:
+            pct_text += f"  (+{_fmt_troops(total - goal_parsed)})"
+        progress_text = f"{bar}\n{pct_text}"
+        color = discord.Color.from_rgb(34, 197, 94) if goal_reached else discord.Color.from_rgb(239, 68, 68)
+    else:
+        # No goal set — just show a growing bar
+        bar_filled = min(BAR_LEN, max(1, len(contributions)))
+        bar = "🟥" * bar_filled + "⬜" * (BAR_LEN - bar_filled)
+        progress_text = f"{bar}\n**{_fmt_troops(total)}** Truppen"
+        color = discord.Color.from_rgb(239, 68, 68)
+
+    # ── Embed ─────────────────────────────────────────────────────────────────
     title = "⚔️ Truppen gesendet" if lang == "de" else "⚔️ Troops Sent"
-    embed = discord.Embed(title=title, color=discord.Color.from_rgb(239, 68, 68))
 
-    # Travian link
+    # Build Travian link for embed title
     coord_match = re.search(r"(-?\d+)\s*[|]\s*(-?\d+)", coords)
+    travian_link = ""
     if coord_match and tw_world:
         x, y = coord_match.group(1), coord_match.group(2)
-        link = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
-        embed.description = f"[🗺️ Ziel-Dorf öffnen: {coords}]({link})" if lang == "de" else f"[🗺️ Open target village: {coords}]({link})"
+        travian_link = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
+
+    embed = discord.Embed(
+        title=title,
+        url=travian_link or discord.utils.MISSING,
+        color=color,
+    )
+
+    # Prominent Travian link in description
+    if travian_link:
+        map_label = f"🗺️ **[Ziel-Dorf auf der Karte öffnen — {coords}]({travian_link})**"
+        embed.description = map_label
 
     # Progress bar + total
     total_label = "📊 Gesamt gesendet" if lang == "de" else "📊 Total sent"
-    embed.add_field(
-        name=total_label,
-        value=f"{bar}\n**{_fmt_troops(total)}** Truppen",
-        inline=False,
-    )
+    embed.add_field(name=total_label, value=progress_text, inline=False)
 
     # Individual contributions (last 15)
     if contributions:
@@ -430,8 +467,9 @@ class DefendSentModal(discord.ui.Modal):
         config        = await database.get_guild_config(guild_id)
         tw_world      = (config or {}).get("tw_world") or ""
         coords        = (defend_rec or {}).get("coords", "")
+        goal_raw      = (defend_rec or {}).get("goal", "") or ""
 
-        tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world)
+        tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world, goal_raw)
 
         # Edit or post the tracking message
         tracking_msg_id = (defend_rec or {}).get("tracking_msg_id")
