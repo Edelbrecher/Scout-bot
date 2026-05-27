@@ -152,14 +152,19 @@
   </div>
 </div>
 
-<!-- ── Detail Slide-Over ── -->
-<div id="detailOverlay" onclick="closeDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;"></div>
-<div id="detailPanel" style="display:none;position:fixed;right:0;top:0;height:100%;width:min(520px,100vw);background:var(--bg-card);border-left:1px solid var(--border);z-index:1001;overflow-y:auto;padding:1.5rem;box-shadow:-8px 0 32px rgba(0,0,0,0.4);transition:transform 0.25s;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
-    <h2 style="margin:0;" id="detailTitle">Scout-Details</h2>
-    <button onclick="closeDetail()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.5rem;">×</button>
+<!-- ── Detail Modal ── -->
+<div id="detailOverlay" onclick="closeDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;backdrop-filter:blur(3px);"></div>
+<div id="detailPanel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.96);width:min(700px,95vw);max-height:88vh;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;z-index:1001;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.6);transition:transform 0.18s,opacity 0.18s;opacity:0;">
+  <!-- Modal Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.4rem;border-bottom:1px solid var(--border);background:var(--bg-main);position:sticky;top:0;z-index:1;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <span style="font-size:1.25rem;">🔍</span>
+      <h2 style="margin:0;font-size:1.05rem;" id="detailTitle">Scout-Details</h2>
+    </div>
+    <button onclick="closeDetail()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);cursor:pointer;color:var(--text-muted);font-size:1.1rem;width:2rem;height:2rem;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">×</button>
   </div>
-  <div id="detailContent" style="font-size:0.9rem;">
+  <!-- Modal Body -->
+  <div id="detailContent" style="overflow-y:auto;max-height:calc(88vh - 60px);padding:1.25rem 1.4rem;font-size:0.9rem;">
     <div style="text-align:center;color:var(--text-muted);padding:2rem;">⏳ Laden…</div>
   </div>
 </div>
@@ -184,8 +189,9 @@
 .scout-corn-badge { font-size:0.72rem;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);border-radius:4px;padding:1px 6px;font-weight:700; }
 .scout-coords { background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);border-radius:4px;padding:1px 6px;font-size:0.82rem; }
 
-/* Detail panel closing */
-#detailPanel.closing { transform:translateX(100%); }
+/* Detail modal open/close */
+#detailPanel.open { transform:translate(-50%,-50%) scale(1); opacity:1; }
+#detailPanel.closing { transform:translate(-50%,-50%) scale(0.94); opacity:0; }
 
 .report-card { background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.85rem;margin-bottom:0.75rem; }
 .troop-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.4rem;margin-top:0.5rem; }
@@ -194,21 +200,31 @@
 .res-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem;margin-top:0.5rem; }
 .res-item { background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.18);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.78rem;text-align:center; }
 .res-label { color:var(--text-muted);font-size:0.7rem; }
+
+/* Detail modal tiles */
+.d-tile { background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.75rem; }
+.d-label { font-size:0.7rem;color:var(--text-muted);margin-bottom:0.2rem; }
+.d-val { font-weight:600;font-size:0.88rem; }
+.d-section-label { font-size:0.72rem;color:var(--text-muted);margin-bottom:0.4rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em; }
 </style>
 
 <script>
 // ── Detail panel ──────────────────────────────────────────────────────────
 function openDetail(channelId, guildId) {
-  document.getElementById('detailOverlay').style.display = 'block';
-  const panel = document.getElementById('detailPanel');
-  panel.style.display = 'block';
+  const overlay = document.getElementById('detailOverlay');
+  const panel   = document.getElementById('detailPanel');
+  overlay.style.display = 'block';
+  panel.style.display   = 'block';
   panel.classList.remove('closing');
+  requestAnimationFrame(() => panel.classList.add('open'));
   document.getElementById('detailContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">⏳ Laden…</div>';
+  document.body.style.overflow = 'hidden';
 
   fetch(`/guild/${guildId}/scout-channels/${channelId}`, {headers:{'Accept':'application/json'}})
     .then(r => r.json())
     .then(data => {
-      document.getElementById('detailTitle').textContent = `👤 ${data.ch.player || '—'}`;
+      const ch = data.ch;
+      document.getElementById('detailTitle').textContent = `${ch.player || '—'} · ${ch.coordinates || ''}`;
       try {
         document.getElementById('detailContent').innerHTML = renderDetail(data, guildId);
       } catch(e) {
@@ -223,113 +239,143 @@ function openDetail(channelId, guildId) {
 }
 
 function closeDetail() {
-  document.getElementById('detailOverlay').style.display = 'none';
-  document.getElementById('detailPanel').style.display = 'none';
+  const panel = document.getElementById('detailPanel');
+  panel.classList.add('closing');
+  panel.classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('detailOverlay').style.display = 'none';
+    panel.style.display = 'none';
+    panel.classList.remove('closing');
+  }, 180);
+  document.body.style.overflow = '';
 }
+
+// Close on Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 function renderDetail(data, guildId) {
   const ch = data.ch;
   const reports = data.reports || [];
-  let html = `
-    <div class="report-card">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.85rem;">
-        <div><span style="color:var(--text-muted);">Spieler</span><br><strong>${ch.player||'—'}</strong></div>
-        <div><span style="color:var(--text-muted);">Dorf</span><br><strong>${ch.village||'—'}</strong></div>
-        <div><span style="color:var(--text-muted);">Koordinaten</span><br><code>${ch.coordinates||'—'}</code></div>
-        <div><span style="color:var(--text-muted);">Scout-Zeitpunkt</span><br>${ch.scout_time||'—'}</div>
-        ${ch.additional_info ? `<div style="grid-column:1/-1"><span style="color:var(--text-muted);">Zusatzinfo</span><br>${ch.additional_info}</div>` : ''}
-        <div style="grid-column:1/-1"><span style="color:var(--text-muted);">Erstellt</span> <span style="font-family:monospace;font-size:0.8rem;">${(ch.created_at||'').slice(0,16)}</span></div>
-      </div>
-    </div>`;
+  const _safeJson = (s, fb) => { try { return JSON.parse(s) || fb; } catch { return fb; } };
 
+  // ── Info tiles ────────────────────────────────────────────────────────────
+  const infoBadge = ch.corn_scout
+    ? '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);border-radius:4px;padding:1px 7px;font-size:0.72rem;font-weight:700;">🌾🌾 Kornspäh</span>'
+    : '';
+  let html = `
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.6rem;margin-bottom:1rem;">
+    <div class="d-tile"><div class="d-label">👤 Spieler</div><div class="d-val">${ch.player||'—'}</div></div>
+    <div class="d-tile"><div class="d-label">🏠 Dorf</div><div class="d-val">${ch.village||'—'}</div></div>
+    <div class="d-tile"><div class="d-label">📍 Koordinaten</div><div class="d-val"><code style="font-size:0.85rem;">${ch.coordinates||'—'}</code></div></div>
+    <div class="d-tile"><div class="d-label">⏰ Bis wann</div><div class="d-val" style="font-size:0.82rem;">${ch.scout_time||'—'}</div></div>
+    <div class="d-tile"><div class="d-label">📅 Erstellt</div><div class="d-val" style="font-size:0.78rem;font-family:monospace;">${(ch.created_at||'').slice(0,16)}</div></div>
+    ${ch.additional_info ? `<div class="d-tile" style="grid-column:1/-1"><div class="d-label">💬 Zusatzinfo</div><div class="d-val">${ch.additional_info}</div></div>` : ''}
+  </div>`;
+
+  if (infoBadge) html += `<div style="margin-bottom:0.75rem;">${infoBadge}</div>`;
+
+  // ── Kornspäh calculator ───────────────────────────────────────────────────
   if (ch.corn_scout) {
-    html += `<div class="report-card" style="border-color:rgba(245,158,11,0.4);">
-      <div style="color:#f59e0b;font-weight:700;margin-bottom:0.4rem;">🌾🌾 Kornspäh-Rechner</div>
-      <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.5rem;">Formel: Kornproduktion = (R2 − R1) × 360 /h</p>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <div>
-          <label style="font-size:0.75rem;color:var(--text-muted);">Korn Scout 1</label><br>
+    html += `<div class="report-card" style="border-color:rgba(245,158,11,0.35);margin-bottom:1rem;">
+      <div style="color:#f59e0b;font-weight:700;margin-bottom:0.5rem;font-size:0.9rem;">🌾 Kornspäh-Rechner</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem;">Formel: Produktion = (R2 − R1) × 360 / Std.</div>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+        <div><div class="d-label">Scout 1</div>
           <input type="number" id="korn1" oninput="calcKorn()" placeholder="0"
-                 style="width:110px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.5rem;">
-        </div>
-        <div>
-          <label style="font-size:0.75rem;color:var(--text-muted);">Korn Scout 2</label><br>
+                 style="width:100px;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.9rem;"></div>
+        <div><div class="d-label">Scout 2</div>
           <input type="number" id="korn2" oninput="calcKorn()" placeholder="0"
-                 style="width:110px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.5rem;">
-        </div>
+                 style="width:100px;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.9rem;"></div>
+        <div id="kornResult" style="font-weight:700;color:#f59e0b;font-size:1rem;padding-bottom:0.3rem;"></div>
       </div>
-      <div id="kornResult" style="margin-top:0.5rem;font-weight:700;color:#f59e0b;"></div>
     </div>`;
   }
 
+  // ── Reports ───────────────────────────────────────────────────────────────
   if (reports.length === 0) {
-    html += `<div style="text-align:center;color:var(--text-muted);padding:1.5rem;">
-      <div style="font-size:1.8rem;margin-bottom:0.5rem;">📋</div>
-      <div>Noch kein Scout-Bericht erfasst.</div>
-      <div style="font-size:0.78rem;margin-top:0.4rem;">Text-Report in Discord einfügen oder Screenshot posten.</div>
+    html += `<div style="text-align:center;color:var(--text-muted);padding:2rem 1rem;background:var(--bg-main);border-radius:10px;border:1px dashed var(--border);">
+      <div style="font-size:2rem;margin-bottom:0.4rem;">📋</div>
+      <div style="font-weight:600;">Noch kein Scout-Bericht erfasst</div>
+      <div style="font-size:0.78rem;margin-top:0.3rem;">Text-Report in Discord einfügen oder Screenshot posten.</div>
     </div>`;
     return html;
   }
 
-  html += `<h3 style="margin:0.75rem 0 0.5rem;font-size:0.95rem;">📋 Berichte (${reports.length})</h3>`;
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+    <h3 style="margin:0;font-size:0.92rem;font-weight:700;">📋 Berichte</h3>
+    <span style="font-size:0.78rem;color:var(--text-muted);background:var(--bg-main);border:1px solid var(--border);border-radius:12px;padding:1px 8px;">${reports.length}</span>
+  </div>`;
+
   for (const r of reports) {
-    const _safeJson = (s, fallback) => { try { return JSON.parse(s) || fallback; } catch { return fallback; } };
     const troops = _safeJson(r.troops_json, {});
     const losses = _safeJson(r.losses_json, {});
     const res    = _safeJson(r.resources_json, null);
     const srcBadge = r.source === 'ocr'
-      ? '<span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;border-radius:4px;padding:1px 5px;">OCR</span>'
-      : '<span style="font-size:0.7rem;background:#14532d;color:#4ade80;border-radius:4px;padding:1px 5px;">Text</span>';
+      ? '<span style="font-size:0.68rem;background:#1e3a5f;color:#93c5fd;border-radius:4px;padding:1px 6px;font-weight:600;">OCR</span>'
+      : '<span style="font-size:0.68rem;background:#14532d;color:#4ade80;border-radius:4px;padding:1px 6px;font-weight:600;">Text</span>';
 
     html += `<div class="report-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-        <span style="font-size:0.8rem;color:var(--text-muted);">${(r.created_at||'').slice(0,16)}</span>
-        ${srcBadge}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <span style="font-size:0.78rem;color:var(--text-muted);">📅 ${(r.created_at||'').slice(0,16)}</span>
+        <div style="display:flex;gap:0.4rem;align-items:center;">${srcBadge}</div>
       </div>`;
 
+    // Resources tiles
     if (res) {
-      html += `<div style="margin-bottom:0.6rem;"><div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;">🌾 Ressourcen (gesamt: ${res.total?.toLocaleString()})</div>
+      html += `<div style="margin-bottom:0.75rem;">
+        <div class="d-section-label">🌾 Ressourcen · gesamt ${res.total?.toLocaleString('de-DE')}</div>
         <div class="res-grid">
-          <div class="res-item"><div class="res-label">Holz</div>${res.wood?.toLocaleString()}</div>
-          <div class="res-item"><div class="res-label">Lehm</div>${res.clay?.toLocaleString()}</div>
-          <div class="res-item"><div class="res-label">Eisen</div>${res.iron?.toLocaleString()}</div>
-          <div class="res-item"><div class="res-label">Korn</div>${res.crop?.toLocaleString()}</div>
-        </div></div>`;
+          <div class="res-item"><div class="res-label">🪵 Holz</div><strong>${(res.wood||0).toLocaleString('de-DE')}</strong></div>
+          <div class="res-item"><div class="res-label">🏺 Lehm</div><strong>${(res.clay||0).toLocaleString('de-DE')}</strong></div>
+          <div class="res-item"><div class="res-label">⚙️ Eisen</div><strong>${(res.iron||0).toLocaleString('de-DE')}</strong></div>
+          <div class="res-item"><div class="res-label">🌾 Korn</div><strong>${(res.crop||0).toLocaleString('de-DE')}</strong></div>
+        </div>
+      </div>`;
     }
 
-    if (Object.keys(troops).length) {
-      html += `<div><div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;">⚔️ Truppen</div><div class="troop-grid">`;
-      for (const [name, cnt] of Object.entries(troops)) {
+    // Troops tiles
+    const troopEntries = Object.entries(troops);
+    if (troopEntries.length) {
+      html += `<div style="margin-bottom:0.75rem;">
+        <div class="d-section-label">⚔️ Truppen</div>
+        <div class="troop-grid">`;
+      for (const [name, cnt] of troopEntries) {
         const loss = losses[name] || 0;
-        html += `<div class="troop-item">${name} <strong>${cnt}</strong>${loss ? ` <span style="color:#f87171">-${loss}</span>` : ''}</div>`;
+        html += `<div class="troop-item">
+          <span style="font-size:0.78rem;">${name}</span>
+          <div style="display:flex;gap:0.3rem;align-items:center;">
+            <strong>${cnt}</strong>
+            ${loss ? `<span style="color:#f87171;font-size:0.75rem;">-${loss}</span>` : ''}
+          </div>
+        </div>`;
       }
       html += `</div></div>`;
     }
 
     if (r.experience) {
-      html += `<div style="margin-top:0.4rem;font-size:0.78rem;color:#f59e0b;">⭐ Erfahrung: ${r.experience}</div>`;
+      html += `<div style="margin-bottom:0.5rem;"><span style="font-size:0.78rem;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);color:#f59e0b;border-radius:6px;padding:2px 8px;">⭐ Erfahrung: ${r.experience}</span></div>`;
     }
 
-    // Scout images
+    // Images
     const imgs = r.image_urls || [];
     if (imgs.length) {
-      html += `<div style="margin-top:0.6rem;"><div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;">🖼️ Screenshot(s)</div>
+      html += `<div style="margin-bottom:0.75rem;">
+        <div class="d-section-label">🖼️ Screenshot(s)</div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">`;
       for (const url of imgs) {
-        html += `<a href="${url}" target="_blank" rel="noopener">
+        html += `<a href="${url}" target="_blank" rel="noopener" style="display:block;">
           <img src="${url}" alt="Scout-Screenshot"
-               style="max-height:120px;max-width:200px;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;object-fit:contain;background:var(--bg-card);"
-               onerror="this.parentElement.style.display='none'">
+               style="max-height:140px;max-width:220px;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;object-fit:contain;background:var(--bg-main);transition:opacity 0.15s;"
+               onerror="this.closest('a').style.display='none'">
         </a>`;
       }
       html += `</div></div>`;
     }
 
     // Share button
-    html += `<div style="margin-top:0.6rem;text-align:right;">
+    html += `<div style="display:flex;justify-content:flex-end;padding-top:0.5rem;border-top:1px solid rgba(255,255,255,0.05);">
       <a href="/guild/${guildId}/scout/report/${r.id}/card" target="_blank"
-         style="font-size:0.75rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;padding:0.25rem 0.65rem;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;"
-         title="Scout-Karte als PNG herunterladen &amp; teilen">
+         style="font-size:0.75rem;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);color:#fbbf24;padding:0.25rem 0.75rem;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:0.35rem;">
         📤 Teilen
       </a>
     </div>`;

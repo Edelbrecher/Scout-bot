@@ -878,17 +878,38 @@ async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | No
 
 async def save_scout_image(
     guild_id: str, channel_id: str, discord_url: str,
-    discord_message_id: str = "", scout_report_id: int | None = None
+    discord_message_id: str = "", scout_report_id: int | None = None,
+    local_path: str = "",
 ) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
+        # Ensure local_path column exists (migration)
+        try:
+            await db.execute("ALTER TABLE scout_images ADD COLUMN local_path TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
         cur = await db.execute("""
             INSERT INTO scout_images
-                (scout_report_id, guild_id, channel_id, discord_url, discord_message_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (scout_report_id, guild_id, channel_id, discord_url, discord_message_id, local_path, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (scout_report_id, guild_id, channel_id, discord_url,
-              discord_message_id, datetime.utcnow().isoformat()))
+              discord_message_id, local_path, datetime.utcnow().isoformat()))
         await db.commit()
         return cur.lastrowid
+
+
+async def update_scout_image_local_path(image_id: int, local_path: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE scout_images SET local_path=? WHERE id=?", (local_path, image_id))
+        await db.commit()
+
+
+async def link_scout_image_to_report(image_id: int, report_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE scout_images SET scout_report_id=? WHERE id=?", (report_id, image_id))
+        await db.commit()
 
 
 async def upsert_enemy(

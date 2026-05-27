@@ -621,6 +621,8 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(UserTrackingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+Path("/app/data/scout_images").mkdir(parents=True, exist_ok=True)
+app.mount("/scout-images", StaticFiles(directory="/app/data/scout_images"), name="scout_images")
 
 from starlette.exceptions import HTTPException as StarletteHTTPException
 

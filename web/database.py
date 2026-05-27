@@ -2749,7 +2749,8 @@ async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT sr.*,
-                   GROUP_CONCAT(si.discord_url, '|||') AS image_urls
+                   GROUP_CONCAT(si.local_path, '|||') AS local_paths,
+                   GROUP_CONCAT(si.discord_url, '|||') AS discord_urls
             FROM scout_reports sr
             LEFT JOIN scout_images si ON si.scout_report_id = sr.id
             WHERE sr.channel_id = ?
@@ -2759,8 +2760,12 @@ async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
             rows = []
             for r in await cur.fetchall():
                 d = dict(r)
-                raw = d.pop("image_urls", None) or ""
-                d["image_urls"] = [u for u in raw.split("|||") if u]
+                local_raw   = d.pop("local_paths", None) or ""
+                discord_raw = d.pop("discord_urls", None) or ""
+                locals_ = [p for p in local_raw.split("|||") if p]
+                discords = [u for u in discord_raw.split("|||") if u]
+                # Prefer local paths (served via /scout-images/), fallback to Discord CDN
+                d["image_urls"] = [f"/scout-images/{p}" for p in locals_] or discords
                 rows.append(d)
             return rows
 

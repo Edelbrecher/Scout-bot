@@ -1,7 +1,9 @@
 import asyncio
 import io
 import json
+import os
 import re
+from pathlib import Path
 
 import discord
 from discord import app_commands
@@ -433,6 +435,22 @@ async def _try_ocr(image_bytes: bytes) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Image storage helper
+# ---------------------------------------------------------------------------
+
+_SCOUT_IMAGES_DIR = Path("/app/data/scout_images")
+
+def _save_image_locally(guild_id: str, image_id: int, image_bytes: bytes, ext: str = "png") -> str:
+    """Save image bytes to /app/data/scout_images/{guild_id}/{image_id}.ext.
+    Returns the relative path stored in DB, e.g. 'guild_id/123.png'."""
+    guild_dir = _SCOUT_IMAGES_DIR / guild_id
+    guild_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{image_id}.{ext}"
+    (guild_dir / filename).write_bytes(image_bytes)
+    return f"{guild_id}/{filename}"
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -797,13 +815,23 @@ class Scout(commands.Cog):
             try:
                 img_bytes  = await attachment.read()
                 image_url  = attachment.url
+                ext = (attachment.filename or "png").rsplit(".", 1)[-1].lower() or "png"
                 ocr_text   = await _try_ocr(img_bytes)
 
-                if not ocr_text:
-                    await database.save_scout_image(
-                        guild_id=guild_id, channel_id=channel_id,
-                        discord_url=image_url, discord_message_id=str(message.id),
+                # Save placeholder entry to get the DB id, then store locally
+                img_db_id = await database.save_scout_image(
+                    guild_id=guild_id, channel_id=channel_id,
+                    discord_url=image_url, discord_message_id=str(message.id),
+                )
+                try:
+                    local_rel = await asyncio.get_event_loop().run_in_executor(
+                        None, _save_image_locally, guild_id, img_db_id, img_bytes, ext
                     )
+                    await database.update_scout_image_local_path(img_db_id, local_rel)
+                except Exception as e_img:
+                    print(f"[scout] could not save image locally: {e_img}", flush=True)
+
+                if not ocr_text:
                     if not is_report and ch_info and ch_info.get("player"):
                         await database.upsert_enemy(
                             guild_id=guild_id, player_name=ch_info["player"],
@@ -822,11 +850,6 @@ class Scout(commands.Cog):
                     reason = parsed.get("invalid_reason", "unknown")
                     print(f"[scout] report rejected ({reason}) in ch {channel_id}", flush=True)
                     print(f"[scout][ocr_dump]\n{ocr_text}\n[/ocr_dump]", flush=True)
-                    # Save the image unlinked so it's not lost, but don't create an enemy entry
-                    await database.save_scout_image(
-                        guild_id=guild_id, channel_id=channel_id,
-                        discord_url=image_url, discord_message_id=str(message.id),
-                    )
                     try:
                         await message.add_reaction("❓")
                     except discord.HTTPException:
@@ -879,11 +902,8 @@ class Scout(commands.Cog):
                     experience=parsed.get("experience", 0),
                     stats_json=json.dumps({**(parsed.get("stats") or {}), "text_strike": parsed.get("text_strike", False)}),
                 )
-                await database.save_scout_image(
-                    guild_id=guild_id, channel_id=channel_id,
-                    discord_url=image_url, discord_message_id=str(message.id),
-                    scout_report_id=report_id,
-                )
+                # Link the already-saved image entry to this report
+                await database.link_scout_image_to_report(img_db_id, report_id)
                 if enemy_player:
                     await database.upsert_enemy(
                         guild_id=guild_id, player_name=enemy_player,
