@@ -484,6 +484,48 @@ async def handle_leave_guild(request: aiohttp_web.Request) -> aiohttp_web.Respon
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
+async def handle_refresh_res_push(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Rebuild and edit the push embed after a status change from the dashboard."""
+    try:
+        data = await request.json()
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    request_id = data.get("request_id")
+    if not request_id:
+        return aiohttp_web.json_response({"ok": False, "error": "request_id required"}, status=400)
+
+    try:
+        from cogs.res_push import _build_push_embed, ResPushChannelView
+        req = await database.get_res_request_by_id(int(request_id))
+        if not req:
+            return aiohttp_web.json_response({"ok": False, "error": "not found"}, status=404)
+
+        push_channel_id = req.get("push_channel_id")
+        push_message_id = req.get("push_message_id")
+        status = req.get("status", "accepted")
+
+        if not push_channel_id or not push_message_id:
+            return aiohttp_web.json_response({"ok": False, "error": "no push message tracked"}, status=404)
+
+        guild = bot_instance.get_guild(int(req["guild_id"]))
+        if not guild:
+            return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+        channel = guild.get_channel(int(push_channel_id))
+        if not channel:
+            return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+
+        contribs = await database.get_res_contributions(int(request_id))
+        embed = _build_push_embed(req, contribs, status=status)
+        msg = await channel.fetch_message(int(push_message_id))
+        await msg.edit(embed=embed, view=ResPushChannelView())
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -495,6 +537,7 @@ async def start_api_server():
     app.router.add_post("/api/guild-info", handle_guild_info)
     app.router.add_post("/api/hero-scout-build-library", handle_build_hero_library)
     app.router.add_get("/api/hero-scout-library-status", handle_hero_library_status)
+    app.router.add_post("/api/refresh-res-push", handle_refresh_res_push)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

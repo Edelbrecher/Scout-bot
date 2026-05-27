@@ -1847,6 +1847,15 @@ async def res_request_inactive(request: Request, guild_id: str, request_id: int)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "inactive")
+    # Refresh the Discord embed via bot internal API
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(
+                "http://localhost:7777/api/refresh-res-push",
+                json={"request_id": request_id},
+            )
+    except Exception:
+        pass
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
 
@@ -1860,6 +1869,15 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "accepted")
+    # Refresh the Discord embed via bot internal API
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(
+                "http://localhost:7777/api/refresh-res-push",
+                json={"request_id": request_id},
+            )
+    except Exception:
+        pass
     return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
 
 
