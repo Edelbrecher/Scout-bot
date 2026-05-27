@@ -199,12 +199,24 @@
         <div style="font-weight:600;font-size:0.95rem;">
           🏚️ Inaktive Farmen
           {% if inactive_farms %}
+          {% set missing_count = inactive_farms | selectattr('x') | list | selectattr('y') | list | length %}
+          {% set on_list_count  = inactive_farms | selectattr('x') | list | length %}
+          {# count missing via JS — badge updated dynamically #}
           <span style="font-size:0.8rem;font-weight:400;color:var(--text-muted);margin-left:0.4rem;">
             {{ inactive_farms | length }} Ergebnisse · mind. {{ min_days }} Tage · Bev. {{ min_pop }}–{{ max_pop }}
           </span>
+          {% if farm_list %}
+          <span id="missingBadge" style="font-size:0.75rem;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.35);border-radius:5px;padding:1px 7px;margin-left:0.4rem;"></span>
+          {% endif %}
           {% endif %}
         </div>
-        <div style="display:flex;gap:0.5rem;align-items:center;">
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+          {% if inactive_farms and farm_list %}
+          <button id="btnOnlyMissing" onclick="toggleOnlyMissing()"
+                  class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;background:rgba(251,146,60,0.1);border-color:rgba(251,146,60,0.4);color:#fb923c;">
+            ➕ Nur fehlende
+          </button>
+          {% endif %}
           {% if inactive_farms %}
           <button onclick="exportCSV()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">
             📥 CSV Export
@@ -261,8 +273,10 @@
           <tbody id="inactiveBody">
             {% for farm in inactive_farms %}
             {% set is_cross = (farm.x, farm.y) in cross_ref_coords %}
+            {% set is_on_list = farm_list_coords is defined and (farm.x, farm.y) in farm_list_coords %}
             <tr data-population="{{ farm.population }}" data-days="{{ farm.days_tracked }}"
                 data-coords="{{ farm.x }}|{{ farm.y }}"
+                data-on-list="{{ 'true' if is_on_list else 'false' }}"
                 {% if is_cross %}style="background:rgba(34,197,94,0.06);"{% endif %}>
               <td style="color:var(--text-muted);font-size:0.8rem;">{{ loop.index }}</td>
               <td>
@@ -279,6 +293,13 @@
                           title="Koordinaten kopieren">📋</button>
                   {% if is_cross %}
                   <span style="font-size:0.7rem;background:rgba(34,197,94,0.15);color:#22c55e;border-radius:4px;padding:1px 5px;">🎯 Meine Farm</span>
+                  {% endif %}
+                  {% if farm_list %}
+                  {% if is_on_list %}
+                  <span style="font-size:0.68rem;background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">✅ Farmliste</span>
+                  {% else %}
+                  <span style="font-size:0.68rem;background:rgba(251,146,60,0.12);color:#fb923c;border:1px solid rgba(251,146,60,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">➕ Fehlt</span>
+                  {% endif %}
                   {% endif %}
                 </div>
               </td>
@@ -842,6 +863,43 @@ function sortInactive(col) {
   });
   rows.forEach(r => tbody.appendChild(r));
 }
+
+// Farmlist cross-reference: "Nur fehlende" toggle
+let _onlyMissing = false;
+function toggleOnlyMissing() {
+  _onlyMissing = !_onlyMissing;
+  const btn = document.getElementById('btnOnlyMissing');
+  const rows = document.querySelectorAll('#inactiveBody tr');
+  rows.forEach(row => {
+    if (_onlyMissing && row.dataset.onList === 'true') {
+      row.style.display = 'none';
+    } else {
+      row.style.display = '';
+    }
+  });
+  if (btn) {
+    btn.style.background = _onlyMissing ? 'rgba(251,146,60,0.3)' : 'rgba(251,146,60,0.1)';
+    btn.style.fontWeight  = _onlyMissing ? '700' : '';
+    btn.textContent = _onlyMissing ? '✕ Alle zeigen' : '➕ Nur fehlende';
+  }
+}
+
+// Init: count missing farms and update badge
+(function() {
+  const badge = document.getElementById('missingBadge');
+  if (!badge) return;
+  const rows = document.querySelectorAll('#inactiveBody tr');
+  let missing = 0;
+  rows.forEach(r => { if (r.dataset.onList === 'false') missing++; });
+  if (missing > 0) {
+    badge.textContent = missing + ' fehlen auf Farmliste';
+  } else if (rows.length > 0) {
+    badge.textContent = 'Alle auf Farmliste ✓';
+    badge.style.color = '#22c55e';
+    badge.style.background = 'rgba(34,197,94,0.12)';
+    badge.style.borderColor = 'rgba(34,197,94,0.3)';
+  }
+})();
 
 // Snapshot age + countdown
 {% if farm_stats.latest_snapshot %}
