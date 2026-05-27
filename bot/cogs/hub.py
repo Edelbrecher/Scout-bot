@@ -22,12 +22,26 @@ from i18n import t, get_guild_lang
 
 async def _get_config_and_category(guild: discord.Guild) -> tuple[dict | None, discord.CategoryChannel | None]:
     config = await database.get_guild_config(str(guild.id))
-    if not config or not config.get("category_id"):
+    if not config:
         return None, None
-    category = guild.get_channel(int(config["category_id"]))
-    if not category or not isinstance(category, discord.CategoryChannel):
+    category_id = config.get("category_id")
+    if category_id:
+        category = guild.get_channel(int(category_id))
+        if category and isinstance(category, discord.CategoryChannel):
+            return config, category
+    # Category missing or deleted — create a new one and persist it
+    try:
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),
+        }
+        category = await guild.create_category("TravOps", overwrites=overwrites)
+        await database.set_category(guild_id=str(guild.id), category_id=str(category.id))
+        print(f"[hub] Re-created missing category for guild {guild.id}: {category.id}")
+        return config, category
+    except Exception as e:
+        print(f"[hub] Failed to create category for guild {guild.id}: {e}")
         return config, None
-    return config, category
 
 
 def _build_overwrites(guild: discord.Guild, config: dict, requester: discord.Member) -> dict:
