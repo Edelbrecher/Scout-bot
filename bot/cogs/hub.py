@@ -259,8 +259,11 @@ async def _create_defend_channel(
     embed.set_footer(**travops_footer(t(lang, "reported_by", user=interaction.user.display_name)))
 
     timed_prefix = t(lang, "defend.timed_prefix") if timed else ""
+    ping_content = t(lang, "defend.ping", user=interaction.user.mention, prefix=timed_prefix)
+    if travian_link:
+        ping_content += f"\n🗺️ **Karte:** {travian_link}"
     await new_channel.send(
-        content=t(lang, "defend.ping", user=interaction.user.mention, prefix=timed_prefix),
+        content=ping_content,
         embed=embed,
         view=DefendCloseView(),
     )
@@ -332,13 +335,64 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
 
 
 # ---------------------------------------------------------------------------
-# Defend close view
+# Defend — troop unit data (name, grain/h per troop)
 # ---------------------------------------------------------------------------
-# Defend — troop-sent tracking helpers
+
+_FOOT_UNITS: list[tuple[str, int]] = [
+    ("— Keine —",        0),
+    # ─ Römer ─
+    ("Legionär",         1),
+    ("Prätorianer",      1),
+    ("Imperianer",       1),
+    # ─ Teutonen ─
+    ("Keule",            1),
+    ("Speerträger",      1),
+    ("Axtkämpfer",       1),
+    ("Aufklärer",        1),
+    # ─ Gallier ─
+    ("Phalanx",          1),
+    ("Schwertkämpfer",   1),
+    # ─ Hunnen ─
+    ("Soldat",           1),
+    ("Slugger",          1),
+    ("Lanzenkämpfer",    1),
+    ("Bogenschütze",     1),
+    # ─ Ägypter ─
+    ("Schilf-Pfeil",     1),
+    ("Edelgardist",      1),
+    ("Khopesh-Kämpfer",  1),
+]
+
+_CAVALRY_UNITS: list[tuple[str, int]] = [
+    ("— Keine —",              0),
+    # ─ Römer ─
+    ("Equites Legati",         2),
+    ("Equites Imperatoris",    3),
+    ("Equites Caesaris",       4),
+    # ─ Teutonen ─
+    ("Paladin",                2),
+    ("Teutonischer Ritter",    3),
+    # ─ Gallier ─
+    ("Treverer-Späher",        2),
+    ("Druidenreiter",          2),
+    ("Haeduer",                3),
+    # ─ Hunnen ─
+    ("Steppenkämpfer",         2),
+    ("Marksman",               3),
+    ("Mameluk",                3),
+    ("Amazonas",               3),
+    # ─ Ägypter ─
+    ("Sopdu-Speerkämpfer",     2),
+    ("Anhur-Garde",            3),
+    ("Asclepion",              2),
+]
+
+
+# ---------------------------------------------------------------------------
+# Defend — tracking helpers
 # ---------------------------------------------------------------------------
 
 def _parse_defend_amount(s: str) -> int | None:
-    """Parse shorthand troop numbers like 10k, 1.5k, 2m, 5.000 → int."""
     from cogs.res_push import _parse_amount
     return _parse_amount(s)
 
@@ -352,141 +406,268 @@ def _build_defend_tracking_embed(
     goal_raw: str = "",
 ) -> discord.Embed:
     from cogs.res_push import _parse_amount
-    total = sum(c.get("amount_parsed", 0) for c in contributions)
+    total_troops = sum(c.get("amount_parsed", 0) for c in contributions)
+    total_grain  = sum(
+        (c.get("amount_parsed") or 0) * (c.get("grain_per_unit") or 1)
+        for c in contributions
+    )
     goal_parsed = _parse_amount(goal_raw) if goal_raw else None
 
     # ── Progress bar ──────────────────────────────────────────────────────────
     BAR_LEN = 20
     if goal_parsed and goal_parsed > 0:
-        pct = min(total / goal_parsed, 1.0)
+        pct = min(total_troops / goal_parsed, 1.0)
         filled = round(pct * BAR_LEN)
-        goal_reached = total >= goal_parsed
+        goal_reached = total_troops >= goal_parsed
         fill_emoji = "🟩" if goal_reached else "🟥"
         bar = fill_emoji * filled + "⬜" * (BAR_LEN - filled)
-        pct_text = f"**{int(pct * 100)}%**  ({_fmt_troops(total)} / {_fmt_troops(goal_parsed)})"
-        if total > goal_parsed:
-            pct_text += f"  (+{_fmt_troops(total - goal_parsed)})"
+        pct_text = f"**{int(pct * 100)}%**  ({_fmt_troops(total_troops)} / {_fmt_troops(goal_parsed)})"
+        if total_troops > goal_parsed:
+            pct_text += f"  (+{_fmt_troops(total_troops - goal_parsed)})"
         progress_text = f"{bar}\n{pct_text}"
         color = discord.Color.from_rgb(34, 197, 94) if goal_reached else discord.Color.from_rgb(239, 68, 68)
     else:
-        # No goal set — just show a growing bar
         bar_filled = min(BAR_LEN, max(1, len(contributions)))
         bar = "🟥" * bar_filled + "⬜" * (BAR_LEN - bar_filled)
-        progress_text = f"{bar}\n**{_fmt_troops(total)}** Truppen"
+        progress_text = f"{bar}\n**{_fmt_troops(total_troops)}** Truppen"
         color = discord.Color.from_rgb(239, 68, 68)
 
-    # ── Embed ─────────────────────────────────────────────────────────────────
-    title = "⚔️ Truppen gesendet" if lang == "de" else "⚔️ Troops Sent"
-
-    # Build Travian link for embed title
+    # ── Travian link ──────────────────────────────────────────────────────────
     coord_match = re.search(r"(-?\d+)\s*[|]\s*(-?\d+)", coords)
     travian_link = ""
     if coord_match and tw_world:
         x, y = coord_match.group(1), coord_match.group(2)
         travian_link = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
 
+    # ── Build embed ───────────────────────────────────────────────────────────
+    title = "⚔️ Truppen gesendet" if lang == "de" else "⚔️ Troops Sent"
     embed_kw = dict(title=title, color=color)
     if travian_link:
         embed_kw["url"] = travian_link
     embed = discord.Embed(**embed_kw)
 
-    # Prominent Travian link in description
     if travian_link:
-        map_label = f"🗺️ **[Ziel-Dorf auf der Karte öffnen — {coords}]({travian_link})**"
-        embed.description = map_label
+        embed.description = f"### [🗺️ Ziel-Dorf öffnen — {coords}]({travian_link})"
 
-    # Progress bar + total
-    total_label = "📊 Gesamt gesendet" if lang == "de" else "📊 Total sent"
-    embed.add_field(name=total_label, value=progress_text, inline=False)
+    # Progress + total troops
+    embed.add_field(
+        name="📊 Gesamt Truppen" if lang == "de" else "📊 Total Troops",
+        value=progress_text,
+        inline=False,
+    )
+    # Grain consumption
+    embed.add_field(
+        name="🌾 Getreide/h gesamt",
+        value=f"**{_fmt_troops(total_grain)}** /h",
+        inline=True,
+    )
 
-    # Individual contributions (last 15)
+    # Individual contributions (newest 15)
     if contributions:
         lines = []
         for c in contributions[-15:]:
-            troop_suffix = f" ({c['troop_type']})" if c.get("troop_type") else ""
-            lines.append(f"• **{c['user_name']}** — {_fmt_troops(c['amount_parsed'])}{troop_suffix}")
+            grain_info = f" · {_fmt_troops((c.get('amount_parsed') or 0) * (c.get('grain_per_unit') or 1))} 🌾/h"
+            lines.append(
+                f"• **{c['user_name']}** — {_fmt_troops(c.get('amount_parsed', 0))} {c.get('troop_type', '')}{grain_info}"
+            )
         embed.add_field(
             name="👥 Beiträge" if lang == "de" else "👥 Contributions",
             value="\n".join(lines),
             inline=False,
         )
 
-    embed.set_footer(text=f"{len(contributions)} Eintrag/Einträge · {coords}")
+    embed.set_footer(text=f"{len(contributions)} Einträge · {coords}")
     return embed
 
 
-class DefendSentModal(discord.ui.Modal):
-    amount = discord.ui.TextInput(
-        label="Wieviele Truppen sendest du?",
-        placeholder="z.B. 500, 10k, 2.5k …",
-        max_length=20,
-    )
-    troop_type = discord.ui.TextInput(
-        label="Truppentyp (optional)",
-        placeholder="z.B. Imps, Axt, Legionäre …",
-        required=False,
-        max_length=50,
-    )
+async def _save_and_update_tracking(
+    interaction: discord.Interaction, lang: str,
+    entries: list[tuple[str, int, str, int]],   # (amount_raw, amount_parsed, troop_type, grain_per_unit)
+):
+    """Save one or more troop entries to DB and refresh the tracking embed."""
+    channel_id = str(interaction.channel.id)
+    guild_id   = str(interaction.guild_id)
 
-    def __init__(self, lang: str = "de"):
+    for amount_raw, amount_parsed, troop_type, grain_per_unit in entries:
+        if amount_parsed > 0:
+            await database.add_defend_sent(
+                channel_id=channel_id, guild_id=guild_id,
+                user_id=str(interaction.user.id), user_name=interaction.user.display_name,
+                amount_raw=amount_raw, amount_parsed=amount_parsed,
+                troop_type=troop_type, grain_per_unit=grain_per_unit,
+            )
+
+    contributions = await database.get_defend_sent(channel_id)
+    defend_rec    = await database.get_defend_channel(channel_id)
+    config        = await database.get_guild_config(guild_id)
+    tw_world      = (config or {}).get("tw_world") or ""
+    coords        = (defend_rec or {}).get("coords", "")
+    goal_raw      = (defend_rec or {}).get("goal", "") or ""
+
+    tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world, goal_raw)
+
+    tracking_msg_id = (defend_rec or {}).get("tracking_msg_id")
+    if tracking_msg_id:
+        try:
+            msg = await interaction.channel.fetch_message(int(tracking_msg_id))
+            await msg.edit(embed=tracking_embed)
+            tracking_msg_id = tracking_msg_id  # still valid
+        except Exception:
+            tracking_msg_id = None
+
+    if not tracking_msg_id:
+        new_msg = await interaction.channel.send(embed=tracking_embed)
+        await database.set_defend_tracking_msg(channel_id, str(new_msg.id))
+
+    total_grain = sum(
+        (c.get("amount_parsed") or 0) * (c.get("grain_per_unit") or 1)
+        for c in contributions
+    )
+    parts = [f"{_fmt_troops(ap)} {tt}" for _, ap, tt, _ in entries if ap > 0 and tt]
+    confirm = (
+        f"✅ Eingetragen: {' + '.join(parts) or '—'} — "
+        f"Gesamt Getreide/h jetzt: {_fmt_troops(total_grain)}"
+    )
+    await interaction.followup.send(confirm, ephemeral=True)
+
+
+# ---------------------------------------------------------------------------
+# Defend — troop selection flow (Select → Modal)
+# ---------------------------------------------------------------------------
+
+class DefendAmountModal(discord.ui.Modal):
+    """Dynamically built modal: label includes selected troop type."""
+
+    def __init__(
+        self, lang: str,
+        foot_type: str, foot_grain: int,
+        cav_type: str, cav_grain: int,
+    ):
         title = "⚔️ Truppen eintragen" if lang == "de" else "⚔️ Log sent troops"
         super().__init__(title=title)
-        if lang == "en":
-            self.amount.label = "How many troops are you sending?"
-            self.troop_type.label = "Troop type (optional)"
         self.lang = lang
+        self.foot_type = foot_type
+        self.foot_grain = foot_grain
+        self.cav_type = cav_type
+        self.cav_grain = cav_grain
+        self._foot_inp = None
+        self._cav_inp = None
+
+        if foot_type:
+            self._foot_inp = discord.ui.TextInput(
+                label=f"{foot_type}  ({foot_grain} 🌾/Truppe)",
+                placeholder="z.B. 500, 5k, 2.5k …",
+                required=False,
+                max_length=20,
+            )
+            self.add_item(self._foot_inp)
+
+        if cav_type:
+            self._cav_inp = discord.ui.TextInput(
+                label=f"{cav_type}  ({cav_grain} 🌾/Truppe)",
+                placeholder="z.B. 200, 1k …",
+                required=False,
+                max_length=20,
+            )
+            self.add_item(self._cav_inp)
 
     async def on_submit(self, interaction: discord.Interaction):
         lang = self.lang
-        raw = self.amount.value.strip()
-        parsed = _parse_defend_amount(raw)
-        if parsed is None or parsed <= 0:
+        foot_raw = (self._foot_inp.value or "").strip() if self._foot_inp else ""
+        cav_raw  = (self._cav_inp.value or "").strip()  if self._cav_inp  else ""
+
+        foot_n = _parse_defend_amount(foot_raw) or 0
+        cav_n  = _parse_defend_amount(cav_raw)  or 0
+
+        if not foot_n and not cav_n:
             await interaction.response.send_message(
-                "❌ Ungültige Zahl. Versuche z.B. `500`, `10k`, `2.5k`." if lang == "de"
-                else "❌ Invalid number. Try e.g. `500`, `10k`, `2.5k`.",
+                "❌ Bitte mindestens eine Anzahl eingeben." if lang == "de"
+                else "❌ Please enter at least one amount.",
                 ephemeral=True,
             )
             return
 
         await interaction.response.defer(ephemeral=True)
-        channel_id = str(interaction.channel.id)
-        guild_id   = str(interaction.guild_id)
+        entries = []
+        if foot_n and self.foot_type:
+            entries.append((foot_raw, foot_n, self.foot_type, self.foot_grain))
+        if cav_n and self.cav_type:
+            entries.append((cav_raw, cav_n, self.cav_type, self.cav_grain))
 
-        await database.add_defend_sent(
-            channel_id=channel_id,
-            guild_id=guild_id,
-            user_id=str(interaction.user.id),
-            user_name=interaction.user.display_name,
-            amount_raw=raw,
-            amount_parsed=parsed,
-            troop_type=self.troop_type.value.strip(),
+        await _save_and_update_tracking(interaction, lang, entries)
+
+
+class DefendTroopSelectView(discord.ui.View):
+    """Ephemeral view: pick foot type + cavalry type, then open amount modal."""
+
+    def __init__(self, lang: str = "de"):
+        super().__init__(timeout=120)
+        self.lang = lang
+        self.foot_type  = ""
+        self.foot_grain = 0
+        self.cav_type   = ""
+        self.cav_grain  = 0
+
+        foot_opts = [
+            discord.SelectOption(label=name, value=f"{name}:{grain}")
+            for name, grain in _FOOT_UNITS
+        ]
+        foot_sel = discord.ui.Select(
+            placeholder="🥾 Fußtruppen auswählen…",
+            options=foot_opts,
+            row=0,
         )
+        foot_sel.callback = self._on_foot
+        self.add_item(foot_sel)
 
-        # Fetch all contributions + defend record
-        contributions = await database.get_defend_sent(channel_id)
-        defend_rec    = await database.get_defend_channel(channel_id)
-        config        = await database.get_guild_config(guild_id)
-        tw_world      = (config or {}).get("tw_world") or ""
-        coords        = (defend_rec or {}).get("coords", "")
-        goal_raw      = (defend_rec or {}).get("goal", "") or ""
+        cav_opts = [
+            discord.SelectOption(label=name, value=f"{name}:{grain}")
+            for name, grain in _CAVALRY_UNITS
+        ]
+        cav_sel = discord.ui.Select(
+            placeholder="🐴 Reitertruppen auswählen…",
+            options=cav_opts,
+            row=1,
+        )
+        cav_sel.callback = self._on_cav
+        self.add_item(cav_sel)
 
-        tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world, goal_raw)
+        btn = discord.ui.Button(
+            label="Anzahl eingeben →",
+            style=discord.ButtonStyle.primary,
+            row=2,
+        )
+        btn.callback = self._on_next
+        self.add_item(btn)
 
-        # Edit or post the tracking message
-        tracking_msg_id = (defend_rec or {}).get("tracking_msg_id")
-        if tracking_msg_id:
-            try:
-                msg = await interaction.channel.fetch_message(int(tracking_msg_id))
-                await msg.edit(embed=tracking_embed)
-            except Exception:
-                tracking_msg_id = None
+    async def _on_foot(self, interaction: discord.Interaction):
+        val = interaction.data["values"][0]
+        name, grain = val.rsplit(":", 1)
+        self.foot_type  = "" if name == "— Keine —" else name
+        self.foot_grain = int(grain)
+        await interaction.response.defer()
 
-        if not tracking_msg_id:
-            new_msg = await interaction.channel.send(embed=tracking_embed)
-            await database.set_defend_tracking_msg(channel_id, str(new_msg.id))
+    async def _on_cav(self, interaction: discord.Interaction):
+        val = interaction.data["values"][0]
+        name, grain = val.rsplit(":", 1)
+        self.cav_type  = "" if name == "— Keine —" else name
+        self.cav_grain = int(grain)
+        await interaction.response.defer()
 
-        confirm = f"✅ {_fmt_troops(parsed)} Truppen eingetragen!" if lang == "de" else f"✅ {_fmt_troops(parsed)} troops logged!"
-        await interaction.followup.send(confirm, ephemeral=True)
+    async def _on_next(self, interaction: discord.Interaction):
+        if not self.foot_type and not self.cav_type:
+            await interaction.response.send_message(
+                "❌ Bitte mindestens einen Truppentyp auswählen." if self.lang == "de"
+                else "❌ Select at least one troop type.",
+                ephemeral=True,
+            )
+            return
+        modal = DefendAmountModal(
+            lang=self.lang,
+            foot_type=self.foot_type, foot_grain=self.foot_grain,
+            cav_type=self.cav_type,   cav_grain=self.cav_grain,
+        )
+        await interaction.response.send_modal(modal)
 
 
 class DefendCloseView(discord.ui.View):
@@ -501,7 +682,9 @@ class DefendCloseView(discord.ui.View):
     )
     async def i_sent(self, interaction: discord.Interaction, button: discord.ui.Button):
         lang = await get_guild_lang(str(interaction.guild_id))
-        await interaction.response.send_modal(DefendSentModal(lang=lang))
+        view = DefendTroopSelectView(lang=lang)
+        label = "Welche Truppen schickst du?" if lang == "de" else "Which troops are you sending?"
+        await interaction.response.send_message(label, view=view, ephemeral=True)
 
     @discord.ui.button(
         label="✅ Defend done",

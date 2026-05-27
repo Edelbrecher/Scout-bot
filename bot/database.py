@@ -294,6 +294,7 @@ async def init_db():
                 amount_raw      TEXT NOT NULL,
                 amount_parsed   INTEGER NOT NULL DEFAULT 0,
                 troop_type      TEXT DEFAULT '',
+                grain_per_unit  INTEGER NOT NULL DEFAULT 1,
                 sent_at         TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
@@ -1082,14 +1083,20 @@ async def get_defend_channel(channel_id: str) -> dict | None:
 
 async def add_defend_sent(
     channel_id: str, guild_id: str, user_id: str, user_name: str,
-    amount_raw: str, amount_parsed: int, troop_type: str,
+    amount_raw: str, amount_parsed: int, troop_type: str, grain_per_unit: int = 1,
 ):
     async with aiosqlite.connect(DB_PATH) as db:
+        # Add grain_per_unit column if missing (migration)
+        try:
+            await db.execute("ALTER TABLE defend_sent ADD COLUMN grain_per_unit INTEGER NOT NULL DEFAULT 1")
+            await db.commit()
+        except Exception:
+            pass
         await db.execute("""
             INSERT INTO defend_sent
-                (channel_id, guild_id, user_id, user_name, amount_raw, amount_parsed, troop_type)
-            VALUES (?,?,?,?,?,?,?)
-        """, (channel_id, guild_id, user_id, user_name, amount_raw, amount_parsed, troop_type))
+                (channel_id, guild_id, user_id, user_name, amount_raw, amount_parsed, troop_type, grain_per_unit)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (channel_id, guild_id, user_id, user_name, amount_raw, amount_parsed, troop_type, grain_per_unit))
         await db.commit()
 
 
