@@ -4424,3 +4424,15 @@ async def get_private_channel_by_channel_id(channel_id: str) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def get_all_private_channels_for_guild(guild_id: str) -> list[dict]:
+    """Return all private channel records for a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM private_channels WHERE guild_id = ?",
+            (guild_id,),
+        ) as cur:
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]

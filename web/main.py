@@ -654,6 +654,75 @@ templates = Jinja2Templates(directory="templates")
 
 VIEW_CHANNEL = "1024"  # Discord permission bit
 
+async def _sync_private_channel_permissions(guild_id: str, private_channel_role_ids: str, allowed_role_ids: str):
+    """Update all private channels in this guild to match the current role config.
+
+    Roles in private_channel_role_ids (or fallback allowed_role_ids) get view+send access.
+    All other role overwrites (that aren't @everyone or the bot) are removed from every
+    private channel tracked in the DB.
+    """
+    token = os.environ.get("DISCORD_TOKEN", "")
+    if not token:
+        return
+
+    # Determine which role IDs should have access
+    role_source = private_channel_role_ids.strip() if private_channel_role_ids.strip() else allowed_role_ids
+    granted_role_ids = {r.strip() for r in role_source.split(",") if r.strip()}
+
+    VIEW_SEND = str(int("0x400", 16) | int("0x800", 16))  # VIEW_CHANNEL + SEND_MESSAGES = 3072
+    VIEW_CHANNEL_DENY = str(int("0x400", 16))  # 1024
+
+    # Fetch all private channels for this guild
+    channels = await database.get_all_private_channels_for_guild(guild_id)
+    if not channels:
+        return
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        for rec in channels:
+            channel_id = rec["channel_id"]
+            owner_id   = rec["owner_id"]
+
+            # Fetch current channel overwrites to preserve the owner's entry
+            try:
+                resp = await client.get(
+                    f"https://discord.com/api/v10/channels/{channel_id}",
+                    headers={"Authorization": f"Bot {token}"},
+                )
+                if resp.status_code != 200:
+                    continue
+                channel_data = resp.json()
+            except Exception:
+                continue
+
+            # Build new overwrites:
+            # 1. @everyone → deny view
+            # 2. owner (member) → allow view+send
+            # 3. each granted role → allow view+send
+            # Keep any member-type overwrites that aren't the owner (manually granted users)
+            existing_overwrites = channel_data.get("permission_overwrites", [])
+            new_overwrites = []
+
+            # Carry over member overwrites (type=1, individual users) unchanged
+            for ow in existing_overwrites:
+                if ow.get("type") == 1:  # member overwrite
+                    new_overwrites.append(ow)
+
+            # @everyone deny
+            new_overwrites.append({"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL_DENY})
+            # Granted roles allow
+            for rid in granted_role_ids:
+                new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_SEND, "deny": "0"})
+
+            try:
+                await client.patch(
+                    f"https://discord.com/api/v10/channels/{channel_id}",
+                    headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                    json={"permission_overwrites": new_overwrites},
+                )
+            except Exception:
+                pass
+
+
 async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str):
     """Set archive channel: @everyone hidden, allowed roles can view."""
     token = os.environ.get("DISCORD_TOKEN", "")
@@ -1444,10 +1513,17 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
     added = await database.toggle_role_in_field(guild_id, role_id, field)
+    guild_row = await database.get_guild(guild_id)
     if field == "allowed_role_ids":
-        guild = await database.get_guild(guild_id)
-        if guild and guild.get("archive_channel_id"):
-            await _sync_archive_permissions(guild_id, guild["archive_channel_id"], guild.get("allowed_role_ids") or "")
+        if guild_row and guild_row.get("archive_channel_id"):
+            await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], guild_row.get("allowed_role_ids") or "")
+    if field in ("allowed_role_ids", "private_channel_role_ids"):
+        # Sync all existing private channels — run in background so response is fast
+        asyncio.create_task(_sync_private_channel_permissions(
+            guild_id,
+            (guild_row or {}).get("private_channel_role_ids") or "",
+            (guild_row or {}).get("allowed_role_ids") or "",
+        ))
     return JSONResponse({"added": added})
 
 
