@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Defend-Statistiken · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Verteidigung</a>
+  <h1 style="margin:0.25rem 0 1.5rem;">📊 Defend-Statistiken</h1>
+
+  <!-- Summary cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+    <div class="card" style="text-align:center;padding:1rem;">
+      <div style="font-size:1.8rem;font-weight:700;color:#f87171;">{{ stats.totals.total or 0 }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Defend-Anfragen gesamt</div>
+    </div>
+    <div class="card" style="text-align:center;padding:1rem;">
+      <div style="font-size:1.8rem;font-weight:700;color:#f59e0b;">{{ stats.totals.open_count or 0 }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Noch offen</div>
+    </div>
+    <div class="card" style="text-align:center;padding:1rem;">
+      <div style="font-size:1.8rem;font-weight:700;color:#22c55e;">{{ stats.totals.closed_count or 0 }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Erledigt</div>
+    </div>
+    <div class="card" style="text-align:center;padding:1rem;">
+      <div style="font-size:1.8rem;font-weight:700;color:#93c5fd;">
+        {% set t = stats.totals.total_troops_sent or 0 %}
+        {% if t >= 1000000 %}{{ "%.1f"|format(t/1000000) }}M
+        {% elif t >= 1000 %}{{ "%.1f"|format(t/1000) }}k
+        {% else %}{{ t }}{% endif %}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Truppen gesendet gesamt</div>
+    </div>
+    <div class="card" style="text-align:center;padding:1rem;">
+      <div style="font-size:1.8rem;font-weight:700;color:#c084fc;">{{ stats.totals.unique_senders or 0 }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Aktive Verteidiger</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+
+    <!-- Nervig: Angreifer-Ranking -->
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem;font-size:1rem;">😤 Nervigste Angreifer</h2>
+      {% if stats.attackers %}
+      <table class="table" style="font-size:0.83rem;">
+        <thead><tr><th>#</th><th>Angreifer</th><th style="text-align:right;">Angriffe</th></tr></thead>
+        <tbody>
+          {% for row in stats.attackers %}
+          {% set max_attacks = stats.attackers[0].attacks %}
+          <tr>
+            <td style="color:var(--text-muted);width:2rem;">{{ loop.index }}</td>
+            <td>
+              <span style="font-weight:600;color:#f87171;">{{ row.attacker }}</span>
+              <div style="height:4px;border-radius:2px;background:rgba(239,68,68,0.15);margin-top:3px;">
+                <div style="height:4px;border-radius:2px;background:#ef4444;width:{{ (row.attacks / max_attacks * 100)|int }}%;"></div>
+              </div>
+            </td>
+            <td style="text-align:right;font-weight:700;color:#f87171;">{{ row.attacks }}×</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Daten.</p>
+      {% endif %}
+    </div>
+
+    <!-- Meistangegriffene unserer Spieler -->
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem;font-size:1rem;">🎯 Am meisten angegriffen (unsere Spieler)</h2>
+      {% if stats.targeted %}
+      <table class="table" style="font-size:0.83rem;">
+        <thead><tr><th>#</th><th>Spieler</th><th style="text-align:right;">Anfragen</th></tr></thead>
+        <tbody>
+          {% for row in stats.targeted %}
+          {% set max_def = stats.targeted[0].defends %}
+          <tr>
+            <td style="color:var(--text-muted);width:2rem;">{{ loop.index }}</td>
+            <td>
+              <span style="font-weight:600;">{{ row.player }}</span>
+              <div style="height:4px;border-radius:2px;background:rgba(249,115,22,0.15);margin-top:3px;">
+                <div style="height:4px;border-radius:2px;background:#f97316;width:{{ (row.defends / max_def * 100)|int }}%;"></div>
+              </div>
+            </td>
+            <td style="text-align:right;font-weight:700;color:#f97316;">{{ row.defends }}×</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Daten.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Truppenbeiträge unserer Spieler -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;">⚔️ Truppenbeiträge unserer Spieler</h2>
+    {% if stats.senders %}
+    <div style="overflow-x:auto;">
+    <table class="table" style="font-size:0.83rem;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Spieler</th>
+          <th style="text-align:right;">Truppen gesamt</th>
+          <th style="text-align:right;">Beteiligungen</th>
+          <th style="text-align:right;">🌾/h gesamt</th>
+          <th>Anteil</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set max_troops = stats.senders[0].total_troops %}
+        {% set grand_total = stats.senders | sum(attribute='total_troops') %}
+        {% for row in stats.senders %}
+        <tr>
+          <td style="color:var(--text-muted);width:2rem;">{{ loop.index }}</td>
+          <td style="font-weight:600;">{{ row.user_name }}</td>
+          <td style="text-align:right;font-weight:700;color:#93c5fd;">
+            {% set t = row.total_troops %}
+            {% if t >= 1000000 %}{{ "%.1f"|format(t/1000000) }}M
+            {% elif t >= 1000 %}{{ "%.1f"|format(t/1000) }}k
+            {% else %}{{ t }}{% endif %}
+          </td>
+          <td style="text-align:right;color:#f59e0b;">{{ row.participations }}×</td>
+          <td style="text-align:right;color:#86efac;font-size:0.78rem;">
+            {% set g = row.total_grain or 0 %}
+            {% if g >= 1000000 %}{{ "%.1f"|format(g/1000000) }}M
+            {% elif g >= 1000 %}{{ "%.1f"|format(g/1000) }}k
+            {% else %}{{ g }}{% endif %} /h
+          </td>
+          <td style="min-width:120px;">
+            {% set pct = ((row.total_troops / grand_total) * 100)|round(1) if grand_total > 0 else 0 %}
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+              <div style="flex:1;height:6px;border-radius:3px;background:rgba(147,197,253,0.15);">
+                <div style="height:6px;border-radius:3px;background:#3b82f6;width:{{ (row.total_troops / max_troops * 100)|int }}%;"></div>
+              </div>
+              <span style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;">{{ pct }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Truppenbeiträge erfasst.</p>
+    {% endif %}
+  </div>
+
+  <!-- Aktionen mit den meisten Truppen -->
+  <div class="card">
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;">🏆 Defend-Aktionen mit meisten Truppen</h2>
+    {% if stats.top_defends %}
+    <div style="overflow-x:auto;">
+    <table class="table" style="font-size:0.83rem;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Verteidiger</th>
+          <th>Angreifer</th>
+          <th>Koords</th>
+          <th style="text-align:right;">Truppen</th>
+          <th style="text-align:right;">Beteiligte</th>
+          <th>Ziel</th>
+          <th style="text-align:right;">Datum</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.top_defends %}
+        <tr>
+          <td style="color:var(--text-muted);width:2rem;">{{ loop.index }}</td>
+          <td style="font-weight:600;">{{ row.requested_by_name or '—' }}</td>
+          <td style="color:#f87171;">{{ row.attacker or '—' }}</td>
+          <td style="font-family:monospace;color:#93c5fd;">{{ row.coords or '—' }}</td>
+          <td style="text-align:right;font-weight:700;color:#93c5fd;">
+            {% set t = row.total_troops %}
+            {% if t >= 1000000 %}{{ "%.1f"|format(t/1000000) }}M
+            {% elif t >= 1000 %}{{ "%.1f"|format(t/1000) }}k
+            {% else %}{{ t }}{% endif %}
+          </td>
+          <td style="text-align:right;color:#f59e0b;">{{ row.contributor_count }}</td>
+          <td style="color:var(--text-muted);font-size:0.78rem;">{{ row.goal or '—' }}</td>
+          <td style="text-align:right;font-size:0.75rem;color:var(--text-muted);">
+            {{ row.created_at[:10] if row.created_at else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Daten.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

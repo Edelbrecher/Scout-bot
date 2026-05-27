@@ -7,29 +7,60 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;" data-i18n="defense.title">🛡️ Verteidigung</h1>
-      <p class="subtitle" style="margin:0;" data-i18n="defense.subtitle">Defend- und Timed-Defend Anfragen dieser Allianz</p>
+      <h1 style="margin:0.25rem 0 0;">🛡️ Verteidigung</h1>
+      <p class="subtitle" style="margin:0;">Defend- und Timed-Defend Anfragen dieser Allianz</p>
     </div>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+      <a href="/guild/{{ guild.guild_id }}/verteidigung/stats"
+         style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
+                background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);
+                border-radius:8px;font-size:0.85rem;font-weight:600;color:#818cf8;text-decoration:none;">
+        📊 Statistiken
+      </a>
       <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
          style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
                 background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);
                 border-radius:8px;font-size:0.85rem;font-weight:600;color:#f59e0b;text-decoration:none;">
-        <span data-i18n="defense.heroscout_btn">🗡️ Helden-Scout</span>
+        🗡️ Helden-Scout
       </a>
     </div>
   </div>
 
-  {% if saved == 'ok' %}
-  <div class="alert alert-success">✅ Gespeichert.</div>
+  {% if flash == 'closed' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;">
+    ✅ Defend-Anfrage als erledigt markiert.
+  </div>
+  {% elif flash == 'reopened' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#818cf8;">
+    🔄 Defend-Anfrage wieder geöffnet.
+  </div>
   {% endif %}
+
+  <!-- Filter tabs -->
+  <div style="display:flex;gap:0.4rem;margin-bottom:1rem;border-bottom:1px solid var(--border);padding-bottom:0.75rem;">
+    <a href="?show=open" style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.83rem;font-weight:600;text-decoration:none;
+      {% if show == 'open' %}background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);
+      {% else %}color:var(--text-muted);border:1px solid transparent;{% endif %}">
+      🔴 Offen <span style="opacity:.7;">({{ total_open }})</span>
+    </a>
+    <a href="?show=all" style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.83rem;font-weight:600;text-decoration:none;
+      {% if show == 'all' %}background:rgba(148,163,184,0.15);color:var(--text);border:1px solid var(--border);
+      {% else %}color:var(--text-muted);border:1px solid transparent;{% endif %}">
+      📋 Alle <span style="opacity:.7;">({{ total_open + total_closed }})</span>
+    </a>
+    <a href="?show=closed" style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.83rem;font-weight:600;text-decoration:none;
+      {% if show == 'closed' %}background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);
+      {% else %}color:var(--text-muted);border:1px solid transparent;{% endif %}">
+      ✅ Erledigt <span style="opacity:.7;">({{ total_closed }})</span>
+    </a>
+  </div>
 
   {% if channels %}
   <div style="display:grid;gap:0.75rem;">
     {% for ch in channels %}
     <div class="card" style="border-left:3px solid {% if ch.type == 'timed_defend' %}rgba(249,115,22,0.6){% else %}rgba(239,68,68,0.6){% endif %};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;">
-        <div>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
           <span style="font-size:0.75rem;font-weight:700;
             background:{% if ch.type == 'timed_defend' %}rgba(249,115,22,0.15){% else %}rgba(239,68,68,0.15){% endif %};
             color:{% if ch.type == 'timed_defend' %}#f97316{% else %}#ef4444{% endif %};
@@ -37,35 +68,61 @@
             {% if ch.type == 'timed_defend' %}⏱️ Timed-Defend{% else %}🛡️ Defend{% endif %}
           </span>
           {% if ch.status == 'closed' %}
-          <span style="font-size:0.75rem;background:rgba(34,197,94,0.1);color:#22c55e;
-                       border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem;" data-i18n="defense.status.done">✅ Erledigt</span>
+          <span style="font-size:0.75rem;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:4px;padding:0.15rem 0.5rem;">✅ Erledigt</span>
           {% else %}
-          <span style="font-size:0.75rem;background:rgba(239,68,68,0.1);color:#f87171;
-                       border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem;" data-i18n="defense.status.open">🔴 Offen</span>
+          <span style="font-size:0.75rem;background:rgba(239,68,68,0.1);color:#f87171;border-radius:4px;padding:0.15rem 0.5rem;">🔴 Offen</span>
           {% endif %}
         </div>
-        <span style="font-size:0.78rem;color:var(--text-muted);">
-          {{ ch.created_at[:16].replace('T',' ') }} UTC
-        </span>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <span style="font-size:0.78rem;color:var(--text-muted);">{{ ch.created_at[:16].replace('T',' ') }} UTC</span>
+          {% if ch.status != 'closed' %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/defend/{{ ch.channel_id }}/close" style="margin:0;"
+                onsubmit="return confirm('Defend-Anfrage als erledigt markieren?')">
+            <button type="submit" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
+              border-radius:6px;padding:0.25rem 0.75rem;color:#22c55e;cursor:pointer;font-size:0.78rem;font-weight:600;">
+              ✅ Schließen
+            </button>
+          </form>
+          {% else %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/defend/{{ ch.channel_id }}/reopen" style="margin:0;">
+            <button type="submit" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);
+              border-radius:6px;padding:0.25rem 0.75rem;color:#818cf8;cursor:pointer;font-size:0.78rem;font-weight:600;">
+              🔄 Öffnen
+            </button>
+          </form>
+          {% endif %}
+        </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;margin-top:0.75rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;margin-top:0.75rem;">
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.attacker">Angreifer</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Angreifer</div>
           <div style="font-weight:600;color:#f87171;">{{ ch.attacker or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.target">Ziel</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ziel</div>
           <div style="font-family:monospace;color:#93c5fd;">{{ ch.coords or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.arrival">Ankunft</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ankunft</div>
           <div style="font-weight:600;color:#f59e0b;">{{ ch.arrival_time or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.reported_by">Gemeldet von</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Gemeldet von</div>
           <div style="font-size:0.85rem;">{{ ch.requested_by_name or '—' }}</div>
         </div>
+        {% if ch.goal %}
+        <div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">🎯 Ziel</div>
+          <div style="font-size:0.85rem;font-weight:600;">{{ ch.goal }}</div>
+        </div>
+        {% endif %}
+        {% if ch.ratio %}
+        <div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">⚖️ Verteilung</div>
+          <div style="font-size:0.85rem;">{{ ch.ratio }}</div>
+        </div>
+        {% endif %}
       </div>
 
       {% if ch.notes %}
@@ -81,7 +138,9 @@
   {% else %}
   <div class="card">
     <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
-      <span data-i18n="defense.empty">Noch keine Defend-Anfragen. Sobald jemand im Discord einen Defend- oder Timed-Defend-Channel über den Anfragen-Hub erstellt, erscheint er hier.</span>
+      {% if show == 'closed' %}Keine erledigten Anfragen.
+      {% elif show == 'open' %}Keine offenen Defend-Anfragen. Sobald jemand im Discord einen Defend-Channel erstellt, erscheint er hier.
+      {% else %}Noch keine Defend-Anfragen.{% endif %}
     </p>
   </div>
   {% endif %}

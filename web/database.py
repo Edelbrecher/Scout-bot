@@ -4436,3 +4436,76 @@ async def get_all_private_channels_for_guild(guild_id: str) -> list[dict]:
         ) as cur:
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
+
+
+async def get_defend_stats(guild_id: str) -> dict:
+    """Return aggregated defense statistics for a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Most annoying attackers
+        async with db.execute("""
+            SELECT attacker, COUNT(*) as attacks
+            FROM defend_channels
+            WHERE guild_id=? AND attacker != '' AND attacker IS NOT NULL
+            GROUP BY attacker ORDER BY attacks DESC LIMIT 20
+        """, (guild_id,)) as cur:
+            attackers = [dict(r) for r in await cur.fetchall()]
+
+        # Most targeted defenders (our players)
+        async with db.execute("""
+            SELECT requested_by_name as player, COUNT(*) as defends
+            FROM defend_channels
+            WHERE guild_id=? AND requested_by_name != '' AND requested_by_name IS NOT NULL
+            GROUP BY requested_by_name ORDER BY defends DESC LIMIT 20
+        """, (guild_id,)) as cur:
+            targeted = [dict(r) for r in await cur.fetchall()]
+
+        # Troop senders — who sends the most deff
+        async with db.execute("""
+            SELECT user_name, SUM(amount_parsed) as total_troops,
+                   COUNT(DISTINCT channel_id) as participations,
+                   SUM(amount_parsed * grain_per_unit) as total_grain
+            FROM defend_sent
+            WHERE guild_id=?
+            GROUP BY user_name ORDER BY total_troops DESC LIMIT 20
+        """, (guild_id,)) as cur:
+            senders = [dict(r) for r in await cur.fetchall()]
+
+        # Most defended targets (channel = one defend request)
+        async with db.execute("""
+            SELECT dc.channel_id, dc.attacker, dc.coords, dc.requested_by_name,
+                   dc.created_at, dc.goal, dc.type,
+                   COALESCE(SUM(ds.amount_parsed),0) as total_troops,
+                   COUNT(ds.id) as contributor_count
+            FROM defend_channels dc
+            LEFT JOIN defend_sent ds ON dc.channel_id = ds.channel_id
+            WHERE dc.guild_id=?
+            GROUP BY dc.channel_id
+            ORDER BY total_troops DESC LIMIT 15
+        """, (guild_id,)) as cur:
+            top_defends = [dict(r) for r in await cur.fetchall()]
+
+        # Total counts
+        async with db.execute("""
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) as open_count,
+                   SUM(CASE WHEN status='closed' THEN 1 ELSE 0 END) as closed_count
+            FROM defend_channels WHERE guild_id=?
+        """, (guild_id,)) as cur:
+            totals = dict(await cur.fetchone())
+
+        async with db.execute("""
+            SELECT COALESCE(SUM(amount_parsed),0) as total_troops_sent,
+                   COUNT(DISTINCT user_id) as unique_senders
+            FROM defend_sent WHERE guild_id=?
+        """, (guild_id,)) as cur:
+            sent_totals = dict(await cur.fetchone())
+
+    return {
+        "attackers": attackers,
+        "targeted": targeted,
+        "senders": senders,
+        "top_defends": top_defends,
+        "totals": {**totals, **sent_totals},
+    }

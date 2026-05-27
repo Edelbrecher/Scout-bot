@@ -5246,12 +5246,64 @@ async def verteidigung_page(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     err = await _require_alliance(guild, guild_id)
     if err: return err
-    channels = await database.get_defend_channels(guild_id)
+    show = request.query_params.get("show", "open")  # open | all | closed
+    all_channels = await database.get_defend_channels(guild_id)
+    if show == "open":
+        channels = [c for c in all_channels if c.get("status") != "closed"]
+    elif show == "closed":
+        channels = [c for c in all_channels if c.get("status") == "closed"]
+    else:
+        channels = all_channels
     return templates.TemplateResponse("verteidigung.html", {
         "request": request,
         "guild": guild,
         "channels": channels,
+        "show": show,
+        "total_open":   sum(1 for c in all_channels if c.get("status") != "closed"),
+        "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),
         "saved": request.query_params.get("saved", ""),
+        "flash": request.query_params.get("flash", ""),
+    })
+
+
+@app.post("/guild/{guild_id}/defend/{channel_id}/close")
+async def defend_close(request: Request, guild_id: str, channel_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.close_defend_channel(channel_id)
+    return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=closed", status_code=303)
+
+
+@app.post("/guild/{guild_id}/defend/{channel_id}/reopen")
+async def defend_reopen(request: Request, guild_id: str, channel_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    async with __import__("aiosqlite").connect(database.DB_PATH) as db:
+        await db.execute("UPDATE defend_channels SET status='open' WHERE channel_id=?", (channel_id,))
+        await db.commit()
+    return RedirectResponse(f"/guild/{guild_id}/verteidigung?show=closed&flash=reopened", status_code=303)
+
+
+@app.get("/guild/{guild_id}/verteidigung/stats", response_class=HTMLResponse)
+async def verteidigung_stats_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    err = await _require_alliance(guild, guild_id)
+    if err: return err
+    stats = await database.get_defend_stats(guild_id)
+    return templates.TemplateResponse("verteidigung_stats.html", {
+        "request": request,
+        "guild": guild,
+        "stats": stats,
     })
 
 
