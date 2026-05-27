@@ -340,10 +340,6 @@ class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Truppen
             ratio=self.ratio.value.strip(),
         )
 
-    async def on_error(self, interaction: discord.Interaction, error: Exception):
-        import traceback
-        print(f"[DefendStep2Modal] ERROR: {error}")
-        traceback.print_exc()
 
 
 class DefendStep2View(discord.ui.View):
@@ -354,12 +350,7 @@ class DefendStep2View(discord.ui.View):
 
     @discord.ui.button(label="⚔️ Weiter: Truppenziel →", style=discord.ButtonStyle.primary)
     async def open_step2(self, interaction: discord.Interaction, _btn: discord.ui.Button):
-        try:
-            await interaction.response.send_modal(DefendStep2Modal(self._key))
-        except Exception as e:
-            import traceback
-            print(f"[DefendStep2View.open_step2] ERROR: {e}")
-            traceback.print_exc()
+        await interaction.response.send_modal(DefendStep2Modal(self._key))
 
 
 class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
@@ -387,11 +378,6 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
             view=DefendStep2View(key),
             ephemeral=True,
         )
-
-    async def on_error(self, interaction: discord.Interaction, error: Exception):
-        import traceback
-        print(f"[DefendModal] ERROR: {error}")
-        traceback.print_exc()
 
 
 class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend (1/2)"):
