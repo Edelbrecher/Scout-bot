@@ -354,7 +354,12 @@ class DefendStep2View(discord.ui.View):
 
     @discord.ui.button(label="⚔️ Weiter: Truppenziel →", style=discord.ButtonStyle.primary)
     async def open_step2(self, interaction: discord.Interaction, _btn: discord.ui.Button):
-        await interaction.response.send_modal(DefendStep2Modal(self._key))
+        try:
+            await interaction.response.send_modal(DefendStep2Modal(self._key))
+        except Exception as e:
+            import traceback
+            print(f"[DefendStep2View.open_step2] ERROR: {e}")
+            traceback.print_exc()
 
 
 class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
