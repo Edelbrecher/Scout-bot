@@ -250,10 +250,8 @@ async def _create_defend_channel(
         embed.add_field(name=t(lang, "defend.field.arrival"), value=arrival_1, inline=True)
 
     if goal:
-        from cogs.res_push import _parse_amount, _fmt as _fmt_res
-        goal_parsed = _parse_amount(goal)
-        goal_display = _fmt_res(goal_parsed) if goal_parsed else goal
-        embed.add_field(name="🎯 Truppen-Ziel", value=goal_display, inline=True)
+        # goal = free-text requirements field (e.g. "10k · 60/40 Fuß/Pferd")
+        embed.add_field(name="🎯 Anforderungen", value=goal, inline=False)
     if notes:
         embed.add_field(name=t(lang, "defend.field.notes"), value=notes, inline=False)
     embed.set_footer(**travops_footer(t(lang, "reported_by", user=interaction.user.display_name)))
@@ -288,14 +286,14 @@ async def _create_defend_channel(
 
 class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
     """Plain defend — single arrival time."""
-    defender = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
-    attacker = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords   = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
-    arrival  = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=30)
-    goal     = discord.ui.TextInput(
-        label="Truppen-Ziel (optional)", required=False,
-        placeholder="z.B. 5k, 10.000 — wie viele Truppen werden gebraucht?",
-        max_length=20,
+    defender     = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
+    attacker     = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
+    coords       = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    arrival      = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=30)
+    requirements = discord.ui.TextInput(
+        label="Anforderungen (optional)", required=False,
+        placeholder="z.B. 10k · 60/40 Fuß/Pferd  oder  5k reine Imps",
+        max_length=80,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -304,7 +302,7 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
             defender=self.defender.value.strip(),
             attacker=self.attacker.value.strip(),
             coords=self.coords.value.strip(),
-            goal=self.goal.value.strip(),
+            goal=self.requirements.value.strip(),
             notes="",
             arrival_1=self.arrival.value.strip(),
             arrival_2="",
@@ -314,11 +312,11 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage"):
 
 class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
     """Timed defend — two arrival times, calculates between-defense window."""
-    defender  = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
-    attacker  = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords    = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
-    arrival   = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=30)
-    arrival_2 = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC (muss später sein)", max_length=30)
+    defender     = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
+    attacker     = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
+    coords       = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    arrival      = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=30)
+    arrival_2    = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC (muss später sein)", max_length=30)
 
     async def on_submit(self, interaction: discord.Interaction):
         await _create_defend_channel(
@@ -411,7 +409,8 @@ def _build_defend_tracking_embed(
         (c.get("amount_parsed") or 0) * (c.get("grain_per_unit") or 1)
         for c in contributions
     )
-    goal_parsed = _parse_amount(goal_raw) if goal_raw else None
+    _num_match  = re.search(r'(\d[\d.,]*\s*[km]?)\b', goal_raw, re.IGNORECASE) if goal_raw else None
+    goal_parsed = _parse_amount(_num_match.group(1).strip()) if _num_match else None
 
     # ── Progress bar ──────────────────────────────────────────────────────────
     BAR_LEN = 20
