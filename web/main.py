@@ -1508,7 +1508,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids"}:
+    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
