@@ -276,7 +276,7 @@ async def _create_defend_channel(
     await new_channel.send(
         content=ping_content,
         embed=embed,
-        view=DefendCloseView(),
+        view=DefendCloseView(troop_link=troop_link),
     )
 
     arrival_db = arrival_1
@@ -765,8 +765,15 @@ class DefendTroopSelectView(discord.ui.View):
 
 
 class DefendCloseView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, troop_link: str = ""):
         super().__init__(timeout=None)
+        if troop_link:
+            self.add_item(discord.ui.Button(
+                label="🏘️ Zum Dorf",
+                style=discord.ButtonStyle.link,
+                url=troop_link,
+                row=1,
+            ))
 
     @discord.ui.button(
         label="⚔️ I sent",
