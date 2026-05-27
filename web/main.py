@@ -739,6 +739,94 @@ async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allo
         )
 
 
+async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str):
+    """Update all open scout channels to match current allowed_role_ids."""
+    token = os.environ.get("DISCORD_TOKEN", "")
+    if not token:
+        return
+    granted = {r.strip() for r in allowed_role_ids.split(",") if r.strip()}
+    VIEW_SEND = str(0x400 | 0x800)  # 3072
+    VIEW_CHANNEL_DENY = str(0x400)
+
+    channels = await database.get_scout_channels(guild_id)
+    if not channels:
+        return
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        for rec in channels:
+            channel_id = rec["channel_id"]
+            # Fetch current overwrites to preserve member-level entries
+            try:
+                resp = await client.get(
+                    f"https://discord.com/api/v10/channels/{channel_id}",
+                    headers={"Authorization": f"Bot {token}"},
+                )
+                if resp.status_code != 200:
+                    continue
+                existing = resp.json().get("permission_overwrites", [])
+            except Exception:
+                continue
+
+            new_overwrites = [ow for ow in existing if ow.get("type") == 1]  # keep member overwrites
+            new_overwrites.append({"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL_DENY})
+            for rid in granted:
+                new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_SEND, "deny": "0"})
+
+            try:
+                await client.patch(
+                    f"https://discord.com/api/v10/channels/{channel_id}",
+                    headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                    json={"permission_overwrites": new_overwrites},
+                )
+            except Exception:
+                pass
+
+
+async def _sync_defend_channel_permissions(guild_id: str, defend_role_ids: str, allowed_role_ids: str):
+    """Update all open defend channels to match current defend_role_ids (fallback: allowed_role_ids)."""
+    token = os.environ.get("DISCORD_TOKEN", "")
+    if not token:
+        return
+    role_source = defend_role_ids.strip() if defend_role_ids.strip() else allowed_role_ids
+    granted = {r.strip() for r in role_source.split(",") if r.strip()}
+    VIEW_SEND = str(0x400 | 0x800)
+    VIEW_CHANNEL_DENY = str(0x400)
+
+    channels = await database.get_defend_channels(guild_id)
+    if not channels:
+        return
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        for rec in channels:
+            if rec.get("status") == "closed":
+                continue
+            channel_id = rec["channel_id"]
+            try:
+                resp = await client.get(
+                    f"https://discord.com/api/v10/channels/{channel_id}",
+                    headers={"Authorization": f"Bot {token}"},
+                )
+                if resp.status_code != 200:
+                    continue
+                existing = resp.json().get("permission_overwrites", [])
+            except Exception:
+                continue
+
+            new_overwrites = [ow for ow in existing if ow.get("type") == 1]
+            new_overwrites.append({"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL_DENY})
+            for rid in granted:
+                new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_SEND, "deny": "0"})
+
+            try:
+                await client.patch(
+                    f"https://discord.com/api/v10/channels/{channel_id}",
+                    headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                    json={"permission_overwrites": new_overwrites},
+                )
+            except Exception:
+                pass
+
+
 def _get_username(request: Request) -> str:
     session = get_session(request)
     return session.get("username", "") if session else ""
@@ -1514,16 +1602,24 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
     added = await database.toggle_role_in_field(guild_id, role_id, field)
     guild_row = await database.get_guild(guild_id)
+    allowed_ids = (guild_row or {}).get("allowed_role_ids") or ""
+    defend_ids  = (guild_row or {}).get("defend_role_ids") or ""
+    priv_ids    = (guild_row or {}).get("private_channel_role_ids") or ""
+
     if field == "allowed_role_ids":
         if guild_row and guild_row.get("archive_channel_id"):
-            await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], guild_row.get("allowed_role_ids") or "")
+            await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids)
+        # Sync scout channels immediately
+        asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
+        # Defend channels use defend_role_ids with fallback to allowed_role_ids
+        asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
+
+    if field == "defend_role_ids":
+        asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
+
     if field in ("allowed_role_ids", "private_channel_role_ids"):
-        # Sync all existing private channels — run in background so response is fast
-        asyncio.create_task(_sync_private_channel_permissions(
-            guild_id,
-            (guild_row or {}).get("private_channel_role_ids") or "",
-            (guild_row or {}).get("allowed_role_ids") or "",
-        ))
+        asyncio.create_task(_sync_private_channel_permissions(guild_id, priv_ids, allowed_ids))
+
     return JSONResponse({"added": added})
 
 
