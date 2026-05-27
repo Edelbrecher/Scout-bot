@@ -224,11 +224,13 @@ async def _create_defend_channel(
         cx, cy = coord_match.group(1), coord_match.group(2)
         travian_link = f"{tw_world.rstrip('/')}/karte.php?x={cx}&y={cy}"
 
-    embed = discord.Embed(
+    embed_kwargs = dict(
         title=t(lang, "defend.timed_title") if timed else t(lang, "defend.title"),
-        url=travian_link or discord.utils.MISSING,   # clickable title
         color=discord.Color.from_rgb(239, 68, 68),
     )
+    if travian_link:
+        embed_kwargs["url"] = travian_link
+    embed = discord.Embed(**embed_kwargs)
     embed.add_field(name=t(lang, "defend.field.defender"), value=defender, inline=True)
     embed.add_field(name=t(lang, "defend.field.attacker"), value=attacker, inline=True)
     # Target coords — show as hyperlink if we have a Travian URL
@@ -383,11 +385,10 @@ def _build_defend_tracking_embed(
         x, y = coord_match.group(1), coord_match.group(2)
         travian_link = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
 
-    embed = discord.Embed(
-        title=title,
-        url=travian_link or discord.utils.MISSING,
-        color=color,
-    )
+    embed_kw = dict(title=title, color=color)
+    if travian_link:
+        embed_kw["url"] = travian_link
+    embed = discord.Embed(**embed_kw)
 
     # Prominent Travian link in description
     if travian_link:
