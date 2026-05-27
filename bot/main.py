@@ -416,11 +416,12 @@ async def handle_refresh_request_hub(request: aiohttp_web.Request) -> aiohttp_we
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
-    # Also ensure archive channel is in the correct category
+    # Also ensure archive channel exists in the correct category (same logic as create)
     config = await database.get_guild_config(guild_id)
     try:
         category = await _get_or_create_category(guild, config)
         archive_channel_id = (config or {}).get("archive_channel_id")
+        archive_ok = False
         if archive_channel_id:
             existing = guild.get_channel(int(archive_channel_id))
             if not existing:
@@ -428,10 +429,33 @@ async def handle_refresh_request_hub(request: aiohttp_web.Request) -> aiohttp_we
                     existing = await guild.fetch_channel(int(archive_channel_id))
                 except Exception:
                     existing = None
-            if existing and isinstance(existing, discord.TextChannel) and existing.category_id != category.id:
-                await existing.edit(category=category)
-    except Exception:
-        pass
+            if existing and isinstance(existing, discord.TextChannel):
+                if existing.category_id != category.id:
+                    await existing.edit(category=category)
+                archive_ok = True
+        if not archive_ok:
+            allowed_ids = (config or {}).get("allowed_role_ids") or ""
+            archive_overwrites = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                guild.me: discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True,
+                    embed_links=True, attach_files=True, manage_channels=True,
+                ),
+            }
+            for rid in [r.strip() for r in allowed_ids.split(",") if r.strip()]:
+                role = guild.get_role(int(rid))
+                if role:
+                    archive_overwrites[role] = discord.PermissionOverwrite(view_channel=True)
+            archive_ch = await guild.create_text_channel(
+                name="scout-archive",
+                category=category,
+                topic="Scout-Archiv — automatisch befüllt",
+                overwrites=archive_overwrites,
+            )
+            await database.set_archive_channel_id(guild_id, str(archive_ch.id))
+            print(f"[hub_refresh] Created scout-archive {archive_ch.id} in category {category.id}")
+    except Exception as e:
+        print(f"[hub_refresh] archive error: {e}")
 
     return aiohttp_web.json_response({"ok": True})
 

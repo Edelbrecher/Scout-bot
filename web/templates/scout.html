@@ -209,9 +209,15 @@ function openDetail(channelId, guildId) {
     .then(r => r.json())
     .then(data => {
       document.getElementById('detailTitle').textContent = `👤 ${data.ch.player || '—'}`;
-      document.getElementById('detailContent').innerHTML = renderDetail(data);
+      try {
+        document.getElementById('detailContent').innerHTML = renderDetail(data, guildId);
+      } catch(e) {
+        console.error('renderDetail error:', e);
+        document.getElementById('detailContent').innerHTML = '<p style="color:#f87171;">Fehler beim Rendern.</p>';
+      }
     })
-    .catch(() => {
+    .catch((e) => {
+      console.error('fetch error:', e);
       document.getElementById('detailContent').innerHTML = '<p style="color:#f87171;">Fehler beim Laden.</p>';
     });
 }
@@ -221,7 +227,7 @@ function closeDetail() {
   document.getElementById('detailPanel').style.display = 'none';
 }
 
-function renderDetail(data) {
+function renderDetail(data, guildId) {
   const ch = data.ch;
   const reports = data.reports || [];
   let html = `
@@ -267,9 +273,10 @@ function renderDetail(data) {
 
   html += `<h3 style="margin:0.75rem 0 0.5rem;font-size:0.95rem;">📋 Berichte (${reports.length})</h3>`;
   for (const r of reports) {
-    const troops = r.troops_json ? (JSON.parse(r.troops_json) || {}) : {};
-    const losses = r.losses_json ? (JSON.parse(r.losses_json) || {}) : {};
-    const res    = r.resources_json ? (JSON.parse(r.resources_json) || null) : null;
+    const _safeJson = (s, fallback) => { try { return JSON.parse(s) || fallback; } catch { return fallback; } };
+    const troops = _safeJson(r.troops_json, {});
+    const losses = _safeJson(r.losses_json, {});
+    const res    = _safeJson(r.resources_json, null);
     const srcBadge = r.source === 'ocr'
       ? '<span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;border-radius:4px;padding:1px 5px;">OCR</span>'
       : '<span style="font-size:0.7rem;background:#14532d;color:#4ade80;border-radius:4px;padding:1px 5px;">Text</span>';
