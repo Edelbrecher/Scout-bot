@@ -217,25 +217,30 @@ async def _create_defend_channel(
         name=channel_name, category=category, topic=topic, overwrites=overwrites,
     )
 
-    # Build Travian direct link to the target village
+    # Build Travian "send troops" link (rally point → reinforcement)
     tw_world = (config or {}).get("tw_world") or ""
-    coord_match = re.search(r"(-?\d+)\s*[|]\s*(-?\d+)", coords)
-    travian_link = ""
+    coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", coords)
+    troop_link = ""
+    map_link = ""
     if coord_match and tw_world:
         cx, cy = coord_match.group(1), coord_match.group(2)
-        travian_link = f"{tw_world.rstrip('/')}/karte.php?x={cx}&y={cy}"
+        base = tw_world.rstrip("/")
+        # Rally point → send reinforcement (eventType=5 = reinforcement)
+        troop_link = f"{base}/build.php?gid=16&tt=2&eventType=5&x={cx}&y={cy}"
+        map_link   = f"{base}/karte.php?x={cx}&y={cy}"
 
     embed_kwargs = dict(
         title=t(lang, "defend.timed_title") if timed else t(lang, "defend.title"),
         color=discord.Color.from_rgb(239, 68, 68),
     )
-    if travian_link:
-        embed_kwargs["url"] = travian_link
+    if troop_link:
+        embed_kwargs["url"] = troop_link
     embed = discord.Embed(**embed_kwargs)
+
+    # Coords field: clickable → opens rally point directly
+    coords_display = f"[{coords}]({troop_link})" if troop_link else coords
     embed.add_field(name=t(lang, "defend.field.defender"), value=defender, inline=True)
     embed.add_field(name=t(lang, "defend.field.attacker"), value=attacker, inline=True)
-    # Target coords — show as hyperlink if we have a Travian URL
-    coords_display = f"[{coords}]({travian_link})" if travian_link else coords
     embed.add_field(name=t(lang, "defend.field.target"),   value=coords_display, inline=True)
 
     if timed and arrival_2:
@@ -256,13 +261,18 @@ async def _create_defend_channel(
         embed.add_field(name="⚖️ Verteilung Fuß/Pferd", value=ratio, inline=True)
     if notes:
         embed.add_field(name=t(lang, "defend.field.notes"), value=notes, inline=False)
+
+    # Troop-send link as clickable button in embed description (always visible)
+    if troop_link:
+        embed.description = f"### [⚔️ Jetzt Truppen schicken →]({troop_link})"
+
     embed.set_footer(**travops_footer(t(lang, "reported_by", user=interaction.user.display_name)))
 
     timed_prefix = t(lang, "defend.timed_prefix") if timed else ""
     ping_content = t(lang, "defend.ping", user=interaction.user.mention, prefix=timed_prefix)
-    # Always show Travian map link as plain URL so Discord renders it clickable
-    if travian_link:
-        ping_content += f"\n\n🗺️ **Ziel-Dorf auf der Karte:**\n{travian_link}"
+    # Post links as plain text so Discord always renders them (not suppressed by embed)
+    if troop_link:
+        ping_content += f"\n⚔️ **Truppen schicken:** <{troop_link}>"
     await new_channel.send(
         content=ping_content,
         embed=embed,
