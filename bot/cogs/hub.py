@@ -216,13 +216,23 @@ async def _create_defend_channel(
         name=channel_name, category=category, topic=topic, overwrites=overwrites,
     )
 
+    # Build Travian direct link to the target village
+    tw_world = (config or {}).get("tw_world") or ""
+    coord_match = re.search(r"(-?\d+)\s*[|]\s*(-?\d+)", coords)
+    if coord_match and tw_world:
+        cx, cy = coord_match.group(1), coord_match.group(2)
+        travian_link = f"{tw_world.rstrip('/')}/karte.php?x={cx}&y={cy}"
+        coords_display = f"[{coords}]({travian_link})"
+    else:
+        coords_display = coords
+
     embed = discord.Embed(
         title=t(lang, "defend.timed_title") if timed else t(lang, "defend.title"),
         color=discord.Color.from_rgb(239, 68, 68),
     )
     embed.add_field(name=t(lang, "defend.field.defender"), value=defender, inline=True)
     embed.add_field(name=t(lang, "defend.field.attacker"), value=attacker, inline=True)
-    embed.add_field(name=t(lang, "defend.field.target"),   value=coords,   inline=True)
+    embed.add_field(name=t(lang, "defend.field.target"),   value=coords_display, inline=True)
 
     if timed and arrival_2:
         embed.add_field(name=t(lang, "defend.field.wave1"), value=arrival_1, inline=True)
@@ -313,15 +323,152 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend Anfrage"):
 # ---------------------------------------------------------------------------
 # Defend close view
 # ---------------------------------------------------------------------------
+# Defend — troop-sent tracking helpers
+# ---------------------------------------------------------------------------
+
+def _parse_defend_amount(s: str) -> int | None:
+    """Parse shorthand troop numbers like 10k, 1.5k, 2m, 5.000 → int."""
+    from cogs.res_push import _parse_amount
+    return _parse_amount(s)
+
+
+def _fmt_troops(n: int) -> str:
+    return f"{n:,}".replace(",", ".")
+
+
+def _build_defend_tracking_embed(
+    contributions: list[dict], lang: str, coords: str, tw_world: str | None
+) -> discord.Embed:
+    total = sum(c.get("amount_parsed", 0) for c in contributions)
+    bar_blocks = min(20, max(1, len(contributions)))
+    bar = "🟥" * bar_blocks
+
+    title = "⚔️ Truppen gesendet" if lang == "de" else "⚔️ Troops Sent"
+    embed = discord.Embed(title=title, color=discord.Color.from_rgb(239, 68, 68))
+
+    # Travian link
+    coord_match = re.search(r"(-?\d+)\s*[|]\s*(-?\d+)", coords)
+    if coord_match and tw_world:
+        x, y = coord_match.group(1), coord_match.group(2)
+        link = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
+        embed.description = f"[🗺️ Ziel-Dorf öffnen: {coords}]({link})" if lang == "de" else f"[🗺️ Open target village: {coords}]({link})"
+
+    # Progress bar + total
+    total_label = "📊 Gesamt gesendet" if lang == "de" else "📊 Total sent"
+    embed.add_field(
+        name=total_label,
+        value=f"{bar}\n**{_fmt_troops(total)}** Truppen",
+        inline=False,
+    )
+
+    # Individual contributions (last 15)
+    if contributions:
+        lines = []
+        for c in contributions[-15:]:
+            troop_suffix = f" ({c['troop_type']})" if c.get("troop_type") else ""
+            lines.append(f"• **{c['user_name']}** — {_fmt_troops(c['amount_parsed'])}{troop_suffix}")
+        embed.add_field(
+            name="👥 Beiträge" if lang == "de" else "👥 Contributions",
+            value="\n".join(lines),
+            inline=False,
+        )
+
+    embed.set_footer(text=f"{len(contributions)} Eintrag/Einträge · {coords}")
+    return embed
+
+
+class DefendSentModal(discord.ui.Modal):
+    amount = discord.ui.TextInput(
+        label="Wieviele Truppen sendest du?",
+        placeholder="z.B. 500, 10k, 2.5k …",
+        max_length=20,
+    )
+    troop_type = discord.ui.TextInput(
+        label="Truppentyp (optional)",
+        placeholder="z.B. Imps, Axt, Legionäre …",
+        required=False,
+        max_length=50,
+    )
+
+    def __init__(self, lang: str = "de"):
+        title = "⚔️ Truppen eintragen" if lang == "de" else "⚔️ Log sent troops"
+        super().__init__(title=title)
+        if lang == "en":
+            self.amount.label = "How many troops are you sending?"
+            self.troop_type.label = "Troop type (optional)"
+        self.lang = lang
+
+    async def on_submit(self, interaction: discord.Interaction):
+        lang = self.lang
+        raw = self.amount.value.strip()
+        parsed = _parse_defend_amount(raw)
+        if parsed is None or parsed <= 0:
+            await interaction.response.send_message(
+                "❌ Ungültige Zahl. Versuche z.B. `500`, `10k`, `2.5k`." if lang == "de"
+                else "❌ Invalid number. Try e.g. `500`, `10k`, `2.5k`.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        channel_id = str(interaction.channel.id)
+        guild_id   = str(interaction.guild_id)
+
+        await database.add_defend_sent(
+            channel_id=channel_id,
+            guild_id=guild_id,
+            user_id=str(interaction.user.id),
+            user_name=interaction.user.display_name,
+            amount_raw=raw,
+            amount_parsed=parsed,
+            troop_type=self.troop_type.value.strip(),
+        )
+
+        # Fetch all contributions + defend record
+        contributions = await database.get_defend_sent(channel_id)
+        defend_rec    = await database.get_defend_channel(channel_id)
+        config        = await database.get_guild_config(guild_id)
+        tw_world      = (config or {}).get("tw_world") or ""
+        coords        = (defend_rec or {}).get("coords", "")
+
+        tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world)
+
+        # Edit or post the tracking message
+        tracking_msg_id = (defend_rec or {}).get("tracking_msg_id")
+        if tracking_msg_id:
+            try:
+                msg = await interaction.channel.fetch_message(int(tracking_msg_id))
+                await msg.edit(embed=tracking_embed)
+            except Exception:
+                tracking_msg_id = None
+
+        if not tracking_msg_id:
+            new_msg = await interaction.channel.send(embed=tracking_embed)
+            await database.set_defend_tracking_msg(channel_id, str(new_msg.id))
+
+        confirm = f"✅ {_fmt_troops(parsed)} Truppen eingetragen!" if lang == "de" else f"✅ {_fmt_troops(parsed)} troops logged!"
+        await interaction.followup.send(confirm, ephemeral=True)
+
 
 class DefendCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(
+        label="⚔️ I sent",
+        style=discord.ButtonStyle.secondary,
+        custom_id="persistent:defend_sent",
+        row=0,
+    )
+    async def i_sent(self, interaction: discord.Interaction, button: discord.ui.Button):
+        lang = await get_guild_lang(str(interaction.guild_id))
+        await interaction.response.send_modal(DefendSentModal(lang=lang))
+
+    @discord.ui.button(
         label="✅ Defend done",
         style=discord.ButtonStyle.success,
         custom_id="persistent:defend_done",
+        row=0,
     )
     async def done_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         lang = await get_guild_lang(str(interaction.guild_id))
@@ -336,6 +483,7 @@ class DefendCloseView(discord.ui.View):
         label="🔒 Close channel",
         style=discord.ButtonStyle.danger,
         custom_id="persistent:defend_channel_close",
+        row=0,
     )
     async def close_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         lang = await get_guild_lang(str(interaction.guild_id))

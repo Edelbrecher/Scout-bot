@@ -284,6 +284,24 @@ async def init_db():
                 created_at      TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS defend_sent (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id      TEXT NOT NULL,
+                guild_id        TEXT NOT NULL,
+                user_id         TEXT NOT NULL,
+                user_name       TEXT NOT NULL,
+                amount_raw      TEXT NOT NULL,
+                amount_parsed   INTEGER NOT NULL DEFAULT 0,
+                troop_type      TEXT DEFAULT '',
+                sent_at         TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        # Add tracking_msg_id column to defend_channels if not present
+        try:
+            await db.execute("ALTER TABLE defend_channels ADD COLUMN tracking_msg_id TEXT")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -1047,6 +1065,48 @@ async def close_defend_channel(channel_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "UPDATE defend_channels SET status='closed' WHERE channel_id=?", (channel_id,))
+        await db.commit()
+
+
+async def get_defend_channel(channel_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM defend_channels WHERE channel_id = ?", (channel_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def add_defend_sent(
+    channel_id: str, guild_id: str, user_id: str, user_name: str,
+    amount_raw: str, amount_parsed: int, troop_type: str,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO defend_sent
+                (channel_id, guild_id, user_id, user_name, amount_raw, amount_parsed, troop_type)
+            VALUES (?,?,?,?,?,?,?)
+        """, (channel_id, guild_id, user_id, user_name, amount_raw, amount_parsed, troop_type))
+        await db.commit()
+
+
+async def get_defend_sent(channel_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM defend_sent WHERE channel_id = ? ORDER BY sent_at ASC", (channel_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
+async def set_defend_tracking_msg(channel_id: str, msg_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE defend_channels SET tracking_msg_id = ? WHERE channel_id = ?",
+            (msg_id, channel_id),
+        )
         await db.commit()
 
 
