@@ -294,18 +294,40 @@ def parse_scout_report(text: str) -> dict:
     result["defender_troop_positions"] = defender_sent
     if defender_losses: result["defender_loss_positions"] = defender_losses
 
-    # Resources — label-based first, then 4-number fallback on full text
+    # Resources — label-based first, then context-aware 4-number fallback
     m = _RESOURCE_RE.search(text)
     if m:
         w, c, i, cr = [_clean_num(x) for x in m.groups()]
         result["resources"] = {"wood": w, "clay": c, "iron": i, "crop": cr, "total": w+c+i+cr}
     else:
+        # Fallback: look for 4-number group near a resource-related keyword,
+        # OR in a "Loot" / "Beute" / "Haul" section.
+        # Avoid picking troop rows (which are usually in a table with many columns).
+        _RES_CONTEXT_RE = re.compile(
+            r"(?:ressourcen|resources|beute|loot|haul|stolen|gestohlen)[^\n]*\n?"
+            r"[^\n]*?(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)",
+            re.IGNORECASE,
+        )
         best, best_total = None, 0
-        for mm in _RES_4NUM_RE.finditer(text):
+        # Prefer context match
+        for mm in _RES_CONTEXT_RE.finditer(text):
             vals = [_clean_num(x) for x in mm.groups()]
             t = sum(vals)
             if t > best_total:
                 best, best_total = vals, t
+        # Generic fallback only if no context match — skip rows that look like
+        # troop tables (line has more than 4 numbers = troop row)
+        if not best:
+            for mm in _RES_4NUM_RE.finditer(text):
+                line_start = text.rfind("\n", 0, mm.start()) + 1
+                line_end   = text.find("\n", mm.end())
+                line = text[line_start: line_end if line_end != -1 else len(text)]
+                if len(re.findall(r"\d[\d.,]*", line)) > 5:
+                    continue  # too many numbers → troop row, skip
+                vals = [_clean_num(x) for x in mm.groups()]
+                t = sum(vals)
+                if t > best_total:
+                    best, best_total = vals, t
         if best and best_total > 0:
             result["resources"] = {"wood": best[0], "clay": best[1],
                                    "iron": best[2], "crop": best[3], "total": best_total}

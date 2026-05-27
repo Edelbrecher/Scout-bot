@@ -2747,11 +2747,22 @@ async def save_account_sitters(guild_id: str, user_id: str, data: dict):
 async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM scout_reports WHERE channel_id = ? ORDER BY created_at DESC",
-            (channel_id,)
-        ) as cur:
-            return [dict(r) for r in await cur.fetchall()]
+        async with db.execute("""
+            SELECT sr.*,
+                   GROUP_CONCAT(si.discord_url, '|||') AS image_urls
+            FROM scout_reports sr
+            LEFT JOIN scout_images si ON si.scout_report_id = sr.id
+            WHERE sr.channel_id = ?
+            GROUP BY sr.id
+            ORDER BY sr.created_at DESC
+        """, (channel_id,)) as cur:
+            rows = []
+            for r in await cur.fetchall():
+                d = dict(r)
+                raw = d.pop("image_urls", None) or ""
+                d["image_urls"] = [u for u in raw.split("|||") if u]
+                rows.append(d)
+            return rows
 
 
 async def _init_settle_list_table():

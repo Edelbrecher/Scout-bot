@@ -310,6 +310,21 @@ function renderDetail(data, guildId) {
       html += `<div style="margin-top:0.4rem;font-size:0.78rem;color:#f59e0b;">⭐ Erfahrung: ${r.experience}</div>`;
     }
 
+    // Scout images
+    const imgs = r.image_urls || [];
+    if (imgs.length) {
+      html += `<div style="margin-top:0.6rem;"><div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;">🖼️ Screenshot(s)</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">`;
+      for (const url of imgs) {
+        html += `<a href="${url}" target="_blank" rel="noopener">
+          <img src="${url}" alt="Scout-Screenshot"
+               style="max-height:120px;max-width:200px;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;object-fit:contain;background:var(--bg-card);"
+               onerror="this.parentElement.style.display='none'">
+        </a>`;
+      }
+      html += `</div></div>`;
+    }
+
     // Share button
     html += `<div style="margin-top:0.6rem;text-align:right;">
       <a href="/guild/${guildId}/scout/report/${r.id}/card" target="_blank"
