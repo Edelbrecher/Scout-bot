@@ -490,8 +490,15 @@ class ScoutTakenView(discord.ui.View):
 class ScoutActionView(discord.ui.View):
     """Persistent view attached to the info message in each scout channel."""
 
-    def __init__(self):
+    def __init__(self, troop_link: str = ""):
         super().__init__(timeout=None)
+        if troop_link:
+            self.add_item(discord.ui.Button(
+                label="🏘️ Zum Dorf",
+                style=discord.ButtonStyle.link,
+                url=troop_link,
+                row=1,
+            ))
 
     @discord.ui.button(
         label="Taken by",

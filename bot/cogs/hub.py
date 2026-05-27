@@ -25,23 +25,18 @@ async def _get_config_and_category(guild: discord.Guild) -> tuple[dict | None, d
     if not config:
         return None, None
     category_id = config.get("category_id")
-    if category_id:
-        category = guild.get_channel(int(category_id))
-        if category and isinstance(category, discord.CategoryChannel):
-            return config, category
-    # Category missing or deleted — create a new one and persist it
-    try:
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),
-        }
-        category = await guild.create_category("TravOps", overwrites=overwrites)
-        await database.set_category(guild_id=str(guild.id), category_id=str(category.id))
-        print(f"[hub] Re-created missing category for guild {guild.id}: {category.id}")
-        return config, category
-    except Exception as e:
-        print(f"[hub] Failed to create category for guild {guild.id}: {e}")
+    if not category_id:
         return config, None
+    # Try cache first, then API fetch (handles stale cache / bot restart)
+    category = guild.get_channel(int(category_id))
+    if not category:
+        try:
+            category = await guild.fetch_channel(int(category_id))
+        except Exception:
+            category = None
+    if category and isinstance(category, discord.CategoryChannel):
+        return config, category
+    return config, None
 
 
 def _build_overwrites(guild: discord.Guild, config: dict, requester: discord.Member) -> dict:
@@ -161,11 +156,20 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
             embed.add_field(name=t(lang, "hub.scout.field.info_embed"), value=self.additional_info.value, inline=False)
         embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
 
+        # Build Travian map link for the scout target
+        tw_world = (config or {}).get("tw_world") or ""
+        coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", self.coordinates.value)
+        scout_troop_link = ""
+        if coord_match and tw_world:
+            cx, cy = coord_match.group(1), coord_match.group(2)
+            scout_troop_link = f"{tw_world.rstrip('/')}/build.php?gid=16&tt=2&eventType=4&x={cx}&y={cy}"
+
         from cogs.scout import ScoutActionView
+        view = ScoutActionView(troop_link=scout_troop_link)
         await new_channel.send(
             content=t(lang, "hub.scout.new_request", user=interaction.user.mention),
             embed=embed,
-            view=ScoutActionView(),
+            view=view,
         )
 
         # Save to DB (reuse scout channel registration)
