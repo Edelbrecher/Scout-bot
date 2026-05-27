@@ -323,13 +323,26 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
 
     await database.set_request_hub(guild_id, str(channel.id), channel.name, str(msg.id))
 
-    # Ensure archive channel exists in the same category
+    # Ensure archive channel exists in the correct category
     archive_channel_id = (config or {}).get("archive_channel_id")
-    archive_exists = False
+    archive_ok = False
     if archive_channel_id:
         existing = guild.get_channel(int(archive_channel_id))
-        archive_exists = existing is not None and existing.category_id == category.id
-    if not archive_exists:
+        if not existing:
+            try:
+                existing = await guild.fetch_channel(int(archive_channel_id))
+            except Exception:
+                existing = None
+        if existing and isinstance(existing, discord.TextChannel):
+            if existing.category_id != category.id:
+                # Move to correct category
+                try:
+                    await existing.edit(category=category)
+                    print(f"[hub] Moved scout-archive {existing.id} → category {category.id}")
+                except Exception as e:
+                    print(f"[hub] Could not move archive channel: {e}")
+            archive_ok = True
+    if not archive_ok:
         try:
             archive_overwrites = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False),
