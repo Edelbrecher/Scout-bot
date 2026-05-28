@@ -628,6 +628,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # API paths always get JSON error responses
+    if "/api/" in request.url.path or request.url.path.endswith("/api"):
+        return _JSONResponse({"error": str(exc.detail) if exc.detail else str(exc.status_code)}, status_code=exc.status_code)
     if exc.status_code == 404:
         ctx = {"emoji": "🗺️", "code": "404", "message": "Diese Seite existiert nicht.", "detail": None}
     elif exc.status_code == 403:
