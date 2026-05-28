@@ -269,6 +269,7 @@ const INIT_MEMBERS = {{ members | tojson }};
         <span id="topPlanStatus" class="status-badge"></span>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <span id="topCountdown" style="font-size:.8rem;font-family:monospace;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:6px;padding:.15rem .5rem;display:none;"></span>
         <span id="topLandingTime" title="Klicken um Einschlagszeit zu ändern"
               style="font-size:.82rem;color:#fbbf24;font-family:monospace;cursor:pointer;padding:.2rem .4rem;border-radius:4px;"
               onmouseenter="this.style.background='rgba(251,191,36,.12)'" onmouseleave="this.style.background=''"
@@ -735,6 +736,8 @@ function renderEditor() {
   sb.className = `status-badge status-${p.status}`;
   document.getElementById('topLandingTime').textContent =
     p.landing_time ? '🕐 ' + fmtDatetime(p.landing_time) : '';
+  startCountdown(p.landing_time);
+  loadPollAvailability();
 
   renderPlanInfo();
   renderTargets();
@@ -755,6 +758,15 @@ function renderPlanInfo() {
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Wellen</td><td style="padding:.2rem .4rem;">${(p.targets||[]).reduce((a,t)=>a+(t.waves||[]).length,0)}</td></tr>
       ${p.notes ? `<tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Notizen</td><td style="padding:.2rem .4rem;">${escHtml(p.notes)}</td></tr>` : ''}
     </table>
+    <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.75rem;">
+      <button class="btn btn-secondary" style="font-size:.78rem;" onclick="recalcTimes()" title="Alle Sendezeiten neu berechnen basierend auf aktueller Einschlagszeit">
+        ⏱ Sendezeiten neu berechnen
+      </button>
+      <button class="btn btn-secondary" style="font-size:.78rem;" id="launchPollBtn" onclick="launchPoll()" title="Verfügbarkeitsumfrage in Discord starten">
+        📊 Umfrage starten
+      </button>
+      <div id="pollStatusLine" style="font-size:.72rem;color:var(--text-muted);"></div>
+    </div>
   `;
 }
 
@@ -1141,7 +1153,7 @@ function renderPbPlayer(p) {
   return `
   <div class="pb-player" id="pbp-${escHtml(p.player_name).replace(/\s/g,'_')}">
     <div class="pb-player-header" onclick="togglePbPlayer(this)">
-      <span class="pb-player-name">${escHtml(p.player_name)}</span>
+      <span class="pb-player-name">${escHtml(p.player_name)}${pollBadge(p.discord_id||'')}</span>
       <span class="pb-player-pop">${fmtPop(p.total_pop)} Pop · ${p.villages.length} Dörfer</span>
       <span class="pb-chevron">▼</span>
     </div>
@@ -1322,7 +1334,7 @@ function _renderAssignmentPanel(settings) {
         return `
         <div class="atk-row" id="atk-row-${i}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:.3rem;">
-            <span class="atk-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.player_name)}</span>
+            <span class="atk-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.player_name)}${pollBadge(r.discord_id||'')}</span>
             ${roleTag[r.role]||''}
             <span class="atk-time">${fmtTravel(r.travelSec)}</span>
           </div>
@@ -2000,6 +2012,93 @@ async function saveInlineLanding() {
     await apiPost(`/plans/${activePlanId}/update`, { landing_time: val });
     await loadPlan(activePlanId);
   } catch(e) { console.error('saveInlineLanding', e); }
+}
+
+// ══ Recalc times ══════════════════════════════════════════════════════════
+async function recalcTimes() {
+  if (!activePlanId) return;
+  if (!activePlan?.landing_time) { showToast('⚠️ Keine Einschlagszeit gesetzt.'); return; }
+  if (!confirm('Alle Sendezeiten neu berechnen?\nDies überschreibt manuell gesetzte Sendezeiten.')) return;
+  try {
+    const r = await apiPost(`/plans/${activePlanId}/recalc-times`);
+    showToast(`✅ ${r.updated} Sendezeit${r.updated!==1?'en':''} neu berechnet.`);
+    await loadPlan(activePlanId);
+  } catch(e) { showToast('❌ Fehler: '+e.message); }
+}
+
+// ══ Poll integration ═══════════════════════════════════════════════════════
+let pollAvailability = {}; // {discord_id: 'available'|'maybe'|'unavailable'}
+let activePollId = null;
+
+async function loadPollAvailability() {
+  if (!activePlanId) return;
+  try {
+    const d = await apiFetch(`/plans/${activePlanId}/poll-availability`);
+    pollAvailability = d.availability || {};
+    activePollId = d.poll?.id || null;
+    const line = document.getElementById('pollStatusLine');
+    if (line) {
+      if (activePollId) {
+        const avail = Object.values(pollAvailability).filter(r=>r==='available').length;
+        const maybe = Object.values(pollAvailability).filter(r=>r==='maybe').length;
+        const no    = Object.values(pollAvailability).filter(r=>r==='unavailable').length;
+        line.innerHTML = `📊 Umfrage #${activePollId}: ✅ ${avail} · ⏰ ${maybe} · ❌ ${no}`;
+      } else {
+        line.textContent = '';
+      }
+    }
+  } catch(e) {}
+}
+
+async function launchPoll() {
+  if (!activePlanId) return;
+  if (!confirm('Verfügbarkeitsumfrage für diesen EP in Discord starten?')) return;
+  try {
+    const r = await apiPost(`/plans/${activePlanId}/launch-poll`);
+    if (r.ok) {
+      showToast('✅ Umfrage gestartet!');
+      await loadPollAvailability();
+      renderPlanInfo();
+    } else {
+      showToast('❌ ' + (r.error||'Fehler'));
+    }
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+function pollBadge(discordId) {
+  const r = pollAvailability[discordId];
+  if (!r) return '';
+  const map = {available:'✅', maybe:'⏰', unavailable:'❌'};
+  const tip = {available:'Verfügbar', maybe:'Vielleicht', unavailable:'Nicht verfügbar'};
+  return `<span title="${tip[r]||r}" style="font-size:.75rem;margin-left:.2rem;">${map[r]||''}</span>`;
+}
+
+// ══ Live countdown ═════════════════════════════════════════════════════════
+let _countdownTimer = null;
+function startCountdown(landingTime) {
+  if (_countdownTimer) clearInterval(_countdownTimer);
+  const el = document.getElementById('topCountdown');
+  if (!landingTime) { el.style.display='none'; return; }
+  function tick() {
+    const now = Date.now();
+    const land = new Date(landingTime).getTime();
+    const diff = land - now;
+    if (diff <= 0) {
+      el.textContent = '💥 Einschlag!';
+      el.style.color = '#f87171';
+      el.style.display = '';
+      return;
+    }
+    const h = Math.floor(diff/3600000);
+    const m = Math.floor((diff%3600000)/60000);
+    const s = Math.floor((diff%60000)/1000);
+    const pad = n => String(n).padStart(2,'0');
+    el.textContent = `⏱ ${h>0?h+'h ':''} ${pad(m)}:${pad(s)}`;
+    el.style.color = diff < 3600000 ? '#f87171' : diff < 7200000 ? '#fbbf24' : '#a5b4fc';
+    el.style.display = '';
+  }
+  tick();
+  _countdownTimer = setInterval(tick, 1000);
 }
 
 // ══ Discord notify ════════════════════════════════════════════════════════

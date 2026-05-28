@@ -4626,8 +4626,60 @@ async def op_update_plan(
     if notes        is not None: kwargs["notes"]         = notes.strip()[:500]
     if status       is not None and status in ("draft","active","completed","cancelled"):
         kwargs["status"] = status
+    # Check if status is changing to active → trigger Discord announcement
+    was_active_trigger = (status == "active" and kwargs.get("status") == "active")
+    # Get old plan before update to detect transition
+    old_plan = await database.get_op_plan(plan_id, guild_id) if status == "active" else None
     await database.update_op_plan(plan_id, guild_id, **kwargs)
+    if old_plan and old_plan.get("status") != "active" and kwargs.get("status") == "active":
+        # Send Discord announcement to all approved members
+        _bg_announce_plan(guild_id, plan_id)
     return _JSONResponse({"ok": True})
+
+
+def _bg_announce_plan(guild_id: str, plan_id: int):
+    """Fire-and-forget Discord announcement for plan going active."""
+    import asyncio as _asyncio
+    async def _do():
+        try:
+            guild = await database.get_guild(guild_id)
+            plan = await database.get_op_plan(plan_id, guild_id)
+            if not guild or not plan:
+                return
+            poll_channel = guild.get("poll_channel_id") or ""
+            if not poll_channel:
+                return
+            token = os.environ.get("DISCORD_TOKEN", "")
+            landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
+            server_host = os.environ.get("SERVER_HOST", "https://travops.app")
+            plan_url = f"{server_host}/guild/{guild_id}/operations"
+            embed = {
+                "title": f"⚔️ Neuer aktiver Einsatzplan: {plan['name']}",
+                "description": f"Ein neuer Einsatz wurde aktiviert. Bitte öffne den Plan und bestätige deine Wellen.",
+                "color": 15548997,
+                "fields": [
+                    {"name": "🕐 Einschlagszeit", "value": landing or "—", "inline": True},
+                    {"name": "🎯 Ziele", "value": str(plan.get("target_count") or "—"), "inline": True},
+                ],
+                "footer": {"text": "TravOps Einsatzplanung"},
+            }
+            components = [{"type": 1, "components": [
+                {"type": 2, "style": 5, "label": "Zum Einsatzplan", "url": plan_url},
+            ]}]
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"https://discord.com/api/v10/channels/{poll_channel}/messages",
+                    headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                    json={"embeds": [embed], "components": components},
+                )
+        except Exception:
+            pass
+    import asyncio as _asyncio_outer
+    try:
+        loop = _asyncio_outer.get_event_loop()
+        loop.create_task(_do())
+    except Exception:
+        pass
 
 
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/delete")
@@ -4812,6 +4864,69 @@ async def op_my_waves(request: Request, guild_id: str):
     uid = session.get("uid","")
     waves = await database.get_my_op_waves(guild_id, uid)
     return _JSONResponse({"waves": waves})
+
+
+# ── Recalculate wave times ────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/recalc-times")
+async def op_recalc_times(request: Request, guild_id: str, plan_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    updated = await database.recalc_op_wave_times(plan_id, guild_id)
+    return _JSONResponse({"ok": True, "updated": updated})
+
+
+# ── EP Poll ───────────────────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/launch-poll")
+async def op_launch_poll(request: Request, guild_id: str, plan_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("poll_channel_id"):
+        return _JSONResponse({"error": "Kein Poll-Kanal konfiguriert. Bitte zuerst unter Umfragen einrichten."}, status_code=400)
+    plan = await database.get_op_plan(plan_id, guild_id)
+    if not plan:
+        return _JSONResponse({"error": "Plan nicht gefunden."}, status_code=404)
+    title = f"⚔️ EP: {plan['name']}"
+    landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
+    description = f"Bist du für diesen Einsatz verfügbar?\n🕐 Einschlag: **{landing}**" if landing else "Bist du für diesen Einsatz verfügbar?"
+    poll_id = await database.create_ep_poll(guild_id, plan_id, title, description, plan.get("landing_time") or "")
+    # Post to Discord
+    token = os.environ.get("DISCORD_TOKEN", "")
+    channel_id = guild["poll_channel_id"]
+    embed = {
+        "title": title,
+        "description": description,
+        "color": 15548997,
+        "fields": [{"name": "🕐 Einschlagszeit", "value": landing or "—", "inline": True},
+                   {"name": "📋 Plan", "value": plan["name"], "inline": True}],
+        "footer": {"text": f"EP-Umfrage #{poll_id} · Antwort ist anonym"},
+    }
+    components = [{"type": 1, "components": [
+        {"type": 2, "style": 3, "label": "Dabei",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
+        {"type": 2, "style": 1, "label": "Vielleicht",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
+        {"type": 2, "style": 4, "label": "Nicht dabei", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
+    ]}]
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json={"embeds": [embed], "components": components},
+        )
+    if resp.status_code in (200, 201):
+        await database.set_poll_message_id(poll_id, resp.json()["id"])
+        return _JSONResponse({"ok": True, "poll_id": poll_id})
+    return _JSONResponse({"error": f"Discord-Fehler {resp.status_code}"}, status_code=502)
+
+
+@app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/poll-availability")
+async def op_poll_availability(request: Request, guild_id: str, plan_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    availability = await database.get_ep_poll_availability(guild_id, plan_id)
+    poll = await database.get_ep_poll(guild_id, plan_id)
+    return _JSONResponse({"availability": availability, "poll": poll})
 
 
 # ── Plausibility ──────────────────────────────────────────────────────────────
@@ -5514,6 +5629,33 @@ async def admin_consents(request: Request):
 # ---------------------------------------------------------------------------
 # Admin — stats / live users / funnel
 # ---------------------------------------------------------------------------
+
+@app.get("/admin/ideas", response_class=HTMLResponse)
+async def admin_ideas_page(request: Request, saved: str = "", deleted: str = ""):
+    session, err = _require_admin(request)
+    if err: return err
+    ideas = await database.get_ideas()
+    return templates.TemplateResponse("admin_ideas.html", {
+        "request": request, "ideas": ideas, "saved": saved, "deleted": deleted
+    })
+
+@app.post("/admin/ideas")
+async def admin_ideas_create(request: Request,
+                              title: str = Form(...), description: str = Form(""),
+                              category: str = Form("general")):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.create_idea(title.strip(), description.strip(), category)
+    # Pre-populate default ideas on first save if empty
+    return RedirectResponse("/admin/ideas?saved=1", status_code=303)
+
+@app.post("/admin/ideas/{idea_id}/delete")
+async def admin_ideas_delete(request: Request, idea_id: int):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.delete_idea(idea_id)
+    return RedirectResponse("/admin/ideas?deleted=1", status_code=303)
+
 
 @app.get("/admin/stats", response_class=HTMLResponse)
 async def admin_stats(request: Request):

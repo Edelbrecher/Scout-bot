@@ -5119,6 +5119,12 @@ async def _init_op_tables():
             await db.commit()
         except Exception:
             pass
+        # availability_polls: link to EP plan
+        try:
+            await db.execute("ALTER TABLE availability_polls ADD COLUMN plan_id INTEGER")
+            await db.commit()
+        except Exception:
+            pass
         # Notifications table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
@@ -5767,4 +5773,140 @@ async def mark_notifications_read(guild_id: str, discord_id: str, notif_ids: lis
                 "UPDATE notifications SET read=1 WHERE guild_id=? AND recipient_id=?",
                 (guild_id, discord_id)
             )
+        await db.commit()
+
+
+# ── EP Poll integration ───────────────────────────────────────────────────────
+
+async def create_ep_poll(guild_id: str, plan_id: int, title: str, description: str, event_datetime: str) -> int:
+    """Create a poll linked to an EP plan."""
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO availability_polls (guild_id, plan_id, title, description, event_datetime, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (guild_id, plan_id, title, description, event_datetime, _dt.utcnow().isoformat()))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_ep_poll(guild_id: str, plan_id: int) -> dict | None:
+    """Return the most recent active poll for this EP plan."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM availability_polls WHERE guild_id=? AND plan_id=?
+            ORDER BY created_at DESC LIMIT 1
+        """, (guild_id, plan_id)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_ep_poll_availability(guild_id: str, plan_id: int) -> dict[str, str]:
+    """Return {discord_user_id: response} for the EP's linked poll."""
+    poll = await get_ep_poll(guild_id, plan_id)
+    if not poll:
+        return {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, response FROM poll_responses WHERE poll_id=?", (poll["id"],)
+        ) as cur:
+            rows = await cur.fetchall()
+    return {r["user_id"]: r["response"] for r in rows}
+
+
+# ── EP wave time recalculation ────────────────────────────────────────────────
+
+async def recalc_op_wave_times(plan_id: int, guild_id: str) -> int:
+    """Recompute send_time for all waves in a plan from its current landing_time. Returns updated count."""
+    import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT landing_time, server_speed FROM op_plans WHERE id=? AND guild_id=?",
+                              (plan_id, guild_id)) as cur:
+            plan_row = await cur.fetchone()
+        if not plan_row or not plan_row["landing_time"]:
+            return 0
+        landing_time = plan_row["landing_time"]
+        server_speed = float(plan_row["server_speed"] or 1.0)
+        try:
+            lt = _dt.datetime.fromisoformat(landing_time.replace("Z", ""))
+        except Exception:
+            return 0
+        async with db.execute("""
+            SELECT w.id, w.origin_x, w.origin_y, w.slowest_speed, t.x AS tx, t.y AS ty
+            FROM op_waves w JOIN op_targets t ON t.id = w.target_id
+            WHERE w.plan_id=? AND w.guild_id=?
+        """, (plan_id, guild_id)) as cur:
+            waves = [dict(r) for r in await cur.fetchall()]
+        updated = 0
+        for w in waves:
+            if w["origin_x"] is None or w["origin_y"] is None or not w["slowest_speed"]:
+                continue
+            travel_sec = _calc_travel_seconds(
+                w["origin_x"], w["origin_y"], w["tx"], w["ty"],
+                float(w["slowest_speed"]), server_speed
+            )
+            send_dt = lt - _dt.timedelta(seconds=travel_sec)
+            send_time = send_dt.strftime("%Y-%m-%dT%H:%M:%S")
+            await db.execute(
+                "UPDATE op_waves SET send_time=?, travel_seconds=?, arrival_time=? WHERE id=?",
+                (send_time, travel_sec, landing_time, w["id"])
+            )
+            updated += 1
+        await db.commit()
+    return updated
+
+
+# ── Admin Ideas ───────────────────────────────────────────────────────────────
+
+async def init_ideas_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS admin_ideas (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                title       TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                category    TEXT DEFAULT 'general',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+        # Seed default ideas once
+        async with db.execute("SELECT COUNT(*) FROM admin_ideas") as cur:
+            count = (await cur.fetchone())[0]
+        if count == 0:
+            defaults = [
+                ("EP-Vorlagen (Templates)", "Plan-Struktur ohne Wellen als Vorlage speichern und für zukünftige Ops wiederverwenden.", "ep"),
+                ("Wellen Bulk-Import per Text", "Textbox zum Einfügen einer Angreifer-Liste (Name, Dorf, Typ, Sendezeit) aus Discord — alles auf einmal importieren.", "ep"),
+                ("Mobile App / PWA", "Native App oder Progressive Web App für TravOps. Aktuell zu kostenintensiv, aber für die Zukunft sinnvoll.", "general"),
+            ]
+            for t, d, c in defaults:
+                await db.execute("INSERT INTO admin_ideas (title, description, category) VALUES (?,?,?)", (t, d, c))
+            await db.commit()
+
+
+async def create_idea(title: str, description: str, category: str) -> int:
+    await init_ideas_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO admin_ideas (title, description, category) VALUES (?,?,?)",
+            (title[:120], description[:600], category or "general")
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_ideas() -> list[dict]:
+    await init_ideas_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM admin_ideas ORDER BY created_at DESC") as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_idea(idea_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM admin_ideas WHERE id=?", (idea_id,))
         await db.commit()

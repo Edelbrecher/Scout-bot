@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Ideen · Admin · TravOps{% endblock %}
+
+{% block content %}
+<div class="container-wide">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">👥 Kunden</a>
+        <a href="/admin/servers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🖥 Server</a>
+        <a href="/admin/trial-links" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🔑 Trial-Links</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🎟 Rabattcodes</a>
+        <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">💬 Popup</a>
+        <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📈 Statistik</a>
+        <a href="/admin/contact" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">✉️ Kontakt-Seite</a>
+        <a href="/admin/auths" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🔐 Auths</a>
+        <a href="/admin/ideas" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">💡 Ideen</a>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div style="flex:1; min-width:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem;">
+        <h1 style="margin:0;">💡 Feature-Ideen</h1>
+        <form method="post" action="/admin/ideas" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;">
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <input name="title" placeholder="Titel der Idee…" required maxlength="120"
+                   style="padding:.4rem .7rem;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:.88rem;width:260px;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <textarea name="description" placeholder="Beschreibung (optional)…" rows="1" maxlength="600"
+                      style="padding:.4rem .7rem;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:.88rem;width:320px;resize:vertical;"></textarea>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <select name="category" style="padding:.42rem .7rem;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:.88rem;">
+              <option value="ep">⚔️ Einsatzplanung</option>
+              <option value="general">🌐 Allgemein</option>
+              <option value="ux">🎨 UX/Design</option>
+              <option value="integration">🔗 Integration</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="font-size:.85rem;">➕ Hinzufügen</button>
+        </form>
+      </div>
+
+      {% if saved %}<div class="alert alert-success" style="margin-bottom:1rem;">✅ Idee gespeichert.</div>{% endif %}
+      {% if deleted %}<div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Idee gelöscht.</div>{% endif %}
+
+      {% if not ideas %}
+      <div class="card" style="text-align:center;padding:2rem;opacity:.7;">
+        <p style="color:var(--text-muted);">Noch keine Ideen eingetragen.</p>
+      </div>
+      {% else %}
+      {% set cat_labels = {'ep':'⚔️ Einsatzplanung','general':'🌐 Allgemein','ux':'🎨 UX/Design','integration':'🔗 Integration'} %}
+      <div style="display:flex;flex-direction:column;gap:.6rem;">
+        {% for idea in ideas %}
+        <div class="card" style="padding:.85rem 1rem;display:flex;align-items:flex-start;gap:.75rem;">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
+              <span style="font-weight:700;font-size:.92rem;">{{ idea.title }}</span>
+              <span style="font-size:.7rem;background:rgba(99,102,241,.15);color:#a5b4fc;border-radius:8px;padding:1px 8px;">{{ cat_labels.get(idea.category, idea.category) }}</span>
+              <span style="font-size:.7rem;color:var(--text-muted);">{{ idea.created_at[:10] }}</span>
+            </div>
+            {% if idea.description %}
+            <div style="font-size:.82rem;color:var(--text-muted);">{{ idea.description }}</div>
+            {% endif %}
+          </div>
+          <form method="post" action="/admin/ideas/{{ idea.id }}/delete" style="margin:0;flex-shrink:0;">
+            <button type="submit" class="btn-icon danger" style="font-size:.8rem;" title="Löschen">🗑</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
