@@ -4641,38 +4641,50 @@ async def op_update_plan(
 
 
 async def _announce_plan_via_bot(guild_id: str, plan_id: int):
-    """Send Discord announcement for plan going active via the bot's internal API."""
+    """Send Discord DMs + internal notifications when a plan goes active."""
     try:
-        guild = await database.get_guild(guild_id)
         plan = await database.get_op_plan(plan_id, guild_id)
-        if not guild or not plan:
-            print(f"[announce-ep] guild or plan not found: guild={guild_id} plan={plan_id}")
+        if not plan:
+            print(f"[announce-ep] plan not found: guild={guild_id} plan={plan_id}")
             return
-        poll_channel = guild.get("poll_channel_id") or ""
         landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
+        plan_name = plan.get("name", "Einsatzplan")
         server_host = os.environ.get("SERVER_HOST", "https://travops.app")
         plan_url = f"{server_host}/guild/{guild_id}/operations"
-        # Get all approved ally members' discord IDs
+
+        # Get all approved ally members
         ally_group = await database.get_ally_group_for_guild(guild_id)
         member_ids = []
         if ally_group:
             members = await database.get_ally_members(ally_group["id"])
             member_ids = [str(m["discord_id"]) for m in members
                           if m.get("discord_id") and m.get("status", "approved") == "approved"]
+
+        # 1. Discord DMs via bot (no channel needed)
         payload = {
             "guild_id": guild_id,
-            "plan_name": plan.get("name", "Einsatzplan"),
+            "plan_name": plan_name,
             "landing_time": landing,
             "plan_url": plan_url,
-            "poll_channel_id": poll_channel,
+            "poll_channel_id": "",   # no channel post
             "member_discord_ids": member_ids,
         }
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post("http://bot:7777/api/announce-ep", json=payload)
-            if resp.status_code != 200:
-                print(f"[announce-ep] bot returned {resp.status_code}: {resp.text}")
-            else:
-                print(f"[announce-ep] sent to {len(member_ids)} members for plan {plan_id}")
+            dms = resp.json().get("dms", 0) if resp.status_code == 200 else 0
+            print(f"[announce-ep] DMs sent: {dms}/{len(member_ids)} for plan {plan_id}")
+
+        # 2. Internal TravOps notifications for all approved members
+        await database.create_notifications(
+            guild_id=guild_id,
+            ally_group_id=ally_group["id"] if ally_group else None,
+            recipient_ids=member_ids,
+            notif_type="ep_active",
+            title=f"⚔️ Neuer Einsatzplan: {plan_name}",
+            message=f"Ein Einsatz wurde aktiviert. Einschlag: {landing}. Bitte prüfe deine Wellen unter »Mein Account«.",
+            plan_id=plan_id,
+        )
+        print(f"[announce-ep] internal notifications created for {len(member_ids)} members")
     except Exception as e:
         print(f"[announce-ep] error: {e}")
 
