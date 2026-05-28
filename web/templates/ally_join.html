@@ -52,7 +52,7 @@
     {% if not session or not session.get('uid') %}
     <div style="text-align:center;color:var(--text-muted);padding:1rem;">
       <p>Du musst eingeloggt sein um beizutreten.</p>
-      <a href="/auth/login?next=/ally/join/{{ token }}" class="btn btn-primary">🔐 Mit Discord einloggen</a>
+      <a href="/auth/discord?next=/ally/join/{{ token }}" class="btn btn-primary">🔐 Mit Discord einloggen</a>
     </div>
     {% else %}
     <form method="post" action="/ally/join/{{ token }}">

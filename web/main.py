@@ -897,20 +897,37 @@ async def login(request: Request, username: str = Form(...), password: str = For
 import hmac as _hmac
 import hashlib as _hashlib
 
-def _make_oauth_state() -> str:
-    """Generate a self-validating HMAC state — no cookie needed."""
+def _make_oauth_state(next_url: str = "") -> str:
+    """Generate a self-validating HMAC state with optional next_url — no cookie needed."""
+    import base64 as _b64
     nonce = secrets.token_hex(20)
-    sig = _hmac.new(SECRET_KEY.encode(), nonce.encode(), _hashlib.sha256).hexdigest()[:24]
-    return f"{nonce}.{sig}"
+    payload = nonce
+    if next_url:
+        # Encode next_url safely into the state
+        encoded = _b64.urlsafe_b64encode(next_url.encode()).decode().rstrip("=")
+        payload = f"{nonce}~{encoded}"
+    sig = _hmac.new(SECRET_KEY.encode(), payload.encode(), _hashlib.sha256).hexdigest()[:24]
+    return f"{payload}.{sig}"
 
-def _verify_oauth_state(state: str) -> bool:
-    """Verify a self-validating HMAC state."""
+def _verify_oauth_state(state: str) -> tuple[bool, str]:
+    """Verify a self-validating HMAC state. Returns (valid, next_url)."""
+    import base64 as _b64
     try:
-        nonce, sig = state.rsplit(".", 1)
-        expected = _hmac.new(SECRET_KEY.encode(), nonce.encode(), _hashlib.sha256).hexdigest()[:24]
-        return secrets.compare_digest(expected, sig)
+        payload, sig = state.rsplit(".", 1)
+        expected = _hmac.new(SECRET_KEY.encode(), payload.encode(), _hashlib.sha256).hexdigest()[:24]
+        if not secrets.compare_digest(expected, sig):
+            return False, ""
+        if "~" in payload:
+            _, encoded = payload.split("~", 1)
+            # Re-pad base64
+            padding = 4 - len(encoded) % 4
+            next_url = _b64.urlsafe_b64decode(encoded + "=" * padding).decode()
+            # Sanitize: only allow relative paths
+            if next_url.startswith("/") and not next_url.startswith("//"):
+                return True, next_url
+        return True, ""
     except Exception:
-        return False
+        return False, ""
 
 
 @app.get("/auth/discord")
@@ -918,7 +935,8 @@ async def auth_discord(request: Request):
     client_id = get_client_id()
     if not client_id or not DISCORD_CLIENT_SECRET:
         return RedirectResponse("/login?error=Discord+OAuth2+not+configured")
-    state = _make_oauth_state()
+    next_url = request.query_params.get("next", "")
+    state = _make_oauth_state(next_url=next_url)
     params = urlencode({
         "client_id": client_id,
         "redirect_uri": DISCORD_REDIRECT_URI,
@@ -937,7 +955,8 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
         return RedirectResponse("/login?error=Discord+authentication+cancelled")
 
     # Validate OAuth state (HMAC-signed, no cookie needed)
-    if not state or not _verify_oauth_state(state):
+    state_valid, next_url = _verify_oauth_state(state) if state else (False, "")
+    if not state or not state_valid:
         await database.log_auth(status="csrf_error", ip=_ip, detail="state_mismatch")
         return RedirectResponse("/login?error=Invalid+OAuth+state.+Please+try+again.")
 
@@ -1029,7 +1048,8 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
             ),
         ))
 
-    response = RedirectResponse("/dashboard", status_code=303)
+    redirect_to = next_url if next_url else "/dashboard"
+    response = RedirectResponse(redirect_to, status_code=303)
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
     response.delete_cookie("oauth_state")
     return response
