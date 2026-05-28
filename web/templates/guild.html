@@ -222,7 +222,7 @@
     </a>
 
     <!-- Benachrichtigungen -->
-    <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;">
+    <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;{% if unread_notif %}border:2px solid #ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15);animation:pulse 2s infinite;{% endif %}">
       <div class="feature-icon">🔔</div>
       <div class="feature-body">
         <div class="feature-title">Benachrichtigungen
