@@ -87,8 +87,8 @@
 /* ── Player Browser Modal ────────────────────────────────────── */
 .pb-modal { width:98vw; max-width:1600px; height:92vh; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; }
 .pb-split { display:flex; flex:1; min-height:0; }
-.pb-left  { flex:1 1 0; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); }
-.pb-right { width:380px; min-width:340px; flex-shrink:0; display:flex; flex-direction:column; background:rgba(0,0,0,.12); }
+.pb-left  { flex:0 0 60%; width:60%; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); overflow:hidden; }
+.pb-right { flex:0 0 40%; width:40%; display:flex; flex-direction:column; background:rgba(0,0,0,.12); overflow:hidden; }
 .pb-right-empty { display:flex; flex-direction:column; align-items:center; justify-content:center;
   height:100%; color:var(--text-muted); font-size:.82rem; gap:.5rem; padding:1.5rem; text-align:center; }
 /* Attacker rows in assignment panel */
