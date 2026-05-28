@@ -5242,8 +5242,7 @@ async def notifications_page(request: Request, guild_id: str):
     uid = session.get("uid", "")
     notifs = await database.get_notifications(guild_id, uid, limit=80)
     unread = sum(1 for n in notifs if not n["read"])
-    # Mark all as read after loading
-    await database.mark_notifications_read(guild_id, uid)
+    # Mark as read only when user explicitly clears — not on page load
     return templates.TemplateResponse("notifications.html", {
         "request": request,
         "guild": guild,
@@ -5259,10 +5258,7 @@ async def notifications_clear(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
-    import aiosqlite as _aio_n
-    async with _aio_n.connect(database.DB_PATH) as _db_n:
-        await _db_n.execute("DELETE FROM notifications WHERE guild_id=? AND recipient_id=?", (guild_id, uid))
-        await _db_n.commit()
+    await database.mark_notifications_read(guild_id, uid)
     return RedirectResponse(f"/guild/{guild_id}/notifications", status_code=303)
 
 
