@@ -1062,8 +1062,6 @@ async function reloadActivePlan() {
   await refreshPlanList();
 }
 async function refreshPlanList() {
-  const data = await apiFetch('/plans'.replace('/api/plans','/api/plans'));
-  // Re-fetch plan list from sidebar endpoint
   const r = await fetch(`/guild/${GUILD_ID}/operations/api/plan-list`);
   if (r.ok) { plans = await r.json(); renderPlanList(); }
 }
