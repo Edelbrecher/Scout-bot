@@ -4742,19 +4742,47 @@ async def op_delete_favorite(request: Request, guild_id: str, fav_id: int):
 
 # ── Village / player search ───────────────────────────────────────────────────
 
-@app.get("/guild/{guild_id}/operations/api/villages")
-async def op_search_villages(request: Request, guild_id: str, q: str = ""):
+@app.get("/guild/{guild_id}/operations/api/alliances")
+async def op_list_alliances(request: Request, guild_id: str):
+    """Return distinct alliance names from the latest map snapshot."""
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
-    q = q.strip()
-    # Search map_snapshots + alliance_members
     import aiosqlite as _aiosqlite_op
     async with _aiosqlite_op.connect(database.DB_PATH) as db:
         db.row_factory = _aiosqlite_op.Row
-        # Latest snapshot villages
+        async with db.execute("""
+            SELECT DISTINCT m.alliance_name
+            FROM map_snapshots m
+            INNER JOIN (
+                SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
+                WHERE guild_id=? GROUP BY guild_id
+            ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
+            WHERE m.guild_id=? AND m.alliance_name IS NOT NULL AND m.alliance_name != ''
+            ORDER BY m.alliance_name
+        """, (guild_id, guild_id)) as cur:
+            alliances = [r["alliance_name"] for r in await cur.fetchall()]
+    return _JSONResponse({"alliances": alliances})
+
+
+@app.get("/guild/{guild_id}/operations/api/villages")
+async def op_search_villages(request: Request, guild_id: str, q: str = "", alliances: str = ""):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    q = q.strip()
+    # alliances = comma-separated list of alliance names to filter by (empty = all)
+    alliance_filter = [a.strip() for a in alliances.split(",") if a.strip()] if alliances else []
+    import aiosqlite as _aiosqlite_op
+    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+        db.row_factory = _aiosqlite_op.Row
         if q:
-            async with db.execute("""
-                SELECT DISTINCT m.village_name, m.x, m.y, m.player_name, m.population
+            alliance_clause = ""
+            params: list = [guild_id, guild_id, f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"]
+            if alliance_filter:
+                placeholders = ",".join("?" * len(alliance_filter))
+                alliance_clause = f" AND m.alliance_name IN ({placeholders})"
+                params.extend(alliance_filter)
+            async with db.execute(f"""
+                SELECT DISTINCT m.village_name, m.x, m.y, m.player_name, m.population, m.alliance_name
                 FROM map_snapshots m
                 INNER JOIN (
                     SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
@@ -4763,8 +4791,9 @@ async def op_search_villages(request: Request, guild_id: str, q: str = ""):
                 WHERE m.guild_id=?
                   AND (m.player_name LIKE ? OR m.village_name LIKE ?
                        OR (m.x||'|'||m.y) LIKE ? OR (m.x||'/'||m.y) LIKE ?)
+                  {alliance_clause}
                 ORDER BY m.player_name LIMIT 40
-            """, (guild_id, guild_id, f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")) as cur:
+            """, params) as cur:
                 rows = [dict(r) for r in await cur.fetchall()]
         else:
             rows = []

@@ -167,6 +167,13 @@
 /* ── Tribe pills ─────────────────────────────────────────────── */
 .tribe-pill { display:inline-block; font-size:.65rem; padding:1px 6px; border-radius:8px;
   background:rgba(255,255,255,.06); border:1px solid var(--border); }
+.ally-chip { display:inline-flex; align-items:center; gap:.3rem; font-size:.74rem; padding:.2rem .55rem;
+  border-radius:20px; border:1px solid var(--border); cursor:pointer; transition:all .15s;
+  background:var(--bg-card); color:var(--text-muted); user-select:none; }
+.ally-chip:hover { border-color:#6366f1; color:var(--text); }
+.ally-chip.active { background:rgba(99,102,241,.18); border-color:#6366f1; color:#a5b4fc; font-weight:600; }
+.ally-chip .chip-x { color:var(--text-muted); font-size:.7rem; }
+.ally-chip.active .chip-x { color:#a5b4fc; }
 </style>
 
 <!-- Inject data for JS -->
@@ -237,12 +244,19 @@ const INIT_MEMBERS = {{ members | tojson }};
           <!-- LEFT: Targets + Waves -->
           <div>
             <!-- Add target row -->
-            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
               <div style="font-size:.9rem;font-weight:700;flex:1;">🎯 Ziele</div>
               <input id="targetSearch" type="text" placeholder="Spieler / Koordinaten suchen…"
                      style="width:220px;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.35rem .7rem;color:var(--text);font-size:.82rem;"
                      oninput="debounceSearch(this.value)" autocomplete="off">
               <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
+            </div>
+
+            <!-- Alliance filter -->
+            <div id="allianceFilterRow" style="display:none;margin-bottom:.6rem;gap:.4rem;flex-wrap:wrap;align-items:center;">
+              <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;">Allianz-Filter:</span>
+              <div id="allianceChips" style="display:flex;gap:.3rem;flex-wrap:wrap;flex:1;"></div>
+              <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);">Keine Auswahl = alle Spieler</span>
             </div>
 
             <!-- Search dropdown -->
@@ -503,6 +517,8 @@ let currentTargetId = null; // for wave modal
 let editingWaveId = null;   // null = new wave, else update existing
 let planFilter = 'all';
 let editingPlanId = null; // null = new plan, else update
+let selectedAlliances = new Set(); // alliance filter for target search
+let availableAlliances = [];       // loaded once per plan open
 
 const BASE = `/guild/${GUILD_ID}/operations/api`;
 
@@ -586,6 +602,9 @@ async function loadPlan(id) {
   try {
     activePlan = await apiFetch(`/plans/${id}`);
     renderEditor();
+    // Load alliances for filter (once per plan open, non-blocking)
+    if (!availableAlliances.length) loadAlliances();
+    else renderAllianceFilter();
   } catch(e) { alert('Fehler beim Laden: '+e.message); }
 }
 
@@ -720,18 +739,64 @@ function getTroopName(id, tribe) {
 }
 
 // ══ Search ════════════════════════════════════════════════════════════════
+async function loadAlliances() {
+  try {
+    const data = await apiFetch('/alliances');
+    availableAlliances = data.alliances || [];
+    renderAllianceFilter();
+  } catch(e) { availableAlliances = []; }
+}
+
+function renderAllianceFilter() {
+  const row = document.getElementById('allianceFilterRow');
+  const chips = document.getElementById('allianceChips');
+  const hint = document.getElementById('allianceFilterHint');
+  if (!availableAlliances.length) { row.style.display='none'; return; }
+  row.style.display = 'flex';
+  chips.innerHTML = availableAlliances.map(a => {
+    const active = selectedAlliances.has(a);
+    const disabled = !active && selectedAlliances.size >= 2;
+    return `<span class="ally-chip${active?' active':''}${disabled?' disabled':''}"
+      onclick="toggleAlliance('${escJs(a)}')" title="${active?'Filter entfernen':'Als Filter hinzufügen (max. 2)'}">
+      ${escHtml(a)}<span class="chip-x">${active?' ✕':''}</span>
+    </span>`;
+  }).join('');
+  if (selectedAlliances.size === 0) {
+    hint.textContent = 'Keine Auswahl = alle Spieler';
+  } else {
+    hint.textContent = `Gefiltert: ${[...selectedAlliances].join(', ')}`;
+  }
+}
+
+function toggleAlliance(name) {
+  if (selectedAlliances.has(name)) {
+    selectedAlliances.delete(name);
+  } else if (selectedAlliances.size < 2) {
+    selectedAlliances.add(name);
+  } else {
+    showToast('Maximal 2 Allianzen können gleichzeitig gefiltert werden.');
+    return;
+  }
+  renderAllianceFilter();
+  // Re-run search if active
+  const q = document.getElementById('targetSearch').value;
+  if (q.length >= 2) doSearch(q);
+}
+
 async function doSearch(q) {
   const dd = document.getElementById('searchDropdown');
   const res = document.getElementById('searchResults');
   if (!q || q.length < 2) { dd.style.display='none'; return; }
   try {
-    const data = await apiFetch(`/villages?q=${encodeURIComponent(q)}`);
+    const allyParam = selectedAlliances.size > 0 ? `&alliances=${encodeURIComponent([...selectedAlliances].join(','))}` : '';
+    const data = await apiFetch(`/villages?q=${encodeURIComponent(q)}${allyParam}`);
     if (!data.results?.length) { dd.style.display='none'; return; }
     res.innerHTML = data.results.map(v => `
       <div class="fav-item" onclick="addTargetFromSearch(${v.x},${v.y},'${escJs(v.player_name||'')}','${escJs(v.village_name||'')}',${v.population||0})">
         <span class="fav-coords">${v.x}|${v.y}</span>
         <span style="font-weight:600;">${escHtml(v.player_name||'?')}</span>
         <span style="color:var(--text-muted);">${escHtml(v.village_name||'')}</span>
+        ${v.alliance_name ? `<span style="font-size:.7rem;padding:1px 5px;border-radius:5px;background:rgba(99,102,241,.15);color:#a5b4fc;margin-left:.25rem;">${escHtml(v.alliance_name)}</span>` : ''}
         ${v.population ? `<span style="color:var(--text-muted);font-size:.72rem;">${v.population} Pop</span>` : ''}
       </div>
     `).join('');
