@@ -200,7 +200,6 @@ let camX = 0, camY = 0;
 let dragging   = false, dragSX = 0, dragSY = 0, camSX = 0, camSY = 0;
 let highlighted = new Map();   // "x|y" → highlight color
 let viewMode    = 'tribe';
-let hoveredVillage = null;
 
 // Multi-filter state
 let playerFilters   = [];   // [{name, color}]
@@ -401,45 +400,6 @@ function draw() {
     }
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
-  }
-
-  // Hover label — only draw for the currently hovered village
-  if (hoveredVillage) {
-    const v = hoveredVillage;
-    if (v.x>=vx0&&v.x<=vx1&&v.y>=vy1&&v.y<=vy0) {
-      const fontSize = Math.max(10, Math.min(14, Math.max(scale, 4) * 0.7));
-      ctx.textBaseline = 'top';
-      const [cx,cy] = worldToCanvas(v.x,v.y);
-      const lx = cx + Math.max(5, tS*0.6);
-      const ly = cy - fontSize * 0.5;
-
-      const lines = [];
-      if (v.player)    lines.push({text: v.player,               color:'rgba(160,225,160,1)',   bold:true});
-      else if (v.name) lines.push({text: v.name,                 color:'rgba(255,255,255,1)',   bold:true});
-      if (v.name && v.player) lines.push({text: v.name,          color:'rgba(220,220,220,0.85)',bold:false});
-      if (v.alliance)  lines.push({text:`[${v.alliance}]`,       color:'rgba(160,195,255,0.9)', bold:false});
-      if (v.pop)       lines.push({text:`👥 ${v.pop.toLocaleString()}`, color:'rgba(210,210,100,0.9)', bold:false});
-
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      const maxW = Math.max(...lines.map(l => ctx.measureText(l.text).width));
-      const totalH = lines.length * (fontSize + 2);
-      const pad = 5;
-
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.beginPath();
-      const bx=lx-pad, by=ly-pad, bw=maxW+pad*2, bh=totalH+pad*2;
-      ctx.roundRect ? ctx.roundRect(bx,by,bw,bh,4) : ctx.rect(bx,by,bw,bh);
-      ctx.fill();
-
-      let ty = ly;
-      for (const line of lines) {
-        ctx.font = `${line.bold?'bold ':''} ${fontSize}px sans-serif`;
-        ctx.fillStyle = line.color;
-        ctx.fillText(line.text, lx, ty);
-        ty += fontSize + 2;
-      }
-      ctx.textBaseline = 'alphabetic';
-    }
   }
 
   ctx.restore();
@@ -715,10 +675,8 @@ window.addEventListener('mousemove', e => {
     const ty = e.clientY-rect.top-8;
     tooltip.style.left = `${Math.min(tx,rect.width-310)}px`;
     tooltip.style.top  = `${Math.max(4,ty)}px`;
-    if (hoveredVillage !== best) { hoveredVillage = best; draw(); }
   } else {
     tooltip.style.display='none';
-    if (hoveredVillage) { hoveredVillage = null; draw(); }
   }
 });
 
