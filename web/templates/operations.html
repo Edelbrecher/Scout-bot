@@ -985,7 +985,8 @@ function renderAllianceFilter() {
   const chips = document.getElementById('allianceChips');
   const hint = document.getElementById('allianceFilterHint');
   if (!availableAlliances.length) { row.style.display='none'; return; }
-  row.style.display = 'flex';
+  // Don't auto-open — only render content, panel stays closed until toggled
+  if (!alliancePanelOpen) row.style.display = 'none';
 
   let html = '';
 
