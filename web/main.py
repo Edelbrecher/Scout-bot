@@ -4663,7 +4663,7 @@ async def op_update_wave(request: Request, guild_id: str, wave_id: int):
     if "origin_x" in data or "tribe" in data or "troop_json" in data:
         # fetch wave to get current plan
         import aiosqlite as _aiosqlite_op
-    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+        async with _aiosqlite_op.connect(database.DB_PATH) as db:
             db.row_factory = _aiosqlite_op.Row
             async with db.execute(
                 "SELECT w.*, t.x as tx, t.y as ty, p.landing_time, p.server_speed "
