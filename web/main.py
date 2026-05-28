@@ -4618,6 +4618,7 @@ async def op_add_wave(
     landing_time: str = Form(""),
     server_speed: float = Form(1.0),
     notes: str = Form(""),
+    tournament_square: int = Form(0),
 ):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
@@ -4634,7 +4635,8 @@ async def op_add_wave(
         target_id, plan_id, guild_id,
         attacker_discord_id, attacker_name.strip(),
         origin_village.strip(), origin_x, origin_y,
-        wave_type, tribe, troops, landing_time, server_speed, notes.strip()
+        wave_type, tribe, troops, landing_time, server_speed, notes.strip(),
+        tournament_square=max(0, min(tournament_square, 20))
     )
     return _JSONResponse({"ok": True, **result})
 

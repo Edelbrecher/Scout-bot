@@ -146,10 +146,10 @@
 .form-group input:focus, .form-group select:focus {
   outline:none; border-color:#f59e0b; box-shadow:0 0 0 2px rgba(245,158,11,.15);
 }
-.troop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.4rem; }
-.troop-entry { display:flex; align-items:center; gap:.4rem; }
-.troop-entry label { font-size:.78rem; white-space:nowrap; flex:1; }
-.troop-entry input { width:70px; text-align:right; }
+.troop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:.5rem .6rem; }
+.troop-entry { display:flex; flex-direction:column; gap:.2rem; }
+.troop-entry label { font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.troop-entry input { width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:5px; padding:.3rem .5rem; color:var(--text); font-size:.88rem; text-align:right; box-sizing:border-box; }
 
 /* ── Empty state ─────────────────────────────────────────────── */
 .op-empty { text-align:center; padding:4rem 2rem; color:var(--text-muted); }
@@ -402,87 +402,87 @@ const INIT_MEMBERS = {{ members | tojson }};
   </div>
 </div>
 
-<!-- Add Wave Modal -->
+<!-- Add/Edit Wave Modal -->
 <div class="op-modal-overlay" id="waveModal">
-  <div class="op-modal" style="width:min(720px,96vw);">
+  <div class="op-modal" style="width:min(760px,97vw);">
     <div class="op-modal-header">
-      <span style="font-weight:700;">💥 Welle hinzufügen — <span id="waveModalTarget"></span></span>
+      <span style="font-weight:700;" id="waveModalTitle">💥 Welle hinzufügen — <span id="waveModalTarget"></span></span>
       <button class="btn-icon" onclick="closeModal('waveModal')">✕</button>
     </div>
     <div class="op-modal-body">
 
-      <!-- Attacker selection -->
-      <div style="margin-bottom:.9rem;">
-        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">Angreifer</div>
-        <div class="form-row">
-          <div class="form-group" style="flex:2;">
-            <label>Name / Discordname</label>
-            <input id="wmAttacker" type="text" placeholder="z.B. Currax" list="memberSuggestions">
-            <datalist id="memberSuggestions"></datalist>
-          </div>
-          <div class="form-group">
-            <label>Herkunfts-Dorf</label>
-            <input id="wmOriginVillage" type="text" placeholder="Dorfname">
-          </div>
+      <!-- Row 1: Angreifer + Dorf -->
+      <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Angreifer</div>
+      <div class="form-row" style="margin-bottom:.6rem;">
+        <div class="form-group" style="flex:1;">
+          <label>Allianz-Mitglied</label>
+          <select id="wmAttackerSelect" onchange="onAttackerSelect()">
+            <option value="">— Angreifer wählen —</option>
+          </select>
         </div>
-        <div class="form-row">
-          <div class="form-group" style="max-width:110px;">
-            <label>Herkunft X</label>
-            <input id="wmOX" type="number" placeholder="X" oninput="recalcWaveTime()">
-          </div>
-          <div class="form-group" style="max-width:110px;">
-            <label>Herkunft Y</label>
-            <input id="wmOY" type="number" placeholder="Y" oninput="recalcWaveTime()">
-          </div>
-          <div class="form-group" style="max-width:160px;">
-            <label>Volk</label>
-            <select id="wmTribe" onchange="updateTroopGrid(); recalcWaveTime();">
-              <option value="romans">Römer</option>
-              <option value="gauls">Gallier</option>
-              <option value="teutons">Teutonen</option>
-              <option value="huns">Hunnen</option>
-              <option value="egyptians">Ägypter</option>
-            </select>
-          </div>
-          <div class="form-group" style="max-width:130px;">
-            <label>Wellentyp</label>
-            <select id="wmType">
-              <option value="real">🗡 Echter Angriff</option>
-              <option value="fake">👻 Fake</option>
-              <option value="def">🛡 Verteidigung</option>
-              <option value="scout">🔍 Aufklärung</option>
-            </select>
-          </div>
+        <div class="form-group" style="flex:2;">
+          <label>Angreifer-Dorf</label>
+          <select id="wmVillageSelect" onchange="onVillageSelect()" disabled>
+            <option value="">— erst Angreifer wählen —</option>
+          </select>
         </div>
       </div>
-
-      <!-- Quick load from member troops -->
-      <div id="memberTroopBtn" style="margin-bottom:.75rem;">
-        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadFromMember()">📥 Truppen aus Account laden</button>
-        <span id="memberTroopHint" style="font-size:.75rem;color:var(--text-muted);margin-left:.5rem;"></span>
+      <!-- Manual coords (shown/prefilled from village select) -->
+      <div class="form-row" style="margin-bottom:.6rem;">
+        <div class="form-group" style="max-width:100px;">
+          <label>Herkunft X</label>
+          <input id="wmOX" type="number" placeholder="X" oninput="recalcWaveTime()">
+        </div>
+        <div class="form-group" style="max-width:100px;">
+          <label>Herkunft Y</label>
+          <input id="wmOY" type="number" placeholder="Y" oninput="recalcWaveTime()">
+        </div>
+        <div class="form-group" style="max-width:80px;">
+          <label title="Turnierplatz-Stufe (0–20), erhöht Marschgeschwindigkeit um 20% je Stufe">Turnierpl. <span style="font-size:.68rem;color:var(--text-muted);">(0–20)</span></label>
+          <input id="wmTournament" type="number" min="0" max="20" value="0" placeholder="0" oninput="recalcWaveTime()">
+        </div>
+        <div class="form-group" style="max-width:130px;">
+          <label>Volk</label>
+          <select id="wmTribe" onchange="updateTroopGrid(); recalcWaveTime();">
+            <option value="romans">Römer</option>
+            <option value="gauls">Gallier</option>
+            <option value="teutons">Teutonen</option>
+            <option value="huns">Hunnen</option>
+            <option value="egyptians">Ägypter</option>
+          </select>
+        </div>
+        <div class="form-group" style="max-width:145px;">
+          <label>Wellentyp</label>
+          <select id="wmType">
+            <option value="real">⚔ Echter Angriff</option>
+            <option value="fake">👻 Fake</option>
+            <option value="def">🛡 Verteidigung</option>
+            <option value="scout">🔍 Aufklärung</option>
+          </select>
+        </div>
       </div>
 
       <!-- Troop grid -->
-      <div>
-        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Truppen</div>
+      <div style="margin-bottom:.6rem;">
+        <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Truppen</div>
         <div class="troop-grid" id="troopGrid"></div>
       </div>
 
       <!-- Timing preview -->
-      <div id="waveTiming" style="margin-top:.9rem;padding:.65rem .85rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;display:none;">
-        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.25rem;">Berechnete Sendezeit</div>
+      <div id="waveTiming" style="margin:.6rem 0;padding:.6rem .85rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;display:none;">
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.2rem;">Berechnete Sendezeit</div>
         <div id="waveTimingText" style="font-family:monospace;color:#fbbf24;font-size:.95rem;font-weight:700;"></div>
-        <div id="waveTravelText" style="font-size:.75rem;color:var(--text-muted);"></div>
+        <div id="waveTravelText" style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;"></div>
       </div>
 
-      <div class="form-group" style="margin-top:.75rem;">
+      <div class="form-group">
         <label>Notizen</label>
         <input id="wmNotes" type="text" placeholder="optional">
       </div>
     </div>
     <div class="op-modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('waveModal')">Abbrechen</button>
-      <button class="btn btn-primary" onclick="addWave()">+ Welle hinzufügen</button>
+      <button class="btn btn-primary" id="wmSaveBtn" onclick="saveWave()">+ Welle hinzufügen</button>
     </div>
   </div>
 </div>
@@ -495,6 +495,7 @@ let members = INIT_MEMBERS.slice();
 let activePlan = null;   // full plan object with targets+waves
 let activePlanId = null;
 let currentTargetId = null; // for wave modal
+let editingWaveId = null;   // null = new wave, else update existing
 let planFilter = 'all';
 let editingPlanId = null; // null = new plan, else update
 
@@ -680,7 +681,10 @@ function renderWavesTable(t) {
         <div class="send-time">${w.send_time ? fmtDatetime(w.send_time) : '—'}</div>
         <div class="travel-time">${w.travel_seconds ? '🕐 ' + fmtTravel(w.travel_seconds) : ''}</div>
       </td>
-      <td>
+      <td style="white-space:nowrap;">
+        <button class="btn-icon" style="font-size:.7rem;" title="Duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
+        <button class="btn-icon" style="font-size:.7rem;" title="Duplizieren & Bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
+        <button class="btn-icon" style="font-size:.7rem;" title="Bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
         <button class="btn-icon danger" style="font-size:.7rem;" title="Welle löschen" onclick="deleteWave(${w.id},${t.id})">🗑</button>
       </td>
     </tr>`;
@@ -779,22 +783,143 @@ async function favTarget(targetId) {
 }
 
 // ══ Wave Modal ════════════════════════════════════════════════════════════
+function classifyVillage(village, tribe) {
+  if (!village || !village.troops) return 'off';
+  const troops = TROOPS_DEF[tribe] || Object.values(TROOPS_DEF).flat();
+  let offCnt = 0, defCnt = 0, scoutCnt = 0;
+  Object.entries(village.troops).forEach(([name, cnt]) => {
+    const t = troops.find(t => t.id === name || t.name === name);
+    if (!t || !cnt) return;
+    if (t.scout) scoutCnt += cnt;
+    else if ((t.attack || 0) > 40) offCnt += cnt;
+    else defCnt += cnt;
+  });
+  if (scoutCnt > 0 && scoutCnt >= offCnt && scoutCnt >= defCnt) return 'scout';
+  if (offCnt >= defCnt) return 'off';
+  return 'def';
+}
+
 function openWaveModal(targetId, targetLabel) {
   currentTargetId = targetId;
-  document.getElementById('waveModalTarget').textContent = targetLabel;
-  ['wmAttacker','wmOriginVillage','wmNotes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('wmOX').value='';
-  document.getElementById('wmOY').value='';
-  document.getElementById('wmTribe').value='romans';
-  document.getElementById('wmType').value='real';
-  document.getElementById('waveTiming').style.display='none';
-  updateTroopGrid();
-
-  // Populate member suggestions
-  const dl = document.getElementById('memberSuggestions');
-  dl.innerHTML = members.map(m=>`<option value="${escHtml(m.discord_name)}">${escHtml(m.discord_name)} (${escHtml(m.travian_name||'?')})</option>`).join('');
-
+  editingWaveId = null;
+  document.getElementById('waveModalTitle').innerHTML = `💥 Welle hinzufügen — <span id="waveModalTarget">${escHtml(targetLabel)}</span>`;
+  document.getElementById('wmSaveBtn').textContent = '+ Welle hinzufügen';
+  _resetWaveForm();
+  _populateAttackerDropdown();
   openModal('waveModal');
+}
+
+function openWaveEditModal(waveId, targetId) {
+  const wave = findWaveById(waveId);
+  if (!wave) return;
+  currentTargetId = targetId;
+  editingWaveId = waveId;
+  const t = activePlan?.targets?.find(t => t.id === targetId);
+  document.getElementById('waveModalTitle').innerHTML = `✏ Welle bearbeiten — <span id="waveModalTarget">${escHtml(t ? t.player_name + ' ('+t.x+'|'+t.y+')' : '')}</span>`;
+  document.getElementById('wmSaveBtn').textContent = '💾 Änderungen speichern';
+  _resetWaveForm();
+  _populateAttackerDropdown();
+  // Pre-fill from wave data
+  document.getElementById('wmTribe').value = wave.tribe || 'romans';
+  document.getElementById('wmType').value = wave.wave_type || 'real';
+  document.getElementById('wmOX').value = wave.origin_x ?? '';
+  document.getElementById('wmOY').value = wave.origin_y ?? '';
+  document.getElementById('wmTournament').value = wave.tournament_square || 0;
+  document.getElementById('wmNotes').value = wave.notes || '';
+  updateTroopGrid();
+  // Set attacker dropdown
+  const sel = document.getElementById('wmAttackerSelect');
+  const m = members.find(m => m.discord_name === wave.attacker_name || m.travian_name === wave.attacker_name);
+  if (m) {
+    sel.value = m.discord_name;
+    onAttackerSelect(false);
+    // Try to select the right village by coords
+    const vs = document.getElementById('wmVillageSelect');
+    for (let i = 0; i < vs.options.length; i++) {
+      if (vs.options[i].dataset.x == wave.origin_x && vs.options[i].dataset.y == wave.origin_y) {
+        vs.value = i - 1; break;
+      }
+    }
+  }
+  // Fill troop counts
+  Object.entries(wave.troop_json || {}).forEach(([id, cnt]) => {
+    const el = document.getElementById('troop-' + id);
+    if (el && cnt > 0) el.value = cnt;
+  });
+  recalcWaveTime();
+  openModal('waveModal');
+}
+
+function _resetWaveForm() {
+  document.getElementById('wmOX').value = '';
+  document.getElementById('wmOY').value = '';
+  document.getElementById('wmTournament').value = '0';
+  document.getElementById('wmTribe').value = 'romans';
+  document.getElementById('wmType').value = 'real';
+  document.getElementById('wmNotes').value = '';
+  document.getElementById('waveTiming').style.display = 'none';
+  updateTroopGrid();
+}
+
+function _populateAttackerDropdown() {
+  const sel = document.getElementById('wmAttackerSelect');
+  sel.innerHTML = '<option value="">— Angreifer wählen —</option>';
+  members.forEach(m => {
+    const opt = new Option(`${m.discord_name}${m.travian_name ? ' · '+m.travian_name : ''}`, m.discord_name);
+    sel.add(opt);
+  });
+  const vs = document.getElementById('wmVillageSelect');
+  vs.innerHTML = '<option value="">— erst Angreifer wählen —</option>';
+  vs.disabled = true;
+}
+
+function onAttackerSelect(resetCoords = true) {
+  const name = document.getElementById('wmAttackerSelect').value;
+  const m = members.find(m => m.discord_name === name);
+  const vs = document.getElementById('wmVillageSelect');
+  vs.innerHTML = '<option value="">— Dorf wählen —</option>';
+  if (!m) { vs.disabled = true; return; }
+  vs.disabled = false;
+  if (m.tribe && TROOPS_DEF[m.tribe]) {
+    document.getElementById('wmTribe').value = m.tribe;
+    updateTroopGrid();
+  }
+  const roleIcon = {off:'⚔', def:'🛡', scout:'🔍'};
+  const roleLabel = {off:'OFF', def:'DEF', scout:'Scout'};
+  (m.villages || []).forEach((v, i) => {
+    const role = classifyVillage(v, m.tribe);
+    const label = `${roleIcon[role]} [${roleLabel[role]}] ${v.village_name || 'Dorf '+(i+1)} (${v.x}|${v.y})`;
+    const opt = new Option(label, i);
+    opt.dataset.x = v.x;
+    opt.dataset.y = v.y;
+    vs.add(opt);
+  });
+  if (resetCoords) {
+    document.getElementById('wmOX').value = '';
+    document.getElementById('wmOY').value = '';
+  }
+}
+
+function onVillageSelect() {
+  const name = document.getElementById('wmAttackerSelect').value;
+  const m = members.find(m => m.discord_name === name);
+  if (!m) return;
+  const idx = parseInt(document.getElementById('wmVillageSelect').value);
+  const v = m.villages?.[idx];
+  if (!v) return;
+  document.getElementById('wmOX').value = v.x ?? '';
+  document.getElementById('wmOY').value = v.y ?? '';
+  // Load troop counts from this specific village
+  const tribe = m.tribe || document.getElementById('wmTribe').value;
+  updateTroopGrid();
+  Object.entries(v.troops || {}).forEach(([name, cnt]) => {
+    const troop = TROOPS_DEF[tribe]?.find(t => t.id === name || t.name === name);
+    if (troop && cnt > 0) {
+      const el = document.getElementById('troop-' + troop.id);
+      if (el) el.value = cnt;
+    }
+  });
+  recalcWaveTime();
 }
 
 function updateTroopGrid() {
@@ -802,43 +927,10 @@ function updateTroopGrid() {
   const troops = TROOPS_DEF[tribe]||[];
   document.getElementById('troopGrid').innerHTML = troops.map(t =>
     `<div class="troop-entry">
-      <label title="${t.speed} Fel/h">${t.name}</label>
-      <input type="number" id="troop-${t.id}" min="0" value="" placeholder="0"
-             oninput="recalcWaveTime()" style="width:70px;background:var(--bg-main);border:1px solid var(--border);border-radius:5px;padding:.25rem .4rem;color:var(--text);font-size:.82rem;text-align:right;">
+      <label title="${t.name} · ${t.speed} Fel/h${t.scout?' · Scout':''}">${t.name}</label>
+      <input type="number" id="troop-${t.id}" min="0" value="" placeholder="0" oninput="recalcWaveTime()">
     </div>`
   ).join('');
-}
-
-function loadFromMember() {
-  const name = document.getElementById('wmAttacker').value.trim().toLowerCase();
-  const m = members.find(m => m.discord_name.toLowerCase()===name || (m.travian_name||'').toLowerCase()===name);
-  if (!m) { document.getElementById('memberTroopHint').textContent='Kein Member mit diesem Namen gefunden.'; return; }
-  // Set tribe if detectable
-  if (m.tribe && TROOPS_DEF[m.tribe]) document.getElementById('wmTribe').value = m.tribe;
-  updateTroopGrid();
-  // Fill troop counts from all villages combined
-  const combined = {};
-  (m.villages||[]).forEach(v => {
-    Object.entries(v.troops||{}).forEach(([name,cnt]) => {
-      // Try to match troop name to id
-      const tribe = document.getElementById('wmTribe').value;
-      const troop = TROOPS_DEF[tribe]?.find(t=>t.name===name||t.id===name);
-      if (troop) combined[troop.id] = (combined[troop.id]||0) + (cnt||0);
-    });
-  });
-  Object.entries(combined).forEach(([id,cnt]) => {
-    const el = document.getElementById('troop-'+id);
-    if (el) el.value = cnt;
-  });
-  // Try fill origin from first village
-  const vill = m.villages?.[0];
-  if (vill) {
-    document.getElementById('wmOriginVillage').value = vill.village_name||'';
-    if (vill.x != null) document.getElementById('wmOX').value = vill.x;
-    if (vill.y != null) document.getElementById('wmOY').value = vill.y;
-  }
-  recalcWaveTime();
-  document.getElementById('memberTroopHint').textContent = `✓ Daten von ${m.discord_name} geladen`;
 }
 
 function recalcWaveTime() {
@@ -847,38 +939,33 @@ function recalcWaveTime() {
   const ox = parseInt(document.getElementById('wmOX').value);
   const oy = parseInt(document.getElementById('wmOY').value);
   if (!activePlan || isNaN(ox)||isNaN(oy)) { document.getElementById('waveTiming').style.display='none'; return; }
-
-  // Find target coords
   const t = activePlan.targets?.find(t=>t.id===currentTargetId);
   if (!t) { document.getElementById('waveTiming').style.display='none'; return; }
-
-  // Find slowest troop with count
-  let slowestSpeed = 999;
-  let slowestName = '';
+  let slowestSpeed = 999, slowestName = '';
   troops.forEach(tr => {
     const inp = document.getElementById('troop-'+tr.id);
-    if (inp && parseInt(inp.value)>0) {
-      if (tr.speed < slowestSpeed) { slowestSpeed=tr.speed; slowestName=tr.name; }
+    if (inp && parseInt(inp.value)>0 && tr.speed < slowestSpeed) {
+      slowestSpeed = tr.speed; slowestName = tr.name;
     }
   });
   if (slowestSpeed===999 || !activePlan.landing_time) { document.getElementById('waveTiming').style.display='none'; return; }
-
+  const ts = Math.max(0, Math.min(20, parseInt(document.getElementById('wmTournament').value)||0));
+  const effectiveSpeed = slowestSpeed * (1 + ts * 0.2);
   const spd = parseFloat(activePlan.server_speed)||1;
   const dx = Math.min(Math.abs(ox-t.x), 801-Math.abs(ox-t.x));
   const dy = Math.min(Math.abs(oy-t.y), 801-Math.abs(oy-t.y));
   const dist = Math.sqrt(dx*dx+dy*dy);
-  const travelSec = Math.round((dist/(slowestSpeed*spd))*3600);
-
+  const travelSec = Math.round((dist/(effectiveSpeed*spd))*3600);
   const landingDt = new Date(activePlan.landing_time);
   const sendDt = new Date(landingDt.getTime() - travelSec*1000);
   const sendStr = sendDt.toISOString().replace('T',' ').slice(0,16);
-
   document.getElementById('waveTiming').style.display='block';
   document.getElementById('waveTimingText').textContent = sendStr + ' (Serverzeit)';
-  document.getElementById('waveTravelText').textContent = `🕐 Marschzeit: ${fmtTravel(travelSec)} · Langsamste Einheit: ${slowestName} (${slowestSpeed} Fel/h × ${spd}x)`;
+  const tsInfo = ts > 0 ? ` · TP Stufe ${ts} (+${(ts*20)}% Speed)` : '';
+  document.getElementById('waveTravelText').textContent = `🕐 Marschzeit: ${fmtTravel(travelSec)} · ${slowestName} (${slowestSpeed}→${effectiveSpeed.toFixed(1)} Fel/h × ${spd}x${tsInfo})`;
 }
 
-async function addWave() {
+async function saveWave() {
   if (!currentTargetId || !activePlanId) return;
   const tribe = document.getElementById('wmTribe').value;
   const troops = {};
@@ -889,23 +976,76 @@ async function addWave() {
   });
   const ox = document.getElementById('wmOX').value;
   const oy = document.getElementById('wmOY').value;
+  const attacker = document.getElementById('wmAttackerSelect').value;
+  const payload = {
+    attacker_name: attacker,
+    origin_village: '',
+    origin_x: ox||'',
+    origin_y: oy||'',
+    wave_type: document.getElementById('wmType').value,
+    tribe,
+    troop_json: JSON.stringify(troops),
+    landing_time: activePlan?.landing_time||'',
+    server_speed: activePlan?.server_speed||1,
+    notes: document.getElementById('wmNotes').value,
+    tournament_square: parseInt(document.getElementById('wmTournament').value)||0,
+  };
+  // Get village name from dropdown
+  const vs = document.getElementById('wmVillageSelect');
+  if (vs.value !== '' && !isNaN(parseInt(vs.value))) {
+    const m = members.find(m => m.discord_name === attacker);
+    const v = m?.villages?.[parseInt(vs.value)];
+    if (v) payload.origin_village = v.village_name || '';
+  }
   try {
-    const r = await apiPost(`/targets/${currentTargetId}/waves`, {
-      plan_id: activePlanId,
-      attacker_name: document.getElementById('wmAttacker').value,
-      origin_village: document.getElementById('wmOriginVillage').value,
-      origin_x: ox||'',
-      origin_y: oy||'',
-      wave_type: document.getElementById('wmType').value,
-      tribe,
-      troop_json: JSON.stringify(troops),
-      landing_time: activePlan?.landing_time||'',
-      server_speed: activePlan?.server_speed||1,
-      notes: document.getElementById('wmNotes').value,
-    });
+    if (editingWaveId) {
+      await apiPost(`/waves/${editingWaveId}/update`, payload);
+    } else {
+      payload.plan_id = activePlanId;
+      await apiPost(`/targets/${currentTargetId}/waves`, payload);
+    }
     closeModal('waveModal');
     await reloadActivePlan();
   } catch(e) { alert('Fehler: '+e.message); }
+}
+
+function findWaveById(waveId) {
+  for (const t of activePlan?.targets || []) {
+    const w = t.waves?.find(w => w.id === waveId);
+    if (w) return { ...w, target_id: t.id };
+  }
+  return null;
+}
+
+async function duplicateWave(waveId) {
+  const wave = findWaveById(waveId);
+  if (!wave) return;
+  try {
+    await apiPost(`/targets/${wave.target_id}/waves`, {
+      plan_id: activePlanId,
+      attacker_discord_id: wave.attacker_discord_id || '',
+      attacker_name: wave.attacker_name || '',
+      origin_village: wave.origin_village || '',
+      origin_x: wave.origin_x ?? '',
+      origin_y: wave.origin_y ?? '',
+      wave_type: wave.wave_type,
+      tribe: wave.tribe,
+      troop_json: JSON.stringify(wave.troop_json || {}),
+      landing_time: activePlan?.landing_time || '',
+      server_speed: activePlan?.server_speed || 1,
+      notes: wave.notes || '',
+      tournament_square: wave.tournament_square || 0,
+    });
+    await reloadActivePlan();
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+async function duplicateWaveEdit(waveId, targetId) {
+  await duplicateWave(waveId);
+  // After reload, find the new last wave of that target and open edit
+  const t = activePlan?.targets?.find(t => t.id === targetId);
+  const lastWave = t?.waves?.[t.waves.length - 1];
+  if (lastWave) openWaveEditModal(lastWave.id, targetId);
 }
 
 async function deleteWave(waveId, targetId) {

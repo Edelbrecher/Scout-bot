@@ -5030,6 +5030,12 @@ async def _init_op_tables():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_op_waves_target ON op_waves(target_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_op_waves_attacker ON op_waves(attacker_discord_id)")
+        # Migration: add tournament_square if not present
+        try:
+            await db.execute("ALTER TABLE op_waves ADD COLUMN tournament_square INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
 
         # Favourites per user per guild (saved targets)
         await db.execute("""
@@ -5158,12 +5164,14 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
                        origin_village: str, origin_x: int | None, origin_y: int | None,
                        wave_type: str, tribe: str, troop_json: dict,
                        landing_time: str, server_speed: float,
-                       notes: str = "") -> dict:
+                       notes: str = "", tournament_square: int = 0) -> dict:
     """Add a wave and compute send_time from landing_time and troop speed."""
     # Slowest troop
     troops = {k: v for k, v in troop_json.items() if v and int(v) > 0}
     slowest_id = min(troops.keys(), key=lambda t: _TROOP_SPEED.get(t, 99), default="")
-    slowest_speed = _TROOP_SPEED.get(slowest_id, 6.0)
+    base_speed = _TROOP_SPEED.get(slowest_id, 6.0)
+    # Tournament square boosts speed by 20% per level
+    slowest_speed = base_speed * (1 + max(0, min(tournament_square, 20)) * 0.2)
 
     # Get target coords
     async with aiosqlite.connect(DB_PATH) as db:
@@ -5196,8 +5204,8 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
                 (target_id, plan_id, guild_id, attacker_discord_id, attacker_name,
                  origin_village, origin_x, origin_y, wave_type, tribe, troop_json,
                  slowest_unit, slowest_speed, travel_seconds, send_time, arrival_time,
-                 notes, order_idx)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 notes, order_idx, tournament_square)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (target_id, plan_id, guild_id,
               attacker_discord_id, attacker_name[:80],
               origin_village[:80], origin_x, origin_y,
@@ -5205,7 +5213,7 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
               _json_op.dumps(troops),
               slowest_id, slowest_speed, travel_sec,
               send_time, landing_time,
-              notes[:300], idx))
+              notes[:300], idx, max(0, min(tournament_square, 20))))
         wave_id = cur.lastrowid
         await db.commit()
 
