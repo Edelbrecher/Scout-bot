@@ -85,7 +85,7 @@
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
-.btn-icon { background:transparent; border:1px solid var(--border); border-radius:6px;
+.btn-icon { background:transparent; border:1px solid var(--border); border-radius:6px; position:relative;
   padding:.25rem .5rem; color:var(--text-muted); cursor:pointer; font-size:.8rem;
   transition:all .15s; }
 .btn-icon:hover { background:var(--bg-main); color:var(--text); }
@@ -156,8 +156,13 @@
 .op-empty-icon { font-size:3rem; margin-bottom:.75rem; }
 
 /* ── Send time highlight ─────────────────────────────────────── */
-.send-time { font-family:monospace; font-size:.78rem; color:#fbbf24; }
-.travel-time { font-size:.72rem; color:var(--text-muted); }
+.send-time { font-family:monospace; font-size:.92rem; font-weight:700; color:#fbbf24; letter-spacing:.02em; }
+.travel-time { font-size:.72rem; color:var(--text-muted); margin-top:.1rem; }
+.wave-action-btn { background:transparent; border:1px solid var(--border); border-radius:6px; padding:.28rem .55rem; cursor:pointer; color:var(--text-muted); font-size:.82rem; transition:background .15s,color .15s,border-color .15s; position:relative; }
+.wave-action-btn:hover { background:var(--bg-main); color:var(--text); }
+.wave-action-btn.danger:hover { border-color:#ef4444; color:#ef4444; }
+.wave-action-btn[title]:hover::after { content:attr(title); position:absolute; bottom:calc(100% + 5px); left:50%; transform:translateX(-50%); background:#1e293b; color:#e2e8f0; font-size:.72rem; padding:.25rem .55rem; border-radius:5px; white-space:nowrap; pointer-events:none; z-index:999; border:1px solid var(--border); }
+.wave-action-btn[title]:hover::before { content:''; position:absolute; bottom:calc(100% + 1px); left:50%; transform:translateX(-50%); border:4px solid transparent; border-top-color:#1e293b; z-index:999; }
 
 /* ── Tribe pills ─────────────────────────────────────────────── */
 .tribe-pill { display:inline-block; font-size:.65rem; padding:1px 6px; border-radius:8px;
@@ -524,6 +529,10 @@ async function apiPost(path, data={}) {
 
 function fmtDatetime(s) {
   if (!s) return '—';
+  return s.replace('T',' ').slice(0,19);
+}
+function fmtDatetimeShort(s) {
+  if (!s) return '—';
   return s.replace('T',' ').slice(0,16);
 }
 function fmtTravel(sec) {
@@ -671,21 +680,27 @@ function renderWavesTable(t) {
   const rows = t.waves.map(w => {
     const troops = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
       .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('');
+    const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;" title="Turnierplatz Stufe ${w.tournament_square}">🏆${w.tournament_square}</span>` : '';
+    const rallyCoords = `${w.origin_x}|${w.origin_y}`;
     return `
     <tr>
       <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeLabel(w.wave_type)}</span></td>
-      <td><strong>${escHtml(w.attacker_name)}</strong><br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}</span></td>
+      <td>
+        <strong>${escHtml(w.attacker_name)}</strong>
+        <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}${tsInfo}</span>
+      </td>
       <td><span class="tribe-pill">${tribeName(w.tribe)}</span></td>
       <td>${troops || '<span style="color:var(--text-muted)">—</span>'}</td>
       <td>
         <div class="send-time">${w.send_time ? fmtDatetime(w.send_time) : '—'}</div>
-        <div class="travel-time">${w.travel_seconds ? '🕐 ' + fmtTravel(w.travel_seconds) : ''}</div>
+        <div class="travel-time">${w.travel_seconds ? '🕐 '+fmtTravel(w.travel_seconds) : ''}</div>
       </td>
-      <td style="white-space:nowrap;">
-        <button class="btn-icon" style="font-size:.7rem;" title="Duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
-        <button class="btn-icon" style="font-size:.7rem;" title="Duplizieren & Bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
-        <button class="btn-icon" style="font-size:.7rem;" title="Bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
-        <button class="btn-icon danger" style="font-size:.7rem;" title="Welle löschen" onclick="deleteWave(${w.id},${t.id})">🗑</button>
+      <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
+        <button class="wave-action-btn" title="Rallypoint öffnen — Ziel: ${t.x}|${t.y}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')">🏹</button>
+        <button class="wave-action-btn" title="Welle duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
+        <button class="wave-action-btn" title="Duplizieren &amp; sofort bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
+        <button class="wave-action-btn" title="Welle bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
+        <button class="wave-action-btn danger" title="Welle löschen" onclick="deleteWave(${w.id},${t.id})">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -1052,6 +1067,32 @@ async function deleteWave(waveId, targetId) {
   if (!confirm('Welle löschen?')) return;
   await apiPost(`/waves/${waveId}/delete`);
   await reloadActivePlan();
+}
+
+function openRallypoint(tx, ty, sendTime) {
+  // Copy attack info to clipboard and show hint
+  const txt = `Ziel: ${tx}|${ty}\nSendezeit: ${sendTime || '—'}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(() => {
+      showToast('📋 Ziel & Sendezeit kopiert: ' + tx+'|'+ty);
+    });
+  } else {
+    prompt('Für den Rallypoint — Ziel & Sendezeit:', txt);
+  }
+}
+
+function showToast(msg) {
+  let el = document.getElementById('op-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'op-toast';
+    el.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:.55rem 1.2rem;border-radius:8px;font-size:.82rem;z-index:9999;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.4);transition:opacity .3s;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.opacity = '0', 2500);
 }
 
 // ══ Favourites ════════════════════════════════════════════════════════════
