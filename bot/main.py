@@ -34,6 +34,7 @@ class ScouterBot(commands.Bot):
         await self.load_extension("cogs.hero_scout")
         await self.tree.sync()
         print("Slash commands synced.")
+        self.loop.create_task(self.heartbeat_loop())
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         import traceback
@@ -192,8 +193,6 @@ class ScouterBot(commands.Bot):
             print(f"[heartbeat] Updated bot_last_seen for {len(self.guilds)} guild(s).")
             await _asyncio.sleep(8 * 3600)  # 8 hours
 
-    async def setup_hook(self):
-        self.loop.create_task(self.heartbeat_loop())
 
 
 bot = ScouterBot()
