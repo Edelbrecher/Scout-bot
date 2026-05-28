@@ -2591,6 +2591,7 @@ async def _init_own_villages_table():
             CREATE TABLE IF NOT EXISTS guild_own_villages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guild_id TEXT NOT NULL,
+                discord_id TEXT NOT NULL DEFAULT '',
                 village_name TEXT,
                 x INTEGER,
                 y INTEGER,
@@ -2602,13 +2603,18 @@ async def _init_own_villages_table():
                 priority INTEGER DEFAULT 0,
                 uploaded_by TEXT,
                 uploaded_at TEXT DEFAULT (datetime('now')),
-                UNIQUE(guild_id, x, y)
+                UNIQUE(guild_id, discord_id, x, y)
             )
         """)
+        # Migration: add discord_id column if not present
+        try:
+            await db.execute("ALTER TABLE guild_own_villages ADD COLUMN discord_id TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
         await db.commit()
 
 
-async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: str):
+async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: str, discord_id: str = ""):
     """Replace all own villages for a guild and record a history snapshot."""
     import json as _json
     CROP_MAP = {
@@ -2630,16 +2636,23 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         for v in villages
     )
     async with aiosqlite.connect(DB_PATH) as db:
-        # Full replace: delete all current villages, then insert fresh
-        await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
+        # Replace only this user's villages
+        if discord_id:
+            await db.execute(
+                "DELETE FROM guild_own_villages WHERE guild_id = ? AND discord_id = ?",
+                (guild_id, discord_id)
+            )
+        else:
+            await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
         for v in villages:
             await db.execute("""
                 INSERT INTO guild_own_villages
-                    (guild_id, village_name, x, y, population, troops_json,
+                    (guild_id, discord_id, village_name, x, y, population, troops_json,
                      village_type, def_score, off_score, priority, uploaded_by, uploaded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             """, (
                 guild_id,
+                discord_id,
                 v.get("village_name"),
                 v.get("x"),
                 v.get("y"),
@@ -2651,11 +2664,12 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
                 v.get("priority", 0),
                 uploaded_by,
             ))
-        # Record history snapshot — update today's entry if it already exists
-        async with db.execute("""
-            SELECT id FROM guild_own_villages_history
-            WHERE guild_id = ? AND date(uploaded_at) = date('now')
-        """, (guild_id,)) as cur:
+        # Record history snapshot — update today's entry for this user if it already exists
+        hist_filter = "guild_id = ? AND discord_id = ? AND date(uploaded_at) = date('now')"
+        hist_params = (guild_id, discord_id)
+        async with db.execute(
+            f"SELECT id FROM guild_own_villages_history WHERE {hist_filter}", hist_params
+        ) as cur:
             existing = await cur.fetchone()
         if existing:
             await db.execute("""
@@ -2667,16 +2681,22 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         else:
             await db.execute("""
                 INSERT INTO guild_own_villages_history
-                    (guild_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
-                VALUES (?, date('now'), ?, ?, ?, ?, ?)
-            """, (guild_id, total_off, total_def, total_crop, len(villages), uploaded_by))
+                    (guild_id, discord_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
+                VALUES (?, ?, date('now'), ?, ?, ?, ?, ?)
+            """, (guild_id, discord_id, total_off, total_def, total_crop, len(villages), uploaded_by))
         await db.commit()
 
 
-async def get_own_villages(guild_id: str) -> list[dict]:
-    """Return all own villages for a guild, sorted by priority desc."""
+async def get_own_villages(guild_id: str, discord_id: str = "") -> list[dict]:
+    """Return own villages for a guild (filtered by discord_id if provided)."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        if discord_id:
+            async with db.execute(
+                "SELECT * FROM guild_own_villages WHERE guild_id = ? AND discord_id = ? ORDER BY priority DESC, village_name ASC",
+                (guild_id, discord_id),
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
         async with db.execute(
             "SELECT * FROM guild_own_villages WHERE guild_id = ? ORDER BY priority DESC, village_name ASC",
             (guild_id,),
@@ -2684,10 +2704,17 @@ async def get_own_villages(guild_id: str) -> list[dict]:
             return [dict(r) for r in await cur.fetchall()]
 
 
-async def delete_own_villages(guild_id: str):
-    """Delete all own villages for a guild."""
+async def delete_own_villages(guild_id: str, discord_id: str = ""):
+    """Delete own villages for a guild (filtered by discord_id if provided)."""
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
+        if discord_id:
+            await db.execute(
+                "DELETE FROM guild_own_villages WHERE guild_id = ? AND discord_id = ?",
+                (guild_id, discord_id)
+            )
+        else:
+            await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
+        await db.commit()
         await db.commit()
 
 
@@ -2697,6 +2724,7 @@ async def _init_own_villages_history_table():
             CREATE TABLE IF NOT EXISTS guild_own_villages_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guild_id TEXT NOT NULL,
+                discord_id TEXT NOT NULL DEFAULT '',
                 uploaded_at TEXT DEFAULT (datetime('now')),
                 total_off INTEGER DEFAULT 0,
                 total_def INTEGER DEFAULT 0,
@@ -2705,13 +2733,24 @@ async def _init_own_villages_history_table():
                 uploaded_by TEXT
             )
         """)
+        # Migration: add discord_id column if not present
+        try:
+            await db.execute("ALTER TABLE guild_own_villages_history ADD COLUMN discord_id TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
         await db.commit()
 
 
-async def get_own_villages_history(guild_id: str) -> list[dict]:
+async def get_own_villages_history(guild_id: str, discord_id: str = "") -> list[dict]:
     """Return historical snapshots for own villages, oldest first."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        if discord_id:
+            async with db.execute(
+                "SELECT * FROM guild_own_villages_history WHERE guild_id = ? AND discord_id = ? ORDER BY uploaded_at ASC",
+                (guild_id, discord_id),
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
         async with db.execute(
             "SELECT * FROM guild_own_villages_history WHERE guild_id = ? ORDER BY uploaded_at ASC",
             (guild_id,),

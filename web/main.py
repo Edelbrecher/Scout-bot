@@ -3277,8 +3277,9 @@ async def mein_account_page(request: Request, guild_id: str):
     err = await _require_premium(guild, guild_id)
     if err: return err
 
-    own_villages = _enrich_own_villages(await database.get_own_villages(guild_id))
-    history      = await database.get_own_villages_history(guild_id)
+    discord_id   = session.get("uid", "")
+    own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, discord_id))
+    history      = await database.get_own_villages_history(guild_id, discord_id)
     uploaded     = request.query_params.get("uploaded")
     cleared      = request.query_params.get("cleared")
     saved        = request.query_params.get("saved")
@@ -3341,9 +3342,9 @@ async def mein_account_upload(
         v["def_score"]    = def_s
         v["priority"]     = prio
     if parsed:
-        await database.save_own_villages(guild_id, parsed, uploaded_by)
-        # Also save to member_troops for op planner
         discord_id = session.get("uid","")
+        await database.save_own_villages(guild_id, parsed, uploaded_by, discord_id)
+        # Also save to member_troops for op planner
         total_off = sum(v.get("off_score",0) for v in parsed)
         total_def = sum(v.get("def_score",0) for v in parsed)
         travian_name = parsed[0].get("uploaded_by","") if parsed else uploaded_by
@@ -3365,7 +3366,8 @@ async def mein_account_clear(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    await database.delete_own_villages(guild_id)
+    discord_id = session.get("uid", "")
+    await database.delete_own_villages(guild_id, discord_id)
     return RedirectResponse(f"/guild/{guild_id}/mein-account?cleared=1", status_code=303)
 
 
@@ -3413,7 +3415,7 @@ async def kampfkraft_page(request: Request, guild_id: str):
     err = await _require_premium(guild, guild_id)
     if err: return err
     # Pass own villages so the calculator can pre-fill troop counts
-    own_villages = _enrich_own_villages(await database.get_own_villages(guild_id))
+    own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, session.get("uid","")))
     return templates.TemplateResponse("kampfkraft.html", {
         "request": request, "guild": guild, "own_villages": own_villages,
     })
