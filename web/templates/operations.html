@@ -567,7 +567,7 @@ const INIT_MEMBERS = {{ members | tojson }};
 
 <!-- Player Browser Modal -->
 <div class="op-modal-overlay" id="playerBrowserModal">
-  <div class="op-modal pb-modal">
+  <div class="pb-modal" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
     <div class="op-modal-header">
       <span style="font-weight:700;">👥 Spieler-Browser — <span id="pbAllianceLabel"></span></span>
       <button class="btn-icon" onclick="closeModal('playerBrowserModal')">✕</button>
@@ -1137,7 +1137,7 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
 let assignTarget = null;
 let assignRows   = [];
 // Panel-wide settings (read from DOM when rendering)
-const ASSIGN_DEFAULTS = { ts: 0, heroEnabled: true, heroBonus: 5, onlyOff: true };
+const ASSIGN_DEFAULTS = { ts: 0, heroEnabled: true, heroBonus: 5, onlyOff: false };
 
 function _torusDist(x1, y1, x2, y2) {
   const dx = Math.min(Math.abs(x1-x2), 801-Math.abs(x1-x2));
@@ -1207,7 +1207,7 @@ function _buildAssignRows(settings) {
         role,
         type: 'real',
         waves: 1,
-        include: role !== 'unknown',
+        include: true,
       });
     });
   });
@@ -1263,7 +1263,9 @@ function _renderAssignmentPanel(settings) {
     </div>
 
     <div style="overflow-y:auto;flex:1;" id="pbAtkList">
-      ${assignRows.length ? assignRows.map((r, i) => {
+      ${!attackers.length ? '<div style="color:#f87171;font-size:.8rem;padding:1.2rem;text-align:center;">⚠️ Keine eigenen Spieler geladen.<br><small style=\'color:var(--text-muted)\'>Truppen in Mein Account importieren.</small></div>'
+      : !assignRows.length ? '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">Keine Dörfer gefunden.<br><small>„Nur OFF" deaktivieren oder Truppen importieren.</small></div>'
+      : assignRows.map((r, i) => {
         const sendStr = _sendTimeStr(r.travelSec);
         return `
         <div class="atk-row">
@@ -1282,7 +1284,7 @@ function _renderAssignmentPanel(settings) {
             </label>
           </div>
         </div>`;
-      }).join('') : '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">Keine OFF-Dörfer mit Koordinaten gefunden</div>'}
+      }).join('')}
     </div>
     ${assignRows.length ? `
     <div style="padding:.5rem .75rem;border-top:1px solid var(--border);">
