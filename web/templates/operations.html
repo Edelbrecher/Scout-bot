@@ -85,7 +85,28 @@
 }
 
 /* ── Player Browser Modal ────────────────────────────────────── */
-.pb-modal { width:min(820px,96vw); max-height:88vh; display:flex; flex-direction:column; }
+.pb-modal { width:min(1100px,97vw); max-height:90vh; display:flex; flex-direction:column; }
+.pb-split { display:flex; flex:1; min-height:0; }
+.pb-left  { flex:1; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); }
+.pb-right { width:320px; min-width:280px; display:flex; flex-direction:column; background:rgba(0,0,0,.12); }
+.pb-right-empty { display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; color:var(--text-muted); font-size:.82rem; gap:.5rem; padding:1.5rem; text-align:center; }
+/* Attacker rows in assignment panel */
+.atk-row { padding:.45rem .7rem; border-bottom:1px solid rgba(255,255,255,.04); display:flex; flex-direction:column; gap:.25rem; }
+.atk-row:hover { background:rgba(255,255,255,.03); }
+.atk-name { font-weight:600; font-size:.83rem; }
+.atk-village { font-size:.75rem; color:var(--text-muted); }
+.atk-time { font-family:monospace; font-size:.8rem; color:#fbbf24; font-weight:700; }
+.atk-controls { display:flex; gap:.3rem; align-items:center; flex-wrap:wrap; }
+.atk-type-btn { padding:.18rem .45rem; border:1px solid var(--border); border-radius:5px;
+  font-size:.72rem; cursor:pointer; background:transparent; color:var(--text-muted); transition:all .15s; }
+.atk-type-btn.sel-real  { background:rgba(239,68,68,.2);  border-color:#f87171; color:#f87171; }
+.atk-type-btn.sel-fake  { background:rgba(107,114,128,.2);border-color:#9ca3af; color:#9ca3af; }
+.atk-type-btn.sel-scout { background:rgba(168,85,247,.2); border-color:#c084fc; color:#c084fc; }
+.atk-type-btn.sel-def   { background:rgba(59,130,246,.2); border-color:#93c5fd; color:#93c5fd; }
+.atk-waves-input { width:42px; background:var(--bg-main); border:1px solid var(--border);
+  border-radius:5px; padding:.2rem .35rem; color:var(--text); font-size:.78rem; text-align:center; }
+.atk-include { accent-color:#6366f1; width:14px; height:14px; cursor:pointer; }
 .pb-search { background:var(--bg-main); border:1px solid var(--border); border-radius:7px;
   padding:.4rem .8rem; color:var(--text); font-size:.85rem; width:100%; box-sizing:border-box; }
 .pb-alliance-section { margin-bottom:.5rem; }
@@ -551,7 +572,8 @@ const INIT_MEMBERS = {{ members | tojson }};
       <span style="font-weight:700;">👥 Spieler-Browser — <span id="pbAllianceLabel"></span></span>
       <button class="btn-icon" onclick="closeModal('playerBrowserModal')">✕</button>
     </div>
-    <div style="padding:.6rem .9rem .4rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+    <!-- Toolbar -->
+    <div style="padding:.5rem .9rem .4rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
       <input class="pb-search" id="pbSearch" placeholder="Spieler oder Dorf suchen…" oninput="filterPlayerBrowser(this.value)" style="flex:1;min-width:180px;">
       <div style="display:flex;gap:.3rem;">
         <button class="pb-sort-btn active" id="pbSortPop" onclick="sortPlayerBrowser('pop')">↓ Population</button>
@@ -559,10 +581,25 @@ const INIT_MEMBERS = {{ members | tojson }};
       </div>
       <span id="pbCount" style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;"></span>
     </div>
-    <div id="pbBody" style="overflow-y:auto;flex:1;padding:.6rem .9rem;"></div>
-    <div class="op-modal-footer" style="justify-content:space-between;">
-      <span id="pbAddedCount" style="font-size:.8rem;color:#4ade80;"></span>
-      <button class="btn btn-secondary" onclick="closeModal('playerBrowserModal')">Schließen</button>
+    <!-- Split body -->
+    <div class="pb-split">
+      <!-- Left: enemy players -->
+      <div class="pb-left">
+        <div id="pbBody" style="overflow-y:auto;flex:1;padding:.6rem .9rem;"></div>
+        <div style="padding:.5rem .9rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span id="pbAddedCount" style="font-size:.8rem;color:#4ade80;"></span>
+          <button class="btn btn-secondary" onclick="closeModal('playerBrowserModal')">Schließen</button>
+        </div>
+      </div>
+      <!-- Right: assignment panel -->
+      <div class="pb-right">
+        <div id="pbAssignPanel">
+          <div class="pb-right-empty">
+            <span style="font-size:1.5rem;">🎯</span>
+            <span>Dorf anklicken<br>um eigene Spieler<br>mit Laufzeiten zu sehen</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -572,6 +609,7 @@ const INIT_MEMBERS = {{ members | tojson }};
 let plans = INIT_PLANS.slice();
 let favs  = INIT_FAVS.slice();
 let members = INIT_MEMBERS.slice();
+let attackers = []; // from /attacker-list — merged alliance_members + map_snapshots + member_troops
 let activePlan = null;   // full plan object with targets+waves
 let activePlanId = null;
 let currentTargetId = null; // for wave modal
@@ -667,6 +705,7 @@ async function loadPlan(id) {
     // Load alliances for filter (once per plan open, non-blocking)
     if (!availableAlliances.length) loadAlliances();
     else renderAllianceFilter();
+    if (!attackers.length) loadAttackers();
   } catch(e) { alert('Fehler beim Laden: '+e.message); }
 }
 
@@ -818,6 +857,35 @@ async function loadAlliances() {
     // Show the filter button now that data is loaded
     document.getElementById('allyFilterToggleBtn').style.display = availableAlliances.length ? '' : 'none';
   } catch(e) { availableAlliances = []; metaGroups = []; }
+}
+
+async function loadAttackers() {
+  try {
+    const data = await apiFetch('/attacker-list');
+    attackers = data.attackers || [];
+  } catch(e) {
+    // Fallback: convert existing members data
+    attackers = members.map(m => ({
+      player_name: m.travian_name || m.discord_name,
+      discord_name: m.discord_name,
+      tribe: m.tribe,
+      rank: 9999,
+      villages: (m.villages || []).map(v => ({
+        name: v.village_name || '', x: v.x, y: v.y, pop: v.population || 0,
+        troops: v
+      }))
+    }));
+  }
+}
+
+function _findAttacker(nameVal) {
+  // Match by player_name (primary) or discord_name
+  return attackers.find(a => a.player_name === nameVal || a.discord_name === nameVal)
+      || (members.find(m => m.discord_name === nameVal) && (() => {
+           const m = members.find(m => m.discord_name === nameVal);
+           return { player_name: m.travian_name||m.discord_name, discord_name:m.discord_name, tribe:m.tribe,
+                    villages:(m.villages||[]).map(v=>({name:v.village_name||'',x:v.x,y:v.y,pop:v.population||0,troops:v})) };
+         })());
 }
 
 function fmtPop(n) {
@@ -1055,13 +1123,158 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
     pbAddedCount++;
     document.getElementById('pbAddedCount').textContent =
       `✓ ${pbAddedCount} Ziel${pbAddedCount>1?'e':''} hinzugefügt`;
-    // Refresh plan in background without closing modal
     reloadActivePlan();
+    // Open assignment panel for this target
+    openAssignmentPanel(x, y, player, village);
   } catch(e) {
     el.style.borderColor = '#ef4444';
     el.querySelector('.add-icon').textContent = '✗';
     el.style.pointerEvents = '';
   }
+}
+
+// ── Assignment Panel (right side of Player Browser) ─────────────────────────
+let assignTarget = null; // {x, y, player, village}
+let assignRows = [];     // [{attacker, village, travelSec, type, waves, include}]
+
+function _torusDist(x1, y1, x2, y2) {
+  const dx = Math.min(Math.abs(x1-x2), 801-Math.abs(x1-x2));
+  const dy = Math.min(Math.abs(y1-y2), 801-Math.abs(y1-y2));
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function openAssignmentPanel(tx, ty, targetPlayer, targetVillage) {
+  assignTarget = {x: tx, y: ty, player: targetPlayer, village: targetVillage};
+  if (!attackers.length) { loadAttackers().then(() => _renderAssignmentPanel()); return; }
+  _renderAssignmentPanel();
+}
+
+function _renderAssignmentPanel() {
+  const panel = document.getElementById('pbAssignPanel');
+  if (!assignTarget) return;
+  const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
+  const spd = parseFloat(activePlan?.server_speed) || 1;
+
+  // Build rows: all attacker-villages sorted by fastest troop speed or just base infantry
+  // Use a reference speed per tribe: Romans legionnaire 6, Gauls Phalanx 7, Teutons Clubswinger 7
+  const TRIBE_BASE_SPEED = {romans:6, gauls:7, teutons:7};
+
+  assignRows = [];
+  (attackers.length ? attackers : []).forEach(a => {
+    (a.villages || []).forEach(v => {
+      if (v.x == null || v.y == null) return;
+      const dist = _torusDist(v.x, v.y, tx, ty);
+      // Find slowest selected troop speed — use tribe infantry as default
+      const tribeSpeed = TRIBE_BASE_SPEED[a.tribe?.toLowerCase()] || 6;
+      const travelSec = Math.round((dist / (tribeSpeed * spd)) * 3600);
+      assignRows.push({
+        player_name: a.player_name,
+        discord_name: a.discord_name,
+        tribe: a.tribe,
+        village_name: v.name || v.village_name || '',
+        vx: v.x, vy: v.y,
+        dist: dist.toFixed(1),
+        travelSec,
+        type: 'real',
+        waves: 1,
+        include: true,
+      });
+    });
+  });
+  assignRows.sort((a, b) => a.travelSec - b.travelSec);
+
+  panel.innerHTML = `
+    <div style="padding:.6rem .8rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);">
+      <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">🎯 Schnellzuweisung</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">
+        ${escHtml(tp)} · ${escHtml(tv||'')} (${tx}|${ty})
+      </div>
+    </div>
+    <div style="overflow-y:auto;flex:1;" id="pbAtkList">
+      ${assignRows.length ? assignRows.map((r, i) => `
+        <div class="atk-row">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="atk-name">${escHtml(r.player_name)}</span>
+            <span class="atk-time">${fmtTravel(r.travelSec)}</span>
+          </div>
+          <div class="atk-village">${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</div>
+          <div class="atk-controls">
+            ${['real','fake','scout','def'].map(t =>
+              `<button class="atk-type-btn ${r.type===t?'sel-'+t:''}" onclick="setAtkType(${i},'${t}',this)">${{real:'⚔ Echt',fake:'👻 Fake',scout:'🔍 Scout',def:'🛡 Def'}[t]}</button>`
+            ).join('')}
+            <input class="atk-waves-input" type="number" min="1" max="20" value="${r.waves}" title="Wellen" oninput="setAtkWaves(${i},this.value)">
+            <label style="display:flex;align-items:center;gap:.25rem;font-size:.74rem;color:var(--text-muted);margin-left:auto;">
+              <input class="atk-include" type="checkbox" ${r.include?'checked':''} onchange="setAtkInclude(${i},this.checked)"> Dabei
+            </label>
+          </div>
+        </div>
+      `).join('') : '<div style="color:var(--text-muted);font-size:.8rem;padding:1rem;text-align:center;">Keine eigenen Spieler mit Koordinaten</div>'}
+    </div>
+    ${assignRows.length ? `
+    <div style="padding:.5rem .8rem;border-top:1px solid var(--border);">
+      <button class="btn btn-primary" style="width:100%;font-size:.82rem;" onclick="submitAssignments()">
+        ✅ Alle markierten zum Plan hinzufügen
+      </button>
+    </div>` : ''}
+  `;
+}
+
+function setAtkType(i, type, btn) {
+  assignRows[i].type = type;
+  const row = btn.closest('.atk-row');
+  row.querySelectorAll('.atk-type-btn').forEach(b => b.className = 'atk-type-btn');
+  btn.classList.add('sel-' + type);
+}
+
+function setAtkWaves(i, val) {
+  assignRows[i].waves = Math.max(1, parseInt(val) || 1);
+}
+
+function setAtkInclude(i, val) {
+  assignRows[i].include = val;
+}
+
+async function submitAssignments() {
+  if (!activePlanId || !assignTarget) return;
+  // Find the target we added
+  await reloadActivePlan();
+  const {x: tx, y: ty} = assignTarget;
+  const target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
+  if (!target) { alert('Ziel nicht im Plan gefunden. Bitte zuerst Dorf hinzufügen.'); return; }
+  const rows = assignRows.filter(r => r.include);
+  if (!rows.length) { alert('Keine Spieler ausgewählt.'); return; }
+  const btn = document.querySelector('#pbAssignPanel .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Füge hinzu…'; }
+  let ok = 0, fail = 0;
+  for (const r of rows) {
+    for (let w = 0; w < r.waves; w++) {
+      try {
+        await apiPost(`/targets/${target.id}/waves`, {
+          plan_id: activePlanId,
+          attacker_name: r.player_name,
+          origin_village: r.village_name,
+          origin_x: r.vx,
+          origin_y: r.vy,
+          wave_type: r.type,
+          tribe: r.tribe || 'romans',
+          troop_json: '{}',
+          landing_time: activePlan?.landing_time || '',
+          server_speed: activePlan?.server_speed || 1,
+          notes: '',
+          tournament_square: 0,
+        });
+        ok++;
+      } catch(e) { fail++; }
+    }
+  }
+  await reloadActivePlan();
+  if (btn) { btn.disabled = false; btn.textContent = '✅ Alle markierten zum Plan hinzufügen'; }
+  showToast(`✅ ${ok} Welle${ok!==1?'n':''} hinzugefügt${fail?' · '+fail+' Fehler':''}`);
+  // Reset panel
+  assignTarget = null;
+  assignRows = [];
+  document.getElementById('pbAssignPanel').innerHTML =
+    `<div class="pb-right-empty"><span style="font-size:1.5rem;">🎯</span><span>Dorf anklicken<br>um eigene Spieler<br>mit Laufzeiten zu sehen</span></div>`;
 }
 
 async function doSearch(q) {
@@ -1190,9 +1403,10 @@ function openWaveEditModal(waveId, targetId) {
   updateTroopGrid();
   // Set attacker dropdown
   const sel = document.getElementById('wmAttackerSelect');
-  const m = members.find(m => m.discord_name === wave.attacker_name || m.travian_name === wave.attacker_name);
-  if (m) {
-    sel.value = m.discord_name;
+  const a = attackers.find(a => a.player_name === wave.attacker_name || a.discord_name === wave.attacker_name)
+         || members.find(m => m.discord_name === wave.attacker_name || m.travian_name === wave.attacker_name);
+  if (a) {
+    sel.value = a.player_name || a.discord_name;
     onAttackerSelect(false);
     // Try to select the right village by coords
     const vs = document.getElementById('wmVillageSelect');
@@ -1225,8 +1439,15 @@ function _resetWaveForm() {
 function _populateAttackerDropdown() {
   const sel = document.getElementById('wmAttackerSelect');
   sel.innerHTML = '<option value="">— Angreifer wählen —</option>';
-  members.forEach(m => {
-    const opt = new Option(`${m.discord_name}${m.travian_name ? ' · '+m.travian_name : ''}`, m.discord_name);
+  const src = attackers.length ? attackers : members.map(m => ({
+    player_name: m.travian_name || m.discord_name,
+    discord_name: m.discord_name,
+    tribe: m.tribe,
+    villages: (m.villages||[]).map(v=>({name:v.village_name||'',x:v.x,y:v.y,pop:v.population||0,troops:v}))
+  }));
+  src.forEach(a => {
+    const extra = a.discord_name && a.discord_name !== a.player_name ? ` · ${a.discord_name}` : '';
+    const opt = new Option(`${a.player_name}${extra}`, a.player_name);
     sel.add(opt);
   });
   const vs = document.getElementById('wmVillageSelect');
@@ -1236,20 +1457,21 @@ function _populateAttackerDropdown() {
 
 function onAttackerSelect(resetCoords = true) {
   const name = document.getElementById('wmAttackerSelect').value;
-  const m = members.find(m => m.discord_name === name);
+  const a = _findAttacker(name);
   const vs = document.getElementById('wmVillageSelect');
   vs.innerHTML = '<option value="">— Dorf wählen —</option>';
-  if (!m) { vs.disabled = true; return; }
+  if (!a) { vs.disabled = true; return; }
   vs.disabled = false;
-  if (m.tribe && TROOPS_DEF[m.tribe]) {
-    document.getElementById('wmTribe').value = m.tribe;
+  if (a.tribe && TROOPS_DEF[a.tribe]) {
+    document.getElementById('wmTribe').value = a.tribe;
     updateTroopGrid();
   }
   const roleIcon = {off:'⚔', def:'🛡', scout:'🔍'};
   const roleLabel = {off:'OFF', def:'DEF', scout:'Scout'};
-  (m.villages || []).forEach((v, i) => {
-    const role = classifyVillage(v, m.tribe);
-    const label = `${roleIcon[role]} [${roleLabel[role]}] ${v.village_name || 'Dorf '+(i+1)} (${v.x}|${v.y})`;
+  (a.villages || []).forEach((v, i) => {
+    const role = classifyVillage(v, a.tribe);
+    const vName = v.name || v.village_name || 'Dorf '+(i+1);
+    const label = `${roleIcon[role]} [${roleLabel[role]}] ${vName} (${v.x}|${v.y})`;
     const opt = new Option(label, i);
     opt.dataset.x = v.x;
     opt.dataset.y = v.y;
@@ -1263,19 +1485,21 @@ function onAttackerSelect(resetCoords = true) {
 
 function onVillageSelect() {
   const name = document.getElementById('wmAttackerSelect').value;
-  const m = members.find(m => m.discord_name === name);
-  if (!m) return;
+  const a = _findAttacker(name);
+  if (!a) return;
   const idx = parseInt(document.getElementById('wmVillageSelect').value);
-  const v = m.villages?.[idx];
+  const v = a.villages?.[idx];
   if (!v) return;
   document.getElementById('wmOX').value = v.x ?? '';
   document.getElementById('wmOY').value = v.y ?? '';
-  // Load troop counts from this specific village
-  const tribe = m.tribe || document.getElementById('wmTribe').value;
+  const tribe = a.tribe || document.getElementById('wmTribe').value;
   updateTroopGrid();
-  Object.entries(v.troops || {}).forEach(([name, cnt]) => {
-    const troop = TROOPS_DEF[tribe]?.find(t => t.id === name || t.name === name);
-    if (troop && cnt > 0) {
+  // troops may be nested in v.troops or directly on v
+  const troopSrc = v.troops || v;
+  Object.entries(troopSrc).forEach(([tname, cnt]) => {
+    if (typeof cnt !== 'number' || cnt <= 0) return;
+    const troop = TROOPS_DEF[tribe]?.find(t => t.id === tname || t.name === tname);
+    if (troop) {
       const el = document.getElementById('troop-' + troop.id);
       if (el) el.value = cnt;
     }
@@ -1354,9 +1578,9 @@ async function saveWave() {
   // Get village name from dropdown
   const vs = document.getElementById('wmVillageSelect');
   if (vs.value !== '' && !isNaN(parseInt(vs.value))) {
-    const m = members.find(m => m.discord_name === attacker);
-    const v = m?.villages?.[parseInt(vs.value)];
-    if (v) payload.origin_village = v.village_name || '';
+    const a = _findAttacker(attacker);
+    const v = a?.villages?.[parseInt(vs.value)];
+    if (v) payload.origin_village = v.name || v.village_name || '';
   }
   try {
     if (editingWaveId) {

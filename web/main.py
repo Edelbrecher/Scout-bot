@@ -4806,6 +4806,88 @@ async def op_search_villages(request: Request, guild_id: str, q: str = "", allia
     return _JSONResponse({"results": rows})
 
 
+@app.get("/guild/{guild_id}/operations/api/attacker-list")
+async def op_attacker_list(request: Request, guild_id: str):
+    """All own alliance members merged with their village coords from map_snapshots + troop data."""
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    import aiosqlite as _aiosqlite_op, json as _jop
+    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+        db.row_factory = _aiosqlite_op.Row
+        # Alliance members (Travian names, tribe, rank)
+        async with db.execute(
+            "SELECT player_name, tribe, rank, population FROM alliance_members WHERE guild_id=? ORDER BY rank",
+            (guild_id,)
+        ) as cur:
+            ally_members = {r["player_name"]: dict(r) for r in await cur.fetchall()}
+
+        # Their villages from latest map snapshot (own alliance villages)
+        tw_name = await database.get_tw_alliance_name(guild_id)
+        snap_params = [guild_id, guild_id]
+        ally_clause = ""
+        if tw_name:
+            ally_clause = " AND m.alliance_name = ?"
+            snap_params.append(tw_name)
+        elif ally_members:
+            placeholders = ",".join("?" * len(ally_members))
+            ally_clause = f" AND m.player_name IN ({placeholders})"
+            snap_params.extend(ally_members.keys())
+
+        async with db.execute(f"""
+            SELECT m.player_name, m.village_name, m.x, m.y, m.population, m.tribe
+            FROM map_snapshots m
+            INNER JOIN (
+                SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
+                WHERE guild_id=? GROUP BY guild_id
+            ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
+            WHERE m.guild_id=? {ally_clause}
+            ORDER BY m.player_name, m.population DESC
+        """, snap_params) as cur:
+            snap_rows = await cur.fetchall()
+
+        # Member troops (discord name, troop data)
+        async with db.execute(
+            "SELECT discord_name, travian_name, tribe, villages_json FROM member_troops WHERE guild_id=?",
+            (guild_id,)
+        ) as cur:
+            troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
+
+    # Group snap villages by player
+    from collections import defaultdict
+    snap_villages: dict = defaultdict(list)
+    snap_tribe: dict = {}
+    for r in snap_rows:
+        snap_villages[r["player_name"]].append({
+            "name": r["village_name"], "x": r["x"], "y": r["y"], "pop": r["population"]
+        })
+        if not snap_tribe.get(r["player_name"]):
+            snap_tribe[r["player_name"]] = r["tribe"]
+
+    # Build merged attacker list
+    all_names = set(ally_members.keys()) | set(snap_villages.keys()) | set(troop_rows.keys())
+    result = []
+    for name in all_names:
+        am = ally_members.get(name, {})
+        tr = troop_rows.get(name, {})
+        villages = snap_villages.get(name, [])
+        # Merge troop village coords if no snap data
+        if not villages and tr.get("villages_json"):
+            try:
+                tv = _jop.loads(tr["villages_json"])
+                villages = [{"name": v.get("village_name",""), "x": v.get("x"), "y": v.get("y"), "pop": v.get("population",0)} for v in tv if v.get("x") is not None]
+            except Exception:
+                pass
+        result.append({
+            "player_name": name,
+            "discord_name": tr.get("discord_name", ""),
+            "tribe": tr.get("tribe") or snap_tribe.get(name) or am.get("tribe", ""),
+            "rank": am.get("rank", 9999),
+            "villages": villages,
+        })
+    result.sort(key=lambda x: x["rank"])
+    return _JSONResponse({"attackers": result})
+
+
 @app.get("/guild/{guild_id}/operations/api/players-by-alliance")
 async def op_players_by_alliance(request: Request, guild_id: str, alliances: str = ""):
     """Return all players+villages from latest snapshot, filtered by alliances, grouped by player."""
