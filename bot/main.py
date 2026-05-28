@@ -35,6 +35,19 @@ class ScouterBot(commands.Bot):
         await self.tree.sync()
         print("Slash commands synced.")
 
+    async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        import traceback
+        print(f"[interaction error] /{interaction.command.name if interaction.command else '?'} by {interaction.user}: {error}")
+        traceback.print_exc()
+        try:
+            msg = f"❌ Fehler: {error}"
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
+
     async def on_ready(self):
         print(f"Logged in as {self.user} ({self.user.id})")
         # Sync all current guilds to DB — include owner so slots_used is accurate
