@@ -760,6 +760,21 @@ function renderPlanInfo() {
       ${p.notes ? `<tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Notizen</td><td style="padding:.2rem .4rem;">${escHtml(p.notes)}</td></tr>` : ''}
     </table>
     <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.75rem;">
+      ${p.status === 'draft' ? `
+        <button class="btn" style="background:#16a34a;color:#fff;font-size:.82rem;font-weight:600;" onclick="setPlanStatus('active')" title="Einsatz aktivieren und Spieler benachrichtigen">
+          🚀 Einsatz aktivieren
+        </button>` : ''}
+      ${p.status === 'active' ? `
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('completed')" title="Einsatz als abgeschlossen markieren">
+          ✅ Abschließen
+        </button>
+        <button class="btn btn-secondary" style="font-size:.78rem;color:#f87171;" onclick="setPlanStatus('cancelled')" title="Einsatz abbrechen">
+          ❌ Abbrechen
+        </button>` : ''}
+      ${p.status === 'completed' || p.status === 'cancelled' ? `
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Zurück zu Entwurf">
+          ↩ Zurück zu Entwurf
+        </button>` : ''}
       <button class="btn btn-secondary" style="font-size:.78rem;" onclick="recalcTimes()" title="Alle Sendezeiten neu berechnen basierend auf aktueller Einschlagszeit">
         ⏱ Sendezeiten neu berechnen
       </button>
@@ -2025,6 +2040,17 @@ async function saveInlineLanding() {
 }
 
 // ══ Recalc times ══════════════════════════════════════════════════════════
+async function setPlanStatus(newStatus) {
+  if (!activePlanId) return;
+  const labels = { active: 'aktivieren', completed: 'abschließen', cancelled: 'abbrechen', draft: 'zurücksetzen' };
+  if (!confirm(`Einsatz wirklich ${labels[newStatus] || newStatus}?`)) return;
+  try {
+    await apiPost(`/plans/${activePlanId}/update`, { status: newStatus });
+    await reloadActivePlan();
+    await refreshPlanList();
+  } catch(e) { alert('Fehler: ' + e.message); }
+}
+
 async function recalcTimes() {
   if (!activePlanId) return;
   if (!activePlan?.landing_time) { showToast('⚠️ Keine Einschlagszeit gesetzt.'); return; }
