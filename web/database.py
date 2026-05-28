@@ -2911,12 +2911,25 @@ async def _init_ally_tables():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ally_groups (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id TEXT NOT NULL,
+                guild_id TEXT NOT NULL UNIQUE,
                 owner_discord_id TEXT NOT NULL,
                 owner_username TEXT,
                 ally_name TEXT NOT NULL,
                 invite_token TEXT UNIQUE NOT NULL,
+                wing1_name TEXT DEFAULT '',
+                wing2_name TEXT DEFAULT '',
+                wing1_token TEXT UNIQUE,
+                wing2_token TEXT UNIQUE,
                 created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ally_group_id INTEGER NOT NULL REFERENCES ally_groups(id) ON DELETE CASCADE,
+                role_name TEXT NOT NULL,
+                color TEXT DEFAULT '#94a3b8',
+                UNIQUE(ally_group_id, role_name)
             )
         """)
         await db.execute("""
@@ -2926,12 +2939,43 @@ async def _init_ally_tables():
                 discord_id TEXT NOT NULL,
                 discord_username TEXT,
                 travian_name TEXT,
+                role_id INTEGER REFERENCES ally_roles(id) ON DELETE SET NULL,
+                wing INTEGER DEFAULT 0,
                 note TEXT,
                 joined_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(ally_group_id, discord_id)
             )
         """)
+        # Migrations for existing tables
+        for col, definition in [
+            ("wing1_name", "TEXT DEFAULT ''"),
+            ("wing2_name", "TEXT DEFAULT ''"),
+            ("wing1_token", "TEXT"),
+            ("wing2_token", "TEXT"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE ally_groups ADD COLUMN {col} {definition}")
+            except Exception:
+                pass
+        for col, definition in [
+            ("role_id", "INTEGER"),
+            ("wing", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE ally_members ADD COLUMN {col} {definition}")
+            except Exception:
+                pass
         await db.commit()
+
+
+async def get_ally_group_for_guild(guild_id: str) -> dict | None:
+    """Return the one ally group for this guild (if any)."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM ally_groups WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, ally_name: str) -> dict:
@@ -2939,12 +2983,78 @@ async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, a
     import secrets as _sec
     token = _sec.token_urlsafe(24)
     async with aiosqlite.connect(DB_PATH) as db:
-        cur = await db.execute("""
-            INSERT INTO ally_groups (guild_id, owner_discord_id, owner_username, ally_name, invite_token)
-            VALUES (?, ?, ?, ?, ?)
-        """, (guild_id, owner_id, owner_username, ally_name, token))
+        try:
+            cur = await db.execute("""
+                INSERT INTO ally_groups (guild_id, owner_discord_id, owner_username, ally_name, invite_token)
+                VALUES (?, ?, ?, ?, ?)
+            """, (guild_id, owner_id, owner_username, ally_name, token))
+            await db.commit()
+            return {"id": cur.lastrowid, "invite_token": token}
+        except Exception:
+            return {}
+
+
+async def delete_ally_group(ally_group_id: int, owner_id: str):
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM ally_members WHERE ally_group_id=?", (ally_group_id,))
+        await db.execute(
+            "DELETE FROM ally_roles WHERE ally_group_id=?", (ally_group_id,))
+        await db.execute(
+            "DELETE FROM ally_groups WHERE id=? AND owner_discord_id=?", (ally_group_id, owner_id))
         await db.commit()
-        return {"id": cur.lastrowid, "invite_token": token}
+
+
+async def update_ally_group(ally_group_id: int, owner_id: str, **kwargs):
+    """Update ally_group fields: ally_name, wing1_name, wing2_name, wing1_token, wing2_token."""
+    allowed = {"ally_name", "wing1_name", "wing2_name", "wing1_token", "wing2_token"}
+    updates = {k: v for k, v in kwargs.items() if k in allowed}
+    if not updates:
+        return
+    set_clause = ", ".join(f"{k}=?" for k in updates)
+    vals = list(updates.values()) + [ally_group_id, owner_id]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            f"UPDATE ally_groups SET {set_clause} WHERE id=? AND owner_discord_id=?", vals)
+        await db.commit()
+
+
+async def get_ally_roles(ally_group_id: int) -> list[dict]:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_roles WHERE ally_group_id=? ORDER BY id ASC", (ally_group_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def create_ally_role(ally_group_id: int, role_name: str, color: str) -> int:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, color) VALUES (?,?,?)",
+            (ally_group_id, role_name[:40], color or "#94a3b8"),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_ally_role(ally_group_id: int, role_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ally_roles WHERE id=? AND ally_group_id=?", (role_id, ally_group_id))
+        await db.execute("UPDATE ally_members SET role_id=NULL WHERE role_id=?", (role_id,))
+        await db.commit()
+
+
+async def set_member_role_and_wing(ally_group_id: int, discord_id: str, role_id: int | None, wing: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_members SET role_id=?, wing=? WHERE ally_group_id=? AND discord_id=?",
+            (role_id, wing, ally_group_id, discord_id),
+        )
+        await db.commit()
 
 
 async def get_ally_group_by_token(token: str) -> dict | None:
@@ -2956,12 +3066,23 @@ async def get_ally_group_by_token(token: str) -> dict | None:
             return dict(row) if row else None
 
 
+async def get_ally_group_by_wing_token(token: str) -> dict | None:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_groups WHERE wing1_token=? OR wing2_token=?", (token, token)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
 async def get_ally_group_for_owner(guild_id: str, owner_id: str) -> dict | None:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT * FROM ally_groups WHERE guild_id=? AND owner_discord_id=? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM ally_groups WHERE guild_id=? AND owner_discord_id=?",
             (guild_id, owner_id),
         ) as cur:
             row = await cur.fetchone()
@@ -2972,35 +3093,42 @@ async def get_ally_members(ally_group_id: int) -> list[dict]:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM ally_members WHERE ally_group_id=? ORDER BY joined_at ASC",
-            (ally_group_id,),
-        ) as cur:
+        async with db.execute("""
+            SELECT am.*, ar.role_name, ar.color AS role_color
+            FROM ally_members am
+            LEFT JOIN ally_roles ar ON ar.id = am.role_id
+            WHERE am.ally_group_id=?
+            ORDER BY am.wing ASC, ar.role_name ASC, am.travian_name ASC
+        """, (ally_group_id,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
 
-async def join_ally_group(ally_group_id: int, discord_id: str, discord_username: str, travian_name: str = "") -> bool:
+async def join_ally_group(ally_group_id: int, discord_id: str, discord_username: str,
+                          travian_name: str = "", wing: int = 0) -> bool:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute("""
-                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, travian_name)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, travian_name, wing)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(ally_group_id, discord_id) DO UPDATE
-                SET discord_username=excluded.discord_username, travian_name=excluded.travian_name
-            """, (ally_group_id, discord_id, discord_username, travian_name))
+                SET discord_username=excluded.discord_username,
+                    travian_name=excluded.travian_name,
+                    wing=excluded.wing
+            """, (ally_group_id, discord_id, discord_username, travian_name, wing))
             await db.commit()
             return True
         except Exception:
             return False
 
 
-async def update_ally_member(ally_group_id: int, discord_id: str, travian_name: str, note: str):
+async def update_ally_member(ally_group_id: int, discord_id: str, travian_name: str, note: str,
+                             role_id: int | None = None, wing: int = 0):
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "UPDATE ally_members SET travian_name=?, note=? WHERE ally_group_id=? AND discord_id=?",
-            (travian_name, note, ally_group_id, discord_id),
+            "UPDATE ally_members SET travian_name=?, note=?, role_id=?, wing=? WHERE ally_group_id=? AND discord_id=?",
+            (travian_name, note, role_id, wing, ally_group_id, discord_id),
         )
         await db.commit()
 

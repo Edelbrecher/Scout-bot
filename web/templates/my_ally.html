@@ -10,77 +10,167 @@
     </div>
   </div>
 
-  {% if flash == "created" %}
-  <div class="alert alert-success">✅ Allianz erstellt.</div>
-  {% elif flash == "saved" %}
-  <div class="alert alert-success">✅ Gespeichert.</div>
-  {% elif flash == "removed" %}
-  <div class="alert alert-success">✅ Mitglied entfernt.</div>
-  {% elif flash == "token_renewed" %}
-  <div class="alert alert-success">✅ Neuer Einladungslink generiert.</div>
-  {% elif flash == "already_exists" %}
-  <div class="alert alert-error">⚠️ Du hast bereits eine Allianz in diesem Server.</div>
+  {% set flash = flash %}
+  {% if flash == "created" %}<div class="alert alert-success">✅ Allianz erstellt.</div>
+  {% elif flash == "saved" %}<div class="alert alert-success">✅ Gespeichert.</div>
+  {% elif flash == "removed" %}<div class="alert alert-success">✅ Mitglied entfernt.</div>
+  {% elif flash == "deleted" %}<div class="alert alert-success">🗑️ Allianz gelöscht.</div>
+  {% elif flash == "token_renewed" %}<div class="alert alert-success">🔄 Neuer Link generiert.</div>
+  {% elif flash == "role_created" %}<div class="alert alert-success">✅ Rolle erstellt.</div>
+  {% elif flash == "role_deleted" %}<div class="alert alert-success">🗑️ Rolle gelöscht.</div>
+  {% elif flash == "guild_has_ally" %}<div class="alert alert-error">⚠️ Auf diesem Server existiert bereits eine Allianz. Bitte erst die bestehende löschen.</div>
   {% endif %}
 
-  {# ── Owner: has own ally group ── #}
-  {% if ally_group %}
+{# ════════════════════════════════════════════════════════════════════════════
+   OWNER VIEW
+   ════════════════════════════════════════════════════════════════════════════ #}
+{% if ally_group %}
 
+  {# ── Settings Card ── #}
   <div class="card" style="margin-bottom:1rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
-      <div>
-        <h2 style="margin:0;">🏰 {{ ally_group.ally_name }}</h2>
-        <div style="color:var(--text-muted);font-size:0.82rem;margin-top:0.2rem;">Erstellt {{ (ally_group.created_at or '')[:10] }} · {{ members|length }} Mitglied{{ 'er' if members|length != 1 else '' }}</div>
-      </div>
-      <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/regen-token">
-        <button type="submit" class="btn btn-secondary" style="font-size:0.8rem;"
-                onclick="return confirm('Neuen Link generieren? Alter Link wird ungültig.')">🔄 Neuen Link generieren</button>
+      <h2 style="margin:0;">🏰 {{ ally_group.ally_name }}</h2>
+      <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/delete"
+            onsubmit="return confirm('Allianz wirklich löschen? Alle Mitglieder und Rollen werden entfernt.')">
+        <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.78rem;">🗑️ Allianz löschen</button>
       </form>
     </div>
 
-    <!-- Invite link -->
-    <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1rem;">
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.4rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">🔗 Einladungslink</div>
-      <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
-        <code id="inviteUrl" style="font-size:0.82rem;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.75rem;flex:1;min-width:0;word-break:break-all;">
-          {{ base_url }}/ally/join/{{ ally_group.invite_token }}
-        </code>
-        <button onclick="copyInvite()" class="btn btn-primary" style="font-size:0.8rem;white-space:nowrap;">📋 Kopieren</button>
+    <details style="margin-bottom:1rem;">
+      <summary style="cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text-muted);padding:0.4rem 0;">⚙️ Einstellungen bearbeiten</summary>
+      <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/settings" style="margin-top:0.75rem;display:flex;flex-direction:column;gap:0.6rem;max-width:500px;">
+        <div>
+          <label class="d-label">Allianz-Name</label>
+          <input type="text" name="ally_name" value="{{ ally_group.ally_name }}" required maxlength="80"
+                 style="width:100%;padding:0.4rem 0.6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+          <div>
+            <label class="d-label">Wing 1 Name</label>
+            <input type="text" name="wing1_name" value="{{ ally_group.wing1_name or '' }}" maxlength="40"
+                   placeholder="z.B. BLOOD I" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">
+          </div>
+          <div>
+            <label class="d-label">Wing 2 Name</label>
+            <input type="text" name="wing2_name" value="{{ ally_group.wing2_name or '' }}" maxlength="40"
+                   placeholder="z.B. BLOOD II" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">
+          </div>
+        </div>
+        <div><button type="submit" class="btn btn-primary" style="font-size:0.85rem;">💾 Speichern</button></div>
+      </form>
+    </details>
+
+    {# ── Invite Links ── #}
+    <div style="display:flex;flex-direction:column;gap:0.6rem;">
+      {% set links = [
+        ("Hauptallianz", ally_group.invite_token, "main", "#3b82f6"),
+        (ally_group.wing1_name or "Wing 1", ally_group.wing1_token, "wing1", "#8b5cf6"),
+        (ally_group.wing2_name or "Wing 2", ally_group.wing2_token, "wing2", "#10b981"),
+      ] %}
+      {% for label, token, which, color in links %}
+      <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.4rem;">
+          <span style="font-size:0.78rem;font-weight:700;color:{{ color }};text-transform:uppercase;letter-spacing:0.05em;">🔗 {{ label }}</span>
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/regen-token">
+            <input type="hidden" name="which" value="{{ which }}">
+            <button type="submit" class="btn-action btn-action-sec" style="font-size:0.72rem;padding:0.15rem 0.45rem;"
+                    onclick="return confirm('Neuen Link generieren?')">🔄 Neu</button>
+          </form>
+        </div>
+        {% if token %}
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <code id="link-{{ which }}" style="font-size:0.78rem;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:5px;padding:0.25rem 0.6rem;flex:1;min-width:0;word-break:break-all;">{{ base_url }}/ally/join/{{ token }}</code>
+          <button onclick="copyLink('link-{{ which }}')" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;white-space:nowrap;">📋 Kopieren</button>
+        </div>
+        {% else %}
+        <span style="font-size:0.8rem;color:var(--text-muted);">Noch kein Link — klicke 🔄 Neu um einen zu generieren.</span>
+        {% endif %}
       </div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">Diesen Link an Allianz-Mitglieder weitergeben — sie müssen eingeloggt sein um beizutreten.</div>
+      {% endfor %}
     </div>
   </div>
 
-  <!-- Members list -->
+  {# ── Roles Card ── #}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">🏷️ Rollen ({{ roles|length }})</h3>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+      {% for r in roles %}
+      <div style="display:flex;align-items:center;gap:0.4rem;background:var(--bg-main);border:1px solid {{ r.color }};border-radius:20px;padding:0.2rem 0.65rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
+        <span style="font-size:0.82rem;font-weight:600;">{{ r.role_name }}</span>
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="margin:0;">
+          <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.75rem;padding:0;line-height:1;"
+                  onclick="return confirm('Rolle löschen?')">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/create"
+          style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+      <input type="text" name="role_name" placeholder="Neue Rolle…" required maxlength="40"
+             style="padding:0.35rem 0.6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.85rem;flex:1;min-width:120px;">
+      <input type="color" name="color" value="#94a3b8" title="Farbe"
+             style="width:38px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;">
+      <button type="submit" class="btn btn-secondary" style="font-size:0.82rem;">➕ Rolle hinzufügen</button>
+    </form>
+  </div>
+
+  {# ── Members Card ── #}
   <div class="card">
-    <h2 style="margin:0 0 1rem;">👥 Mitglieder ({{ members|length }})</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+      <h2 style="margin:0;">👥 Mitglieder ({{ members|length }})</h2>
+      {% set wings_defined = ally_group.wing1_name or ally_group.wing2_name %}
+      {% if wings_defined %}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <span class="wing-filter-btn active" onclick="filterWing('all', this)" style="cursor:pointer;">Alle</span>
+        <span class="wing-filter-btn" onclick="filterWing('0', this)" style="cursor:pointer;">Hauptallianz</span>
+        {% if ally_group.wing1_name %}<span class="wing-filter-btn" onclick="filterWing('1', this)" style="cursor:pointer;">{{ ally_group.wing1_name }}</span>{% endif %}
+        {% if ally_group.wing2_name %}<span class="wing-filter-btn" onclick="filterWing('2', this)" style="cursor:pointer;">{{ ally_group.wing2_name }}</span>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
     {% if members %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0.75rem;">
+    <div id="memberGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.75rem;">
       {% for m in members %}
-      <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;">
+      {% set wing_label = "" %}
+      {% if m.wing == 1 and ally_group.wing1_name %}{% set wing_label = ally_group.wing1_name %}
+      {% elif m.wing == 2 and ally_group.wing2_name %}{% set wing_label = ally_group.wing2_name %}
+      {% endif %}
+      <div class="member-card" data-wing="{{ m.wing }}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;margin-bottom:0.6rem;">
           <div>
-            <div style="font-weight:700;font-size:0.95rem;">{{ m.discord_username or m.discord_id }}</div>
-            {% if m.travian_name %}
-            <div style="color:#93c5fd;font-size:0.82rem;margin-top:0.1rem;">🎯 {{ m.travian_name }}</div>
-            {% endif %}
-            <div style="color:var(--text-muted);font-size:0.75rem;margin-top:0.2rem;">Beigetreten {{ (m.joined_at or '')[:10] }}</div>
+            <div style="font-weight:700;font-size:0.92rem;">{{ m.discord_username or m.discord_id }}</div>
+            {% if m.travian_name %}<div style="color:#93c5fd;font-size:0.82rem;">🎯 {{ m.travian_name }}</div>{% endif %}
+            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.3rem;">
+              {% if m.role_name %}<span style="font-size:0.7rem;background:rgba(0,0,0,0.25);border:1px solid {{ m.role_color or '#94a3b8' }};color:{{ m.role_color or '#94a3b8' }};border-radius:10px;padding:1px 7px;font-weight:600;">{{ m.role_name }}</span>{% endif %}
+              {% if wing_label %}<span style="font-size:0.7rem;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:1px 7px;">{{ wing_label }}</span>{% endif %}
+            </div>
           </div>
           <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/remove" style="margin:0;">
-            <button type="submit" class="btn-action btn-action-err" style="font-size:0.75rem;padding:0.15rem 0.45rem;"
-                    onclick="return confirm('Mitglied entfernen?')" title="Entfernen">✕</button>
+            <button type="submit" class="btn-action btn-action-err" style="font-size:0.72rem;padding:0.15rem 0.4rem;"
+                    onclick="return confirm('Mitglied entfernen?')">✕</button>
           </form>
         </div>
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/update"
-              style="display:flex;flex-direction:column;gap:0.4rem;">
+              style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
           <input type="text" name="travian_name" value="{{ m.travian_name or '' }}"
-                 placeholder="Travian-Name" style="font-size:0.82rem;padding:0.3rem 0.5rem;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:6px;">
+                 placeholder="Travian-Name" class="ally-input">
           <input type="text" name="note" value="{{ m.note or '' }}"
-                 placeholder="Notiz" style="font-size:0.82rem;padding:0.3rem 0.5rem;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:6px;">
-          <button type="submit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.5rem;align-self:flex-end;">💾 Speichern</button>
+                 placeholder="Notiz" class="ally-input">
+          <select name="role_id" class="ally-input">
+            <option value="">— Rolle —</option>
+            {% for r in roles %}
+            <option value="{{ r.id }}" {% if m.role_id == r.id %}selected{% endif %}>{{ r.role_name }}</option>
+            {% endfor %}
+          </select>
+          <select name="wing" class="ally-input">
+            <option value="0" {% if m.wing == 0 %}selected{% endif %}>Hauptallianz</option>
+            {% if ally_group.wing1_name %}<option value="1" {% if m.wing == 1 %}selected{% endif %}>{{ ally_group.wing1_name }}</option>{% endif %}
+            {% if ally_group.wing2_name %}<option value="2" {% if m.wing == 2 %}selected{% endif %}>{{ ally_group.wing2_name }}</option>{% endif %}
+          </select>
+          <button type="submit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.5rem;grid-column:1/-1;justify-self:end;">💾 Speichern</button>
         </form>
-        {% if m.note %}
-        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;font-style:italic;">{{ m.note }}</div>
-        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -93,25 +183,41 @@
     {% endif %}
   </div>
 
-  {# ── Member: joined someone else's group ── #}
-  {% elif membership %}
-  <div class="card">
+{# ════════════════════════════════════════════════════════════════════════════
+   MEMBER VIEW (joined someone else's group)
+   ════════════════════════════════════════════════════════════════════════════ #}
+{% elif membership %}
+  <div class="card" style="max-width:480px;">
     <h2 style="margin:0 0 0.75rem;">🏰 {{ membership.ally_name }}</h2>
-    <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Allianz von <strong>{{ membership.owner_username or 'Unbekannt' }}</strong> · Beigetreten {{ (membership.member_since or '')[:10] }}</div>
+    <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">
+      Allianz von <strong>{{ membership.owner_username or 'Unbekannt' }}</strong> ·
+      Beigetreten {{ (membership.member_since or '')[:10] }}
+    </div>
     {% if membership.travian_name %}
-    <div style="margin-bottom:0.5rem;">Dein Travian-Name: <strong>{{ membership.travian_name }}</strong></div>
+    <div style="margin-bottom:0.4rem;">Travian-Name: <strong>{{ membership.travian_name }}</strong></div>
     {% endif %}
     {% if membership.note %}
-    <div style="color:var(--text-muted);font-size:0.85rem;">Notiz: {{ membership.note }}</div>
+    <div style="color:var(--text-muted);font-size:0.85rem;margin-top:0.4rem;">📝 {{ membership.note }}</div>
     {% endif %}
   </div>
 
-  {# ── Neither: create new ally group ── #}
+{# ════════════════════════════════════════════════════════════════════════════
+   NO GROUP — server already has one or can create
+   ════════════════════════════════════════════════════════════════════════════ #}
+{% else %}
+  {% if guild_group %}
+  <div class="card" style="max-width:500px;">
+    <h2 style="margin:0 0 0.5rem;">⚠️ Server hat bereits eine Allianz</h2>
+    <p style="color:var(--text-muted);font-size:0.88rem;">
+      Auf diesem Server gibt es bereits eine Allianz (<strong>{{ guild_group.ally_name }}</strong> von {{ guild_group.owner_username or 'Unbekannt' }}).
+      Pro Server ist nur eine Allianz erlaubt. Bitte den Besitzer kontaktieren.
+    </p>
+  </div>
   {% else %}
   <div class="card" style="max-width:500px;">
     <h2 style="margin:0 0 0.75rem;">🤝 Allianz erstellen</h2>
     <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1rem;">
-      Erstelle eine Allianz und lade andere über einen Link ein. Du kannst Mitglieder verwalten, Travian-Namen zuweisen und Notizen hinterlegen.
+      Erstelle eine Allianz für diesen Server. Du kannst Rollen vergeben, bis zu 2 Wings definieren und Mitglieder per Einladungslink hinzufügen.
     </p>
     <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/create">
       <div class="form-group">
@@ -123,15 +229,42 @@
     </form>
   </div>
   {% endif %}
+{% endif %}
+
 </div>
 
+<style>
+.ally-input {
+  padding:0.3rem 0.5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;font-size:0.82rem;width:100%;
+}
+.ally-input:focus { outline:none;border-color:#3b82f6; }
+.member-card {
+  background:var(--bg-main);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;
+  transition:border-color 0.15s;
+}
+.member-card:hover { border-color:rgba(59,130,246,0.4); }
+.wing-filter-btn {
+  font-size:0.75rem;padding:0.2rem 0.7rem;border-radius:12px;
+  background:var(--bg-main);border:1px solid var(--border);color:var(--text-muted);
+  transition:all 0.15s;
+}
+.wing-filter-btn.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
+</style>
+
 <script>
-function copyInvite() {
-  const url = document.getElementById('inviteUrl').textContent.trim();
-  navigator.clipboard.writeText(url).then(() => {
-    const btn = event.target;
-    btn.textContent = '✅ Kopiert!';
-    setTimeout(() => btn.textContent = '📋 Kopieren', 2000);
+function copyLink(id) {
+  const text = document.getElementById(id).textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    event.target.textContent = '✅ Kopiert!';
+    setTimeout(() => event.target.textContent = '📋 Kopieren', 2000);
+  });
+}
+function filterWing(wing, btn) {
+  document.querySelectorAll('.wing-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.member-card').forEach(card => {
+    card.style.display = (wing === 'all' || card.dataset.wing === wing) ? '' : 'none';
   });
 }
 </script>

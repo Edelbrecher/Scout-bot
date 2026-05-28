@@ -3586,21 +3586,24 @@ async def my_ally_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    username = session.get("username", "")
 
-    # Owner view: user has an ally group in this guild
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
-    members = await database.get_ally_members(ally_group["id"]) if ally_group else []
+    members = []
+    roles = []
+    if ally_group:
+        members = await database.get_ally_members(ally_group["id"])
+        roles   = await database.get_ally_roles(ally_group["id"])
 
-    # Member view: user joined someone else's group
     membership = await database.get_ally_membership(guild_id, uid) if not ally_group else None
+    # Check if guild already has a group (owned by someone else)
+    guild_group = await database.get_ally_group_for_guild(guild_id) if not ally_group else None
 
     flash = request.query_params.get("flash", "")
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
-        "ally_group": ally_group, "members": members,
-        "membership": membership, "flash": flash,
-        "base_url": str(request.base_url).rstrip("/"),
+        "ally_group": ally_group, "members": members, "roles": roles,
+        "membership": membership, "guild_group": guild_group,
+        "flash": flash, "base_url": str(request.base_url).rstrip("/"),
     })
 
 
@@ -3611,16 +3614,32 @@ async def my_ally_create(request: Request, guild_id: str, ally_name: str = Form(
     err = _require_guild(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
-    username = session.get("username", "")
-    existing = await database.get_ally_group_for_owner(guild_id, uid)
+    # 1 per server: check if ANY group exists for this guild
+    existing = await database.get_ally_group_for_guild(guild_id)
     if existing:
-        return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=already_exists", status_code=303)
-    await database.create_ally_group(guild_id, uid, username, ally_name.strip()[:80])
+        return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=guild_has_ally", status_code=303)
+    await database.create_ally_group(guild_id, uid, session.get("username",""), ally_name.strip()[:80])
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=created", status_code=303)
 
 
-@app.post("/guild/{guild_id}/my-ally/regen-token")
-async def my_ally_regen_token(request: Request, guild_id: str):
+@app.post("/guild/{guild_id}/my-ally/delete")
+async def my_ally_delete(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if ally_group:
+        await database.delete_ally_group(ally_group["id"], uid)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=deleted", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/settings")
+async def my_ally_settings(request: Request, guild_id: str,
+                             ally_name: str = Form(""),
+                             wing1_name: str = Form(""),
+                             wing2_name: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -3629,13 +3648,39 @@ async def my_ally_regen_token(request: Request, guild_id: str):
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
         return RedirectResponse(f"/guild/{guild_id}/my-ally", status_code=303)
-    await database.regenerate_ally_token(ally_group["id"], uid)
+    await database.update_ally_group(
+        ally_group["id"], uid,
+        ally_name=ally_name.strip()[:80],
+        wing1_name=wing1_name.strip()[:40],
+        wing2_name=wing2_name.strip()[:40],
+    )
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/regen-token")
+async def my_ally_regen_token(request: Request, guild_id: str, which: str = Form("main")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally", status_code=303)
+    import secrets as _sec
+    new_token = _sec.token_urlsafe(24)
+    if which == "wing1":
+        await database.update_ally_group(ally_group["id"], uid, wing1_token=new_token)
+    elif which == "wing2":
+        await database.update_ally_group(ally_group["id"], uid, wing2_token=new_token)
+    else:
+        await database.regenerate_ally_token(ally_group["id"], uid)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=token_renewed", status_code=303)
 
 
-@app.post("/guild/{guild_id}/my-ally/member/{discord_id}/update")
-async def my_ally_member_update(request: Request, guild_id: str, discord_id: str,
-                                 travian_name: str = Form(""), note: str = Form("")):
+@app.post("/guild/{guild_id}/my-ally/roles/create")
+async def my_ally_role_create(request: Request, guild_id: str,
+                               role_name: str = Form(...), color: str = Form("#94a3b8")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -3644,7 +3689,38 @@ async def my_ally_member_update(request: Request, guild_id: str, discord_id: str
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
         return JSONResponse({"error": "not owner"}, status_code=403)
-    await database.update_ally_member(ally_group["id"], discord_id, travian_name, note)
+    await database.create_ally_role(ally_group["id"], role_name.strip(), color)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_created", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/roles/{role_id}/delete")
+async def my_ally_role_delete(request: Request, guild_id: str, role_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return JSONResponse({"error": "not owner"}, status_code=403)
+    await database.delete_ally_role(ally_group["id"], role_id)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_deleted", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/member/{discord_id}/update")
+async def my_ally_member_update(request: Request, guild_id: str, discord_id: str,
+                                 travian_name: str = Form(""), note: str = Form(""),
+                                 role_id: str = Form(""), wing: str = Form("0")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return JSONResponse({"error": "not owner"}, status_code=403)
+    rid = int(role_id) if role_id and role_id.isdigit() else None
+    await database.update_ally_member(ally_group["id"], discord_id, travian_name, note, rid, int(wing or 0))
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved", status_code=303)
 
 
@@ -3666,27 +3742,38 @@ async def my_ally_member_remove(request: Request, guild_id: str, discord_id: str
 async def ally_join_page(request: Request, token: str):
     session = get_session(request)
     group = await database.get_ally_group_by_token(token)
+    if not group:
+        # check wing tokens
+        group = await database.get_ally_group_by_wing_token(token)
+    wing = 0
+    if group:
+        if group.get("wing1_token") == token:
+            wing = 1
+        elif group.get("wing2_token") == token:
+            wing = 2
     accepted = request.query_params.get("accepted")
     return templates.TemplateResponse("ally_join.html", {
         "request": request, "group": group, "token": token,
-        "session": session, "accepted": accepted,
+        "wing": wing, "session": session, "accepted": accepted,
     })
 
 
 @app.post("/ally/join/{token}")
-async def ally_join_accept(request: Request, token: str,
-                            travian_name: str = Form("")):
+async def ally_join_accept(request: Request, token: str, travian_name: str = Form("")):
     session, err = _require_session(request)
     if err: return RedirectResponse(f"/ally/join/{token}?need_login=1", status_code=303)
     group = await database.get_ally_group_by_token(token)
+    wing = 0
+    if not group:
+        group = await database.get_ally_group_by_wing_token(token)
+        if group:
+            wing = 1 if group.get("wing1_token") == token else 2
     if not group:
         return RedirectResponse(f"/ally/join/{token}?error=invalid", status_code=303)
     uid = session.get("uid", "")
-    username = session.get("username", "")
-    # Owner can't join own group
     if uid == group["owner_discord_id"]:
         return RedirectResponse(f"/ally/join/{token}?error=own_group", status_code=303)
-    await database.join_ally_group(group["id"], uid, username, travian_name.strip())
+    await database.join_ally_group(group["id"], uid, session.get("username",""), travian_name.strip(), wing=wing)
     return RedirectResponse(f"/ally/join/{token}?accepted=1", status_code=303)
 
 
