@@ -237,6 +237,11 @@
                   <button type="submit" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; color:var(--text); font-size:0.78rem; cursor:pointer;">Speichern</button>
                 </form>
                 <a href="/guild/{{ g.guild_id }}" style="font-size:0.78rem; color:#3b82f6; text-decoration:none;">→ öffnen</a>
+                <form method="post" action="/admin/preview/set" style="display:inline;">
+                  <input type="hidden" name="guild_id" value="{{ g.guild_id }}">
+                  <input type="hidden" name="plan" value="{{ (g.subscription_plan or 'starter') | lower | replace('_monthly','') | replace('_annual','') }}">
+                  <button type="submit" style="background:transparent;border:1px solid #f97316;color:#f97316;border-radius:5px;padding:0.15rem 0.45rem;font-size:0.75rem;cursor:pointer;margin-left:4px;">👁 Vorschau</button>
+                </form>
               </div>
               {% endfor %}
             </div>

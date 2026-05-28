@@ -8,6 +8,25 @@
 {% set _plan = (guild.subscription_plan or '') | lower | replace('_monthly','') | replace('_annual','') %}
 {% set has_player_pro = is_premium %}
 {% set has_alliance_pro = is_premium and _plan != 'player_pro' %}
+{% if preview_plan %}
+<div style="position:sticky;top:0;z-index:9999;background:#7c2d12;border-bottom:2px solid #f97316;padding:0.5rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+  <span style="color:#fed7aa;font-weight:700;font-size:0.9rem;">👁️ VORSCHAU-MODUS</span>
+  <span style="color:#fdba74;font-size:0.85rem;">Simuliertes Paket: <strong style="color:#fff;">{{ preview_plan | upper }}</strong></span>
+  <form method="post" action="/admin/preview/set" style="display:flex;gap:0.4rem;align-items:center;margin-left:auto;">
+    <input type="hidden" name="guild_id" value="{{ guild.guild_id }}">
+    <select name="plan" onchange="this.form.submit()" style="background:#431407;color:#fed7aa;border:1px solid #f97316;border-radius:6px;padding:0.2rem 0.5rem;font-size:0.82rem;cursor:pointer;">
+      {% for p in ['free','player_pro','starter','clan','alliance','imperium'] %}
+      <option value="{{ p }}" {% if p == preview_plan %}selected{% endif %}>{{ p }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <form method="post" action="/admin/preview/clear">
+    <input type="hidden" name="redirect" value="/guild/{{ guild.guild_id }}">
+    <button type="submit" style="background:transparent;border:1px solid #f97316;color:#fed7aa;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;">✕ Vorschau beenden</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="container" style="max-width:1100px;">
 
   <!-- ── Header ── -->

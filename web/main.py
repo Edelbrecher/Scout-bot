@@ -1493,6 +1493,20 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
         guild = dict(guild)
         guild["subscription_status"] = user_sub_status
 
+    # Admin preview mode: override subscription plan/status for UI simulation
+    preview_info = None
+    preview = session.get("preview") if is_admin else None
+    if preview and preview.get("guild_id") == guild_id:
+        guild = dict(guild)
+        pplan = preview.get("plan", "starter")
+        if pplan == "free":
+            guild["subscription_status"] = "free"
+            guild["subscription_plan"] = ""
+        else:
+            guild["subscription_status"] = "active"
+            guild["subscription_plan"] = pplan
+        preview_info = pplan
+
     return templates.TemplateResponse(
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
@@ -1501,6 +1515,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "perm_issues": perm_issues,
          "is_personal": is_personal,
          "trial_expires_at": guild.get("trial_expires_at"),
+         "preview_plan": preview_info,
          },
     )
 
@@ -4937,6 +4952,45 @@ async def admin_contact_save(
     }
     await database.set_setting("contact_config", _json_mod.dumps(config))
     return RedirectResponse("/admin/contact?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Admin — preview mode (simulate different subscription tiers)
+# ---------------------------------------------------------------------------
+
+@app.post("/admin/preview/set")
+async def admin_preview_set(
+    request: Request,
+    guild_id: str = Form(""),
+    plan: str = Form("starter"),
+):
+    """Store a preview override in the admin's session cookie."""
+    session, err = _require_admin(request)
+    if err: return err
+    plan = plan if plan in ("free", "player_pro", "starter", "clan", "alliance", "imperium") else "starter"
+    new_session = dict(session)
+    if guild_id:
+        new_session["preview"] = {"guild_id": guild_id, "plan": plan}
+    else:
+        new_session.pop("preview", None)
+    token = create_session(new_session)
+    redirect_to = f"/guild/{guild_id}" if guild_id else "/admin"
+    resp = RedirectResponse(redirect_to, status_code=303)
+    resp.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    return resp
+
+
+@app.post("/admin/preview/clear")
+async def admin_preview_clear(request: Request, redirect: str = Form("/dashboard")):
+    """Clear the preview override from the admin's session cookie."""
+    session, err = _require_admin(request)
+    if err: return err
+    new_session = dict(session)
+    new_session.pop("preview", None)
+    token = create_session(new_session)
+    resp = RedirectResponse(redirect, status_code=303)
+    resp.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    return resp
 
 
 # ---------------------------------------------------------------------------
