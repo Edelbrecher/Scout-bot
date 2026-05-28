@@ -4806,6 +4806,47 @@ async def op_search_villages(request: Request, guild_id: str, q: str = "", allia
     return _JSONResponse({"results": rows})
 
 
+@app.get("/guild/{guild_id}/operations/api/players-by-alliance")
+async def op_players_by_alliance(request: Request, guild_id: str, alliances: str = ""):
+    """Return all players+villages from latest snapshot, filtered by alliances, grouped by player."""
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    alliance_filter = [a.strip() for a in alliances.split(",") if a.strip()] if alliances else []
+    import aiosqlite as _aiosqlite_op
+    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+        db.row_factory = _aiosqlite_op.Row
+        params: list = [guild_id, guild_id]
+        alliance_clause = ""
+        if alliance_filter:
+            placeholders = ",".join("?" * len(alliance_filter))
+            alliance_clause = f" AND m.alliance_name IN ({placeholders})"
+            params.extend(alliance_filter)
+        async with db.execute(f"""
+            SELECT m.player_name, m.alliance_name,
+                   m.village_name, m.x, m.y, m.population
+            FROM map_snapshots m
+            INNER JOIN (
+                SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
+                WHERE guild_id=? GROUP BY guild_id
+            ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
+            WHERE m.guild_id=? {alliance_clause}
+            ORDER BY m.alliance_name, m.player_name, m.population DESC
+        """, params) as cur:
+            rows = await cur.fetchall()
+    # Group by player
+    from collections import OrderedDict
+    players: dict = OrderedDict()
+    for r in rows:
+        key = (r["alliance_name"] or "", r["player_name"] or "")
+        if key not in players:
+            players[key] = {"player_name": r["player_name"], "alliance_name": r["alliance_name"],
+                            "total_pop": 0, "villages": []}
+        players[key]["villages"].append({"name": r["village_name"], "x": r["x"], "y": r["y"], "pop": r["population"]})
+        players[key]["total_pop"] += (r["population"] or 0)
+    result = sorted(players.values(), key=lambda p: -p["total_pop"])
+    return _JSONResponse({"players": result})
+
+
 # ── Member troops ─────────────────────────────────────────────────────────────
 
 @app.get("/guild/{guild_id}/operations/api/members")

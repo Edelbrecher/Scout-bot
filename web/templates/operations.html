@@ -84,6 +84,34 @@
   border:1px solid var(--border); border-radius:4px; padding:1px 6px; margin:1px 2px;
 }
 
+/* ── Player Browser Modal ────────────────────────────────────── */
+.pb-modal { width:min(820px,96vw); max-height:88vh; display:flex; flex-direction:column; }
+.pb-search { background:var(--bg-main); border:1px solid var(--border); border-radius:7px;
+  padding:.4rem .8rem; color:var(--text); font-size:.85rem; width:100%; box-sizing:border-box; }
+.pb-alliance-section { margin-bottom:.5rem; }
+.pb-alliance-header { font-size:.75rem; font-weight:700; color:#a5b4fc; padding:.3rem .1rem;
+  border-bottom:1px solid var(--border); margin-bottom:.3rem; letter-spacing:.04em; text-transform:uppercase; }
+.pb-player { border:1px solid var(--border); border-radius:7px; margin-bottom:.3rem; overflow:hidden; }
+.pb-player-header { display:flex; align-items:center; gap:.5rem; padding:.4rem .65rem;
+  cursor:pointer; background:var(--bg-card); transition:background .15s; user-select:none; }
+.pb-player-header:hover { background:rgba(255,255,255,.06); }
+.pb-player-name { font-weight:600; font-size:.85rem; flex:1; }
+.pb-player-pop { font-size:.75rem; color:var(--text-muted); }
+.pb-chevron { font-size:.7rem; color:var(--text-muted); transition:transform .2s; }
+.pb-player.open .pb-chevron { transform:rotate(180deg); }
+.pb-villages { display:none; padding:.3rem .5rem; gap:.3rem; flex-wrap:wrap; background:rgba(0,0,0,.15); }
+.pb-player.open .pb-villages { display:flex; }
+.pb-village { display:flex; align-items:center; gap:.4rem; padding:.3rem .6rem;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:6px;
+  cursor:pointer; transition:border-color .15s,background .15s; font-size:.8rem; }
+.pb-village:hover { border-color:#6366f1; background:rgba(99,102,241,.1); }
+.pb-village .coords { font-family:monospace; color:var(--text-muted); font-size:.75rem; }
+.pb-village .pop-badge { font-size:.7rem; color:var(--text-muted); }
+.pb-village .add-icon { color:#4ade80; font-size:.9rem; margin-left:.2rem; }
+.pb-sort-btn { background:transparent; border:1px solid var(--border); border-radius:5px;
+  padding:.2rem .55rem; font-size:.75rem; cursor:pointer; color:var(--text-muted); }
+.pb-sort-btn.active { border-color:#6366f1; color:#a5b4fc; background:rgba(99,102,241,.12); }
+
 /* ── Buttons ─────────────────────────────────────────────────── */
 .btn-icon { background:transparent; border:1px solid var(--border); border-radius:6px; position:relative;
   padding:.25rem .5rem; color:var(--text-muted); cursor:pointer; font-size:.8rem;
@@ -251,6 +279,9 @@ const INIT_MEMBERS = {{ members | tojson }};
                      oninput="debounceSearch(this.value)" autocomplete="off">
               <button class="btn btn-secondary" style="font-size:.8rem;" id="allyFilterToggleBtn" onclick="toggleAlliancePanel()" title="Allianz-Filter">
                 🏰 Filter <span id="allyFilterBadge" style="display:none;background:#6366f1;color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;margin-left:.2rem;"></span>
+              </button>
+              <button class="btn btn-primary" id="pbOpenBtn" style="font-size:.8rem;display:none;" onclick="openPlayerBrowser()">
+                👥 Spieler <span id="pbOpenCount"></span>
               </button>
               <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
             </div>
@@ -509,6 +540,29 @@ const INIT_MEMBERS = {{ members | tojson }};
     <div class="op-modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('waveModal')">Abbrechen</button>
       <button class="btn btn-primary" id="wmSaveBtn" onclick="saveWave()">+ Welle hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Player Browser Modal -->
+<div class="op-modal-overlay" id="playerBrowserModal">
+  <div class="op-modal pb-modal">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">👥 Spieler-Browser — <span id="pbAllianceLabel"></span></span>
+      <button class="btn-icon" onclick="closeModal('playerBrowserModal')">✕</button>
+    </div>
+    <div style="padding:.6rem .9rem .4rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+      <input class="pb-search" id="pbSearch" placeholder="Spieler oder Dorf suchen…" oninput="filterPlayerBrowser(this.value)" style="flex:1;min-width:180px;">
+      <div style="display:flex;gap:.3rem;">
+        <button class="pb-sort-btn active" id="pbSortPop" onclick="sortPlayerBrowser('pop')">↓ Population</button>
+        <button class="pb-sort-btn" id="pbSortName" onclick="sortPlayerBrowser('name')">A–Z Name</button>
+      </div>
+      <span id="pbCount" style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;"></span>
+    </div>
+    <div id="pbBody" style="overflow-y:auto;flex:1;padding:.6rem .9rem;"></div>
+    <div class="op-modal-footer" style="justify-content:space-between;">
+      <span id="pbAddedCount" style="font-size:.8rem;color:#4ade80;"></span>
+      <button class="btn btn-secondary" onclick="closeModal('playerBrowserModal')">Schließen</button>
     </div>
   </div>
 </div>
@@ -829,6 +883,19 @@ function renderAllianceFilter() {
     badge.textContent = selectedAlliances.size;
     badge.style.display = hasFilter ? 'inline' : 'none';
   }
+  // Player browser open button
+  const pbBtn = document.getElementById('pbOpenBtn');
+  const pbCnt = document.getElementById('pbOpenCount');
+  if (pbBtn) {
+    pbBtn.style.display = hasFilter ? '' : 'none';
+    // Count players in selected alliances
+    if (hasFilter && pbCnt) {
+      const cnt = availableAlliances
+        .filter(a => selectedAlliances.has(a.name))
+        .reduce((s,a) => s + (a.players||0), 0);
+      pbCnt.textContent = cnt ? `(${cnt})` : '';
+    }
+  }
 }
 
 function toggleAlliance(name) {
@@ -866,6 +933,135 @@ function resetAllianceFilter() {
   renderAllianceFilter();
   const q = document.getElementById('targetSearch').value;
   if (q.length >= 2) doSearch(q);
+}
+
+// ══ Player Browser ════════════════════════════════════════════════════════════
+let pbAllPlayers = [];   // raw data from API
+let pbFiltered   = [];   // after search filter
+let pbSortMode   = 'pop';
+let pbAddedCount = 0;
+
+async function openPlayerBrowser() {
+  if (!activePlanId) { alert('Bitte erst einen Plan auswählen.'); return; }
+  const allyParam = selectedAlliances.size > 0
+    ? `?alliances=${encodeURIComponent([...selectedAlliances].join(','))}` : '';
+  document.getElementById('pbAllianceLabel').textContent =
+    selectedAlliances.size ? [...selectedAlliances].join(' + ') : 'Alle';
+  document.getElementById('pbBody').innerHTML =
+    '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Lade Spieler…</div>';
+  document.getElementById('pbSearch').value = '';
+  document.getElementById('pbAddedCount').textContent = '';
+  pbAddedCount = 0;
+  openModal('playerBrowserModal');
+  try {
+    const data = await apiFetch(`/players-by-alliance${allyParam}`);
+    pbAllPlayers = data.players || [];
+    pbFiltered = pbAllPlayers.slice();
+    pbSortMode = 'pop';
+    document.getElementById('pbSortPop').classList.add('active');
+    document.getElementById('pbSortName').classList.remove('active');
+    renderPlayerBrowser();
+  } catch(e) {
+    document.getElementById('pbBody').innerHTML =
+      `<div style="color:#f87171;padding:1rem;">Fehler: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function filterPlayerBrowser(q) {
+  q = q.trim().toLowerCase();
+  pbFiltered = q
+    ? pbAllPlayers.filter(p =>
+        p.player_name.toLowerCase().includes(q) ||
+        p.alliance_name?.toLowerCase().includes(q) ||
+        p.villages.some(v => v.name?.toLowerCase().includes(q) ||
+          (v.x+'|'+v.y).includes(q) || (v.x+'/'+v.y).includes(q)))
+    : pbAllPlayers.slice();
+  sortPlayerBrowser(pbSortMode, false);
+}
+
+function sortPlayerBrowser(mode, rerender=true) {
+  pbSortMode = mode;
+  document.getElementById('pbSortPop').classList.toggle('active', mode==='pop');
+  document.getElementById('pbSortName').classList.toggle('active', mode==='name');
+  if (mode === 'pop') pbFiltered.sort((a,b) => b.total_pop - a.total_pop);
+  else pbFiltered.sort((a,b) => a.player_name.localeCompare(b.player_name));
+  if (rerender) renderPlayerBrowser();
+}
+
+function renderPlayerBrowser() {
+  const body = document.getElementById('pbBody');
+  const count = document.getElementById('pbCount');
+  if (!pbFiltered.length) {
+    body.innerHTML = '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Keine Spieler gefunden.</div>';
+    count.textContent = '';
+    return;
+  }
+  count.textContent = `${pbFiltered.length} Spieler`;
+
+  // Group by alliance
+  const byAlliance = {};
+  pbFiltered.forEach(p => {
+    const a = p.alliance_name || '—';
+    if (!byAlliance[a]) byAlliance[a] = [];
+    byAlliance[a].push(p);
+  });
+
+  body.innerHTML = Object.entries(byAlliance).map(([allyName, players]) => `
+    <div class="pb-alliance-section">
+      <div class="pb-alliance-header">🏰 ${escHtml(allyName)} <span style="font-weight:400;opacity:.6;">(${players.length} Spieler)</span></div>
+      ${players.map(p => renderPbPlayer(p)).join('')}
+    </div>
+  `).join('');
+}
+
+function renderPbPlayer(p) {
+  const alreadyAdded = (activePlan?.targets||[]).some(t =>
+    t.player_name === p.player_name &&
+    p.villages.some(v => t.x === v.x && t.y === v.y));
+  return `
+  <div class="pb-player" id="pbp-${escHtml(p.player_name).replace(/\s/g,'_')}">
+    <div class="pb-player-header" onclick="togglePbPlayer(this)">
+      <span class="pb-player-name">${escHtml(p.player_name)}</span>
+      <span class="pb-player-pop">${fmtPop(p.total_pop)} Pop · ${p.villages.length} Dörfer</span>
+      <span class="pb-chevron">▼</span>
+    </div>
+    <div class="pb-villages">
+      ${p.villages.map(v => `
+        <div class="pb-village" onclick="addVillageFromBrowser(${v.x},${v.y},'${escJs(p.player_name)}','${escJs(v.name||'')}',${v.pop||0},this)">
+          <span style="font-weight:600;font-size:.82rem;">${escHtml(v.name||'?')}</span>
+          <span class="coords">${v.x}|${v.y}</span>
+          <span class="pop-badge">${v.pop||0} Pop</span>
+          <span class="add-icon">＋</span>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function togglePbPlayer(header) {
+  header.closest('.pb-player').classList.toggle('open');
+}
+
+async function addVillageFromBrowser(x, y, player, village, pop, el) {
+  if (!activePlanId) return;
+  // Visual feedback
+  el.style.borderColor = '#4ade80';
+  el.querySelector('.add-icon').textContent = '✓';
+  el.style.pointerEvents = 'none';
+  try {
+    await apiPost(`/plans/${activePlanId}/targets`, {
+      player_name: player, village_name: village, x, y, population: pop, notes: ''
+    });
+    pbAddedCount++;
+    document.getElementById('pbAddedCount').textContent =
+      `✓ ${pbAddedCount} Ziel${pbAddedCount>1?'e':''} hinzugefügt`;
+    // Refresh plan in background without closing modal
+    reloadActivePlan();
+  } catch(e) {
+    el.style.borderColor = '#ef4444';
+    el.querySelector('.add-icon').textContent = '✗';
+    el.style.pointerEvents = '';
+  }
 }
 
 async function doSearch(q) {
