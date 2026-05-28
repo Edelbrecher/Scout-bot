@@ -297,7 +297,7 @@ const INIT_MEMBERS = {{ members | tojson }};
         <div class="op-editor-grid">
 
           <!-- LEFT: Targets + Waves -->
-          <div>
+          <div style="position:relative;">
             <!-- Add target row -->
             <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
               <div style="font-size:.9rem;font-weight:700;flex:1;">🎯 Ziele</div>
@@ -313,8 +313,8 @@ const INIT_MEMBERS = {{ members | tojson }};
               <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
             </div>
 
-            <!-- Alliance filter panel (collapsible) -->
-            <div id="allianceFilterRow" style="display:none;margin-bottom:.6rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;">
+            <!-- Alliance filter panel (floating dropdown) -->
+            <div id="allianceFilterRow" style="display:none;position:absolute;z-index:200;top:auto;left:0;right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;box-shadow:0 8px 32px rgba(0,0,0,.45);margin-top:.2rem;">
               <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
                 <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🏰 Allianz-Filter</span>
                 <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">Keine Auswahl = alle Spieler</span>
@@ -345,6 +345,7 @@ const INIT_MEMBERS = {{ members | tojson }};
                 <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favoriten</div>
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Truppen</div>
                 <div class="op-panel-tab" onclick="switchPanel('check',this)">🔍 Check</div>
+                <div class="op-panel-tab" onclick="switchPanel('stats',this);loadStats()">📊 Auswertung</div>
               </div>
 
               <!-- Plan info -->
@@ -370,6 +371,13 @@ const INIT_MEMBERS = {{ members | tojson }};
                 <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Automatische Überprüfung des Plans auf häufige Fehler.</div>
                 <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="runCheck()">🔍 Jetzt prüfen</button>
                 <div id="checkResults"></div>
+              </div>
+
+              <!-- Statistics / Auswertung -->
+              <div class="op-panel-body" id="panel-stats" style="display:none;">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Bestätigungsstatus aller Angreifer nach dem Einschlag.</div>
+                <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Aktualisieren</button>
+                <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">Noch keine Daten.</div></div>
               </div>
             </div>
           </div>
@@ -1854,6 +1862,94 @@ async function runCheck() {
   } catch(e) { el.innerHTML=`<div style="color:#f87171;">Fehler: ${e.message}</div>`; }
 }
 
+function loadStats() {
+  if (!activePlan) return;
+  const el = document.getElementById('statsContent');
+  el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">Lade…</div>';
+
+  // Collect all waves from current plan targets
+  const allWaves = (activePlan.targets||[]).flatMap(t =>
+    (t.waves||[]).map(w => ({...w, target_player: t.player_name, target_x: t.x, target_y: t.y}))
+  );
+
+  if (!allWaves.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">Keine Wellen im Plan.</div>';
+    return;
+  }
+
+  // Group by attacker
+  const byAttacker = {};
+  allWaves.forEach(w => {
+    if (!byAttacker[w.attacker_name]) byAttacker[w.attacker_name] = [];
+    byAttacker[w.attacker_name].push(w);
+  });
+
+  const csIcons  = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫', '':'⬜'};
+  const csColors = {on_time:'#4ade80', late:'#fbbf24', not_sent:'#f87171', cant_send:'#f87171', '':'var(--text-muted)'};
+  const csLabels = {on_time:'Pünktlich', late:'Unpünktlich', not_sent:'Nicht abg.', cant_send:'Fällt aus', '':'Ausstehend'};
+
+  // Summary counts
+  const totalWaves  = allWaves.length;
+  const confirmedCnt = allWaves.filter(w=>w.confirm_status).length;
+  const onTimeCnt   = allWaves.filter(w=>w.confirm_status==='on_time').length;
+  const lateCnt     = allWaves.filter(w=>w.confirm_status==='late').length;
+  const notSentCnt  = allWaves.filter(w=>w.confirm_status==='not_sent').length;
+  const cantSendCnt = allWaves.filter(w=>w.confirm_status==='cant_send').length;
+  const pendingCnt  = totalWaves - confirmedCnt;
+  const pct = totalWaves ? Math.round(confirmedCnt/totalWaves*100) : 0;
+
+  const summaryHtml = `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:.85rem;">
+    <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:800;color:#4ade80;">${onTimeCnt}</div>
+      <div style="font-size:.65rem;color:var(--text-muted);">✅ Pünktlich</div>
+    </div>
+    <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:800;color:#fbbf24;">${lateCnt}</div>
+      <div style="font-size:.65rem;color:var(--text-muted);">⏱ Unpünktlich</div>
+    </div>
+    <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:800;color:#f87171;">${notSentCnt+cantSendCnt}</div>
+      <div style="font-size:.65rem;color:var(--text-muted);">❌ Ausgefallen</div>
+    </div>
+  </div>
+  <div style="margin-bottom:.6rem;">
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">
+      <span>Bestätigt: ${confirmedCnt} / ${totalWaves}</span>
+      <span>${pct}%</span>
+    </div>
+    <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;background:${pct>=80?'#4ade80':pct>=50?'#fbbf24':'#f87171'};transition:width .3s;border-radius:3px;"></div>
+    </div>
+    ${pendingCnt ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">⬜ ${pendingCnt} Welle${pendingCnt!==1?'n':''} noch ohne Bestätigung</div>` : ''}
+  </div>`;
+
+  // Per-attacker rows
+  const attackerRows = Object.entries(byAttacker).map(([name, waves]) => {
+    const total = waves.length;
+    const ok = waves.filter(w=>w.confirm_status==='on_time').length;
+    const bad = waves.filter(w=>['not_sent','cant_send'].includes(w.confirm_status)).length;
+    const late = waves.filter(w=>w.confirm_status==='late').length;
+    const pending = waves.filter(w=>!w.confirm_status).length;
+    const rowColor = bad ? 'rgba(248,113,113,.06)' : late ? 'rgba(251,191,36,.05)' : ok===total ? 'rgba(74,222,128,.05)' : '';
+    const chips = waves.map(w => {
+      const ic = csIcons[w.confirm_status||''];
+      const clr = csColors[w.confirm_status||''];
+      const wtIcon = {real:'⚔',fake:'👻',scout:'🔍',def:'🛡'}[w.wave_type]||'';
+      const deltaStr = w.confirm_status==='late' ? ' ('+(w.confirm_delta_seconds>0?'+':'')+w.confirm_delta_seconds+'s)' : '';
+      const ttip = wtIcon+' '+w.target_x+'|'+w.target_y+deltaStr;
+      return `<span title="${escHtml(ttip)}" style="font-size:.8rem;color:${clr};">${ic}</span>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:.4rem;padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.04);background:${rowColor}">
+      <span style="flex:1;font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span>
+      <span style="font-size:.75rem;color:var(--text-muted);">${total}W</span>
+      <span style="display:flex;gap:.1rem;">${chips}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = summaryHtml + `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:.3rem;">Angreifer</div>` + attackerRows;
+}
+
 function openInlineLandingEditor() {
   const span = document.getElementById('topLandingTime');
   const inp  = document.getElementById('inlineLandingInput');
@@ -1959,7 +2055,7 @@ async function refreshPlanList() {
 
 function switchPanel(name, el) {
   document.querySelectorAll('.op-panel-tab').forEach(t=>t.classList.remove('active'));
-  ['info','favs','members','check'].forEach(n => {
+  ['info','favs','members','check','stats'].forEach(n => {
     document.getElementById('panel-'+n).style.display = n===name ? 'block' : 'none';
   });
   if (el) el.classList.add('active');
