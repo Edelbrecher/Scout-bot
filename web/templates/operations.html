@@ -1277,9 +1277,9 @@ function _buildAssignRows(settings) {
   (attackers.length ? attackers : []).forEach(a => {
     (a.villages || []).forEach(v => {
       if (v.x == null || v.y == null) return;
-      // Classify village (OFF / DEF / Scout / unknown)
-      const role = (v.troops || v.name) ? classifyVillage(v, a.tribe) : 'unknown';
-      if (settings.onlyOff && role !== 'off' && role !== 'unknown') return;
+      // Classify village (OFF / DEF / Scout / unknown) — only if actual troop data exists
+      const role = classifyVillage(v, a.tribe);
+      if (settings.onlyOff && role !== 'off') return;
       const dist = _torusDist(v.x, v.y, tx, ty);
       const travelSec = _catTravelSec(dist, settings, spd);
       assignRows.push({
@@ -1291,6 +1291,7 @@ function _buildAssignRows(settings) {
         dist: dist.toFixed(1),
         travelSec,
         role,
+        troops: v.troops || {},
         type: 'real',
         waves: 1,
         include: true,
@@ -1353,6 +1354,16 @@ function _renderAssignmentPanel(settings) {
       : !assignRows.length ? '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">Keine Dörfer gefunden.<br><small>„Nur OFF" deaktivieren oder Truppen importieren.</small></div>'
       : assignRows.map((r, i) => {
         const sendStr = _sendTimeStr(r.travelSec);
+        // Build troops display (only >0)
+        const troopEntries = Object.entries(r.troops || {}).filter(([,cnt]) => cnt > 0);
+        const troopHtml = troopEntries.length
+          ? troopEntries.map(([id, cnt]) => {
+              const tDef = (TROOPS_DEF[r.tribe] || []).find(t => t.id === id);
+              const label = tDef ? tDef.name : id;
+              return `<span style="font-size:.68rem;background:rgba(255,255,255,.06);border-radius:4px;padding:.1rem .35rem;white-space:nowrap;">${escHtml(label)}: <b>${cnt.toLocaleString()}</b></span>`;
+            }).join('')
+          : '<span style="font-size:.68rem;color:var(--text-muted);">Keine Truppendaten</span>';
+        const hasTroops = troopEntries.length > 0;
         return `
         <div class="atk-row" id="atk-row-${i}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:.3rem;">
@@ -1360,7 +1371,15 @@ function _renderAssignmentPanel(settings) {
             ${roleTag[r.role]||''}
             <span class="atk-time">${fmtTravel(r.travelSec)}</span>
           </div>
-          <div class="atk-village">${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</div>
+          <div class="atk-village" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</span>
+            <button onclick="toggleTroopRow(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem;padding:0 .2rem;" title="Truppen anzeigen/ausblenden">
+              🪖 <span id="troop-toggle-${i}">▼</span>
+            </button>
+          </div>
+          <div id="troop-row-${i}" style="display:none;flex-wrap:wrap;gap:.25rem;padding:.25rem 0;">
+            ${troopHtml}
+          </div>
           ${sendStr ? `<div style="font-size:.7rem;color:#4ade80;">📤 ${sendStr}</div>` : ''}
           <div class="atk-controls" id="atk-btns-${i}">
             <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Echt</button>
@@ -1371,6 +1390,15 @@ function _renderAssignmentPanel(settings) {
       }).join('')}
     </div>
   `;
+}
+
+function toggleTroopRow(i) {
+  const row = document.getElementById(`troop-row-${i}`);
+  const icon = document.getElementById(`troop-toggle-${i}`);
+  if (!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'flex';
+  if (icon) icon.textContent = open ? '▼' : '▲';
 }
 
 function rebuildAssignPanel() {
@@ -1528,19 +1556,24 @@ async function favTarget(targetId) {
 
 // ══ Wave Modal ════════════════════════════════════════════════════════════
 function classifyVillage(village, tribe) {
-  if (!village || !village.troops) return 'off';
+  // No troop data at all → unknown (don't assume OFF)
+  if (!village || !village.troops) return 'unknown';
+  const entries = Object.entries(village.troops).filter(([,cnt]) => cnt > 0);
+  if (!entries.length) return 'unknown';
   const troops = TROOPS_DEF[tribe] || Object.values(TROOPS_DEF).flat();
   let offCnt = 0, defCnt = 0, scoutCnt = 0;
-  Object.entries(village.troops).forEach(([name, cnt]) => {
+  entries.forEach(([name, cnt]) => {
     const t = troops.find(t => t.id === name || t.name === name);
-    if (!t || !cnt) return;
+    if (!t) return;
     if (t.scout) scoutCnt += cnt;
     else if ((t.attack || 0) > 40) offCnt += cnt;
     else defCnt += cnt;
   });
   if (scoutCnt > 0 && scoutCnt >= offCnt && scoutCnt >= defCnt) return 'scout';
-  if (offCnt >= defCnt) return 'off';
-  return 'def';
+  // Must have meaningfully more OFF than DEF to be classified as OFF
+  if (offCnt > 0 && offCnt >= defCnt) return 'off';
+  if (defCnt > 0) return 'def';
+  return 'unknown';
 }
 
 function openWaveModal(targetId, targetLabel) {
