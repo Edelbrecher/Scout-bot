@@ -12,7 +12,7 @@
 
   {% set flash = flash %}
   {% if flash == "created" %}<div class="alert alert-success">✅ Allianz erstellt.</div>
-  {% elif flash == "saved" %}<div class="alert alert-success">✅ Gespeichert.</div>
+  {% elif flash == "saved" or flash == "settings_saved" %}<div class="alert alert-success">✅ Gespeichert.</div>
   {% elif flash == "removed" %}<div class="alert alert-success">✅ Mitglied entfernt.</div>
   {% elif flash == "rejected" %}<div class="alert alert-success">❌ Beitrittsanfrage abgelehnt.</div>
   {% elif flash == "approved" %}<div class="alert alert-success">✅ Mitglied freigeschaltet.</div>
@@ -58,6 +58,11 @@
             <input type="text" name="wing2_name" value="{{ ally_group.wing2_name or '' }}" maxlength="40"
                    placeholder="z.B. BLOOD II" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">
           </div>
+        </div>
+        <div>
+          <label class="d-label">Mindest-TQ (%) <span style="font-weight:400;color:var(--text-muted);">— 0 = deaktiviert</span></label>
+          <input type="number" name="tq_min" value="{{ ally_group.tq_min or 0 }}" min="0" max="9999"
+                 style="width:100%;padding:0.4rem 0.6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">
         </div>
         <div><button type="submit" class="btn btn-primary" style="font-size:0.85rem;">💾 Speichern</button></div>
       </form>
@@ -232,6 +237,119 @@
     {% endif %}
   </div>
 
+  {# ── Leaderboard ── #}
+  {% if leaderboard %}
+  <div class="card" style="margin-top:1rem;">
+    <h2 style="margin:0 0 1rem;">🏆 Leaderboard</h2>
+    {% set tq_min = ally_group.tq_min or 0 %}
+
+    {# TQ-Warnung #}
+    {% if tq_min > 0 %}
+    {% set failing = leaderboard | selectattr("tq", "ne", None) | selectattr("tq", "lt", tq_min) | list %}
+    {% set no_data = leaderboard | selectattr("tq", "none") | list %}
+    {% if failing or no_data %}
+    <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;">
+      <div style="font-size:.8rem;font-weight:700;color:#ef4444;margin-bottom:.4rem;">⚠️ TQ unter Minimum ({{ tq_min }}%)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;">
+        {% for m in failing %}
+        <span style="font-size:.75rem;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:2px 9px;color:#f87171;">{{ m.travian_name or m.discord_name }} — {{ m.tq }}%</span>
+        {% endfor %}
+        {% for m in no_data %}
+        <span style="font-size:.75rem;background:rgba(100,116,139,.15);border:1px solid rgba(100,116,139,.3);border-radius:12px;padding:2px 9px;color:var(--text-muted);">{{ m.travian_name or m.discord_name }} — keine Daten</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;">
+
+      {# Einwohner #}
+      {% set by_pop = leaderboard | sort(attribute='population', reverse=True) %}
+      <div class="lb-card">
+        <div class="lb-title">🏘️ Einwohner</div>
+        {% for m in by_pop[:10] %}
+        <div class="lb-row">
+          <span class="lb-rank">{{ loop.index }}</span>
+          <span class="lb-name">{{ m.travian_name or m.discord_name }}</span>
+          <span class="lb-val">{{ "{:,}".format(m.population or 0).replace(",",".") }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Truppen gesamt #}
+      {% set by_units = leaderboard | sort(attribute='total_units', reverse=True) %}
+      <div class="lb-card">
+        <div class="lb-title">⚔️ Truppen</div>
+        {% for m in by_units[:10] %}
+        <div class="lb-row">
+          <span class="lb-rank">{{ loop.index }}</span>
+          <span class="lb-name">{{ m.travian_name or m.discord_name }}</span>
+          <span class="lb-val">{{ "{:,}".format(m.total_units or 0).replace(",",".") }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Off #}
+      {% set by_off = leaderboard | sort(attribute='total_off', reverse=True) %}
+      <div class="lb-card">
+        <div class="lb-title" style="color:#ef4444;">⚔️ Off-Score</div>
+        {% for m in by_off[:10] %}
+        <div class="lb-row">
+          <span class="lb-rank">{{ loop.index }}</span>
+          <span class="lb-name">{{ m.travian_name or m.discord_name }}</span>
+          <span class="lb-val" style="color:#f87171;">{{ "{:,}".format(m.total_off or 0).replace(",",".") }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Def #}
+      {% set by_def = leaderboard | sort(attribute='total_def', reverse=True) %}
+      <div class="lb-card">
+        <div class="lb-title" style="color:#22c55e;">🛡️ Def-Score</div>
+        {% for m in by_def[:10] %}
+        <div class="lb-row">
+          <span class="lb-rank">{{ loop.index }}</span>
+          <span class="lb-name">{{ m.travian_name or m.discord_name }}</span>
+          <span class="lb-val" style="color:#4ade80;">{{ "{:,}".format(m.total_def or 0).replace(",",".") }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Scouts #}
+      {% set by_scouts = leaderboard | sort(attribute='total_scouts', reverse=True) %}
+      <div class="lb-card">
+        <div class="lb-title" style="color:#8b5cf6;">🔍 Scouts</div>
+        {% for m in by_scouts[:10] %}
+        <div class="lb-row">
+          <span class="lb-rank">{{ loop.index }}</span>
+          <span class="lb-name">{{ m.travian_name or m.discord_name }}</span>
+          <span class="lb-val" style="color:#a78bfa;">{{ "{:,}".format(m.total_scouts or 0).replace(",",".") }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# TQ #}
+      {% set by_tq = leaderboard | selectattr("tq", "ne", None) | sort(attribute='tq', reverse=True) | list %}
+      <div class="lb-card">
+        <div class="lb-title" style="color:#f59e0b;">📊 TQ{% if tq_min > 0 %} <span style="font-size:.7rem;font-weight:400;color:var(--text-muted);">(Min: {{ tq_min }}%)</span>{% endif %}</div>
+        {% for m in by_tq[:10] %}
+        {% set below = tq_min > 0 and m.tq < tq_min %}
+        <div class="lb-row">
+          <span class="lb-rank">{{ loop.index }}</span>
+          <span class="lb-name">{{ m.travian_name or m.discord_name }}</span>
+          <span class="lb-val" style="color:{% if below %}#ef4444{% else %}#f59e0b{% endif %};">{{ m.tq }}%{% if below %} ⚠️{% endif %}</span>
+        </div>
+        {% endfor %}
+        {% if not by_tq %}
+        <div style="font-size:.78rem;color:var(--text-muted);padding:.5rem 0;">Noch keine Truppendaten importiert.</div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+  {% endif %}
+
 {# ════════════════════════════════════════════════════════════════════════════
    MEMBER VIEW (joined someone else's group)
    ════════════════════════════════════════════════════════════════════════════ #}
@@ -299,6 +417,13 @@
   transition:all 0.15s;
 }
 .wing-filter-btn.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
+.lb-card { background:var(--bg-main);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem; }
+.lb-title { font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.5rem; }
+.lb-row { display:flex;align-items:center;gap:.5rem;padding:.22rem 0;border-bottom:1px solid rgba(255,255,255,.04); }
+.lb-row:last-child { border-bottom:none; }
+.lb-rank { font-size:.72rem;font-weight:700;color:var(--text-muted);width:1.2rem;text-align:right;flex-shrink:0; }
+.lb-name { flex:1;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.lb-val { font-size:.82rem;font-weight:700;flex-shrink:0; }
 </style>
 
 <script>

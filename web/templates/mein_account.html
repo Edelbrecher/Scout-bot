@@ -590,6 +590,8 @@ function copyDualLink() {
 </style>
 <script>
 const OWN_VILLAGES_MA = {{ own_villages | tojson }};
+const MY_POPULATION   = {{ my_population | tojson }};
+const TQ_MIN          = {{ tq_min | tojson }};
 const INFANTRY_MA = new Set(['Legionär','Prätorianer','Imperianer','Senator','Siedler','Keulenschwinger','Speerkämpfer','Axtkämpfer','Häuptling','Phalanx','Schwertkämpfer','Stammesältester','Schleuderer','Khopesh-Krieger','Soldat','Lanzenkämpfer','Hoplite','Sentinel']);
 const CAVALRY_MA  = new Set(['Equites Legati','Equites Imperatoris','Equites Caesaris','Paladin','Teut. Ritter','Pathfinder','Theutates-Blitz','Druidentreiter','Haeduer','Ägyptischer Reiter','Resheph-Streitwagen','Hunnischer Reiter','Boyar','Ammende Nomadin','Späher','Sopdu-Erkunder']);
 const SIEGE_MA    = new Set(['Rammbock','Feuerkatapult','Teutonen-Rammbock','Kriegsmaschine','Gallier-Rammbock','Gallier-Kata']);
@@ -629,6 +631,7 @@ function openArmyModal() {
       <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:#22c55e;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">🛡️ Def-Score</div><div style="font-size:1.25rem;font-weight:800;color:#22c55e;">${totalDef.toLocaleString('de-DE')}</div></div>
       <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:#f59e0b;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">🌾 Korn/h</div><div style="font-size:1.25rem;font-weight:800;color:#f59e0b;">${totalCrop.toLocaleString('de-DE')}</div></div>
       <div style="background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">👥 Gesamt</div><div style="font-size:1.25rem;font-weight:800;color:var(--text);">${totalTroops.toLocaleString('de-DE')}</div></div>
+      ${(()=>{const tq=MY_POPULATION>0?Math.round(totalCrop/MY_POPULATION*100):null;const ok=tq===null||TQ_MIN<=0||tq>=TQ_MIN;const col=tq===null?'var(--text-muted)':ok?'#22c55e':'#ef4444';const bg=tq===null?'rgba(100,116,139,.1)':ok?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)';const bd=tq===null?'rgba(100,116,139,.3)':ok?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)';const warn=(!ok&&TQ_MIN>0)?`<div style="font-size:.62rem;color:#ef4444;margin-top:.2rem;">⚠️ Minimum: ${TQ_MIN}%</div>`:'';return`<div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:${col};font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">📊 TQ</div><div style="font-size:1.25rem;font-weight:800;color:${col};">${tq!==null?tq+'%':'—'}</div>${warn}</div>`;})()}
     </div>
     <div style="margin-bottom:1rem;"><div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.35rem;">⚖️ Off / Def Balance</div>
       <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.06);"><div style="width:${offPct}%;background:rgba(239,68,68,.75);"></div><div style="flex:1;background:rgba(34,197,94,.65);"></div></div>

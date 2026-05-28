@@ -3385,6 +3385,16 @@ async def mein_account_page(request: Request, guild_id: str):
     total_def  = sum(v.get("def_score", 0) for v in own_villages)
     total_crop = sum(v.get("total_crop", 0) for v in own_villages)
 
+    # Population for TQ calculation (from map snapshot, sum per travian_name)
+    my_travian_name_val = (await database.get_member_troops_single(guild_id, discord_id) or {}).get("travian_name", "")
+    my_population = 0
+    if my_travian_name_val:
+        player = await database.get_player_from_snapshot(guild_id, my_travian_name_val)
+        my_population = (player or {}).get("total_pop", 0) or 0
+    # Alliance TQ requirement
+    ally_group_info = await database.get_ally_group_for_guild(guild_id)
+    tq_min = (ally_group_info or {}).get("tq_min", 0) or 0
+
     sitters = await database.get_account_sitters(guild_id, session.get("uid", ""))
     dual_links = await database.get_dual_links_for_owner(guild_id, session.get("uid", ""))
     dual_created = request.query_params.get("dual_created")
@@ -3412,8 +3422,10 @@ async def mein_account_page(request: Request, guild_id: str):
         "hospital_data":      hospital_data,
         "hospital_uploaded":  hospital_uploaded,
         "hospital_cleared":   hospital_cleared,
-        "my_travian_name":    (my_troops or {}).get("travian_name", ""),
+        "my_travian_name":    my_travian_name_val or (my_troops or {}).get("travian_name", ""),
         "my_waves":           my_waves,
+        "my_population":      my_population,
+        "tq_min":             tq_min,
     })
 
 
@@ -3446,15 +3458,21 @@ async def mein_account_upload(
         v["priority"]     = prio
     if parsed:
         await database.save_own_villages(guild_id, parsed, uploaded_by, discord_id)
-    total_off = sum(v.get("off_score",0) for v in parsed)
-    total_def = sum(v.get("def_score",0) for v in parsed)
+    total_off  = sum(v.get("off_score",0) for v in parsed)
+    total_def  = sum(v.get("def_score",0) for v in parsed)
+    total_crop = sum(v.get("total_crop",0) for v in parsed)
+    total_units= sum(sum(t for t in v.get("troops",{}).values() if isinstance(t,int)) for v in parsed)
+    # count scouts
+    scout_names = {"Equites Legati","Späher","Pathfinder","Sopdu-Erkunder"}
+    total_scouts= sum(v.get("troops",{}).get(s,0) for v in parsed for s in scout_names)
     # Always upsert member_troops so travian_name is stored (even if no troop data yet)
     if tname or parsed:
         await database.upsert_member_troops(
             guild_id, discord_id, uploaded_by, tname or uploaded_by,
             [{k:v for k,v in vill.items() if k in ("village_name","x","y","troops","off_score","def_score","village_type")}
              for vill in parsed],
-            tribe="", total_off=total_off, total_def=total_def
+            tribe="", total_off=total_off, total_def=total_def,
+            total_crop=total_crop, total_units=total_units, total_scouts=total_scouts,
         )
     return RedirectResponse(f"/guild/{guild_id}/mein-account?uploaded={len(parsed)}", status_code=303)
 
@@ -3728,11 +3746,13 @@ async def my_ally_page(request: Request, guild_id: str):
     guild_group = await database.get_ally_group_for_guild(guild_id) if not ally_group else None
 
     flash = request.query_params.get("flash", "")
+    leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
         "membership": membership, "guild_group": guild_group,
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
+        "leaderboard": leaderboard,
     })
 
 
@@ -3768,7 +3788,8 @@ async def my_ally_delete(request: Request, guild_id: str):
 async def my_ally_settings(request: Request, guild_id: str,
                              ally_name: str = Form(""),
                              wing1_name: str = Form(""),
-                             wing2_name: str = Form("")):
+                             wing2_name: str = Form(""),
+                             tq_min: int = Form(0)):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -3782,6 +3803,7 @@ async def my_ally_settings(request: Request, guild_id: str,
         ally_name=ally_name.strip()[:80],
         wing1_name=wing1_name.strip()[:40],
         wing2_name=wing2_name.strip()[:40],
+        tq_min=max(0, tq_min),
     )
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved", status_code=303)
 

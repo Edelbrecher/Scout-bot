@@ -3090,6 +3090,11 @@ async def _init_ally_tables():
             await db.execute("ALTER TABLE ally_roles ADD COLUMN permissions TEXT DEFAULT ''")
         except Exception:
             pass
+        # ally_groups: tq_min (Truppenquote Mindestanforderung in %)
+        try:
+            await db.execute("ALTER TABLE ally_groups ADD COLUMN tq_min INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -3139,8 +3144,8 @@ async def delete_ally_group(ally_group_id: int, owner_id: str):
 
 
 async def update_ally_group(ally_group_id: int, owner_id: str, **kwargs):
-    """Update ally_group fields: ally_name, wing1_name, wing2_name, wing1_token, wing2_token."""
-    allowed = {"ally_name", "wing1_name", "wing2_name", "wing1_token", "wing2_token"}
+    """Update ally_group fields: ally_name, wing1_name, wing2_name, wing1_token, wing2_token, tq_min."""
+    allowed = {"ally_name", "wing1_name", "wing2_name", "wing1_token", "wing2_token", "tq_min"}
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if not updates:
         return
@@ -5452,15 +5457,31 @@ async def delete_op_favorite(fav_id: int, discord_id: str, guild_id: str):
 
 # ── member_troops ──────────────────────────────────────────────────────────────
 
+async def _migrate_member_troops():
+    async with aiosqlite.connect(DB_PATH) as db:
+        for col, definition in [
+            ("total_crop", "INTEGER DEFAULT 0"),
+            ("total_units", "INTEGER DEFAULT 0"),
+            ("total_scouts", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE member_troops ADD COLUMN {col} {definition}")
+            except Exception:
+                pass
+        await db.commit()
+
+
 async def upsert_member_troops(guild_id: str, discord_id: str, discord_name: str,
                                 travian_name: str, villages: list[dict],
-                                tribe: str = "", total_off: int = 0, total_def: int = 0):
+                                tribe: str = "", total_off: int = 0, total_def: int = 0,
+                                total_crop: int = 0, total_units: int = 0, total_scouts: int = 0):
+    await _migrate_member_troops()
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT INTO member_troops
                 (guild_id, discord_id, discord_name, travian_name, villages_json,
-                 tribe, total_off, total_def, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+                 tribe, total_off, total_def, total_crop, total_units, total_scouts, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
             ON CONFLICT(guild_id, discord_id) DO UPDATE SET
                 discord_name  = excluded.discord_name,
                 travian_name  = excluded.travian_name,
@@ -5468,9 +5489,13 @@ async def upsert_member_troops(guild_id: str, discord_id: str, discord_name: str
                 tribe         = excluded.tribe,
                 total_off     = excluded.total_off,
                 total_def     = excluded.total_def,
+                total_crop    = excluded.total_crop,
+                total_units   = excluded.total_units,
+                total_scouts  = excluded.total_scouts,
                 updated_at    = excluded.updated_at
         """, (guild_id, discord_id, discord_name, travian_name,
-              _json_op.dumps(villages), tribe, total_off, total_def))
+              _json_op.dumps(villages), tribe, total_off, total_def,
+              total_crop, total_units, total_scouts))
         await db.commit()
 
 
@@ -5499,6 +5524,40 @@ async def get_member_troops_single(guild_id: str, discord_id: str) -> dict | Non
     r = dict(row)
     r["villages"] = _json_op.loads(r["villages_json"]) if r["villages_json"] else []
     return r
+
+
+async def get_member_leaderboard(guild_id: str) -> list[dict]:
+    """Return member_troops enriched with population from latest map snapshot.
+    Each row: discord_id, discord_name, travian_name, total_off, total_def,
+              total_crop, total_units, total_scouts, population, tq (%)"""
+    await _migrate_member_troops()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Get population per player_name from latest snapshot
+        pop_rows = await db.execute_fetchall("""
+            SELECT player_name, SUM(population) as pop
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND fetched_at = (SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?)
+              AND player_name IS NOT NULL AND player_name != ''
+            GROUP BY player_name
+        """, (guild_id, guild_id))
+        pop_map = {r["player_name"]: r["pop"] for r in pop_rows}
+
+        rows = await db.execute_fetchall(
+            "SELECT * FROM member_troops WHERE guild_id=? ORDER BY total_off DESC",
+            (guild_id,)
+        )
+    result = []
+    for r in rows:
+        d = dict(r)
+        pop = pop_map.get(d.get("travian_name") or "", 0) or 0
+        crop = d.get("total_crop") or 0
+        tq = round(crop / pop * 100) if pop > 0 else None
+        d["population"] = pop
+        d["tq"] = tq
+        result.append(d)
+    return result
 
 
 # ── Personal missions (per member) ─────────────────────────────────────────────
