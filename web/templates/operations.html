@@ -253,10 +253,12 @@ const INIT_MEMBERS = {{ members | tojson }};
             </div>
 
             <!-- Alliance filter -->
-            <div id="allianceFilterRow" style="display:none;margin-bottom:.6rem;gap:.4rem;flex-wrap:wrap;align-items:center;">
-              <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;">Allianz-Filter:</span>
-              <div id="allianceChips" style="display:flex;gap:.3rem;flex-wrap:wrap;flex:1;"></div>
-              <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);">Keine Auswahl = alle Spieler</span>
+            <div id="allianceFilterRow" style="display:none;margin-bottom:.6rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;">
+              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
+                <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🎯 Allianz-Filter</span>
+                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);">Keine Auswahl = alle Spieler</span>
+              </div>
+              <div id="allianceChips" style="display:flex;gap:.3rem;flex-wrap:wrap;"></div>
             </div>
 
             <!-- Search dropdown -->
@@ -518,7 +520,8 @@ let editingWaveId = null;   // null = new wave, else update existing
 let planFilter = 'all';
 let editingPlanId = null; // null = new plan, else update
 let selectedAlliances = new Set(); // alliance filter for target search
-let availableAlliances = [];       // loaded once per plan open
+let availableAlliances = [];       // [{name, players, pop}] sorted by pop desc
+let metaGroups = [];               // [{meta_name, alliances:[]}]
 
 const BASE = `/guild/${GUILD_ID}/operations/api`;
 
@@ -743,8 +746,16 @@ async function loadAlliances() {
   try {
     const data = await apiFetch('/alliances');
     availableAlliances = data.alliances || [];
+    metaGroups = data.meta_groups || [];
     renderAllianceFilter();
-  } catch(e) { availableAlliances = []; }
+  } catch(e) { availableAlliances = []; metaGroups = []; }
+}
+
+function fmtPop(n) {
+  if (!n) return '';
+  if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if (n >= 1000) return Math.round(n/1000)+'k';
+  return n;
 }
 
 function renderAllianceFilter() {
@@ -753,18 +764,45 @@ function renderAllianceFilter() {
   const hint = document.getElementById('allianceFilterHint');
   if (!availableAlliances.length) { row.style.display='none'; return; }
   row.style.display = 'flex';
-  chips.innerHTML = availableAlliances.map(a => {
-    const active = selectedAlliances.has(a);
-    const disabled = !active && selectedAlliances.size >= 2;
-    return `<span class="ally-chip${active?' active':''}${disabled?' disabled':''}"
-      onclick="toggleAlliance('${escJs(a)}')" title="${active?'Filter entfernen':'Als Filter hinzufügen (max. 2)'}">
-      ${escHtml(a)}<span class="chip-x">${active?' ✕':''}</span>
+
+  let html = '';
+
+  // Meta groups section (if any)
+  if (metaGroups.length) {
+    html += `<span style="font-size:.7rem;color:var(--text-muted);font-weight:600;margin-right:.1rem;">Meta:</span>`;
+    metaGroups.forEach(g => {
+      const allActive = g.alliances.length > 0 && g.alliances.every(a => selectedAlliances.has(a));
+      html += `<span class="ally-chip${allActive?' active':''}" onclick="toggleMetaGroup('${escJs(g.meta_name)}')"
+        title="${allActive?'Meta-Gruppe abwählen':'Alle Allianzen dieser Meta-Gruppe wählen'} (${g.alliances.join(', ')})">
+        🏰 ${escHtml(g.meta_name)}
+        <span style="font-size:.68rem;opacity:.7;">${g.alliances.length} Ally</span>
+        <span class="chip-x">${allActive?' ✕':''}</span>
+      </span>`;
+    });
+    html += `<span style="color:var(--border);margin:0 .2rem;">|</span>`;
+  }
+
+  // Individual alliances sorted by pop
+  availableAlliances.forEach((a, i) => {
+    const active = selectedAlliances.has(a.name);
+    const rank = i + 1;
+    const rankColor = rank <= 3 ? '#fbbf24' : rank <= 10 ? '#94a3b8' : 'var(--text-muted)';
+    html += `<span class="ally-chip${active?' active':''}"
+      onclick="toggleAlliance('${escJs(a.name)}')"
+      title="${active?'Filter entfernen':'Als Filter hinzufügen (max. 2)'} · Rang ${rank} · ${a.players} Spieler · Pop ${fmtPop(a.pop)}">
+      <span style="font-size:.68rem;color:${rankColor};font-weight:700;min-width:1.4rem;">#${rank}</span>
+      ${escHtml(a.name)}
+      <span style="font-size:.68rem;color:var(--text-muted);">${a.players}👤</span>
+      <span class="chip-x">${active?' ✕':''}</span>
     </span>`;
-  }).join('');
+  });
+
+  chips.innerHTML = html;
+
   if (selectedAlliances.size === 0) {
     hint.textContent = 'Keine Auswahl = alle Spieler';
   } else {
-    hint.textContent = `Gefiltert: ${[...selectedAlliances].join(', ')}`;
+    hint.textContent = `Gefiltert: ${[...selectedAlliances].join(' + ')}`;
   }
 }
 
@@ -774,11 +812,27 @@ function toggleAlliance(name) {
   } else if (selectedAlliances.size < 2) {
     selectedAlliances.add(name);
   } else {
-    showToast('Maximal 2 Allianzen können gleichzeitig gefiltert werden.');
+    showToast('Max. 2 Allianzen gleichzeitig. Erst eine abwählen.');
     return;
   }
   renderAllianceFilter();
-  // Re-run search if active
+  const q = document.getElementById('targetSearch').value;
+  if (q.length >= 2) doSearch(q);
+}
+
+function toggleMetaGroup(metaName) {
+  const g = metaGroups.find(g => g.meta_name === metaName);
+  if (!g) return;
+  const allActive = g.alliances.every(a => selectedAlliances.has(a));
+  if (allActive) {
+    g.alliances.forEach(a => selectedAlliances.delete(a));
+  } else {
+    // Add all alliances of this meta group (up to 2 total)
+    selectedAlliances.clear();
+    g.alliances.slice(0, 2).forEach(a => selectedAlliances.add(a));
+    if (g.alliances.length > 2) showToast(`Meta "${metaName}" hat ${g.alliances.length} Allianzen — die ersten 2 wurden gefiltert.`);
+  }
+  renderAllianceFilter();
   const q = document.getElementById('targetSearch').value;
   if (q.length >= 2) doSearch(q);
 }

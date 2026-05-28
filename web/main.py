@@ -4744,24 +4744,30 @@ async def op_delete_favorite(request: Request, guild_id: str, fav_id: int):
 
 @app.get("/guild/{guild_id}/operations/api/alliances")
 async def op_list_alliances(request: Request, guild_id: str):
-    """Return distinct alliance names from the latest map snapshot."""
+    """Return alliances sorted by total population (strength), plus meta groups."""
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     import aiosqlite as _aiosqlite_op
     async with _aiosqlite_op.connect(database.DB_PATH) as db:
         db.row_factory = _aiosqlite_op.Row
+        # Alliances sorted by total population desc (= world rank proxy)
         async with db.execute("""
-            SELECT DISTINCT m.alliance_name
+            SELECT m.alliance_name,
+                   COUNT(DISTINCT m.player_name) AS player_count,
+                   SUM(m.population) AS total_pop
             FROM map_snapshots m
             INNER JOIN (
                 SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
                 WHERE guild_id=? GROUP BY guild_id
             ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
             WHERE m.guild_id=? AND m.alliance_name IS NOT NULL AND m.alliance_name != ''
-            ORDER BY m.alliance_name
+            GROUP BY m.alliance_name
+            ORDER BY total_pop DESC
         """, (guild_id, guild_id)) as cur:
-            alliances = [r["alliance_name"] for r in await cur.fetchall()]
-    return _JSONResponse({"alliances": alliances})
+            alliances = [{"name": r["alliance_name"], "players": r["player_count"], "pop": r["total_pop"]} for r in await cur.fetchall()]
+    # Meta groups
+    meta_groups = await database.get_meta_groups(guild_id)
+    return _JSONResponse({"alliances": alliances, "meta_groups": meta_groups})
 
 
 @app.get("/guild/{guild_id}/operations/api/villages")
