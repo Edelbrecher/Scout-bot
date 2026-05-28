@@ -3274,8 +3274,6 @@ async def mein_account_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
 
     discord_id   = session.get("uid", "")
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, discord_id))
@@ -3330,8 +3328,6 @@ async def mein_account_upload(
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
 
     uploaded_by = session.get("username") or session.get("discord_username") or "unknown"
     parsed = parse_own_villages(troop_text)
@@ -3412,8 +3408,6 @@ async def kampfkraft_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
     # Pass own villages so the calculator can pre-fill troop counts
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, session.get("uid","")))
     return templates.TemplateResponse("kampfkraft.html", {
@@ -3551,8 +3545,6 @@ async def dual_create(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
     token = await database.create_dual_invite(
         guild_id=guild_id,
         owner_id=session.get("uid", ""),
@@ -5866,8 +5858,6 @@ async def hospital_upload(
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_premium(guild, guild_id)
-    if err: return err
 
     entries = parse_hospital(hospital_text)
     await database.save_hospital_data(
@@ -5891,8 +5881,6 @@ async def hospital_clear(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_premium(guild, guild_id)
-    if err: return err
 
     await database.delete_hospital_data(guild_id, session.get("uid", ""))
     return RedirectResponse(f"/guild/{guild_id}/mein-account?hospital_cleared=1", status_code=303)

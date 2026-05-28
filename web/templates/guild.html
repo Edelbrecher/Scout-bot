@@ -177,14 +177,14 @@
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
 
-    <!-- Mein Account (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/mein-account" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
+    <!-- Mein Account (Free) -->
+    <a href="/guild/{{ guild.guild_id }}/mein-account" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🏰</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.account.title">Mein Account</span> {{ PLAYER_BADGE }}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.account.title">Mein Account</span></div>
         <div class="feature-desc" data-i18n="guild.feature.account.desc">Eigene Dörfer & Truppen importieren — Datenbasis für alle Features</div>
       </div>
-      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
+      <span style="color:var(--text-muted);font-size:1rem;">→</span>
     </a>
 
     <!-- My Ally -->
