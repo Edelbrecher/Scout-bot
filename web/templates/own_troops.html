@@ -46,32 +46,67 @@
 
   <!-- Timeline chart -->
   {% if history and history | length > 0 %}
-  <div class="card" style="margin-bottom:1.5rem;">
-    <h2>📈 Entwicklung der Truppenstärke</h2>
-    <p class="hint">Jeder Datenpunkt = ein Import. Zeigt wie sich Off, Def und Korn über Zeit entwickelt haben.</p>
-    <div style="position:relative; height:220px;">
+  {% set last = history[-1] %}
+  {% set prev = history[-2] if history | length > 1 else none %}
+
+  <!-- KPI stat cards with delta -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.75rem; margin-bottom:1rem;">
+
+    <div style="background:var(--bg-card); border:1px solid rgba(239,68,68,0.35); border-radius:12px; padding:0.9rem 1.1rem;">
+      <div style="font-size:0.72rem; color:#ef4444; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">⚔️ Off-Score</div>
+      <div style="font-size:1.7rem; font-weight:900; color:#ef4444; line-height:1;">{{ "{:,}".format(last.total_off).replace(",",".") }}</div>
+      {% if prev %}{% set d = last.total_off - prev.total_off %}
+      <div style="font-size:0.78rem; margin-top:.3rem; color:{% if d >= 0 %}#4caf82{% else %}#f87171{% endif %};">
+        {% if d >= 0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+      </div>{% endif %}
+    </div>
+
+    <div style="background:var(--bg-card); border:1px solid rgba(34,197,94,0.35); border-radius:12px; padding:0.9rem 1.1rem;">
+      <div style="font-size:0.72rem; color:#22c55e; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🛡️ Def-Score</div>
+      <div style="font-size:1.7rem; font-weight:900; color:#22c55e; line-height:1;">{{ "{:,}".format(last.total_def).replace(",",".") }}</div>
+      {% if prev %}{% set d = last.total_def - prev.total_def %}
+      <div style="font-size:0.78rem; margin-top:.3rem; color:{% if d >= 0 %}#4caf82{% else %}#f87171{% endif %};">
+        {% if d >= 0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+      </div>{% endif %}
+    </div>
+
+    <div style="background:var(--bg-card); border:1px solid rgba(245,158,11,0.35); border-radius:12px; padding:0.9rem 1.1rem;">
+      <div style="font-size:0.72rem; color:#f59e0b; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🌾 Korn/h</div>
+      <div style="font-size:1.7rem; font-weight:900; color:#f59e0b; line-height:1;">{{ "{:,}".format(last.total_crop).replace(",",".") }}</div>
+      {% if prev %}{% set d = last.total_crop - prev.total_crop %}
+      <div style="font-size:0.78rem; margin-top:.3rem; color:{% if d >= 0 %}#f87171{% else %}#4caf82{% endif %};">
+        {% if d >= 0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+      </div>{% endif %}
+    </div>
+
+    <div style="background:var(--bg-card); border:1px solid rgba(100,116,139,0.3); border-radius:12px; padding:0.9rem 1.1rem;">
+      <div style="font-size:0.72rem; color:var(--text-muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🏘️ Dörfer</div>
+      <div style="font-size:1.7rem; font-weight:900; color:var(--text); line-height:1;">{{ last.village_count }}</div>
+      {% if prev %}{% set d = last.village_count - prev.village_count %}
+      {% if d != 0 %}<div style="font-size:0.78rem; margin-top:.3rem; color:{% if d > 0 %}#4caf82{% else %}#f87171{% endif %};">
+        {% if d > 0 %}▲{% else %}▼{% endif %} {{ d|abs }} Dorf{% if d|abs != 1 %}e{% endif %}
+      </div>{% endif %}{% endif %}
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="card" style="margin-bottom:1.5rem; padding:1.25rem;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
+      <h2 style="margin:0; font-size:1rem;">📈 Truppenstärke über Zeit</h2>
+      <span style="font-size:0.75rem; color:var(--text-muted);">{{ history | length }} Import{% if history | length != 1 %}e{% endif %}</span>
+    </div>
+    <div style="position:relative; height:260px;">
       <canvas id="historyChart"></canvas>
     </div>
-    <!-- mini stats row -->
-    {% set last = history[-1] %}
-    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:1rem;">
-      <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
-        <div style="font-size:0.75rem; color:var(--text-muted);">⚔️ Off-Score gesamt</div>
-        <div style="font-size:1.4rem; font-weight:800; color:#ef4444;">{{ "{:,}".format(last.total_off).replace(",",".") }}</div>
-      </div>
-      <div style="background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
-        <div style="font-size:0.75rem; color:var(--text-muted);">🛡️ Def-Score gesamt</div>
-        <div style="font-size:1.4rem; font-weight:800; color:#22c55e;">{{ "{:,}".format(last.total_def).replace(",",".") }}</div>
-      </div>
-      <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
-        <div style="font-size:0.75rem; color:var(--text-muted);">🌾 Korn-Verbrauch</div>
-        <div style="font-size:1.4rem; font-weight:800; color:#f59e0b;">{{ "{:,}".format(last.total_crop).replace(",",".") }}</div>
-      </div>
-      <div style="background:rgba(100,116,139,0.08); border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:0.5rem 1rem; min-width:140px;">
-        <div style="font-size:0.75rem; color:var(--text-muted);">🏘️ Dörfer</div>
-        <div style="font-size:1.4rem; font-weight:800; color:var(--text);">{{ last.village_count }}</div>
+
+    {% if history | length > 1 %}
+    <div style="margin-top:1.25rem; border-top:1px solid var(--border); padding-top:1rem;">
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:.6rem; font-weight:600;">⚖️ Off / Def Verhältnis pro Import</div>
+      <div style="position:relative; height:80px;">
+        <canvas id="ratioChart"></canvas>
       </div>
     </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -264,66 +299,192 @@
 <script>
 (function() {
   const history = {{ history | tojson }};
-  const labels = history.map(h => h.uploaded_at.slice(0,16).replace('T',' '));
-  const ctx = document.getElementById('historyChart');
-  if (!ctx) return;
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '⚔️ Off-Score',
-          data: history.map(h => h.total_off),
-          borderColor: '#ef4444',
-          backgroundColor: 'rgba(239,68,68,0.08)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: history.length < 30 ? 4 : 2,
-          pointHoverRadius: 6,
+  if (!history.length) return;
+
+  // Format date labels
+  const labels = history.map(h => {
+    const d = h.uploaded_at.slice(0,10);
+    const [y,mo,day] = d.split('-');
+    return `${day}.${mo}.${y.slice(2)}`;
+  });
+
+  const fmt = v => v >= 1000 ? (v/1000).toFixed(1).replace('.0','')+'k' : String(v);
+
+  // ── Helper: canvas gradient ──────────────────────────────────────────────
+  function makeGradient(ctx, color, alpha1, alpha2) {
+    const g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+    g.addColorStop(0, color.replace(')', `,${alpha1})`).replace('rgb', 'rgba'));
+    g.addColorStop(1, color.replace(')', `,${alpha2})`).replace('rgb', 'rgba'));
+    return g;
+  }
+
+  // ── Main chart ────────────────────────────────────────────────────────────
+  const mainEl = document.getElementById('historyChart');
+  if (mainEl) {
+    const mainCtx = mainEl.getContext('2d');
+    const gradOff = mainCtx.createLinearGradient(0,0,0,260);
+    gradOff.addColorStop(0, 'rgba(239,68,68,0.35)');
+    gradOff.addColorStop(1, 'rgba(239,68,68,0.02)');
+    const gradDef = mainCtx.createLinearGradient(0,0,0,260);
+    gradDef.addColorStop(0, 'rgba(34,197,94,0.35)');
+    gradDef.addColorStop(1, 'rgba(34,197,94,0.02)');
+
+    const pts = history.length <= 20 ? 5 : history.length <= 60 ? 3 : 0;
+
+    new Chart(mainEl, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: '⚔️ Off-Score',
+            data: history.map(h => h.total_off),
+            borderColor: '#ef4444',
+            backgroundColor: gradOff,
+            borderWidth: 2.5,
+            tension: 0.4,
+            fill: true,
+            pointRadius: pts,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#ef4444',
+            pointBorderColor: '#1a1a2e',
+            pointBorderWidth: 2,
+          },
+          {
+            label: '🛡️ Def-Score',
+            data: history.map(h => h.total_def),
+            borderColor: '#22c55e',
+            backgroundColor: gradDef,
+            borderWidth: 2.5,
+            tension: 0.4,
+            fill: true,
+            pointRadius: pts,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#22c55e',
+            pointBorderColor: '#1a1a2e',
+            pointBorderWidth: 2,
+          },
+          {
+            label: '🌾 Korn/h',
+            data: history.map(h => h.total_crop),
+            borderColor: '#f59e0b',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderDash: [6,4],
+            tension: 0.4,
+            fill: false,
+            pointRadius: pts > 0 ? pts - 1 : 0,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#f59e0b',
+            yAxisID: 'yCrop',
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: { color: '#ccc', font: { size: 11 }, usePointStyle: true, pointStyleWidth: 10, padding: 16 }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15,20,30,0.92)',
+            borderColor: 'rgba(255,255,255,0.12)',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              title: items => `📅 ${items[0].label}`,
+              label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('de-DE')}`,
+              afterBody: items => {
+                const h = history[items[0].dataIndex];
+                const prev = history[items[0].dataIndex - 1];
+                if (!prev) return [];
+                const dOff = h.total_off - prev.total_off;
+                const dDef = h.total_def - prev.total_def;
+                return [
+                  '',
+                  ` Δ Off: ${dOff >= 0 ? '+' : ''}${dOff.toLocaleString('de-DE')}`,
+                  ` Δ Def: ${dDef >= 0 ? '+' : ''}${dDef.toLocaleString('de-DE')}`,
+                ];
+              }
+            }
+          }
         },
-        {
-          label: '🛡️ Def-Score',
-          data: history.map(h => h.total_def),
-          borderColor: '#22c55e',
-          backgroundColor: 'rgba(34,197,94,0.08)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: history.length < 30 ? 4 : 2,
-          pointHoverRadius: 6,
-        },
-        {
-          label: '🌾 Korn',
-          data: history.map(h => h.total_crop),
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245,158,11,0.0)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: history.length < 30 ? 4 : 2,
-          pointHoverRadius: 6,
-          borderDash: [5,3],
-        },
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { color: '#ccc', font: { size: 12 } } },
-        tooltip: {
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('de-DE')}`
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.04)', drawTicks: false },
+            ticks: { color: '#888', font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
+            border: { color: 'rgba(255,255,255,0.08)' }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)', drawTicks: false },
+            ticks: { color: '#aaa', font: { size: 10 }, callback: fmt, padding: 6 },
+            border: { display: false },
+            beginAtZero: true,
+          },
+          yCrop: {
+            position: 'right',
+            grid: { display: false },
+            ticks: { color: '#f59e0b88', font: { size: 9 }, callback: fmt },
+            border: { display: false },
+            beginAtZero: true,
           }
         }
-      },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 }, maxRotation: 30 } },
-        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa', font: { size: 10 },
-             callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, beginAtZero: true }
       }
-    }
-  });
+    });
+  }
+
+  // ── Off/Def Ratio bar chart ───────────────────────────────────────────────
+  const ratioEl = document.getElementById('ratioChart');
+  if (ratioEl && history.length > 1) {
+    const total = history.map(h => (h.total_off||0) + (h.total_def||0));
+    const offPct = history.map((h,i) => total[i] ? Math.round((h.total_off||0)/total[i]*100) : 50);
+    const defPct = offPct.map(p => 100 - p);
+
+    new Chart(ratioEl, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: '⚔️ Off %',
+            data: offPct,
+            backgroundColor: 'rgba(239,68,68,0.75)',
+            borderRadius: 3,
+            stack: 'ratio',
+          },
+          {
+            label: '🛡️ Def %',
+            data: defPct,
+            backgroundColor: 'rgba(34,197,94,0.65)',
+            borderRadius: 3,
+            stack: 'ratio',
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15,20,30,0.92)',
+            borderColor: 'rgba(255,255,255,0.12)',
+            borderWidth: 1,
+            callbacks: {
+              label: c => ` ${c.dataset.label}: ${c.parsed.y}%`
+            }
+          }
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { color: '#888', font: { size: 9 }, maxTicksLimit: 8 }, border: { color: 'rgba(255,255,255,0.08)' } },
+          y: { stacked: true, display: false, max: 100 }
+        }
+      }
+    });
+  }
 })();
 </script>
 {% endif %}
