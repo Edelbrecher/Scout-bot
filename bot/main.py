@@ -801,15 +801,22 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
     )
     for uid in member_ids:
         if not uid or not str(uid).isdigit():
+            print(f"[announce-ep] skipping invalid uid: {uid!r}")
             continue
         member = guild.get_member(int(uid))
         if not member:
-            continue
+            print(f"[announce-ep] member {uid} not found in guild cache, trying fetch...")
+            try:
+                member = await guild.fetch_member(int(uid))
+            except Exception as e:
+                print(f"[announce-ep] fetch_member {uid} failed: {e}")
+                continue
         try:
             await member.send(dm_text)
             dm_sent += 1
-        except Exception:
-            pass  # DMs may be disabled
+            print(f"[announce-ep] DM sent to {uid} ({member.name})")
+        except Exception as e:
+            print(f"[announce-ep] DM to {uid} ({member.name}) failed: {e}")
 
     return aiohttp_web.json_response({"ok": True, "channel": channel_sent, "dms": dm_sent})
 
