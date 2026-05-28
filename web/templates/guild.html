@@ -222,7 +222,7 @@
     </a>
 
     <!-- Benachrichtigungen -->
-    <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;{% if unread_notif %}border:2px solid #ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15);animation:pulse 2s infinite;{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;{% if unread_notif %}border:2px solid #ef4444;animation:pulse-strong 1.4s ease-in-out infinite;{% endif %}">
       <div class="feature-icon">🔔</div>
       <div class="feature-body">
         <div class="feature-title">Benachrichtigungen
@@ -680,7 +680,8 @@
 details.card > summary { cursor:pointer; }
 details.card[open] .details-chevron { transform:rotate(180deg); }
 .details-chevron { transition:transform 0.2s; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+@keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 3px rgba(239,68,68,.2);} 50%{opacity:.85;box-shadow:0 0 0 8px rgba(239,68,68,.0);} }
+@keyframes pulse-strong { 0%,100%{box-shadow:0 0 0 3px rgba(239,68,68,.5),0 0 12px rgba(239,68,68,.3);} 50%{box-shadow:0 0 0 7px rgba(239,68,68,.0),0 0 20px rgba(239,68,68,.0);} }
 </style>
 
 <script>
