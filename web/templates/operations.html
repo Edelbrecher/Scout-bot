@@ -773,7 +773,10 @@ function renderTargetCard(t) {
       <span class="target-coords">${t.x}|${t.y}</span>
       <div style="flex:1;">
         <div class="target-player">${escHtml(t.player_name)||'Unbekannt'}</div>
-        <div class="target-village">${escHtml(t.village_name)||''} ${t.population?'· '+t.population+' Pop':''}</div>
+        <div class="target-village">
+          ${escHtml(t.village_name)||''} ${t.population?'· '+t.population+' Pop':''}
+          ${activePlan?.landing_time ? `<span style="margin-left:.4rem;font-size:.7rem;color:#fbbf24;font-family:monospace;">🕐 ${fmtDatetimeShort(activePlan.landing_time)}</span>` : ''}
+        </div>
       </div>
       <div style="display:flex;gap:.3rem;align-items:center;">
         ${realCnt ? `<span class="wave-type-badge wt-real">⚔ ${realCnt}</span>` : ''}
@@ -807,12 +810,16 @@ function renderWavesTable(t) {
     const troops = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
       .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('');
     const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;" title="Turnierplatz Stufe ${w.tournament_square}">🏆${w.tournament_square}</span>` : '';
-    const rallyCoords = `${w.origin_x}|${w.origin_y}`;
+    // Confirm status indicator
+    const csMap = {on_time:['✅','#4ade80','Pünktlich abgeschickt'], late:['⏱','#fbbf24',`Unpünktlich (${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s)`], not_sent:['❌','#f87171','Nicht abgeschickt'], cant_send:['🚫','#f87171','Kann nicht abschicken']};
+    const cs = csMap[w.confirm_status];
+    const confirmIndicator = cs ? `<span title="${cs[2]}" style="font-size:.85rem;margin-left:.2rem;">${cs[0]}</span>` : '';
+    const rowBg = cs ? (w.confirm_status==='on_time'?'rgba(74,222,128,.04)':w.confirm_status==='late'?'rgba(251,191,36,.06)':'rgba(248,113,113,.06)') : '';
     return `
-    <tr>
+    <tr style="background:${rowBg}">
       <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeLabel(w.wave_type)}</span></td>
       <td>
-        <strong>${escHtml(w.attacker_name)}</strong>
+        <strong>${escHtml(w.attacker_name)}</strong>${confirmIndicator}
         <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}${tsInfo}</span>
       </td>
       <td><span class="tribe-pill">${tribeName(w.tribe)}</span></td>
@@ -821,6 +828,7 @@ function renderWavesTable(t) {
         <div class="send-time">${w.send_time ? fmtDatetime(w.send_time) : '—'}</div>
         <div class="travel-time">${w.travel_seconds ? '🕐 '+fmtTravel(w.travel_seconds) : ''}</div>
       </td>
+      <td style="font-size:.75rem;color:var(--text-muted);max-width:110px;word-break:break-word;">${w.notes ? escHtml(w.notes) : ''}</td>
       <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
         <button class="wave-action-btn" title="Rallypoint öffnen — Ziel: ${t.x}|${t.y}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')">🏹</button>
         <button class="wave-action-btn" title="Welle duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
@@ -833,7 +841,7 @@ function renderWavesTable(t) {
   return `
   <table class="wave-table">
     <thead><tr>
-      <th>Typ</th><th>Angreifer</th><th>Volk</th><th>Truppen</th><th>Sendezeit</th><th></th>
+      <th>Typ</th><th>Angreifer</th><th>Volk</th><th>Truppen</th><th>Sendezeit</th><th>Notiz</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;

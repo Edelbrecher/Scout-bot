@@ -5088,6 +5088,17 @@ async def _init_op_tables():
             await db.commit()
         except Exception:
             pass
+        # Migration: wave confirmation status
+        try:
+            await db.execute("ALTER TABLE op_waves ADD COLUMN confirm_status TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE op_waves ADD COLUMN confirm_delta_seconds INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
 
         # Favourites per user per guild (saved targets)
         await db.execute("""
@@ -5276,7 +5287,7 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
 async def update_op_wave(wave_id: int, guild_id: str, **kwargs):
     allowed = {"attacker_name","origin_village","origin_x","origin_y","wave_type","tribe",
                "troop_json","send_time","arrival_time","notes","confirmed","slowest_unit",
-               "slowest_speed","travel_seconds"}
+               "slowest_speed","travel_seconds","confirm_status","confirm_delta_seconds"}
     sets = {k: v for k, v in kwargs.items() if k in allowed}
     if not sets:
         return
@@ -5296,6 +5307,36 @@ async def delete_op_wave(wave_id: int, guild_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM op_waves WHERE id=? AND guild_id=?", (wave_id, guild_id))
         await db.commit()
+
+
+async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
+    """Return all waves assigned to a user across all active/draft plans, with plan + target info."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT w.id, w.plan_id, w.target_id, w.attacker_name, w.origin_village,
+                   w.origin_x, w.origin_y, w.wave_type, w.tribe, w.troop_json,
+                   w.send_time, w.arrival_time, w.travel_seconds, w.notes,
+                   w.confirm_status, w.confirm_delta_seconds, w.tournament_square,
+                   p.name AS plan_name, p.landing_time, p.status AS plan_status,
+                   t.player_name AS target_player, t.village_name AS target_village,
+                   t.x AS target_x, t.y AS target_y
+            FROM op_waves w
+            JOIN op_plans p  ON p.id = w.plan_id
+            JOIN op_targets t ON t.id = w.target_id
+            WHERE w.guild_id = ?
+              AND w.attacker_discord_id = ?
+              AND p.status IN ('draft','active')
+            ORDER BY p.landing_time ASC, w.send_time ASC
+        """, (guild_id, discord_id)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        try:
+            import json as _j
+            r["troop_json"] = _j.loads(r["troop_json"] or "{}")
+        except Exception:
+            r["troop_json"] = {}
+    return rows
 
 
 async def get_op_plan_full(plan_id: int, guild_id: str) -> dict | None:

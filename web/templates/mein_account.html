@@ -587,7 +587,7 @@ function copyDualLink() {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
     <div>
       <h2 style="margin:0 0 .2rem;">⚔️ Meine Einsätze</h2>
-      <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Alle Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind.</p>
+      <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Alle Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind. Bitte bestätige nach dem Abschicken.</p>
     </div>
     <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Einsatzplanung öffnen</a>
   </div>
@@ -596,51 +596,137 @@ function copyDualLink() {
   </div>
 </div>
 
+<!-- Delta-Modal for "Unpünktlich" -->
+<div id="deltaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:min(340px,95vw);box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <h3 style="margin:0 0 1rem;">⏱ Abweichung angeben</h3>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.75rem;">Wie viele Sekunden war dein Abschicken von der geplanten Sendezeit entfernt?<br><span style="color:#fbbf24;">+ = zu spät &nbsp;·&nbsp; − = zu früh</span></p>
+    <input id="deltaInput" type="number" placeholder="z.B. +15 oder -5"
+           style="width:100%;padding:.5rem .75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:1rem;margin-bottom:1rem;box-sizing:border-box;">
+    <div style="display:flex;gap:.5rem;">
+      <button onclick="closeDeltaModal()" class="btn btn-secondary" style="flex:1;">Abbrechen</button>
+      <button onclick="saveDelta()" class="btn btn-primary" style="flex:1;">Bestätigen</button>
+    </div>
+  </div>
+</div>
+
 <script>
-(function(){
-  fetch('/guild/{{ guild.guild_id }}/operations/api/my-missions')
+const GUILD_ID_MA = '{{ guild.guild_id }}';
+let _pendingDeltaWaveId = null;
+
+function openDeltaModal(waveId) {
+  _pendingDeltaWaveId = waveId;
+  document.getElementById('deltaInput').value = '';
+  const m = document.getElementById('deltaModal');
+  m.style.display = 'flex';
+  document.getElementById('deltaInput').focus();
+}
+function closeDeltaModal() {
+  document.getElementById('deltaModal').style.display = 'none';
+  _pendingDeltaWaveId = null;
+}
+async function saveDelta() {
+  const delta = parseInt(document.getElementById('deltaInput').value) || 0;
+  closeDeltaModal();
+  if (_pendingDeltaWaveId) await confirmWave(_pendingDeltaWaveId, 'late', delta);
+}
+
+async function confirmWave(waveId, status, delta=0) {
+  const fd = new FormData();
+  fd.append('confirm_status', status);
+  fd.append('confirm_delta_seconds', delta);
+  try {
+    await fetch(`/guild/${GUILD_ID_MA}/operations/api/waves/${waveId}/confirm`, {method:'POST', body:fd});
+    loadMissions();
+  } catch(e) { console.error(e); }
+}
+
+// Mark wave as "cant_send" immediately — before the op
+async function markCantSend(waveId) {
+  if (!confirm('Bestätigen: Du kannst diese Welle nicht abschicken?')) return;
+  await confirmWave(waveId, 'cant_send');
+}
+
+function loadMissions() {
+  fetch(`/guild/${GUILD_ID_MA}/operations/api/my-waves`)
     .then(r=>r.json())
     .then(data=>{
       const el = document.getElementById('missionsContent');
-      const missions = data.missions || [];
-      if (!missions.length) {
+      const waves = data.waves || [];
+      if (!waves.length) {
         el.innerHTML='<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem 0;">Keine Einsätze zugewiesen.</div>';
         document.getElementById('missionsCard').style.opacity='.6';
         return;
       }
-      const typeLabels = {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout'};
-      const typeColors = {real:'wt-real',fake:'wt-fake',def:'wt-def',scout:'wt-scout'};
-      const now = Date.now();
-      el.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.83rem;">
-        <thead><tr style="border-bottom:1px solid var(--border);">
-          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Plan</th>
-          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Ziel</th>
-          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Typ</th>
-          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Sendezeit</th>
-          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Marschzeit</th>
-          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Truppen</th>
-        </tr></thead>
-        <tbody>
-        ${missions.map(m => {
-          const sendDt = m.send_time ? new Date(m.send_time.replace(' ','T')+'Z') : null;
-          const isPast = sendDt && sendDt < new Date();
-          const travelH = Math.floor((m.travel_seconds||0)/3600);
-          const travelM = Math.floor(((m.travel_seconds||0)%3600)/60);
+      document.getElementById('missionsCard').style.opacity='1';
+
+      // Group by plan
+      const byPlan = {};
+      waves.forEach(w => {
+        const key = w.plan_id;
+        if (!byPlan[key]) byPlan[key] = { plan_name: w.plan_name, landing_time: w.landing_time, plan_status: w.plan_status, waves: [] };
+        byPlan[key].waves.push(w);
+      });
+
+      const typeLabels = {real:'⚔ Echter Angriff', fake:'👻 Fake', def:'🛡 Verteidigung', scout:'🔍 Aufklärung'};
+      const typeColors = {real:'wt-real', fake:'wt-fake', def:'wt-def', scout:'wt-scout'};
+      const csIcons   = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫'};
+      const csLabels  = {on_time:'Pünktlich', late:'Unpünktlich', not_sent:'Nicht abgeschickt', cant_send:'Kann nicht'};
+      const csBg      = {on_time:'rgba(74,222,128,.06)', late:'rgba(251,191,36,.08)', not_sent:'rgba(248,113,113,.08)', cant_send:'rgba(248,113,113,.08)'};
+
+      el.innerHTML = Object.values(byPlan).map(p => {
+        const landStr = p.landing_time ? p.landing_time.slice(0,16).replace('T',' ') : '—';
+        const rows = p.waves.map(w => {
+          const sendDt = w.send_time ? new Date(w.send_time.replace(' ','T')) : null;
+          const now = new Date();
+          const isPast = sendDt && sendDt < now;
+          const travelH = Math.floor((w.travel_seconds||0)/3600);
+          const travelM = Math.floor(((w.travel_seconds||0)%3600)/60);
           const travelStr = travelH>0 ? `${travelH}h ${travelM}m` : travelM>0 ? `${travelM}m` : '—';
-          const troops = Object.entries(m.troop_json||{}).filter(([,v])=>v>0)
-            .map(([id,cnt])=>`${id}×${cnt}`).slice(0,4).join(' ');
-          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${isPast?'opacity:.5':''}">
-            <td style="padding:.4rem .6rem;"><strong>${m.plan_name||'—'}</strong></td>
-            <td style="padding:.4rem .6rem;font-family:monospace;color:#93c5fd;">${m.target_x}|${m.target_y} <span style="color:var(--text-muted);font-family:sans-serif;font-size:.75rem;">${m.target_player||''}</span></td>
-            <td style="padding:.4rem .6rem;"><span class="wave-type-badge ${typeColors[m.wave_type]||''}">${typeLabels[m.wave_type]||m.wave_type}</span></td>
-            <td style="padding:.4rem .6rem;font-family:monospace;${isPast?'color:#6b7280;':'color:#fbbf24;'}">${m.send_time?m.send_time.slice(0,16):'—'}${isPast?' (vergangenheit)':''}</td>
-            <td style="padding:.4rem .6rem;font-size:.78rem;color:var(--text-muted);">${travelStr}</td>
-            <td style="padding:.4rem .6rem;font-size:.75rem;color:var(--text-muted);">${troops||'—'}</td>
+          const cs = w.confirm_status;
+          const rowBg = cs ? csBg[cs] : '';
+          const deltaStr = cs==='late' ? ` (${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s)` : '';
+          const statusCell = cs
+            ? `<span style="font-size:.85rem;" title="${csLabels[cs]||cs}${deltaStr}">${csIcons[cs]||'?'} ${csLabels[cs]||cs}${deltaStr}</span>`
+            : (isPast
+              ? `<div style="display:flex;gap:.3rem;flex-wrap:wrap;">
+                  <button onclick="confirmWave(${w.id},'on_time')" style="font-size:.72rem;padding:.2rem .5rem;background:#16a34a22;color:#4ade80;border:1px solid #4ade8044;border-radius:5px;cursor:pointer;">✅ Pünktlich</button>
+                  <button onclick="openDeltaModal(${w.id})" style="font-size:.72rem;padding:.2rem .5rem;background:#d9770622;color:#fbbf24;border:1px solid #fbbf2444;border-radius:5px;cursor:pointer;">⏱ Unpünktlich</button>
+                  <button onclick="confirmWave(${w.id},'not_sent')" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262622;color:#f87171;border:1px solid #f8717144;border-radius:5px;cursor:pointer;">❌ Nicht abgeschickt</button>
+                </div>`
+              : `<button onclick="markCantSend(${w.id})" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262611;color:#f87171;border:1px solid #f8717133;border-radius:5px;cursor:pointer;">🚫 Kann nicht abschicken</button>`);
+
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);background:${rowBg}">
+            <td style="padding:.45rem .6rem;"><span class="wave-type-badge ${typeColors[w.wave_type]||''}">${typeLabels[w.wave_type]||w.wave_type}</span></td>
+            <td style="padding:.45rem .6rem;font-family:monospace;color:#93c5fd;font-size:.82rem;">${w.target_x}|${w.target_y}<br><span style="font-family:sans-serif;color:var(--text-muted);font-size:.72rem;">${w.target_player||''}</span></td>
+            <td style="padding:.45rem .6rem;font-family:monospace;font-size:.82rem;${isPast&&!cs?'color:#6b7280;':'color:#fbbf24;'}">${w.send_time?w.send_time.slice(0,16).replace('T',' '):'—'}</td>
+            <td style="padding:.45rem .6rem;font-size:.78rem;color:var(--text-muted);">${travelStr}</td>
+            <td style="padding:.45rem .6rem;font-size:.8rem;color:var(--text-muted);">${w.notes||''}</td>
+            <td style="padding:.45rem .6rem;">${statusCell}</td>
           </tr>`;
-        }).join('')}
-        </tbody></table></div>`;
+        }).join('');
+
+        return `<div style="margin-bottom:1.25rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;">
+            <strong style="font-size:.92rem;">📋 ${p.plan_name||'Plan'}</strong>
+            <span style="font-size:.75rem;color:#fbbf24;font-family:monospace;">🕐 Einschlag: ${landStr}</span>
+          </div>
+          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+            <thead><tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Typ</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Ziel</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Sendezeit</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Marschzeit</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Notiz</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Status</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+        </div>`;
+      }).join('');
     })
     .catch(()=>{ document.getElementById('missionsContent').innerHTML='<div style="color:var(--text-muted);font-size:.83rem;">Einsätze konnten nicht geladen werden.</div>'; });
-})();
+}
+loadMissions();
 </script>
 {% endblock %}

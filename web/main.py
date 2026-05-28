@@ -3296,6 +3296,8 @@ async def mein_account_page(request: Request, guild_id: str):
     hospital_uploaded = request.query_params.get("hospital_uploaded")
     hospital_cleared  = request.query_params.get("hospital_cleared")
 
+    my_waves = await database.get_my_op_waves(guild_id, discord_id)
+
     return templates.TemplateResponse("mein_account.html", {
         "request":            request,
         "guild":              guild,
@@ -3314,6 +3316,7 @@ async def mein_account_page(request: Request, guild_id: str):
         "hospital_uploaded":  hospital_uploaded,
         "hospital_cleared":   hospital_cleared,
         "my_travian_name":    (my_troops or {}).get("travian_name", ""),
+        "my_waves":           my_waves,
     })
 
 
@@ -4744,14 +4747,56 @@ async def op_delete_wave(request: Request, guild_id: str, wave_id: int):
     return _JSONResponse({"ok": True})
 
 
+# ── Wave confirmation ─────────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/waves/{wave_id}/confirm")
+async def op_confirm_wave(
+    request: Request, guild_id: str, wave_id: int,
+    confirm_status: str = Form(""),
+    confirm_delta_seconds: int = Form(0),
+):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    uid = session.get("uid","")
+    valid = {"on_time","late","not_sent","cant_send",""}
+    if confirm_status not in valid:
+        return _JSONResponse({"error": "invalid status"}, status_code=400)
+    # Only the assigned attacker may confirm (by discord_id)
+    import aiosqlite as _aiosqlite_c
+    async with _aiosqlite_c.connect(database.DB_PATH) as _db_c:
+        _db_c.row_factory = _aiosqlite_c.Row
+        async with _db_c.execute(
+            "SELECT attacker_discord_id FROM op_waves WHERE id=? AND guild_id=?",
+            (wave_id, guild_id)
+        ) as _cur_c:
+            wrow = await _cur_c.fetchone()
+    if not wrow:
+        return _JSONResponse({"error": "not found"}, status_code=404)
+    if wrow["attacker_discord_id"] and wrow["attacker_discord_id"] != uid:
+        return _JSONResponse({"error": "not your wave"}, status_code=403)
+    await database.update_op_wave(wave_id, guild_id,
+        confirm_status=confirm_status,
+        confirm_delta_seconds=confirm_delta_seconds)
+    return _JSONResponse({"ok": True})
+
+
+@app.get("/guild/{guild_id}/operations/api/my-waves")
+async def op_my_waves(request: Request, guild_id: str):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    uid = session.get("uid","")
+    waves = await database.get_my_op_waves(guild_id, uid)
+    return _JSONResponse({"waves": waves})
+
+
 # ── Plausibility ──────────────────────────────────────────────────────────────
 
 @app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/check")
 async def op_plausibility(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
-    warnings = await database.check_op_plausibility(plan_id, guild_id)
-    return _JSONResponse({"warnings": warnings})
+    result = await database.check_op_plausibility(plan_id, guild_id)
+    return _JSONResponse(result)
 
 
 # ── Favourites ────────────────────────────────────────────────────────────────
