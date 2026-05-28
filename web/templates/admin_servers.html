@@ -171,11 +171,14 @@
       {% endif %}
 
       <!-- ══ Section 2: Guild-Snapshots ════════════════════════════════════════ -->
-      <div style="margin-bottom:1rem;">
-        <h2 style="margin:0 0 0.25rem;">🏰 Guild-Snapshot-Status</h2>
-        <p style="color:var(--text-muted);font-size:0.875rem;margin:0;">
-          Alle registrierten Guilds mit ihrer konfigurierten Travian-Welt und Snapshot-Verlauf
-        </p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+        <div>
+          <h2 style="margin:0 0 0.25rem;">🏰 Guild-Snapshot-Status</h2>
+          <p style="color:var(--text-muted);font-size:0.875rem;margin:0;">
+            Alle registrierten Guilds · Verbindungsstatus · Snapshots
+          </p>
+        </div>
+        <a href="/admin/servers/archived" class="btn btn-secondary" style="font-size:0.82rem;padding:0.3rem 0.75rem;">📦 Archiv anzeigen</a>
       </div>
 
       <!-- KPI -->
@@ -210,18 +213,20 @@
             <thead>
               <tr>
                 <th>Guild</th>
+                <th style="text-align:center;">Status</th>
                 <th>Travian-Welt</th>
                 <th style="text-align:center;">Snapshots</th>
                 <th style="text-align:center;">Dörfer (letzter)</th>
                 <th style="text-align:center;">Mitglieder</th>
                 <th>Letzter Fetch</th>
-                <th>Erster Fetch</th>
+                <th>Bot zuletzt aktiv</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {% for s in servers %}
-              <tr>
+              {%- set is_inactive = s.is_active == 0 -%}
+              <tr style="{% if is_inactive %}opacity:0.55;{% endif %}">
                 <td>
                   <a href="/guild/{{ s.guild_id }}" style="font-weight:600;color:var(--text);">
                     {{ s.guild_name or s.guild_id }}
@@ -231,6 +236,19 @@
                                border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.3rem;">
                     {{ s.subscription_plan or 'aktiv' }}
                   </span>
+                  {% endif %}
+                  {% if is_inactive %}
+                  <span style="font-size:0.7rem;background:rgba(239,68,68,0.15);color:#ef4444;border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.3rem;">inaktiv</span>
+                  {% endif %}
+                </td>
+                {# Connection status based on bot_last_seen — rendered by JS #}
+                <td style="text-align:center;">
+                  {% if s.bot_status == 'kicked' %}
+                    <span title="Bot wurde gekickt" style="font-size:1rem;">🔴</span>
+                  {% elif s.bot_last_seen %}
+                    <span class="conn-badge" data-seen="{{ s.bot_last_seen }}" title="{{ s.bot_last_seen }}">⚫</span>
+                  {% else %}
+                    <span title="Noch nie gesehen" style="font-size:1rem;color:var(--text-muted);">⚫</span>
                   {% endif %}
                 </td>
                 <td style="font-size:0.82rem;">
@@ -269,17 +287,37 @@
                 <td style="font-size:0.82rem;color:var(--text-muted);">
                   {{ s.last_fetch[:16].replace('T',' ') ~ ' UTC' if s.last_fetch else '—' }}
                 </td>
-                <td style="font-size:0.82rem;color:var(--text-muted);">
-                  {{ s.first_fetch[:16].replace('T',' ') ~ ' UTC' if s.first_fetch else '—' }}
+                <td style="font-size:0.8rem;" class="conn-cell" data-seen="{{ s.bot_last_seen or '' }}">
+                  {% if s.bot_last_seen %}
+                    {{ s.bot_last_seen[:16].replace('T',' ') ~ ' UTC' }}
+                  {% else %}
+                    <span style="color:var(--text-muted);">—</span>
+                  {% endif %}
                 </td>
-                <td>
+                <td style="white-space:nowrap;">
+                  <!-- Inaktiv/Aktiv toggle -->
+                  <form method="post" action="/admin/servers/{{ s.guild_id }}/set-inactive" style="display:inline;margin:0;">
+                    {% if is_inactive %}
+                    <input type="hidden" name="active" value="1">
+                    <button type="submit" class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" title="Reaktivieren">▶</button>
+                    {% else %}
+                    <input type="hidden" name="active" value="0">
+                    <button type="submit" class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" title="Inaktiv setzen">⏸</button>
+                    {% endif %}
+                  </form>
+                  <!-- Archive -->
+                  <form method="post" action="/admin/servers/{{ s.guild_id }}/archive"
+                        onsubmit="return confirm('{{ s.guild_name }} archivieren?')"
+                        style="display:inline;margin:0;">
+                    <button type="submit" class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" title="Archivieren">📦</button>
+                  </form>
                   {% if s.snap_count > 0 %}
                   <form method="post"
                         action="/admin/servers/{{ s.guild_id }}/clear-snapshots"
                         onsubmit="return confirm('Snapshots für {{ s.guild_name }} löschen?')"
-                        style="margin:0;">
+                        style="display:inline;margin:0;">
                     <button type="submit" class="btn btn-danger"
-                            style="font-size:0.75rem;padding:0.25rem 0.6rem;">🗑</button>
+                            style="font-size:0.72rem;padding:0.2rem 0.5rem;" title="Snapshots löschen">🗑</button>
                   </form>
                   {% endif %}
                 </td>
@@ -299,4 +337,29 @@
     </div>
   </div>
 </div>
+<script>
+// Colour connection badges based on bot_last_seen age
+(function(){
+  const now = Date.now();
+  document.querySelectorAll('.conn-badge').forEach(el => {
+    const seen = el.dataset.seen;
+    if (!seen) return;
+    const ms = now - new Date(seen.replace(' ','T') + 'Z').getTime();
+    const h = ms / 3600000;
+    if (h < 8)       { el.textContent = '🟢'; el.title = 'Verbunden (< 8h)'; }
+    else if (h < 24) { el.textContent = '🟡'; el.title = 'Warnung (8–24h)'; }
+    else             { el.textContent = '🔴'; el.title = 'Keine Verbindung (> 24h)'; }
+  });
+  // Also colour the bot_last_seen text cells
+  document.querySelectorAll('.conn-cell').forEach(el => {
+    const seen = el.dataset.seen;
+    if (!seen) return;
+    const ms = now - new Date(seen.replace(' ','T') + 'Z').getTime();
+    const h = ms / 3600000;
+    if (h >= 24) el.style.color = '#ef4444';
+    else if (h >= 8) el.style.color = '#f59e0b';
+    else el.style.color = '#22c55e';
+  });
+})();
+</script>
 {% endblock %}

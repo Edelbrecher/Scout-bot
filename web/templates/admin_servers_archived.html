@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Archivierte Server · Admin · TravOps{% endblock %}
+
+{% block content %}
+<div class="container-wide">
+  <div style="display:flex;gap:1.5rem;">
+
+    <!-- Sidebar -->
+    <div style="width:190px;flex-shrink:0;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:sticky;top:1rem;">
+        <div style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/servers" style="display:block;padding:0.65rem 1rem;color:#f59e0b;text-decoration:none;font-size:0.9rem;background:rgba(245,158,11,0.08);">🖥 Server</a>
+        <a href="/admin/promos" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
+        <a href="/admin/contact" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+        <a href="/admin/auths" style="display:block;padding:0.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🔐 Auths</a>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div style="flex:1;min-width:0;">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.5rem;">
+        <div>
+          <a href="/admin/servers" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">← Zurück zur Server-Liste</a>
+          <h1 style="margin:0.25rem 0 0;">📦 Archivierte Server</h1>
+          <p style="color:var(--text-muted);font-size:0.875rem;margin:0;">{{ servers|length }} archivierte Guilds</p>
+        </div>
+      </div>
+
+      {% if servers %}
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="table" style="margin:0;">
+            <thead>
+              <tr>
+                <th>Guild</th>
+                <th>Owner Discord ID</th>
+                <th>Abo-Status</th>
+                <th>Bot-Status</th>
+                <th>Bot zuletzt aktiv</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in servers %}
+              <tr>
+                <td>
+                  <div style="font-weight:600;">{{ s.guild_name or s.guild_id }}</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);font-family:monospace;">{{ s.guild_id }}</div>
+                </td>
+                <td style="font-size:0.82rem;font-family:monospace;color:var(--text-muted);">{{ s.owner_discord_id or '—' }}</td>
+                <td style="font-size:0.82rem;">
+                  {% if s.subscription_status in ('active','trialing') %}
+                  <span style="color:#22c55e;">{{ s.subscription_status }}</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);">{{ s.subscription_status or 'free' }}</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:0.82rem;">
+                  {% if s.bot_status == 'kicked' %}
+                  <span style="color:#ef4444;">🚫 gekickt</span>
+                  {% else %}
+                  <span style="color:var(--text-muted);">{{ s.bot_status or '—' }}</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:0.8rem;color:var(--text-muted);">
+                  {{ s.bot_last_seen[:16].replace('T',' ') ~ ' UTC' if s.bot_last_seen else '—' }}
+                </td>
+                <td style="white-space:nowrap;">
+                  <form method="post" action="/admin/servers/{{ s.guild_id }}/unarchive"
+                        onsubmit="return confirm('{{ s.guild_name }} wiederherstellen?')"
+                        style="display:inline;margin:0;">
+                    <button type="submit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;" title="Wiederherstellen">♻️ Wiederherstellen</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="card" style="text-align:center;padding:3rem;color:var(--text-muted);">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">📭</div>
+        <p style="margin:0;">Keine archivierten Server.</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

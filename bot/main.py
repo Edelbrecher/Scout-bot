@@ -166,6 +166,22 @@ class ScouterBot(commands.Bot):
         await database.set_bot_kicked(str(guild.id))
         print(f"[on_guild_remove] Marked {guild.name} ({guild.id}) as kicked.")
 
+    async def heartbeat_loop(self):
+        """Update bot_last_seen for all current guilds every 8 hours."""
+        await self.wait_until_ready()
+        import asyncio as _asyncio
+        while not self.is_closed():
+            for guild in self.guilds:
+                try:
+                    await database.update_bot_last_seen(str(guild.id))
+                except Exception:
+                    pass
+            print(f"[heartbeat] Updated bot_last_seen for {len(self.guilds)} guild(s).")
+            await _asyncio.sleep(8 * 3600)  # 8 hours
+
+    async def setup_hook(self):
+        self.loop.create_task(self.heartbeat_loop())
+
 
 bot = ScouterBot()
 

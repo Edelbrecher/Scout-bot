@@ -4932,6 +4932,50 @@ async def admin_clear_snapshots(request: Request, guild_id: str):
     return RedirectResponse("/admin/servers", status_code=303)
 
 
+@app.post("/admin/servers/{guild_id}/archive")
+async def admin_archive_guild(request: Request, guild_id: str):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.archive_guild(guild_id)
+    return RedirectResponse("/admin/servers", status_code=303)
+
+
+@app.post("/admin/servers/{guild_id}/unarchive")
+async def admin_unarchive_guild(request: Request, guild_id: str):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.unarchive_guild(guild_id)
+    return RedirectResponse("/admin/servers?tab=archived", status_code=303)
+
+
+@app.post("/admin/servers/{guild_id}/set-inactive")
+async def admin_set_guild_inactive(request: Request, guild_id: str, active: int = Form(0)):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.set_guild_active_flag(guild_id, bool(active))
+    return RedirectResponse("/admin/servers", status_code=303)
+
+
+@app.get("/admin/servers/archived", response_class=HTMLResponse)
+async def admin_servers_archived(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    archived = await database.get_archived_guilds()
+    return templates.TemplateResponse("admin_servers_archived.html", {
+        "request": request,
+        "servers": archived,
+        "session": session,
+    })
+
+
+@app.post("/admin/customers/{discord_user_id}/delete")
+async def admin_delete_customer(request: Request, discord_user_id: str):
+    session, err = _require_admin(request)
+    if err: return err
+    await database.delete_customer(discord_user_id)
+    return RedirectResponse("/admin/customers", status_code=303)
+
+
 @app.post("/admin/contact/save")
 async def admin_contact_save(
     request: Request,

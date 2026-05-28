@@ -186,6 +186,17 @@ async def init_db():
         except Exception:
             pass
 
+        # Bot last seen / activity tracking & inactive flag
+        for col in [
+            "bot_last_seen TEXT",
+            "is_active INTEGER DEFAULT 1",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS trial_links (
                 code            TEXT PRIMARY KEY,
@@ -1194,6 +1205,72 @@ async def set_bot_active(guild_id: str):
         await db.commit()
 
 
+async def update_bot_last_seen(guild_id: str):
+    """Update the timestamp when bot last had activity in this guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET bot_last_seen = datetime('now') WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()
+
+
+async def set_guild_active_flag(guild_id: str, active: bool):
+    """Set is_active flag (1=active, 0=inactive) for a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET is_active = ? WHERE guild_id = ?",
+            (1 if active else 0, guild_id),
+        )
+        await db.commit()
+
+
+async def archive_guild(guild_id: str):
+    """Archive a guild (hide from dashboard, mark bot as kicked)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET workspace_status='archived', bot_status='kicked' WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()
+
+
+async def unarchive_guild(guild_id: str):
+    """Restore an archived guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET workspace_status='active' WHERE guild_id = ?",
+            (guild_id,),
+        )
+        await db.commit()
+
+
+async def get_archived_guilds() -> list[dict]:
+    """Return all guilds with workspace_status='archived'."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT guild_id, guild_name, owner_discord_id, subscription_status, subscription_plan,
+                   bot_status, bot_last_seen, is_active, workspace_status, bot_kicked_at
+            FROM guild_configs WHERE workspace_status = 'archived'
+            ORDER BY guild_name
+        """) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_customer(discord_user_id: str):
+    """Remove a customer (user subscription + unlink owned guilds)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Remove user subscription
+        await db.execute("DELETE FROM user_subscriptions WHERE discord_user_id = ?", (discord_user_id,))
+        # Unlink guilds owned by this user (don't delete the guilds themselves)
+        await db.execute(
+            "UPDATE guild_configs SET owner_discord_id = NULL WHERE owner_discord_id = ?",
+            (discord_user_id,),
+        )
+        await db.commit()
+
+
 async def set_subscription_status(guild_id: str, status: str, expires_at: str | None = None):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
@@ -1483,11 +1560,13 @@ async def get_servers_overview() -> list[dict]:
     """Return all guilds with tw_world set, plus snapshot stats per guild."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        # All guilds with tw_world configured
+        # All guilds (not archived)
         async with db.execute("""
             SELECT guild_id, guild_name, tw_world,
-                   subscription_status, subscription_plan
+                   subscription_status, subscription_plan,
+                   bot_last_seen, is_active, workspace_status, bot_status
             FROM guild_configs
+            WHERE COALESCE(workspace_status,'active') != 'archived'
             ORDER BY guild_name
         """) as cur:
             guilds = [dict(r) for r in await cur.fetchall()]

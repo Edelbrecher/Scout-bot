@@ -250,6 +250,18 @@
             {% endif %}
           </div>
 
+          <!-- Danger zone: delete customer -->
+          {% if uid != '__unowned__' %}
+          <div style="padding:0.75rem 1.25rem;border-top:1px solid var(--border);background:rgba(239,68,68,0.04);display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <span style="font-size:0.8rem;color:var(--text-muted);">⚠️ Kunden-Abonnement entfernen (Server bleiben erhalten, nur Abo-Verknüpfung wird gelöscht)</span>
+            <form method="post" action="/admin/customers/{{ uid }}/delete"
+                  onsubmit="return confirm('Kunden {{ c.discord_username }} wirklich entfernen? Das Abonnement wird gelöscht und alle Server werden entkoppelt.')"
+                  style="margin:0;margin-left:auto;">
+              <button type="submit" class="btn btn-danger" style="font-size:0.78rem;padding:0.25rem 0.65rem;">🗑 Kunden entfernen</button>
+            </form>
+          </div>
+          {% endif %}
+
         </div>
       </div>
       {% else %}
