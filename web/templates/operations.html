@@ -232,6 +232,7 @@ const TROOPS_DEF = {{ troops_def | tojson }};
 const INIT_PLANS = {{ plans | tojson }};
 const INIT_FAVS  = {{ favorites | tojson }};
 const INIT_MEMBERS = {{ members | tojson }};
+const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 </script>
 
 <div class="op-shell">
@@ -861,13 +862,18 @@ function renderWavesTable(t) {
     const countBadge = count > 1
       ? `<span title="${count} identische Wellen" style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;min-width:18px;height:18px;padding:0 4px;margin-left:.3rem;">×${count}</span>`
       : '';
+    // Low-troop fake warning (< 20 troops total)
+    const totalTroops = Object.values(w.troop_json||{}).reduce((s,v)=>s+(parseInt(v)||0), 0);
+    const lowTroopBadge = (w.wave_type==='fake' && totalTroops > 0 && totalTroops < 20)
+      ? `<span title="Nur ${totalTroops} Truppen — Fake könnte zu wenig sein (< 20)" style="color:#f87171;font-size:.85rem;margin-left:.2rem;" >🔻</span>`
+      : '';
     // Action buttons — for grouped waves: dup+edit on representative, delete deletes all in group
     const deleteHandler = count > 1
       ? `if(confirm('${count} identische Wellen löschen?')) { ${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')} }`
       : `deleteWave(${w.id},${t.id})`;
     return `
     <tr style="background:${rowBg}">
-      <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeLabel(w.wave_type)}</span>${countBadge}</td>
+      <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeLabel(w.wave_type)}</span>${countBadge}${lowTroopBadge}</td>
       <td>
         <strong>${escHtml(w.attacker_name)}</strong>${confirmIndicator}
         <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}${tsInfo}</span>
@@ -880,11 +886,11 @@ function renderWavesTable(t) {
       </td>
       <td style="font-size:.75rem;color:var(--text-muted);max-width:110px;word-break:break-word;">${w.notes ? escHtml(w.notes) : ''}</td>
       <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
-        <button class="wave-action-btn" title="Rallypoint öffnen — Ziel: ${t.x}|${t.y}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')">🏹</button>
         <button class="wave-action-btn" title="Welle duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
         <button class="wave-action-btn" title="Duplizieren &amp; sofort bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
         <button class="wave-action-btn" title="Welle bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
         <button class="wave-action-btn danger" title="${count>1?count+' Wellen löschen':'Welle löschen'}" onclick="${deleteHandler}">🗑${count>1?` ×${count}`:''}</button>
+        <button class="wave-action-btn" title="Direkt zum Rallypoint — Ziel: ${t.x}|${t.y}${TW_WORLD?'':' (Travian-Server nicht konfiguriert)'}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);font-size:.85rem;">🏹</button>
       </td>
     </tr>`;
   }).join('');
@@ -1788,14 +1794,18 @@ async function deleteWave(waveId, targetId, silent=false) {
 }
 
 function openRallypoint(tx, ty, sendTime) {
-  // Copy attack info to clipboard and show hint
-  const txt = `Ziel: ${tx}|${ty}\nSendezeit: ${sendTime || '—'}`;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(txt).then(() => {
-      showToast('📋 Ziel & Sendezeit kopiert: ' + tx+'|'+ty);
-    });
+  if (TW_WORLD) {
+    const base = TW_WORLD.replace(/\/$/, '');
+    const url = `${base}/build.php?gid=16&tt=2&x=${tx}&y=${ty}`;
+    window.open(url, '_blank');
   } else {
-    prompt('Für den Rallypoint — Ziel & Sendezeit:', txt);
+    // Fallback: copy coords to clipboard
+    const txt = `Ziel: ${tx}|${ty}\nSendezeit: ${sendTime || '—'}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(txt).then(() => showToast('📋 Ziel & Sendezeit kopiert: ' + tx+'|'+ty));
+    } else {
+      prompt('Für den Rallypoint — Ziel & Sendezeit:', txt);
+    }
   }
 }
 

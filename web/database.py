@@ -5595,6 +5595,17 @@ async def check_op_plausibility(plan_id: int, guild_id: str) -> dict:
         elif real_waves and len(fake_waves) >= 3 * len(real_waves):
             ok_items.append(f"{label}: Fake-Ratio gut ({len(fake_waves)} Fakes / {len(real_waves)} echt).")
 
+        # Fake troop count < 20
+        import json as _jf
+        for fw in fake_waves:
+            try:
+                tj = _jf.loads(fw.get("troop_json") or "{}")
+            except Exception:
+                tj = {}
+            total = sum(int(v) for v in tj.values() if v)
+            if 0 < total < 20:
+                warnings.append(f"{label}: Fake von '{fw.get('attacker_name','')}' hat nur {total} Truppen (< 20) — könnte erkannt werden!")
+
         # Scout
         if real_waves and not scout_waves:
             warnings.append(f"{label}: Keine Aufklärungswelle.")
