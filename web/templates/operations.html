@@ -260,6 +260,7 @@ const INIT_MEMBERS = {{ members | tojson }};
               <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
                 <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🏰 Allianz-Filter</span>
                 <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">Keine Auswahl = alle Spieler</span>
+                <button class="btn-icon" id="allyResetBtn" style="font-size:.7rem;padding:.15rem .5rem;display:none;" onclick="resetAllianceFilter()">↺ Reset</button>
                 <button class="btn-icon" style="font-size:.7rem;padding:.1rem .35rem;" onclick="toggleAlliancePanel()">✕</button>
               </div>
               <div id="allianceChips" style="display:flex;gap:.3rem;flex-wrap:wrap;"></div>
@@ -813,20 +814,20 @@ function renderAllianceFilter() {
 
   chips.innerHTML = html;
 
-  if (selectedAlliances.size === 0) {
+  const hasFilter = selectedAlliances.size > 0;
+  if (!hasFilter) {
     hint.textContent = 'Keine Auswahl = alle Spieler';
   } else {
     hint.textContent = `Aktiv: ${[...selectedAlliances].join(' + ')}`;
   }
-  // Update badge on toggle button
+  // Reset button
+  const resetBtn = document.getElementById('allyResetBtn');
+  if (resetBtn) resetBtn.style.display = hasFilter ? '' : 'none';
+  // Badge on toggle button
   const badge = document.getElementById('allyFilterBadge');
   if (badge) {
-    if (selectedAlliances.size > 0) {
-      badge.textContent = selectedAlliances.size;
-      badge.style.display = 'inline';
-    } else {
-      badge.style.display = 'none';
-    }
+    badge.textContent = selectedAlliances.size;
+    badge.style.display = hasFilter ? 'inline' : 'none';
   }
 }
 
@@ -847,15 +848,21 @@ function toggleAlliance(name) {
 function toggleMetaGroup(metaName) {
   const g = metaGroups.find(g => g.meta_name === metaName);
   if (!g) return;
-  const allActive = g.alliances.every(a => selectedAlliances.has(a));
+  const allActive = g.alliances.length > 0 && g.alliances.every(a => selectedAlliances.has(a));
   if (allActive) {
     g.alliances.forEach(a => selectedAlliances.delete(a));
   } else {
-    // Add all alliances of this meta group (up to 2 total)
+    // Select ALL alliances of this meta group (no limit for meta groups)
     selectedAlliances.clear();
-    g.alliances.slice(0, 2).forEach(a => selectedAlliances.add(a));
-    if (g.alliances.length > 2) showToast(`Meta "${metaName}" hat ${g.alliances.length} Allianzen — die ersten 2 wurden gefiltert.`);
+    g.alliances.forEach(a => selectedAlliances.add(a));
   }
+  renderAllianceFilter();
+  const q = document.getElementById('targetSearch').value;
+  if (q.length >= 2) doSearch(q);
+}
+
+function resetAllianceFilter() {
+  selectedAlliances.clear();
   renderAllianceFilter();
   const q = document.getElementById('targetSearch').value;
   if (q.length >= 2) doSearch(q);
