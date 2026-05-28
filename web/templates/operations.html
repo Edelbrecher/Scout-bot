@@ -1268,7 +1268,7 @@ function _renderAssignmentPanel(settings) {
       : assignRows.map((r, i) => {
         const sendStr = _sendTimeStr(r.travelSec);
         return `
-        <div class="atk-row">
+        <div class="atk-row" id="atk-row-${i}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:.3rem;">
             <span class="atk-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.player_name)}</span>
             ${roleTag[r.role]||''}
@@ -1276,22 +1276,14 @@ function _renderAssignmentPanel(settings) {
           </div>
           <div class="atk-village">${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</div>
           ${sendStr ? `<div style="font-size:.7rem;color:#4ade80;">📤 ${sendStr}</div>` : ''}
-          <div class="atk-controls">
-            ${['real','fake','scout','def'].map(t=>`<button class="atk-type-btn ${r.type===t?'sel-'+t:''}" onclick="setAtkType(${i},'${t}',this)">${lbl[t]}</button>`).join('')}
-            <input class="atk-waves-input" type="number" min="1" max="20" value="${r.waves}" title="Wellen" oninput="setAtkWaves(${i},this.value)">
-            <label style="display:flex;align-items:center;gap:.2rem;font-size:.72rem;color:var(--text-muted);margin-left:auto;">
-              <input class="atk-include" type="checkbox" ${r.include?'checked':''} onchange="setAtkInclude(${i},this.checked)"> Dabei
-            </label>
+          <div class="atk-controls" id="atk-btns-${i}">
+            <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Echt</button>
+            <button class="atk-type-btn sel-fake"  onclick="addAtkWave(${i},'fake',this)">👻 Fake</button>
+            <button class="atk-type-btn sel-scout" onclick="addAtkWave(${i},'scout',this)">🔍 Scout</button>
           </div>
         </div>`;
       }).join('')}
     </div>
-    ${assignRows.length ? `
-    <div style="padding:.5rem .75rem;border-top:1px solid var(--border);">
-      <button class="btn btn-primary" style="width:100%;font-size:.82rem;" onclick="submitAssignments()">
-        ✅ Markierte zum Plan hinzufügen
-      </button>
-    </div>` : ''}
   `;
 }
 
@@ -1301,61 +1293,72 @@ function rebuildAssignPanel() {
   _renderAssignmentPanel(settings);
 }
 
-function setAtkType(i, type, btn) {
-  assignRows[i].type = type;
-  const row = btn.closest('.atk-row');
-  row.querySelectorAll('.atk-type-btn').forEach(b => b.className = 'atk-type-btn');
-  btn.classList.add('sel-' + type);
-}
-
-function setAtkWaves(i, val) {
-  assignRows[i].waves = Math.max(1, parseInt(val) || 1);
-}
-
-function setAtkInclude(i, val) {
-  assignRows[i].include = val;
-}
-
-async function submitAssignments() {
+async function addAtkWave(i, type, btn) {
   if (!activePlanId || !assignTarget) return;
+  const r = assignRows[i];
+  if (!r) return;
+
+  // Disable all buttons in this row while saving
+  const btnsEl = document.getElementById(`atk-btns-${i}`);
+  if (btnsEl) btnsEl.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  // Find or create target in plan
   await reloadActivePlan();
-  const {x: tx, y: ty} = assignTarget;
-  const target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
-  if (!target) { alert('Ziel nicht im Plan gefunden. Bitte zuerst Dorf hinzufügen.'); return; }
-  const rows = assignRows.filter(r => r.include);
-  if (!rows.length) { alert('Keine Spieler ausgewählt.'); return; }
-  const btn = document.querySelector('#pbAssignPanel .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Füge hinzu…'; }
-  const settings = _assignSettings();
-  let ok = 0, fail = 0;
-  for (const r of rows) {
-    for (let w = 0; w < r.waves; w++) {
-      try {
-        await apiPost(`/targets/${target.id}/waves`, {
-          plan_id: activePlanId,
-          attacker_name: r.player_name,
-          origin_village: r.village_name,
-          origin_x: r.vx,
-          origin_y: r.vy,
-          wave_type: r.type,
-          tribe: r.tribe || 'romans',
-          troop_json: JSON.stringify({[r.tribe==='gauls'?'trebuchet':r.tribe==='teutons'?'catapult':'fire_cat']: 1}),
-          landing_time: activePlan?.landing_time || '',
-          server_speed: activePlan?.server_speed || 1,
-          notes: '',
-          tournament_square: settings.ts,
-        });
-        ok++;
-      } catch(e) { fail++; }
-    }
+  const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
+  let target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
+  if (!target) {
+    // Target not yet in plan — add it first
+    try {
+      await apiPost(`/plans/${activePlanId}/targets`, {
+        player_name: tp, village_name: tv, x: tx, y: ty, population: 0, notes: ''
+      });
+      await reloadActivePlan();
+      target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
+    } catch(e) { /* ignore */ }
   }
-  await reloadActivePlan();
-  if (btn) { btn.disabled = false; btn.textContent = '✅ Markierte zum Plan hinzufügen'; }
-  showToast(`✅ ${ok} Welle${ok!==1?'n':''} hinzugefügt${fail?' · '+fail+' Fehler':''}`);
-  assignTarget = null;
-  assignRows = [];
-  document.getElementById('pbAssignPanel').innerHTML =
-    `<div class="pb-right-empty"><span style="font-size:1.5rem;">🎯</span><span>Dorf anklicken<br>um eigene Spieler<br>mit Laufzeiten zu sehen</span></div>`;
+  if (!target) {
+    if (btnsEl) btnsEl.querySelectorAll('button').forEach(b => b.disabled = false);
+    showToast('⚠️ Ziel konnte nicht angelegt werden');
+    return;
+  }
+
+  const settings = _assignSettings();
+  const catId = r.tribe === 'gauls' ? 'trebuchet' : r.tribe === 'teutons' ? 'catapult' : 'fire_cat';
+  try {
+    await apiPost(`/targets/${target.id}/waves`, {
+      plan_id: activePlanId,
+      attacker_name: r.player_name,
+      origin_village: r.village_name,
+      origin_x: r.vx,
+      origin_y: r.vy,
+      wave_type: type,
+      tribe: r.tribe || 'romans',
+      troop_json: JSON.stringify({[catId]: 1}),
+      landing_time: activePlan?.landing_time || '',
+      server_speed: activePlan?.server_speed || 1,
+      notes: '',
+      tournament_square: settings.ts,
+    });
+    // Visual feedback: show checkmark + re-enable
+    if (btnsEl) {
+      btnsEl.innerHTML = `<span style="color:#4ade80;font-size:.78rem;font-weight:700;">✓ ${type==='real'?'Echt':type==='fake'?'Fake':'Scout'} eingetragen</span>
+        <button class="atk-type-btn" style="margin-left:auto;font-size:.68rem;" onclick="resetAtkRow(${i})">+ nochmal</button>`;
+    }
+    reloadActivePlan(); // refresh EP in background
+  } catch(e) {
+    if (btnsEl) btnsEl.querySelectorAll('button').forEach(b => b.disabled = false);
+    showToast('⚠️ Fehler: ' + e.message);
+  }
+}
+
+function resetAtkRow(i) {
+  const btnsEl = document.getElementById(`atk-btns-${i}`);
+  if (!btnsEl) return;
+  btnsEl.innerHTML = `
+    <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Echt</button>
+    <button class="atk-type-btn sel-fake"  onclick="addAtkWave(${i},'fake',this)">👻 Fake</button>
+    <button class="atk-type-btn sel-scout" onclick="addAtkWave(${i},'scout',this)">🔍 Scout</button>
+  `;
 }
 
 async function doSearch(q) {
