@@ -32,24 +32,42 @@
   <div class="alert alert-success">🗑️ Alle Dörfer wurden gelöscht.</div>
   {% endif %}
 
-  <!-- KPI Strip (nur wenn Daten vorhanden) -->
+  <!-- KPI Strip mit Delta (nur wenn Daten vorhanden) -->
   {% if own_villages %}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(total_off).replace(",",".") }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">⚔️ Off-Score</div>
+  {% set last = history[-1] if history else none %}
+  {% set prev = history[-2] if history and history|length > 1 else none %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+    <div style="background:var(--bg-card);border:1px solid rgba(239,68,68,0.35);border-radius:12px;padding:.9rem 1.1rem;">
+      <div style="font-size:.72rem;color:#ef4444;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">⚔️ Off-Score</div>
+      <div style="font-size:1.7rem;font-weight:900;color:#ef4444;line-height:1;">{{ "{:,}".format(total_off).replace(",",".") }}</div>
+      {% if prev %}{% set d = (last.total_off - prev.total_off) %}
+      <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#4caf82{% else %}#f87171{% endif %};">
+        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+      </div>{% endif %}
     </div>
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">{{ "{:,}".format(total_def).replace(",",".") }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🛡️ Def-Score</div>
+    <div style="background:var(--bg-card);border:1px solid rgba(34,197,94,0.35);border-radius:12px;padding:.9rem 1.1rem;">
+      <div style="font-size:.72rem;color:#22c55e;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🛡️ Def-Score</div>
+      <div style="font-size:1.7rem;font-weight:900;color:#22c55e;line-height:1;">{{ "{:,}".format(total_def).replace(",",".") }}</div>
+      {% if prev %}{% set d = (last.total_def - prev.total_def) %}
+      <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#4caf82{% else %}#f87171{% endif %};">
+        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+      </div>{% endif %}
     </div>
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">{{ "{:,}".format(total_crop).replace(",",".") }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🌾 Korn/h</div>
+    <div style="background:var(--bg-card);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:.9rem 1.1rem;">
+      <div style="font-size:.72rem;color:#f59e0b;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🌾 Korn/h</div>
+      <div style="font-size:1.7rem;font-weight:900;color:#f59e0b;line-height:1;">{{ "{:,}".format(total_crop).replace(",",".") }}</div>
+      {% if prev %}{% set d = (last.total_crop - prev.total_crop) %}
+      <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#f87171{% else %}#4caf82{% endif %};">
+        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+      </div>{% endif %}
     </div>
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;">{{ own_villages|length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🏘️ Dörfer</div>
+    <div style="background:var(--bg-card);border:1px solid rgba(100,116,139,0.3);border-radius:12px;padding:.9rem 1.1rem;">
+      <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🏘️ Dörfer</div>
+      <div style="font-size:1.7rem;font-weight:900;color:var(--text);line-height:1;">{{ own_villages|length }}</div>
+      {% if prev %}{% set d = (last.village_count - prev.village_count) %}
+      {% if d != 0 %}<div style="font-size:.78rem;margin-top:.3rem;color:{% if d>0 %}#4caf82{% else %}#f87171{% endif %};">
+        {% if d>0 %}▲{% else %}▼{% endif %} {{ d|abs }} Dorf{% if d|abs != 1 %}e{% endif %}
+      </div>{% endif %}{% endif %}
     </div>
   </div>
   {% endif %}
@@ -243,12 +261,29 @@
 
   <!-- Timeline chart -->
   {% if history and history | length > 0 %}
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin:0 0 0.25rem;">📈 Truppenstärke-Timeline</h2>
-    <p class="hint" style="margin-bottom:0.75rem;">Jeder Datenpunkt entspricht einem Import.</p>
-    <div style="position:relative;height:220px;">
+  <div class="card" style="margin-bottom:1.25rem; padding:1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+      <div>
+        <h2 style="margin:0;font-size:1rem;">📈 Truppenstärke-Timeline</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <span style="font-size:.75rem;color:var(--text-muted);">{{ history|length }} Import{% if history|length != 1 %}e{% endif %}</span>
+        {% if own_villages %}
+        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem;font-size:.8rem;">🪖 Army Details</button>
+        {% endif %}
+      </div>
+    </div>
+    <div style="position:relative;height:260px;">
       <canvas id="historyChart"></canvas>
     </div>
+    {% if history|length > 1 %}
+    <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1rem;">
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.6rem;font-weight:600;">⚖️ Off / Def Verhältnis pro Import</div>
+      <div style="position:relative;height:80px;">
+        <canvas id="ratioChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -530,57 +565,125 @@ function copyDualLink() {
 }
 </script>
 
+{% if own_villages %}
+<!-- Army Details Modal -->
+<div id="armyModal" onclick="if(event.target===this)closeArmyModal()" style="display:none;position:fixed;inset:0;z-index:10100;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 1rem;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;width:100%;max-width:820px;padding:1.5rem;position:relative;box-shadow:0 24px 80px rgba(0,0,0,.6);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+      <div>
+        <h2 style="margin:0;font-size:1.1rem;">🪖 Army Details</h2>
+        <p style="margin:.2rem 0 0;font-size:.78rem;color:var(--text-muted);">Aufschlüsselung aller importierten Truppen</p>
+      </div>
+      <button onclick="closeArmyModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.25rem .4rem;">&times;</button>
+    </div>
+    <div id="armyModalContent"></div>
+  </div>
+</div>
+<style>
+.army-section{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:1rem;}
+.army-section h3{margin:0 0 .75rem;font-size:.9rem;}
+.army-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem;font-size:.85rem;}
+.army-bar-bg{flex:1;height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;min-width:80px;}
+.army-bar-fill{height:100%;border-radius:4px;}
+.army-count{min-width:60px;text-align:right;font-weight:700;font-size:.85rem;}
+.army-label{min-width:130px;color:var(--text-muted);}
+</style>
+<script>
+const OWN_VILLAGES_MA = {{ own_villages | tojson }};
+const INFANTRY_MA = new Set(['Legionär','Prätorianer','Imperianer','Senator','Siedler','Keulenschwinger','Speerkämpfer','Axtkämpfer','Häuptling','Phalanx','Schwertkämpfer','Stammesältester','Schleuderer','Khopesh-Krieger','Soldat','Lanzenkämpfer','Hoplite','Sentinel']);
+const CAVALRY_MA  = new Set(['Equites Legati','Equites Imperatoris','Equites Caesaris','Paladin','Teut. Ritter','Pathfinder','Theutates-Blitz','Druidentreiter','Haeduer','Ägyptischer Reiter','Resheph-Streitwagen','Hunnischer Reiter','Boyar','Ammende Nomadin','Späher','Sopdu-Erkunder']);
+const SIEGE_MA    = new Set(['Rammbock','Feuerkatapult','Teutonen-Rammbock','Kriegsmaschine','Gallier-Rammbock','Gallier-Kata']);
+const OFF_MA      = new Set(['Imperianer','Equites Imperatoris','Equites Caesaris','Axtkämpfer','Teut. Ritter','Keulenschwinger','Theutates-Blitz','Haeduer','Druidentreiter','Khopesh-Krieger','Ägyptischer Reiter','Resheph-Streitwagen','Soldat','Lanzenkämpfer','Hunnischer Reiter','Boyar']);
+const SCOUT_MA    = new Set(['Equites Legati','Späher','Pathfinder','Sopdu-Erkunder']);
+const CROP_MA     = {'Legionär':1,'Prätorianer':1,'Imperianer':1,'Equites Legati':2,'Equites Imperatoris':3,'Equites Caesaris':4,'Rammbock':5,'Feuerkatapult':6,'Senator':5,'Keulenschwinger':1,'Speerkämpfer':1,'Axtkämpfer':1,'Späher':1,'Paladin':2,'Teut. Ritter':3,'Teutonen-Rammbock':5,'Kriegsmaschine':6,'Häuptling':4,'Phalanx':1,'Schwertkämpfer':1,'Pathfinder':2,'Theutates-Blitz':2,'Druidentreiter':2,'Haeduer':3,'Gallier-Rammbock':5,'Gallier-Kata':6,'Stammesältester':5,'Siedler':1,'Held':0};
+
+function openArmyModal() {
+  const totals={};let totalTroops=0,totalCrop=0,totalOff=0,totalDef=0;
+  for(const v of OWN_VILLAGES_MA){
+    const troops=typeof v.troops==='string'?JSON.parse(v.troops||'{}'):(v.troops||{});
+    for(const[name,cnt] of Object.entries(troops)){if(cnt>0){totals[name]=(totals[name]||0)+cnt;totalTroops+=cnt;totalCrop+=(CROP_MA[name]||1)*cnt;}}
+    totalOff+=v.off_score||0;totalDef+=v.def_score||0;
+  }
+  const infantry={},cavalry={},siege={},other={};
+  for(const[name,cnt] of Object.entries(totals)){
+    if(SIEGE_MA.has(name))siege[name]=cnt;
+    else if(CAVALRY_MA.has(name))cavalry[name]=cnt;
+    else if(INFANTRY_MA.has(name))infantry[name]=cnt;
+    else other[name]=cnt;
+  }
+  const maxC=Math.max(...Object.values(totals),1);
+  function sec(title,icon,color,data){
+    if(!Object.keys(data).length)return'';
+    const rows=Object.entries(data).sort((a,b)=>b[1]-a[1]).map(([name,cnt])=>{
+      const pct=Math.round(cnt/maxC*100);
+      const tag=SCOUT_MA.has(name)?'<span style="font-size:.65rem;color:#a78bfa;margin-left:4px;">scout</span>':OFF_MA.has(name)?'<span style="font-size:.65rem;color:#ef4444;margin-left:4px;">off</span>':'<span style="font-size:.65rem;color:#22c55e;margin-left:4px;">def</span>';
+      return`<div class="army-row"><span class="army-label">${name}${tag}</span><div class="army-bar-bg"><div class="army-bar-fill" style="width:${pct}%;background:${color};"></div></div><span class="army-count" style="color:${color};">${cnt.toLocaleString('de-DE')}</span><span style="min-width:48px;text-align:right;font-size:.72rem;color:var(--text-muted);">🌾×${CROP_MA[name]||1}</span></div>`;
+    }).join('');
+    const sub=Object.values(data).reduce((s,c)=>s+c,0);
+    return`<div class="army-section"><h3>${icon} ${title} <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">(${sub.toLocaleString('de-DE')} Einheiten)</span></h3>${rows}</div>`;
+  }
+  const offPct=totalOff+totalDef>0?Math.round(totalOff/(totalOff+totalDef)*100):50;
+  document.getElementById('armyModalContent').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.65rem;margin-bottom:1rem;">
+      <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:#ef4444;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">⚔️ Off-Score</div><div style="font-size:1.25rem;font-weight:800;color:#ef4444;">${totalOff.toLocaleString('de-DE')}</div></div>
+      <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:#22c55e;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">🛡️ Def-Score</div><div style="font-size:1.25rem;font-weight:800;color:#22c55e;">${totalDef.toLocaleString('de-DE')}</div></div>
+      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:#f59e0b;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">🌾 Korn/h</div><div style="font-size:1.25rem;font-weight:800;color:#f59e0b;">${totalCrop.toLocaleString('de-DE')}</div></div>
+      <div style="background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.3);border-radius:8px;padding:.65rem .85rem;"><div style="font-size:.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">👥 Gesamt</div><div style="font-size:1.25rem;font-weight:800;color:var(--text);">${totalTroops.toLocaleString('de-DE')}</div></div>
+    </div>
+    <div style="margin-bottom:1rem;"><div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.35rem;">⚖️ Off / Def Balance</div>
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.06);"><div style="width:${offPct}%;background:rgba(239,68,68,.75);"></div><div style="flex:1;background:rgba(34,197,94,.65);"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);margin-top:.25rem;"><span>⚔️ Off ${offPct}%</span><span>🛡️ Def ${100-offPct}%</span></div>
+    </div>
+    ${sec('Fußvolk','🚶','#3b82f6',infantry)}${sec('Kavallerie','🐴','#f59e0b',cavalry)}${sec('Belagerung','🏹','#ef4444',siege)}${Object.keys(other).length?sec('Weitere','⚔️','#94a3b8',other):''}`;
+  document.getElementById('armyModal').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeArmyModal(){document.getElementById('armyModal').style.display='none';document.body.style.overflow='';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeArmyModal();});
+</script>
+{% endif %}
+
 {% if history and history | length > 0 %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function() {
   const history = {{ history | tojson }};
-  // Deduplicate by date (keep last entry per day), then sort oldest→newest
   const byDate = {};
-  for (const h of history) {
-    const day = (h.uploaded_at||'').slice(0,10);
-    byDate[day] = h;
+  for (const h of history) { const day=(h.uploaded_at||'').slice(0,10); byDate[day]=h; }
+  const sorted = Object.values(byDate).sort((a,b)=>(a.uploaded_at||'')<(b.uploaded_at||'')?-1:1);
+  const labels = sorted.map(h=>{const[y,mo,d]=(h.uploaded_at||'').slice(0,10).split('-');return`${d}.${mo}.${y.slice(2)}`;});
+  const fmt = v => v>=1000?(v/1000).toFixed(1).replace('.0','')+'k':String(v);
+
+  const mainEl = document.getElementById('historyChart');
+  if (mainEl) {
+    const mCtx = mainEl.getContext('2d');
+    const gOff = mCtx.createLinearGradient(0,0,0,260); gOff.addColorStop(0,'rgba(239,68,68,.35)'); gOff.addColorStop(1,'rgba(239,68,68,.02)');
+    const gDef = mCtx.createLinearGradient(0,0,0,260); gDef.addColorStop(0,'rgba(34,197,94,.35)');  gDef.addColorStop(1,'rgba(34,197,94,.02)');
+    const pts = sorted.length<=20?5:sorted.length<=60?3:0;
+    new Chart(mainEl,{type:'line',data:{labels,datasets:[
+      {label:'⚔️ Off-Score',data:sorted.map(h=>h.total_off||0),borderColor:'#ef4444',backgroundColor:gOff,borderWidth:2.5,tension:.4,fill:true,pointRadius:pts,pointHoverRadius:7,pointBackgroundColor:'#ef4444',pointBorderColor:'#1a1a2e',pointBorderWidth:2},
+      {label:'🛡️ Def-Score',data:sorted.map(h=>h.total_def||0),borderColor:'#22c55e',backgroundColor:gDef,borderWidth:2.5,tension:.4,fill:true,pointRadius:pts,pointHoverRadius:7,pointBackgroundColor:'#22c55e',pointBorderColor:'#1a1a2e',pointBorderWidth:2},
+      {label:'🌾 Korn/h',data:sorted.map(h=>h.total_crop||0),borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:1.5,borderDash:[6,4],tension:.4,fill:false,pointRadius:pts>0?pts-1:0,pointHoverRadius:5,pointBackgroundColor:'#f59e0b',yAxisID:'yCrop'},
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#ccc',font:{size:11},usePointStyle:true,pointStyleWidth:10,padding:16}},
+        tooltip:{backgroundColor:'rgba(15,20,30,.92)',borderColor:'rgba(255,255,255,.12)',borderWidth:1,padding:10,
+          callbacks:{title:i=>`📅 ${i[0].label}`,label:c=>` ${c.dataset.label}: ${c.parsed.y.toLocaleString('de-DE')}`,
+            afterBody:items=>{const h=sorted[items[0].dataIndex],p=sorted[items[0].dataIndex-1];if(!p)return[];return['',` Δ Off: ${(h.total_off-p.total_off>=0?'+':'')}${(h.total_off-p.total_off).toLocaleString('de-DE')}`,` Δ Def: ${(h.total_def-p.total_def>=0?'+':'')}${(h.total_def-p.total_def).toLocaleString('de-DE')}`];}}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.04)',drawTicks:false},ticks:{color:'#888',font:{size:10},maxRotation:0,maxTicksLimit:8},border:{color:'rgba(255,255,255,.08)'}},
+        y:{grid:{color:'rgba(255,255,255,.05)',drawTicks:false},ticks:{color:'#aaa',font:{size:10},callback:fmt,padding:6},border:{display:false},beginAtZero:true},
+        yCrop:{position:'right',grid:{display:false},ticks:{color:'#f59e0b88',font:{size:9},callback:fmt},border:{display:false},beginAtZero:true}}}});
   }
-  const sorted = Object.values(byDate).sort((a,b) => (a.uploaded_at||'') < (b.uploaded_at||'') ? -1 : 1);
-
-  const labels = sorted.map(h => {
-    const s = (h.uploaded_at||'').slice(0,10); // YYYY-MM-DD
-    const parts = s.split('-');
-    return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0].slice(2)}` : s;
-  });
-
-  const ctx = document.getElementById('historyChart');
-  if (!ctx) return;
-
-  if (sorted.length < 2) {
-    ctx.closest('.card').querySelector('p.hint').textContent =
-      'Noch zu wenig Daten — lade nach dem nächsten Upload erneut.';
+  const ratioEl = document.getElementById('ratioChart');
+  if (ratioEl && sorted.length>1) {
+    const tot=sorted.map(h=>(h.total_off||0)+(h.total_def||0));
+    const offP=sorted.map((h,i)=>tot[i]?Math.round((h.total_off||0)/tot[i]*100):50);
+    new Chart(ratioEl,{type:'bar',data:{labels,datasets:[
+      {label:'⚔️ Off %',data:offP,backgroundColor:'rgba(239,68,68,.75)',borderRadius:3,stack:'r'},
+      {label:'🛡️ Def %',data:offP.map(p=>100-p),backgroundColor:'rgba(34,197,94,.65)',borderRadius:3,stack:'r'},
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(15,20,30,.92)',borderColor:'rgba(255,255,255,.12)',borderWidth:1,callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y}%`}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#888',font:{size:9},maxTicksLimit:8},border:{color:'rgba(255,255,255,.08)'}},y:{stacked:true,display:false,max:100}}}});
   }
-
-  const pr = sorted.length < 30 ? 4 : 2;
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label:'⚔️ Off-Score', data:sorted.map(h=>h.total_off||0), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)', tension:0.3, fill:true, pointRadius:pr, pointHoverRadius:6 },
-        { label:'🛡️ Def-Score', data:sorted.map(h=>h.total_def||0), borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.08)', tension:0.3, fill:true, pointRadius:pr, pointHoverRadius:6 },
-        { label:'🌾 Korn',      data:sorted.map(h=>h.total_crop||0), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0)', tension:0.3, fill:false, pointRadius:pr, pointHoverRadius:6, borderDash:[5,3] },
-      ]
-    },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{labels:{color:'#ccc',font:{size:12}}},
-        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toLocaleString('de-DE')}`}}
-      },
-      scales:{
-        x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa',font:{size:10},maxRotation:30}},
-        y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},beginAtZero:true}
-      }
-    }
-  });
 })();
 </script>
 {% endif %}
