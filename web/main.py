@@ -4821,10 +4821,18 @@ async def op_attacker_list(request: Request, guild_id: str):
         ) as cur:
             ally_members = {r["player_name"]: dict(r) for r in await cur.fetchall()}
 
+        # Member troops first — we need their travian names to filter the snapshot
+        async with db.execute(
+            "SELECT discord_name, travian_name, tribe, villages_json FROM member_troops WHERE guild_id=?",
+            (guild_id,)
+        ) as cur:
+            troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
+
         # Their villages from latest map snapshot (own alliance villages)
         tw_name = await database.get_tw_alliance_name(guild_id)
         snap_params = [guild_id, guild_id]
         ally_clause = ""
+        known_names = set(ally_members.keys()) | set(troop_rows.keys())
         if tw_name:
             ally_clause = " AND m.alliance_name = ?"
             snap_params.append(tw_name)
@@ -4832,25 +4840,25 @@ async def op_attacker_list(request: Request, guild_id: str):
             placeholders = ",".join("?" * len(ally_members))
             ally_clause = f" AND m.player_name IN ({placeholders})"
             snap_params.extend(ally_members.keys())
+        elif troop_rows:
+            # Fallback: filter snapshot by known travian names from troop uploads
+            placeholders = ",".join("?" * len(troop_rows))
+            ally_clause = f" AND m.player_name IN ({placeholders})"
+            snap_params.extend(troop_rows.keys())
 
-        async with db.execute(f"""
-            SELECT m.player_name, m.village_name, m.x, m.y, m.population, m.tribe
-            FROM map_snapshots m
-            INNER JOIN (
-                SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
-                WHERE guild_id=? GROUP BY guild_id
-            ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
-            WHERE m.guild_id=? {ally_clause}
-            ORDER BY m.player_name, m.population DESC
-        """, snap_params) as cur:
-            snap_rows = await cur.fetchall()
-
-        # Member troops (discord name, troop data)
-        async with db.execute(
-            "SELECT discord_name, travian_name, tribe, villages_json FROM member_troops WHERE guild_id=?",
-            (guild_id,)
-        ) as cur:
-            troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
+        snap_rows = []
+        if ally_clause or tw_name:  # only query if we have a filter (avoid full scan)
+            async with db.execute(f"""
+                SELECT m.player_name, m.village_name, m.x, m.y, m.population, m.tribe
+                FROM map_snapshots m
+                INNER JOIN (
+                    SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
+                    WHERE guild_id=? GROUP BY guild_id
+                ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
+                WHERE m.guild_id=? {ally_clause}
+                ORDER BY m.player_name, m.population DESC
+            """, snap_params) as cur:
+                snap_rows = await cur.fetchall()
 
     # Group snap villages by player
     from collections import defaultdict
@@ -4863,7 +4871,7 @@ async def op_attacker_list(request: Request, guild_id: str):
         if not snap_tribe.get(r["player_name"]):
             snap_tribe[r["player_name"]] = r["tribe"]
 
-    # Build merged attacker list
+    # Build merged attacker list — only include players we actually know about
     all_names = set(ally_members.keys()) | set(snap_villages.keys()) | set(troop_rows.keys())
     result = []
     for name in all_names:
