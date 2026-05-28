@@ -766,6 +766,12 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
     # Post to poll channel if configured
     if poll_channel_id and poll_channel_id.isdigit():
         ch = guild.get_channel(int(poll_channel_id))
+        if not ch:
+            try:
+                ch = await bot.fetch_channel(int(poll_channel_id))
+            except Exception as e:
+                print(f"[announce-ep] fetch_channel error: {e}")
+                ch = None
         if ch:
             try:
                 import discord as _discord
