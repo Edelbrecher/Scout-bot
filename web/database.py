@@ -3113,8 +3113,15 @@ async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, a
                 INSERT INTO ally_groups (guild_id, owner_discord_id, owner_username, ally_name, invite_token)
                 VALUES (?, ?, ?, ?, ?)
             """, (guild_id, owner_id, owner_username, ally_name, token))
+            group_id = cur.lastrowid
+            # Auto-add owner as approved member so they receive EP notifications
+            await db.execute("""
+                INSERT OR IGNORE INTO ally_members
+                    (ally_group_id, discord_id, discord_username, travian_name, status)
+                VALUES (?, ?, ?, '', 'approved')
+            """, (group_id, owner_id, owner_username))
             await db.commit()
-            return {"id": cur.lastrowid, "invite_token": token}
+            return {"id": group_id, "invite_token": token}
         except Exception:
             return {}
 
