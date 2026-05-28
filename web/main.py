@@ -2367,11 +2367,13 @@ async def guild_map(request: Request, guild_id: str):
     if err: return err
     is_admin = session.get("type") == "admin"
     scouted = await database.get_scouted_coordinates(guild_id)
+    ally_group = await database.get_ally_group_for_guild(guild_id)
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
         "scouted": scouted,
         "is_admin": is_admin,
+        "ally_group": ally_group,
     })
 
 
