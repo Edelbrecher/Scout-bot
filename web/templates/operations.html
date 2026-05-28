@@ -503,8 +503,17 @@ const BASE = `/guild/${GUILD_ID}/operations/api`;
 // ══ Utilities ════════════════════════════════════════════════════════════
 async function apiFetch(path, opts={}) {
   const r = await fetch(BASE + path, opts);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) {
+    let msg = text;
+    try { const j = JSON.parse(text); msg = j.error || j.detail || text; } catch(_){}
+    throw new Error(msg);
+  }
+  try {
+    return JSON.parse(text);
+  } catch(_) {
+    throw new Error('Server-Antwort konnte nicht verarbeitet werden (Session abgelaufen?)');
+  }
 }
 async function apiPost(path, data={}) {
   const fd = new FormData();
