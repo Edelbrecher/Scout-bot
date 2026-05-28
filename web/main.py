@@ -3339,6 +3339,17 @@ async def mein_account_upload(
         v["priority"]     = prio
     if parsed:
         await database.save_own_villages(guild_id, parsed, uploaded_by)
+        # Also save to member_troops for op planner
+        discord_id = session.get("uid","")
+        total_off = sum(v.get("off_score",0) for v in parsed)
+        total_def = sum(v.get("def_score",0) for v in parsed)
+        travian_name = parsed[0].get("uploaded_by","") if parsed else uploaded_by
+        await database.upsert_member_troops(
+            guild_id, discord_id, uploaded_by, travian_name,
+            [{k:v for k,v in vill.items() if k in ("village_name","x","y","troops","off_score","def_score","village_type")}
+             for vill in parsed],
+            tribe="", total_off=total_off, total_def=total_def
+        )
     return RedirectResponse(f"/guild/{guild_id}/mein-account?uploaded={len(parsed)}", status_code=303)
 
 
@@ -4437,6 +4448,402 @@ async def einsatz_delete(request: Request, guild_id: str, plan_id: int):
     if err: return err
     await database.delete_attack_plan(guild_id, plan_id)
     return RedirectResponse(f"/guild/{guild_id}/einsatz", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Einsatzplanung (Alliance Operation Planner)
+# ---------------------------------------------------------------------------
+
+import json as _op_json
+
+@app.get("/guild/{guild_id}/operations", response_class=HTMLResponse)
+async def operations_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    err = await _require_alliance(guild, guild_id)
+    if err: return err
+    uid  = session.get("uid","")
+    plans = await database.get_op_plans(guild_id)
+    favorites = await database.get_op_favorites(guild_id, uid)
+    members   = await database.get_member_troops(guild_id)
+    return templates.TemplateResponse("operations.html", {
+        "request":   request,
+        "guild":     guild,
+        "session":   session,
+        "plans":     plans,
+        "favorites": favorites,
+        "members":   members,
+        "troops_def": database.TRAVIAN_TROOPS,
+    })
+
+
+# ── Plan CRUD (JSON API) ──────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/plans")
+async def op_create_plan(
+    request: Request, guild_id: str,
+    name: str = Form("Neuer Einsatz"),
+    landing_time: str = Form(""),
+    server_speed: float = Form(1.0),
+    target_ally: str = Form(""),
+    notes: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    err = await _require_alliance(guild, guild_id)
+    if err: return err
+    plan_id = await database.create_op_plan(
+        guild_id, name.strip() or "Neuer Einsatz",
+        landing_time, max(0.5, min(server_speed, 10.0)),
+        target_ally.strip(), notes.strip(),
+        session.get("uid",""),
+    )
+    return _op_json.dumps({"ok": True, "id": plan_id})
+
+
+@app.get("/guild/{guild_id}/operations/api/plan-list")
+async def op_plan_list(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    plans = await database.get_op_plans(guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(plans)
+
+
+@app.get("/guild/{guild_id}/operations/api/plans/{plan_id}")
+async def op_get_plan(request: Request, guild_id: str, plan_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    plan = await database.get_op_plan_full(plan_id, guild_id)
+    if not plan:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "not found"}, status_code=404)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(plan)
+
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/update")
+async def op_update_plan(
+    request: Request, guild_id: str, plan_id: int,
+    name: str = Form(None), landing_time: str = Form(None),
+    server_speed: float = Form(None), target_ally: str = Form(None),
+    notes: str = Form(None), status: str = Form(None),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    kwargs = {}
+    if name         is not None: kwargs["name"]          = name.strip()[:120]
+    if landing_time is not None: kwargs["landing_time"]  = landing_time
+    if server_speed is not None: kwargs["server_speed"]  = max(0.5, min(float(server_speed), 10.0))
+    if target_ally  is not None: kwargs["target_ally"]   = target_ally.strip()[:100]
+    if notes        is not None: kwargs["notes"]         = notes.strip()[:500]
+    if status       is not None and status in ("draft","active","completed","cancelled"):
+        kwargs["status"] = status
+    await database.update_op_plan(plan_id, guild_id, **kwargs)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/delete")
+async def op_delete_plan(request: Request, guild_id: str, plan_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_op_plan(plan_id, guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True})
+
+
+# ── Targets ───────────────────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/targets")
+async def op_add_target(
+    request: Request, guild_id: str, plan_id: int,
+    player_name: str = Form(""), village_name: str = Form(""),
+    x: int = Form(...), y: int = Form(...),
+    population: int = Form(0), notes: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    # Verify plan belongs to guild
+    plan = await database.get_op_plan(plan_id, guild_id)
+    if not plan:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "plan not found"}, status_code=404)
+    tid = await database.add_op_target(
+        plan_id, guild_id,
+        player_name.strip(), village_name.strip(),
+        x, y, population, notes.strip()
+    )
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True, "id": tid})
+
+
+@app.post("/guild/{guild_id}/operations/api/targets/{target_id}/delete")
+async def op_delete_target(request: Request, guild_id: str, target_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_op_target(target_id, guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True})
+
+
+# ── Waves ─────────────────────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/targets/{target_id}/waves")
+async def op_add_wave(
+    request: Request, guild_id: str, target_id: int,
+    plan_id: int = Form(...),
+    attacker_discord_id: str = Form(""),
+    attacker_name: str = Form(""),
+    origin_village: str = Form(""),
+    origin_x: int = Form(None),
+    origin_y: int = Form(None),
+    wave_type: str = Form("real"),
+    tribe: str = Form("romans"),
+    troop_json: str = Form("{}"),
+    landing_time: str = Form(""),
+    server_speed: float = Form(1.0),
+    notes: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if wave_type not in ("real","fake","def","scout"):
+        wave_type = "real"
+    if tribe not in database.TRAVIAN_TROOPS:
+        tribe = "romans"
+    try:
+        troops = _op_json.loads(troop_json)
+        if not isinstance(troops, dict): troops = {}
+    except Exception:
+        troops = {}
+    result = await database.add_op_wave(
+        target_id, plan_id, guild_id,
+        attacker_discord_id, attacker_name.strip(),
+        origin_village.strip(), origin_x, origin_y,
+        wave_type, tribe, troops, landing_time, server_speed, notes.strip()
+    )
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True, **result})
+
+
+@app.post("/guild/{guild_id}/operations/api/waves/{wave_id}/update")
+async def op_update_wave(request: Request, guild_id: str, wave_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    try:
+        data = await request.json()
+    except Exception:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    # Recompute times if origin/target changed
+    plan = None
+    if "origin_x" in data or "tribe" in data or "troop_json" in data:
+        # fetch wave to get current plan
+        import aiosqlite as _aiosqlite_op
+    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+            db.row_factory = _aiosqlite_op.Row
+            async with db.execute(
+                "SELECT w.*, t.x as tx, t.y as ty, p.landing_time, p.server_speed "
+                "FROM op_waves w JOIN op_targets t ON t.id=w.target_id "
+                "JOIN op_plans p ON p.id=w.plan_id WHERE w.id=? AND w.guild_id=?",
+                (wave_id, guild_id)
+            ) as cur:
+                row = await cur.fetchone()
+        if row:
+            row = dict(row)
+            troops = data.get("troop_json", _op_json.loads(row["troop_json"] or "{}"))
+            if isinstance(troops, str): troops = _op_json.loads(troops)
+            tribe  = data.get("tribe", row["tribe"])
+            ox = data.get("origin_x", row["origin_x"])
+            oy = data.get("origin_y", row["origin_y"])
+            lt = data.get("landing_time", row["landing_time"])
+            spd = float(data.get("server_speed", row["server_speed"]))
+            # recalc
+            slowest = min(troops.keys(), key=lambda t: database._TROOP_SPEED.get(t,99), default="")
+            sl_speed = database._TROOP_SPEED.get(slowest, 6.0)
+            travel_sec = 0
+            send_t = lt or ""
+            if ox is not None and oy is not None and sl_speed > 0:
+                travel_sec = database._calc_travel_seconds(int(ox), int(oy), row["tx"], row["ty"], sl_speed, spd)
+                if lt:
+                    import datetime as _dt
+                    try:
+                        ltd = _dt.datetime.fromisoformat(lt.replace("Z",""))
+                        send_t = (ltd - _dt.timedelta(seconds=travel_sec)).strftime("%Y-%m-%dT%H:%M:%S")
+                    except Exception: pass
+            data["travel_seconds"] = travel_sec
+            data["send_time"] = send_t
+            data["slowest_unit"] = slowest
+            data["slowest_speed"] = sl_speed
+            if isinstance(data.get("troop_json"), dict):
+                data["troop_json"] = _op_json.dumps(data["troop_json"])
+    await database.update_op_wave(wave_id, guild_id, **data)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True, "send_time": data.get("send_time",""), "travel_seconds": data.get("travel_seconds",0)})
+
+
+@app.post("/guild/{guild_id}/operations/api/waves/{wave_id}/delete")
+async def op_delete_wave(request: Request, guild_id: str, wave_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_op_wave(wave_id, guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True})
+
+
+# ── Plausibility ──────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/check")
+async def op_plausibility(request: Request, guild_id: str, plan_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    warnings = await database.check_op_plausibility(plan_id, guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"warnings": warnings})
+
+
+# ── Favourites ────────────────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/favorites")
+async def op_add_favorite(
+    request: Request, guild_id: str,
+    player_name: str = Form(""), village_name: str = Form(""),
+    x: int = Form(...), y: int = Form(...), label: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    fid = await database.add_op_favorite(
+        guild_id, session.get("uid",""),
+        player_name.strip(), village_name.strip(), x, y, label.strip()
+    )
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True, "id": fid})
+
+
+@app.post("/guild/{guild_id}/operations/api/favorites/{fav_id}/delete")
+async def op_delete_favorite(request: Request, guild_id: str, fav_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_op_favorite(fav_id, session.get("uid",""), guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": True})
+
+
+# ── Village / player search ───────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/operations/api/villages")
+async def op_search_villages(request: Request, guild_id: str, q: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    q = q.strip()
+    # Search map_snapshots + alliance_members
+    import aiosqlite as _aiosqlite_op
+    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+        db.row_factory = _aiosqlite_op.Row
+        # Latest snapshot villages
+        if q:
+            async with db.execute("""
+                SELECT DISTINCT m.village_name, m.x, m.y, m.player_name, m.population
+                FROM map_snapshots m
+                INNER JOIN (
+                    SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
+                    WHERE guild_id=? GROUP BY guild_id
+                ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
+                WHERE m.guild_id=?
+                  AND (m.player_name LIKE ? OR m.village_name LIKE ?
+                       OR (m.x||'|'||m.y) LIKE ? OR (m.x||'/'||m.y) LIKE ?)
+                ORDER BY m.player_name LIMIT 40
+            """, (guild_id, guild_id, f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")) as cur:
+                rows = [dict(r) for r in await cur.fetchall()]
+        else:
+            rows = []
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"results": rows})
+
+
+# ── Member troops ─────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/operations/api/members")
+async def op_get_members(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    members = await database.get_member_troops(guild_id)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"members": members})
+
+
+# ── Discord notification ───────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/notify")
+async def op_send_notification(request: Request, guild_id: str, plan_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    plan = await database.get_op_plan_full(plan_id, guild_id)
+    if not plan:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "not found"}, status_code=404)
+    # Build notification payload for bot
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                "http://bot:7777/api/op-notify",
+                json={"guild_id": guild_id, "plan": plan}
+            )
+            ok = resp.status_code == 200
+    except Exception:
+        ok = False
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"ok": ok})
+
+
+# ── Personal missions (used by mein-account tab) ──────────────────────────────
+
+@app.get("/guild/{guild_id}/operations/api/my-missions")
+async def op_my_missions(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    missions = await database.get_personal_missions(guild_id, session.get("uid",""))
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"missions": missions})
 
 
 # ---------------------------------------------------------------------------

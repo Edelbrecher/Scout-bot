@@ -563,4 +563,73 @@ function copyDualLink() {
 })();
 </script>
 {% endif %}
+
+<style>
+.wave-type-badge{font-size:.7rem;padding:2px 7px;border-radius:6px;font-weight:700;}
+.wt-real{background:rgba(239,68,68,.2);color:#f87171;}
+.wt-fake{background:rgba(107,114,128,.2);color:#9ca3af;}
+.wt-def{background:rgba(59,130,246,.2);color:#93c5fd;}
+.wt-scout{background:rgba(168,85,247,.2);color:#c084fc;}
+</style>
+<!-- ══ Meine Einsätze ════════════════════════════════════════════════ -->
+<div class="card" style="margin-top:1.25rem;" id="missionsCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+    <div>
+      <h2 style="margin:0 0 .2rem;">⚔️ Meine Einsätze</h2>
+      <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Alle Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind.</p>
+    </div>
+    <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Einsatzplanung öffnen</a>
+  </div>
+  <div id="missionsContent">
+    <div style="color:var(--text-muted);font-size:.85rem;">Lade Einsätze…</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  fetch('/guild/{{ guild.guild_id }}/operations/api/my-missions')
+    .then(r=>r.json())
+    .then(data=>{
+      const el = document.getElementById('missionsContent');
+      const missions = data.missions || [];
+      if (!missions.length) {
+        el.innerHTML='<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem 0;">Keine Einsätze zugewiesen.</div>';
+        document.getElementById('missionsCard').style.opacity='.6';
+        return;
+      }
+      const typeLabels = {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout'};
+      const typeColors = {real:'wt-real',fake:'wt-fake',def:'wt-def',scout:'wt-scout'};
+      const now = Date.now();
+      el.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+        <thead><tr style="border-bottom:1px solid var(--border);">
+          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Plan</th>
+          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Ziel</th>
+          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Typ</th>
+          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Sendezeit</th>
+          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Marschzeit</th>
+          <th style="padding:.4rem .6rem;color:var(--text-muted);text-align:left;">Truppen</th>
+        </tr></thead>
+        <tbody>
+        ${missions.map(m => {
+          const sendDt = m.send_time ? new Date(m.send_time.replace(' ','T')+'Z') : null;
+          const isPast = sendDt && sendDt < new Date();
+          const travelH = Math.floor((m.travel_seconds||0)/3600);
+          const travelM = Math.floor(((m.travel_seconds||0)%3600)/60);
+          const travelStr = travelH>0 ? `${travelH}h ${travelM}m` : travelM>0 ? `${travelM}m` : '—';
+          const troops = Object.entries(m.troop_json||{}).filter(([,v])=>v>0)
+            .map(([id,cnt])=>`${id}×${cnt}`).slice(0,4).join(' ');
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${isPast?'opacity:.5':''}">
+            <td style="padding:.4rem .6rem;"><strong>${m.plan_name||'—'}</strong></td>
+            <td style="padding:.4rem .6rem;font-family:monospace;color:#93c5fd;">${m.target_x}|${m.target_y} <span style="color:var(--text-muted);font-family:sans-serif;font-size:.75rem;">${m.target_player||''}</span></td>
+            <td style="padding:.4rem .6rem;"><span class="wave-type-badge ${typeColors[m.wave_type]||''}">${typeLabels[m.wave_type]||m.wave_type}</span></td>
+            <td style="padding:.4rem .6rem;font-family:monospace;${isPast?'color:#6b7280;':'color:#fbbf24;'}">${m.send_time?m.send_time.slice(0,16):'—'}${isPast?' (vergangenheit)':''}</td>
+            <td style="padding:.4rem .6rem;font-size:.78rem;color:var(--text-muted);">${travelStr}</td>
+            <td style="padding:.4rem .6rem;font-size:.75rem;color:var(--text-muted);">${troops||'—'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody></table></div>`;
+    })
+    .catch(()=>{ document.getElementById('missionsContent').innerHTML='<div style="color:var(--text-muted);font-size:.83rem;">Einsätze konnten nicht geladen werden.</div>'; });
+})();
+</script>
 {% endblock %}

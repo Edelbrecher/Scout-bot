@@ -217,12 +217,22 @@
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
 
-    <!-- Einsatzplanung (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">🎯</div>
+    <!-- Einsatzplanung (Alliance Op Planner) -->
+    <a href="/guild/{{ guild.guild_id }}/operations" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
+      <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.einsatz.title">Einsatzplanung</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.einsatz.desc">Angriffe koordinieren, Marschzeit berechnen und direkt absenden</div>
+        <div class="feature-title">Einsatzplanung {{ ALLIANCE_BADGE }}</div>
+        <div class="feature-desc">Allianz-Ops planen · Wellen-Builder · Fake-Check · Marschzeiten</div>
+      </div>
+      {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
+    </a>
+
+    <!-- Personal Planning (Pro) -->
+    <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
+      <div class="feature-icon">📋</div>
+      <div class="feature-body">
+        <div class="feature-title">Personal Planning {{ PLAYER_BADGE }}</div>
+        <div class="feature-desc">Persönliche Marschzeiten, Wellen und Solo-Planung</div>
       </div>
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>

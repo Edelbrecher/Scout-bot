@@ -345,6 +345,7 @@ async def init_db():
 
     await _init_farming_tables()
     await _init_einsatz_tables()
+    await _init_op_tables()
     await _init_admin_tables()
     await _init_consent_tables()
     await _init_user_sub_tables()
@@ -4872,3 +4873,627 @@ async def get_defend_stats(guild_id: str) -> dict:
         "top_defends": top_defends,
         "totals": {**totals, **sent_totals},
     }
+
+
+# =============================================================================
+# ── OPERATION PLANNING ────────────────────────────────────────────────────────
+# =============================================================================
+
+import json as _json_op
+
+TRAVIAN_TROOPS: dict = {
+    "romans": [
+        {"id": "legionnaire",    "name": "Legionär",               "speed": 6,  "carry": 50,   "attack": 40,  "scout": False},
+        {"id": "praetorian",     "name": "Prätorianer",             "speed": 5,  "carry": 20,   "attack": 30,  "scout": False},
+        {"id": "imperian",       "name": "Imperianer",              "speed": 7,  "carry": 70,   "attack": 70,  "scout": False},
+        {"id": "eq_legati",      "name": "Equites Legati",          "speed": 16, "carry": 0,    "attack": 0,   "scout": True},
+        {"id": "eq_imperatoris", "name": "Equites Imperatoris",     "speed": 14, "carry": 100,  "attack": 120, "scout": False},
+        {"id": "eq_caesaris",    "name": "Equites Caesaris",        "speed": 10, "carry": 70,   "attack": 180, "scout": False},
+        {"id": "bat_ram",        "name": "Rammbock",                "speed": 4,  "carry": 0,    "attack": 60,  "scout": False},
+        {"id": "fire_cat",       "name": "Feuerkatapult",           "speed": 3,  "carry": 0,    "attack": 75,  "scout": False},
+        {"id": "senator",        "name": "Senator",                 "speed": 4,  "carry": 0,    "attack": 50,  "scout": False},
+        {"id": "settler",        "name": "Siedler",                 "speed": 5,  "carry": 3000, "attack": 10,  "scout": False},
+    ],
+    "gauls": [
+        {"id": "phalanx",    "name": "Phalanx",              "speed": 7,  "carry": 35,   "attack": 15,  "scout": False},
+        {"id": "swordsman",  "name": "Schwertkämpfer",       "speed": 6,  "carry": 45,   "attack": 65,  "scout": False},
+        {"id": "pathfinder", "name": "Pathfinder",           "speed": 17, "carry": 0,    "attack": 0,   "scout": True},
+        {"id": "thunder",    "name": "Theutates-Blitz",      "speed": 19, "carry": 75,   "attack": 100, "scout": False},
+        {"id": "druid",      "name": "Druidentreiter",       "speed": 16, "carry": 35,   "attack": 45,  "scout": False},
+        {"id": "haeduan",    "name": "Haeduer",              "speed": 13, "carry": 65,   "attack": 140, "scout": False},
+        {"id": "gal_ram",    "name": "Rammbock",             "speed": 4,  "carry": 0,    "attack": 50,  "scout": False},
+        {"id": "trebuchet",  "name": "Trebuchet",            "speed": 3,  "carry": 0,    "attack": 70,  "scout": False},
+        {"id": "chieftain",  "name": "Häuptling",            "speed": 5,  "carry": 0,    "attack": 40,  "scout": False},
+        {"id": "settler",    "name": "Siedler",              "speed": 5,  "carry": 3000, "attack": 10,  "scout": False},
+    ],
+    "teutons": [
+        {"id": "clubswinger", "name": "Keulenschwinger",     "speed": 7,  "carry": 60,   "attack": 40,  "scout": False},
+        {"id": "spearman",    "name": "Speerkämpfer",        "speed": 7,  "carry": 40,   "attack": 10,  "scout": False},
+        {"id": "axeman",      "name": "Axtkämpfer",          "speed": 7,  "carry": 50,   "attack": 60,  "scout": False},
+        {"id": "scout",       "name": "Kundschafter",        "speed": 9,  "carry": 0,    "attack": 0,   "scout": True},
+        {"id": "paladin",     "name": "Paladin",             "speed": 10, "carry": 55,   "attack": 55,  "scout": False},
+        {"id": "tk",          "name": "Teutonenknight",      "speed": 9,  "carry": 80,   "attack": 150, "scout": False},
+        {"id": "teu_ram",     "name": "Rammbock",            "speed": 4,  "carry": 0,    "attack": 65,  "scout": False},
+        {"id": "catapult",    "name": "Katapult",            "speed": 3,  "carry": 0,    "attack": 50,  "scout": False},
+        {"id": "chief",       "name": "Stammesführer",       "speed": 4,  "carry": 0,    "attack": 40,  "scout": False},
+        {"id": "settler",     "name": "Siedler",             "speed": 5,  "carry": 3000, "attack": 10,  "scout": False},
+    ],
+    "huns": [
+        {"id": "mercenary",     "name": "Söldner",           "speed": 10, "carry": 40,   "attack": 45,  "scout": False},
+        {"id": "bowman",        "name": "Bogenschütze",      "speed": 9,  "carry": 30,   "attack": 30,  "scout": False},
+        {"id": "spotter",       "name": "Späher",            "speed": 13, "carry": 0,    "attack": 0,   "scout": True},
+        {"id": "steppe_rider",  "name": "Steppenreiter",     "speed": 14, "carry": 55,   "attack": 100, "scout": False},
+        {"id": "marksman",      "name": "Scharfschütze",     "speed": 13, "carry": 50,   "attack": 70,  "scout": False},
+        {"id": "marauder",      "name": "Plünderer",         "speed": 11, "carry": 80,   "attack": 120, "scout": False},
+        {"id": "hun_ram",       "name": "Rammbock",          "speed": 4,  "carry": 0,    "attack": 50,  "scout": False},
+        {"id": "hun_cat",       "name": "Katapult",          "speed": 3,  "carry": 0,    "attack": 50,  "scout": False},
+        {"id": "logades",       "name": "Logades",           "speed": 5,  "carry": 0,    "attack": 40,  "scout": False},
+        {"id": "settler",       "name": "Siedler",           "speed": 5,  "carry": 3000, "attack": 10,  "scout": False},
+    ],
+    "egyptians": [
+        {"id": "slave_militia", "name": "Sklavenmiliz",      "speed": 8,  "carry": 40,   "attack": 10,  "scout": False},
+        {"id": "ash_warden",    "name": "Aschenwächter",     "speed": 6,  "carry": 35,   "attack": 45,  "scout": False},
+        {"id": "khopesh",       "name": "Khopeschkämpfer",   "speed": 7,  "carry": 50,   "attack": 60,  "scout": False},
+        {"id": "sopdu",         "name": "Sopdu-Entdecker",   "speed": 13, "carry": 0,    "attack": 0,   "scout": True},
+        {"id": "anhur",         "name": "Anhur-Wächter",     "speed": 12, "carry": 55,   "attack": 100, "scout": False},
+        {"id": "resheph",       "name": "Resheph-Streitwagen","speed":10, "carry": 70,   "attack": 140, "scout": False},
+        {"id": "egy_ram",       "name": "Rammbock",          "speed": 4,  "carry": 0,    "attack": 50,  "scout": False},
+        {"id": "stone_cat",     "name": "Steinkatapult",     "speed": 3,  "carry": 0,    "attack": 65,  "scout": False},
+        {"id": "nomarch",       "name": "Nomarch",           "speed": 5,  "carry": 0,    "attack": 40,  "scout": False},
+        {"id": "settler",       "name": "Siedler",           "speed": 5,  "carry": 3000, "attack": 10,  "scout": False},
+    ],
+}
+
+# Flat lookup: id → speed
+_TROOP_SPEED: dict[str, float] = {
+    t["id"]: float(t["speed"])
+    for troops in TRAVIAN_TROOPS.values()
+    for t in troops
+}
+
+def _calc_travel_seconds(x1: int, y1: int, x2: int, y2: int,
+                          speed_tiles_per_hour: float, server_speed: float = 1.0,
+                          map_size: int = 801) -> int:
+    """Return travel time in seconds (Travian torus distance)."""
+    dx = min(abs(x1 - x2), map_size - abs(x1 - x2))
+    dy = min(abs(y1 - y2), map_size - abs(y1 - y2))
+    dist = (dx*dx + dy*dy) ** 0.5
+    if dist == 0:
+        return 0
+    hours = dist / (speed_tiles_per_hour * server_speed)
+    return int(hours * 3600)
+
+
+async def _init_op_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Operation plan header
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_plans (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                name          TEXT NOT NULL DEFAULT 'Einsatz',
+                status        TEXT NOT NULL DEFAULT 'draft',
+                landing_time  TEXT,
+                server_speed  REAL NOT NULL DEFAULT 1.0,
+                target_ally   TEXT DEFAULT '',
+                notes         TEXT DEFAULT '',
+                created_by    TEXT NOT NULL,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_op_plans_guild ON op_plans(guild_id)")
+
+        # Targets within a plan
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_targets (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                plan_id       INTEGER NOT NULL,
+                guild_id      TEXT NOT NULL,
+                player_name   TEXT NOT NULL DEFAULT '',
+                village_name  TEXT NOT NULL DEFAULT '',
+                x             INTEGER NOT NULL,
+                y             INTEGER NOT NULL,
+                population    INTEGER DEFAULT 0,
+                order_idx     INTEGER DEFAULT 0,
+                notes         TEXT DEFAULT '',
+                FOREIGN KEY (plan_id) REFERENCES op_plans(id) ON DELETE CASCADE
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_op_targets_plan ON op_targets(plan_id)")
+
+        # Waves per target
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_waves (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                target_id           INTEGER NOT NULL,
+                plan_id             INTEGER NOT NULL,
+                guild_id            TEXT NOT NULL,
+                attacker_discord_id TEXT DEFAULT '',
+                attacker_name       TEXT NOT NULL DEFAULT '',
+                origin_village      TEXT DEFAULT '',
+                origin_x            INTEGER,
+                origin_y            INTEGER,
+                wave_type           TEXT NOT NULL DEFAULT 'real',
+                tribe               TEXT NOT NULL DEFAULT 'romans',
+                troop_json          TEXT NOT NULL DEFAULT '{}',
+                slowest_unit        TEXT DEFAULT '',
+                slowest_speed       REAL DEFAULT 0,
+                travel_seconds      INTEGER DEFAULT 0,
+                send_time           TEXT DEFAULT '',
+                arrival_time        TEXT DEFAULT '',
+                notes               TEXT DEFAULT '',
+                order_idx           INTEGER DEFAULT 0,
+                confirmed           INTEGER DEFAULT 0,
+                FOREIGN KEY (target_id) REFERENCES op_targets(id) ON DELETE CASCADE,
+                FOREIGN KEY (plan_id)   REFERENCES op_plans(id)   ON DELETE CASCADE
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_op_waves_target ON op_waves(target_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_op_waves_attacker ON op_waves(attacker_discord_id)")
+
+        # Favourites per user per guild (saved targets)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_favorites (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                discord_id    TEXT NOT NULL,
+                player_name   TEXT DEFAULT '',
+                village_name  TEXT DEFAULT '',
+                x             INTEGER NOT NULL,
+                y             INTEGER NOT NULL,
+                label         TEXT DEFAULT '',
+                created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(guild_id, discord_id, x, y)
+            )
+        """)
+
+        # Per-member troop snapshot (latest upload per user)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS member_troops (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                discord_id    TEXT NOT NULL,
+                discord_name  TEXT DEFAULT '',
+                travian_name  TEXT DEFAULT '',
+                villages_json TEXT NOT NULL DEFAULT '[]',
+                tribe         TEXT DEFAULT '',
+                total_off     INTEGER DEFAULT 0,
+                total_def     INTEGER DEFAULT 0,
+                updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(guild_id, discord_id)
+            )
+        """)
+        await db.commit()
+
+
+# ── op_plans CRUD ──────────────────────────────────────────────────────────────
+
+async def create_op_plan(guild_id: str, name: str, landing_time: str,
+                          server_speed: float, target_ally: str,
+                          notes: str, created_by: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO op_plans (guild_id, name, status, landing_time, server_speed,
+                                   target_ally, notes, created_by)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (guild_id, name[:120], "draft", landing_time, server_speed,
+              target_ally[:100], notes[:500], created_by))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_op_plans(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT p.*, COUNT(DISTINCT t.id) as target_count,
+                   COUNT(DISTINCT w.id) as wave_count
+            FROM op_plans p
+            LEFT JOIN op_targets t ON t.plan_id = p.id
+            LEFT JOIN op_waves w   ON w.plan_id = p.id
+            WHERE p.guild_id = ?
+            GROUP BY p.id ORDER BY p.created_at DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_op_plan(plan_id: int, guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def update_op_plan(plan_id: int, guild_id: str, **kwargs):
+    allowed = {"name", "status", "landing_time", "server_speed", "target_ally", "notes"}
+    sets = {k: v for k, v in kwargs.items() if k in allowed}
+    if not sets:
+        return
+    cols = ", ".join(f"{k}=?" for k in sets)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            f"UPDATE op_plans SET {cols} WHERE id=? AND guild_id=?",
+            (*sets.values(), plan_id, guild_id)
+        )
+        await db.commit()
+
+
+async def delete_op_plan(plan_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id))
+        await db.commit()
+
+
+# ── op_targets CRUD ────────────────────────────────────────────────────────────
+
+async def add_op_target(plan_id: int, guild_id: str, player_name: str,
+                         village_name: str, x: int, y: int,
+                         population: int = 0, notes: str = "") -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COALESCE(MAX(order_idx)+1,0) FROM op_targets WHERE plan_id=?", (plan_id,)
+        ) as cur:
+            idx = (await cur.fetchone())[0]
+        cur = await db.execute("""
+            INSERT INTO op_targets (plan_id, guild_id, player_name, village_name, x, y, population, order_idx, notes)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (plan_id, guild_id, player_name[:80], village_name[:80], x, y, population, idx, notes[:300]))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_op_target(target_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM op_targets WHERE id=? AND guild_id=?", (target_id, guild_id))
+        await db.commit()
+
+
+# ── op_waves CRUD ──────────────────────────────────────────────────────────────
+
+async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
+                       attacker_discord_id: str, attacker_name: str,
+                       origin_village: str, origin_x: int | None, origin_y: int | None,
+                       wave_type: str, tribe: str, troop_json: dict,
+                       landing_time: str, server_speed: float,
+                       notes: str = "") -> dict:
+    """Add a wave and compute send_time from landing_time and troop speed."""
+    # Slowest troop
+    troops = {k: v for k, v in troop_json.items() if v and int(v) > 0}
+    slowest_id = min(troops.keys(), key=lambda t: _TROOP_SPEED.get(t, 99), default="")
+    slowest_speed = _TROOP_SPEED.get(slowest_id, 6.0)
+
+    # Get target coords
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT x,y FROM op_targets WHERE id=?", (target_id,)) as cur:
+            trow = await cur.fetchone()
+
+    travel_sec = 0
+    send_time = landing_time
+    if trow and origin_x is not None and origin_y is not None and slowest_speed > 0:
+        travel_sec = _calc_travel_seconds(
+            origin_x, origin_y, trow["x"], trow["y"], slowest_speed, server_speed
+        )
+        if landing_time:
+            import datetime as _dt
+            try:
+                lt = _dt.datetime.fromisoformat(landing_time.replace("Z",""))
+                send_dt = lt - _dt.timedelta(seconds=travel_sec)
+                send_time = send_dt.strftime("%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                pass
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COALESCE(MAX(order_idx)+1,0) FROM op_waves WHERE target_id=?", (target_id,)
+        ) as cur:
+            idx = (await cur.fetchone())[0]
+        cur = await db.execute("""
+            INSERT INTO op_waves
+                (target_id, plan_id, guild_id, attacker_discord_id, attacker_name,
+                 origin_village, origin_x, origin_y, wave_type, tribe, troop_json,
+                 slowest_unit, slowest_speed, travel_seconds, send_time, arrival_time,
+                 notes, order_idx)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (target_id, plan_id, guild_id,
+              attacker_discord_id, attacker_name[:80],
+              origin_village[:80], origin_x, origin_y,
+              wave_type, tribe,
+              _json_op.dumps(troops),
+              slowest_id, slowest_speed, travel_sec,
+              send_time, landing_time,
+              notes[:300], idx))
+        wave_id = cur.lastrowid
+        await db.commit()
+
+    return {"id": wave_id, "send_time": send_time, "travel_seconds": travel_sec,
+            "slowest_unit": slowest_id, "slowest_speed": slowest_speed}
+
+
+async def update_op_wave(wave_id: int, guild_id: str, **kwargs):
+    allowed = {"attacker_name","origin_village","origin_x","origin_y","wave_type","tribe",
+               "troop_json","send_time","arrival_time","notes","confirmed","slowest_unit",
+               "slowest_speed","travel_seconds"}
+    sets = {k: v for k, v in kwargs.items() if k in allowed}
+    if not sets:
+        return
+    # Serialise troop_json if dict
+    if "troop_json" in sets and isinstance(sets["troop_json"], dict):
+        sets["troop_json"] = _json_op.dumps(sets["troop_json"])
+    cols = ", ".join(f"{k}=?" for k in sets)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            f"UPDATE op_waves SET {cols} WHERE id=? AND guild_id=?",
+            (*sets.values(), wave_id, guild_id)
+        )
+        await db.commit()
+
+
+async def delete_op_wave(wave_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM op_waves WHERE id=? AND guild_id=?", (wave_id, guild_id))
+        await db.commit()
+
+
+async def get_op_plan_full(plan_id: int, guild_id: str) -> dict | None:
+    """Return plan with nested targets and waves."""
+    plan = await get_op_plan(plan_id, guild_id)
+    if not plan:
+        return None
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM op_targets WHERE plan_id=? ORDER BY order_idx", (plan_id,)
+        ) as cur:
+            targets = [dict(r) for r in await cur.fetchall()]
+        async with db.execute(
+            "SELECT * FROM op_waves WHERE plan_id=? ORDER BY target_id, order_idx", (plan_id,)
+        ) as cur:
+            waves = [dict(r) for r in await cur.fetchall()]
+
+    waves_by_target: dict[int, list] = {}
+    for w in waves:
+        w["troop_json"] = _json_op.loads(w["troop_json"]) if w["troop_json"] else {}
+        waves_by_target.setdefault(w["target_id"], []).append(w)
+
+    for t in targets:
+        t["waves"] = waves_by_target.get(t["id"], [])
+
+    plan["targets"] = targets
+    return plan
+
+
+# ── op_favorites ───────────────────────────────────────────────────────────────
+
+async def get_op_favorites(guild_id: str, discord_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM op_favorites WHERE guild_id=? AND discord_id=?
+            ORDER BY created_at DESC
+        """, (guild_id, discord_id)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_op_favorite(guild_id: str, discord_id: str, player_name: str,
+                           village_name: str, x: int, y: int, label: str = "") -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT OR REPLACE INTO op_favorites
+                (guild_id, discord_id, player_name, village_name, x, y, label)
+            VALUES (?,?,?,?,?,?,?)
+        """, (guild_id, discord_id, player_name[:80], village_name[:80], x, y, label[:80]))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_op_favorite(fav_id: int, discord_id: str, guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM op_favorites WHERE id=? AND discord_id=? AND guild_id=?",
+            (fav_id, discord_id, guild_id)
+        )
+        await db.commit()
+
+
+# ── member_troops ──────────────────────────────────────────────────────────────
+
+async def upsert_member_troops(guild_id: str, discord_id: str, discord_name: str,
+                                travian_name: str, villages: list[dict],
+                                tribe: str = "", total_off: int = 0, total_def: int = 0):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO member_troops
+                (guild_id, discord_id, discord_name, travian_name, villages_json,
+                 tribe, total_off, total_def, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(guild_id, discord_id) DO UPDATE SET
+                discord_name  = excluded.discord_name,
+                travian_name  = excluded.travian_name,
+                villages_json = excluded.villages_json,
+                tribe         = excluded.tribe,
+                total_off     = excluded.total_off,
+                total_def     = excluded.total_def,
+                updated_at    = excluded.updated_at
+        """, (guild_id, discord_id, discord_name, travian_name,
+              _json_op.dumps(villages), tribe, total_off, total_def))
+        await db.commit()
+
+
+async def get_member_troops(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM member_troops WHERE guild_id=? ORDER BY discord_name
+        """, (guild_id,)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        r["villages"] = _json_op.loads(r["villages_json"]) if r["villages_json"] else []
+    return rows
+
+
+async def get_member_troops_single(guild_id: str, discord_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM member_troops WHERE guild_id=? AND discord_id=?",
+            (guild_id, discord_id)
+        ) as cur:
+            row = await cur.fetchone()
+    if not row:
+        return None
+    r = dict(row)
+    r["villages"] = _json_op.loads(r["villages_json"]) if r["villages_json"] else []
+    return r
+
+
+# ── Personal missions (per member) ─────────────────────────────────────────────
+
+async def get_personal_missions(guild_id: str, discord_id: str) -> list[dict]:
+    """Return all waves assigned to a specific member across active/completed plans."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT w.*,
+                   t.player_name as target_player, t.village_name as target_village,
+                   t.x as target_x, t.y as target_y,
+                   p.name as plan_name, p.status as plan_status,
+                   p.landing_time, p.server_speed
+            FROM op_waves w
+            JOIN op_targets t ON t.id = w.target_id
+            JOIN op_plans   p ON p.id = w.plan_id
+            WHERE w.guild_id=? AND w.attacker_discord_id=?
+              AND p.status IN ('active','completed')
+            ORDER BY w.send_time ASC
+        """, (guild_id, discord_id)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        r["troop_json"] = _json_op.loads(r["troop_json"]) if r["troop_json"] else {}
+    return rows
+
+
+# ── Plausibility check ─────────────────────────────────────────────────────────
+
+async def check_op_plausibility(plan_id: int, guild_id: str) -> list[dict]:
+    """Run plausibility checks and return list of warnings."""
+    plan = await get_op_plan_full(plan_id, guild_id)
+    if not plan:
+        return [{"level": "error", "msg": "Plan nicht gefunden."}]
+
+    warnings: list[dict] = []
+    server_speed = float(plan.get("server_speed") or 1.0)
+    landing_time_str = plan.get("landing_time") or ""
+
+    import datetime as _dt
+
+    try:
+        landing_dt = _dt.datetime.fromisoformat(landing_time_str.replace("Z","")) if landing_time_str else None
+    except Exception:
+        landing_dt = None
+
+    if not landing_dt:
+        warnings.append({"level": "error", "msg": "Keine Ankunftszeit gesetzt — Sendezeiten können nicht berechnet werden."})
+
+    if not plan["targets"]:
+        warnings.append({"level": "warning", "msg": "Keine Ziele im Plan."})
+        return warnings
+
+    # Check per target
+    for t in plan["targets"]:
+        waves = t["waves"]
+        if not waves:
+            warnings.append({"level": "warning", "msg": f"Ziel ({t['x']}|{t['y']}) {t['player_name']} hat keine Wellen."})
+            continue
+
+        real_waves  = [w for w in waves if w["wave_type"] == "real"]
+        fake_waves  = [w for w in waves if w["wave_type"] == "fake"]
+        scout_waves = [w for w in waves if w["wave_type"] == "scout"]
+        def_waves   = [w for w in waves if w["wave_type"] == "def"]
+
+        label = f"{t['player_name']} ({t['x']}|{t['y']})"
+
+        # ── Fake ratio check ────────────────────────────────────────────────
+        if real_waves and len(fake_waves) < 3 * len(real_waves):
+            needed = 3 * len(real_waves)
+            warnings.append({
+                "level": "warning",
+                "msg": f"{label}: Zu wenig Fakes — {len(fake_waves)} von empfohlenen {needed} (3× pro echter Welle)."
+            })
+
+        if real_waves and not fake_waves:
+            warnings.append({
+                "level": "error",
+                "msg": f"{label}: Echter Angriff ohne Fakes — Ziel wird nicht getarnt!"
+            })
+
+        # ── Scout check ─────────────────────────────────────────────────────
+        if real_waves and not scout_waves:
+            warnings.append({
+                "level": "info",
+                "msg": f"{label}: Keine Aufklärungswelle — blindes Angreifen."
+            })
+
+        # ── Timing checks ───────────────────────────────────────────────────
+        if landing_dt:
+            for w in waves:
+                send_str = w.get("send_time","")
+                if not send_str:
+                    warnings.append({"level":"warning","msg": f"{label} / {w['attacker_name']}: Keine Sendezeit berechnet."})
+                    continue
+                try:
+                    send_dt = _dt.datetime.fromisoformat(send_str.replace("Z",""))
+                    if send_dt < _dt.datetime.utcnow():
+                        warnings.append({"level":"error","msg": f"{label} / {w['attacker_name']} ({w['wave_type']}): Sendezeit liegt in der Vergangenheit!"})
+                    diff = abs((send_dt + _dt.timedelta(seconds=w["travel_seconds"])) - landing_dt).total_seconds()
+                    if diff > 60:
+                        warnings.append({"level":"warning","msg": f"{label} / {w['attacker_name']} ({w['wave_type']}): Ankunft weicht {int(diff)}s von der Zielzeit ab."})
+                except Exception:
+                    pass
+
+        # ── Duplicate attacker check ─────────────────────────────────────────
+        attacker_types: dict[str,set] = {}
+        for w in waves:
+            aid = w.get("attacker_discord_id") or w["attacker_name"]
+            attacker_types.setdefault(aid, set()).add(w["wave_type"])
+
+    # ── Cross-plan: same attacker double-booked ─────────────────────────────
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT w.attacker_name, w.send_time, w.wave_type, t.x, t.y
+            FROM op_waves w
+            JOIN op_targets t ON t.id = w.target_id
+            WHERE w.plan_id=? AND w.guild_id=?
+            ORDER BY w.attacker_discord_id, w.send_time
+        """, (plan_id, guild_id)) as cur:
+            all_waves = [dict(r) for r in await cur.fetchall()]
+
+    attacker_times: dict[str, list] = {}
+    for w in all_waves:
+        k = w["attacker_name"]
+        attacker_times.setdefault(k, []).append(w)
+
+    for attacker, awt in attacker_times.items():
+        awt_sorted = sorted(awt, key=lambda x: x.get("send_time") or "")
+        for i in range(len(awt_sorted) - 1):
+            t1 = awt_sorted[i].get("send_time","")
+            t2 = awt_sorted[i+1].get("send_time","")
+            if t1 and t2:
+                try:
+                    d1 = _dt.datetime.fromisoformat(t1)
+                    d2 = _dt.datetime.fromisoformat(t2)
+                    if abs((d2-d1).total_seconds()) < 30:
+                        warnings.append({
+                            "level": "warning",
+                            "msg": f"{attacker}: zwei Wellen mit Sendezeit < 30s Abstand — möglicherweise doppelt verplant."
+                        })
+                except Exception:
+                    pass
+
+    if not warnings:
+        warnings.append({"level":"ok","msg":"Alle Checks bestanden — Plan sieht plausibel aus! ✅"})
+
+    return warnings

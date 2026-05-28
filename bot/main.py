@@ -684,6 +684,67 @@ async def handle_refresh_res_push(request: aiohttp_web.Request) -> aiohttp_web.R
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
+async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Send Discord DMs to each attacker with their waves from an op plan."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id",""))
+        plan = data.get("plan",{})
+    except Exception:
+        return aiohttp_web.json_response({"ok":False,"error":"invalid json"}, status=400)
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok":False,"error":"guild not found"}, status=404)
+
+    plan_name = plan.get("name","Einsatz")
+    landing   = (plan.get("landing_time") or "")[:16].replace("T"," ")
+    ally      = plan.get("target_ally") or ""
+
+    # Build per-attacker message
+    attacker_waves: dict[str, list] = {}
+    for t in plan.get("targets",[]):
+        coords = f"({t.get('x')}|{t.get('y')})"
+        player = t.get("player_name","?")
+        for w in t.get("waves",[]):
+            aid = w.get("attacker_discord_id","")
+            aname = w.get("attacker_name","")
+            key = aid or aname
+            attacker_waves.setdefault(key, []).append({
+                "type": w.get("wave_type","?"),
+                "send_time": (w.get("send_time") or "—")[:16].replace("T"," "),
+                "target": f"{player} {coords}",
+                "origin": w.get("origin_village","?"),
+                "travel": w.get("travel_seconds",0),
+            })
+
+    sent = 0
+    for key, waves in attacker_waves.items():
+        member = None
+        if key and key.isdigit():
+            member = guild.get_member(int(key))
+        if not member:
+            continue
+        try:
+            wave_lines = "\n".join([
+                f"  {'⚔' if w['type']=='real' else '👻' if w['type']=='fake' else '🛡' if w['type']=='def' else '🔍'} "
+                f"**{w['type'].upper()}** → {w['target']}\n"
+                f"    📤 Senden: **{w['send_time']}** | 🕐 Marsch: {w['travel']//3600}h{(w['travel']%3600)//60}m | Von: {w['origin']}"
+                for w in waves
+            ])
+            msg = (f"⚔️ **Einsatz: {plan_name}**\n"
+                   f"{'🎯 Ziel-Allianz: ' + ally + chr(10) if ally else ''}"
+                   f"🕐 Ankunftszeit: **{landing}**\n\n"
+                   f"**Deine Wellen:**\n{wave_lines}\n\n"
+                   f"➡️ Details: TravOps → Einsatzplanung")
+            await member.send(msg)
+            sent += 1
+        except Exception:
+            pass
+
+    return aiohttp_web.json_response({"ok":True,"sent":sent})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -697,6 +758,7 @@ async def start_api_server():
     app.router.add_get("/api/hero-scout-library-status", handle_hero_library_status)
     app.router.add_post("/api/refresh-res-push", handle_refresh_res_push)
     app.router.add_post("/api/refresh-request-hub", handle_refresh_request_hub)
+    app.router.add_post("/api/op-notify", handle_op_notify)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

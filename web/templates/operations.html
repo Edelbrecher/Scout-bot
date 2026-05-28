@@ -1,0 +1,1107 @@
+{% extends "base.html" %}
+{% block title %}Einsatzplanung · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+/* ── Layout ─────────────────────────────────────────────────── */
+.op-shell { display:flex; gap:0; height:calc(100vh - 56px); overflow:hidden; }
+.op-sidebar {
+  width:280px; flex-shrink:0; background:var(--bg-card);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.op-main {
+  flex:1; overflow-y:auto; background:var(--bg-main);
+  display:flex; flex-direction:column;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.op-sidebar-header {
+  padding:.75rem 1rem; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.op-plan-list { overflow-y:auto; flex:1; padding:.4rem 0; }
+.op-plan-item {
+  padding:.55rem 1rem; cursor:pointer; border-left:3px solid transparent;
+  transition:background .15s;
+}
+.op-plan-item:hover { background:var(--bg-main); }
+.op-plan-item.active { border-left-color:#f59e0b; background:rgba(245,158,11,.08); }
+.op-plan-item .pi-name { font-weight:600; font-size:.88rem; }
+.op-plan-item .pi-meta { font-size:.72rem; color:var(--text-muted); margin-top:.15rem; }
+.status-badge { display:inline-block; font-size:.65rem; padding:1px 6px; border-radius:8px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+.status-draft     { background:rgba(107,114,128,.2); color:#9ca3af; }
+.status-active    { background:rgba(234,179,8,.2);   color:#fbbf24; }
+.status-completed { background:rgba(34,197,94,.2);   color:#4ade80; }
+.status-cancelled { background:rgba(239,68,68,.2);   color:#f87171; }
+
+/* ── Main header ────────────────────────────────────────────── */
+.op-topbar {
+  padding:.65rem 1.25rem; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap; flex-shrink:0;
+  background:var(--bg-card);
+}
+.op-plan-title { font-size:1.1rem; font-weight:700; flex:1; min-width:0; }
+
+/* ── Content area ───────────────────────────────────────────── */
+.op-content { padding:1.25rem; flex:1; }
+
+/* ── Plan editor grid ───────────────────────────────────────── */
+.op-editor-grid { display:grid; grid-template-columns:1fr 340px; gap:1rem; align-items:start; }
+@media(max-width:1100px){ .op-editor-grid { grid-template-columns:1fr; } }
+
+/* ── Target card ────────────────────────────────────────────── */
+.target-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:10px; margin-bottom:1rem; overflow:hidden;
+}
+.target-header {
+  padding:.6rem 1rem; display:flex; align-items:center; gap:.75rem;
+  background:rgba(0,0,0,.12); cursor:pointer; user-select:none;
+}
+.target-coords { font-family:monospace; font-size:.8rem; color:#93c5fd;
+  background:rgba(59,130,246,.12); padding:2px 8px; border-radius:6px; }
+.target-player { font-weight:600; font-size:.9rem; }
+.target-village{ font-size:.8rem; color:var(--text-muted); }
+.target-body { padding:.75rem 1rem; }
+
+/* ── Wave table ─────────────────────────────────────────────── */
+.wave-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.wave-table th { color:var(--text-muted); font-weight:600; padding:.3rem .6rem; text-align:left;
+  border-bottom:1px solid var(--border); white-space:nowrap; }
+.wave-table td { padding:.35rem .6rem; border-bottom:1px solid rgba(255,255,255,.04);
+  vertical-align:middle; }
+.wave-table tr:last-child td { border-bottom:none; }
+.wave-type-badge { font-size:.7rem; padding:2px 7px; border-radius:6px; font-weight:700; }
+.wt-real   { background:rgba(239,68,68,.2);  color:#f87171; }
+.wt-fake   { background:rgba(107,114,128,.2);color:#9ca3af; }
+.wt-def    { background:rgba(59,130,246,.2); color:#93c5fd; }
+.wt-scout  { background:rgba(168,85,247,.2); color:#c084fc; }
+
+/* ── Troop chips ─────────────────────────────────────────────── */
+.troop-chip {
+  display:inline-block; font-size:.72rem; background:rgba(255,255,255,.06);
+  border:1px solid var(--border); border-radius:4px; padding:1px 6px; margin:1px 2px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn-icon { background:transparent; border:1px solid var(--border); border-radius:6px;
+  padding:.25rem .5rem; color:var(--text-muted); cursor:pointer; font-size:.8rem;
+  transition:all .15s; }
+.btn-icon:hover { background:var(--bg-main); color:var(--text); }
+.btn-icon.danger:hover { border-color:#ef4444; color:#ef4444; }
+
+/* ── Right panel ─────────────────────────────────────────────── */
+.op-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.op-panel-tabs { display:flex; border-bottom:1px solid var(--border); }
+.op-panel-tab { flex:1; padding:.55rem; text-align:center; font-size:.8rem; cursor:pointer;
+  color:var(--text-muted); border-bottom:2px solid transparent; transition:all .15s; }
+.op-panel-tab.active { color:#f59e0b; border-bottom-color:#f59e0b; }
+.op-panel-body { padding:.9rem; }
+
+/* ── Plausibility ────────────────────────────────────────────── */
+.pcheck-item { display:flex; gap:.5rem; align-items:flex-start; padding:.4rem 0;
+  border-bottom:1px solid rgba(255,255,255,.04); font-size:.82rem; }
+.pcheck-item:last-child { border-bottom:none; }
+.pcheck-icon { flex-shrink:0; font-size:.9rem; }
+
+/* ── Favorite item ───────────────────────────────────────────── */
+.fav-item { display:flex; align-items:center; gap:.5rem; padding:.4rem .6rem;
+  border-radius:6px; cursor:pointer; transition:background .15s; font-size:.82rem; }
+.fav-item:hover { background:var(--bg-main); }
+.fav-coords { font-family:monospace; color:#93c5fd; font-size:.75rem;
+  background:rgba(59,130,246,.1); padding:1px 5px; border-radius:4px; }
+
+/* ── Member troops ───────────────────────────────────────────── */
+.member-item { padding:.5rem .75rem; border-radius:8px; border:1px solid var(--border);
+  margin-bottom:.5rem; cursor:pointer; transition:all .15s; }
+.member-item:hover { border-color:#f59e0b; background:rgba(245,158,11,.05); }
+.member-item.selected { border-color:#f59e0b; background:rgba(245,158,11,.1); }
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.op-modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.65);
+  display:none; align-items:center; justify-content:center; z-index:900;
+}
+.op-modal-overlay.open { display:flex; }
+.op-modal {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
+  width:min(680px, 96vw); max-height:92vh; overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.op-modal-header { padding:1rem 1.25rem; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; }
+.op-modal-body { padding:1.25rem; }
+.op-modal-footer { padding:.75rem 1.25rem; border-top:1px solid var(--border);
+  display:flex; justify-content:flex-end; gap:.5rem; }
+
+/* ── Form helpers ────────────────────────────────────────────── */
+.form-row { display:flex; gap:.6rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:.75rem; }
+.form-group { display:flex; flex-direction:column; gap:.25rem; flex:1; min-width:120px; }
+.form-group label { font-size:.78rem; color:var(--text-muted); font-weight:600; }
+.form-group input, .form-group select, .form-group textarea {
+  background:var(--bg-main); border:1px solid var(--border); border-radius:7px;
+  padding:.4rem .7rem; color:var(--text); font-size:.88rem; width:100%;
+}
+.form-group input:focus, .form-group select:focus {
+  outline:none; border-color:#f59e0b; box-shadow:0 0 0 2px rgba(245,158,11,.15);
+}
+.troop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.4rem; }
+.troop-entry { display:flex; align-items:center; gap:.4rem; }
+.troop-entry label { font-size:.78rem; white-space:nowrap; flex:1; }
+.troop-entry input { width:70px; text-align:right; }
+
+/* ── Empty state ─────────────────────────────────────────────── */
+.op-empty { text-align:center; padding:4rem 2rem; color:var(--text-muted); }
+.op-empty-icon { font-size:3rem; margin-bottom:.75rem; }
+
+/* ── Send time highlight ─────────────────────────────────────── */
+.send-time { font-family:monospace; font-size:.78rem; color:#fbbf24; }
+.travel-time { font-size:.72rem; color:var(--text-muted); }
+
+/* ── Tribe pills ─────────────────────────────────────────────── */
+.tribe-pill { display:inline-block; font-size:.65rem; padding:1px 6px; border-radius:8px;
+  background:rgba(255,255,255,.06); border:1px solid var(--border); }
+</style>
+
+<!-- Inject data for JS -->
+<script>
+const GUILD_ID = {{ guild.guild_id | tojson }};
+const TROOPS_DEF = {{ troops_def | tojson }};
+const INIT_PLANS = {{ plans | tojson }};
+const INIT_FAVS  = {{ favorites | tojson }};
+const INIT_MEMBERS = {{ members | tojson }};
+</script>
+
+<div class="op-shell">
+
+  <!-- ══ SIDEBAR ══════════════════════════════════════════════════════ -->
+  <div class="op-sidebar">
+    <div class="op-sidebar-header">
+      <div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">
+          <a href="/guild/{{ guild.guild_id }}" style="color:var(--text-muted);text-decoration:none;">← {{ guild.guild_name }}</a>
+        </div>
+        <div style="font-weight:700;font-size:.95rem;margin-top:.1rem;">⚔️ Einsatzplanung</div>
+      </div>
+      <button class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;" onclick="openNewPlanModal()">+ Neu</button>
+    </div>
+
+    <!-- Filter chips -->
+    <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;gap:.3rem;flex-wrap:wrap;">
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('all')" id="filter-all">Alle</button>
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('draft')" id="filter-draft">Entwurf</button>
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('active')" id="filter-active">Aktiv</button>
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('completed')" id="filter-completed">Fertig</button>
+    </div>
+
+    <div class="op-plan-list" id="planList"></div>
+  </div>
+
+  <!-- ══ MAIN ═════════════════════════════════════════════════════════ -->
+  <div class="op-main">
+
+    <!-- Top bar (shown when plan loaded) -->
+    <div class="op-topbar" id="opTopbar" style="display:none;">
+      <div style="display:flex;align-items:center;gap:.75rem;flex:1;min-width:0;">
+        <span id="topPlanName" class="op-plan-title"></span>
+        <span id="topPlanStatus" class="status-badge"></span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <span id="topLandingTime" style="font-size:.82rem;color:#fbbf24;font-family:monospace;"></span>
+        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Prüfung</button>
+        <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
+        <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
+        <button class="btn-icon danger" onclick="deletePlan()">🗑</button>
+      </div>
+    </div>
+
+    <div class="op-content" id="opContent">
+      <!-- Empty state -->
+      <div class="op-empty" id="opEmptyState">
+        <div class="op-empty-icon">⚔️</div>
+        <h2 style="margin:0 0 .5rem;">Einsatzplanung</h2>
+        <p style="max-width:360px;margin:0 auto .75rem;">Erstelle einen neuen Einsatzplan oder wähle einen aus der Liste.</p>
+        <button class="btn btn-primary" onclick="openNewPlanModal()">+ Ersten Einsatz erstellen</button>
+      </div>
+
+      <!-- Plan editor (hidden until plan selected) -->
+      <div id="opEditor" style="display:none;">
+        <div class="op-editor-grid">
+
+          <!-- LEFT: Targets + Waves -->
+          <div>
+            <!-- Add target row -->
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+              <div style="font-size:.9rem;font-weight:700;flex:1;">🎯 Ziele</div>
+              <input id="targetSearch" type="text" placeholder="Spieler / Koordinaten suchen…"
+                     style="width:220px;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.35rem .7rem;color:var(--text);font-size:.82rem;"
+                     oninput="debounceSearch(this.value)" autocomplete="off">
+              <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
+            </div>
+
+            <!-- Search dropdown -->
+            <div id="searchDropdown" style="display:none;position:relative;margin-bottom:.75rem;">
+              <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:250px;overflow-y:auto;" id="searchResults"></div>
+            </div>
+
+            <!-- Target list -->
+            <div id="targetList"></div>
+
+            <div id="noTargets" style="text-align:center;padding:2rem;color:var(--text-muted);font-size:.85rem;display:none;">
+              Noch keine Ziele — suche nach einem Spieler oder gib Koordinaten manuell ein.
+            </div>
+          </div>
+
+          <!-- RIGHT: Panel (Plan info, Favourites, Members, Check) -->
+          <div>
+            <div class="op-panel">
+              <div class="op-panel-tabs">
+                <div class="op-panel-tab active" onclick="switchPanel('info',this)">📋 Plan</div>
+                <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favoriten</div>
+                <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Truppen</div>
+                <div class="op-panel-tab" onclick="switchPanel('check',this)">🔍 Check</div>
+              </div>
+
+              <!-- Plan info -->
+              <div class="op-panel-body" id="panel-info">
+                <div id="planInfoContent" style="font-size:.83rem;line-height:1.8;"></div>
+              </div>
+
+              <!-- Favourites -->
+              <div class="op-panel-body" id="panel-favs" style="display:none;">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;">Klicken um als Ziel hinzuzufügen · 🗑 zum Löschen</div>
+                <div id="favsList"></div>
+                <div id="noFavs" style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">Noch keine Favoriten. Ziele über ⭐ speichern.</div>
+              </div>
+
+              <!-- Members / Troops -->
+              <div class="op-panel-body" id="panel-members" style="display:none;">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;">Truppenstand aus letztem Account-Upload</div>
+                <div id="membersList"></div>
+              </div>
+
+              <!-- Plausibility check -->
+              <div class="op-panel-body" id="panel-check" style="display:none;">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Automatische Überprüfung des Plans auf häufige Fehler.</div>
+                <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="runCheck()">🔍 Jetzt prüfen</button>
+                <div id="checkResults"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODALS ════════════════════════════════════════════════════════ -->
+
+<!-- New/Edit Plan Modal -->
+<div class="op-modal-overlay" id="planModal">
+  <div class="op-modal">
+    <div class="op-modal-header">
+      <span id="planModalTitle" style="font-weight:700;">Neuer Einsatz</span>
+      <button class="btn-icon" onclick="closeModal('planModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+      <div class="form-row">
+        <div class="form-group" style="flex:2;">
+          <label>Einsatzname</label>
+          <input id="pmName" type="text" placeholder="z.B. Op Sturmvogel" maxlength="100">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="pmStatus">
+            <option value="draft">Entwurf</option>
+            <option value="active">Aktiv</option>
+            <option value="completed">Abgeschlossen</option>
+            <option value="cancelled">Abgebrochen</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ankunftszeit (Serverzeit)</label>
+          <input id="pmLanding" type="datetime-local">
+        </div>
+        <div class="form-group" style="max-width:120px;">
+          <label>Server-Speed</label>
+          <select id="pmSpeed">
+            <option value="1">1x</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+            <option value="5">5x</option>
+            <option value="10">10x</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Angegriffene Allianz (optional)</label>
+          <input id="pmAlly" type="text" placeholder="z.B. ATTILA" maxlength="80">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notizen</label>
+        <textarea id="pmNotes" rows="2" placeholder="Infos, Ziele, Koordination…" style="resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('planModal')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="savePlan()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Target Modal -->
+<div class="op-modal-overlay" id="targetModal">
+  <div class="op-modal">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">🎯 Ziel hinzufügen</span>
+      <button class="btn-icon" onclick="closeModal('targetModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Spieler</label>
+          <input id="tmPlayer" type="text" placeholder="Spielername">
+        </div>
+        <div class="form-group">
+          <label>Dorfname</label>
+          <input id="tmVillage" type="text" placeholder="Dorfname">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="max-width:110px;">
+          <label>X-Koordinate</label>
+          <input id="tmX" type="number" placeholder="-400…400">
+        </div>
+        <div class="form-group" style="max-width:110px;">
+          <label>Y-Koordinate</label>
+          <input id="tmY" type="number" placeholder="-400…400">
+        </div>
+        <div class="form-group" style="max-width:110px;">
+          <label>Bevölkerung</label>
+          <input id="tmPop" type="number" placeholder="0" min="0">
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn-icon" title="Als Favorit speichern" onclick="saveAsFav()" style="margin-bottom:1px;">⭐</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notizen</label>
+        <input id="tmNotes" type="text" placeholder="optional">
+      </div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('targetModal')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addTarget()">+ Ziel hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Wave Modal -->
+<div class="op-modal-overlay" id="waveModal">
+  <div class="op-modal" style="width:min(720px,96vw);">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">💥 Welle hinzufügen — <span id="waveModalTarget"></span></span>
+      <button class="btn-icon" onclick="closeModal('waveModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+
+      <!-- Attacker selection -->
+      <div style="margin-bottom:.9rem;">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">Angreifer</div>
+        <div class="form-row">
+          <div class="form-group" style="flex:2;">
+            <label>Name / Discordname</label>
+            <input id="wmAttacker" type="text" placeholder="z.B. Currax" list="memberSuggestions">
+            <datalist id="memberSuggestions"></datalist>
+          </div>
+          <div class="form-group">
+            <label>Herkunfts-Dorf</label>
+            <input id="wmOriginVillage" type="text" placeholder="Dorfname">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="max-width:110px;">
+            <label>Herkunft X</label>
+            <input id="wmOX" type="number" placeholder="X" oninput="recalcWaveTime()">
+          </div>
+          <div class="form-group" style="max-width:110px;">
+            <label>Herkunft Y</label>
+            <input id="wmOY" type="number" placeholder="Y" oninput="recalcWaveTime()">
+          </div>
+          <div class="form-group" style="max-width:160px;">
+            <label>Volk</label>
+            <select id="wmTribe" onchange="updateTroopGrid(); recalcWaveTime();">
+              <option value="romans">Römer</option>
+              <option value="gauls">Gallier</option>
+              <option value="teutons">Teutonen</option>
+              <option value="huns">Hunnen</option>
+              <option value="egyptians">Ägypter</option>
+            </select>
+          </div>
+          <div class="form-group" style="max-width:130px;">
+            <label>Wellentyp</label>
+            <select id="wmType">
+              <option value="real">🗡 Echter Angriff</option>
+              <option value="fake">👻 Fake</option>
+              <option value="def">🛡 Verteidigung</option>
+              <option value="scout">🔍 Aufklärung</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick load from member troops -->
+      <div id="memberTroopBtn" style="margin-bottom:.75rem;">
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadFromMember()">📥 Truppen aus Account laden</button>
+        <span id="memberTroopHint" style="font-size:.75rem;color:var(--text-muted);margin-left:.5rem;"></span>
+      </div>
+
+      <!-- Troop grid -->
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Truppen</div>
+        <div class="troop-grid" id="troopGrid"></div>
+      </div>
+
+      <!-- Timing preview -->
+      <div id="waveTiming" style="margin-top:.9rem;padding:.65rem .85rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;display:none;">
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.25rem;">Berechnete Sendezeit</div>
+        <div id="waveTimingText" style="font-family:monospace;color:#fbbf24;font-size:.95rem;font-weight:700;"></div>
+        <div id="waveTravelText" style="font-size:.75rem;color:var(--text-muted);"></div>
+      </div>
+
+      <div class="form-group" style="margin-top:.75rem;">
+        <label>Notizen</label>
+        <input id="wmNotes" type="text" placeholder="optional">
+      </div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('waveModal')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addWave()">+ Welle hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ State ═══════════════════════════════════════════════════════════════
+let plans = INIT_PLANS.slice();
+let favs  = INIT_FAVS.slice();
+let members = INIT_MEMBERS.slice();
+let activePlan = null;   // full plan object with targets+waves
+let activePlanId = null;
+let currentTargetId = null; // for wave modal
+let planFilter = 'all';
+let editingPlanId = null; // null = new plan, else update
+
+const BASE = `/guild/${GUILD_ID}/operations/api`;
+
+// ══ Utilities ════════════════════════════════════════════════════════════
+async function apiFetch(path, opts={}) {
+  const r = await fetch(BASE + path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function apiPost(path, data={}) {
+  const fd = new FormData();
+  Object.entries(data).forEach(([k,v]) => fd.append(k, v ?? ''));
+  return apiFetch(path, {method:'POST', body:fd});
+}
+
+function fmtDatetime(s) {
+  if (!s) return '—';
+  return s.replace('T',' ').slice(0,16);
+}
+function fmtTravel(sec) {
+  if (!sec) return '';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s2 = sec%60;
+  return [h?h+'h':'', m?m+'m':'', s2?s2+'s':''].filter(Boolean).join(' ');
+}
+function statusLabel(s) {
+  const m = {draft:'Entwurf',active:'Aktiv',completed:'Abgeschlossen',cancelled:'Abgebrochen'};
+  return m[s]||s;
+}
+function waveTypeLabel(t) {
+  return {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout'}[t]||t;
+}
+function tribeName(t) {
+  return {romans:'Römer',gauls:'Gallier',teutons:'Teutonen',huns:'Hunnen',egyptians:'Ägypter'}[t]||t;
+}
+let _searchTimer;
+function debounceSearch(q) { clearTimeout(_searchTimer); _searchTimer = setTimeout(()=>doSearch(q), 300); }
+
+// ══ Sidebar plan list ════════════════════════════════════════════════════
+function renderPlanList() {
+  const el = document.getElementById('planList');
+  const filtered = planFilter==='all' ? plans : plans.filter(p=>p.status===planFilter);
+  if (!filtered.length) {
+    el.innerHTML = '<div style="padding:1.25rem;text-align:center;color:var(--text-muted);font-size:.82rem;">Keine Pläne.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(p => `
+    <div class="op-plan-item ${p.id===activePlanId?'active':''}" onclick="loadPlan(${p.id})">
+      <div class="pi-name">${escHtml(p.name)}</div>
+      <div class="pi-meta">
+        <span class="status-badge status-${p.status}">${statusLabel(p.status)}</span>
+        ${p.landing_time ? `<span style="margin-left:.3rem;">🕐 ${fmtDatetime(p.landing_time)}</span>` : ''}
+        <span style="margin-left:.3rem;opacity:.6;">${p.target_count||0}Z · ${p.wave_count||0}W</span>
+      </div>
+    </div>
+  `).join('');
+}
+function filterPlans(f) {
+  planFilter = f;
+  document.querySelectorAll('[id^=filter-]').forEach(b=>b.style.background='');
+  document.getElementById('filter-'+f).style.background='rgba(245,158,11,.15)';
+  renderPlanList();
+}
+
+// ══ Load plan ═════════════════════════════════════════════════════════════
+async function loadPlan(id) {
+  activePlanId = id;
+  renderPlanList();
+  try {
+    activePlan = await apiFetch(`/plans/${id}`);
+    renderEditor();
+  } catch(e) { alert('Fehler beim Laden: '+e.message); }
+}
+
+function renderEditor() {
+  const p = activePlan;
+  document.getElementById('opEmptyState').style.display='none';
+  document.getElementById('opEditor').style.display='block';
+  document.getElementById('opTopbar').style.display='flex';
+
+  document.getElementById('topPlanName').textContent = p.name;
+  const sb = document.getElementById('topPlanStatus');
+  sb.textContent = statusLabel(p.status);
+  sb.className = `status-badge status-${p.status}`;
+  document.getElementById('topLandingTime').textContent =
+    p.landing_time ? '🕐 ' + fmtDatetime(p.landing_time) : '';
+
+  renderPlanInfo();
+  renderTargets();
+  renderFavs();
+  renderMembers();
+}
+
+function renderPlanInfo() {
+  const p = activePlan;
+  document.getElementById('planInfoContent').innerHTML = `
+    <table style="width:100%;font-size:.82rem;">
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Name</td><td style="padding:.2rem .4rem;font-weight:600;">${escHtml(p.name)}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Status</td><td style="padding:.2rem .4rem;"><span class="status-badge status-${p.status}">${statusLabel(p.status)}</span></td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Ankunft</td><td style="padding:.2rem .4rem;font-family:monospace;color:#fbbf24;">${fmtDatetime(p.landing_time)}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Speed</td><td style="padding:.2rem .4rem;">${p.server_speed}x</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Gegner-Ally</td><td style="padding:.2rem .4rem;">${escHtml(p.target_ally||'—')}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Ziele</td><td style="padding:.2rem .4rem;">${(p.targets||[]).length}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Wellen</td><td style="padding:.2rem .4rem;">${(p.targets||[]).reduce((a,t)=>a+(t.waves||[]).length,0)}</td></tr>
+      ${p.notes ? `<tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Notizen</td><td style="padding:.2rem .4rem;">${escHtml(p.notes)}</td></tr>` : ''}
+    </table>
+  `;
+}
+
+// ══ Targets ══════════════════════════════════════════════════════════════
+function renderTargets() {
+  const targets = (activePlan?.targets)||[];
+  const el = document.getElementById('targetList');
+  const noEl = document.getElementById('noTargets');
+  if (!targets.length) { el.innerHTML=''; noEl.style.display='block'; return; }
+  noEl.style.display='none';
+  el.innerHTML = targets.map(t => renderTargetCard(t)).join('');
+}
+
+function renderTargetCard(t) {
+  const realCnt  = (t.waves||[]).filter(w=>w.wave_type==='real').length;
+  const fakeCnt  = (t.waves||[]).filter(w=>w.wave_type==='fake').length;
+  const defCnt   = (t.waves||[]).filter(w=>w.wave_type==='def').length;
+  const scoutCnt = (t.waves||[]).filter(w=>w.wave_type==='scout').length;
+  const fakeOk   = !realCnt || fakeCnt >= realCnt*3;
+
+  return `
+  <div class="target-card" id="tc-${t.id}">
+    <div class="target-header" onclick="toggleTarget(${t.id})">
+      <span class="target-coords">${t.x}|${t.y}</span>
+      <div style="flex:1;">
+        <div class="target-player">${escHtml(t.player_name)||'Unbekannt'}</div>
+        <div class="target-village">${escHtml(t.village_name)||''} ${t.population?'· '+t.population+' Pop':''}</div>
+      </div>
+      <div style="display:flex;gap:.3rem;align-items:center;">
+        ${realCnt ? `<span class="wave-type-badge wt-real">⚔ ${realCnt}</span>` : ''}
+        ${fakeCnt ? `<span class="wave-type-badge wt-fake">👻 ${fakeCnt}</span>` : ''}
+        ${defCnt  ? `<span class="wave-type-badge wt-def">🛡 ${defCnt}</span>` : ''}
+        ${scoutCnt? `<span class="wave-type-badge wt-scout">🔍 ${scoutCnt}</span>` : ''}
+        ${realCnt && !fakeOk ? '<span title="Zu wenig Fakes!" style="color:#f59e0b;">⚠️</span>' : ''}
+        <button class="btn-icon" title="Welle hinzufügen" style="font-size:.75rem;" onclick="event.stopPropagation();openWaveModal(${t.id},'${escHtml(t.player_name||'')} (${t.x}|${t.y})')">+ Welle</button>
+        <button class="btn-icon" title="Als Favorit" style="font-size:.75rem;" onclick="event.stopPropagation();favTarget(${t.id})">⭐</button>
+        <button class="btn-icon danger" title="Ziel entfernen" style="font-size:.75rem;" onclick="event.stopPropagation();deleteTarget(${t.id})">🗑</button>
+        <span style="color:var(--text-muted);font-size:.8rem;" id="tc-chevron-${t.id}">▼</span>
+      </div>
+    </div>
+    <div class="target-body" id="tc-body-${t.id}">
+      ${renderWavesTable(t)}
+    </div>
+  </div>`;
+}
+
+function toggleTarget(id) {
+  const body = document.getElementById(`tc-body-${id}`);
+  const chev = document.getElementById(`tc-chevron-${id}`);
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chev.textContent = open ? '►' : '▼';
+}
+
+function renderWavesTable(t) {
+  if (!t.waves?.length) return `<div style="color:var(--text-muted);font-size:.82rem;padding:.25rem 0;">Keine Wellen — klicke "+ Welle" um eine hinzuzufügen.</div>`;
+  const rows = t.waves.map(w => {
+    const troops = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
+      .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('');
+    return `
+    <tr>
+      <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeLabel(w.wave_type)}</span></td>
+      <td><strong>${escHtml(w.attacker_name)}</strong><br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}</span></td>
+      <td><span class="tribe-pill">${tribeName(w.tribe)}</span></td>
+      <td>${troops || '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>
+        <div class="send-time">${w.send_time ? fmtDatetime(w.send_time) : '—'}</div>
+        <div class="travel-time">${w.travel_seconds ? '🕐 ' + fmtTravel(w.travel_seconds) : ''}</div>
+      </td>
+      <td>
+        <button class="btn-icon danger" style="font-size:.7rem;" title="Welle löschen" onclick="deleteWave(${w.id},${t.id})">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  return `
+  <table class="wave-table">
+    <thead><tr>
+      <th>Typ</th><th>Angreifer</th><th>Volk</th><th>Truppen</th><th>Sendezeit</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function getTroopName(id, tribe) {
+  const list = TROOPS_DEF[tribe]||[];
+  const t = list.find(t=>t.id===id);
+  return t ? t.name : id;
+}
+
+// ══ Search ════════════════════════════════════════════════════════════════
+async function doSearch(q) {
+  const dd = document.getElementById('searchDropdown');
+  const res = document.getElementById('searchResults');
+  if (!q || q.length < 2) { dd.style.display='none'; return; }
+  try {
+    const data = await apiFetch(`/villages?q=${encodeURIComponent(q)}`);
+    if (!data.results?.length) { dd.style.display='none'; return; }
+    res.innerHTML = data.results.map(v => `
+      <div class="fav-item" onclick="addTargetFromSearch(${v.x},${v.y},'${escJs(v.player_name||'')}','${escJs(v.village_name||'')}',${v.population||0})">
+        <span class="fav-coords">${v.x}|${v.y}</span>
+        <span style="font-weight:600;">${escHtml(v.player_name||'?')}</span>
+        <span style="color:var(--text-muted);">${escHtml(v.village_name||'')}</span>
+        ${v.population ? `<span style="color:var(--text-muted);font-size:.72rem;">${v.population} Pop</span>` : ''}
+      </div>
+    `).join('');
+    dd.style.display='block';
+  } catch(e) { dd.style.display='none'; }
+}
+
+function addTargetFromSearch(x, y, player, village, pop) {
+  document.getElementById('searchDropdown').style.display='none';
+  document.getElementById('targetSearch').value='';
+  document.getElementById('tmX').value=x;
+  document.getElementById('tmY').value=y;
+  document.getElementById('tmPlayer').value=player;
+  document.getElementById('tmVillage').value=village;
+  document.getElementById('tmPop').value=pop||0;
+  addTarget();
+}
+
+// ══ Target CRUD ═══════════════════════════════════════════════════════════
+function openManualTargetModal() {
+  ['tmPlayer','tmVillage','tmNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tmX').value='';
+  document.getElementById('tmY').value='';
+  document.getElementById('tmPop').value='0';
+  openModal('targetModal');
+}
+
+async function addTarget() {
+  if (!activePlanId) return;
+  const x = parseInt(document.getElementById('tmX').value);
+  const y = parseInt(document.getElementById('tmY').value);
+  if (isNaN(x)||isNaN(y)) { alert('Koordinaten erforderlich.'); return; }
+  try {
+    const r = await apiPost(`/plans/${activePlanId}/targets`, {
+      player_name: document.getElementById('tmPlayer').value,
+      village_name: document.getElementById('tmVillage').value,
+      x, y,
+      population: parseInt(document.getElementById('tmPop').value)||0,
+      notes: document.getElementById('tmNotes').value,
+    });
+    closeModal('targetModal');
+    await reloadActivePlan();
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+async function deleteTarget(id) {
+  if (!confirm('Ziel und alle Wellen löschen?')) return;
+  await apiPost(`/targets/${id}/delete`);
+  await reloadActivePlan();
+}
+
+async function favTarget(targetId) {
+  const t = activePlan?.targets?.find(t=>t.id===targetId);
+  if (!t) return;
+  const label = prompt('Favorit-Label (optional):', t.player_name||'');
+  if (label === null) return;
+  try {
+    const r = await apiPost('/favorites', {player_name:t.player_name,village_name:t.village_name,x:t.x,y:t.y,label:label||''});
+    favs.push({id:r.id,x:t.x,y:t.y,player_name:t.player_name,village_name:t.village_name,label:label});
+    renderFavs();
+  } catch(e) {}
+}
+
+// ══ Wave Modal ════════════════════════════════════════════════════════════
+function openWaveModal(targetId, targetLabel) {
+  currentTargetId = targetId;
+  document.getElementById('waveModalTarget').textContent = targetLabel;
+  ['wmAttacker','wmOriginVillage','wmNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('wmOX').value='';
+  document.getElementById('wmOY').value='';
+  document.getElementById('wmTribe').value='romans';
+  document.getElementById('wmType').value='real';
+  document.getElementById('waveTiming').style.display='none';
+  updateTroopGrid();
+
+  // Populate member suggestions
+  const dl = document.getElementById('memberSuggestions');
+  dl.innerHTML = members.map(m=>`<option value="${escHtml(m.discord_name)}">${escHtml(m.discord_name)} (${escHtml(m.travian_name||'?')})</option>`).join('');
+
+  openModal('waveModal');
+}
+
+function updateTroopGrid() {
+  const tribe = document.getElementById('wmTribe').value;
+  const troops = TROOPS_DEF[tribe]||[];
+  document.getElementById('troopGrid').innerHTML = troops.map(t =>
+    `<div class="troop-entry">
+      <label title="${t.speed} Fel/h">${t.name}</label>
+      <input type="number" id="troop-${t.id}" min="0" value="" placeholder="0"
+             oninput="recalcWaveTime()" style="width:70px;background:var(--bg-main);border:1px solid var(--border);border-radius:5px;padding:.25rem .4rem;color:var(--text);font-size:.82rem;text-align:right;">
+    </div>`
+  ).join('');
+}
+
+function loadFromMember() {
+  const name = document.getElementById('wmAttacker').value.trim().toLowerCase();
+  const m = members.find(m => m.discord_name.toLowerCase()===name || (m.travian_name||'').toLowerCase()===name);
+  if (!m) { document.getElementById('memberTroopHint').textContent='Kein Member mit diesem Namen gefunden.'; return; }
+  // Set tribe if detectable
+  if (m.tribe && TROOPS_DEF[m.tribe]) document.getElementById('wmTribe').value = m.tribe;
+  updateTroopGrid();
+  // Fill troop counts from all villages combined
+  const combined = {};
+  (m.villages||[]).forEach(v => {
+    Object.entries(v.troops||{}).forEach(([name,cnt]) => {
+      // Try to match troop name to id
+      const tribe = document.getElementById('wmTribe').value;
+      const troop = TROOPS_DEF[tribe]?.find(t=>t.name===name||t.id===name);
+      if (troop) combined[troop.id] = (combined[troop.id]||0) + (cnt||0);
+    });
+  });
+  Object.entries(combined).forEach(([id,cnt]) => {
+    const el = document.getElementById('troop-'+id);
+    if (el) el.value = cnt;
+  });
+  // Try fill origin from first village
+  const vill = m.villages?.[0];
+  if (vill) {
+    document.getElementById('wmOriginVillage').value = vill.village_name||'';
+    if (vill.x != null) document.getElementById('wmOX').value = vill.x;
+    if (vill.y != null) document.getElementById('wmOY').value = vill.y;
+  }
+  recalcWaveTime();
+  document.getElementById('memberTroopHint').textContent = `✓ Daten von ${m.discord_name} geladen`;
+}
+
+function recalcWaveTime() {
+  const tribe = document.getElementById('wmTribe').value;
+  const troops = TROOPS_DEF[tribe]||[];
+  const ox = parseInt(document.getElementById('wmOX').value);
+  const oy = parseInt(document.getElementById('wmOY').value);
+  if (!activePlan || isNaN(ox)||isNaN(oy)) { document.getElementById('waveTiming').style.display='none'; return; }
+
+  // Find target coords
+  const t = activePlan.targets?.find(t=>t.id===currentTargetId);
+  if (!t) { document.getElementById('waveTiming').style.display='none'; return; }
+
+  // Find slowest troop with count
+  let slowestSpeed = 999;
+  let slowestName = '';
+  troops.forEach(tr => {
+    const inp = document.getElementById('troop-'+tr.id);
+    if (inp && parseInt(inp.value)>0) {
+      if (tr.speed < slowestSpeed) { slowestSpeed=tr.speed; slowestName=tr.name; }
+    }
+  });
+  if (slowestSpeed===999 || !activePlan.landing_time) { document.getElementById('waveTiming').style.display='none'; return; }
+
+  const spd = parseFloat(activePlan.server_speed)||1;
+  const dx = Math.min(Math.abs(ox-t.x), 801-Math.abs(ox-t.x));
+  const dy = Math.min(Math.abs(oy-t.y), 801-Math.abs(oy-t.y));
+  const dist = Math.sqrt(dx*dx+dy*dy);
+  const travelSec = Math.round((dist/(slowestSpeed*spd))*3600);
+
+  const landingDt = new Date(activePlan.landing_time);
+  const sendDt = new Date(landingDt.getTime() - travelSec*1000);
+  const sendStr = sendDt.toISOString().replace('T',' ').slice(0,16);
+
+  document.getElementById('waveTiming').style.display='block';
+  document.getElementById('waveTimingText').textContent = sendStr + ' (Serverzeit)';
+  document.getElementById('waveTravelText').textContent = `🕐 Marschzeit: ${fmtTravel(travelSec)} · Langsamste Einheit: ${slowestName} (${slowestSpeed} Fel/h × ${spd}x)`;
+}
+
+async function addWave() {
+  if (!currentTargetId || !activePlanId) return;
+  const tribe = document.getElementById('wmTribe').value;
+  const troops = {};
+  (TROOPS_DEF[tribe]||[]).forEach(t => {
+    const el = document.getElementById('troop-'+t.id);
+    const v = parseInt(el?.value||0);
+    if (v > 0) troops[t.id] = v;
+  });
+  const ox = document.getElementById('wmOX').value;
+  const oy = document.getElementById('wmOY').value;
+  try {
+    const r = await apiPost(`/targets/${currentTargetId}/waves`, {
+      plan_id: activePlanId,
+      attacker_name: document.getElementById('wmAttacker').value,
+      origin_village: document.getElementById('wmOriginVillage').value,
+      origin_x: ox||'',
+      origin_y: oy||'',
+      wave_type: document.getElementById('wmType').value,
+      tribe,
+      troop_json: JSON.stringify(troops),
+      landing_time: activePlan?.landing_time||'',
+      server_speed: activePlan?.server_speed||1,
+      notes: document.getElementById('wmNotes').value,
+    });
+    closeModal('waveModal');
+    await reloadActivePlan();
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+async function deleteWave(waveId, targetId) {
+  if (!confirm('Welle löschen?')) return;
+  await apiPost(`/waves/${waveId}/delete`);
+  await reloadActivePlan();
+}
+
+// ══ Favourites ════════════════════════════════════════════════════════════
+function renderFavs() {
+  const el = document.getElementById('favsList');
+  const noEl = document.getElementById('noFavs');
+  if (!favs.length) { el.innerHTML=''; noEl.style.display='block'; return; }
+  noEl.style.display='none';
+  el.innerHTML = favs.map(f => `
+    <div class="fav-item" onclick="addTargetFromFav(${f.x},${f.y},'${escJs(f.player_name||'')}','${escJs(f.village_name||'')}')">
+      <span class="fav-coords">${f.x}|${f.y}</span>
+      <span style="flex:1;">${escHtml(f.label||f.player_name||'')} <span style="color:var(--text-muted);font-size:.75rem;">${escHtml(f.village_name||'')}</span></span>
+      <button class="btn-icon danger" style="font-size:.7rem;" onclick="event.stopPropagation();deleteFav(${f.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+function addTargetFromFav(x,y,player,village) {
+  document.getElementById('tmX').value=x;
+  document.getElementById('tmY').value=y;
+  document.getElementById('tmPlayer').value=player;
+  document.getElementById('tmVillage').value=village;
+  document.getElementById('tmPop').value=0;
+  addTarget();
+}
+
+async function deleteFav(id) {
+  await apiPost(`/favorites/${id}/delete`);
+  favs = favs.filter(f=>f.id!==id);
+  renderFavs();
+}
+
+// ══ Members panel ════════════════════════════════════════════════════════
+function renderMembers() {
+  const el = document.getElementById('membersList');
+  if (!members.length) {
+    el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">Keine Truppenstand-Uploads. Mitglieder können in "Mein Account" ihre Truppen hochladen.</div>';
+    return;
+  }
+  el.innerHTML = members.map(m => `
+    <div class="member-item" onclick="selectMemberForWave('${escJs(m.discord_name)}')">
+      <div style="font-weight:600;font-size:.85rem;">${escHtml(m.discord_name)} <span style="color:var(--text-muted);font-weight:400;font-size:.75rem;">${m.travian_name?'· '+escHtml(m.travian_name):''}</span></div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">
+        ⚔ Off: ${m.total_off||0} · 🛡 Def: ${m.total_def||0} · 🏘 ${(m.villages||[]).length} Dörfer
+        · <span style="opacity:.7;">${m.updated_at?m.updated_at.slice(0,10):''}</span>
+      </div>
+    </div>
+  `).join('');
+}
+function selectMemberForWave(name) {
+  switchPanel('members', document.querySelector('[onclick*="members"]'));
+}
+
+// ══ Plausibility check ════════════════════════════════════════════════════
+async function runCheck() {
+  if (!activePlanId) return;
+  switchPanel('check', document.querySelectorAll('.op-panel-tab')[3]);
+  const el = document.getElementById('checkResults');
+  el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">Prüfe…</div>';
+  try {
+    const data = await apiFetch(`/plans/${activePlanId}/check`);
+    const icons = {ok:'✅',info:'ℹ️',warning:'⚠️',error:'❌'};
+    const colors = {ok:'#4ade80',info:'#93c5fd',warning:'#fbbf24',error:'#f87171'};
+    el.innerHTML = (data.warnings||[]).map(w=>`
+      <div class="pcheck-item">
+        <span class="pcheck-icon">${icons[w.level]||'ℹ️'}</span>
+        <span style="color:${colors[w.level]||'var(--text)'}">${escHtml(w.msg)}</span>
+      </div>`).join('');
+  } catch(e) { el.innerHTML=`<div style="color:#f87171;">Fehler: ${e.message}</div>`; }
+}
+
+// ══ Discord notify ════════════════════════════════════════════════════════
+async function sendNotify() {
+  if (!activePlanId) return;
+  if (!confirm('Plan als Discord-Nachricht an alle betroffenen Mitglieder senden?')) return;
+  try {
+    const r = await apiPost(`/plans/${activePlanId}/notify`);
+    alert(r.ok ? '✅ Discord-Benachrichtigung gesendet!' : '⚠️ Benachrichtigung fehlgeschlagen (Bot prüfen).');
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+// ══ Plan modal ════════════════════════════════════════════════════════════
+function openNewPlanModal() {
+  editingPlanId = null;
+  document.getElementById('planModalTitle').textContent = 'Neuer Einsatz';
+  document.getElementById('pmName').value = '';
+  document.getElementById('pmStatus').value = 'draft';
+  document.getElementById('pmLanding').value = '';
+  document.getElementById('pmSpeed').value = '1';
+  document.getElementById('pmAlly').value = '';
+  document.getElementById('pmNotes').value = '';
+  openModal('planModal');
+}
+function openEditPlanModal() {
+  if (!activePlan) return;
+  editingPlanId = activePlan.id;
+  document.getElementById('planModalTitle').textContent = 'Einsatz bearbeiten';
+  document.getElementById('pmName').value = activePlan.name||'';
+  document.getElementById('pmStatus').value = activePlan.status||'draft';
+  document.getElementById('pmLanding').value = (activePlan.landing_time||'').slice(0,16);
+  document.getElementById('pmSpeed').value = String(activePlan.server_speed||1);
+  document.getElementById('pmAlly').value = activePlan.target_ally||'';
+  document.getElementById('pmNotes').value = activePlan.notes||'';
+  openModal('planModal');
+}
+
+async function savePlan() {
+  const data = {
+    name: document.getElementById('pmName').value.trim()||'Neuer Einsatz',
+    status: document.getElementById('pmStatus').value,
+    landing_time: document.getElementById('pmLanding').value,
+    server_speed: document.getElementById('pmSpeed').value,
+    target_ally: document.getElementById('pmAlly').value,
+    notes: document.getElementById('pmNotes').value,
+  };
+  try {
+    if (editingPlanId) {
+      await apiPost(`/plans/${editingPlanId}/update`, data);
+      closeModal('planModal');
+      await reloadActivePlan();
+      await refreshPlanList();
+    } else {
+      const r = await apiPost('/plans', data);
+      closeModal('planModal');
+      await refreshPlanList();
+      loadPlan(r.id);
+    }
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+async function deletePlan() {
+  if (!activePlanId||!confirm('Einsatz und alle Ziele/Wellen unwiderruflich löschen?')) return;
+  await apiPost(`/plans/${activePlanId}/delete`);
+  activePlanId=null; activePlan=null;
+  await refreshPlanList();
+  document.getElementById('opEmptyState').style.display='block';
+  document.getElementById('opEditor').style.display='none';
+  document.getElementById('opTopbar').style.display='none';
+}
+
+// ══ Helpers ═══════════════════════════════════════════════════════════════
+async function reloadActivePlan() {
+  if (!activePlanId) return;
+  activePlan = await apiFetch(`/plans/${activePlanId}`);
+  renderEditor();
+  await refreshPlanList();
+}
+async function refreshPlanList() {
+  const data = await apiFetch('/plans'.replace('/api/plans','/api/plans'));
+  // Re-fetch plan list from sidebar endpoint
+  const r = await fetch(`/guild/${GUILD_ID}/operations/api/plan-list`);
+  if (r.ok) { plans = await r.json(); renderPlanList(); }
+}
+
+function switchPanel(name, el) {
+  document.querySelectorAll('.op-panel-tab').forEach(t=>t.classList.remove('active'));
+  ['info','favs','members','check'].forEach(n => {
+    document.getElementById('panel-'+n).style.display = n===name ? 'block' : 'none';
+  });
+  if (el) el.classList.add('active');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Close modal on overlay click
+document.querySelectorAll('.op-modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') document.querySelectorAll('.op-modal-overlay.open').forEach(o=>o.classList.remove('open'));
+  if (e.key==='Escape') document.getElementById('searchDropdown').style.display='none';
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#searchDropdown') && !e.target.closest('#targetSearch')) {
+    document.getElementById('searchDropdown').style.display='none';
+  }
+});
+
+function saveAsFav() {
+  const x=parseInt(document.getElementById('tmX').value);
+  const y=parseInt(document.getElementById('tmY').value);
+  if(isNaN(x)||isNaN(y)){alert('Koordinaten fehlen.');return;}
+  apiPost('/favorites',{player_name:document.getElementById('tmPlayer').value,village_name:document.getElementById('tmVillage').value,x,y,label:''})
+    .then(r=>{alert('⭐ Gespeichert!');favs.push({id:r.id,x,y,player_name:document.getElementById('tmPlayer').value,village_name:document.getElementById('tmVillage').value,label:''});renderFavs();})
+    .catch(()=>{});
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escJs(s) { return String(s||'').replace(/'/g,"\\'").replace(/\n/g,' '); }
+
+// ══ Init ══════════════════════════════════════════════════════════════════
+filterPlans('all');
+renderFavs();
+renderMembers();
+
+// Load first active plan if any
+const firstActive = plans.find(p=>p.status==='active') || plans[0];
+if (firstActive) loadPlan(firstActive.id);
+</script>
+
+{% endblock %}
