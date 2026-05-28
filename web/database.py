@@ -3079,6 +3079,7 @@ async def _init_ally_tables():
         for col, definition in [
             ("role_id", "INTEGER"),
             ("wing", "INTEGER DEFAULT 0"),
+            ("status", "TEXT DEFAULT 'approved'"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE ally_members ADD COLUMN {col} {definition}")
@@ -3223,22 +3224,34 @@ async def get_ally_members(ally_group_id: int) -> list[dict]:
 
 
 async def join_ally_group(ally_group_id: int, discord_id: str, discord_username: str,
-                          travian_name: str = "", wing: int = 0) -> bool:
+                          travian_name: str = "", wing: int = 0, status: str = "approved") -> bool:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute("""
-                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, travian_name, wing)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, travian_name, wing, status)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(ally_group_id, discord_id) DO UPDATE
                 SET discord_username=excluded.discord_username,
                     travian_name=excluded.travian_name,
-                    wing=excluded.wing
-            """, (ally_group_id, discord_id, discord_username, travian_name, wing))
+                    wing=excluded.wing,
+                    status=excluded.status
+            """, (ally_group_id, discord_id, discord_username, travian_name, wing, status))
             await db.commit()
             return True
         except Exception:
             return False
+
+
+async def set_ally_member_status(ally_group_id: int, discord_id: str, status: str):
+    """Approve or reject a pending member (status: 'approved' | 'rejected')."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_members SET status=? WHERE ally_group_id=? AND discord_id=?",
+            (status, ally_group_id, discord_id)
+        )
+        await db.commit()
 
 
 async def update_ally_member(ally_group_id: int, discord_id: str, travian_name: str, note: str,

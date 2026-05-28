@@ -3278,6 +3278,7 @@ async def mein_account_page(request: Request, guild_id: str):
     discord_id   = session.get("uid", "")
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, discord_id))
     history      = await database.get_own_villages_history(guild_id, discord_id)
+    my_troops    = await database.get_member_troops_single(guild_id, discord_id)
     uploaded     = request.query_params.get("uploaded")
     cleared      = request.query_params.get("cleared")
     saved        = request.query_params.get("saved")
@@ -3312,6 +3313,7 @@ async def mein_account_page(request: Request, guild_id: str):
         "hospital_data":      hospital_data,
         "hospital_uploaded":  hospital_uploaded,
         "hospital_cleared":   hospital_cleared,
+        "my_travian_name":    (my_troops or {}).get("travian_name", ""),
     })
 
 
@@ -3319,6 +3321,7 @@ async def mein_account_page(request: Request, guild_id: str):
 async def mein_account_upload(
     request: Request,
     guild_id: str,
+    travian_name: str = Form(""),
     troop_text: str = Form(""),
 ):
     session, err = _require_session(request)
@@ -3329,7 +3332,11 @@ async def mein_account_upload(
     if not guild:
         return RedirectResponse("/dashboard")
 
+    discord_id  = session.get("uid","")
     uploaded_by = session.get("username") or session.get("discord_username") or "unknown"
+    tname       = travian_name.strip()
+
+    # Persist travian_name to member_troops even without a troop upload
     parsed = parse_own_villages(troop_text)
     for v in parsed:
         vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}))
@@ -3338,14 +3345,13 @@ async def mein_account_upload(
         v["def_score"]    = def_s
         v["priority"]     = prio
     if parsed:
-        discord_id = session.get("uid","")
         await database.save_own_villages(guild_id, parsed, uploaded_by, discord_id)
-        # Also save to member_troops for op planner
-        total_off = sum(v.get("off_score",0) for v in parsed)
-        total_def = sum(v.get("def_score",0) for v in parsed)
-        travian_name = parsed[0].get("uploaded_by","") if parsed else uploaded_by
+    total_off = sum(v.get("off_score",0) for v in parsed)
+    total_def = sum(v.get("def_score",0) for v in parsed)
+    # Always upsert member_troops so travian_name is stored (even if no troop data yet)
+    if tname or parsed:
         await database.upsert_member_troops(
-            guild_id, discord_id, uploaded_by, travian_name,
+            guild_id, discord_id, uploaded_by, tname or uploaded_by,
             [{k:v for k,v in vill.items() if k in ("village_name","x","y","troops","off_score","def_score","village_type")}
              for vill in parsed],
             tribe="", total_off=total_off, total_def=total_def
@@ -3761,6 +3767,30 @@ async def my_ally_member_remove(request: Request, guild_id: str, discord_id: str
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=removed", status_code=303)
 
 
+@app.post("/guild/{guild_id}/my-ally/member/{discord_id}/approve")
+async def my_ally_member_approve(request: Request, guild_id: str, discord_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return JSONResponse({"error": "not owner"}, status_code=403)
+    await database.set_ally_member_status(ally_group["id"], discord_id, "approved")
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=approved", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/member/{discord_id}/reject")
+async def my_ally_member_reject(request: Request, guild_id: str, discord_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return JSONResponse({"error": "not owner"}, status_code=403)
+    await database.remove_ally_member(ally_group["id"], discord_id)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=rejected", status_code=303)
+
+
 @app.get("/ally/join/{token}", response_class=HTMLResponse)
 async def ally_join_page(request: Request, token: str):
     session = get_session(request)
@@ -3796,8 +3826,23 @@ async def ally_join_accept(request: Request, token: str, travian_name: str = For
     uid = session.get("uid", "")
     if uid == group["owner_discord_id"]:
         return RedirectResponse(f"/ally/join/{token}?error=own_group", status_code=303)
-    await database.join_ally_group(group["id"], uid, session.get("username",""), travian_name.strip(), wing=wing)
-    return RedirectResponse(f"/ally/join/{token}?accepted=1", status_code=303)
+    tname = travian_name.strip()
+    guild_id = group["guild_id"]
+    # Verify: auto-approve if travian_name matches a known alliance_member
+    import aiosqlite as _aio_join
+    status = "pending"
+    if tname:
+        async with _aio_join.connect(database.DB_PATH) as _db:
+            _db.row_factory = _aio_join.Row
+            async with _db.execute(
+                "SELECT 1 FROM alliance_members WHERE guild_id=? AND LOWER(player_name)=LOWER(?) LIMIT 1",
+                (guild_id, tname)
+            ) as cur:
+                if await cur.fetchone():
+                    status = "approved"
+    await database.join_ally_group(group["id"], uid, session.get("username",""), tname, wing=wing, status=status)
+    redirect_status = "accepted" if status == "approved" else "pending"
+    return RedirectResponse(f"/ally/join/{token}?{redirect_status}=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -4817,10 +4862,28 @@ async def op_attacker_list(request: Request, guild_id: str):
 
         # Member troops first — we need their travian names to filter the snapshot
         async with db.execute(
-            "SELECT discord_name, travian_name, tribe, villages_json FROM member_troops WHERE guild_id=?",
+            "SELECT discord_id, discord_name, travian_name, tribe, villages_json FROM member_troops WHERE guild_id=?",
             (guild_id,)
         ) as cur:
             troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
+
+        # Also include approved ally_members with a travian_name as additional name source
+        async with db.execute("""
+            SELECT am.discord_id, am.discord_username, am.travian_name
+            FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE ag.guild_id=? AND am.status='approved' AND am.travian_name != ''
+        """, (guild_id,)) as cur:
+            for r in await cur.fetchall():
+                tname = r["travian_name"]
+                if tname and tname not in troop_rows and tname not in ally_members:
+                    # Add as a minimal entry so they appear in the dropdown
+                    troop_rows[tname] = {
+                        "discord_id": r["discord_id"],
+                        "discord_name": r["discord_username"] or "",
+                        "travian_name": tname,
+                        "tribe": "", "villages_json": None
+                    }
 
         # Their villages from latest map snapshot (own alliance villages)
         tw_name = await database.get_tw_alliance_name(guild_id)

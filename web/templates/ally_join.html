@@ -19,6 +19,17 @@
     <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Zum Dashboard</a>
   </div>
 
+  {% elif request.query_params.get('pending') %}
+  <div class="card" style="text-align:center;padding:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">⏳</div>
+    <h2 style="margin:0 0 0.5rem;">Anfrage gesendet</h2>
+    <p style="color:var(--text-muted);">
+      Dein Travian-Name konnte nicht automatisch verifiziert werden.<br>
+      Ein Allianz-Verwalter muss deinen Beitritt manuell freigeben.
+    </p>
+    <p style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;">Du wirst benachrichtigt sobald du freigeschaltet wirst.</p>
+  </div>
+
   {% elif request.query_params.get('error') == 'own_group' %}
   <div class="card" style="text-align:center;padding:2rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">⚠️</div>
@@ -46,9 +57,12 @@
     {% else %}
     <form method="post" action="/ally/join/{{ token }}">
       <div class="form-group" style="margin-bottom:1rem;">
-        <label style="font-size:0.85rem;font-weight:600;">Dein Travian-Name <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-        <input type="text" name="travian_name" placeholder="z.B. Currax" maxlength="80"
+        <label style="font-size:0.85rem;font-weight:600;">Dein Travian-Name <span style="color:#f87171;">*</span></label>
+        <input type="text" name="travian_name" placeholder="z.B. Currax" maxlength="80" required
                style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:0.95rem;margin-top:0.3rem;">
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem;">
+          Genau wie in Travian angezeigt. Stimmt dein Name mit der Allianz-Liste überein, wirst du automatisch freigeschaltet.
+        </div>
       </div>
       <button type="submit" class="btn btn-primary" style="width:100%;font-size:1rem;padding:0.65rem;">🤝 Beitreten</button>
     </form>

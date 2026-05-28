@@ -54,11 +54,22 @@
         markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
       </p>
       <form method="post" action="/guild/{{ guild.guild_id }}/mein-account">
+        <div style="margin-bottom:.6rem;">
+          <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.25rem;">
+            🏷 Dein Travian Spielername <span style="color:#f87171;">*</span>
+          </label>
+          <input type="text" name="travian_name" value="{{ my_travian_name or '' }}"
+            placeholder="z.B. MaxMustermann" required
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .7rem;font-size:.9rem;">
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;">
+            Genau wie in Travian angezeigt — wird für die EP-Planung und Allianz-Verifikation genutzt.
+          </div>
+        </div>
         <textarea name="troop_text" rows="7"
           placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."
           style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;"></textarea>
         <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap;">
-          <button type="submit" class="btn btn-primary">⬆️ Importieren</button>
+          <button type="submit" class="btn btn-primary">⬆️ Speichern &amp; Importieren</button>
           {% if own_villages %}
           <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/clear" style="margin:0;"
                 onsubmit="return confirm('Alle eigenen Dörfer löschen?')">
