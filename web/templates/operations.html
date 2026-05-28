@@ -85,10 +85,10 @@
 }
 
 /* ── Player Browser Modal ────────────────────────────────────── */
-.pb-modal { width:min(1400px,98vw); height:90vh; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; }
+.pb-modal { width:98vw; max-width:1600px; height:92vh; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; }
 .pb-split { display:flex; flex:1; min-height:0; }
-.pb-left  { flex:1; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); }
-.pb-right { width:320px; min-width:280px; display:flex; flex-direction:column; background:rgba(0,0,0,.12); }
+.pb-left  { flex:1 1 0; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); }
+.pb-right { width:380px; min-width:340px; flex-shrink:0; display:flex; flex-direction:column; background:rgba(0,0,0,.12); }
 .pb-right-empty { display:flex; flex-direction:column; align-items:center; justify-content:center;
   height:100%; color:var(--text-muted); font-size:.82rem; gap:.5rem; padding:1.5rem; text-align:center; }
 /* Attacker rows in assignment panel */
@@ -1134,8 +1134,10 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
 }
 
 // ── Assignment Panel (right side of Player Browser) ─────────────────────────
-let assignTarget = null; // {x, y, player, village}
-let assignRows = [];     // [{attacker, village, travelSec, type, waves, include}]
+let assignTarget = null;
+let assignRows   = [];
+// Panel-wide settings (read from DOM when rendering)
+const ASSIGN_DEFAULTS = { ts: 0, heroEnabled: true, heroBonus: 5, onlyOff: true };
 
 function _torusDist(x1, y1, x2, y2) {
   const dx = Math.min(Math.abs(x1-x2), 801-Math.abs(x1-x2));
@@ -1143,30 +1145,57 @@ function _torusDist(x1, y1, x2, y2) {
   return Math.sqrt(dx*dx+dy*dy);
 }
 
-function openAssignmentPanel(tx, ty, targetPlayer, targetVillage) {
-  assignTarget = {x: tx, y: ty, player: targetPlayer, village: targetVillage};
-  if (!attackers.length) { loadAttackers().then(() => _renderAssignmentPanel()); return; }
-  _renderAssignmentPanel();
+// Catapult speed = 3 for all tribes (Feuerkatapult/Katapult/Trebuchet all = 3)
+const CAT_BASE_SPEED = 3;
+
+function _assignSettings() {
+  return {
+    ts:          Math.max(0, Math.min(20, parseInt(document.getElementById('assignTS')?.value)||0)),
+    heroEnabled: document.getElementById('assignHero')?.checked ?? true,
+    heroBonus:   parseFloat(document.getElementById('assignHeroBonus')?.value)||5,
+    onlyOff:     document.getElementById('assignOnlyOff')?.checked ?? true,
+  };
 }
 
-function _renderAssignmentPanel() {
-  const panel = document.getElementById('pbAssignPanel');
-  if (!assignTarget) return;
-  const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
-  const spd = parseFloat(activePlan?.server_speed) || 1;
+function _catTravelSec(dist, settings, serverSpeed) {
+  const spd = serverSpeed || 1;
+  const eff = CAT_BASE_SPEED * (1 + settings.ts * 0.2) + (settings.heroEnabled ? settings.heroBonus : 0);
+  return Math.round((dist / (eff * spd)) * 3600);
+}
 
-  // Build rows: all attacker-villages sorted by fastest troop speed or just base infantry
-  // Use a reference speed per tribe: Romans legionnaire 6, Gauls Phalanx 7, Teutons Clubswinger 7
-  const TRIBE_BASE_SPEED = {romans:6, gauls:7, teutons:7};
+function _sendTimeStr(travelSec) {
+  if (!activePlan?.landing_time) return null;
+  const land = new Date(activePlan.landing_time);
+  const send = new Date(land.getTime() - travelSec * 1000);
+  return send.toISOString().replace('T',' ').slice(0,19);
+}
+
+function openAssignmentPanel(tx, ty, targetPlayer, targetVillage) {
+  assignTarget = {x: tx, y: ty, player: targetPlayer, village: targetVillage};
+  if (!attackers.length) { loadAttackers().then(() => _buildAndRenderAssignment()); return; }
+  _buildAndRenderAssignment();
+}
+
+function _buildAndRenderAssignment() {
+  const settings = ASSIGN_DEFAULTS; // use defaults on first build
+  _buildAssignRows(settings);
+  _renderAssignmentPanel(settings);
+}
+
+function _buildAssignRows(settings) {
+  if (!assignTarget) return;
+  const {x: tx, y: ty} = assignTarget;
+  const spd = parseFloat(activePlan?.server_speed) || 1;
 
   assignRows = [];
   (attackers.length ? attackers : []).forEach(a => {
     (a.villages || []).forEach(v => {
       if (v.x == null || v.y == null) return;
+      // Classify village (OFF / DEF / Scout / unknown)
+      const role = (v.troops || v.name) ? classifyVillage(v, a.tribe) : 'unknown';
+      if (settings.onlyOff && role !== 'off' && role !== 'unknown') return;
       const dist = _torusDist(v.x, v.y, tx, ty);
-      // Find slowest selected troop speed — use tribe infantry as default
-      const tribeSpeed = TRIBE_BASE_SPEED[a.tribe?.toLowerCase()] || 6;
-      const travelSec = Math.round((dist / (tribeSpeed * spd)) * 3600);
+      const travelSec = _catTravelSec(dist, settings, spd);
       assignRows.push({
         player_name: a.player_name,
         discord_name: a.discord_name,
@@ -1175,46 +1204,99 @@ function _renderAssignmentPanel() {
         vx: v.x, vy: v.y,
         dist: dist.toFixed(1),
         travelSec,
+        role,
         type: 'real',
         waves: 1,
-        include: true,
+        include: role !== 'unknown',
       });
     });
   });
   assignRows.sort((a, b) => a.travelSec - b.travelSec);
+}
+
+function _renderAssignmentPanel(settings) {
+  const panel = document.getElementById('pbAssignPanel');
+  if (!assignTarget) return;
+  settings = settings || _assignSettings();
+  const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
+  const spd = parseFloat(activePlan?.server_speed) || 1;
+
+  const effSpeed = (CAT_BASE_SPEED * (1 + settings.ts * 0.2) + (settings.heroEnabled ? settings.heroBonus : 0)) * spd;
+  const speedInfo = `Kata ${CAT_BASE_SPEED} → ${effSpeed.toFixed(1)} Fel/h (×${spd})`;
+
+  const lbl = {real:'⚔ Echt', fake:'👻 Fake', scout:'🔍 Scout', def:'🛡 Def'};
+  const roleTag = {off:'<span style="color:#f87171;font-size:.68rem;">⚔ OFF</span>',
+                   def:'<span style="color:#93c5fd;font-size:.68rem;">🛡 DEF</span>',
+                   scout:'<span style="color:#c084fc;font-size:.68rem;">🔍 Scout</span>',
+                   unknown:'<span style="color:#94a3b8;font-size:.68rem;">? unbekannt</span>'};
 
   panel.innerHTML = `
-    <div style="padding:.6rem .8rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);">
+    <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);">
       <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">🎯 Schnellzuweisung</div>
-      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">
-        ${escHtml(tp)} · ${escHtml(tv||'')} (${tx}|${ty})
-      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);">${escHtml(tp)} · ${escHtml(tv||'')} (${tx}|${ty})</div>
     </div>
+
+    <!-- Settings bar -->
+    <div style="padding:.45rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);display:flex;flex-direction:column;gap:.3rem;">
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;">
+          🏆 TP:
+          <input id="assignTS" type="number" min="0" max="20" value="${settings.ts}"
+            style="width:38px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
+            oninput="rebuildAssignPanel()">
+        </label>
+        <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.25rem;">
+          <input id="assignHero" type="checkbox" class="atk-include" ${settings.heroEnabled?'checked':''}
+            onchange="rebuildAssignPanel()">
+          Held&nbsp;+&nbsp;Bonus:
+          <input id="assignHeroBonus" type="number" min="0" max="30" step="0.5" value="${settings.heroBonus}"
+            style="width:38px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
+            oninput="rebuildAssignPanel()">
+          Fel/h
+        </label>
+        <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.25rem;margin-left:auto;">
+          <input id="assignOnlyOff" type="checkbox" class="atk-include" ${settings.onlyOff?'checked':''}
+            onchange="rebuildAssignPanel()"> Nur OFF
+        </label>
+      </div>
+      <div style="font-size:.68rem;color:#fbbf24;">${speedInfo}</div>
+    </div>
+
     <div style="overflow-y:auto;flex:1;" id="pbAtkList">
-      ${assignRows.length ? assignRows.map((r, i) => `
+      ${assignRows.length ? assignRows.map((r, i) => {
+        const sendStr = _sendTimeStr(r.travelSec);
+        return `
         <div class="atk-row">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span class="atk-name">${escHtml(r.player_name)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.3rem;">
+            <span class="atk-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.player_name)}</span>
+            ${roleTag[r.role]||''}
             <span class="atk-time">${fmtTravel(r.travelSec)}</span>
           </div>
           <div class="atk-village">${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</div>
+          ${sendStr ? `<div style="font-size:.7rem;color:#4ade80;">📤 ${sendStr}</div>` : ''}
           <div class="atk-controls">
-            ${(()=>{const lbl={real:'⚔ Echt',fake:'👻 Fake',scout:'🔍 Scout',def:'🛡 Def'};return['real','fake','scout','def'].map(t=>`<button class="atk-type-btn ${r.type===t?'sel-'+t:''}" onclick="setAtkType(${i},'${t}',this)">${lbl[t]}</button>`).join('');})()}
+            ${['real','fake','scout','def'].map(t=>`<button class="atk-type-btn ${r.type===t?'sel-'+t:''}" onclick="setAtkType(${i},'${t}',this)">${lbl[t]}</button>`).join('')}
             <input class="atk-waves-input" type="number" min="1" max="20" value="${r.waves}" title="Wellen" oninput="setAtkWaves(${i},this.value)">
-            <label style="display:flex;align-items:center;gap:.25rem;font-size:.74rem;color:var(--text-muted);margin-left:auto;">
+            <label style="display:flex;align-items:center;gap:.2rem;font-size:.72rem;color:var(--text-muted);margin-left:auto;">
               <input class="atk-include" type="checkbox" ${r.include?'checked':''} onchange="setAtkInclude(${i},this.checked)"> Dabei
             </label>
           </div>
-        </div>
-      `).join('') : '<div style="color:var(--text-muted);font-size:.8rem;padding:1rem;text-align:center;">Keine eigenen Spieler mit Koordinaten</div>'}
+        </div>`;
+      }).join('') : '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">Keine OFF-Dörfer mit Koordinaten gefunden</div>'}
     </div>
     ${assignRows.length ? `
-    <div style="padding:.5rem .8rem;border-top:1px solid var(--border);">
+    <div style="padding:.5rem .75rem;border-top:1px solid var(--border);">
       <button class="btn btn-primary" style="width:100%;font-size:.82rem;" onclick="submitAssignments()">
-        ✅ Alle markierten zum Plan hinzufügen
+        ✅ Markierte zum Plan hinzufügen
       </button>
     </div>` : ''}
   `;
+}
+
+function rebuildAssignPanel() {
+  const settings = _assignSettings();
+  _buildAssignRows(settings);
+  _renderAssignmentPanel(settings);
 }
 
 function setAtkType(i, type, btn) {
@@ -1234,7 +1316,6 @@ function setAtkInclude(i, val) {
 
 async function submitAssignments() {
   if (!activePlanId || !assignTarget) return;
-  // Find the target we added
   await reloadActivePlan();
   const {x: tx, y: ty} = assignTarget;
   const target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
@@ -1243,6 +1324,7 @@ async function submitAssignments() {
   if (!rows.length) { alert('Keine Spieler ausgewählt.'); return; }
   const btn = document.querySelector('#pbAssignPanel .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Füge hinzu…'; }
+  const settings = _assignSettings();
   let ok = 0, fail = 0;
   for (const r of rows) {
     for (let w = 0; w < r.waves; w++) {
@@ -1255,20 +1337,19 @@ async function submitAssignments() {
           origin_y: r.vy,
           wave_type: r.type,
           tribe: r.tribe || 'romans',
-          troop_json: '{}',
+          troop_json: JSON.stringify({[r.tribe==='gauls'?'trebuchet':r.tribe==='teutons'?'catapult':'fire_cat']: 1}),
           landing_time: activePlan?.landing_time || '',
           server_speed: activePlan?.server_speed || 1,
           notes: '',
-          tournament_square: 0,
+          tournament_square: settings.ts,
         });
         ok++;
       } catch(e) { fail++; }
     }
   }
   await reloadActivePlan();
-  if (btn) { btn.disabled = false; btn.textContent = '✅ Alle markierten zum Plan hinzufügen'; }
+  if (btn) { btn.disabled = false; btn.textContent = '✅ Markierte zum Plan hinzufügen'; }
   showToast(`✅ ${ok} Welle${ok!==1?'n':''} hinzugefügt${fail?' · '+fail+' Fehler':''}`);
-  // Reset panel
   assignTarget = null;
   assignRows = [];
   document.getElementById('pbAssignPanel').innerHTML =
