@@ -327,9 +327,9 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
-  // Label pass — only when zoomed in enough, with collision detection
-  if (scale >= 8) {
-    const fontSize = Math.max(9, Math.min(13, scale * 0.55));
+  // Label pass — show player names from scale 5, more detail when zoomed in
+  if (scale >= 5) {
+    const fontSize = Math.max(8, Math.min(13, scale * 0.55));
     ctx.textBaseline = 'top';
     for (const v of villages) {
       if (v.x<vx0||v.x>vx1||v.y<vy1||v.y>vy0) continue;
@@ -342,10 +342,11 @@ function draw() {
       const lx = cx + Math.max(3, tS*0.55);
       const ly = cy - fontSize * 0.5;
 
-      // Build label lines
+      // Build label lines: player name is primary, village name at higher zoom
       const lines = [];
-      if (v.name)                    lines.push({text: v.name,              color:'rgba(255,255,255,0.93)', bold:true});
-      if (v.player && scale>=10)     lines.push({text: v.player,            color:'rgba(160,225,160,0.9)', bold:false});
+      if (v.player)                  lines.push({text: v.player,            color:'rgba(160,225,160,0.95)', bold:true});
+      else if (v.name)               lines.push({text: v.name,              color:'rgba(255,255,255,0.93)', bold:true});
+      if (v.name && v.player && scale>=10) lines.push({text: v.name,        color:'rgba(255,255,255,0.75)', bold:false});
       if (v.alliance && scale>=13)   lines.push({text:`[${v.alliance}]`,    color:'rgba(160,195,255,0.85)', bold:false});
       if (v.pop && scale>=20)        lines.push({text:`${v.pop.toLocaleString()}`, color:'rgba(210,210,100,0.8)', bold:false});
 
