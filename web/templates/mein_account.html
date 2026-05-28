@@ -207,8 +207,9 @@
     </form>
   </div>
 
-  <!-- Dual-Accounts -->
-  <div class="card" style="margin-bottom:1.25rem;">
+  <!-- Dual-Accounts + Meine Einsätze nebeneinander -->
+  <div id="dualMissionsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
+  <div class="card" style="margin-bottom:0;height:100%;box-sizing:border-box;">
     <h2 style="margin:0 0 0.75rem;">🔗 Dual-Accounts</h2>
 
     {% if dual_created %}
@@ -258,6 +259,22 @@
       <button type="submit" class="btn btn-secondary">🔗 Neuen Dual-Invite erstellen</button>
     </form>
   </div>
+
+  <!-- Meine Einsätze -->
+  <div class="card" id="missionsCard" style="margin-bottom:0;height:100%;box-sizing:border-box;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+      <div>
+        <h2 style="margin:0 0 .2rem;">⚔️ Meine Einsätze</h2>
+        <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind.</p>
+      </div>
+      <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Einsatzplanung</a>
+    </div>
+    <div id="missionsContent">
+      <div style="color:var(--text-muted);font-size:.85rem;">Lade Einsätze…</div>
+    </div>
+  </div>
+
+  </div>{# end grid row #}
 
   <!-- Timeline chart -->
   {% if history and history | length > 0 %}
@@ -697,20 +714,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeArmyModal();});
 .wt-fake{background:rgba(107,114,128,.2);color:#9ca3af;}
 .wt-def{background:rgba(59,130,246,.2);color:#93c5fd;}
 .wt-scout{background:rgba(168,85,247,.2);color:#c084fc;}
+@media(max-width:680px){
+  #dualMissionsGrid{grid-template-columns:1fr!important;}
+}
 </style>
-<!-- ══ Meine Einsätze ════════════════════════════════════════════════ -->
-<div class="card" style="margin-top:1.25rem;" id="missionsCard">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
-    <div>
-      <h2 style="margin:0 0 .2rem;">⚔️ Meine Einsätze</h2>
-      <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Alle Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind. Bitte bestätige nach dem Abschicken.</p>
-    </div>
-    <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Einsatzplanung öffnen</a>
-  </div>
-  <div id="missionsContent">
-    <div style="color:var(--text-muted);font-size:.85rem;">Lade Einsätze…</div>
-  </div>
-</div>
 
 <!-- Delta-Modal for "Unpünktlich" -->
 <div id="deltaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
