@@ -1510,6 +1510,8 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
             guild["subscription_plan"] = pplan
         preview_info = pplan
 
+    unread_notif = await database.count_unread_notifications(guild_id, session.get("uid",""))
+
     return templates.TemplateResponse(
         "guild.html",
         {"request": request, "guild": guild, "saved": saved, "roles": roles,
@@ -1519,6 +1521,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "is_personal": is_personal,
          "trial_expires_at": guild.get("trial_expires_at"),
          "preview_plan": preview_info,
+         "unread_notif": unread_notif,
          },
     )
 
@@ -3725,6 +3728,28 @@ async def my_ally_role_create(request: Request, guild_id: str,
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_created", status_code=303)
 
 
+@app.post("/guild/{guild_id}/my-ally/roles/{role_id}/update")
+async def my_ally_role_update(request: Request, guild_id: str, role_id: int,
+                               color: str = Form(None), ep_notify: str = Form("0")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        # Allow Lead/HC-Operations members to update permissions too
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        if not ally_group:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        member = await database.get_ally_membership(guild_id, uid)
+        if not member or member.get("role_name","").lower() not in ("lead","hc","hc-operations","hc operations"):
+            return JSONResponse({"error": "no permission"}, status_code=403)
+    perms_flag = "ep_notify" if ep_notify == "1" else ""
+    await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_flag)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated", status_code=303)
+
+
 @app.post("/guild/{guild_id}/my-ally/roles/{role_id}/delete")
 async def my_ally_role_delete(request: Request, guild_id: str, role_id: int):
     session, err = _require_session(request)
@@ -5079,6 +5104,91 @@ async def op_my_missions(request: Request, guild_id: str):
     if err: return err
     missions = await database.get_personal_missions(guild_id, session.get("uid",""))
     return _JSONResponse({"missions": missions})
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/notifications", response_class=HTMLResponse)
+async def notifications_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    notifs = await database.get_notifications(guild_id, uid, limit=80)
+    unread = sum(1 for n in notifs if not n["read"])
+    # Mark all as read after loading
+    await database.mark_notifications_read(guild_id, uid)
+    return templates.TemplateResponse("notifications.html", {
+        "request": request,
+        "guild": guild,
+        "notifications": notifs,
+        "unread_count": unread,
+    })
+
+
+@app.post("/guild/{guild_id}/notifications/clear")
+async def notifications_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    import aiosqlite as _aio_n
+    async with _aio_n.connect(database.DB_PATH) as _db_n:
+        await _db_n.execute("DELETE FROM notifications WHERE guild_id=? AND recipient_id=?", (guild_id, uid))
+        await _db_n.commit()
+    return RedirectResponse(f"/guild/{guild_id}/notifications", status_code=303)
+
+
+@app.get("/guild/{guild_id}/notifications/api/unread-count")
+async def notifications_unread_count(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"count": 0})
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"count": 0})
+    count = await database.count_unread_notifications(guild_id, session.get("uid", ""))
+    return JSONResponse({"count": count})
+
+
+# Wave confirm — trigger notifications for ep_notify roles
+@app.post("/guild/{guild_id}/operations/api/waves/{wave_id}/notify-leads")
+async def op_wave_notify_leads(request: Request, guild_id: str, wave_id: int):
+    """Called after confirm to notify leads if attacker can't send."""
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    try:
+        data = await request.json()
+    except Exception:
+        return _JSONResponse({"ok": False})
+    status = data.get("confirm_status", "")
+    attacker = data.get("attacker_name", "")
+    plan_name = data.get("plan_name", "")
+    plan_id = data.get("plan_id")
+    target = data.get("target", "")
+    if status not in ("cant_send", "not_sent"):
+        return _JSONResponse({"ok": True})
+    lead_ids = await database.get_ep_notify_members(guild_id)
+    sender_id = session.get("uid", "")
+    recipients = [lid for lid in lead_ids if lid != sender_id]
+    if not recipients:
+        return _JSONResponse({"ok": True})
+    title_map = {"cant_send": "⚠️ Angreifer kann nicht abschicken", "not_sent": "❌ Welle nicht abgeschickt"}
+    msg_map = {
+        "cant_send": f"{attacker} hat gemeldet, dass er die Welle zu '{target}' nicht abschicken kann.\nPlan: {plan_name}",
+        "not_sent": f"{attacker} hat bestätigt, dass die Welle zu '{target}' nicht abgeschickt wurde.\nPlan: {plan_name}",
+    }
+    import datetime as _dt_n
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    await database.create_notifications(
+        guild_id, ally_group["id"] if ally_group else None,
+        recipients, status,
+        title_map[status], msg_map[status], plan_id=plan_id
+    )
+    return _JSONResponse({"ok": True, "notified": len(recipients)})
 
 
 # ---------------------------------------------------------------------------

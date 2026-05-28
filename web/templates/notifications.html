@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Benachrichtigungen · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:760px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1 style="margin:.25rem 0 0;">🔔 Benachrichtigungen</h1>
+      <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
+    </div>
+    {% if notifications %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/notifications/clear" style="align-self:flex-end;">
+      <button type="submit" class="btn btn-secondary" style="font-size:.8rem;">🗑 Alle löschen</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if unread_count %}
+  <div class="alert alert-info" style="margin-bottom:1rem;">✅ {{ unread_count }} neue Benachrichtigung{{ 'en' if unread_count != 1 else '' }} als gelesen markiert.</div>
+  {% endif %}
+
+  {% if not notifications %}
+  <div class="card" style="text-align:center;padding:2.5rem;opacity:.7;">
+    <div style="font-size:2rem;margin-bottom:.5rem;">🔕</div>
+    <p style="color:var(--text-muted);margin:0;">Keine Benachrichtigungen.</p>
+  </div>
+  {% else %}
+  <div style="display:flex;flex-direction:column;gap:.5rem;">
+    {% for n in notifications %}
+    {% set type_icon = {'cant_send':'⚠️','not_sent':'❌','info':'ℹ️','warning':'⚠️','error':'❌'}.get(n.type, '🔔') %}
+    {% set type_color = {'cant_send':'rgba(248,113,113,.08)','not_sent':'rgba(248,113,113,.08)','warning':'rgba(251,191,36,.06)','error':'rgba(248,113,113,.08)','info':'rgba(147,197,253,.06)'}.get(n.type,'rgba(255,255,255,.02)') %}
+    <div class="card" style="padding:.85rem 1rem;background:{{ type_color }};border-left:3px solid {{ {'cant_send':'#f87171','not_sent':'#f87171','warning':'#fbbf24','error':'#f87171','info':'#93c5fd'}.get(n.type,'var(--border)') }};">
+      <div style="display:flex;align-items:flex-start;gap:.6rem;">
+        <span style="font-size:1.1rem;flex-shrink:0;margin-top:.1rem;">{{ type_icon }}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:.2rem;">{{ n.title }}</div>
+          <div style="font-size:.83rem;color:var(--text-muted);white-space:pre-wrap;">{{ n.message }}</div>
+          <div style="display:flex;gap:.75rem;align-items:center;margin-top:.4rem;flex-wrap:wrap;">
+            <span style="font-size:.72rem;color:var(--text-muted);">{{ n.created_at[:16].replace('T',' ') }}</span>
+            {% if n.plan_id %}
+            <a href="/guild/{{ guild.guild_id }}/operations?plan={{ n.plan_id }}" style="font-size:.75rem;color:#6366f1;">→ Zum Plan</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

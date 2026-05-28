@@ -3085,6 +3085,11 @@ async def _init_ally_tables():
                 await db.execute(f"ALTER TABLE ally_members ADD COLUMN {col} {definition}")
             except Exception:
                 pass
+        # ally_roles: add permissions column (comma-separated flags e.g. "ep_notify")
+        try:
+            await db.execute("ALTER TABLE ally_roles ADD COLUMN permissions TEXT DEFAULT ''")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -3150,15 +3155,30 @@ async def get_ally_roles(ally_group_id: int) -> list[dict]:
             return [dict(r) for r in await cur.fetchall()]
 
 
-async def create_ally_role(ally_group_id: int, role_name: str, color: str) -> int:
+async def create_ally_role(ally_group_id: int, role_name: str, color: str, permissions: str = "") -> int:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, color) VALUES (?,?,?)",
-            (ally_group_id, role_name[:40], color or "#94a3b8"),
+            "INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, color, permissions) VALUES (?,?,?,?)",
+            (ally_group_id, role_name[:40], color or "#94a3b8", permissions or ""),
         )
         await db.commit()
         return cur.lastrowid
+
+
+async def update_ally_role(role_id: int, ally_group_id: int, color: str | None = None, permissions: str | None = None):
+    await _init_ally_tables()
+    sets, vals = [], []
+    if color is not None:
+        sets.append("color=?"); vals.append(color or "#94a3b8")
+    if permissions is not None:
+        sets.append("permissions=?"); vals.append(permissions or "")
+    if not sets:
+        return
+    vals += [role_id, ally_group_id]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(f"UPDATE ally_roles SET {', '.join(sets)} WHERE id=? AND ally_group_id=?", vals)
+        await db.commit()
 
 
 async def delete_ally_role(ally_group_id: int, role_id: int):
@@ -5099,6 +5119,23 @@ async def _init_op_tables():
             await db.commit()
         except Exception:
             pass
+        # Notifications table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                ally_group_id   INTEGER,
+                recipient_id    TEXT NOT NULL,
+                type            TEXT NOT NULL DEFAULT 'info',
+                title           TEXT NOT NULL DEFAULT '',
+                message         TEXT NOT NULL DEFAULT '',
+                plan_id         INTEGER,
+                read            INTEGER NOT NULL DEFAULT 0,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(guild_id, recipient_id, read)")
+        await db.commit()
 
         # Favourites per user per guild (saved targets)
         await db.execute("""
@@ -5650,3 +5687,84 @@ def _check_summary(ok, warnings, errors, suggestions) -> dict:
         grade = "ok"
     return {"ok": len(ok), "warnings": len(warnings), "errors": len(errors),
             "suggestions": len(suggestions), "score_pct": pct, "grade": grade}
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+async def create_notifications(guild_id: str, ally_group_id: int | None,
+                                recipient_ids: list[str], notif_type: str,
+                                title: str, message: str, plan_id: int | None = None):
+    """Create a notification for each recipient_id."""
+    if not recipient_ids:
+        return
+    async with aiosqlite.connect(DB_PATH) as db:
+        for rid in recipient_ids:
+            await db.execute("""
+                INSERT INTO notifications (guild_id, ally_group_id, recipient_id, type, title, message, plan_id)
+                VALUES (?,?,?,?,?,?,?)
+            """, (guild_id, ally_group_id, rid, notif_type, title[:200], message[:1000], plan_id))
+        await db.commit()
+
+
+async def get_ep_notify_members(guild_id: str) -> list[str]:
+    """Return discord_ids of approved members whose role has 'ep_notify' permission."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT am.discord_id
+            FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            JOIN ally_roles ar ON ar.id = am.role_id
+            WHERE ag.guild_id=? AND am.status='approved'
+              AND (ar.permissions LIKE '%ep_notify%' OR ag.owner_discord_id = am.discord_id)
+        """, (guild_id,)) as cur:
+            rows = await cur.fetchall()
+        # Also always include the group owner
+        async with db.execute(
+            "SELECT owner_discord_id FROM ally_groups WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            owner = await cur.fetchone()
+    ids = list({r["discord_id"] for r in rows})
+    if owner and owner[0] and owner[0] not in ids:
+        ids.append(owner[0])
+    return ids
+
+
+async def get_notifications(guild_id: str, discord_id: str, unread_only: bool = False, limit: int = 50) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        q = "SELECT * FROM notifications WHERE guild_id=? AND recipient_id=?"
+        params: list = [guild_id, discord_id]
+        if unread_only:
+            q += " AND read=0"
+        q += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        async with db.execute(q, params) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def count_unread_notifications(guild_id: str, discord_id: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM notifications WHERE guild_id=? AND recipient_id=? AND read=0",
+            (guild_id, discord_id)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+async def mark_notifications_read(guild_id: str, discord_id: str, notif_ids: list[int] | None = None):
+    """Mark specific notifications (or all) as read for this user."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        if notif_ids:
+            placeholders = ",".join("?" * len(notif_ids))
+            await db.execute(
+                f"UPDATE notifications SET read=1 WHERE guild_id=? AND recipient_id=? AND id IN ({placeholders})",
+                [guild_id, discord_id] + notif_ids
+            )
+        else:
+            await db.execute(
+                "UPDATE notifications SET read=1 WHERE guild_id=? AND recipient_id=?",
+                (guild_id, discord_id)
+            )
+        await db.commit()

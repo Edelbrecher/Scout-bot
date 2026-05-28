@@ -20,6 +20,7 @@
   {% elif flash == "token_renewed" %}<div class="alert alert-success">🔄 Neuer Link generiert.</div>
   {% elif flash == "role_created" %}<div class="alert alert-success">✅ Rolle erstellt.</div>
   {% elif flash == "role_deleted" %}<div class="alert alert-success">🗑️ Rolle gelöscht.</div>
+  {% elif flash == "role_updated" %}<div class="alert alert-success">✅ Rolle aktualisiert.</div>
   {% elif flash == "guild_has_ally" %}<div class="alert alert-error">⚠️ Auf diesem Server existiert bereits eine Allianz. Bitte erst die bestehende löschen.</div>
   {% endif %}
 
@@ -95,14 +96,27 @@
   {# ── Roles Card ── #}
   <div class="card" style="margin-bottom:1rem;">
     <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">🏷️ Rollen ({{ roles|length }})</h3>
-    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+    <div style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:0.75rem;">
       {% for r in roles %}
-      <div style="display:flex;align-items:center;gap:0.4rem;background:var(--bg-main);border:1px solid {{ r.color }};border-radius:20px;padding:0.2rem 0.65rem;">
-        <span style="width:8px;height:8px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
-        <span style="font-size:0.82rem;font-weight:600;">{{ r.role_name }}</span>
+      {% set has_ep_notify = 'ep_notify' in (r.permissions or '') %}
+      <div style="display:flex;align-items:center;gap:0.6rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;flex-wrap:wrap;">
+        <span style="width:10px;height:10px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
+        <span style="font-size:0.85rem;font-weight:600;flex:1;min-width:80px;">{{ r.role_name }}</span>
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/update" style="margin:0;display:flex;align-items:center;gap:.35rem;">
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--text-muted);cursor:pointer;" title="Diese Rolle erhält Benachrichtigungen wenn Angreifer im EP ausfallen">
+            <input type="checkbox" name="ep_notify" value="1" {% if has_ep_notify %}checked{% endif %}
+                   onchange="this.form.submit()" style="accent-color:#6366f1;">
+            🔔 EP-Benachrichtigungen
+          </label>
+        </form>
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/update" style="margin:0;display:flex;align-items:center;gap:.3rem;">
+          <input type="color" name="color" value="{{ r.color }}" title="Farbe ändern"
+                 style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;padding:1px;background:var(--bg-main);cursor:pointer;"
+                 onchange="this.form.submit()">
+        </form>
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="margin:0;">
-          <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.75rem;padding:0;line-height:1;"
-                  onclick="return confirm('Rolle löschen?')">✕</button>
+          <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:.1rem .3rem;line-height:1;"
+                  onclick="return confirm('Rolle löschen?')" title="Rolle löschen">✕</button>
         </form>
       </div>
       {% endfor %}

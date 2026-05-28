@@ -613,9 +613,11 @@ function copyDualLink() {
 <script>
 const GUILD_ID_MA = '{{ guild.guild_id }}';
 let _pendingDeltaWaveId = null;
+let _pendingDeltaWaveData = null;
 
-function openDeltaModal(waveId) {
+function openDeltaModal(waveId, waveData=null) {
   _pendingDeltaWaveId = waveId;
+  _pendingDeltaWaveData = waveData;
   document.getElementById('deltaInput').value = '';
   const m = document.getElementById('deltaModal');
   m.style.display = 'flex';
@@ -624,28 +626,45 @@ function openDeltaModal(waveId) {
 function closeDeltaModal() {
   document.getElementById('deltaModal').style.display = 'none';
   _pendingDeltaWaveId = null;
+  _pendingDeltaWaveData = null;
 }
 async function saveDelta() {
   const delta = parseInt(document.getElementById('deltaInput').value) || 0;
+  const id = _pendingDeltaWaveId, data = _pendingDeltaWaveData;
   closeDeltaModal();
-  if (_pendingDeltaWaveId) await confirmWave(_pendingDeltaWaveId, 'late', delta);
+  if (id) await confirmWave(id, 'late', delta, data);
 }
 
-async function confirmWave(waveId, status, delta=0) {
+async function markCantSend(waveId, waveData=null) {
+  if (!confirm('Bestätigen: Du kannst diese Welle nicht abschicken?')) return;
+  await confirmWave(waveId, 'cant_send', 0, waveData);
+}
+
+async function confirmWave(waveId, status, delta=0, waveData=null) {
   const fd = new FormData();
   fd.append('confirm_status', status);
   fd.append('confirm_delta_seconds', delta);
   try {
     await fetch(`/guild/${GUILD_ID_MA}/operations/api/waves/${waveId}/confirm`, {method:'POST', body:fd});
+    // Notify leads if attacker can't send
+    if ((status==='cant_send'||status==='not_sent') && waveData) {
+      fetch(`/guild/${GUILD_ID_MA}/operations/api/waves/${waveId}/notify-leads`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          confirm_status: status,
+          attacker_name: waveData.attacker_name || '',
+          plan_name: waveData.plan_name || '',
+          plan_id: waveData.plan_id || null,
+          target: (waveData.target_x||'')+'|'+(waveData.target_y||''),
+        })
+      }).catch(()=>{});
+    }
     loadMissions();
   } catch(e) { console.error(e); }
 }
 
 // Mark wave as "cant_send" immediately — before the op
-async function markCantSend(waveId) {
-  if (!confirm('Bestätigen: Du kannst diese Welle nicht abschicken?')) return;
-  await confirmWave(waveId, 'cant_send');
-}
 
 function loadMissions() {
   fetch(`/guild/${GUILD_ID_MA}/operations/api/my-waves`)
@@ -690,11 +709,11 @@ function loadMissions() {
             ? `<span style="font-size:.85rem;" title="${csLabels[cs]||cs}${deltaStr}">${csIcons[cs]||'?'} ${csLabels[cs]||cs}${deltaStr}</span>`
             : (isPast
               ? `<div style="display:flex;gap:.3rem;flex-wrap:wrap;">
-                  <button onclick="confirmWave(${w.id},'on_time')" style="font-size:.72rem;padding:.2rem .5rem;background:#16a34a22;color:#4ade80;border:1px solid #4ade8044;border-radius:5px;cursor:pointer;">✅ Pünktlich</button>
-                  <button onclick="openDeltaModal(${w.id})" style="font-size:.72rem;padding:.2rem .5rem;background:#d9770622;color:#fbbf24;border:1px solid #fbbf2444;border-radius:5px;cursor:pointer;">⏱ Unpünktlich</button>
-                  <button onclick="confirmWave(${w.id},'not_sent')" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262622;color:#f87171;border:1px solid #f8717144;border-radius:5px;cursor:pointer;">❌ Nicht abgeschickt</button>
+                  <button onclick="confirmWave(${w.id},'on_time',0,${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#16a34a22;color:#4ade80;border:1px solid #4ade8044;border-radius:5px;cursor:pointer;">✅ Pünktlich</button>
+                  <button onclick="openDeltaModal(${w.id},${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#d9770622;color:#fbbf24;border:1px solid #fbbf2444;border-radius:5px;cursor:pointer;">⏱ Unpünktlich</button>
+                  <button onclick="confirmWave(${w.id},'not_sent',0,${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262622;color:#f87171;border:1px solid #f8717144;border-radius:5px;cursor:pointer;">❌ Nicht abgeschickt</button>
                 </div>`
-              : `<button onclick="markCantSend(${w.id})" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262611;color:#f87171;border:1px solid #f8717133;border-radius:5px;cursor:pointer;">🚫 Kann nicht abschicken</button>`);
+              : `<button onclick="markCantSend(${w.id},${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262611;color:#f87171;border:1px solid #f8717133;border-radius:5px;cursor:pointer;">🚫 Kann nicht abschicken</button>`);
 
           return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);background:${rowBg}">
             <td style="padding:.45rem .6rem;"><span class="wave-type-badge ${typeColors[w.wave_type]||''}">${typeLabels[w.wave_type]||w.wave_type}</span></td>
