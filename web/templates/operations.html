@@ -720,15 +720,17 @@ async function doSearch(q) {
   } catch(e) { dd.style.display='none'; }
 }
 
-function addTargetFromSearch(x, y, player, village, pop) {
+async function addTargetFromSearch(x, y, player, village, pop) {
   document.getElementById('searchDropdown').style.display='none';
   document.getElementById('targetSearch').value='';
-  document.getElementById('tmX').value=x;
-  document.getElementById('tmY').value=y;
-  document.getElementById('tmPlayer').value=player;
-  document.getElementById('tmVillage').value=village;
-  document.getElementById('tmPop').value=pop||0;
-  addTarget();
+  if (!activePlanId) { alert('Bitte zuerst einen Einsatzplan auswählen oder erstellen.'); return; }
+  try {
+    await apiPost(`/plans/${activePlanId}/targets`, {
+      player_name: player, village_name: village,
+      x: x, y: y, population: pop||0, notes: ''
+    });
+    await reloadActivePlan();
+  } catch(e) { alert('Fehler: ' + e.message); }
 }
 
 // ══ Target CRUD ═══════════════════════════════════════════════════════════
@@ -927,13 +929,15 @@ function renderFavs() {
   `).join('');
 }
 
-function addTargetFromFav(x,y,player,village) {
-  document.getElementById('tmX').value=x;
-  document.getElementById('tmY').value=y;
-  document.getElementById('tmPlayer').value=player;
-  document.getElementById('tmVillage').value=village;
-  document.getElementById('tmPop').value=0;
-  addTarget();
+async function addTargetFromFav(x,y,player,village) {
+  if (!activePlanId) { alert('Bitte zuerst einen Einsatzplan auswählen oder erstellen.'); return; }
+  try {
+    await apiPost(`/plans/${activePlanId}/targets`, {
+      player_name: player, village_name: village,
+      x: x, y: y, population: 0, notes: ''
+    });
+    await reloadActivePlan();
+  } catch(e) { alert('Fehler: ' + e.message); }
 }
 
 async function deleteFav(id) {
