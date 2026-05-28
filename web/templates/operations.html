@@ -249,14 +249,18 @@ const INIT_MEMBERS = {{ members | tojson }};
               <input id="targetSearch" type="text" placeholder="Spieler / Koordinaten suchen…"
                      style="width:220px;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.35rem .7rem;color:var(--text);font-size:.82rem;"
                      oninput="debounceSearch(this.value)" autocomplete="off">
+              <button class="btn btn-secondary" style="font-size:.8rem;" id="allyFilterToggleBtn" onclick="toggleAlliancePanel()" title="Allianz-Filter">
+                🏰 Filter <span id="allyFilterBadge" style="display:none;background:#6366f1;color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;margin-left:.2rem;"></span>
+              </button>
               <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
             </div>
 
-            <!-- Alliance filter -->
+            <!-- Alliance filter panel (collapsible) -->
             <div id="allianceFilterRow" style="display:none;margin-bottom:.6rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;">
               <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
-                <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🎯 Allianz-Filter</span>
-                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);">Keine Auswahl = alle Spieler</span>
+                <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🏰 Allianz-Filter</span>
+                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">Keine Auswahl = alle Spieler</span>
+                <button class="btn-icon" style="font-size:.7rem;padding:.1rem .35rem;" onclick="toggleAlliancePanel()">✕</button>
               </div>
               <div id="allianceChips" style="display:flex;gap:.3rem;flex-wrap:wrap;"></div>
             </div>
@@ -742,12 +746,22 @@ function getTroopName(id, tribe) {
 }
 
 // ══ Search ════════════════════════════════════════════════════════════════
+let alliancePanelOpen = false;
+
+function toggleAlliancePanel() {
+  if (!availableAlliances.length) return;
+  alliancePanelOpen = !alliancePanelOpen;
+  document.getElementById('allianceFilterRow').style.display = alliancePanelOpen ? 'block' : 'none';
+}
+
 async function loadAlliances() {
   try {
     const data = await apiFetch('/alliances');
     availableAlliances = data.alliances || [];
     metaGroups = data.meta_groups || [];
     renderAllianceFilter();
+    // Show the filter button now that data is loaded
+    document.getElementById('allyFilterToggleBtn').style.display = availableAlliances.length ? '' : 'none';
   } catch(e) { availableAlliances = []; metaGroups = []; }
 }
 
@@ -802,7 +816,17 @@ function renderAllianceFilter() {
   if (selectedAlliances.size === 0) {
     hint.textContent = 'Keine Auswahl = alle Spieler';
   } else {
-    hint.textContent = `Gefiltert: ${[...selectedAlliances].join(' + ')}`;
+    hint.textContent = `Aktiv: ${[...selectedAlliances].join(' + ')}`;
+  }
+  // Update badge on toggle button
+  const badge = document.getElementById('allyFilterBadge');
+  if (badge) {
+    if (selectedAlliances.size > 0) {
+      badge.textContent = selectedAlliances.size;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 }
 
