@@ -11,7 +11,17 @@
       <h1 style="margin:0.25rem 0 0;">🏰 Mein Travian-Account</h1>
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
-    <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Kampfkraft-Rechner</a>
+    <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;">
+      {% if my_waves %}
+      <a href="#missionsCard" onclick="document.getElementById('missionsCard').scrollIntoView({behavior:'smooth'});return false;"
+         class="btn btn-primary" style="align-self:flex-end;position:relative;">
+        ⚔️ Meine Einsätze
+        {% set pending = my_waves | selectattr('confirm_status', 'equalto', '') | list | length %}
+        {% if pending %}<span style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending }}</span>{% endif %}
+      </a>
+      {% endif %}
+      <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Kampfkraft-Rechner</a>
+    </div>
   </div>
 
   <!-- Flash messages -->

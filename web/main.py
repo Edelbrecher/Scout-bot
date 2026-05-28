@@ -1511,6 +1511,8 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
         preview_info = pplan
 
     unread_notif = await database.count_unread_notifications(guild_id, session.get("uid",""))
+    my_waves = await database.get_my_op_waves(guild_id, session.get("uid",""))
+    pending_waves = sum(1 for w in my_waves if not w.get("confirm_status") and w.get("send_time"))
 
     return templates.TemplateResponse(
         "guild.html",
@@ -1522,6 +1524,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "trial_expires_at": guild.get("trial_expires_at"),
          "preview_plan": preview_info,
          "unread_notif": unread_notif,
+         "pending_waves": pending_waves,
          },
     )
 
