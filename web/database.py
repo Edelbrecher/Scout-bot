@@ -2904,6 +2904,145 @@ async def revoke_dual_link(token: str, owner_id: str):
         await db.commit()
 
 
+# ── My Ally ──────────────────────────────────────────────────────────────────
+
+async def _init_ally_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                owner_discord_id TEXT NOT NULL,
+                owner_username TEXT,
+                ally_name TEXT NOT NULL,
+                invite_token TEXT UNIQUE NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ally_group_id INTEGER NOT NULL REFERENCES ally_groups(id) ON DELETE CASCADE,
+                discord_id TEXT NOT NULL,
+                discord_username TEXT,
+                travian_name TEXT,
+                note TEXT,
+                joined_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(ally_group_id, discord_id)
+            )
+        """)
+        await db.commit()
+
+
+async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, ally_name: str) -> dict:
+    await _init_ally_tables()
+    import secrets as _sec
+    token = _sec.token_urlsafe(24)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO ally_groups (guild_id, owner_discord_id, owner_username, ally_name, invite_token)
+            VALUES (?, ?, ?, ?, ?)
+        """, (guild_id, owner_id, owner_username, ally_name, token))
+        await db.commit()
+        return {"id": cur.lastrowid, "invite_token": token}
+
+
+async def get_ally_group_by_token(token: str) -> dict | None:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM ally_groups WHERE invite_token = ?", (token,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_ally_group_for_owner(guild_id: str, owner_id: str) -> dict | None:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_groups WHERE guild_id=? AND owner_discord_id=? ORDER BY created_at DESC LIMIT 1",
+            (guild_id, owner_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_ally_members(ally_group_id: int) -> list[dict]:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_members WHERE ally_group_id=? ORDER BY joined_at ASC",
+            (ally_group_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def join_ally_group(ally_group_id: int, discord_id: str, discord_username: str, travian_name: str = "") -> bool:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            await db.execute("""
+                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, travian_name)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(ally_group_id, discord_id) DO UPDATE
+                SET discord_username=excluded.discord_username, travian_name=excluded.travian_name
+            """, (ally_group_id, discord_id, discord_username, travian_name))
+            await db.commit()
+            return True
+        except Exception:
+            return False
+
+
+async def update_ally_member(ally_group_id: int, discord_id: str, travian_name: str, note: str):
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_members SET travian_name=?, note=? WHERE ally_group_id=? AND discord_id=?",
+            (travian_name, note, ally_group_id, discord_id),
+        )
+        await db.commit()
+
+
+async def remove_ally_member(ally_group_id: int, discord_id: str):
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM ally_members WHERE ally_group_id=? AND discord_id=?",
+            (ally_group_id, discord_id),
+        )
+        await db.commit()
+
+
+async def get_ally_membership(guild_id: str, discord_id: str) -> dict | None:
+    """Return the ally_group this user has joined (not owner) in this guild."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT ag.*, am.travian_name, am.note, am.joined_at AS member_since
+            FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE ag.guild_id = ? AND am.discord_id = ?
+            ORDER BY am.joined_at DESC LIMIT 1
+        """, (guild_id, discord_id)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def regenerate_ally_token(ally_group_id: int, owner_id: str) -> str:
+    import secrets as _sec
+    token = _sec.token_urlsafe(24)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_groups SET invite_token=? WHERE id=? AND owner_discord_id=?",
+            (token, ally_group_id, owner_id),
+        )
+        await db.commit()
+    return token
+
+
 async def get_all_shared_sitters(guild_id: str) -> list[dict]:
     await _init_sitter_table()
     async with aiosqlite.connect(DB_PATH) as db:

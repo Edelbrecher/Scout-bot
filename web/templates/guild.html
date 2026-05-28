@@ -168,6 +168,16 @@
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
 
+    <!-- My Ally -->
+    <a href="/guild/{{ guild.guild_id }}/my-ally" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🤝</div>
+      <div class="feature-body">
+        <div class="feature-title">My Ally</div>
+        <div class="feature-desc">Allianz-Mitglieder einladen, auflisten & verwalten</div>
+      </div>
+      <span style="color:var(--text-muted);font-size:1rem;">→</span>
+    </a>
+
     <!-- Farming (Pro) -->
     <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">⚜️</div>
@@ -322,11 +332,11 @@
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
 
-    <!-- Allianz-Mitglieder -->
+    <!-- Meta-Builder -->
     <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">👥</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.members.title">Allianz-Mitglieder</div>
+        <div class="feature-title" data-i18n="guild.feature.members.title">Meta-Builder</div>
         <div class="feature-desc" data-i18n="guild.feature.members.desc">Mitgliederliste importieren — Übersicht, Stämme, Bevölkerung, Punkte</div>
       </div>
       {{ OK_ARROW }}

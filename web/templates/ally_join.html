@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Allianz beitreten · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:480px;margin:3rem auto;">
+
+  {% if not group %}
+  <div class="card" style="text-align:center;padding:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">❌</div>
+    <h2 style="margin:0 0 0.5rem;">Ungültiger Link</h2>
+    <p style="color:var(--text-muted);">Dieser Einladungslink ist nicht mehr gültig oder wurde erneuert.</p>
+  </div>
+
+  {% elif accepted %}
+  <div class="card" style="text-align:center;padding:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">🎉</div>
+    <h2 style="margin:0 0 0.5rem;">Willkommen!</h2>
+    <p style="color:var(--text-muted);">Du bist der Allianz <strong>{{ group.ally_name }}</strong> beigetreten.</p>
+    <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Zum Dashboard</a>
+  </div>
+
+  {% elif request.query_params.get('error') == 'own_group' %}
+  <div class="card" style="text-align:center;padding:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">⚠️</div>
+    <h2 style="margin:0 0 0.5rem;">Eigene Allianz</h2>
+    <p style="color:var(--text-muted);">Du kannst nicht deiner eigenen Allianz beitreten.</p>
+  </div>
+
+  {% else %}
+  <div class="card">
+    <div style="text-align:center;margin-bottom:1.5rem;">
+      <div style="font-size:2.5rem;margin-bottom:0.5rem;">🤝</div>
+      <h2 style="margin:0 0 0.25rem;">Allianz beitreten</h2>
+      <div style="color:var(--text-muted);font-size:0.9rem;">Einladung von <strong>{{ group.owner_username or 'Unbekannt' }}</strong></div>
+    </div>
+
+    <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1.25rem;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:700;">🏰 {{ group.ally_name }}</div>
+    </div>
+
+    {% if not session or not session.get('uid') %}
+    <div style="text-align:center;color:var(--text-muted);padding:1rem;">
+      <p>Du musst eingeloggt sein um beizutreten.</p>
+      <a href="/auth/login?next=/ally/join/{{ token }}" class="btn btn-primary">🔐 Mit Discord einloggen</a>
+    </div>
+    {% else %}
+    <form method="post" action="/ally/join/{{ token }}">
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label style="font-size:0.85rem;font-weight:600;">Dein Travian-Name <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+        <input type="text" name="travian_name" placeholder="z.B. Currax" maxlength="80"
+               style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:0.95rem;margin-top:0.3rem;">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;font-size:1rem;padding:0.65rem;">🤝 Beitreten</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

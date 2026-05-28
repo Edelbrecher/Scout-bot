@@ -514,20 +514,37 @@ function copyDualLink() {
 <script>
 (function() {
   const history = {{ history | tojson }};
-  const labels = history.map(h => {
-    const d = new Date((h.uploaded_at||'').replace(' ','T')+'Z');
-    return (h.uploaded_at||'').slice(0,10).split('-').slice(1).reverse().join('.');
+  // Deduplicate by date (keep last entry per day), then sort oldest→newest
+  const byDate = {};
+  for (const h of history) {
+    const day = (h.uploaded_at||'').slice(0,10);
+    byDate[day] = h;
+  }
+  const sorted = Object.values(byDate).sort((a,b) => (a.uploaded_at||'') < (b.uploaded_at||'') ? -1 : 1);
+
+  const labels = sorted.map(h => {
+    const s = (h.uploaded_at||'').slice(0,10); // YYYY-MM-DD
+    const parts = s.split('-');
+    return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0].slice(2)}` : s;
   });
+
   const ctx = document.getElementById('historyChart');
   if (!ctx) return;
+
+  if (sorted.length < 2) {
+    ctx.closest('.card').querySelector('p.hint').textContent =
+      'Noch zu wenig Daten — lade nach dem nächsten Upload erneut.';
+  }
+
+  const pr = sorted.length < 30 ? 4 : 2;
   new Chart(ctx, {
     type: 'line',
     data: {
       labels,
       datasets: [
-        { label:'⚔️ Off-Score', data:history.map(h=>h.total_off), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)', tension:0.3, fill:true, pointRadius:history.length<30?4:2, pointHoverRadius:6 },
-        { label:'🛡️ Def-Score', data:history.map(h=>h.total_def), borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.08)', tension:0.3, fill:true, pointRadius:history.length<30?4:2, pointHoverRadius:6 },
-        { label:'🌾 Korn',      data:history.map(h=>h.total_crop), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0)', tension:0.3, fill:false, pointRadius:history.length<30?4:2, pointHoverRadius:6, borderDash:[5,3] },
+        { label:'⚔️ Off-Score', data:sorted.map(h=>h.total_off||0), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)', tension:0.3, fill:true, pointRadius:pr, pointHoverRadius:6 },
+        { label:'🛡️ Def-Score', data:sorted.map(h=>h.total_def||0), borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.08)', tension:0.3, fill:true, pointRadius:pr, pointHoverRadius:6 },
+        { label:'🌾 Korn',      data:sorted.map(h=>h.total_crop||0), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0)', tension:0.3, fill:false, pointRadius:pr, pointHoverRadius:6, borderDash:[5,3] },
       ]
     },
     options: {
@@ -535,7 +552,7 @@ function copyDualLink() {
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{labels:{color:'#ccc',font:{size:12}}},
-        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('de-DE')}`}}
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toLocaleString('de-DE')}`}}
       },
       scales:{
         x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa',font:{size:10},maxRotation:30}},
