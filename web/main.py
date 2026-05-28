@@ -4661,43 +4661,45 @@ async def op_update_wave(request: Request, guild_id: str, wave_id: int):
     # Recompute times if origin/target changed
     plan = None
     if "origin_x" in data or "tribe" in data or "troop_json" in data:
-        # fetch wave to get current plan
         import aiosqlite as _aiosqlite_op
-        async with _aiosqlite_op.connect(database.DB_PATH) as db:
-            db.row_factory = _aiosqlite_op.Row
-            async with db.execute(
+        import datetime as _dt_op
+        row = None
+        async with _aiosqlite_op.connect(database.DB_PATH) as _db2:
+            _db2.row_factory = _aiosqlite_op.Row
+            async with _db2.execute(
                 "SELECT w.*, t.x as tx, t.y as ty, p.landing_time, p.server_speed "
                 "FROM op_waves w JOIN op_targets t ON t.id=w.target_id "
                 "JOIN op_plans p ON p.id=w.plan_id WHERE w.id=? AND w.guild_id=?",
                 (wave_id, guild_id)
-            ) as cur:
-                row = await cur.fetchone()
+            ) as _cur2:
+                row = await _cur2.fetchone()
         if row:
             row = dict(row)
             troops = data.get("troop_json", _op_json.loads(row["troop_json"] or "{}"))
-            if isinstance(troops, str): troops = _op_json.loads(troops)
-            tribe  = data.get("tribe", row["tribe"])
-            ox = data.get("origin_x", row["origin_x"])
-            oy = data.get("origin_y", row["origin_y"])
-            lt = data.get("landing_time", row["landing_time"])
-            spd = float(data.get("server_speed", row["server_speed"]))
-            # recalc
-            slowest = min(troops.keys(), key=lambda t: database._TROOP_SPEED.get(t,99), default="")
+            if isinstance(troops, str):
+                troops = _op_json.loads(troops)
+            tribe   = data.get("tribe", row["tribe"])
+            ox      = data.get("origin_x", row["origin_x"])
+            oy      = data.get("origin_y", row["origin_y"])
+            lt      = data.get("landing_time", row["landing_time"])
+            spd     = float(data.get("server_speed", row["server_speed"]))
+            slowest = min(troops.keys(), key=lambda t: database._TROOP_SPEED.get(t, 99), default="")
             sl_speed = database._TROOP_SPEED.get(slowest, 6.0)
             travel_sec = 0
             send_t = lt or ""
             if ox is not None and oy is not None and sl_speed > 0:
-                travel_sec = database._calc_travel_seconds(int(ox), int(oy), row["tx"], row["ty"], sl_speed, spd)
+                travel_sec = database._calc_travel_seconds(
+                    int(ox), int(oy), row["tx"], row["ty"], sl_speed, spd)
                 if lt:
-                    import datetime as _dt
                     try:
-                        ltd = _dt.datetime.fromisoformat(lt.replace("Z",""))
-                        send_t = (ltd - _dt.timedelta(seconds=travel_sec)).strftime("%Y-%m-%dT%H:%M:%S")
-                    except Exception: pass
+                        ltd = _dt_op.datetime.fromisoformat(lt.replace("Z", ""))
+                        send_t = (ltd - _dt_op.timedelta(seconds=travel_sec)).strftime("%Y-%m-%dT%H:%M:%S")
+                    except Exception:
+                        pass
             data["travel_seconds"] = travel_sec
-            data["send_time"] = send_t
-            data["slowest_unit"] = slowest
-            data["slowest_speed"] = sl_speed
+            data["send_time"]      = send_t
+            data["slowest_unit"]   = slowest
+            data["slowest_speed"]  = sl_speed
             if isinstance(data.get("troop_json"), dict):
                 data["troop_json"] = _op_json.dumps(data["troop_json"])
     await database.update_op_wave(wave_id, guild_id, **data)
