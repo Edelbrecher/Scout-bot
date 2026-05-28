@@ -1199,9 +1199,7 @@ function _renderAssignmentPanel() {
           </div>
           <div class="atk-village">${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</div>
           <div class="atk-controls">
-            ${['real','fake','scout','def'].map(t =>
-              `<button class="atk-type-btn ${r.type===t?'sel-'+t:''}" onclick="setAtkType(${i},'${t}',this)">${{real:'⚔ Echt',fake:'👻 Fake',scout:'🔍 Scout',def:'🛡 Def'}[t]}</button>`
-            ).join('')}
+            ${(()=>{const lbl={real:'⚔ Echt',fake:'👻 Fake',scout:'🔍 Scout',def:'🛡 Def'};return['real','fake','scout','def'].map(t=>`<button class="atk-type-btn ${r.type===t?'sel-'+t:''}" onclick="setAtkType(${i},'${t}',this)">${lbl[t]}</button>`).join('');})()}
             <input class="atk-waves-input" type="number" min="1" max="20" value="${r.waves}" title="Wellen" oninput="setAtkWaves(${i},this.value)">
             <label style="display:flex;align-items:center;gap:.25rem;font-size:.74rem;color:var(--text-muted);margin-left:auto;">
               <input class="atk-include" type="checkbox" ${r.include?'checked':''} onchange="setAtkInclude(${i},this.checked)"> Dabei
