@@ -609,6 +609,14 @@ function parseTuple(s) {
 }
 
 function parseSql(text) {
+  // Three known Travian map.sql layouts (mirrors backend _parse_map_sql):
+  // Layout A (T4.5+ new):  vid, x, y, tribe, row_uid, vname, player_id, pname, aid, aname, pop, ?, isCapital
+  //   Detection: f0>=0 (vid) AND v[7] is non-numeric (player_name string)
+  // Layout B (old x-first): x, y, tid, tribe, vid, vname, pop, pname, pid, aname, aid, ?, isCapital
+  //   Detection: |f0|<=800 (coordinate) AND v[7] is non-numeric
+  // Layout C (old vid-first): vid, x, y, tid, tribe, ?, vname, pop, pname, ?, aname, ...
+  //   Detection: f0>800 AND v[7] is numeric (population)
+  const isNum = s => /^-?\d+(\.\d+)?$/.test((s||'').trim());
   const rows=[]; let maxC=0;
   for (const line of text.split('\n')) {
     const m=line.match(/VALUES\s*\((.+)\);?\s*$/i);
@@ -616,14 +624,24 @@ function parseSql(text) {
     const v=parseTuple(m[1]);
     if(v.length<7)continue;
     const f0=parseFloat(v[0]);
+    if(isNaN(f0))continue;
     let x,y,tribe,vname,pop,pname,aname,isCapital;
-    if(Math.abs(f0)<=800){
-      // x, y, tid, tribe, vid, vname, pop, pname, pid, aname, aid, ?, isCapital
+    const v7num = isNum(v[7]);
+    if(!v7num && f0>=0 && v.length>10) {
+      // Layout A: vid, x, y, tribe, row_uid, vname, player_id, pname, aid, aname, pop
+      x=+v[1];y=+v[2];tribe=+v[3]||0;vname=v[5]||'';
+      pname=(v[7]&&v[7]!=='NULL'&&v[7]!=='')?v[7]:null;
+      aname=(v[9]&&v[9]!=='NULL'&&v[9]!=='')?v[9]:null;
+      pop=+v[10]||0;
+      isCapital=v[12]==='TRUE'||v[12]==='1';
+    } else if(!v7num && Math.abs(f0)<=800) {
+      // Layout B: x, y, tid, tribe, vid, vname, pop, pname, pid, aname
       x=+v[0];y=+v[1];tribe=+v[3]||0;vname=v[5]||'';pop=+v[6]||0;
       pname=(v[7]&&v[7]!=='NULL')?v[7]:null;
       aname=(v[9]&&v[9]!=='NULL'&&v[9]!=='')?v[9]:null;
       isCapital=v[12]==='TRUE'||v[12]==='1';
     } else {
+      // Layout C: vid, x, y, tid, tribe, ?, vname, pop, pname, ?, aname
       x=+v[1];y=+v[2];tribe=+v[4]||0;vname=v[6]||'';pop=+v[7]||0;
       pname=(v[8]&&v[8]!=='NULL')?v[8]:null;
       aname=(v[10]&&v[10]!=='NULL'&&v[10]!=='')?v[10]:null;
