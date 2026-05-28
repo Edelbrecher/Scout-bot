@@ -158,6 +158,11 @@
   {% endif %}
   {% endif %}
 
+  <!-- ── Tile-Edit Button ── -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:.5rem;">
+    <button id="editTilesBtn" onclick="toggleEditMode()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;">✏️ Anpassen</button>
+  </div>
+
   <!-- ── Feature-Grid ── -->
 
   {# Reusable badge macros #}
@@ -175,7 +180,7 @@
     <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.player">Spieler</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
+  <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
 
     <!-- Mein Account (Free) -->
     <a href="/guild/{{ guild.guild_id }}/mein-account{% if pending_waves %}#missionsCard{% endif %}" class="feature-card" style="text-decoration:none;{% if pending_waves %}border-color:rgba(239,68,68,.5);box-shadow:0 0 0 2px rgba(239,68,68,.15);{% endif %}">
@@ -191,15 +196,6 @@
       <span style="color:{% if pending_waves %}#ef4444{% else %}var(--text-muted){% endif %};font-size:1rem;">→</span>
     </a>
 
-    <!-- My Ally -->
-    <a href="/guild/{{ guild.guild_id }}/my-ally" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🤝</div>
-      <div class="feature-body">
-        <div class="feature-title">My Ally</div>
-        <div class="feature-desc">Allianz-Mitglieder einladen, auflisten & verwalten</div>
-      </div>
-      <span style="color:var(--text-muted);font-size:1rem;">→</span>
-    </a>
 
     <!-- Farming (Pro) -->
     <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
@@ -375,7 +371,17 @@
     <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.alliance">Allianz</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
+  <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
+
+    <!-- My Ally -->
+    <a href="/guild/{{ guild.guild_id }}/my-ally" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">🤝</div>
+      <div class="feature-body">
+        <div class="feature-title">My Ally</div>
+        <div class="feature-desc">Allianz-Mitglieder einladen, auflisten & verwalten</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
 
     <!-- Meta-Builder -->
     <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" class="feature-card" style="text-decoration:none;">
@@ -456,97 +462,7 @@
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
 
-  <!-- Server-Einstellungen (Travian World URL) -->
   {% set needs_setup = not guild.tw_world and not is_personal %}
-  <div id="setupCard" class="card" style="margin-bottom:1rem;
-    {% if needs_setup %}border:2px solid #f59e0b; background:linear-gradient(135deg,#1c1600,#0f0f0f);{% endif %}">
-    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleSetup()">
-      <h2 style="margin:0; display:flex; align-items:center; gap:0.5rem; font-size:0.95rem;">
-        {% if needs_setup %}
-          <span style="color:#f59e0b;" data-i18n="guild.setup.title">⚙️ Ersteinrichtung erforderlich</span>
-        {% else %}
-          <span data-i18n="guild.settings.title">⚙️ Server-Einstellungen</span>
-        {% endif %}
-      </h2>
-      <span id="setupChevron" style="font-size:1.2rem; transition:transform 0.2s; {% if not needs_setup %}transform:rotate(-90deg);{% endif %}">▼</span>
-    </div>
-
-    <div id="setupBody" style="{% if not needs_setup %}display:none;{% endif %} margin-top:1rem;">
-      {% if needs_setup %}
-      <p style="color:#f59e0b; margin-bottom:1rem;" data-i18n="guild.setup.hint">
-        Bitte trage einmal die Travian-Server-URL ein. Diese wird für Karten-Snapshots, Farming-Analyse und alle Deep-Links benötigt.
-      </p>
-      {% else %}
-      <p class="hint" data-i18n="guild.settings.hint">Travian-Server-Einstellungen für diesen Discord-Server.</p>
-      {% endif %}
-
-      <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
-        <div class="form-group" style="margin:0; flex:1; min-width:260px;">
-          <label data-i18n="guild.world.label">Travian World URL</label>
-          <input type="url" name="server_url" required
-            placeholder="https://ts2.x1.europe.travian.com"
-            list="worldlist"
-            value="{{ guild.tw_world or '' }}"
-            style="width:100%; padding:0.5rem; background:var(--bg-main); color:var(--text); border:1px solid {% if needs_setup %}#f59e0b{% else %}var(--border){% endif %}; border-radius:6px;" />
-          <datalist id="worldlist">
-            <option value="https://ts1.x1.europe.travian.com">ts1.x1.europe (Speed 1x)</option>
-            <option value="https://ts2.x1.europe.travian.com">ts2.x1.europe (Speed 1x)</option>
-            <option value="https://ts3.x1.europe.travian.com">ts3.x1.europe</option>
-            <option value="https://ts4.x1.europe.travian.com">ts4.x1.europe</option>
-            <option value="https://ts5.x1.europe.travian.com">ts5.x1.europe</option>
-            <option value="https://ts1.x3.europe.travian.com">ts1.x3.europe (Speed 3x)</option>
-            <option value="https://ts2.x3.europe.travian.com">ts2.x3.europe (Speed 3x)</option>
-            <option value="https://ts1.x5.europe.travian.com">ts1.x5.europe (Speed 5x)</option>
-            <option value="https://ts2.x5.europe.travian.com">ts2.x5.europe (Speed 5x)</option>
-            <option value="https://ts1.x1.international.travian.com">ts1.x1.international</option>
-            <option value="https://ts2.x1.international.travian.com">ts2.x1.international</option>
-            <option value="https://ts3.x1.international.travian.com">ts3.x1.international</option>
-            <option value="https://ts4.x1.international.travian.com">ts4.x1.international</option>
-            <option value="https://ts5.x1.international.travian.com">ts5.x1.international</option>
-            <option value="https://ts1.x3.international.travian.com">ts1.x3.international (Speed 3x)</option>
-            <option value="https://ts2.x3.international.travian.com">ts2.x3.international (Speed 3x)</option>
-            <option value="https://ts1.x5.international.travian.com">ts1.x5.international (Speed 5x)</option>
-            <option value="https://ts1.x1.de.travian.com">ts1.x1.de</option>
-            <option value="https://ts2.x1.de.travian.com">ts2.x1.de</option>
-            <option value="https://ts3.x1.de.travian.com">ts3.x1.de</option>
-            <option value="https://ts1.x3.de.travian.com">ts1.x3.de (Speed 3x)</option>
-            <option value="https://ts1.x5.de.travian.com">ts1.x5.de (Speed 5x)</option>
-            <option value="https://ts1.x1.arabia.travian.com">ts1.x1.arabia</option>
-            <option value="https://ts2.x1.arabia.travian.com">ts2.x1.arabia</option>
-          </datalist>
-          <p style="margin:0.4rem 0 0;font-size:0.8rem;color:var(--text-muted);" data-i18n="guild.world.hint">Oder URL direkt eingeben — muss auf /map.sql enden können.</p>
-        </div>
-        <button type="submit" class="btn btn-primary" data-i18n="guild.world.save">💾 Speichern</button>
-      </form>
-
-      {% if guild.tw_world %}
-      <p style="margin-top:0.75rem; font-size:0.83rem; color:#4caf82;">
-        ✅ Aktuell: <code>{{ guild.tw_world }}</code>
-        — Nächster Karten-Snapshot automatisch alle 6 h
-      </p>
-      {% endif %}
-
-      {% if not is_personal %}
-      <!-- Bot-Sprache -->
-      <form method="post" action="/guild/{{ guild.guild_id }}" style="display:flex;gap:0.75rem;align-items:flex-end;margin-top:1.25rem;flex-wrap:wrap;">
-        <input type="hidden" name="category_id" value="{{ guild.category_id or '' }}">
-        <input type="hidden" name="archive_channel_id" value="{{ guild.archive_channel_id or '' }}">
-        <input type="hidden" name="allowed_role_ids" value="{{ guild.allowed_role_ids or '' }}">
-        <input type="hidden" name="scout_channel_id" value="{{ guild.scout_channel_id or '' }}">
-        <div class="form-group" style="margin:0;min-width:200px;">
-          <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">🌐 Bot-Sprache / Bot Language</label>
-          <select name="bot_language"
-            style="background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.9rem;width:100%;">
-            <option value="de" {% if (guild.bot_language or 'de') == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
-            <option value="en" {% if guild.bot_language == 'en' %}selected{% endif %}>🇬🇧 English</option>
-          </select>
-          <p style="margin:0.3rem 0 0;font-size:0.78rem;color:var(--text-muted);">Sprache für alle Bot-Nachrichten im Discord-Server.</p>
-        </div>
-        <button type="submit" class="btn btn-primary">💾 Speichern</button>
-      </form>
-      {% endif %}
-    </div>
-  </div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
 
@@ -622,6 +538,16 @@
       {% endif %}
     </div>
 
+    <!-- World / Server -->
+    <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="feature-card" style="text-decoration:none;{% if needs_setup %}border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.2);{% endif %}">
+      <div class="feature-icon">🌍</div>
+      <div class="feature-body">
+        <div class="feature-title">World / Server{% if needs_setup %} <span style="font-size:.72rem;background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;margin-left:4px;">Einrichten</span>{% endif %}</div>
+        <div class="feature-desc">{% if guild.tw_world %}<span style="color:#4ade80;">✅ {{ guild.tw_world.replace('https://','') }}</span>{% else %}Travian-Server-URL & Bot-Sprache konfigurieren{% endif %}</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
+
     <!-- Serververwaltung (nur Discord) -->
     {% if not is_personal %}
     <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">
@@ -632,7 +558,7 @@
       </div>
       {{ OK_ARROW }}
     </a>
-    {% endif %}{# end not is_personal (Serververwaltung) #}
+    {% endif %}
 
   </div>
 
@@ -685,13 +611,102 @@ details.card[open] .details-chevron { transform:rotate(180deg); }
 </style>
 
 <script>
-// Setup-Wizard toggle
-let setupOpen = {{ 'true' if needs_setup else 'false' }};
-function toggleSetup() {
-  setupOpen = !setupOpen;
-  document.getElementById('setupBody').style.display = setupOpen ? 'block' : 'none';
-  document.getElementById('setupChevron').style.transform = setupOpen ? '' : 'rotate(-90deg)';
+// ── Tile drag & drop ──────────────────────────────────────────────────────────
+const TILE_ORDER_KEY = 'tileOrder_{{ guild.guild_id }}';
+let editMode = false;
+let dragSrc = null;
+
+function initTiles() {
+  // Assign data-tile-id to every feature-card that doesn't have one
+  document.querySelectorAll('.tile-grid .feature-card, .tile-grid a.feature-card').forEach((el, i) => {
+    if (!el.dataset.tileId) {
+      // Use href or title or index as stable ID
+      const href = el.getAttribute('href') || '';
+      el.dataset.tileId = href ? href.replace(/.*\/guild\/[^/]+\//,'') || ('tile'+i) : ('tile'+i);
+    }
+  });
+  applyStoredOrder();
 }
+
+function applyStoredOrder() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(TILE_ORDER_KEY) || '{}');
+    document.querySelectorAll('.tile-grid').forEach(grid => {
+      const cards = [...grid.querySelectorAll('.feature-card')];
+      const sorted = cards.slice().sort((a, b) => {
+        const ia = stored[a.dataset.tileId] ?? 999;
+        const ib = stored[b.dataset.tileId] ?? 999;
+        return ia - ib;
+      });
+      sorted.forEach(c => grid.appendChild(c));
+    });
+  } catch(e) {}
+}
+
+function saveOrder() {
+  const order = {};
+  document.querySelectorAll('.tile-grid .feature-card').forEach((el, i) => {
+    if (el.dataset.tileId) order[el.dataset.tileId] = i;
+  });
+  localStorage.setItem(TILE_ORDER_KEY, JSON.stringify(order));
+}
+
+function toggleEditMode() {
+  editMode = !editMode;
+  const btn = document.getElementById('editTilesBtn');
+  btn.textContent = editMode ? '✅ Fertig' : '✏️ Anpassen';
+  btn.style.background = editMode ? 'rgba(74,222,128,.15)' : '';
+  btn.style.borderColor = editMode ? '#4ade80' : '';
+  document.querySelectorAll('.tile-grid .feature-card').forEach(el => {
+    if (editMode) {
+      el.setAttribute('draggable', 'true');
+      el.style.cursor = 'grab';
+      el.addEventListener('dragstart', onDragStart);
+      el.addEventListener('dragover', onDragOver);
+      el.addEventListener('drop', onDrop);
+      el.addEventListener('dragend', onDragEnd);
+    } else {
+      el.setAttribute('draggable', 'false');
+      el.style.cursor = '';
+      el.removeEventListener('dragstart', onDragStart);
+      el.removeEventListener('dragover', onDragOver);
+      el.removeEventListener('drop', onDrop);
+      el.removeEventListener('dragend', onDragEnd);
+    }
+  });
+}
+
+function onDragStart(e) {
+  dragSrc = this;
+  this.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  this.style.outline = '2px dashed #6366f1';
+  return false;
+}
+function onDrop(e) {
+  e.stopPropagation();
+  if (dragSrc !== this) {
+    const grid = this.parentNode;
+    const cards = [...grid.querySelectorAll('.feature-card')];
+    const srcIdx = cards.indexOf(dragSrc);
+    const dstIdx = cards.indexOf(this);
+    if (srcIdx < dstIdx) grid.insertBefore(dragSrc, this.nextSibling);
+    else grid.insertBefore(dragSrc, this);
+    saveOrder();
+  }
+  this.style.outline = '';
+  return false;
+}
+function onDragEnd() {
+  this.style.opacity = '';
+  document.querySelectorAll('.tile-grid .feature-card').forEach(el => el.style.outline = '');
+}
+
+document.addEventListener('DOMContentLoaded', initTiles);
 
 // Auto-push tw_world to localStorage (so Timer & Einsatz pick it up)
 {% if guild.tw_world %}

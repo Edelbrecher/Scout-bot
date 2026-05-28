@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}World / Server · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block content %}
+<div class="container" style="max-width:700px;">
+  <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+  <h1 style="margin:.5rem 0 .25rem;">🌍 World / Server</h1>
+  <p class="subtitle" style="margin:0 0 1.5rem;">Travian-Server-URL und Bot-Einstellungen</p>
+
+  {% if saved %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Einstellungen gespeichert.</div>
+  {% endif %}
+
+  <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
+    <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Travian World URL</h3>
+    <p class="hint" style="margin-bottom:1rem;">Diese URL wird für Karten-Snapshots, Farming-Analyse und alle Deep-Links benötigt.</p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
+      <div class="form-group" style="margin:0;flex:1;min-width:260px;">
+        <label>Travian World URL</label>
+        <input type="url" name="server_url" required
+          placeholder="https://ts2.x1.europe.travian.com"
+          list="worldlist"
+          value="{{ guild.tw_world or '' }}"
+          style="width:100%;padding:.5rem;background:var(--bg-main);color:var(--text);border:1px solid {% if not guild.tw_world %}#f59e0b{% else %}var(--border){% endif %};border-radius:6px;" />
+        <datalist id="worldlist">
+          <option value="https://ts1.x1.europe.travian.com">ts1.x1.europe (Speed 1x)</option>
+          <option value="https://ts2.x1.europe.travian.com">ts2.x1.europe (Speed 1x)</option>
+          <option value="https://ts3.x1.europe.travian.com">ts3.x1.europe</option>
+          <option value="https://ts4.x1.europe.travian.com">ts4.x1.europe</option>
+          <option value="https://ts5.x1.europe.travian.com">ts5.x1.europe</option>
+          <option value="https://ts1.x3.europe.travian.com">ts1.x3.europe (Speed 3x)</option>
+          <option value="https://ts2.x3.europe.travian.com">ts2.x3.europe (Speed 3x)</option>
+          <option value="https://ts1.x5.europe.travian.com">ts1.x5.europe (Speed 5x)</option>
+          <option value="https://ts2.x5.europe.travian.com">ts2.x5.europe (Speed 5x)</option>
+          <option value="https://ts1.x1.international.travian.com">ts1.x1.international</option>
+          <option value="https://ts2.x1.international.travian.com">ts2.x1.international</option>
+          <option value="https://ts3.x1.international.travian.com">ts3.x1.international</option>
+          <option value="https://ts4.x1.international.travian.com">ts4.x1.international</option>
+          <option value="https://ts5.x1.international.travian.com">ts5.x1.international</option>
+          <option value="https://ts1.x3.international.travian.com">ts1.x3.international (Speed 3x)</option>
+          <option value="https://ts1.x5.international.travian.com">ts1.x5.international (Speed 5x)</option>
+          <option value="https://ts1.x1.de.travian.com">ts1.x1.de</option>
+          <option value="https://ts2.x1.de.travian.com">ts2.x1.de</option>
+          <option value="https://ts3.x1.de.travian.com">ts3.x1.de</option>
+          <option value="https://ts1.x3.de.travian.com">ts1.x3.de (Speed 3x)</option>
+          <option value="https://ts1.x5.de.travian.com">ts1.x5.de (Speed 5x)</option>
+          <option value="https://ts1.x1.arabia.travian.com">ts1.x1.arabia</option>
+          <option value="https://ts2.x1.arabia.travian.com">ts2.x1.arabia</option>
+        </datalist>
+        <p style="margin:.4rem 0 0;font-size:.8rem;color:var(--text-muted);">Oder URL direkt eingeben.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">💾 Speichern</button>
+    </form>
+    {% if guild.tw_world %}
+    <p style="margin-top:.75rem;font-size:.83rem;color:#4caf82;">
+      ✅ Aktuell: <code>{{ guild.tw_world }}</code> — Karten-Snapshot alle 6 h
+    </p>
+    {% endif %}
+  </div>
+
+  {% if guild.workspace_type != 'personal' %}
+  <div class="card" style="padding:1.5rem;">
+    <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Bot-Sprache</h3>
+    <form method="post" action="/guild/{{ guild.guild_id }}" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
+      <input type="hidden" name="category_id" value="{{ guild.category_id or '' }}">
+      <input type="hidden" name="archive_channel_id" value="{{ guild.archive_channel_id or '' }}">
+      <input type="hidden" name="allowed_role_ids" value="{{ guild.allowed_role_ids or '' }}">
+      <input type="hidden" name="scout_channel_id" value="{{ guild.scout_channel_id or '' }}">
+      <div class="form-group" style="margin:0;min-width:200px;">
+        <label style="font-size:.85rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Bot-Sprache / Bot Language</label>
+        <select name="bot_language" style="background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:.9rem;width:100%;">
+          <option value="de" {% if (guild.bot_language or 'de') == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
+          <option value="en" {% if guild.bot_language == 'en' %}selected{% endif %}>🇬🇧 English</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">💾 Speichern</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

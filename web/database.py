@@ -5690,6 +5690,25 @@ async def check_op_plausibility(plan_id: int, guild_id: str) -> dict:
     elif attacker_times:
         ok_items.append(f"Kein Angreifer doppelt verplant ({len(attacker_times)} Angreifer).")
 
+    # ── Zwei-Dorf-Fake-Check: mehrere Fakes vom selben Dorf mit gleicher Ankunftszeit ──
+    fake_waves_all = [w for w in all_waves if w.get("wave_type") == "fake"]
+    # Group by (attacker_name, target_x, target_y, send_time)
+    from collections import Counter as _Counter
+    fake_key_counts = _Counter(
+        (w["attacker_name"], w["x"], w["y"], (w.get("send_time") or "")[:16])
+        for w in fake_waves_all
+        if w.get("send_time")
+    )
+    for (attacker, tx, ty, stime), cnt in fake_key_counts.items():
+        if cnt >= 2:
+            warnings.append(
+                f"🔺 Zwei-Dorf-Fake: {attacker} hat {cnt}× exakt dieselbe Fake-Welle auf {tx}|{ty} (Sendezeit {stime}) — "
+                f"Verteidiger erkennt gleiche Ankunftszeit!"
+            )
+            suggestions.append(
+                f"{attacker}: Fake-Wellen auf {tx}|{ty} aus verschiedenen Dörfern schicken oder Zeiten minimal verschieben."
+            )
+
     return {
         "ok": ok_items,
         "warnings": warnings,
@@ -5899,6 +5918,10 @@ async def init_ideas_table():
                 ("EP-Vorlagen (Templates)", "Plan-Struktur ohne Wellen als Vorlage speichern und für zukünftige Ops wiederverwenden.", "ep"),
                 ("Wellen Bulk-Import per Text", "Textbox zum Einfügen einer Angreifer-Liste (Name, Dorf, Typ, Sendezeit) aus Discord — alles auf einmal importieren.", "ep"),
                 ("Mobile App / PWA", "Native App oder Progressive Web App für TravOps. Aktuell zu kostenintensiv, aber für die Zukunft sinnvoll.", "general"),
+                ("Angreifer-Zuverlässigkeits-Score", "Über alle EPs hinweg tracken: wer hat immer pünktlich bestätigt, wer fällt oft aus? Score in der Allianz-Ansicht anzeigen.", "ep"),
+                ("Minimap der EP-Ziele", "Einfache Canvas-Visualisierung der Zielkoordinaten — sieht man sofort ob alle Ziele im gleichen Bereich liegen.", "ep"),
+                ("Sendezeit-Alarm via Discord-DM", "Bot schickt eine DM X Minuten vor der Sendezeit: 'Denk daran: Deine Welle geht um 14:32 ab!'", "integration"),
+                ("Karte: Heatmap-Modus", "Allianzen oder Spieler eingeben → Heatmap der Aktivität auf der Travian-Karte erstellen.", "ux"),
             ]
             for t, d, c in defaults:
                 await db.execute("INSERT INTO admin_ideas (title, description, category) VALUES (?,?,?)", (t, d, c))

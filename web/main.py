@@ -2375,6 +2375,20 @@ async def guild_map(request: Request, guild_id: str):
     })
 
 
+@app.get("/guild/{guild_id}/map/world-settings", response_class=HTMLResponse)
+async def guild_world_settings_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("world_settings.html", {
+        "request": request, "guild": guild, "session": session, "saved": saved,
+    })
+
+
 @app.post("/guild/{guild_id}/map/world")
 async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form("")):
     session, err = _require_session(request)
@@ -2389,7 +2403,7 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
         return RedirectResponse(f"/guild/{guild_id}/map?error=invalid_url", status_code=303)
     await database.update_tw_world(guild_id, url)
-    return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
 
 
 @app.get("/guild/{guild_id}/map/data")
