@@ -5437,123 +5437,175 @@ async def get_personal_missions(guild_id: str, discord_id: str) -> list[dict]:
 
 # ── Plausibility check ─────────────────────────────────────────────────────────
 
-async def check_op_plausibility(plan_id: int, guild_id: str) -> list[dict]:
-    """Run plausibility checks and return list of warnings."""
+async def check_op_plausibility(plan_id: int, guild_id: str) -> dict:
+    """Run plausibility checks. Returns {ok:[], warnings:[], errors:[], suggestions:[], summary:{}}."""
     plan = await get_op_plan_full(plan_id, guild_id)
     if not plan:
-        return [{"level": "error", "msg": "Plan nicht gefunden."}]
+        return {"ok": [], "warnings": [], "errors": [{"msg": "Plan nicht gefunden."}], "suggestions": [], "summary": {}}
 
-    warnings: list[dict] = []
-    server_speed = float(plan.get("server_speed") or 1.0)
-    landing_time_str = plan.get("landing_time") or ""
+    ok_items: list[str] = []
+    warnings: list[str] = []
+    errors:   list[str] = []
+    suggestions: list[str] = []
 
     import datetime as _dt
+    server_speed = float(plan.get("server_speed") or 1.0)
+    landing_time_str = plan.get("landing_time") or ""
+    now = _dt.datetime.utcnow()
 
     try:
         landing_dt = _dt.datetime.fromisoformat(landing_time_str.replace("Z","")) if landing_time_str else None
     except Exception:
         landing_dt = None
 
-    if not landing_dt:
-        warnings.append({"level": "error", "msg": "Keine Ankunftszeit gesetzt — Sendezeiten können nicht berechnet werden."})
+    # ── Plan-level basics ────────────────────────────────────────────────────
+    if landing_dt:
+        mins_until = int((landing_dt - now).total_seconds() / 60)
+        if mins_until > 0:
+            ok_items.append(f"Einschlagszeit gesetzt: {landing_time_str[:16].replace('T',' ')} (in {mins_until} min)")
+        else:
+            errors.append(f"Einschlagszeit liegt in der Vergangenheit ({abs(mins_until)} min)!")
+    else:
+        errors.append("Keine Einschlagszeit gesetzt — Sendezeiten können nicht berechnet werden.")
+        suggestions.append("Einschlagszeit im Plan-Einstellungen (✏ Bearbeiten) hinterlegen.")
 
-    if not plan["targets"]:
-        warnings.append({"level": "warning", "msg": "Keine Ziele im Plan."})
-        return warnings
+    targets = plan.get("targets") or []
+    if not targets:
+        warnings.append("Keine Ziele im Plan.")
+        return {"ok": ok_items, "warnings": warnings, "errors": errors, "suggestions": suggestions,
+                "summary": _check_summary(ok_items, warnings, errors, suggestions)}
+    else:
+        ok_items.append(f"{len(targets)} Ziel{'e' if len(targets)!=1 else ''} angelegt.")
 
-    # Check per target
-    for t in plan["targets"]:
-        waves = t["waves"]
+    # ── Per-target checks ───────────────────────────────────────────────────
+    targets_no_waves = []
+    targets_no_fake  = []
+    targets_no_scout = []
+    targets_good     = []
+
+    for t in targets:
+        waves = t.get("waves") or []
+        label = f"{t['player_name']} ({t['x']}|{t['y']})"
+
         if not waves:
-            warnings.append({"level": "warning", "msg": f"Ziel ({t['x']}|{t['y']}) {t['player_name']} hat keine Wellen."})
+            targets_no_waves.append(label)
+            suggestions.append(f"Ziel {label}: Noch keine Wellen — Angreifer zuweisen.")
             continue
 
         real_waves  = [w for w in waves if w["wave_type"] == "real"]
         fake_waves  = [w for w in waves if w["wave_type"] == "fake"]
         scout_waves = [w for w in waves if w["wave_type"] == "scout"]
-        def_waves   = [w for w in waves if w["wave_type"] == "def"]
 
-        label = f"{t['player_name']} ({t['x']}|{t['y']})"
+        target_ok = True
 
-        # ── Fake ratio check ────────────────────────────────────────────────
-        if real_waves and len(fake_waves) < 3 * len(real_waves):
-            needed = 3 * len(real_waves)
-            warnings.append({
-                "level": "warning",
-                "msg": f"{label}: Zu wenig Fakes — {len(fake_waves)} von empfohlenen {needed} (3× pro echter Welle)."
-            })
-
+        # Fake ratio
         if real_waves and not fake_waves:
-            warnings.append({
-                "level": "error",
-                "msg": f"{label}: Echter Angriff ohne Fakes — Ziel wird nicht getarnt!"
-            })
+            errors.append(f"{label}: Echter Angriff ohne Fakes — Ziel wird nicht getarnt!")
+            suggestions.append(f"{label}: Mindestens {3*len(real_waves)} Fake-Wellen hinzufügen.")
+            target_ok = False
+        elif real_waves and len(fake_waves) < 3 * len(real_waves):
+            needed = 3 * len(real_waves) - len(fake_waves)
+            warnings.append(f"{label}: Nur {len(fake_waves)} Fakes für {len(real_waves)} echte Wellen (Empfehlung: 3:1).")
+            suggestions.append(f"{label}: {needed} weitere Fake-Welle{'n' if needed>1 else ''} hinzufügen.")
+            target_ok = False
+        elif real_waves and len(fake_waves) >= 3 * len(real_waves):
+            ok_items.append(f"{label}: Fake-Ratio gut ({len(fake_waves)} Fakes / {len(real_waves)} echt).")
 
-        # ── Scout check ─────────────────────────────────────────────────────
+        # Scout
         if real_waves and not scout_waves:
-            warnings.append({
-                "level": "info",
-                "msg": f"{label}: Keine Aufklärungswelle — blindes Angreifen."
-            })
+            warnings.append(f"{label}: Keine Aufklärungswelle.")
+            suggestions.append(f"{label}: Scout-Welle hinzufügen um Truppenstärke vor Angriff zu prüfen.")
+            target_ok = False
+        elif scout_waves:
+            ok_items.append(f"{label}: Aufklärungswelle vorhanden.")
 
-        # ── Timing checks ───────────────────────────────────────────────────
+        # Timing
         if landing_dt:
+            past_count = 0
+            no_send_count = 0
             for w in waves:
-                send_str = w.get("send_time","")
+                send_str = w.get("send_time", "")
                 if not send_str:
-                    warnings.append({"level":"warning","msg": f"{label} / {w['attacker_name']}: Keine Sendezeit berechnet."})
+                    no_send_count += 1
                     continue
                 try:
-                    send_dt = _dt.datetime.fromisoformat(send_str.replace("Z",""))
-                    if send_dt < _dt.datetime.utcnow():
-                        warnings.append({"level":"error","msg": f"{label} / {w['attacker_name']} ({w['wave_type']}): Sendezeit liegt in der Vergangenheit!"})
-                    diff = abs((send_dt + _dt.timedelta(seconds=w["travel_seconds"])) - landing_dt).total_seconds()
-                    if diff > 60:
-                        warnings.append({"level":"warning","msg": f"{label} / {w['attacker_name']} ({w['wave_type']}): Ankunft weicht {int(diff)}s von der Zielzeit ab."})
+                    send_dt = _dt.datetime.fromisoformat(send_str.replace("Z", ""))
+                    if send_dt < now:
+                        past_count += 1
+                    diff = abs((send_dt + _dt.timedelta(seconds=w.get("travel_seconds", 0))) - landing_dt).total_seconds()
+                    if diff > 120:
+                        warnings.append(f"{label} / {w['attacker_name']}: Ankunft weicht {int(diff)}s von Einschlagszeit ab.")
                 except Exception:
                     pass
+            if past_count:
+                errors.append(f"{label}: {past_count} Welle{'n' if past_count>1 else ''} mit Sendezeit in der Vergangenheit!")
+                target_ok = False
+            if no_send_count:
+                warnings.append(f"{label}: {no_send_count} Welle{'n' if no_send_count>1 else ''} ohne Sendezeit (Koordinaten fehlen?).")
+                suggestions.append(f"{label}: Koordinaten der Angreifer-Dörfer im Wellen-Dialog nachtragen.")
+                target_ok = False
 
-        # ── Duplicate attacker check ─────────────────────────────────────────
-        attacker_types: dict[str,set] = {}
-        for w in waves:
-            aid = w.get("attacker_discord_id") or w["attacker_name"]
-            attacker_types.setdefault(aid, set()).add(w["wave_type"])
+        if target_ok:
+            targets_good.append(label)
 
-    # ── Cross-plan: same attacker double-booked ─────────────────────────────
+    if targets_no_waves:
+        warnings.append(f"{len(targets_no_waves)} Ziel{'e' if len(targets_no_waves)!=1 else ''} ohne Wellen: " + ", ".join(targets_no_waves[:3]) + ("…" if len(targets_no_waves)>3 else ""))
+
+    if targets_good:
+        ok_items.append(f"{len(targets_good)} Ziel{'e' if len(targets_good)!=1 else ''} vollständig geplant ✅")
+
+    # ── Cross-plan: double-booking ──────────────────────────────────────────
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT w.attacker_name, w.send_time, w.wave_type, t.x, t.y
-            FROM op_waves w
-            JOIN op_targets t ON t.id = w.target_id
+            FROM op_waves w JOIN op_targets t ON t.id = w.target_id
             WHERE w.plan_id=? AND w.guild_id=?
-            ORDER BY w.attacker_discord_id, w.send_time
+            ORDER BY w.attacker_name, w.send_time
         """, (plan_id, guild_id)) as cur:
             all_waves = [dict(r) for r in await cur.fetchall()]
 
     attacker_times: dict[str, list] = {}
     for w in all_waves:
-        k = w["attacker_name"]
-        attacker_times.setdefault(k, []).append(w)
+        attacker_times.setdefault(w["attacker_name"], []).append(w)
 
+    double_booked = []
     for attacker, awt in attacker_times.items():
-        awt_sorted = sorted(awt, key=lambda x: x.get("send_time") or "")
-        for i in range(len(awt_sorted) - 1):
-            t1 = awt_sorted[i].get("send_time","")
-            t2 = awt_sorted[i+1].get("send_time","")
+        awt_s = sorted(awt, key=lambda x: x.get("send_time") or "")
+        for i in range(len(awt_s) - 1):
+            t1, t2 = awt_s[i].get("send_time",""), awt_s[i+1].get("send_time","")
             if t1 and t2:
                 try:
-                    d1 = _dt.datetime.fromisoformat(t1)
-                    d2 = _dt.datetime.fromisoformat(t2)
-                    if abs((d2-d1).total_seconds()) < 30:
-                        warnings.append({
-                            "level": "warning",
-                            "msg": f"{attacker}: zwei Wellen mit Sendezeit < 30s Abstand — möglicherweise doppelt verplant."
-                        })
+                    if abs((_dt.datetime.fromisoformat(t2) - _dt.datetime.fromisoformat(t1)).total_seconds()) < 30:
+                        double_booked.append(attacker)
+                        break
                 except Exception:
                     pass
 
-    if not warnings:
-        warnings.append({"level":"ok","msg":"Alle Checks bestanden — Plan sieht plausibel aus! ✅"})
+    if double_booked:
+        warnings.append(f"Möglicherweise doppelt verplant (< 30s Abstand): {', '.join(double_booked[:4])}")
+        suggestions.append("Sendezeiten dieser Angreifer prüfen — ggf. verschiedene Dörfer oder Zeiten nutzen.")
+    elif attacker_times:
+        ok_items.append(f"Kein Angreifer doppelt verplant ({len(attacker_times)} Angreifer).")
 
-    return warnings
+    return {
+        "ok": ok_items,
+        "warnings": warnings,
+        "errors": errors,
+        "suggestions": suggestions,
+        "summary": _check_summary(ok_items, warnings, errors, suggestions),
+    }
+
+
+def _check_summary(ok, warnings, errors, suggestions) -> dict:
+    score = len(ok)
+    total = len(ok) + len(warnings) + len(errors)
+    pct = int(score / total * 100) if total else 100
+    if errors:
+        grade = "error"
+    elif warnings:
+        grade = "warning"
+    else:
+        grade = "ok"
+    return {"ok": len(ok), "warnings": len(warnings), "errors": len(errors),
+            "suggestions": len(suggestions), "score_pct": pct, "grade": grade}

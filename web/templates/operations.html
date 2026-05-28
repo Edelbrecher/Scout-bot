@@ -269,7 +269,13 @@ const INIT_MEMBERS = {{ members | tojson }};
         <span id="topPlanStatus" class="status-badge"></span>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-        <span id="topLandingTime" style="font-size:.82rem;color:#fbbf24;font-family:monospace;"></span>
+        <span id="topLandingTime" title="Klicken um Einschlagszeit zu ändern"
+              style="font-size:.82rem;color:#fbbf24;font-family:monospace;cursor:pointer;padding:.2rem .4rem;border-radius:4px;"
+              onmouseenter="this.style.background='rgba(251,191,36,.12)'" onmouseleave="this.style.background=''"
+              onclick="openInlineLandingEditor()"></span>
+        <input type="datetime-local" id="inlineLandingInput"
+               style="display:none;font-size:.8rem;background:var(--bg-card);color:var(--text);border:1px solid #fbbf24;border-radius:6px;padding:.2rem .4rem;"
+               onblur="saveInlineLanding()" onkeydown="if(event.key==='Enter')saveInlineLanding();if(event.key==='Escape')closeInlineLanding()">
         <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Prüfung</button>
         <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
         <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
@@ -1810,14 +1816,56 @@ async function runCheck() {
   el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">Prüfe…</div>';
   try {
     const data = await apiFetch(`/plans/${activePlanId}/check`);
-    const icons = {ok:'✅',info:'ℹ️',warning:'⚠️',error:'❌'};
-    const colors = {ok:'#4ade80',info:'#93c5fd',warning:'#fbbf24',error:'#f87171'};
-    el.innerHTML = (data.warnings||[]).map(w=>`
-      <div class="pcheck-item">
-        <span class="pcheck-icon">${icons[w.level]||'ℹ️'}</span>
-        <span style="color:${colors[w.level]||'var(--text)'}">${escHtml(w.msg)}</span>
-      </div>`).join('');
+    const s = data.summary || {};
+    const gradeColor = s.grade==='error' ? '#f87171' : s.grade==='warning' ? '#fbbf24' : '#4ade80';
+    const gradeIcon  = s.grade==='error' ? '❌' : s.grade==='warning' ? '⚠️' : '✅';
+    let html = `<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem .85rem;background:var(--bg-main);border-radius:8px;border:1px solid ${gradeColor}33;margin-bottom:.85rem;">
+      <span style="font-size:1.4rem;">${gradeIcon}</span>
+      <div style="flex:1;">
+        <div style="font-weight:700;color:${gradeColor};font-size:.9rem;">Plan-Score: ${s.score_pct ?? '—'}%</div>
+        <div style="font-size:.75rem;color:var(--text-muted);">
+          ${s.ok||0} OK &nbsp;·&nbsp; ${s.warnings||0} Warnung${(s.warnings||0)!==1?'en':''} &nbsp;·&nbsp; ${s.errors||0} Fehler &nbsp;·&nbsp; ${s.suggestions||0} Hinweis${(s.suggestions||0)!==1?'e':''}
+        </div>
+      </div>
+    </div>`;
+
+    function section(items, icon, color, label) {
+      if (!items || !items.length) return '';
+      return `<div style="margin-bottom:.65rem;">
+        <div style="font-size:.72rem;font-weight:700;color:${color};letter-spacing:.05em;text-transform:uppercase;margin-bottom:.3rem;">${icon} ${label}</div>
+        ${items.map(msg=>`<div class="pcheck-item" style="color:${color};"><span class="pcheck-icon">${icon}</span><span>${escHtml(msg)}</span></div>`).join('')}
+      </div>`;
+    }
+
+    html += section(data.errors,      '❌', '#f87171', 'Fehler');
+    html += section(data.warnings,    '⚠️', '#fbbf24', 'Warnungen');
+    html += section(data.suggestions, '💡', '#93c5fd', 'Vorschläge');
+    html += section(data.ok,          '✅', '#4ade80', 'Positiv');
+
+    el.innerHTML = html || '<div style="color:var(--text-muted);">Keine Ergebnisse.</div>';
   } catch(e) { el.innerHTML=`<div style="color:#f87171;">Fehler: ${e.message}</div>`; }
+}
+
+function openInlineLandingEditor() {
+  const span = document.getElementById('topLandingTime');
+  const inp  = document.getElementById('inlineLandingInput');
+  inp.value = (activePlan?.landing_time||'').slice(0,16);
+  span.style.display = 'none';
+  inp.style.display  = 'inline-block';
+  inp.focus();
+}
+function closeInlineLanding() {
+  document.getElementById('topLandingTime').style.display = '';
+  document.getElementById('inlineLandingInput').style.display = 'none';
+}
+async function saveInlineLanding() {
+  const val = document.getElementById('inlineLandingInput').value;
+  closeInlineLanding();
+  if (!activePlan || !activePlanId) return;
+  try {
+    await apiPost(`/plans/${activePlanId}/update`, { landing_time: val });
+    await loadPlan(activePlanId);
+  } catch(e) { console.error('saveInlineLanding', e); }
 }
 
 // ══ Discord notify ════════════════════════════════════════════════════════
