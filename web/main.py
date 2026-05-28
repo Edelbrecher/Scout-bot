@@ -3110,45 +3110,98 @@ def parse_own_villages(text: str) -> list:
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
     TROOP_ALIASES = {
-        "Theutates Blitz":     "Theutates-Blitz",
-        "Theutates-Blitz":     "Theutates-Blitz",
-        "Theutates Thunder":   "Theutates-Blitz",
-        "Druidenreiter":       "Druidentreiter",
-        "Haeduan":             "Haeduer",
-        "Haeduaner":           "Haeduer",
-        "Rammholz":            "Gallier-Rammbock",
-        "Trebuchet":           "Gallier-Kata",
-        "Kriegskatapult":      "Gallier-Kata",
-        "Kundschafter":        "Späher",
-        "Scout":               "Späher",
-        "Pathfinder":          "Pathfinder",
-        "Teutonen Reiter":     "Teut. Ritter",
-        "Teutonic Knight":     "Teut. Ritter",
-        "Ramme":               "Teutonen-Rammbock",
-        "Battering Ram":       "Teutonen-Rammbock",
-        "Katapult":            "Kriegsmaschine",
-        "Catapult":            "Kriegsmaschine",
-        "Stammesführer":       "Häuptling",
-        "Chief":               "Häuptling",
-        "Chieftain":           "Häuptling",
-        "Legionnaire":         "Legionär",
-        "Praetorian":          "Prätorianer",
-        "Imperian":            "Imperianer",
-        "Equites Legati":      "Equites Legati",
-        "Equites Imperatoris": "Equites Imperatoris",
-        "Equites Caesaris":    "Equites Caesaris",
-        "Ram":                 "Rammbock",
-        "Fire Catapult":       "Feuerkatapult",
-        "Senator":             "Senator",
-        "Phalanx":             "Phalanx",
-        "Swordsman":           "Schwertkämpfer",
-        "Druidrider":          "Druidentreiter",
-        "Clubswinger":         "Keulenschwinger",
-        "Spearman":            "Speerkämpfer",
-        "Axeman":              "Axtkämpfer",
-        "Paladin":             "Paladin",
-        "Settler":             "Siedler",
-        "Hero":                "Held",
+        # ── Gallier ───────────────────────────────────────────────────────────
+        "Phalanx":                "Phalanx",
+        "Schwertkämpfer":         "Schwertkämpfer",
+        "Swordsman":              "Schwertkämpfer",
+        "Kundschafter":           "Pathfinder",   # DE Gallier-Scout
+        "Pathfinder":             "Pathfinder",   # EN Gallier-Scout
+        "Theutates-Blitz":        "Theutates-Blitz",
+        "Theutates Blitz":        "Theutates-Blitz",
+        "Theutates Thunder":      "Theutates-Blitz",
+        "Druidentreiter":         "Druidentreiter",
+        "Druidenreiter":          "Druidentreiter",
+        "Druidrider":             "Druidentreiter",
+        "Haeduer":                "Haeduer",
+        "Haeduan":                "Haeduer",
+        "Haeduaner":              "Haeduer",
+        "Gallier-Rammbock":       "Gallier-Rammbock",
+        "Rammholz":               "Gallier-Rammbock",
+        "Gallier-Kata":           "Gallier-Kata",
+        "Trebuchet":              "Gallier-Kata",
+        "Kriegskatapult":         "Gallier-Kata",
+        # ── Teutonen ─────────────────────────────────────────────────────────
+        "Keulenschwinger":        "Keulenschwinger",
+        "Clubswinger":            "Keulenschwinger",
+        "Speerkämpfer":           "Speerkämpfer",
+        "Spearman":               "Speerkämpfer",
+        "Axtkämpfer":             "Axtkämpfer",
+        "Axeman":                 "Axtkämpfer",
+        "Späher":                 "Späher",        # DE Teuton-Scout
+        "Scout":                  "Späher",        # EN Teuton-Scout
+        "Paladin":                "Paladin",
+        "Teut. Ritter":           "Teut. Ritter",
+        "Teutonischer Ritter":    "Teut. Ritter",
+        "Teutonen Reiter":        "Teut. Ritter",
+        "Teutonic Knight":        "Teut. Ritter",
+        "Teutonen-Rammbock":      "Teutonen-Rammbock",
+        "Ramme":                  "Teutonen-Rammbock",
+        "Battering Ram":          "Teutonen-Rammbock",
+        "Kriegsmaschine":         "Kriegsmaschine",
+        "Katapult":               "Kriegsmaschine",  # DE Teuton-Kata
+        "Catapult":               "Kriegsmaschine",
+        "Häuptling":              "Häuptling",
+        "Stammesführer":          "Häuptling",
+        "Chief":                  "Häuptling",
+        "Chieftain":              "Häuptling",
+        # ── Römer ────────────────────────────────────────────────────────────
+        "Legionär":               "Legionär",
+        "Legionnaire":            "Legionär",
+        "Prätorianer":            "Prätorianer",
+        "Praetorian":             "Prätorianer",
+        "Imperianer":             "Imperianer",
+        "Imperian":               "Imperianer",
+        "Equites Legati":         "Equites Legati",
+        "Equites Imperatoris":    "Equites Imperatoris",
+        "Equites Caesaris":       "Equites Caesaris",
+        "Rammbock":               "Rammbock",      # Roman battering ram DE
+        "Ram":                    "Rammbock",
+        "Feuerkatapult":          "Feuerkatapult",
+        "Fire Catapult":          "Feuerkatapult",
+        "Senator":                "Senator",
+        # ── Ägypter ──────────────────────────────────────────────────────────
+        "Schleuderer":            "Schleuderer",
+        "Slinger":                "Schleuderer",
+        "Ägyptischer Reiter":     "Ägyptischer Reiter",
+        "Khopesh-Krieger":        "Khopesh-Krieger",
+        "Khopesh Warrior":        "Khopesh-Krieger",
+        "Sopdu-Erkunder":         "Sopdu-Erkunder",
+        "Sopdu Explorer":         "Sopdu-Erkunder",
+        "Anhur-Wächter":          "Anhur-Wächter",
+        "Anhur Guard":            "Anhur-Wächter",
+        "Resheph-Streitwagen":    "Resheph-Streitwagen",
+        "Resheph Chariot":        "Resheph-Streitwagen",
+        # ── Hunnen ───────────────────────────────────────────────────────────
+        "Soldat":                 "Soldat",
+        "Soldiery":               "Soldat",
+        "Lanzenkämpfer":          "Lanzenkämpfer",
+        "Lancer":                 "Lanzenkämpfer",
+        "Marauder":               "Marauder",
+        "Ammende Nomadin":        "Ammende Nomadin",
+        "Nomad":                  "Ammende Nomadin",
+        "Boyar":                  "Boyar",
+        "Hunnischer Reiter":      "Hunnischer Reiter",
+        "Hunnic Rider":           "Hunnischer Reiter",
+        # ── Spartaner ────────────────────────────────────────────────────────
+        "Hoplite":                "Hoplite",
+        "Hopliten":               "Hoplite",
+        "Sentinel":               "Sentinel",
+        "Wächter":                "Sentinel",
+        # ── Allgemein ────────────────────────────────────────────────────────
+        "Siedler":                "Siedler",
+        "Settler":                "Siedler",
+        "Held":                   "Held",
+        "Hero":                   "Held",
     }
 
     def normalize(name: str) -> str:
@@ -3169,14 +3222,16 @@ def parse_own_villages(text: str) -> list:
             continue
         first = parts[0].lower()
 
-        # Format 1a: German troops overview ("Dorfname" header)
+        # Format 1a: German troops overview ("Dorfname" / "Dorf" header)
         # Format 1b: English troops overview ("Village" header with troop-name cols)
+        _excl = {'attacks', 'angriffe', 'troops', 'truppen', 'building',
+                 'gebäude', 'merchants', 'händler', 'bevölkerung', 'population',
+                 'loyalität', 'loyalty', 'aktivität', 'activity'}
         is_troop_col_header = (
-            (first == 'dorfname' and len(parts) >= 3) or
+            (first in ('dorfname', 'dorf') and len(parts) >= 3 and not any(
+                p.strip().lower() in _excl for p in parts[1:])) or
             (first == 'village' and len(parts) >= 3 and not any(
-                p.strip().lower() in ('attacks', 'angriffe', 'troops', 'truppen',
-                                      'building', 'gebäude', 'merchants', 'händler')
-                for p in parts[1:]))
+                p.strip().lower() in _excl for p in parts[1:]))
         )
         if is_troop_col_header:
             header_idx = i
@@ -3211,7 +3266,7 @@ def parse_own_villages(text: str) -> list:
                 break
             nums = []
             for n in parts[1:]:
-                nc = re.sub(r'[\s.,]', '', n)
+                nc = re.sub(r'[\s\.\,]', '', n)  # strip spaces, dots (DE thousands), commas
                 nums.append(int(nc) if re.match(r'^\d+$', nc) else None)
             if not any(isinstance(n, int) for n in nums):
                 continue
@@ -3222,8 +3277,8 @@ def parse_own_villages(text: str) -> list:
 
     elif header_idx is not None and fmt_village_overview and troops_col is not None:
         troop_re = re.compile(
-            r'(\d+)\s*x\s+([A-Za-z\u00c0-\u024f][A-Za-z\u00c0-\u024f\s\-\.]+?)' +
-            r'(?=\s+\d+\s*x|\s*$)'
+            r'([\d\.]+)\s*[x\u00d7]\s*([A-Za-z\u00c0-\u024f][A-Za-z\u00c0-\u024f\s\-\.]+?)' +
+            r'(?=\s+[\d\.]+\s*[x\u00d7]|\s*$)'
         )
         for line in lines[header_idx + 1:]:
             parts = [p.strip() for p in line.split('\t')]
@@ -3235,7 +3290,7 @@ def parse_own_villages(text: str) -> list:
             troops_str = parts[troops_col] if troops_col < len(parts) else ""
             troops: dict = {}
             for m in troop_re.finditer(troops_str):
-                count = int(m.group(1))
+                count = int(m.group(1).replace('.', '').replace(',', ''))
                 tname = normalize(m.group(2))
                 if count > 0:
                     troops[tname] = troops.get(tname, 0) + count
