@@ -745,6 +745,69 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
     return aiohttp_web.json_response({"ok":True,"sent":sent})
 
 
+async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Announce a newly activated EP plan to the poll channel + DM all approved ally members."""
+    try:
+        data = await request.json()
+        guild_id   = str(data.get("guild_id", ""))
+        plan_name  = str(data.get("plan_name", "Einsatz"))
+        landing    = str(data.get("landing_time", "")).replace("T", " ")[:16]
+        plan_url   = str(data.get("plan_url", ""))
+        poll_channel_id = str(data.get("poll_channel_id", ""))
+        member_ids = data.get("member_discord_ids", [])   # list of discord id strings
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild = bot.get_guild(int(guild_id)) if guild_id.isdigit() else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    channel_sent = False
+    # Post to poll channel if configured
+    if poll_channel_id and poll_channel_id.isdigit():
+        ch = guild.get_channel(int(poll_channel_id))
+        if ch:
+            try:
+                import discord as _discord
+                embed = _discord.Embed(
+                    title=f"⚔️ Neuer aktiver Einsatzplan: {plan_name}",
+                    description=f"Ein neuer Einsatz wurde aktiviert.\nBitte öffne den Plan, prüfe deine Wellen und bestätige deine Teilnahme.",
+                    color=0xED4245,
+                )
+                if landing:
+                    embed.add_field(name="🕐 Einschlagszeit", value=landing, inline=True)
+                embed.set_footer(text="TravOps Einsatzplanung")
+                view = _discord.ui.View()
+                if plan_url:
+                    view.add_item(_discord.ui.Button(label="Zum Einsatzplan", url=plan_url, style=_discord.ButtonStyle.link))
+                await ch.send(embed=embed, view=view)
+                channel_sent = True
+            except Exception as e:
+                print(f"[announce-ep] channel send error: {e}")
+
+    # DM all approved members
+    dm_sent = 0
+    dm_text = (
+        f"⚔️ **Neuer Einsatz: {plan_name}**\n"
+        f"{('🕐 Einschlag: **' + landing + '**') if landing else ''}\n\n"
+        f"Du könntest für diesen Einsatz eingeplant sein.\n"
+        f"{'➡️ ' + plan_url if plan_url else 'Bitte prüfe TravOps → Einsatzplanung.'}"
+    )
+    for uid in member_ids:
+        if not uid or not str(uid).isdigit():
+            continue
+        member = guild.get_member(int(uid))
+        if not member:
+            continue
+        try:
+            await member.send(dm_text)
+            dm_sent += 1
+        except Exception:
+            pass  # DMs may be disabled
+
+    return aiohttp_web.json_response({"ok": True, "channel": channel_sent, "dms": dm_sent})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -759,6 +822,7 @@ async def start_api_server():
     app.router.add_post("/api/refresh-res-push", handle_refresh_res_push)
     app.router.add_post("/api/refresh-request-hub", handle_refresh_request_hub)
     app.router.add_post("/api/op-notify", handle_op_notify)
+    app.router.add_post("/api/announce-ep", handle_announce_ep)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

@@ -4635,54 +4635,46 @@ async def op_update_plan(
     old_plan = await database.get_op_plan(plan_id, guild_id) if status == "active" else None
     await database.update_op_plan(plan_id, guild_id, **kwargs)
     if old_plan and old_plan.get("status") != "active" and kwargs.get("status") == "active":
-        # Send Discord announcement to all approved members
-        _bg_announce_plan(guild_id, plan_id)
+        # Send Discord announcement via bot internal API
+        await _announce_plan_via_bot(guild_id, plan_id)
     return _JSONResponse({"ok": True})
 
 
-def _bg_announce_plan(guild_id: str, plan_id: int):
-    """Fire-and-forget Discord announcement for plan going active."""
-    import asyncio as _asyncio
-    async def _do():
-        try:
-            guild = await database.get_guild(guild_id)
-            plan = await database.get_op_plan(plan_id, guild_id)
-            if not guild or not plan:
-                return
-            poll_channel = guild.get("poll_channel_id") or ""
-            if not poll_channel:
-                return
-            token = os.environ.get("DISCORD_TOKEN", "")
-            landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
-            server_host = os.environ.get("SERVER_HOST", "https://travops.app")
-            plan_url = f"{server_host}/guild/{guild_id}/operations"
-            embed = {
-                "title": f"⚔️ Neuer aktiver Einsatzplan: {plan['name']}",
-                "description": f"Ein neuer Einsatz wurde aktiviert. Bitte öffne den Plan und bestätige deine Wellen.",
-                "color": 15548997,
-                "fields": [
-                    {"name": "🕐 Einschlagszeit", "value": landing or "—", "inline": True},
-                    {"name": "🎯 Ziele", "value": str(plan.get("target_count") or "—"), "inline": True},
-                ],
-                "footer": {"text": "TravOps Einsatzplanung"},
-            }
-            components = [{"type": 1, "components": [
-                {"type": 2, "style": 5, "label": "Zum Einsatzplan", "url": plan_url},
-            ]}]
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"https://discord.com/api/v10/channels/{poll_channel}/messages",
-                    headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
-                    json={"embeds": [embed], "components": components},
-                )
-        except Exception:
-            pass
-    import asyncio as _asyncio_outer
+async def _announce_plan_via_bot(guild_id: str, plan_id: int):
+    """Send Discord announcement for plan going active via the bot's internal API."""
     try:
-        loop = _asyncio_outer.get_event_loop()
-        loop.create_task(_do())
-    except Exception:
-        pass
+        guild = await database.get_guild(guild_id)
+        plan = await database.get_op_plan(plan_id, guild_id)
+        if not guild or not plan:
+            print(f"[announce-ep] guild or plan not found: guild={guild_id} plan={plan_id}")
+            return
+        poll_channel = guild.get("poll_channel_id") or ""
+        landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
+        server_host = os.environ.get("SERVER_HOST", "https://travops.app")
+        plan_url = f"{server_host}/guild/{guild_id}/operations"
+        # Get all approved ally members' discord IDs
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        member_ids = []
+        if ally_group:
+            members = await database.get_ally_members(ally_group["id"])
+            member_ids = [str(m["discord_id"]) for m in members
+                          if m.get("discord_id") and m.get("status", "approved") == "approved"]
+        payload = {
+            "guild_id": guild_id,
+            "plan_name": plan.get("name", "Einsatzplan"),
+            "landing_time": landing,
+            "plan_url": plan_url,
+            "poll_channel_id": poll_channel,
+            "member_discord_ids": member_ids,
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post("http://bot:7777/api/announce-ep", json=payload)
+            if resp.status_code != 200:
+                print(f"[announce-ep] bot returned {resp.status_code}: {resp.text}")
+            else:
+                print(f"[announce-ep] sent to {len(member_ids)} members for plan {plan_id}")
+    except Exception as e:
+        print(f"[announce-ep] error: {e}")
 
 
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/delete")
