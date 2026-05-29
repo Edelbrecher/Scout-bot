@@ -4882,7 +4882,7 @@ async def _announce_plan_cancelled_via_bot(guild_id: str, plan_id: int):
             recipient_ids=member_ids,
             notif_type="ep_cancelled",
             title=f"❌ Einsatz abgebrochen: {plan_name}",
-            message=f"Der Einsatz „{plan_name}" wurde abgebrochen.",
+            message=f'Der Einsatz "{plan_name}" wurde abgebrochen.',
             plan_id=plan_id,
         )
     except Exception as e:
