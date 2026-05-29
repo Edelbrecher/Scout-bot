@@ -27,11 +27,28 @@
     <!-- Held-Basisdaten -->
     <div class="card" style="margin-bottom:1.25rem;">
       <h2 style="font-size:1rem;margin:0 0 1rem;" data-i18n="manual.section.info">👤 Held-Informationen</h2>
+
+      <!-- Spieler-Suche -->
+      <div style="margin-bottom:1rem;position:relative;" id="playerSearchWrap">
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">🔍 Spieler suchen (Karte)</label>
+        <input
+          id="playerSearchInput"
+          type="text"
+          autocomplete="off"
+          placeholder="Name, Dorf oder Koord. eingeben…"
+          oninput="debounceSearch(this.value)"
+          style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;box-sizing:border-box;"
+        >
+        <div id="playerSearchDrop"
+             style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);background:var(--bg-card);border:1px solid var(--border);border-radius:8px;z-index:200;max-height:260px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+        </div>
+      </div>
+
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
 
         <div>
           <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.player_name">Spielername *</label>
-          <input type="text" name="player_name" required
+          <input type="text" name="player_name" id="fieldPlayerName" required
                  value="{{ prefill.player_name or edit_player or '' }}"
                  placeholder="z.B. ZalmecAwp"
                  style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
@@ -50,7 +67,7 @@
 
         <div>
           <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.alliance">Allianz</label>
-          <input type="text" name="alliance"
+          <input type="text" name="alliance" id="fieldAlliance"
                  value="{{ prefill.alliance or '' }}"
                  placeholder="z.B. BLOOD"
                  style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
@@ -225,5 +242,56 @@ function filterWeapons() {
 
 // Beim Laden Stamm-Filter anwenden
 filterWeapons();
+
+// ── Spieler-Suche ──
+const GUILD_ID = '{{ guild.guild_id }}';
+let _searchTimer = null;
+
+function debounceSearch(q) {
+  clearTimeout(_searchTimer);
+  if (!q || q.length < 2) { hideDrop(); return; }
+  _searchTimer = setTimeout(() => doPlayerSearch(q), 300);
+}
+
+async function doPlayerSearch(q) {
+  try {
+    const resp = await fetch(`/guild/${GUILD_ID}/operations/api/villages?q=${encodeURIComponent(q)}`);
+    if (!resp.ok) { hideDrop(); return; }
+    const data = await resp.json();
+    renderDrop(data.results || []);
+  } catch(e) { hideDrop(); }
+}
+
+function renderDrop(results) {
+  const drop = document.getElementById('playerSearchDrop');
+  if (!results.length) { hideDrop(); return; }
+  drop.innerHTML = results.map(v => `
+    <div onclick="selectPlayer(${JSON.stringify(v.player_name)}, ${JSON.stringify(v.alliance_name||'')}, ${JSON.stringify(v.village_name)}, ${v.x}, ${v.y})"
+         style="padding:0.55rem 0.9rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;"
+         onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
+      <span style="font-weight:600;color:var(--text-primary);">${v.player_name}</span>
+      ${v.alliance_name ? `<span style="margin-left:0.4rem;font-size:0.75rem;color:#a78bfa;background:rgba(167,139,250,0.12);padding:1px 6px;border-radius:4px;">${v.alliance_name}</span>` : ''}
+      <br>
+      <span style="font-size:0.78rem;color:var(--text-muted);">${v.village_name} · ${v.x}|${v.y}
+      ${v.population ? `· 👥 ${v.population}` : ''}</span>
+    </div>`).join('');
+  drop.style.display = 'block';
+}
+
+function selectPlayer(playerName, allianceName, villageName, x, y) {
+  document.getElementById('fieldPlayerName').value = playerName;
+  if (allianceName) document.getElementById('fieldAlliance').value = allianceName;
+  document.getElementById('playerSearchInput').value = `${playerName} · ${villageName} (${x}|${y})`;
+  hideDrop();
+}
+
+function hideDrop() {
+  document.getElementById('playerSearchDrop').style.display = 'none';
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('playerSearchWrap').contains(e.target)) hideDrop();
+});
 </script>
 {% endblock %}
