@@ -6247,6 +6247,284 @@ async def toggle_enemy_artifact(guild_id: str, player_name: str,
                                  artifact_type: str, artifact_size: str) -> bool:
     """Toggle artifact: insert if missing, delete if present. Returns True if now active."""
     await _init_attack_detection_tables()
+
+# ── Sektor-Überwachung ────────────────────────────────────────────────────────
+
+async def _init_sector_monitor_tables():
+    """Create sector_monitors and sector_alerts tables."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS sector_monitors (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL UNIQUE,
+                enabled     INTEGER DEFAULT 1,
+                x1 INTEGER DEFAULT -50, y1 INTEGER DEFAULT -50,
+                x2 INTEGER DEFAULT  50, y2 INTEGER DEFAULT  50,
+                watch_new_village  INTEGER DEFAULT 1,
+                watch_nobling      INTEGER DEFAULT 1,
+                watch_fast_growth  INTEGER DEFAULT 1,
+                growth_threshold   INTEGER DEFAULT 200,
+                nobling_threshold  INTEGER DEFAULT 500,
+                updated_at  TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS sector_alerts (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                alert_type   TEXT NOT NULL,
+                x            INTEGER NOT NULL,
+                y            INTEGER NOT NULL,
+                village_name TEXT DEFAULT '',
+                player_name  TEXT DEFAULT '',
+                alliance_name TEXT DEFAULT '',
+                population   INTEGER DEFAULT 0,
+                pop_change   INTEGER DEFAULT 0,
+                detected_at  TEXT DEFAULT (datetime('now')),
+                dismissed    INTEGER DEFAULT 0
+            )
+        """)
+        await db.commit()
+        try:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_sector_alerts_guild ON sector_alerts(guild_id, dismissed)")
+            await db.commit()
+        except Exception:
+            pass
+
+
+async def get_sector_monitor(guild_id: str) -> dict | None:
+    """Return sector monitor config for a guild, or None."""
+    await _init_sector_monitor_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM sector_monitors WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def upsert_sector_monitor(guild_id: str, **fields) -> None:
+    """Insert or replace sector monitor config, always updating updated_at."""
+    await _init_sector_monitor_tables()
+    # Get existing or defaults
+    existing = await get_sector_monitor(guild_id) or {
+        "enabled": 1,
+        "x1": -50, "y1": -50, "x2": 50, "y2": 50,
+        "watch_new_village": 1, "watch_nobling": 1, "watch_fast_growth": 1,
+        "growth_threshold": 200, "nobling_threshold": 500,
+    }
+    existing.update(fields)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO sector_monitors
+                (guild_id, enabled, x1, y1, x2, y2,
+                 watch_new_village, watch_nobling, watch_fast_growth,
+                 growth_threshold, nobling_threshold, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+        """, (
+            guild_id,
+            int(existing.get("enabled", 1)),
+            int(existing.get("x1", -50)), int(existing.get("y1", -50)),
+            int(existing.get("x2", 50)),  int(existing.get("y2", 50)),
+            int(existing.get("watch_new_village", 1)),
+            int(existing.get("watch_nobling", 1)),
+            int(existing.get("watch_fast_growth", 1)),
+            int(existing.get("growth_threshold", 200)),
+            int(existing.get("nobling_threshold", 500)),
+        ))
+        await db.commit()
+
+
+async def get_sector_alerts(guild_id: str, include_dismissed: bool = False, limit: int = 100) -> list[dict]:
+    """Return sector alerts for a guild."""
+    await _init_sector_monitor_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if include_dismissed:
+            q = "SELECT * FROM sector_alerts WHERE guild_id=? ORDER BY detected_at DESC LIMIT ?"
+            params = (guild_id, limit)
+        else:
+            q = "SELECT * FROM sector_alerts WHERE guild_id=? AND dismissed=0 ORDER BY detected_at DESC LIMIT ?"
+            params = (guild_id, limit)
+        async with db.execute(q, params) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def dismiss_sector_alert(guild_id: str, alert_id: int) -> None:
+    """Dismiss a single sector alert."""
+    await _init_sector_monitor_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE sector_alerts SET dismissed=1 WHERE id=? AND guild_id=?",
+            (alert_id, guild_id)
+        )
+        await db.commit()
+
+
+async def dismiss_all_sector_alerts(guild_id: str) -> None:
+    """Dismiss all active sector alerts for a guild."""
+    await _init_sector_monitor_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE sector_alerts SET dismissed=1 WHERE guild_id=? AND dismissed=0",
+            (guild_id,)
+        )
+        await db.commit()
+
+
+async def run_sector_scan(guild_id: str) -> list[dict]:
+    """Compare two most recent map snapshots, detect changes in bounding box, create alerts.
+
+    Returns list of newly created alert dicts.
+    """
+    await _init_sector_monitor_tables()
+    monitor = await get_sector_monitor(guild_id)
+    if not monitor or not monitor.get("enabled"):
+        return []
+
+    x1, y1, x2, y2 = monitor["x1"], monitor["y1"], monitor["x2"], monitor["y2"]
+    nobling_thr = monitor.get("nobling_threshold", 500)
+    growth_thr  = monitor.get("growth_threshold", 200)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Get two most recent distinct fetched_at timestamps
+        async with db.execute(
+            """SELECT DISTINCT fetched_at FROM map_snapshots
+               WHERE guild_id=? ORDER BY fetched_at DESC LIMIT 2""",
+            (guild_id,)
+        ) as cur:
+            ts_rows = await cur.fetchall()
+
+    if len(ts_rows) < 2:
+        return []
+
+    ts_new = ts_rows[0]["fetched_at"]
+    ts_old = ts_rows[1]["fetched_at"]
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Load villages in bounding box for both snapshots
+        async with db.execute(
+            """SELECT village_id, x, y, village_name, player_name, alliance_name, population
+               FROM map_snapshots
+               WHERE guild_id=? AND fetched_at=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?""",
+            (guild_id, ts_new, x1, x2, y1, y2)
+        ) as cur:
+            new_rows = [dict(r) for r in await cur.fetchall()]
+
+        async with db.execute(
+            """SELECT village_id, x, y, village_name, player_name, alliance_name, population
+               FROM map_snapshots
+               WHERE guild_id=? AND fetched_at=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?""",
+            (guild_id, ts_old, x1, x2, y1, y2)
+        ) as cur:
+            old_rows = [dict(r) for r in await cur.fetchall()]
+
+        # Get all meta-alliance names for this guild
+        async with db.execute(
+            """SELECT LOWER(amm.alliance_name) as aname
+               FROM alliance_meta_members amm
+               JOIN alliance_meta_groups amg ON amg.id = amm.group_id
+               WHERE amg.guild_id=?""",
+            (guild_id,)
+        ) as cur:
+            meta_rows = await cur.fetchall()
+
+    meta_alliance_names = {r["aname"] for r in meta_rows}
+
+    # Filter by meta-alliance membership
+    def in_meta(row):
+        return (row.get("alliance_name") or "").lower() in meta_alliance_names
+
+    new_filtered = [r for r in new_rows if in_meta(r)]
+    old_filtered = [r for r in old_rows if in_meta(r)]
+
+    old_by_id = {r["village_id"]: r for r in old_filtered}
+    new_by_id = {r["village_id"]: r for r in new_filtered}
+
+    new_alerts: list[dict] = []
+
+    for vid, nv in new_by_id.items():
+        alert_type = None
+        pop_change = 0
+
+        if monitor.get("watch_new_village") and vid not in old_by_id:
+            alert_type = "new_village"
+        elif vid in old_by_id:
+            diff = nv["population"] - old_by_id[vid]["population"]
+            if diff >= nobling_thr and monitor.get("watch_nobling"):
+                alert_type = "nobling"
+                pop_change = diff
+            elif diff >= growth_thr and monitor.get("watch_fast_growth"):
+                alert_type = "fast_growth"
+                pop_change = diff
+
+        if not alert_type:
+            continue
+
+        # Skip duplicate: same guild+x+y+alert_type within 1 hour
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                """SELECT id FROM sector_alerts
+                   WHERE guild_id=? AND x=? AND y=? AND alert_type=?
+                   AND detected_at > datetime('now', '-1 hour')""",
+                (guild_id, nv["x"], nv["y"], alert_type)
+            ) as cur:
+                dup = await cur.fetchone()
+            if dup:
+                continue
+
+            await db.execute(
+                """INSERT INTO sector_alerts
+                   (guild_id, alert_type, x, y, village_name, player_name, alliance_name, population, pop_change)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (
+                    guild_id, alert_type, nv["x"], nv["y"],
+                    nv.get("village_name", ""), nv.get("player_name", ""),
+                    nv.get("alliance_name", ""), nv.get("population", 0), pop_change,
+                )
+            )
+            await db.commit()
+
+            async with db.execute(
+                "SELECT * FROM sector_alerts WHERE rowid=last_insert_rowid()"
+            ) as cur:
+                db.row_factory = aiosqlite.Row
+                pass
+            async with db.execute(
+                "SELECT * FROM sector_alerts WHERE guild_id=? ORDER BY id DESC LIMIT 1",
+                (guild_id,)
+            ) as cur:
+                db.row_factory = aiosqlite.Row
+                inserted = await cur.fetchone()
+                if inserted:
+                    new_alerts.append(dict(inserted))
+
+    # Send dashboard notifications to guild leaders
+    if new_alerts:
+        try:
+            lead_ids = await get_ep_notify_members(guild_id)
+            if lead_ids:
+                type_labels = {"new_village": "Neues Dorf", "nobling": "Adelung", "fast_growth": "Wachstum"}
+                types_found = list({a["alert_type"] for a in new_alerts})
+                label = " & ".join(type_labels.get(t, t) for t in types_found)
+                await create_notifications(
+                    guild_id=guild_id,
+                    ally_group_id=None,
+                    recipient_ids=lead_ids,
+                    notif_type="sector_alert",
+                    title=f"🗺️ Sektor-Alert: {label}",
+                    message=f"{len(new_alerts)} neue Aktivität(en) in deinem überwachten Sektor erkannt.",
+                    plan_id=None,
+                )
+        except Exception:
+            pass
+
+    return new_alerts
     async with aiosqlite.connect(DB_PATH) as db:
         vx = village_x if village_x is not None else None
         vy = village_y if village_y is not None else None

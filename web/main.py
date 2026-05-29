@@ -567,6 +567,8 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
             await database.sync_alliance_members_from_snapshot(guild_id)
         except Exception:
             pass
+        # Trigger sector monitor scan in background
+        asyncio.create_task(database.run_sector_scan(guild_id))
 
 
 @asynccontextmanager
@@ -2452,6 +2454,103 @@ async def guild_map_set_timezone(request: Request, guild_id: str,
     offset = max(-720, min(840, server_utc_offset))  # clamp to valid UTC range
     await database.update_guild_config_fields(guild_id, server_utc_offset=offset)
     return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/map/sector-monitor", response_class=HTMLResponse)
+async def sector_monitor_page(request: Request, guild_id: str):
+    """Show sector monitor config + alert list."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    err = await _require_premium(guild, guild_id)
+    if err: return err
+    monitor = await database.get_sector_monitor(guild_id) or {}
+    alerts = await database.get_sector_alerts(guild_id, include_dismissed=False, limit=100)
+    meta_groups = await database.get_meta_groups(guild_id)
+    scanned = request.query_params.get("scanned")
+    new_count = int(request.query_params.get("new_count", 0))
+    # Count stats
+    stats = {
+        "total": len(alerts),
+        "new_village": sum(1 for a in alerts if a["alert_type"] == "new_village"),
+        "nobling": sum(1 for a in alerts if a["alert_type"] == "nobling"),
+        "fast_growth": sum(1 for a in alerts if a["alert_type"] == "fast_growth"),
+    }
+    return templates.TemplateResponse("sector_monitor.html", {
+        "request": request,
+        "guild": guild,
+        "monitor": monitor,
+        "alerts": alerts,
+        "meta_groups": meta_groups,
+        "stats": stats,
+        "scanned": scanned,
+        "new_count": new_count,
+    })
+
+
+@app.post("/guild/{guild_id}/map/sector-monitor/save")
+async def sector_monitor_save(
+    request: Request, guild_id: str,
+    enabled: int = Form(0),
+    x1: int = Form(-50), y1: int = Form(-50),
+    x2: int = Form(50),  y2: int = Form(50),
+    watch_new_village: int = Form(0),
+    watch_nobling: int = Form(0),
+    watch_fast_growth: int = Form(0),
+    growth_threshold: int = Form(200),
+    nobling_threshold: int = Form(500),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.upsert_sector_monitor(
+        guild_id,
+        enabled=enabled,
+        x1=x1, y1=y1, x2=x2, y2=y2,
+        watch_new_village=watch_new_village,
+        watch_nobling=watch_nobling,
+        watch_fast_growth=watch_fast_growth,
+        growth_threshold=growth_threshold,
+        nobling_threshold=nobling_threshold,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/map/sector-monitor/scan")
+async def sector_monitor_scan(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    new_alerts = await database.run_sector_scan(guild_id)
+    return RedirectResponse(
+        f"/guild/{guild_id}/map/sector-monitor?scanned=1&new_count={len(new_alerts)}",
+        status_code=303,
+    )
+
+
+@app.post("/guild/{guild_id}/map/sector-monitor/dismiss/{alert_id}")
+async def sector_monitor_dismiss(request: Request, guild_id: str, alert_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.dismiss_sector_alert(guild_id, alert_id)
+    return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor", status_code=303)
+
+
+@app.post("/guild/{guild_id}/map/sector-monitor/dismiss-all")
+async def sector_monitor_dismiss_all(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.dismiss_all_sector_alerts(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor", status_code=303)
 
 
 @app.get("/guild/{guild_id}/map/data")
