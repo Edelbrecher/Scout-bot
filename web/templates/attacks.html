@@ -224,11 +224,10 @@
   // =========================================================
   function cleanUnicode(s) {
     return s
-      .replace(/ | /g, '\n')
-      .replace(/ /g, ' ')
-      .replace(/[​‌‍‎‏‪‫‬‭‮⁠⁦⁧⁨⁩؀﻿­᠎]/g, '');
+      .replace(/\u00a0|\u2028|\u2029/g, '\n')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\u061c\ufeff\u00ad\u180e]/g, '');
   }
-
   function parseRallyPoint(rawText) {
     const text = cleanUnicode(rawText);
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
