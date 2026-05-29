@@ -253,35 +253,46 @@ function debounceSearch(q) {
   _searchTimer = setTimeout(() => doPlayerSearch(q), 300);
 }
 
+let _searchResults = [];
+
 async function doPlayerSearch(q) {
   try {
     const resp = await fetch(`/guild/${GUILD_ID}/operations/api/villages?q=${encodeURIComponent(q)}`);
     if (!resp.ok) { hideDrop(); return; }
     const data = await resp.json();
-    renderDrop(data.results || []);
+    // Deduplizieren: pro Spieler nur ein Eintrag (erstes Dorf für Allianz)
+    const seen = new Map();
+    for (const v of (data.results || [])) {
+      if (!seen.has(v.player_name)) seen.set(v.player_name, v);
+    }
+    _searchResults = Array.from(seen.values());
+    renderDrop(_searchResults);
   } catch(e) { hideDrop(); }
 }
 
 function renderDrop(results) {
   const drop = document.getElementById('playerSearchDrop');
   if (!results.length) { hideDrop(); return; }
-  drop.innerHTML = results.map(v => `
-    <div onclick="selectPlayer(${JSON.stringify(v.player_name)}, ${JSON.stringify(v.alliance_name||'')}, ${JSON.stringify(v.village_name)}, ${v.x}, ${v.y})"
-         style="padding:0.55rem 0.9rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;"
-         onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
+  drop.innerHTML = results.map((v, i) => `
+    <div data-idx="${i}"
+         style="padding:0.55rem 0.9rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem;">
       <span style="font-weight:600;color:var(--text-primary);">${v.player_name}</span>
       ${v.alliance_name ? `<span style="margin-left:0.4rem;font-size:0.75rem;color:#a78bfa;background:rgba(167,139,250,0.12);padding:1px 6px;border-radius:4px;">${v.alliance_name}</span>` : ''}
-      <br>
-      <span style="font-size:0.78rem;color:var(--text-muted);">${v.village_name} · ${v.x}|${v.y}
-      ${v.population ? `· 👥 ${v.population}` : ''}</span>
     </div>`).join('');
+  drop.querySelectorAll('[data-idx]').forEach(el => {
+    el.addEventListener('mouseover', () => el.style.background = 'rgba(255,255,255,0.06)');
+    el.addEventListener('mouseout',  () => el.style.background = '');
+    el.addEventListener('click', () => selectPlayer(parseInt(el.dataset.idx)));
+  });
   drop.style.display = 'block';
 }
 
-function selectPlayer(playerName, allianceName, villageName, x, y) {
-  document.getElementById('fieldPlayerName').value = playerName;
-  if (allianceName) document.getElementById('fieldAlliance').value = allianceName;
-  document.getElementById('playerSearchInput').value = `${playerName} · ${villageName} (${x}|${y})`;
+function selectPlayer(idx) {
+  const v = _searchResults[idx];
+  if (!v) return;
+  document.getElementById('fieldPlayerName').value = v.player_name;
+  if (v.alliance_name) document.getElementById('fieldAlliance').value = v.alliance_name;
+  document.getElementById('playerSearchInput').value = v.player_name;
   hideDrop();
 }
 
