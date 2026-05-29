@@ -5831,20 +5831,21 @@ async def get_member_troops_single(guild_id: str, discord_id: str) -> dict | Non
 async def get_member_leaderboard(guild_id: str) -> list[dict]:
     """Return member_troops enriched with population from latest map snapshot.
     Each row: discord_id, discord_name, travian_name, total_off, total_def,
-              total_crop, total_units, total_scouts, population, tq (%)"""
+              total_crop, total_units, total_scouts, population, village_count,
+              avg_population, tq (%)"""
     await _migrate_member_troops()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        # Get population per player_name from latest snapshot
+        # Get population + village count per player_name from latest snapshot
         pop_rows = await db.execute_fetchall("""
-            SELECT player_name, SUM(population) as pop
+            SELECT player_name, SUM(population) as pop, COUNT(*) as vcount
             FROM map_snapshots
             WHERE guild_id = ?
               AND fetched_at = (SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?)
               AND player_name IS NOT NULL AND player_name != ''
             GROUP BY player_name
         """, (guild_id, guild_id))
-        pop_map = {r["player_name"]: r["pop"] for r in pop_rows}
+        pop_map = {r["player_name"]: {"pop": r["pop"], "vcount": r["vcount"]} for r in pop_rows}
 
         rows = await db.execute_fetchall(
             "SELECT * FROM member_troops WHERE guild_id=? ORDER BY total_off DESC",
@@ -5853,10 +5854,15 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
     result = []
     for r in rows:
         d = dict(r)
-        pop = pop_map.get(d.get("travian_name") or "", 0) or 0
+        pdata = pop_map.get(d.get("travian_name") or "", {})
+        pop = pdata.get("pop", 0) or 0
+        vcount = pdata.get("vcount", 0) or 0
         crop = d.get("total_crop") or 0
         tq = round(crop / pop * 100) if pop > 0 else None
         d["population"] = pop
+        d["village_count"] = vcount
+        d["avg_population"] = round(pop / vcount) if vcount > 0 else 0
+        d["total_troops"] = (d.get("total_off") or 0) + (d.get("total_def") or 0)
         d["tq"] = tq
         result.append(d)
     return result

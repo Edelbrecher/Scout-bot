@@ -4239,12 +4239,14 @@ async def my_ally_page(request: Request, guild_id: str):
 
     flash = request.query_params.get("flash", "")
     leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
+    member_leaderboard = await database.get_member_leaderboard(guild_id) if membership else []
     meta_alliances = await database.get_meta_alliances(guild_id)
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
         "membership": membership, "guild_group": guild_group,
         "member_view_members": member_view_members,
+        "member_leaderboard": member_leaderboard,
         "session": session,
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
         "leaderboard": leaderboard,

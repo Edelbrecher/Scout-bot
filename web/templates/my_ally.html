@@ -610,6 +610,53 @@
   </div>
   {% endif %}
 
+  {# ── 5 Leaderboards ── #}
+  {% if member_leaderboard %}
+  {% set lb = member_leaderboard %}
+  {% set my_travian = membership.travian_name or '' %}
+
+  {# Helper macro: render one leaderboard card #}
+  {% macro rankcard(title, icon, field, color, fmt) %}
+  {% set sorted = lb | sort(attribute=field, reverse=True) %}
+  {% set top_val = (sorted[0][field] or 0) if sorted else 1 %}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin:0 0 .85rem;font-size:.92rem;">{{ icon }} {{ title }}</h3>
+    <div style="display:flex;flex-direction:column;gap:.35rem;">
+      {% for row in sorted if (row[field] or 0) > 0 %}
+      {% set val = row[field] or 0 %}
+      {% set pct = (val / top_val * 100) | round | int %}
+      {% set is_me = row.travian_name == my_travian %}
+      <div style="display:flex;align-items:center;gap:.6rem;">
+        <span style="font-size:.72rem;color:var(--text-muted);width:1.4rem;text-align:right;flex-shrink:0;">{{ loop.index }}</span>
+        <span style="font-size:.8rem;font-weight:{% if is_me %}700{% else %}400{% endif %};color:{% if is_me %}#a5b4fc{% else %}var(--text-primary){% endif %};width:110px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ row.travian_name or row.discord_name }}</span>
+        <div style="flex:1;background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden;">
+          <div style="height:8px;border-radius:4px;background:{{ color }};width:{{ pct }}%;transition:width .5s;"></div>
+        </div>
+        <span style="font-size:.75rem;color:var(--text-muted);width:60px;text-align:right;flex-shrink:0;">
+          {% if fmt == 'k' %}{{ '{:,.0f}'.format(val / 1000) }}k{% else %}{{ '{:,.0f}'.format(val) }}{% endif %}
+        </span>
+      </div>
+      {% else %}
+      <p style="font-size:.8rem;color:var(--text-muted);margin:0;">Noch keine Daten vorhanden.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endmacro %}
+
+  <div style="margin-bottom:.5rem;">
+    <h2 style="margin:0 0 .25rem;font-size:1rem;">📊 Allianz-Rankings</h2>
+    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">Basierend auf eingereichten Truppen & Karten-Snapshot.</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0;">
+    {{ rankcard('Truppen gesamt',    '⚔️',  'total_troops',     'linear-gradient(90deg,#6366f1,#8b5cf6)', 'k') }}
+    {{ rankcard('Off-Truppen',       '🗡️',  'total_off',        'linear-gradient(90deg,#ef4444,#f97316)', 'k') }}
+    {{ rankcard('Def-Truppen',       '🛡️',  'total_def',        'linear-gradient(90deg,#3b82f6,#06b6d4)', 'k') }}
+    {{ rankcard('Einwohner gesamt',  '🏘️',  'population',       'linear-gradient(90deg,#10b981,#34d399)', 'n') }}
+    {{ rankcard('Ø Einwohner/Dorf',  '🏡',  'avg_population',   'linear-gradient(90deg,#f59e0b,#fbbf24)', 'n') }}
+  </div>
+  {% endif %}
+
   {# Allow member to also create their own alliance on this server if none exists yet #}
   {% if not guild_group %}
   <div class="card" style="max-width:500px;border-color:rgba(99,102,241,.25);background:rgba(99,102,241,.04);">
