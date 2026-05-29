@@ -113,25 +113,20 @@
       <div>
         <label class="cs-label">Aktuelles Getreide</label>
         <input type="text" id="currentGrain" class="cs-input" placeholder="z.B. 481.744">
-        <div class="cs-hint">Aus dem Dorf-Ressourcenanzeige</div>
+        <div class="cs-hint">Aktueller Getreidevorrat im Dorf</div>
       </div>
 
       <div>
-        <label class="cs-label">Brutto-Produktion / h</label>
-        <input type="text" id="grainProduction" class="cs-input" placeholder="z.B. 8.400">
-        <div class="cs-hint">Felder + Oasen + Held (ohne Verbrauch)</div>
-      </div>
-
-      <div>
-        <label class="cs-label">Gesamtverbrauch / h</label>
-        <input type="text" id="grainConsumption" class="cs-input" placeholder="z.B. 12.000">
-        <div class="cs-hint">Truppen + Bevölkerung</div>
+        <label class="cs-label">Netto Getreide / h</label>
+        <input type="text" id="netGrainPerH" class="cs-input" placeholder="z.B. -3.800"
+          style="border-color: rgba(239,68,68,.4);" oninput="updateNetStyle(this)">
+        <div class="cs-hint">Produktion minus Verbrauch — negativ = Defizit</div>
       </div>
 
       <div>
         <label class="cs-label">Speicher-Kapazität</label>
         <input type="text" id="granaryCapacity" class="cs-input" placeholder="z.B. 960.000">
-        <div class="cs-hint">Maximaler Getreide-Speicher</div>
+        <div class="cs-hint">0 = Überlauf ignorieren</div>
       </div>
 
       <div>
@@ -397,6 +392,21 @@ function parseMarketText(rawText) {
 function readNum(id) {
   const val = document.getElementById(id).value.trim();
   return parseGermanNum(val.replace(/[^\d.,]/g, ''));
+}
+
+/** Read a possibly-negative number like "-3.800" or "-3,800" */
+function readSignedNum(id) {
+  const val = document.getElementById(id).value.trim();
+  const negative = val.startsWith('-');
+  const abs = parseGermanNum(val.replace(/[^\d.,]/g, ''));
+  return negative ? -abs : abs;
+}
+
+/** Update border color of net-grain field: red = deficit, green = surplus */
+function updateNetStyle(el) {
+  const val = el.value.trim();
+  const neg = val.startsWith('-') || parseFloat(val.replace(/[^\d.,-]/g,'').replace(',','.')) < 0;
+  el.style.borderColor = neg ? 'rgba(239,68,68,.6)' : 'rgba(34,197,94,.6)';
 }
 
 function fmt(n) {
@@ -674,8 +684,12 @@ function buildChart(simResult, granaryCapacity, durationH, nowMs) {
 function parseAndSimulate() {
   const rawText        = document.getElementById('marketPaste').value;
   const currentGrain   = readNum('currentGrain');
-  const productionPerH = readNum('grainProduction');
-  const consumptionPerH= readNum('grainConsumption');
+  const netPerH        = readSignedNum('netGrainPerH');
+  // Expose as production/consumption so simulate() works unchanged:
+  // positive net → production > 0, consumption = 0
+  // negative net → production = 0, consumption = abs(net)
+  const productionPerH  = netPerH >= 0 ? netPerH : 0;
+  const consumptionPerH = netPerH < 0 ? -netPerH : 0;
   const granaryCapacity= readNum('granaryCapacity');
   const durationH      = parseInt(document.getElementById('simHours').value) || 48;
   const statusEl       = document.getElementById('parseStatus');
@@ -705,7 +719,7 @@ function parseAndSimulate() {
   }
 
   // Validate: need either village params OR marketplace deliveries
-  const hasVillageParams = currentGrain > 0 || productionPerH > 0 || consumptionPerH > 0;
+  const hasVillageParams = currentGrain > 0 || netPerH !== 0;
   const hasDeliveries    = parsed.incoming.length > 0 || parsed.outgoing.length > 0;
 
   if (!hasVillageParams && !hasDeliveries) {
@@ -786,8 +800,6 @@ function renderResults(sim, params) {
 
   const kpis = [
     { label: '🌾 Aktuell',          value: fmt(currentGrain),        cls: '' },
-    { label: '📈 Produktion / h',   value: fmt(productionPerH) + ' G/h', cls: 'cs-ok' },
-    { label: '📉 Verbrauch / h',    value: fmt(consumptionPerH) + ' G/h', cls: 'cs-danger' },
     { label: '⚖️ Netto / h',        value: (netPerH >= 0 ? '+' : '') + fmt(netPerH) + ' G/h', cls: netPerH >= 0 ? 'cs-ok' : 'cs-danger' },
     { label: '↓ Eingehend',         value: fmt(totalIncoming) + ' G', cls: 'cs-ok' },
     { label: '↑ Ausgehend',         value: fmt(totalOutgoing) + ' G', cls: totalOutgoing > 0 ? 'cs-warn' : '' },
@@ -883,9 +895,10 @@ function renderResults(sim, params) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function loadExample() {
-  document.getElementById('currentGrain').value    = '481.743';
-  document.getElementById('grainProduction').value = '8.400';
-  document.getElementById('grainConsumption').value= '12.200';
+  document.getElementById('currentGrain').value = '481.743';
+  document.getElementById('netGrainPerH').value  = '-3.800';
+  const netEl = document.getElementById('netGrainPerH');
+  netEl.style.borderColor = 'rgba(239,68,68,.6)';
   document.getElementById('granaryCapacity').value = '960.000';
   document.getElementById('simHours').value        = '48';
 
