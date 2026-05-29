@@ -136,32 +136,33 @@ async def seed(db, wipe=False):
     print("👥 Allianz-Struktur …")
     await db.execute("""
         INSERT OR IGNORE INTO ally_groups
-          (guild_id, group_name, wing1_name, wing2_name)
-        VALUES (?, ?, ?, ?)
-    """, (DEMO_GUILD_ID, "DEMO Main", "DEMO2", "DEMO3"))
+          (guild_id, ally_name, owner_discord_id, owner_username, wing1_name, wing2_name)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (DEMO_GUILD_ID, "DEMO", MEMBERS[0][0], MEMBERS[0][1], "DEMO2", "DEMO3"))
     row = await (await db.execute(
         "SELECT id FROM ally_groups WHERE guild_id=? LIMIT 1", (DEMO_GUILD_ID,))).fetchone()
     group_id = row[0]
 
-    roles = [("Leiter","leader"),("Officer","officer"),("Mitglied","member"),("Rekrut","recruit")]
-    for rname, rkey in roles:
+    roles = [("Leiter","#f59e0b","leader"),("Officer","#a78bfa","officer"),
+             ("Mitglied","#6b7280","member"),("Rekrut","#374151","recruit")]
+    for rname, rcolor, rperm in roles:
         await db.execute("""
-            INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, role_key)
-            VALUES (?,?,?)
-        """, (group_id, rname, rkey))
+            INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, color, permissions)
+            VALUES (?,?,?,?)
+        """, (group_id, rname, rcolor, rperm))
 
     role_map = {}
-    async with db.execute("SELECT id, role_key FROM ally_roles WHERE ally_group_id=?", (group_id,)) as c:
+    async with db.execute("SELECT id, permissions FROM ally_roles WHERE ally_group_id=?", (group_id,)) as c:
         async for row in c:
             role_map[row[1]] = row[0]
 
     member_roles = ["leader","officer","officer","member","member","member","recruit","recruit"]
-    for (did, dname, tname, _), rkey in zip(MEMBERS, member_roles):
+    for (did, dname, tname, _), rperm in zip(MEMBERS, member_roles):
         await db.execute("""
             INSERT OR IGNORE INTO ally_members
               (ally_group_id, discord_id, discord_username, travian_name, role_id, wing)
             VALUES (?,?,?,?,?,?)
-        """, (group_id, did, dname, tname, role_map.get(rkey), 0))
+        """, (group_id, did, dname, tname, role_map.get(rperm), 0))
 
     # ── map_snapshots ─────────────────────────────────────────────────────────
     print("🗺️  Kartendaten …")
@@ -179,11 +180,11 @@ async def seed(db, wipe=False):
     for vname, x, y, player, tribe, pop in OWN_VILLAGES:
         await db.execute("""
             INSERT OR IGNORE INTO guild_own_villages
-              (guild_id, village_name, x, y, player_name, tribe, population,
-               added_by_id, added_by_name, added_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-        """, (DEMO_GUILD_ID, vname, x, y, player, tribe, pop,
-              MEMBERS[0][0], MEMBERS[0][1], now))
+              (guild_id, village_name, x, y, population, village_type,
+               uploaded_by, uploaded_at, discord_id)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (DEMO_GUILD_ID, vname, x, y, pop, "main",
+              player, now, MEMBERS[0][0]))
 
     # ── Feinde ────────────────────────────────────────────────────────────────
     print("⚔️  Feinde & Artefakte …")
