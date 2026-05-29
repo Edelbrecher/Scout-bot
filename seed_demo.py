@@ -124,13 +124,13 @@ async def seed(db, wipe=False):
     await db.execute("""
         INSERT OR REPLACE INTO guild_configs
           (guild_id, guild_name, scout_channel_id, hero_scout_channel_id,
-           ep_announcement_channel_id, server_utc_offset)
-        VALUES (?,?,?,?,?,?)
+           server_utc_offset, workspace_status, subscription_status, subscription_plan)
+        VALUES (?,?,?,?,?,?,?,?)
     """, (DEMO_GUILD_ID, DEMO_GUILD_NAME,
           "800000000000000001",  # scout channel
           "800000000000000002",  # hero scout channel
-          "800000000000000003",  # ep announcement
-          60))                   # UTC+1
+          60,                    # UTC+1
+          "active", "active", "pro"))
 
     # ── ally_groups + roles + members ─────────────────────────────────────────
     print("👥 Allianz-Struktur …")
