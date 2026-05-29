@@ -1083,7 +1083,7 @@ async def demo_login(request: Request, token: str = ""):
         "uid": DEMO_USER_ID,
         "username": "DemoUser",
         "avatar": None,
-        "guilds": [{"id": DEMO_GUILD_ID, "name": "DEMO · TravOps", "permissions": "8"}],
+        "guilds": [DEMO_GUILD_ID],
     }
     session_token = create_session(session_data)
     response = RedirectResponse("/dashboard", status_code=303)
