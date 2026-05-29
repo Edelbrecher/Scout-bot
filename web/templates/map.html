@@ -119,10 +119,11 @@
     <span id="searchInfo" style="align-self:flex-end; font-size:0.78rem; color:var(--text-muted);"></span>
   </div>
 
-  {% if ally_group %}
+  {% if ally_group or meta_alliances %}
   <!-- Meta-Allianz Schnellfilter -->
   <div style="display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; margin-bottom:0.5rem; padding:0.5rem 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
     <span style="font-size:0.75rem; color:var(--text-muted); margin-right:0.25rem;">🏰 Meta:</span>
+    {% if ally_group %}
     {% if ally_group.ally_name %}
     <button class="meta-btn" style="color:#f1c40f; border-color:#f1c40f;"
       onclick="addAllianceFilterValue('{{ ally_group.ally_name }}', '#f1c40f')">
@@ -141,6 +142,13 @@
       ✦ {{ ally_group.wing2_name }}
     </button>
     {% endif %}
+    {% endif %}
+    {% for ma in meta_alliances %}
+    <button class="meta-btn" style="color:{{ ma.color }}; border-color:{{ ma.color }};"
+      onclick="addAllianceFilterValue('{{ ma.alliance_name | e }}', '{{ ma.color }}')">
+      ✦ {{ ma.alliance_name }}
+    </button>
+    {% endfor %}
     <button class="meta-btn" style="color:#888; border-color:#555;"
       onclick="addAllMetaAlliances()">
       Alle anzeigen
@@ -546,16 +554,19 @@ function removeAllianceFilter(i) {
   allianceFilters.splice(i,1); renderTags(); doSearch();
 }
 
-{% if ally_group %}
 const META_ALLIANCES = [
+  {% if ally_group %}
   {% if ally_group.ally_name %}  {name: {{ ally_group.ally_name | tojson }}, color: '#f1c40f'},{% endif %}
   {% if ally_group.wing1_name %} {name: {{ ally_group.wing1_name | tojson }}, color: '#4caf82'},{% endif %}
   {% if ally_group.wing2_name %} {name: {{ ally_group.wing2_name | tojson }}, color: '#64b5f6'},{% endif %}
+  {% endif %}
+  {% for ma in meta_alliances %}
+  {name: {{ ma.alliance_name | tojson }}, color: {{ ma.color | tojson }}},
+  {% endfor %}
 ];
 function addAllMetaAlliances() {
   for (const m of META_ALLIANCES) addAllianceFilterValue(m.name, m.color);
 }
-{% endif %}
 
 document.getElementById('searchPlayer').addEventListener('keydown', e => e.key==='Enter' && addPlayerFilter());
 document.getElementById('searchAlliance').addEventListener('keydown', e => e.key==='Enter' && addAllianceFilter());

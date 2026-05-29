@@ -3028,6 +3028,16 @@ async def revoke_dual_link(token: str, owner_id: str):
 async def _init_ally_tables():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS meta_alliances (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                alliance_name TEXT NOT NULL,
+                color        TEXT DEFAULT '#94a3b8',
+                sort_order   INTEGER DEFAULT 0,
+                UNIQUE(guild_id, alliance_name)
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS ally_groups (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guild_id TEXT NOT NULL UNIQUE,
@@ -4072,16 +4082,41 @@ async def get_meta_group_stats(guild_id: str, group_id: int) -> list[dict]:
 
 # ── Backwards-compat stubs (kept so any remaining references don't crash) ──────
 
-async def get_meta_alliances(guild_id: str) -> list[str]:
-    return []
+async def get_meta_alliances(guild_id: str) -> list[dict]:
+    """Return extra tracked meta-alliances for this guild (beyond ally_group wings)."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM meta_alliances WHERE guild_id=? ORDER BY sort_order, id",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
-async def add_meta_alliance(guild_id: str, alliance_name: str) -> bool:
-    return False
+async def add_meta_alliance(guild_id: str, alliance_name: str, color: str = '#94a3b8') -> bool:
+    """Add an extra meta-alliance. Returns True if inserted, False if duplicate."""
+    await _init_ally_tables()
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO meta_alliances (guild_id, alliance_name, color) VALUES (?,?,?)",
+                (guild_id, alliance_name.strip(), color)
+            )
+            await db.commit()
+        return True
+    except Exception:
+        return False
 
 
 async def remove_meta_alliance(guild_id: str, alliance_name: str):
-    pass
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM meta_alliances WHERE guild_id=? AND alliance_name=?",
+            (guild_id, alliance_name)
+        )
+        await db.commit()
 
 
 async def get_meta_stats(guild_id: str) -> list[dict]:

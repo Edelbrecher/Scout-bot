@@ -2368,12 +2368,14 @@ async def guild_map(request: Request, guild_id: str):
     is_admin = session.get("type") == "admin"
     scouted = await database.get_scouted_coordinates(guild_id)
     ally_group = await database.get_ally_group_for_guild(guild_id)
+    meta_alliances = await database.get_meta_alliances(guild_id)
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
         "scouted": scouted,
         "is_admin": is_admin,
         "ally_group": ally_group,
+        "meta_alliances": meta_alliances,
     })
 
 
@@ -3747,12 +3749,14 @@ async def my_ally_page(request: Request, guild_id: str):
 
     flash = request.query_params.get("flash", "")
     leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
+    meta_alliances = await database.get_meta_alliances(guild_id)
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
         "membership": membership, "guild_group": guild_group,
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
         "leaderboard": leaderboard,
+        "meta_alliances": meta_alliances,
     })
 
 
@@ -3806,6 +3810,31 @@ async def my_ally_settings(request: Request, guild_id: str,
         tq_min=max(0, tq_min),
     )
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/meta-alliance/add")
+async def meta_alliance_add(request: Request, guild_id: str,
+                             alliance_name: str = Form(""),
+                             color: str = Form("#94a3b8")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    name = alliance_name.strip()[:80]
+    if name:
+        await database.add_meta_alliance(guild_id, name, color)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#meta-alliances", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/meta-alliance/remove")
+async def meta_alliance_remove(request: Request, guild_id: str,
+                                alliance_name: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.remove_meta_alliance(guild_id, alliance_name)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#meta-alliances", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/regen-token")

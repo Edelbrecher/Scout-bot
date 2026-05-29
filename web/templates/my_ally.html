@@ -68,6 +68,38 @@
       </form>
     </details>
 
+    {# ── Extra Meta-Allianzen für Karten-Buttons ── #}
+    <div id="meta-alliances" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+      <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:.6rem;">🗺️ Karten-Quickbuttons — weitere Allianzen</div>
+      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .6rem;">Diese Allianzen erscheinen als Quickbuttons auf der Karte (zusätzlich zu den Wings oben).</p>
+
+      {# Bestehende anzeigen #}
+      {% if meta_alliances %}
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.65rem;">
+        {% for ma in meta_alliances %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/meta-alliance/remove" style="margin:0;display:flex;align-items:center;">
+          <input type="hidden" name="alliance_name" value="{{ ma.alliance_name }}">
+          <span style="display:flex;align-items:center;gap:.35rem;background:rgba(0,0,0,.2);border:1px solid {{ ma.color }};border-radius:20px;padding:3px 10px;font-size:.78rem;font-weight:600;color:{{ ma.color }};">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ ma.color }};flex-shrink:0;"></span>
+            {{ ma.alliance_name }}
+            <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;line-height:1;margin-left:.1rem;" title="Entfernen">✕</button>
+          </span>
+        </form>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# Neue hinzufügen #}
+      <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/meta-alliance/add"
+            style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <input type="text" name="alliance_name" placeholder="Allianzname (wie in Travian)" required maxlength="80"
+               style="flex:1;min-width:160px;padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+        <input type="color" name="color" value="#94a3b8" title="Farbe"
+               style="width:38px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;">
+        <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕ Hinzufügen</button>
+      </form>
+    </div>
+
     {# ── Invite Links ── #}
     <div style="display:flex;flex-direction:column;gap:0.6rem;">
       {% set links = [
