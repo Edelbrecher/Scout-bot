@@ -4508,6 +4508,10 @@ async def ally_join_accept(request: Request, token: str, travian_name: str = For
                 if await cur.fetchone():
                     status = "approved"
     await database.join_ally_group(group["id"], uid, session.get("username",""), tname, wing=wing, status=status)
+    # Redirect directly to the guild's my-ally page if the guild is accessible
+    guild_id = group["guild_id"]
+    if status == "approved" and guild_id in (session.get("guilds") or []):
+        return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=joined", status_code=303)
     redirect_status = "accepted" if status == "approved" else "pending"
     return RedirectResponse(f"/ally/join/{token}?{redirect_status}=1", status_code=303)
 
