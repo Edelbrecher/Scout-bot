@@ -1063,6 +1063,36 @@ async def logout():
 
 
 # ---------------------------------------------------------------------------
+# Demo-Login: Magic-Link ohne Discord OAuth
+# GET /demo-login?token=DEMO_SECRET_TOKEN
+# Loggt als fiktiver Demo-Nutzer ein, der Zugriff auf die Demo-Guild hat.
+# ---------------------------------------------------------------------------
+DEMO_LOGIN_TOKEN = os.environ.get("DEMO_LOGIN_TOKEN", "")
+DEMO_GUILD_ID    = "1509975187276435528"
+DEMO_USER_ID     = "999999999999999001"   # fiktive Discord-ID für Demo-User
+
+@app.get("/demo-login")
+async def demo_login(request: Request, token: str = ""):
+    # Token muss gesetzt und korrekt sein
+    if not DEMO_LOGIN_TOKEN or token != DEMO_LOGIN_TOKEN:
+        return HTMLResponse("<h2>Ungültiger Demo-Token.</h2>", status_code=403)
+
+    # Session als Demo-Nutzer mit Zugriff auf die Demo-Guild
+    session_data = {
+        "type": "discord",
+        "uid": DEMO_USER_ID,
+        "username": "DemoUser",
+        "avatar": None,
+        "guilds": [{"id": DEMO_GUILD_ID, "name": "DEMO · TravOps", "permissions": "8"}],
+    }
+    session_token = create_session(session_data)
+    response = RedirectResponse("/dashboard", status_code=303)
+    response.set_cookie(SESSION_COOKIE, session_token,
+                        max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    return response
+
+
+# ---------------------------------------------------------------------------
 # Routes — dashboard
 # ---------------------------------------------------------------------------
 
