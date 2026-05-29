@@ -94,6 +94,29 @@
     </div>
   </div>
 
+  <!-- ── TOUR RESTART ── -->
+  <div class="card" style="margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <div>
+      <div style="font-weight:600;font-size:.92rem;">🗺️ Einführungstour</div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:.15rem;">Tour beim nächsten Aufruf des Dashboards erneut starten.</div>
+    </div>
+    <button onclick="restartTour()" class="btn btn-secondary" style="font-size:.82rem;white-space:nowrap;">
+      ▶ Tour neu starten
+    </button>
+  </div>
+  <script>
+  function restartTour() {
+    localStorage.removeItem('beb_tour_done');
+    // Redirect to first guild dashboard if available
+    const guildMatch = location.pathname.match(/\/guild\/(\d{17,20})/);
+    if (guildMatch) {
+      window.location.href = '/guild/' + guildMatch[1];
+    } else {
+      window.location.href = '/dashboard';
+    }
+  }
+  </script>
+
   <!-- ── HOW IT WORKS ── -->
   <div class="card" style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);">
     <h3 style="margin:0 0 0.75rem;font-size:0.95rem;color:#a5b4fc;">ℹ️ So funktioniert es</h3>
