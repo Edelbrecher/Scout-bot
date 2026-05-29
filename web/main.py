@@ -4245,6 +4245,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "ally_group": ally_group, "members": members, "roles": roles,
         "membership": membership, "guild_group": guild_group,
         "member_view_members": member_view_members,
+        "session": session,
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
         "leaderboard": leaderboard,
         "meta_alliances": meta_alliances,
