@@ -300,7 +300,15 @@ async def can_access_guild_async(session: dict, guild_id: str) -> bool:
         if not guild:
             return False
         return guild.get("workspace_owner_id") == session.get("uid")
-    return guild_id in session["guilds"]
+    if guild_id in session["guilds"]:
+        return True
+    # Also grant access if user has joined an ally on this guild via invite link
+    uid = session.get("uid", "")
+    if uid:
+        membership = await database.get_ally_membership(guild_id, uid)
+        if membership:
+            return True
+    return False
 
 
 def _require_session(request: Request):
@@ -4207,7 +4215,7 @@ async def dual_join_accept(request: Request, token: str):
 async def my_ally_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4508,12 +4516,10 @@ async def ally_join_accept(request: Request, token: str, travian_name: str = For
                 if await cur.fetchone():
                     status = "approved"
     await database.join_ally_group(group["id"], uid, session.get("username",""), tname, wing=wing, status=status)
-    # Redirect directly to the guild's my-ally page if the guild is accessible
     guild_id = group["guild_id"]
-    if status == "approved" and guild_id in (session.get("guilds") or []):
+    if status == "approved":
         return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=joined", status_code=303)
-    redirect_status = "accepted" if status == "approved" else "pending"
-    return RedirectResponse(f"/ally/join/{token}?{redirect_status}=1", status_code=303)
+    return RedirectResponse(f"/ally/join/{token}?pending=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------
