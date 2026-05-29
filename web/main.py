@@ -5196,12 +5196,30 @@ async def op_attacker_list(request: Request, guild_id: str):
         ) as cur:
             ally_members = {r["player_name"]: dict(r) for r in await cur.fetchall()}
 
-        # Member troops first — we need their travian names to filter the snapshot
+        # Member troops — we need their travian names to filter the snapshot
         async with db.execute(
             "SELECT discord_id, discord_name, travian_name, tribe, villages_json FROM member_troops WHERE guild_id=?",
             (guild_id,)
         ) as cur:
             troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
+
+        # Own villages imported via "Mein Account" — always include these regardless of snapshot
+        # Keyed by (discord_id, travian_name) so we can merge into the right attacker entry
+        async with db.execute(
+            """SELECT discord_id, travian_name, village_name, x, y, population
+               FROM guild_own_villages WHERE guild_id=? ORDER BY discord_id, population DESC""",
+            (guild_id,)
+        ) as cur:
+            own_rows = await cur.fetchall()
+        # Build dict: travian_name (or discord_id) → list of village dicts
+        own_villages_by_player: dict = {}
+        for r in own_rows:
+            key = r["travian_name"] or r["discord_id"]
+            if key not in own_villages_by_player:
+                own_villages_by_player[key] = []
+            own_villages_by_player[key].append({
+                "name": r["village_name"] or "", "x": r["x"], "y": r["y"], "pop": r["population"] or 0
+            })
 
         # Also include approved ally_members with a travian_name as additional name source
         async with db.execute("""
@@ -5265,19 +5283,23 @@ async def op_attacker_list(request: Request, guild_id: str):
             snap_tribe[r["player_name"]] = r["tribe"]
 
     # Build merged attacker list — only include players we actually know about
-    all_names = set(ally_members.keys()) | set(snap_villages.keys()) | set(troop_rows.keys())
+    all_names = (set(ally_members.keys()) | set(snap_villages.keys())
+                 | set(troop_rows.keys()) | set(own_villages_by_player.keys()))
     result = []
     for name in all_names:
         am = ally_members.get(name, {})
         tr = troop_rows.get(name, {})
         villages = snap_villages.get(name, [])
-        # Merge troop village coords if no snap data
+        # Fallback 1: villages_json from member_troops upload
         if not villages and tr.get("villages_json"):
             try:
                 tv = _jop.loads(tr["villages_json"])
                 villages = [{"name": v.get("village_name",""), "x": v.get("x"), "y": v.get("y"), "pop": v.get("population",0)} for v in tv if v.get("x") is not None]
             except Exception:
                 pass
+        # Fallback 2: own villages imported via "Mein Account" (guild_own_villages)
+        if not villages and name in own_villages_by_player:
+            villages = own_villages_by_player[name]
         result.append({
             "player_name": name,
             "discord_name": tr.get("discord_name", ""),
