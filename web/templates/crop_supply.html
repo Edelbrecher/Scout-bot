@@ -253,9 +253,15 @@
 // PARSER — Travian Marktplatz Text
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Remove all Unicode bidi/control/format chars that Travian embeds */
+/** Normalise Unicode: line-seps -> newline, NBSP -> space, format chars removed.
+ *  U+2028/U+2029 are line/paragraph separators Travian may use - convert to \n
+ *  so they split into proper lines when we do text.split('\n').
+ */
 function cleanUnicode(s) {
-  return s.replace(/[\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2060\u2066\u2067\u2068\u2069\u061C\u2028\u2029\uFEFF]/g, '');
+  return s
+    .replace(/\u2028|\u2029/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2060\u2066\u2067\u2068\u2069\u061C\uFEFF\u00AD]/g, '');
 }
 
 /** Parse German-formatted number: "22.000" → 22000, "1.741" → 1741 */
@@ -271,10 +277,11 @@ function parseGermanNum(s) {
 
 /** True if this line is a UI label / navigation element we should skip */
 function isNoise(line) {
-  return /^(transport\s+von|rohstoffe|ankunft|erwartet\s+gesamt|alle\s+anzeigen|keine\s+(ein|aus)|ankommende|ausgehende|händler|kapazit|gesamt|lieferübers|privacy|serverzeit|allianzbanner|marktplatz\s+stufe|verwaltung|verschick|handelsrouten|kaufen|verkaufen|startseite|discord|impressum|linkliste|farm|tropps|top10|forge|aufgaben|dorfname|spieler|dauer|allianz|ankunft\s+\-|jeder\s+deiner|© |dörfer|bevölkerung|zustimmung|dorfgruppen|main\s+-|start\s+village|close\s+support|outside\s+support|north|south|adw)/i.test(line)
+  return /^(transport\s+von|rohstoffe|ankunft|resources|arrival|erwartet\s+gesamt|alle\s+anzeigen|keine\s+(ein|aus|outgoing|incoming)|no\s+(incoming|outgoing)|ankommende|ausgehende|incoming\s+deliveries|outgoing\s+deliveries|delivery\s+overview|händler|kapazit|gesamt|lieferübers|privacy|serverzeit|allianzbanner|marktplatz|verwaltung|verschick|handelsrouten|kaufen|verkaufen|startseite|discord|impressum|linkliste|farm|tropps|top10|forge|aufgaben|dorfname|spieler|dauer|allianz|jeder\s+deiner|© |dörfer|bevölkerung|zustimmung|dorfgruppen|main\s+-|start\s+village|close\s+support|outside\s+support|north|south|adw|deliveries|merchants|management|trade|each\s+of|send\s+resources)/i.test(line)
     || /^\(\d+\|\d+\)$/.test(line)           // coordinates like (102|47)
     || /^[─━═]+$/.test(line)                 // separators
-    || /^-\s+\d+/.test(line);                // village list items "- 00 Valhalla"
+    || /^-\s+\d+/.test(line)                 // village list items "- 00 Valhalla"
+    || /^\d+\s*\/\s*\d/.test(line);          // "0 / 203.886" (send-resources form)
 }
 
 /**
