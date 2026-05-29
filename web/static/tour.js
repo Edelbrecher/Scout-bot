@@ -576,10 +576,13 @@
   function buildUI() {
     ['tt-spot','tt-card'].forEach(id => document.getElementById(id)?.remove());
 
-    // Spotlight/overlay – single div, always visible
+    // Spotlight/overlay – single div, always visible, never className-toggled
     const spot = document.createElement('div');
     spot.id = 'tt-spot';
-    spot.className = 'modal-mode'; // start in modal mode (centered, no hole)
+    // Start: full dark overlay, no hole (0x0 off-screen)
+    spot.style.top = '-2px'; spot.style.left = '50%';
+    spot.style.width = '0'; spot.style.height = '0';
+    spot.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.82)';
 
     // Card
     const card = document.createElement('div');
@@ -606,16 +609,22 @@
       </div>
     `;
 
-    // Start centered, invisible
-    card.style.top = '50%'; card.style.left = '50%';
-    card.style.transform = 'translate(-50%,-50%)';
-    card.style.opacity = '0';
-
     document.body.appendChild(spot);
     document.body.appendChild(card);
 
-    // Fade card in after append
-    requestAnimationFrame(() => requestAnimationFrame(() => { card.style.opacity = '1'; }));
+    // Start centered (pixels), invisible — no transition yet so no initial slide
+    const cw = Math.min(640, window.innerWidth * 0.96);
+    card.style.transition = 'none';
+    card.style.transform  = 'none';
+    card.style.left   = Math.round((window.innerWidth  - cw) / 2) + 'px';
+    card.style.top    = Math.round((window.innerHeight - 400) / 2) + 'px';
+    card.style.opacity = '0';
+
+    // Enable transitions after paint, then fade in
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      card.style.transition = '';  // restore CSS transition
+      card.style.opacity = '1';
+    }));
 
     // Click outside card closes tour (delegated)
     spot.addEventListener('click', e => { spot._onClose && spot._onClose(); });
@@ -665,20 +674,25 @@
         fb.innerHTML = buildForm(step.form, ui);
       } else fb.style.display = 'none';
 
-      // Spotlight position
+      // Spotlight — never change className, always use inline styles for smooth transition
       if (targetEl) {
-        spot.className = '';
         const r = targetEl.getBoundingClientRect(), p = 12;
-        spot.style.top    = (r.top  - p) + 'px';
-        spot.style.left   = (r.left - p) + 'px';
-        spot.style.width  = (r.width  + p*2) + 'px';
-        spot.style.height = (r.height + p*2) + 'px';
-        spot.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.82), 0 0 0 2px rgba(99,102,241,.6)';
-        spot.style.pointerEvents = 'none'; // let user click the highlighted element
+        spot.style.top          = (r.top  - p) + 'px';
+        spot.style.left         = (r.left - p) + 'px';
+        spot.style.width        = (r.width  + p*2) + 'px';
+        spot.style.height       = (r.height + p*2) + 'px';
+        spot.style.borderRadius = '12px';
+        spot.style.boxShadow    = '0 0 0 9999px rgba(0,0,0,.82), 0 0 0 2px rgba(99,102,241,.55)';
+        spot.style.pointerEvents = 'none';
         targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
-        // Modal mode: tiny offscreen hole = full dark overlay
-        spot.className = 'modal-mode';
+        // No spotlight — shrink to 0x0 off-screen, box-shadow still provides full dark overlay
+        spot.style.top          = '-2px';
+        spot.style.left         = '50%';
+        spot.style.width        = '0px';
+        spot.style.height       = '0px';
+        spot.style.borderRadius = '0';
+        spot.style.boxShadow    = '0 0 0 9999px rgba(0,0,0,.82)';
         spot.style.pointerEvents = 'auto';
       }
 
@@ -766,34 +780,39 @@
     }
   };
 
-  // ── Card positioning ──────────────────────────────────────────────────────
+  // ── Card positioning — always pixel values, never % + transform ───────────
   function positionCard(targetEl, card) {
-    if (!targetEl) {
-      card.style.top = '50%'; card.style.left = '50%';
-      card.style.transform = 'translate(-50%,-50%)';
-      return;
-    }
-    const r  = targetEl.getBoundingClientRect();
     const cw = Math.min(640, window.innerWidth * 0.96);
-    const ch = 380;
+    const ch = card.offsetHeight || 400;
     const m  = 20;
 
-    // Priority: right → below → above → centered
+    card.style.transform = 'none'; // always none so transitions are smooth
+
+    if (!targetEl) {
+      // Centered — calculated in pixels
+      card.style.left = Math.round((window.innerWidth  - cw) / 2) + 'px';
+      card.style.top  = Math.round((window.innerHeight - ch) / 2) + 'px';
+      return;
+    }
+
+    const r = targetEl.getBoundingClientRect();
+
     if (r.right + cw + m < window.innerWidth) {
+      // Right of element
       card.style.left = (r.right + m) + 'px';
-      card.style.top  = clamp(r.top + r.height/2 - ch/2, m, window.innerHeight - ch - m) + 'px';
-      card.style.transform = 'none';
+      card.style.top  = clamp(Math.round(r.top + r.height/2 - ch/2), m, window.innerHeight - ch - m) + 'px';
     } else if (r.bottom + ch + m < window.innerHeight) {
+      // Below element
       card.style.top  = (r.bottom + m) + 'px';
-      card.style.left = clamp(r.left + r.width/2 - cw/2, m, window.innerWidth - cw - m) + 'px';
-      card.style.transform = 'none';
+      card.style.left = clamp(Math.round(r.left + r.width/2 - cw/2), m, window.innerWidth - cw - m) + 'px';
     } else if (r.top - ch - m > 0) {
+      // Above element
       card.style.top  = (r.top - ch - m) + 'px';
-      card.style.left = clamp(r.left + r.width/2 - cw/2, m, window.innerWidth - cw - m) + 'px';
-      card.style.transform = 'none';
+      card.style.left = clamp(Math.round(r.left + r.width/2 - cw/2), m, window.innerWidth - cw - m) + 'px';
     } else {
-      card.style.top = '50%'; card.style.left = '50%';
-      card.style.transform = 'translate(-50%,-50%)';
+      // Fallback: centered
+      card.style.left = Math.round((window.innerWidth  - cw) / 2) + 'px';
+      card.style.top  = Math.round((window.innerHeight - ch) / 2) + 'px';
     }
   }
 
