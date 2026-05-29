@@ -3556,6 +3556,97 @@ async def kampfkraft_page(request: Request, guild_id: str):
 
 
 # Legacy redirects — keep old /attacks/own-troops URLs working
+@app.get("/guild/{guild_id}/attacks", response_class=HTMLResponse)
+async def attacks_page(request: Request, guild_id: str, saved: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    attack_stats = await database.get_attack_stats(guild_id)
+    attack_reports = await database.get_attack_reports(guild_id, limit=50)
+    is_admin = session.get("type") == "admin" or session.get("uid") == guild.get("owner_discord_id")
+    return templates.TemplateResponse("attacks.html", {
+        "request": request, "guild": guild, "guild_id": guild_id,
+        "attack_stats": attack_stats, "attack_reports": attack_reports,
+        "is_admin": is_admin, "saved": saved,
+    })
+
+
+@app.post("/guild/{guild_id}/attacks/config")
+async def attacks_config(request: Request, guild_id: str,
+                          attack_channel_id: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.set_attack_channel_web(guild_id, attack_channel_id.strip())
+    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/attacks/auto-setup")
+async def attacks_auto_setup(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post("http://bot:7777/api/create-report-channel",
+                                     json={"guild_id": guild_id})
+            data = resp.json() if resp.status_code == 200 else {}
+            if data.get("channel_id"):
+                await database.set_attack_channel_web(
+                    guild_id, data["channel_id"],
+                    data.get("message_id", ""))
+    except Exception as e:
+        print(f"[attacks-auto-setup] error: {e}")
+    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/attacks/reset")
+async def attacks_reset(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.set_attack_channel_web(guild_id, "")
+    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/attacks/{report_id}/analyse", response_class=HTMLResponse)
+async def attack_analysis_page(request: Request, guild_id: str, report_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    report = await database.get_attack_report(guild_id, report_id)
+    if not report:
+        return RedirectResponse(f"/guild/{guild_id}/attacks")
+    return templates.TemplateResponse("attack_analysis.html", {
+        "request": request, "guild": guild, "guild_id": guild_id, "report": report,
+    })
+
+
+@app.post("/guild/{guild_id}/attacks/delete/{report_id}")
+async def attacks_delete_report(request: Request, guild_id: str, report_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    is_admin = session.get("type") == "admin" or session.get("uid") == (guild or {}).get("owner_discord_id")
+    if not is_admin:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    await database.delete_attack_report(report_id)
+    return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
+
+
 @app.get("/guild/{guild_id}/attacks/own-troops")
 async def _legacy_own_troops_get(guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/mein-account", status_code=301)
