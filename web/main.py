@@ -4773,14 +4773,18 @@ async def op_update_plan(
     if notes        is not None: kwargs["notes"]         = notes.strip()[:500]
     if status       is not None and status in ("draft","active","completed","cancelled"):
         kwargs["status"] = status
-    # Check if status is changing to active → trigger Discord announcement
-    was_active_trigger = (status == "active" and kwargs.get("status") == "active")
-    # Get old plan before update to detect transition
-    old_plan = await database.get_op_plan(plan_id, guild_id) if status == "active" else None
+    # Detect status transitions that require Discord notifications
+    new_status = kwargs.get("status")
+    old_plan = await database.get_op_plan(plan_id, guild_id) if new_status in ("active", "cancelled") else None
     await database.update_op_plan(plan_id, guild_id, **kwargs)
-    if old_plan and old_plan.get("status") != "active" and kwargs.get("status") == "active":
-        # Send Discord announcement via bot internal API
-        await _announce_plan_via_bot(guild_id, plan_id)
+    if old_plan and new_status:
+        old_status = old_plan.get("status")
+        if new_status == "active" and old_status != "active":
+            # Plan activated (fresh or re-activated) → send full announcement
+            await _announce_plan_via_bot(guild_id, plan_id)
+        elif new_status == "cancelled" and old_status == "active":
+            # Plan cancelled → notify members
+            await _announce_plan_cancelled_via_bot(guild_id, plan_id)
     return _JSONResponse({"ok": True})
 
 
@@ -4842,6 +4846,47 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         print(f"[announce-ep] internal notifications created for {len(member_ids)} members")
     except Exception as e:
         print(f"[announce-ep] error: {e}")
+
+
+async def _announce_plan_cancelled_via_bot(guild_id: str, plan_id: int):
+    """Notify Discord members when an active EP is cancelled."""
+    try:
+        plan = await database.get_op_plan(plan_id, guild_id)
+        if not plan:
+            return
+        plan_name = plan.get("name", "Einsatzplan")
+        server_host = os.environ.get("SERVER_HOST", "https://travops.online")
+        plan_url = f"{server_host}/guild/{guild_id}/operations"
+
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        member_ids = []
+        if ally_group:
+            members = await database.get_ally_members(ally_group["id"])
+            member_ids = [str(m["discord_id"]) for m in members
+                          if m.get("discord_id") and m.get("status", "approved") == "approved"]
+
+        payload = {
+            "guild_id": guild_id,
+            "plan_name": plan_name,
+            "plan_url": plan_url,
+            "member_discord_ids": member_ids,
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post("http://bot:7777/api/announce-ep-cancelled", json=payload)
+            dms = resp.json().get("dms", 0) if resp.status_code == 200 else 0
+            print(f"[announce-ep-cancelled] DMs sent: {dms}/{len(member_ids)} for plan {plan_id}")
+
+        await database.create_notifications(
+            guild_id=guild_id,
+            ally_group_id=ally_group["id"] if ally_group else None,
+            recipient_ids=member_ids,
+            notif_type="ep_cancelled",
+            title=f"❌ Einsatz abgebrochen: {plan_name}",
+            message=f"Der Einsatz „{plan_name}" wurde abgebrochen.",
+            plan_id=plan_id,
+        )
+    except Exception as e:
+        print(f"[announce-ep-cancelled] error: {e}")
 
 
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/delete")

@@ -860,6 +860,47 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
     return aiohttp_web.json_response({"ok": True, "channel": channel_sent, "dms": dm_sent})
 
 
+async def handle_announce_ep_cancelled(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Notify Discord members that an EP has been cancelled."""
+    try:
+        data = await request.json()
+        guild_id   = str(data.get("guild_id", ""))
+        plan_name  = str(data.get("plan_name", "Einsatz"))
+        plan_url   = str(data.get("plan_url", ""))
+        member_ids = data.get("member_discord_ids", [])
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild = bot.get_guild(int(guild_id)) if guild_id.isdigit() else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    dm_sent = 0
+    dm_text = (
+        f"❌ **Einsatz abgebrochen: {plan_name}**\n\n"
+        f"Dieser Einsatz wurde abgebrochen und findet nicht statt.\n"
+        f"{'➡️ ' + plan_url if plan_url else ''}"
+    )
+    for uid in member_ids:
+        if not uid or not str(uid).isdigit():
+            continue
+        member = guild.get_member(int(uid))
+        if not member:
+            try:
+                member = await guild.fetch_member(int(uid))
+            except Exception as e:
+                print(f"[announce-ep-cancelled] fetch_member {uid} failed: {e}")
+                continue
+        try:
+            await member.send(dm_text)
+            dm_sent += 1
+            print(f"[announce-ep-cancelled] DM sent to {uid} ({member.name})")
+        except Exception as e:
+            print(f"[announce-ep-cancelled] DM to {uid} ({member.name}) failed: {e}")
+
+    return aiohttp_web.json_response({"ok": True, "dms": dm_sent})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -875,6 +916,7 @@ async def start_api_server():
     app.router.add_post("/api/refresh-request-hub", handle_refresh_request_hub)
     app.router.add_post("/api/op-notify", handle_op_notify)
     app.router.add_post("/api/announce-ep", handle_announce_ep)
+    app.router.add_post("/api/announce-ep-cancelled", handle_announce_ep_cancelled)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)
