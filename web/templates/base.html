@@ -20,6 +20,14 @@
       {% if _is_admin %}
       <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
       {% endif %}
+      <!-- Tour-Button: startet die passende Tour für die aktuelle Seite -->
+      <button id="nav-tour-btn" onclick="navStartTour()"
+        title="Geführte Tour starten"
+        style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;
+               padding:0.25rem 0.75rem;cursor:pointer;color:#a5b4fc;font-size:0.82rem;
+               display:flex;align-items:center;gap:0.3rem;transition:background 0.15s;">
+        ❓ <span style="font-size:0.8rem;" data-i18n="nav.tour">Tour</span>
+      </button>
       {% set _username = get_username(request) %}
       {% if _username %}
       <div class="nav-profile" id="navProfileWrap">
@@ -60,7 +68,7 @@
           <div class="nav-profile-divider"></div>
           <a id="nav-billing-link" href="#" class="nav-profile-item" style="display:none;">💳 <span data-i18n="nav.billing">Abonnement</span></a>
           <div class="nav-profile-divider"></div>
-          <a href="/profile" class="nav-profile-item">🎁 Einladungen &amp; Points</a>
+          <a href="/profile" class="nav-profile-item">👤 Mein Profil</a>
           <div class="nav-profile-divider"></div>
           <a href="/logout" class="nav-profile-item" data-i18n="logout">🚪 Abmelden</a>
         </div>
@@ -206,6 +214,34 @@ document.addEventListener('click', e => {
 
   <!-- Onboarding tour -->
   <script src="/static/tour.js"></script>
+  <script>
+  // Tour-Button: erkennt aktuelle Seite und startet passende Tour
+  function navStartTour() {
+    const path = location.pathname;
+    const guildMatch = path.match(/\/guild\/(\d{17,20})/);
+    const guildId = guildMatch ? guildMatch[1] : null;
+
+    // Seite → Tour-Name
+    let tourName = null;
+    if (path === '/profile')                          tourName = 'my-account';
+    else if (guildId && /\/guild\/\d+\/?$/.test(path)) tourName = 'start';
+    // Weitere Touren hier ergänzen:
+    // else if (path.includes('/operations'))         tourName = 'operations';
+    // else if (path.includes('/attacks'))            tourName = 'attacks';
+
+    if (tourName && window.TravOpsTour) {
+      TravOpsTour.start(tourName, guildId);
+    } else if (!tourName) {
+      // Fallback: Einrichtungs-Tour vom Dashboard aus starten
+      if (guildId) {
+        localStorage.removeItem('beb_tour_done');
+        TravOpsTour && TravOpsTour.start('start', guildId);
+      } else {
+        alert('{{ "Für diese Seite gibt es noch keine Tour." if True else "" }}');
+      }
+    }
+  }
+  </script>
 
   <!-- Cookie Consent Banner -->
   <div id="cookie-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:10000; background:#1a1a2e; border-top:1px solid #334155; padding:1rem 1.5rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
