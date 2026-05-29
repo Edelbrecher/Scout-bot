@@ -5203,11 +5203,19 @@ async def op_attacker_list(request: Request, guild_id: str):
         ) as cur:
             troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
 
-        # Own villages imported via "Mein Account" — always include these regardless of snapshot
-        # Keyed by (discord_id, travian_name) so we can merge into the right attacker entry
+        # Own villages imported via "Mein Account" — always include regardless of snapshot.
+        # Join with member_troops to resolve discord_id → travian_name (guild_own_villages
+        # has no travian_name column — it only stores discord_id).
         async with db.execute(
-            """SELECT discord_id, travian_name, village_name, x, y, population
-               FROM guild_own_villages WHERE guild_id=? ORDER BY discord_id, population DESC""",
+            """SELECT ov.discord_id,
+                      COALESCE(mt.travian_name, '') AS travian_name,
+                      COALESCE(mt.discord_name, '') AS discord_name,
+                      ov.village_name, ov.x, ov.y, ov.population
+               FROM guild_own_villages ov
+               LEFT JOIN member_troops mt
+                      ON mt.guild_id = ov.guild_id AND mt.discord_id = ov.discord_id
+               WHERE ov.guild_id = ?
+               ORDER BY ov.discord_id, ov.population DESC""",
             (guild_id,)
         ) as cur:
             own_rows = await cur.fetchall()
@@ -5215,11 +5223,12 @@ async def op_attacker_list(request: Request, guild_id: str):
         own_villages_by_player: dict = {}
         for r in own_rows:
             key = r["travian_name"] or r["discord_id"]
-            if key not in own_villages_by_player:
+            if key and key not in own_villages_by_player:
                 own_villages_by_player[key] = []
-            own_villages_by_player[key].append({
-                "name": r["village_name"] or "", "x": r["x"], "y": r["y"], "pop": r["population"] or 0
-            })
+            if key:
+                own_villages_by_player[key].append({
+                    "name": r["village_name"] or "", "x": r["x"], "y": r["y"], "pop": r["population"] or 0
+                })
 
         # Also include approved ally_members with a travian_name as additional name source
         async with db.execute("""
@@ -6942,6 +6951,37 @@ async def alliance_members_page(request: Request, guild_id: str):
     top_alliances     = await database.get_top_alliances_from_snapshot(guild_id)
     meta_groups       = await database.get_meta_groups(guild_id)
 
+    # Auto-detect own alliance from snapshot: look up the current user's travian villages
+    # in the latest snapshot to find which alliance they actually belong to.
+    discord_id = session.get("uid", "")
+    detected_alliance = None
+    try:
+        import aiosqlite as _asql_am
+        async with _asql_am.connect(database.DB_PATH) as _db:
+            _db.row_factory = _asql_am.Row
+            # Get travian_name of the current user
+            async with _db.execute(
+                "SELECT travian_name FROM member_troops WHERE guild_id=? AND discord_id=?",
+                (guild_id, discord_id)
+            ) as _cur:
+                _row = await _cur.fetchone()
+            travian_name = (_row["travian_name"] if _row else "") or ""
+            if travian_name:
+                # Look up this player in the latest snapshot
+                async with _db.execute("""
+                    SELECT m.alliance_name FROM map_snapshots m
+                    INNER JOIN (
+                        SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
+                        WHERE guild_id=? GROUP BY guild_id
+                    ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
+                    WHERE m.guild_id=? AND m.player_name=? LIMIT 1
+                """, (guild_id, guild_id, travian_name)) as _cur:
+                    _snap = await _cur.fetchone()
+                if _snap:
+                    detected_alliance = _snap["alliance_name"]
+    except Exception:
+        pass
+
     return templates.TemplateResponse("alliance_members.html", {
         "request": request,
         "guild": guild,
@@ -6952,6 +6992,7 @@ async def alliance_members_page(request: Request, guild_id: str):
         "strike_info": strike_info,
         "top_alliances": top_alliances,
         "meta_groups": meta_groups,
+        "detected_alliance": detected_alliance,
         "imported": request.query_params.get("imported"),
         "cleared": request.query_params.get("cleared"),
         "synced": request.query_params.get("synced"),
