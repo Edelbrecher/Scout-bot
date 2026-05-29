@@ -339,24 +339,36 @@ function parseMarketText(rawText) {
   const text = cleanUnicode(rawText);
   const lines = text.split('\n').map(l => l.trim());
 
-  // Find section boundaries
+  // Find section boundaries — support multiple Travian language variants
+  // DE: "Ankommende Lieferungen" / "Ausgehende Lieferungen"
+  // EN: "Incoming deliveries" / "Outgoing deliveries"
+  // Also: just "Ankommend" / "Ausgehend" as tab labels
+  const reIn  = /^(ankommende?\s*(lieferungen?)?|incoming\s*(deliveries?)?|eingehende?\s*(lieferungen?)?)\s*(\(\d+\))?$/i;
+  const reOut = /^(ausgehende?\s*(lieferungen?)?|outgoing\s*(deliveries?)?)\s*(\(\d+\))?$/i;
+
   let inStart = -1, outStart = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (inStart < 0 && /ankommende\s+lieferungen/i.test(lines[i])) inStart = i + 1;
-    if (/ausgehende\s+lieferungen/i.test(lines[i])) { outStart = i + 1; break; }
+    const l = lines[i];
+    if (inStart < 0 && reIn.test(l)) { inStart = i + 1; continue; }
+    if (reOut.test(l)) { outStart = i + 1; break; }
   }
 
   const inEnd  = outStart > 0 ? outStart - 1 : lines.length;
   const outEnd = lines.length;
 
-  // Fall back: if no section headers found, try the whole text as incoming
+  // Fall back: if no headers found at all, parse entire text for any "in HH:MM:SS" deliveries
   const inLines  = inStart  >= 0 ? lines.slice(inStart, inEnd)  : lines;
   const outLines = outStart >= 0 ? lines.slice(outStart, outEnd) : [];
 
-  return {
+  const result = {
     incoming: parseSectionLines(inLines,  false),
     outgoing: parseSectionLines(outLines, true),
   };
+
+  // Debug info to console
+  console.log(`[crop-supply] Parser: inStart=${inStart}, outStart=${outStart}, in=${result.incoming.length}, out=${result.outgoing.length}`);
+
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -647,46 +659,62 @@ function parseAndSimulate() {
   const consumptionPerH= readNum('grainConsumption');
   const granaryCapacity= readNum('granaryCapacity');
   const durationH      = parseInt(document.getElementById('simHours').value) || 48;
+  const statusEl       = document.getElementById('parseStatus');
 
-  // Validate minimum inputs
-  if (!currentGrain && !productionPerH && !consumptionPerH) {
-    alert('Bitte mindestens "Aktuelles Getreide" und Produktions-/Verbrauchswerte eingeben.');
-    return;
-  }
-
-  // Parse marketplace text
+  // Parse marketplace text first
   let parsed = { incoming: [], outgoing: [] };
-  const statusEl = document.getElementById('parseStatus');
 
-  if (rawText.trim().length > 20) {
+  if (rawText.trim().length > 5) {
     try {
       parsed = parseMarketText(rawText);
       const total = parsed.incoming.length + parsed.outgoing.length;
-      statusEl.textContent = `✅ ${parsed.incoming.length} eingehende, ${parsed.outgoing.length} ausgehende Lieferungen erkannt`;
-      statusEl.style.color = '#4ade80';
+      if (total === 0) {
+        statusEl.textContent = '⚠️ Keine Lieferungen erkannt — prüfe das Format (Lieferübersicht → Alle anzeigen)';
+        statusEl.style.color = '#f87171';
+      } else {
+        statusEl.textContent = `✅ ${parsed.incoming.length} eingehende, ${parsed.outgoing.length} ausgehende Lieferungen erkannt`;
+        statusEl.style.color = '#4ade80';
+      }
     } catch(e) {
       statusEl.textContent = '⚠️ Parsing-Fehler: ' + e.message;
       statusEl.style.color = '#f87171';
+      console.error('Parsing error:', e);
     }
   } else {
     statusEl.textContent = 'Keine Marktplatz-Daten — reine Produktions-Simulation';
     statusEl.style.color = 'var(--text-muted)';
   }
 
-  const simResult = simulate({
-    currentGrain,
-    productionPerH,
-    consumptionPerH,
-    granaryCapacity,
-    incoming: parsed.incoming,
-    outgoing: parsed.outgoing,
-    durationH,
-  });
+  // Validate: need either village params OR marketplace deliveries
+  const hasVillageParams = currentGrain > 0 || productionPerH > 0 || consumptionPerH > 0;
+  const hasDeliveries    = parsed.incoming.length > 0 || parsed.outgoing.length > 0;
 
-  renderResults(simResult, {
-    currentGrain, productionPerH, consumptionPerH, granaryCapacity, durationH,
-    incoming: parsed.incoming, outgoing: parsed.outgoing,
-  });
+  if (!hasVillageParams && !hasDeliveries) {
+    statusEl.textContent = '⚠️ Bitte Dorf-Parameter eingeben oder Marktplatz-Daten einfügen.';
+    statusEl.style.color = '#f87171';
+    return;
+  }
+
+  try {
+    const simResult = simulate({
+      currentGrain,
+      productionPerH,
+      consumptionPerH,
+      granaryCapacity,
+      incoming: parsed.incoming,
+      outgoing: parsed.outgoing,
+      durationH,
+    });
+
+    renderResults(simResult, {
+      currentGrain, productionPerH, consumptionPerH, granaryCapacity, durationH,
+      incoming: parsed.incoming, outgoing: parsed.outgoing,
+    });
+  } catch(e) {
+    statusEl.textContent = '⚠️ Simulations-Fehler: ' + e.message;
+    statusEl.style.color = '#f87171';
+    console.error('Simulation error:', e);
+  }
 }
 
 function renderResults(sim, params) {
@@ -932,5 +960,33 @@ function clearPaste() {
   document.getElementById('marketPaste').value = '';
   document.getElementById('parseStatus').textContent = '';
 }
+
+// Live feedback: show delivery count as user pastes text
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('marketPaste');
+  const statusEl = document.getElementById('parseStatus');
+
+  ta.addEventListener('input', () => {
+    const raw = ta.value.trim();
+    if (raw.length < 10) {
+      statusEl.textContent = '';
+      return;
+    }
+    try {
+      const p = parseMarketText(raw);
+      const total = p.incoming.length + p.outgoing.length;
+      if (total === 0) {
+        statusEl.textContent = '⚠️ Keine Lieferungen erkannt — ggf. Sektion-Header fehlt';
+        statusEl.style.color = '#f59e0b';
+      } else {
+        statusEl.textContent = `✅ ${p.incoming.length} eingehend · ${p.outgoing.length} ausgehend erkannt`;
+        statusEl.style.color = '#4ade80';
+      }
+    } catch(e) {
+      statusEl.textContent = '⚠️ ' + e.message;
+      statusEl.style.color = '#f87171';
+    }
+  });
+});
 </script>
 {% endblock %}
