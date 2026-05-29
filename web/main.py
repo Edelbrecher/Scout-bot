@@ -3653,6 +3653,165 @@ async def _legacy_own_troops_get(guild_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Attack Detection — API routes
+# ---------------------------------------------------------------------------
+
+@app.post("/guild/{guild_id}/attacks/import-rally")
+async def attacks_import_rally(request: Request, guild_id: str):
+    import json as _json
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    attacks = body.get("attacks", [])
+    if not isinstance(attacks, list):
+        return _JSONResponse({"error": "attacks must be a list"}, status_code=400)
+
+    # Re-compute fake scores server-side using enemy artifacts from DB
+    for atk in attacks:
+        player = atk.get("attacker_player", "")
+        artifacts = await database.get_enemy_artifacts(guild_id, player) if player else []
+        result = _compute_fake_score_server(atk, artifacts)
+        atk["fake_score"] = result["score"]
+        atk["fake_reasons"] = result["reasons"]
+
+    discord_id = session.get("uid", "")
+    discord_name = session.get("username", "")
+    saved = await database.save_incoming_attacks(guild_id, attacks, discord_id, discord_name)
+    return _JSONResponse({"saved": saved})
+
+
+def _compute_fake_score_server(atk: dict, artifacts: list) -> dict:
+    score = 50
+    reasons = []
+    troops_hidden = bool(atk.get("troops_hidden"))
+    troop_count = atk.get("troop_count", 0) or 0
+    attack_type = atk.get("attack_type", "attack")
+
+    if not troops_hidden:
+        has_unique_scout = any(
+            a.get("artifact_type") == "scout" and a.get("artifact_size") == "unique"
+            for a in artifacts
+        )
+        if has_unique_scout:
+            reasons.append("Truppen sichtbar (Unique Späher-Artefakt vorhanden - kein Fake-Signal)")
+            score = 40
+        else:
+            score = 98
+            reasons.append("Truppen sichtbar ohne Unique Späher = sehr wahrscheinlich Fake")
+        if troop_count == 1:
+            score = 99
+            reasons.append("Nur 1 Einheit = Fake")
+        elif troop_count <= 5:
+            score = max(score, 92)
+            reasons.append(f"Nur {troop_count} Einheiten sichtbar")
+    else:
+        score = 40
+        reasons.append("Truppen verdeckt (≥20) - möglicherweise echter Angriff")
+
+    if attack_type == "raid":
+        score = min(100, score + 15)
+        reasons.append("Raubzug-Typ (+15% Fake-Wahrscheinlichkeit)")
+
+    return {"score": min(100, max(0, score)), "reasons": reasons}
+
+
+@app.get("/guild/{guild_id}/attacks/api/incoming")
+async def attacks_api_incoming(request: Request, guild_id: str,
+                                x: int = None, y: int = None):
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    attacks = await database.get_incoming_attacks(guild_id, x, y)
+    return _JSONResponse(attacks)
+
+
+@app.get("/guild/{guild_id}/attacks/api/alliance")
+async def attacks_api_alliance(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    attacks = await database.get_incoming_attacks_alliance(guild_id)
+    return _JSONResponse(attacks)
+
+
+@app.post("/guild/{guild_id}/attacks/dismiss/{attack_id}")
+async def attacks_dismiss(request: Request, guild_id: str, attack_id: int):
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    await database.dismiss_attack(attack_id, guild_id)
+    return _JSONResponse({"ok": True})
+
+
+@app.get("/guild/{guild_id}/api/player-info")
+async def guild_api_player_info(request: Request, guild_id: str, player: str = ""):
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if not player:
+        return _JSONResponse({"error": "player param required"}, status_code=400)
+    data = await database.get_player_from_snapshot(guild_id, player)
+    if not data:
+        return _JSONResponse(None)
+    return _JSONResponse(data)
+
+
+@app.get("/guild/{guild_id}/attacks/api/enemy-artifacts/{player_name}")
+async def attacks_api_get_enemy_artifacts(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    artifacts = await database.get_enemy_artifacts(guild_id, player_name)
+    return _JSONResponse(artifacts)
+
+
+@app.post("/guild/{guild_id}/attacks/api/enemy-artifacts/{player_name}/toggle")
+async def attacks_api_toggle_enemy_artifact(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err:
+        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err:
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    vx = body.get("village_x")
+    vy = body.get("village_y")
+    art_type = body.get("artifact_type", "")
+    art_size = body.get("artifact_size", "")
+    if not art_type or not art_size:
+        return _JSONResponse({"error": "artifact_type and artifact_size required"}, status_code=400)
+    now_active = await database.toggle_enemy_artifact(
+        guild_id, player_name, vx, vy, art_type, art_size
+    )
+    return _JSONResponse({"active": now_active})
+
+
+# ---------------------------------------------------------------------------
 # Helper: alliance manager check
 # ---------------------------------------------------------------------------
 

@@ -6074,3 +6074,203 @@ async def delete_idea(idea_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM admin_ideas WHERE id=?", (idea_id,))
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Attack Detection — incoming_attacks + enemy_artifacts
+# ---------------------------------------------------------------------------
+
+async def _init_attack_detection_tables():
+    """Create incoming_attacks and enemy_artifacts tables if not yet present."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS incoming_attacks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                imported_by_discord_id TEXT DEFAULT '',
+                imported_by_name TEXT DEFAULT '',
+                import_time TEXT NOT NULL,
+                server_time_at_import TEXT DEFAULT '',
+                own_village_name TEXT NOT NULL,
+                own_village_x INTEGER,
+                own_village_y INTEGER,
+                attacker_player TEXT NOT NULL,
+                attacker_village_name TEXT DEFAULT '',
+                attacker_x INTEGER,
+                attacker_y INTEGER,
+                attack_type TEXT DEFAULT 'attack',
+                troops_hidden INTEGER DEFAULT 0,
+                troop_count INTEGER DEFAULT 0,
+                troop_details TEXT DEFAULT '{}',
+                arrival_time TEXT NOT NULL,
+                fake_score INTEGER DEFAULT 50,
+                fake_reasons TEXT DEFAULT '[]',
+                is_dismissed INTEGER DEFAULT 0,
+                notes TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_incoming_attacks_guild
+            ON incoming_attacks(guild_id)
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_incoming_attacks_arrival
+            ON incoming_attacks(arrival_time)
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemy_artifacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                village_x INTEGER,
+                village_y INTEGER,
+                artifact_type TEXT NOT NULL,
+                artifact_size TEXT NOT NULL,
+                confirmed INTEGER DEFAULT 1,
+                notes TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, player_name,
+                       COALESCE(village_x,-999),
+                       COALESCE(village_y,-999),
+                       artifact_type, artifact_size)
+            )
+        """)
+        await db.commit()
+
+
+async def save_incoming_attacks(guild_id: str, attacks: list[dict],
+                                 imported_by_discord_id: str = "",
+                                 imported_by_name: str = "") -> int:
+    import json as _json
+    await _init_attack_detection_tables()
+    now = __import__('datetime').datetime.utcnow().isoformat()
+    saved = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        for atk in attacks:
+            try:
+                await db.execute("""
+                    INSERT INTO incoming_attacks (
+                        guild_id, imported_by_discord_id, imported_by_name, import_time,
+                        server_time_at_import,
+                        own_village_name, own_village_x, own_village_y,
+                        attacker_player, attacker_village_name, attacker_x, attacker_y,
+                        attack_type, troops_hidden, troop_count, troop_details,
+                        arrival_time, fake_score, fake_reasons
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT DO NOTHING
+                """, (
+                    guild_id,
+                    imported_by_discord_id,
+                    imported_by_name,
+                    now,
+                    atk.get("server_time_at_import", ""),
+                    atk.get("own_village_name", ""),
+                    atk.get("own_x"),
+                    atk.get("own_y"),
+                    atk.get("attacker_player", ""),
+                    atk.get("attacker_village_name", ""),
+                    atk.get("attacker_x"),
+                    atk.get("attacker_y"),
+                    atk.get("attack_type", "attack"),
+                    1 if atk.get("troops_hidden") else 0,
+                    atk.get("troop_count", 0),
+                    _json.dumps(atk.get("troop_details", {})),
+                    atk.get("arrival_time", ""),
+                    atk.get("fake_score", 50),
+                    _json.dumps(atk.get("fake_reasons", [])),
+                ))
+                saved += 1
+            except Exception:
+                pass
+        await db.commit()
+    return saved
+
+
+async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = None,
+                                limit: int = 200) -> list[dict]:
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if own_x is not None and own_y is not None:
+            async with db.execute(
+                """SELECT * FROM incoming_attacks
+                   WHERE guild_id=? AND own_village_x=? AND own_village_y=? AND is_dismissed=0
+                   ORDER BY arrival_time ASC LIMIT ?""",
+                (guild_id, own_x, own_y, limit)
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        else:
+            async with db.execute(
+                """SELECT * FROM incoming_attacks
+                   WHERE guild_id=? AND is_dismissed=0
+                   ORDER BY arrival_time ASC LIMIT ?""",
+                (guild_id, limit)
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list[dict]:
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM incoming_attacks WHERE guild_id=? AND is_dismissed=0
+               ORDER BY arrival_time ASC LIMIT ?""",
+            (guild_id, limit)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def dismiss_attack(attack_id: int, guild_id: str):
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE incoming_attacks SET is_dismissed=1 WHERE id=? AND guild_id=?",
+            (attack_id, guild_id)
+        )
+        await db.commit()
+
+
+async def get_enemy_artifacts(guild_id: str, player_name: str) -> list[dict]:
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM enemy_artifacts WHERE guild_id=? AND lower(player_name)=lower(?)
+               ORDER BY artifact_size, artifact_type""",
+            (guild_id, player_name)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def toggle_enemy_artifact(guild_id: str, player_name: str,
+                                 village_x, village_y,
+                                 artifact_type: str, artifact_size: str) -> bool:
+    """Toggle artifact: insert if missing, delete if present. Returns True if now active."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        vx = village_x if village_x is not None else None
+        vy = village_y if village_y is not None else None
+        async with db.execute(
+            """SELECT id FROM enemy_artifacts
+               WHERE guild_id=? AND lower(player_name)=lower(?)
+               AND COALESCE(village_x,-999)=COALESCE(?,-999)
+               AND COALESCE(village_y,-999)=COALESCE(?,-999)
+               AND artifact_type=? AND artifact_size=?""",
+            (guild_id, player_name, vx, vy, artifact_type, artifact_size)
+        ) as cur:
+            existing = await cur.fetchone()
+        if existing:
+            await db.execute("DELETE FROM enemy_artifacts WHERE id=?", (existing[0],))
+            await db.commit()
+            return False
+        else:
+            await db.execute(
+                """INSERT INTO enemy_artifacts
+                   (guild_id, player_name, village_x, village_y, artifact_type, artifact_size)
+                   VALUES (?,?,?,?,?,?)""",
+                (guild_id, player_name, vx, vy, artifact_type, artifact_size)
+            )
+            await db.commit()
+            return True
