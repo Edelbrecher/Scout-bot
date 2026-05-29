@@ -112,9 +112,9 @@ async def seed(db, wipe=False):
 
     if wipe:
         print("🗑️  Lösche alte Demo-Daten …")
-        for tbl in ["guild_configs","map_snapshots","guild_own_villages","enemies",
-                    "enemy_artifacts","incoming_attacks","op_plans","op_targets",
-                    "op_waves","scout_channels","scout_reports"]:
+        for tbl in ["guild_configs","ally_groups","map_snapshots","guild_own_villages",
+                    "enemies","enemy_artifacts","incoming_attacks","op_plans",
+                    "op_targets","op_waves","scout_channels","scout_reports"]:
             await db.execute(f"DELETE FROM {tbl} WHERE guild_id = ?", (DEMO_GUILD_ID,))
         await db.commit()
 
@@ -139,7 +139,7 @@ async def seed(db, wipe=False):
            wing1_name, wing2_name, invite_token)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (DEMO_GUILD_ID, "DEMO", MEMBERS[0][0], MEMBERS[0][1],
-          "DEMO2", "DEMO3", "DEMO_TOKEN_001"))
+          "DEMO2", "DEMO3", f"DEMO_{DEMO_GUILD_ID[:8]}"))
     await db.commit()
     row = await (await db.execute(
         "SELECT id FROM ally_groups WHERE guild_id=? LIMIT 1", (DEMO_GUILD_ID,))).fetchone()
