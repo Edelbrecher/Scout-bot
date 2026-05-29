@@ -4066,6 +4066,31 @@ async def allianz_sitter_liste(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
     shared = await database.get_all_shared_sitters(guild_id)
+    # Enrich with discord_username + travian_name from ally_members
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    member_map: dict[str, dict] = {}
+    if ally_group:
+        members = await database.get_ally_members(ally_group["id"])
+        for m in members:
+            member_map[m["discord_id"]] = m
+    # Also enrich from cached usernames
+    import aiosqlite as _aio
+    async with _aio.connect(database.DB_PATH) as _db:
+        _db.row_factory = _aio.Row
+        async with _db.execute(
+            "SELECT discord_user_id, discord_username FROM user_subscriptions WHERE discord_username IS NOT NULL"
+        ) as _cur:
+            for row in await _cur.fetchall():
+                uid = row["discord_user_id"]
+                if uid not in member_map:
+                    member_map[uid] = {}
+                if not member_map[uid].get("discord_username"):
+                    member_map[uid]["discord_username"] = row["discord_username"]
+    for s in shared:
+        uid = s["discord_user_id"]
+        m = member_map.get(uid, {})
+        s["display_name"] = m.get("discord_username") or m.get("travian_name") or uid
+        s["travian_name"] = m.get("travian_name") or "—"
     return templates.TemplateResponse("allianz_sitter.html", {
         "request": request,
         "guild": guild,

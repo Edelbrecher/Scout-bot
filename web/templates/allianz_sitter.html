@@ -2,53 +2,82 @@
 {% block title %}Allianz-Sitter-Listen · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1100px;">
+<div class="container" style="max-width:900px;">
 
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;" data-i18n="sitterlist.title">🤝 Allianz-Sitter-Listen</h1>
-    <p class="subtitle" style="margin:0;" data-i18n="sitterlist.subtitle">Freigegebene Sitter- und Dual-Daten aller Mitglieder</p>
+    <h1 style="margin:0.25rem 0 0;">🤝 Allianz-Sitter-Listen</h1>
+    <p class="subtitle" style="margin:0;">Freigegebene Sitter-Daten aller Mitglieder</p>
   </div>
 
   {% if shared_sitters %}
-  <div class="card" style="overflow-x:auto;">
-    <table class="table">
-      <thead>
-        <tr>
-          <th data-i18n="sitterlist.th.discord">Discord-ID</th>
-          <th data-i18n="sitterlist.th.sitter1">Sitter 1</th>
-          <th data-i18n="sitterlist.th.travian">Travian</th>
-          <th data-i18n="sitterlist.th.sitter2">Sitter 2</th>
-          <th data-i18n="sitterlist.th.travian">Travian</th>
-          <th data-i18n="sitterlist.th.sitting1">Sittet für 1</th>
-          <th data-i18n="sitterlist.th.travian">Travian</th>
-          <th data-i18n="sitterlist.th.sitting2">Sittet für 2</th>
-          <th data-i18n="sitterlist.th.travian">Travian</th>
-          <th data-i18n="sitterlist.th.updated">Aktualisiert</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in shared_sitters %}
-        <tr>
-          <td style="font-family:monospace;font-size:0.8rem;color:var(--text-muted);">{{ s.discord_user_id }}</td>
-          <td>{{ s.sitter1_name or '—' }}</td>
-          <td style="color:var(--text-muted);">{{ s.sitter1_travian or '' }}</td>
-          <td>{{ s.sitter2_name or '—' }}</td>
-          <td style="color:var(--text-muted);">{{ s.sitter2_travian or '' }}</td>
-          <td>{{ s.sitting1_name or '—' }}</td>
-          <td style="color:var(--text-muted);">{{ s.sitting1_travian or '' }}</td>
-          <td>{{ s.sitting2_name or '—' }}</td>
-          <td style="color:var(--text-muted);">{{ s.sitting2_travian or '' }}</td>
-          <td style="color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">{{ s.updated_at[:16] if s.updated_at else '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div style="display:flex;flex-direction:column;gap:.6rem;">
+    {% for s in shared_sitters %}
+    <div class="card" style="padding:.75rem 1rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:.6rem;">
+        <div style="font-size:.95rem;font-weight:700;color:#a5b4fc;">👤 {{ s.display_name }}</div>
+        {% if s.travian_name and s.travian_name != '—' %}
+        <div style="font-size:.78rem;color:var(--text-muted);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:6px;padding:1px 8px;">🏘️ {{ s.travian_name }}</div>
+        {% endif %}
+        <div style="flex:1;"></div>
+        <div style="font-size:.7rem;color:var(--text-muted);">Aktualisiert: {{ s.updated_at[:16] if s.updated_at else '—' }}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.5rem;">
+
+        {# Sitter 1 #}
+        {% if s.sitter1_name and s.sitter1_name != 'None' %}
+        <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:.45rem .7rem;">
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🛡️ Sitter 1</div>
+          <div style="font-size:.88rem;font-weight:600;">{{ s.sitter1_name }}</div>
+          {% if s.sitter1_travian %}<div style="font-size:.73rem;color:var(--text-muted);">{{ s.sitter1_travian }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {# Sitter 2 #}
+        {% if s.sitter2_name and s.sitter2_name != 'None' %}
+        <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:.45rem .7rem;">
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🛡️ Sitter 2</div>
+          <div style="font-size:.88rem;font-weight:600;">{{ s.sitter2_name }}</div>
+          {% if s.sitter2_travian %}<div style="font-size:.73rem;color:var(--text-muted);">{{ s.sitter2_travian }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {# Sittet für 1 #}
+        {% if s.sitting1_name and s.sitting1_name != 'None' %}
+        <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:.45rem .7rem;">
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🏰 Sittet für 1</div>
+          <div style="font-size:.88rem;font-weight:600;">{{ s.sitting1_name }}</div>
+          {% if s.sitting1_travian %}<div style="font-size:.73rem;color:var(--text-muted);">{{ s.sitting1_travian }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {# Sittet für 2 #}
+        {% if s.sitting2_name and s.sitting2_name != 'None' %}
+        <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:.45rem .7rem;">
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🏰 Sittet für 2</div>
+          <div style="font-size:.88rem;font-weight:600;">{{ s.sitting2_name }}</div>
+          {% if s.sitting2_travian %}<div style="font-size:.73rem;color:var(--text-muted);">{{ s.sitting2_travian }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {# No data placeholder #}
+        {% if not (s.sitter1_name and s.sitter1_name != 'None') and not (s.sitter2_name and s.sitter2_name != 'None') and not (s.sitting1_name and s.sitting1_name != 'None') and not (s.sitting2_name and s.sitting2_name != 'None') %}
+        <div style="font-size:.8rem;color:var(--text-muted);padding:.25rem 0;">Keine Sitter-Daten eingetragen.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
   </div>
+
+  <p style="font-size:.75rem;color:var(--text-muted);margin-top:1rem;">
+    {{ shared_sitters|length }} Mitglied(er) haben ihre Liste freigegeben.
+  </p>
+
   {% else %}
   <div class="card" style="text-align:center;padding:3rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🤝</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="sitterlist.empty.title">Noch keine freigegebenen Listen</h2>
+    <h2 style="margin:0 0 0.5rem;">Noch keine freigegebenen Listen</h2>
     <p style="color:var(--text-muted);">
       Mitglieder können ihre Sitter-Liste unter <strong>Mein Account → Sitter-Verwaltung</strong>
       freigeben, indem sie die Checkbox „Liste freigeben" aktivieren.
