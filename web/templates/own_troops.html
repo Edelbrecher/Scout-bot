@@ -6,7 +6,7 @@
 
   <div style="margin-bottom:1.5rem;">
     <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Angriff-Detection</a>
-    <h1 style="margin:0.25rem 0 0;">🏰 Eigene Dörfer &amp; Truppen</h1>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="troops.title">🏰 Eigene Dörfer &amp; Truppen</h1>
     <p style="color:var(--text-muted); font-size:0.85rem; margin:0.25rem 0 0;">{{ guild.guild_name }}</p>
   </div>
 
@@ -19,7 +19,7 @@
 
   <!-- Upload section -->
   <div class="card" style="margin-bottom:1.5rem;">
-    <h2>📋 Truppendaten importieren</h2>
+    <h2 data-i18n="troops.import.title">📋 Truppendaten importieren</h2>
     <p class="hint">
       Öffne in Travian die <strong>Truppenübersicht</strong> (Dorf → Truppen → Truppenübersicht),
       markiere alles (<kbd>Strg+A</kbd>) und kopiere (<kbd>Strg+C</kbd>), dann hier einfügen.
@@ -92,11 +92,11 @@
   <!-- Charts -->
   <div class="card" style="margin-bottom:1.5rem; padding:1.25rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
-      <h2 style="margin:0; font-size:1rem;">📈 Truppenstärke über Zeit</h2>
+      <h2 style="margin:0; font-size:1rem;" data-i18n="troops.timeline.title">📈 Truppenstärke über Zeit</h2>
       <div style="display:flex; align-items:center; gap:.75rem;">
         <span style="font-size:0.75rem; color:var(--text-muted);">{{ history | length }} Import{% if history | length != 1 %}e{% endif %}</span>
         {% if own_villages %}
-        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem; font-size:.8rem; display:flex; align-items:center; gap:.35rem;">
+        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem; font-size:.8rem; display:flex; align-items:center; gap:.35rem;" data-i18n="troops.army.btn">
           🪖 Army Details
         </button>
         {% endif %}
@@ -174,19 +174,19 @@
   <!-- Villages table -->
   {% if own_villages %}
   <div class="card">
-    <h2>🏘️ Importierte Dörfer ({{ own_villages | length }})</h2>
+    <h2><span data-i18n="troops.villages.title">🏘️ Importierte Dörfer</span> ({{ own_villages | length }})</h2>
     <div style="overflow-x:auto;">
       <table class="table">
         <thead>
           <tr>
-            <th>Dorf</th>
-            <th>Koords</th>
-            <th>Typ</th>
+            <th data-i18n="account.th.village">Dorf</th>
+            <th data-i18n="account.th.coords">Koords</th>
+            <th data-i18n="account.th.type">Typ</th>
             <th style="text-align:right;">Off</th>
             <th style="text-align:right;">Def</th>
             <th style="text-align:right;">🌾 Korn</th>
-            <th style="min-width:200px;">Truppenverteilung</th>
-            <th style="color:var(--text-muted); font-size:0.8rem;">Importiert</th>
+            <th style="min-width:200px;" data-i18n="account.th.troops">Truppenverteilung</th>
+            <th style="color:var(--text-muted); font-size:0.8rem;" data-i18n="account.th.imported">Importiert</th>
           </tr>
         </thead>
         <tbody>
@@ -254,7 +254,7 @@
   </div>
   {% else %}
   <div class="card">
-    <p class="empty">Noch keine eigenen Dörfer importiert. Nutze das Formular oben.</p>
+    <p class="empty" data-i18n="account.empty.hint">Noch keine eigenen Dörfer importiert. Nutze das Formular oben.</p>
   </div>
   {% endif %}
 

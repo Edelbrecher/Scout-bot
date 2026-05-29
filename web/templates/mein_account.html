@@ -8,7 +8,7 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🏰 Mein Travian-Account</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="account.title">🏰 Mein Account</h1>
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
     <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;">
@@ -82,20 +82,20 @@
 
     <!-- Upload -->
     <div class="card">
-      <h2 style="margin:0 0 0.4rem;">📋 Daten importieren</h2>
-      <p class="hint" style="margin-bottom:0.75rem;">
+      <h2 style="margin:0 0 0.4rem;" data-i18n="account.import.title">📋 Daten importieren</h2>
+      <p class="hint" data-i18n-html="account.import.hint" style="margin-bottom:0.75rem;">
         Öffne in Travian die <strong>Truppenübersicht</strong> (Dorf → Truppen → Truppenübersicht),
         markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
       </p>
       <form method="post" action="/guild/{{ guild.guild_id }}/mein-account">
         <div style="margin-bottom:.6rem;">
           <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.25rem;">
-            🏷 Dein Travian Spielername <span style="color:#f87171;">*</span>
+            🏷 <span data-i18n="account.import.name_label">Dein Travian Spielername</span> <span style="color:#f87171;">*</span>
           </label>
           <input type="text" name="travian_name" value="{{ my_travian_name or '' }}"
             placeholder="z.B. MaxMustermann" required
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .7rem;font-size:.9rem;">
-          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;">
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;" data-i18n="account.import.name_hint">
             Genau wie in Travian angezeigt — wird für die EP-Planung und Allianz-Verifikation genutzt.
           </div>
         </div>
@@ -103,7 +103,7 @@
           placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."
           style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;"></textarea>
         <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap;">
-          <button type="submit" class="btn btn-primary">⬆️ Speichern &amp; Importieren</button>
+          <button type="submit" class="btn btn-primary" data-i18n="account.import.btn">⬆️ Speichern &amp; Importieren</button>
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='flex'" style="display:flex;align-items:center;gap:.4rem;">
             🏥 Lazarett
             {% if hospital_data %}
@@ -125,7 +125,7 @@
 
     <!-- Dieses Hub erklärt welche Features die Daten nutzen -->
     <div class="card" style="background:linear-gradient(135deg,var(--bg-card),#0f1629);">
-      <h2 style="margin:0 0 0.75rem;">🔗 Verwendete Daten</h2>
+      <h2 style="margin:0 0 0.75rem;" data-i18n="account.hub.title">🔗 Verwendete Daten</h2>
       <p class="hint" style="margin-bottom:0.75rem;">Deine importierten Dörfer werden automatisch von folgenden Features genutzt:</p>
       <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.5rem;">
         <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
@@ -167,7 +167,7 @@
 
   <!-- Sitter-Verwaltung -->
   <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin:0 0 0.75rem;">🤝 Sitter-Verwaltung</h2>
+    <h2 style="margin:0 0 0.75rem;" data-i18n="account.sitter.title">🤝 Sitter-Verwaltung</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/sitters">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
 
@@ -225,7 +225,7 @@
   <!-- Dual-Accounts + Meine Einsätze nebeneinander -->
   <div id="dualMissionsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
   <div class="card" style="margin-bottom:0;height:100%;box-sizing:border-box;">
-    <h2 style="margin:0 0 0.75rem;">🔗 Dual-Accounts</h2>
+    <h2 style="margin:0 0 0.75rem;" data-i18n="account.dual.title">🔗 Dual-Accounts</h2>
 
     {% if dual_created %}
     <div class="alert alert-success" style="margin-bottom:0.75rem;">
@@ -279,7 +279,7 @@
   <div class="card" id="missionsCard" style="margin-bottom:0;height:100%;box-sizing:border-box;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
       <div>
-        <h2 style="margin:0 0 .2rem;">⚔️ Meine Einsätze</h2>
+        <h2 style="margin:0 0 .2rem;" data-i18n="account.missions.title">⚔️ Meine Einsätze</h2>
         <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind.</p>
       </div>
       <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Einsatzplanung</a>
@@ -296,12 +296,12 @@
   <div class="card" style="margin-bottom:1.25rem; padding:1.25rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
       <div>
-        <h2 style="margin:0;font-size:1rem;">📈 Truppenstärke-Timeline</h2>
+        <h2 style="margin:0;font-size:1rem;" data-i18n="account.timeline.title">📈 Truppenstärke-Timeline</h2>
       </div>
       <div style="display:flex;align-items:center;gap:.75rem;">
         <span style="font-size:.75rem;color:var(--text-muted);">{{ history|length }} Import{% if history|length != 1 %}e{% endif %}</span>
         {% if own_villages %}
-        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem;font-size:.8rem;">🪖 Army Details</button>
+        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem;font-size:.8rem;" data-i18n="account.army.btn">🪖 Army Details</button>
         {% endif %}
       </div>
     </div>
@@ -322,19 +322,19 @@
   <!-- Villages table -->
   {% if own_villages %}
   <div class="card">
-    <h2 style="margin:0 0 1rem;">🏘️ Dörfer ({{ own_villages|length }})</h2>
+    <h2 style="margin:0 0 1rem;"><span data-i18n="account.villages.title">🏘️ Dörfer</span> ({{ own_villages|length }})</h2>
     <div style="overflow-x:auto;">
       <table class="table">
         <thead>
           <tr>
-            <th>Dorf</th>
-            <th>Koords</th>
-            <th>Typ</th>
+            <th data-i18n="account.th.village">Dorf</th>
+            <th data-i18n="account.th.coords">Koords</th>
+            <th data-i18n="account.th.type">Typ</th>
             <th style="text-align:right;">⚔️ Off</th>
             <th style="text-align:right;">🛡️ Def</th>
             <th style="text-align:right;">🌾 Korn</th>
-            <th style="min-width:200px;">Truppenverteilung</th>
-            <th>Importiert</th>
+            <th style="min-width:200px;" data-i18n="account.th.troops">Truppenverteilung</th>
+            <th data-i18n="account.th.imported">Importiert</th>
           </tr>
         </thead>
         <tbody>
@@ -397,8 +397,8 @@
   {% else %}
   <div class="card" style="text-align:center;padding:2.5rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🏰</div>
-    <h2 style="margin:0 0 0.5rem;">Noch keine Dörfer importiert</h2>
-    <p style="color:var(--text-muted);">Nutze das Importformular oben um deine Truppenübersicht einzufügen.</p>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="account.empty.title">Noch keine Dörfer importiert</h2>
+    <p style="color:var(--text-muted);" data-i18n="account.empty.hint">Nutze das Importformular oben um deine Truppenübersicht einzufügen.</p>
   </div>
   {% endif %}
 

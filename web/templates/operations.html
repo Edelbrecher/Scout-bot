@@ -244,7 +244,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">
           <a href="/guild/{{ guild.guild_id }}" style="color:var(--text-muted);text-decoration:none;">← {{ guild.guild_name }}</a>
         </div>
-        <div style="font-weight:700;font-size:.95rem;margin-top:.1rem;">⚔️ Einsatzplanung</div>
+        <div style="font-weight:700;font-size:.95rem;margin-top:.1rem;" data-i18n="ops.title">⚔️ Einsatzplanung</div>
       </div>
       <button class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;" onclick="openNewPlanModal()">+ Neu</button>
     </div>
@@ -289,9 +289,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <!-- Empty state -->
       <div class="op-empty" id="opEmptyState">
         <div class="op-empty-icon">⚔️</div>
-        <h2 style="margin:0 0 .5rem;">Einsatzplanung</h2>
-        <p style="max-width:360px;margin:0 auto .75rem;">Erstelle einen neuen Einsatzplan oder wähle einen aus der Liste.</p>
-        <button class="btn btn-primary" onclick="openNewPlanModal()">+ Ersten Einsatz erstellen</button>
+        <h2 style="margin:0 0 .5rem;" data-i18n="ops.title">Einsatzplanung</h2>
+        <p style="max-width:360px;margin:0 auto .75rem;" data-i18n="ops.empty_hint">Erstelle einen neuen Einsatzplan oder wähle einen aus der Liste.</p>
+        <button class="btn btn-primary" onclick="openNewPlanModal()" data-i18n="ops.new.btn">+ Ersten Einsatz erstellen</button>
       </div>
 
       <!-- Plan editor (hidden until plan selected) -->

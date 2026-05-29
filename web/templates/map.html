@@ -57,7 +57,7 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1>🗺️ Travian Karte</h1>
+      <h1 data-i18n="map.title">🗺️ Travian Karte</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
     {% if is_admin %}
@@ -81,7 +81,7 @@
     <div style="flex:1; min-width:200px;">
       <label>👤 Spieler</label>
       <div class="filter-add">
-        <input type="text" id="searchPlayer" placeholder="Spielername…" />
+        <input type="text" id="searchPlayer" placeholder="Spielername…" data-i18n-placeholder="map.search.player" />
         <button onclick="addPlayerFilter()" class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;">+</button>
       </div>
       <div class="filter-tags" id="playerTags"></div>
@@ -90,7 +90,7 @@
     <div style="flex:1; min-width:200px;">
       <label>🛡️ Allianz</label>
       <div class="filter-add">
-        <input type="text" id="searchAlliance" placeholder="Allianzname…" />
+        <input type="text" id="searchAlliance" placeholder="Allianzname…" data-i18n-placeholder="map.search.alliance" />
         <button onclick="addAllianceFilter()" class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;">+</button>
       </div>
       <div class="filter-tags" id="allianceTags"></div>
@@ -101,7 +101,7 @@
       <div style="display:flex; gap:4px;">
         <input type="number" id="jumpX" placeholder="X" style="width:62px;" />
         <input type="number" id="jumpY" placeholder="Y" style="width:62px;" />
-        <button onclick="jumpToCoords()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem;">Go</button>
+        <button onclick="jumpToCoords()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem;" data-i18n="map.jump.btn">Go</button>
       </div>
     </div>
     <!-- View mode -->
@@ -147,7 +147,7 @@
     {% for g in meta_groups %}
     {% set col = grp_colors[loop.index0 % grp_colors|length] %}
     <button class="meta-btn" style="color:{{ col }}; border-color:{{ col }};"
-      onclick="addMetaGroup({{ g.alliances | tojson }}, '{{ col }}')">
+      onclick="addMetaGroupByIdx({{ loop.index0 }})">
       ✦ {{ g.meta_name }}
     </button>
     {% endfor %}
@@ -162,7 +162,7 @@
     {% set total_meta = (meta_groups|length) + (meta_alliances|length) + (1 if ally_group and ally_group.wing1_name else 0) + (1 if ally_group and ally_group.wing2_name else 0) %}
     {% if total_meta > 0 %}
     <button class="meta-btn" style="color:#888; border-color:#555;"
-      onclick="addAllMetaAlliances()">
+      onclick="addAllMetaAlliances()" data-i18n="map.meta.all">
       Alle anzeigen
     </button>
     {% endif %}
@@ -600,14 +600,14 @@ const META_GROUPS = [
   {name: {{ g.meta_name | tojson }}, alliances: {{ g.alliances | tojson }}, color: {{ col | tojson }}},
   {% endfor %}
 ];
-function addMetaGroup(alliances, color) {
-  // Verteile Farb-Abstufungen innerhalb der Gruppe
-  const shades = ['#a78bfa','#7c3aed','#c4b5fd','#ddd6fe','#ede9fe'];
-  alliances.forEach((a, i) => addAllianceFilterValue(a, color));
+function addMetaGroupByIdx(idx) {
+  const g = META_GROUPS[idx];
+  if (!g) return;
+  g.alliances.forEach(a => addAllianceFilterValue(a, g.color));
 }
 function addAllMetaAlliances() {
   for (const m of META_ALLIANCES) addAllianceFilterValue(m.name, m.color);
-  for (const g of META_GROUPS) addMetaGroup(g.alliances, g.color);
+  for (let i = 0; i < META_GROUPS.length; i++) addMetaGroupByIdx(i);
 }
 
 const GUILD_ID_MAP = '{{ guild.guild_id }}';

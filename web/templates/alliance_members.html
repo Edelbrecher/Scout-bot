@@ -7,28 +7,28 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🏗️ Meta-Builder</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="meta.title">🏗️ Meta-Builder</h1>
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
     <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
       {% if members %}
       <button type="button" class="btn btn-secondary"
-              onclick="openChartModal()">
+              onclick="openChartModal()" data-i18n="meta.top20.btn">
         📊 Top 20 Einwohner
       </button>
       <button onclick="document.getElementById('allianzModal').style.display='flex'"
-              class="btn btn-secondary" style="font-size:0.85rem;">
+              class="btn btn-secondary" style="font-size:0.85rem;" data-i18n="meta.top10.btn">
         🏆 Top 10 Allianzen
       </button>
       {% endif %}
       <button type="button" class="btn btn-primary"
-              onclick="document.getElementById('importModal').style.display='flex'">
+              onclick="document.getElementById('importModal').style.display='flex'" data-i18n="meta.import.btn">
         ⬆️ Mitglieder importieren
       </button>
       {% if members %}
       <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/clear"
             onsubmit="return confirm('Mitgliederliste löschen?')" style="margin:0;">
-        <button type="submit" class="btn btn-danger">🗑 Löschen</button>
+        <button type="submit" class="btn btn-danger" data-i18n="meta.delete.btn">🗑 Löschen</button>
       </form>
       {% endif %}
     </div>
@@ -227,12 +227,12 @@
     <table class="table" id="memberTable">
       <thead>
         <tr>
-          <th onclick="sortTable(0)" style="cursor:pointer;">Rang ▲</th>
-          <th onclick="sortTable(1)" style="cursor:pointer;">Spieler</th>
-          <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;">Punkte</th>
-          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;">Dörfer</th>
-          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;">Bevölkerung</th>
-          <th style="min-width:160px;">Notizen</th>
+          <th onclick="sortTable(0)" style="cursor:pointer;" data-i18n="meta.col.rank">Rang ▲</th>
+          <th onclick="sortTable(1)" style="cursor:pointer;" data-i18n="meta.col.player">Spieler</th>
+          <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.points">Punkte</th>
+          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.villages">Dörfer</th>
+          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.pop">Bevölkerung</th>
+          <th style="min-width:160px;" data-i18n="meta.col.notes">Notizen</th>
         </tr>
       </thead>
       <tbody id="memberBody">
@@ -281,7 +281,7 @@
 
   {% else %}
   <div class="card">
-    <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
+    <p style="color:var(--text-muted);font-size:0.88rem;margin:0;" data-i18n-html="meta.empty.hint">
       Noch keine Mitglieder importiert. Öffne in Travian die <strong>Allianz → Mitglieder</strong>-Seite,
       markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und importiere hier.
     </p>

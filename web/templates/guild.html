@@ -221,10 +221,10 @@
     <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;{% if unread_notif %}border:2px solid #ef4444;animation:pulse-strong 1.4s ease-in-out infinite;{% endif %}">
       <div class="feature-icon">🔔</div>
       <div class="feature-body">
-        <div class="feature-title">Benachrichtigungen
+        <div class="feature-title"><span data-i18n="guild.feature.notifications.title">Benachrichtigungen</span>
           {% if unread_notif %}<span style="background:#ef4444;color:#fff;font-size:.65rem;padding:1px 7px;border-radius:10px;margin-left:.4rem;font-weight:700;">{{ unread_notif }}</span>{% endif %}
         </div>
-        <div class="feature-desc">EP-Ausfälle, Statusmeldungen, Allianz-Updates</div>
+        <div class="feature-desc" data-i18n="guild.feature.notifications.desc">EP-Ausfälle, Statusmeldungen, Allianz-Updates</div>
       </div>
       <span style="color:var(--text-muted);">→</span>
     </a>
@@ -233,8 +233,8 @@
     <a href="/guild/{{ guild.guild_id }}/operations" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title">Einsatzplanung {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc">Allianz-Ops planen · Wellen-Builder · Fake-Check · Marschzeiten</div>
+        <div class="feature-title"><span data-i18n="guild.feature.ops.title">Einsatzplanung</span> {{ ALLIANCE_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.ops.desc">Allianz-Ops planen · Wellen-Builder · Fake-Check · Marschzeiten</div>
       </div>
       {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
     </a>
@@ -243,8 +243,8 @@
     <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">📋</div>
       <div class="feature-body">
-        <div class="feature-title">Personal Planning {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc">Persönliche Marschzeiten, Wellen und Solo-Planung</div>
+        <div class="feature-title"><span data-i18n="guild.feature.personal.title">Personal Planning</span> {{ PLAYER_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.personal.desc">Persönliche Marschzeiten, Wellen und Solo-Planung</div>
       </div>
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
@@ -377,8 +377,8 @@
     <a href="/guild/{{ guild.guild_id }}/my-ally" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🤝</div>
       <div class="feature-body">
-        <div class="feature-title">My Ally</div>
-        <div class="feature-desc">Allianz-Mitglieder einladen, auflisten & verwalten</div>
+        <div class="feature-title" data-i18n="guild.feature.myally.title">My Ally</div>
+        <div class="feature-desc" data-i18n="guild.feature.myally.desc">Allianz-Mitglieder einladen, auflisten & verwalten</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -542,8 +542,8 @@
     <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="feature-card" style="text-decoration:none;{% if needs_setup %}border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.2);{% endif %}">
       <div class="feature-icon">🌍</div>
       <div class="feature-body">
-        <div class="feature-title">World / Server{% if needs_setup %} <span style="font-size:.72rem;background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;margin-left:4px;">Einrichten</span>{% endif %}</div>
-        <div class="feature-desc">{% if guild.tw_world %}<span style="color:#4ade80;">✅ {{ guild.tw_world.replace('https://','') }}</span>{% else %}Travian-Server-URL & Bot-Sprache konfigurieren{% endif %}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.world.title">World / Server</span>{% if needs_setup %} <span data-i18n="guild.feature.world.setup" style="font-size:.72rem;background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;margin-left:4px;">Einrichten</span>{% endif %}</div>
+        <div class="feature-desc">{% if guild.tw_world %}<span style="color:#4ade80;">✅ {{ guild.tw_world.replace('https://','') }}</span>{% else %}<span data-i18n="guild.feature.world.desc">Travian-Server-URL & Bot-Sprache konfigurieren</span>{% endif %}</div>
       </div>
       {{ OK_ARROW }}
     </a>

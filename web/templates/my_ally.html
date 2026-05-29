@@ -6,7 +6,7 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🤝 My Ally</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="myally.title">🤝 My Ally</h1>
     </div>
   </div>
 
@@ -70,8 +70,8 @@
 
     {# ── Extra Meta-Allianzen für Karten-Buttons ── #}
     <div id="meta-alliances" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
-      <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:.6rem;">🗺️ Karten-Quickbuttons — weitere Allianzen</div>
-      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .6rem;">Diese Allianzen erscheinen als Quickbuttons auf der Karte (zusätzlich zu den Wings oben).</p>
+      <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:.6rem;" data-i18n="myally.map.title">🗺️ Karten-Quickbuttons — weitere Allianzen</div>
+      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .6rem;" data-i18n="myally.map.hint">Diese Allianzen erscheinen als Quickbuttons auf der Karte (zusätzlich zu den Wings oben).</p>
 
       {# Bestehende anzeigen #}
       {% if meta_alliances %}
@@ -172,7 +172,7 @@
   {% set pending_members = members | selectattr("status", "equalto", "pending") | list %}
   {% if pending_members %}
   <div class="card" style="border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.04);">
-    <h2 style="margin:0 0 .75rem;color:#fbbf24;">⏳ Ausstehende Beitrittsanfragen ({{ pending_members|length }})</h2>
+    <h2 style="margin:0 0 .75rem;color:#fbbf24;"><span data-i18n="myally.pending.title">⏳ Ausstehende Beitrittsanfragen</span> ({{ pending_members|length }})</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.6rem;">
       {% for m in pending_members %}
       <div style="background:var(--bg-main);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:.6rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
@@ -204,12 +204,12 @@
   {% set approved_members = members | rejectattr("status", "equalto", "pending") | list %}
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-      <h2 style="margin:0;">👥 Mitglieder ({{ approved_members|length }})</h2>
+      <h2 style="margin:0;"><span data-i18n="myally.members.title">👥 Mitglieder</span> ({{ approved_members|length }})</h2>
       {% set wings_defined = ally_group.wing1_name or ally_group.wing2_name %}
       {% if wings_defined %}
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <span class="wing-filter-btn active" onclick="filterWing('all', this)" style="cursor:pointer;">Alle</span>
-        <span class="wing-filter-btn" onclick="filterWing('0', this)" style="cursor:pointer;">Hauptallianz</span>
+        <span class="wing-filter-btn active" onclick="filterWing('all', this)" style="cursor:pointer;" data-i18n="myally.members.filter_all">Alle</span>
+        <span class="wing-filter-btn" onclick="filterWing('0', this)" style="cursor:pointer;" data-i18n="myally.members.filter_main">Hauptallianz</span>
         {% if ally_group.wing1_name %}<span class="wing-filter-btn" onclick="filterWing('1', this)" style="cursor:pointer;">{{ ally_group.wing1_name }}</span>{% endif %}
         {% if ally_group.wing2_name %}<span class="wing-filter-btn" onclick="filterWing('2', this)" style="cursor:pointer;">{{ ally_group.wing2_name }}</span>{% endif %}
       </div>
@@ -263,7 +263,7 @@
     {% else %}
     <div style="text-align:center;color:var(--text-muted);padding:2rem;background:var(--bg-main);border-radius:8px;border:1px dashed var(--border);">
       <div style="font-size:1.8rem;margin-bottom:0.4rem;">👋</div>
-      <div style="font-weight:600;">Noch keine Mitglieder</div>
+      <div style="font-weight:600;" data-i18n="myally.members.empty">Noch keine Mitglieder</div>
       <div style="font-size:0.78rem;margin-top:0.3rem;">Teile den Einladungslink damit andere beitreten können.</div>
     </div>
     {% endif %}
@@ -272,7 +272,7 @@
   {# ── Leaderboard ── #}
   {% if leaderboard %}
   <div class="card" style="margin-top:1rem;">
-    <h2 style="margin:0 0 1rem;">🏆 Leaderboard</h2>
+    <h2 style="margin:0 0 1rem;" data-i18n="myally.lb.title">🏆 Leaderboard</h2>
     {% set tq_min = ally_group.tq_min or 0 %}
 
     {# TQ-Warnung #}
@@ -414,7 +414,7 @@
   </div>
   {% else %}
   <div class="card" style="max-width:500px;">
-    <h2 style="margin:0 0 0.75rem;">🤝 Allianz erstellen</h2>
+    <h2 style="margin:0 0 0.75rem;" data-i18n="myally.create.title">🤝 Allianz erstellen</h2>
     <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1rem;">
       Erstelle eine Allianz für diesen Server. Du kannst Rollen vergeben, bis zu 2 Wings definieren und Mitglieder per Einladungslink hinzufügen.
     </p>
