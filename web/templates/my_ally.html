@@ -538,7 +538,7 @@
    MEMBER VIEW (joined someone else's group)
    ════════════════════════════════════════════════════════════════════════════ #}
 {% elif membership %}
-  <div class="card" style="max-width:480px;">
+  <div class="card" style="max-width:480px;margin-bottom:1rem;">
     <h2 style="margin:0 0 0.75rem;">🏰 {{ membership.ally_name }}</h2>
     <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">
       Allianz von <strong>{{ membership.owner_username or 'Unbekannt' }}</strong> ·
@@ -551,6 +551,24 @@
     <div style="color:var(--text-muted);font-size:0.85rem;margin-top:0.4rem;">📝 {{ membership.note }}</div>
     {% endif %}
   </div>
+
+  {# Allow member to also create their own alliance on this server if none exists yet #}
+  {% if not guild_group %}
+  <div class="card" style="max-width:500px;border-color:rgba(99,102,241,.25);background:rgba(99,102,241,.04);">
+    <h2 style="margin:0 0 0.5rem;font-size:1rem;">➕ Eigene Allianz erstellen</h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+      Du bist Mitglied in einer anderen Allianz, kannst aber auch selbst eine verwalten.
+    </p>
+    <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/create">
+      <div class="form-group">
+        <label>Allianz-Name</label>
+        <input type="text" name="ally_name" required placeholder="z.B. BLOOD Allianz" maxlength="80"
+               style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:0.95rem;">
+      </div>
+      <button type="submit" class="btn btn-primary">🤝 Allianz erstellen</button>
+    </form>
+  </div>
+  {% endif %}
 
 {# ════════════════════════════════════════════════════════════════════════════
    NO GROUP — server already has one or can create

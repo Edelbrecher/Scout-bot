@@ -2521,9 +2521,6 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
-    guild = await database.get_guild(guild_id)
-    err = await _require_premium(guild, guild_id)
-    if err: return err
     # Validate: must be https://....travian.com or similar
     url = server_url.strip().rstrip("/")
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
@@ -4227,6 +4224,8 @@ async def my_ally_page(request: Request, guild_id: str):
     membership = await database.get_ally_membership(guild_id, uid) if not ally_group else None
     # Check if guild already has a group (owned by someone else)
     guild_group = await database.get_ally_group_for_guild(guild_id) if not ally_group else None
+    # When user is only a member (not owner), also check if they could create one
+    # guild_group is already set above via get_ally_group_for_guild if not ally_group
 
     flash = request.query_params.get("flash", "")
     leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
