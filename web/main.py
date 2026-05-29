@@ -4060,7 +4060,7 @@ def _is_alliance_manager(session: dict, guild: dict) -> bool:
 async def allianz_sitter_liste(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:

@@ -212,12 +212,9 @@
 
       <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
         <button type="submit" class="btn btn-primary">💾 Sitter-Daten speichern</button>
-        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;color:var(--text-muted);">
-          <input type="checkbox" name="is_shared" value="1"
-                 {% if sitters and sitters.is_shared %}checked{% endif %}
-                 style="width:16px;height:16px;cursor:pointer;">
-          Liste freigeben (für Allianz-Verwalter sichtbar)
-        </label>
+        <span style="font-size:.78rem;color:var(--text-muted);">🔒 Sichtbar für alle Mitglieder deiner Allianz</span>
+        {# Hidden so existing logic keeps working #}
+        <input type="hidden" name="is_shared" value="1">
       </div>
     </form>
   </div>

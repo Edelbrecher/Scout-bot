@@ -3422,13 +3422,14 @@ async def regenerate_ally_token(ally_group_id: int, owner_id: str) -> str:
 
 
 async def get_all_shared_sitters(guild_id: str) -> list[dict]:
-    """Return shared sitter entries for a guild.
-    Matches by guild_id OR by discord_id of ally members in this guild (covers workspace saves)."""
+    """Return sitter entries for ALL approved alliance members in this guild.
+    No is_shared gate — being in the same alliance is enough.
+    Looks up by discord_id across all guild_ids (covers workspace saves)."""
     await _init_sitter_table()
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        # Get ally member discord_ids for this guild
+        # Collect all approved member discord_ids + owner
         async with db.execute("""
             SELECT DISTINCT am.discord_id
             FROM ally_members am
@@ -3436,7 +3437,6 @@ async def get_all_shared_sitters(guild_id: str) -> list[dict]:
             WHERE ag.guild_id = ? AND am.status = 'approved'
         """, (guild_id,)) as cur:
             member_ids = [r[0] for r in await cur.fetchall()]
-        # Also include guild owner
         async with db.execute(
             "SELECT owner_discord_id FROM ally_groups WHERE guild_id=?", (guild_id,)
         ) as cur:
@@ -3445,28 +3445,22 @@ async def get_all_shared_sitters(guild_id: str) -> list[dict]:
                 member_ids.append(row[0])
 
         if not member_ids:
-            # Fallback: original guild_id query
-            async with db.execute(
-                "SELECT * FROM account_sitters WHERE guild_id=? AND is_shared=1", (guild_id,)
-            ) as cur:
-                return [dict(r) for r in await cur.fetchall()]
+            return []
 
-        # Fetch sitter entries for these members (any guild_id) where is_shared=1
+        # Get their sitter entries (any guild_id, no is_shared filter)
         placeholders = ",".join("?" * len(member_ids))
         async with db.execute(
-            f"SELECT * FROM account_sitters WHERE discord_user_id IN ({placeholders}) AND is_shared=1",
+            f"SELECT * FROM account_sitters WHERE discord_user_id IN ({placeholders})",
             member_ids,
         ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
-        # Also include any entries saved directly under this guild_id not already included
-        found_ids = {r["discord_user_id"] for r in rows}
-        async with db.execute(
-            "SELECT * FROM account_sitters WHERE guild_id=? AND is_shared=1", (guild_id,)
-        ) as cur:
+            # Deduplicate: keep most recent per discord_user_id
+            seen: dict[str, dict] = {}
             for r in await cur.fetchall():
-                if r["discord_user_id"] not in found_ids:
-                    rows.append(dict(r))
-        return rows
+                d = dict(r)
+                uid = d["discord_user_id"]
+                if uid not in seen or (d.get("updated_at") or "") > (seen[uid].get("updated_at") or ""):
+                    seen[uid] = d
+            return list(seen.values())
 
 
 async def _init_farmlist_analyses_table():
