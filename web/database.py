@@ -6130,9 +6130,7 @@ async def _init_attack_detection_tables():
                 confirmed INTEGER DEFAULT 1,
                 notes TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now')),
-                UNIQUE(guild_id, player_name,
-                       COALESCE(village_x,-999),
-                       COALESCE(village_y,-999),
+                UNIQUE(guild_id, player_name, village_x, village_y,
                        artifact_type, artifact_size)
             )
         """)
