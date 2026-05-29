@@ -100,20 +100,28 @@
       <div style="font-weight:600;font-size:.92rem;">🗺️ Einführungstour</div>
       <div style="font-size:.78rem;color:var(--text-muted);margin-top:.15rem;">Tour beim nächsten Aufruf des Dashboards erneut starten.</div>
     </div>
-    <button onclick="restartTour()" class="btn btn-secondary" style="font-size:.82rem;white-space:nowrap;">
-      ▶ Tour neu starten
-    </button>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button onclick="restartAccountTour()" class="btn btn-secondary" style="font-size:.82rem;white-space:nowrap;">
+        ▶ Diese Tour starten
+      </button>
+      <button onclick="restartTourFull ? restartTourFull() : restartStartTour()" class="btn btn-secondary" style="font-size:.82rem;white-space:nowrap;opacity:.7;">
+        🏠 Einrichtungs-Tour
+      </button>
+    </div>
   </div>
   <script>
-  function restartTour() {
-    localStorage.removeItem('beb_tour_done');
-    // Redirect to first guild dashboard if available
-    const guildMatch = location.pathname.match(/\/guild\/(\d{17,20})/);
-    if (guildMatch) {
-      window.location.href = '/guild/' + guildMatch[1];
+  function restartAccountTour() {
+    localStorage.removeItem('beb_account_tour_done');
+    if (window.TravOpsTour) {
+      TravOpsTour.start('my-account');
     } else {
-      window.location.href = '/dashboard';
+      location.reload();
     }
+  }
+  function restartStartTour() {
+    localStorage.removeItem('beb_tour_done');
+    const guildMatch = location.pathname.match(/\/guild\/(\d{17,20})/);
+    window.location.href = guildMatch ? '/guild/' + guildMatch[1] : '/dashboard';
   }
   </script>
 
