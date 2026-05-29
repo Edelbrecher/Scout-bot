@@ -497,6 +497,47 @@
     }
   };
 
+  // ── Wave detection ────────────────────────────────────────────────────────
+  // Attacks arriving within 1 second of each other = same wave
+  function groupIntoWaves(attacks) {
+    if (!attacks.length) return [];
+    const sorted = [...attacks].sort((a, b) => (a.arrival_time||'').localeCompare(b.arrival_time||''));
+    const waves = [];
+    let current = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = new Date(sorted[i-1].arrival_time||0).getTime();
+      const curr = new Date(sorted[i].arrival_time||0).getTime();
+      if (Math.abs(curr - prev) <= 1000) {
+        current.push(sorted[i]);
+      } else {
+        waves.push(current);
+        current = [sorted[i]];
+      }
+    }
+    waves.push(current);
+    return waves;
+  }
+
+  function zwischendefWarning(waves) {
+    if (waves.length <= 1) return '';
+    const parts = [];
+    for (let i = 0; i < waves.length - 1; i++) {
+      const t1 = new Date(waves[i][waves[i].length-1].arrival_time||0).getTime();
+      const t2 = new Date(waves[i+1][0].arrival_time||0).getTime();
+      const gapSec = Math.round((t2 - t1) / 1000);
+      const gapMin = Math.floor(gapSec / 60);
+      const gapRemSec = gapSec % 60;
+      const gapLabel = gapMin > 0 ? `${gapMin} Min ${gapRemSec} Sek` : `${gapSec} Sek`;
+      const arr1 = fmtArrival(waves[i][waves[i].length-1].arrival_time);
+      const arr2 = fmtArrival(waves[i+1][0].arrival_time);
+      parts.push(`Welle ${i+1} (${arr1}) → Welle ${i+2} (${arr2}): ${gapLabel} Abstand`);
+    }
+    return `<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;font-size:0.8rem;color:#fbbf24;">
+      ⏱️ <strong>Zwischendef möglich!</strong> ${waves.length} Wellen mit Zeitabstand:<br>
+      ${parts.map(p => '• ' + p).join('<br>')}
+    </div>`;
+  }
+
   function renderOwnAttacks(attacks, cont) {
     if (!attacks.length) {
       cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine eingehenden Angriffe. Importiere deinen Rallyepunkt.</p>';
@@ -515,14 +556,29 @@
     for (const key of Object.keys(groups)) {
       const g = groups[key];
       const coords = g.x != null ? ' ('+g.x+'|'+g.y+')' : '';
+      const waves = groupIntoWaves(g.attacks);
+      const zwWarning = zwischendefWarning(waves);
+      const realCount = g.attacks.filter(a => (a.fake_score||50) < 60).length;
       html += `<div class="village-card">
         <div class="village-card-header">
           🏰 ${escHtml(g.name)}${escHtml(coords)}
-          <span style="margin-left:auto; font-size:0.8rem; color:var(--text-muted); font-weight:400;">${g.attacks.length} Angriff(e)</span>
+          <span style="margin-left:auto; font-size:0.8rem; color:var(--text-muted); font-weight:400;">
+            ${waves.length} Welle(n) · ${g.attacks.length} Angriff(e)
+            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' mögl. echt</span>' : ''}
+          </span>
         </div>
-        <div style="display:flex; flex-direction:column; gap:0.4rem;">`;
-      for (const a of g.attacks) {
-        html += renderAttackRow(a);
+        <div style="display:flex; flex-direction:column; gap:0.4rem;">
+          ${zwWarning}`;
+      // Render wave by wave with separator
+      for (let wi = 0; wi < waves.length; wi++) {
+        if (waves.length > 1) {
+          html += `<div style="font-size:0.72rem;color:var(--text-muted);padding:0.15rem 0 0.1rem;border-top:1px solid var(--border);margin-top:0.2rem;">
+            ⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}
+          </div>`;
+        }
+        for (const a of waves[wi]) {
+          html += renderAttackRow(a);
+        }
       }
       html += '</div></div>';
     }
@@ -603,45 +659,89 @@
     if (filterNonFake) attacks = attacks.filter(a => (a.fake_score||50) < 60);
     if (filterHidden)  attacks = attacks.filter(a => a.troops_hidden);
 
-    if (sortBy === 'fake_score') attacks.sort((a,b) => (a.fake_score||50) - (b.fake_score||50));
-    else if (sortBy === 'own_village') attacks.sort((a,b) => (a.own_village_name||'').localeCompare(b.own_village_name||''));
-    else attacks.sort((a,b) => (a.arrival_time||'').localeCompare(b.arrival_time||''));
-
     if (!attacks.length) {
       cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine Angriffe gefunden.</p>';
       return;
     }
 
-    // Group simultaneous waves (within 5 min window)
-    const waveGroups = groupWaves(attacks, 5 * 60);
+    // Group by own village
+    const villageMap = {};
+    for (const a of attacks) {
+      const key = (a.own_village_name||'') + '|' + (a.own_village_x||'') + '|' + (a.own_village_y||'');
+      if (!villageMap[key]) villageMap[key] = {name: a.own_village_name, x: a.own_village_x, y: a.own_village_y, attacks: []};
+      villageMap[key].attacks.push(a);
+    }
 
-    let html = '<div style="overflow-x:auto;"><table class="table" style="width:100%;font-size:0.82rem;"><thead><tr>'
-      + '<th>Eigenes Dorf</th><th>Angreifer</th><th>Typ</th><th>Truppen</th><th>Ankunft</th><th>Fake-Score</th><th>Welle</th>'
-      + '</tr></thead><tbody>';
+    // Sort village groups
+    let villageKeys = Object.keys(villageMap);
+    if (sortBy === 'arrival') {
+      villageKeys.sort((a,b) => {
+        const at = villageMap[a].attacks[0]?.arrival_time||'';
+        const bt = villageMap[b].attacks[0]?.arrival_time||'';
+        return at.localeCompare(bt);
+      });
+    } else {
+      villageKeys.sort();
+    }
 
-    for (const g of waveGroups) {
-      const isWave = g.attacks.length > 1;
-      for (let i = 0; i < g.attacks.length; i++) {
-        const a = g.attacks[i];
-        const waveLabel = isWave ? (i === 0 ? `<span class="wave-group-header">Welle (${g.attacks.length}x)</span>` : '') : '';
-        const troopStr = a.troops_hidden ? '<span style="color:#fbbf24;">❓</span>' : (a.troop_count||0);
-        html += `<tr style="${isWave ? 'border-left:2px solid rgba(239,68,68,0.5);' : ''}">
-          <td>${escHtml(a.own_village_name||'')}${a.own_village_x!=null?' <span style="color:var(--text-muted);font-size:0.75rem;">('+a.own_village_x+'|'+a.own_village_y+')</span>':''}</td>
-          <td><a class="player-link" onclick="openPlayerModal('${escHtml(a.attacker_player||'').replace(/'/g,"\\'")}')">
-            ${escHtml(a.attacker_player||'')}
-          </a>
-          <span style="color:var(--text-muted); font-size:0.75rem; display:block;">${escHtml(a.attacker_village_name||'')}${a.attacker_x!=null?' ('+a.attacker_x+'|'+a.attacker_y+')':''}</span>
-          ${a.imported_by_name ? '<span style="color:var(--text-muted);font-size:0.72rem;">via '+escHtml(a.imported_by_name)+'</span>' : ''}
-          </td>
-          <td>${typeBadge(a.attack_type)}</td>
-          <td>${troopStr}</td>
-          <td style="white-space:nowrap;">${fmtArrival(a.arrival_time)}</td>
-          <td>${fakeBadge(a.fake_score||50)}</td>
-          <td>${isWave && i===0 ? '<span style="color:#f87171;font-size:0.75rem;font-weight:700;">⚡ Simultane Welle ('+g.attacks.length+'x)</span>' : ''}</td>
-        </tr>`;
+    // Detect coordinated attack: multiple different villages hit within 5-min window
+    const allArrTimes = attacks.map(a => new Date(a.arrival_time||0).getTime()).filter(t => t>0);
+    allArrTimes.sort((a,b) => a-b);
+    let coordWarning = '';
+    if (villageKeys.length > 1) {
+      const first = allArrTimes[0], last = allArrTimes[allArrTimes.length-1];
+      const windowMin = Math.round((last-first)/60000);
+      if (windowMin <= 30) {
+        coordWarning = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:6px;padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.83rem;color:#f87171;">
+          🚨 <strong>Koordinierter Großangriff erkannt!</strong> ${villageKeys.length} Dörfer werden innerhalb von ${windowMin} Minuten angegriffen.
+        </div>`;
       }
     }
-    html += '</tbody></table></div>';
+
+    let html = coordWarning;
+
+    for (const key of villageKeys) {
+      const g = villageMap[key];
+      const waves = groupIntoWaves(g.attacks);
+      const zwWarning = zwischendefWarning(waves);
+      const coords = g.x != null ? ` (${g.x}|${g.y})` : '';
+      const realCount = g.attacks.filter(a => (a.fake_score||50) < 60).length;
+
+      html += `<div class="village-card" style="margin-bottom:1rem;">
+        <div class="village-card-header">
+          🏰 ${escHtml(g.name||'')}${escHtml(coords)}
+          <span style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);font-weight:400;">
+            ${waves.length} Welle(n) · ${g.attacks.length} Angriff(e)
+            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' mögl. echt</span>' : ''}
+          </span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          ${zwWarning}`;
+
+      for (let wi = 0; wi < waves.length; wi++) {
+        if (waves.length > 1) {
+          html += `<div style="font-size:0.72rem;color:var(--text-muted);padding:0.15rem 0 0.1rem;border-top:1px solid var(--border);margin-top:0.2rem;">
+            ⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}
+          </div>`;
+        }
+        for (const a of waves[wi]) {
+          const troopStr = a.troops_hidden ? '<span style="color:#fbbf24;font-size:0.8rem;">❓ verdeckt</span>' : '<span style="font-size:0.8rem;">'+(a.troop_count||0)+' Einh.</span>';
+          html += `<div class="atk-row">
+            ${typeBadge(a.attack_type)}
+            <a class="player-link" onclick="openPlayerModal('${escHtml(a.attacker_player||'').replace(/'/g,"\\'")}')">
+              ${escHtml(a.attacker_player||'')}
+            </a>
+            <span style="color:var(--text-muted);font-size:0.78rem;">${escHtml(a.attacker_village_name||'')}${a.attacker_x!=null?' ('+a.attacker_x+'|'+a.attacker_y+')':''}</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;">
+              ${troopStr}
+              ${fakeBadge(a.fake_score||50)}
+              ${a.imported_by_name ? '<span style="color:var(--text-muted);font-size:0.72rem;">'+escHtml(a.imported_by_name)+'</span>' : ''}
+            </span>
+          </div>`;
+        }
+      }
+      html += '</div></div>';
+    }
     cont.innerHTML = html;
   };
 

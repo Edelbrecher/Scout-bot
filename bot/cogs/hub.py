@@ -93,6 +93,63 @@ def _safe(s: str) -> str:
 # Modals
 # ---------------------------------------------------------------------------
 
+class HeroScoutHubModal(discord.ui.Modal, title="🦸 Helden-Scout melden"):
+    player = discord.ui.TextInput(label="Spieler-Name", placeholder="z.B. Currax", max_length=100)
+    coordinates = discord.ui.TextInput(label="Koordinaten", placeholder="z.B. (102|47)", max_length=30)
+    hero_action = discord.ui.TextInput(
+        label="Helden-Aktion / Zeitpunkt",
+        placeholder="z.B. Items gewechselt um 19:15 Serverzeit",
+        max_length=200,
+    )
+    additional_info = discord.ui.TextInput(
+        label="Zusätzliche Infos (optional)", required=False,
+        style=discord.TextStyle.paragraph, max_length=500,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await require_premium(interaction):
+            return
+        guild = interaction.guild
+        lang = await get_guild_lang(str(guild.id))
+
+        from cogs.hero_scout import get_hero_scout_channel
+        hero_channel_id = await get_hero_scout_channel(str(guild.id))
+
+        if not hero_channel_id:
+            await interaction.response.send_message(
+                "❌ Kein Helden-Scout-Channel konfiguriert. Bitte einen Admin fragen.", ephemeral=True
+            )
+            return
+
+        target_ch = guild.get_channel(int(hero_channel_id))
+        if not target_ch:
+            try:
+                target_ch = await guild.fetch_channel(int(hero_channel_id))
+            except Exception:
+                target_ch = None
+
+        if not target_ch:
+            await interaction.response.send_message(
+                "❌ Helden-Scout-Channel nicht gefunden.", ephemeral=True
+            )
+            return
+
+        embed = discord.Embed(
+            title=f"🦸 Helden-Scout: {self.player.value}",
+            color=discord.Color.teal(),
+        )
+        embed.add_field(name="📍 Koordinaten", value=self.coordinates.value, inline=True)
+        embed.add_field(name="⚡ Helden-Aktion", value=self.hero_action.value, inline=False)
+        if self.additional_info.value:
+            embed.add_field(name="📝 Zusatz", value=self.additional_info.value, inline=False)
+        embed.set_footer(text=f"Gemeldet von {interaction.user.display_name} • {travops_footer()}")
+
+        await target_ch.send(embed=embed)
+        await interaction.response.send_message(
+            f"✅ Helden-Scout gemeldet in {target_ch.mention}!", ephemeral=True
+        )
+
+
 class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
     player = discord.ui.TextInput(label="Spieler-Name", placeholder="z.B. Currax", max_length=100)
     coordinates = discord.ui.TextInput(label="Koordinaten", placeholder="z.B. (102|47)", max_length=30)
@@ -1285,6 +1342,15 @@ class RequestHubView(discord.ui.View):
     )
     async def hub_timed_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TimedDefendModal())
+
+    @discord.ui.button(
+        label="Helden-Scout", emoji="🦸", style=discord.ButtonStyle.secondary,
+        custom_id="persistent:hub_hero_scout", row=2,
+    )
+    async def hub_hero_scout(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await require_premium(interaction):
+            return
+        await interaction.response.send_modal(HeroScoutHubModal())
 
     @discord.ui.button(
         label="Privater Channel", emoji="🔒", style=discord.ButtonStyle.secondary,
