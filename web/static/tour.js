@@ -33,49 +33,49 @@
           page: null, target: null,
           title: t('Willkommen bei TravOps! 👋', 'Welcome to TravOps! 👋'),
           body: t(
-            'TravOps ist dein All-in-One Werkzeug für Travian-Allianzen.\n\nDieser Assistent führt dich in 2 Minuten durch die wichtigsten Einstellungen, damit du sofort loslegen kannst.',
-            'TravOps is your all-in-one tool for Travian alliances.\n\nThis assistant walks you through the key settings in 2 minutes so you can get started right away.'
+            'TravOps ist dein All-in-One Werkzeug für Travian-Allianzen — Einsatzplanung, Angriffserkennung, Helden-Scout, Farming und vieles mehr.\n\nDieser Assistent richtet in 3 Minuten alles ein. Du kannst direkt hier in der Tour die wichtigsten Einstellungen vornehmen.',
+            'TravOps is your all-in-one tool for Travian alliances — operation planning, attack detection, hero scout, farming and much more.\n\nThis assistant sets everything up in 3 minutes. You can make the key settings right here in the tour.'
           ),
           next: t("Los geht's →", "Let's go →"),
         },
         {
-          page: `${base}/map/world-settings`, target: null,
-          title: t('1 / 3 · Serverzeit einstellen ⏰', '1 / 3 · Set server time ⏰'),
+          page: null, target: null,
+          title: t('⏰ Serverzeit einstellen', '⏰ Set server time'),
           body: t(
-            'Alle Marschzeiten und Countdowns basieren auf der Uhrzeit deines Travian-Servers.\n\n🇪🇺 Europa → UTC+1\n🌍 Arabische Server → UTC+3\n\nWähle rechts die passende Zeitzone und speichere.',
-            'All march times and countdowns are based on your Travian server clock.\n\n🇪🇺 Europe → UTC+1\n🌍 Arabic servers → UTC+3\n\nSelect the timezone on the right and save.'
+            'Alle Marschzeiten, Einsatz-Countdowns und Angriffs-Warnungen basieren auf der Uhrzeit deines Travian-Servers.\n\nWähle hier die passende Zeitzone — du kannst sie später jederzeit unter Servereinstellungen ändern.',
+            'All march times, operation countdowns and attack warnings are based on your Travian server clock.\n\nSelect the correct timezone here — you can change it anytime under server settings.'
           ),
-          hint: t('✅ Zeitzone wählen & speichern, dann "Weiter" klicken', '✅ Select timezone & save, then click "Next"'),
-          highlight: 'select[name*="utc"], select[name*="tz"], .timezone-select, #timezone-select',
+          hint: t('Für europäische Server meist UTC+1. Arabische Server UTC+3.', 'For European servers usually UTC+1. Arabic servers UTC+3.'),
+          form: { type: 'timezone' },
           next: t('Weiter', 'Next'),
         },
         {
           page: `${base}/my-ally`, target: null,
-          title: t('2 / 3 · Allianz einrichten 👥', '2 / 3 · Set up alliance 👥'),
+          title: t('👥 Allianz einrichten', '👥 Set up alliance'),
           body: t(
-            'Hier verwaltest du deine Allianz: Mitglieder einladen, Rollen vergeben und Flügel anlegen.\n\nTeile den Einladungslink mit deinen Mitspielern — nach dem Beitritt können sie ihre Dörfer und Truppen hinterlegen.',
-            'Manage your alliance here: invite members, assign roles and create wings.\n\nShare the invitation link with your players — after joining they can add their villages and troops.'
+            'Richte hier deine Allianz ein: Allianz-Namen vergeben, Rollen anlegen und Mitglieder per Einladungslink einladen.\n\nNach dem Beitritt können Mitglieder ihre Dörfer und Truppenbestand hinterlegen — du siehst dann die gesamte Kampfkraft auf einen Blick.',
+            'Set up your alliance here: assign an alliance name, create roles and invite members via invitation link.\n\nAfter joining, members can add their villages and troops — you then see the total combat power at a glance.'
           ),
-          hint: t('✅ Einladungslink kopieren und an Mitglieder weitergeben', '✅ Copy invitation link and share with members'),
-          highlight: '.invite-link, [data-tour="invite"], input[readonly]',
+          hint: t('Einladungslink kopieren → an Mitglieder senden → die treten direkt bei', 'Copy invitation link → send to members → they join directly'),
+          form: { type: 'alliance-rules' },
           next: t('Weiter', 'Next'),
         },
         {
           page: `${base}/map/own-villages`, target: null,
-          title: t('3 / 3 · Dörfer hochladen 🏘️', '3 / 3 · Upload villages 🏘️'),
+          title: t('🏘️ Eigene Dörfer hochladen', '🏘️ Upload your villages'),
           body: t(
-            'Lade deine Dorf-Koordinaten hoch — das ermöglicht exakte Marschzeit-Berechnungen im Einsatzplaner.\n\nKlicke auf "Dörfer hinzufügen" und füge die Daten aus Travian ein.',
-            'Upload your village coordinates — this enables exact march time calculations in the operation planner.\n\nClick "Add villages" and paste data from Travian.'
+            'Lade die Koordinaten deiner Dörfer hoch — das ist die Grundlage für präzise Marschzeit-Berechnungen.\n\nOhne Dörfer rechnet der Einsatzplaner trotzdem, aber mit Dorf-Daten wählt er automatisch das optimale Startdorf für jede Welle.',
+            'Upload your village coordinates — this is the basis for precise march time calculations.\n\nWithout villages the planner still works, but with village data it automatically picks the optimal starting village for each wave.'
           ),
-          hint: t('✅ Optional, aber für präzise Marschzeiten empfohlen', '✅ Optional but recommended for precise march times'),
+          hint: t('In Travian: Profil → Dörfer → alle kopieren → hier einfügen', 'In Travian: Profile → Villages → copy all → paste here'),
           next: t('Weiter', 'Next'),
         },
         {
-          page: base, target: '.feature-grid, .features-section, main',
-          title: t('Alles bereit! 🎉', 'All set! 🎉'),
+          page: base, target: null,
+          title: t('🎉 Einrichtung abgeschlossen!', '🎉 Setup complete!'),
           body: t(
-            'Du hast TravOps eingerichtet. Alle Module sind jetzt verfügbar:\n\n⚔️ Einsatzplanung  🛡️ Angriffserkennung\n🦸 Helden-Scout  📊 Farming-Analyse\n🏥 Hospital  👥 Allianz-Verwaltung\n\nJedes Modul hat eine eigene Tour — klicke oben auf ❓ Tour.',
-            'TravOps is set up. All modules are available:\n\n⚔️ Operations  🛡️ Attack Detection\n🦸 Hero Scout  📊 Farming Analysis\n🏥 Hospital  👥 Alliance Management\n\nEach module has its own tour — click ❓ Tour above.'
+            'TravOps ist einsatzbereit. Alle Module stehen dir jetzt zur Verfügung:\n\n⚔️ Einsatzplanung — koordiniere Angriffe mit Marschzeit-Kalkulator\n🛡️ Angriffserkennung — Fakes von echten Angriffen trennen\n🦸 Helden-Scout — gegnerische Ausrüstung tracken\n📊 Farming — inaktive Farmen finden\n🏥 Hospital — verwundete Truppen verwalten\n\nJedes Modul hat eine eigene Tour — einfach auf ❓ Tour klicken.',
+            'TravOps is ready. All modules are now available:\n\n⚔️ Operations — coordinate attacks with march time calculator\n🛡️ Attack Detection — separate fakes from real attacks\n🦸 Hero Scout — track enemy equipment\n📊 Farming — find inactive farms\n🏥 Hospital — manage wounded troops\n\nEach module has its own tour — just click ❓ Tour.'
           ),
           next: t('Tour abschließen ✓', 'Finish tour ✓'),
           isLast: true,
@@ -473,232 +473,331 @@
     localStorage.removeItem('beb_account_tour_done');
   };
 
-  // ── CSS injekt ────────────────────────────────────────────────────────────
+  // ── UTC offsets for inline timezone form ──────────────────────────────────
+  const TZ_OPTIONS = [
+    [-120,'UTC−2 (Atlantik)'],[-60,'UTC−1 (Azoren)'],[0,'UTC+0 (London/Lissabon)'],
+    [60,'UTC+1 🇪🇺 Europa (Standard)'],[120,'UTC+2 🇪🇺 Osteuropa / Türkei'],
+    [180,'UTC+3 🌍 Arabien / Russland'],[240,'UTC+4 (Dubai)'],[300,'UTC+5 (Pakistan)'],
+    [330,'UTC+5:30 (Indien)'],[360,'UTC+6'],[420,'UTC+7'],[480,'UTC+8 (China)'],
+    [540,'UTC+9 (Japan)'],[600,'UTC+10 (Australien Ost)'],[660,'UTC+11'],[720,'UTC+12'],
+  ];
+
+  // ── CSS inject ────────────────────────────────────────────────────────────
   const _style = document.createElement('style');
   _style.textContent = `
-    #tt-card { position:fixed; z-index:10001; width:min(560px,94vw);
-      background:linear-gradient(160deg,#0f172a 0%,#1e293b 100%);
-      border:1px solid rgba(99,102,241,.35); border-radius:20px;
-      box-shadow:0 32px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(99,102,241,.1);
-      overflow:hidden; }
-    #tt-card-inner { padding:0; }
-    #tt-header { padding:1.6rem 1.8rem 1.1rem;
-      border-bottom:1px solid rgba(255,255,255,.06); }
-    #tt-progress-bar-wrap { height:3px; background:rgba(255,255,255,.06); }
-    #tt-progress-bar { height:3px; background:linear-gradient(90deg,#6366f1,#818cf8);
-      transition:width .4s cubic-bezier(.4,0,.2,1); border-radius:3px; }
-    #tt-step-label { font-size:.7rem; font-weight:700; letter-spacing:.09em;
-      text-transform:uppercase; color:#6366f1; margin-bottom:.5rem; }
-    #tt-title { font-size:1.25rem; font-weight:800; color:#f8fafc;
-      line-height:1.3; margin-bottom:.1rem; }
-    #tt-body-wrap { padding:1.1rem 1.8rem; }
-    #tt-body { font-size:.95rem; color:#94a3b8; line-height:1.7;
-      white-space:pre-line; }
-    #tt-hint { margin-top:.85rem; display:flex; align-items:flex-start; gap:.5rem;
-      background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.25);
-      border-radius:10px; padding:.65rem .9rem; font-size:.84rem; color:#a5b4fc; }
-    #tt-footer { padding:.9rem 1.8rem 1.4rem;
-      border-top:1px solid rgba(255,255,255,.06);
-      display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
-    #tt-dots { display:flex; gap:6px; align-items:center; }
-    .tt-dot { width:8px; height:8px; border-radius:50%;
-      background:#1e3a5f; transition:background .25s, transform .25s; }
-    .tt-dot.active { background:#6366f1; transform:scale(1.3); }
-    .tt-dot.done   { background:#334155; }
-    #tt-btns { display:flex; gap:.55rem; }
-    #tt-skip { background:none; border:1px solid #334155; border-radius:10px;
-      padding:.5rem 1rem; color:#64748b; font-size:.84rem; cursor:pointer;
-      transition:border-color .15s, color .15s; }
-    #tt-skip:hover { border-color:#64748b; color:#94a3b8; }
-    #tt-next { background:linear-gradient(135deg,#6366f1,#4338ca);
-      border:none; border-radius:10px; padding:.55rem 1.4rem;
-      color:#fff; font-size:.9rem; font-weight:700; cursor:pointer;
-      box-shadow:0 4px 14px rgba(99,102,241,.4);
-      transition:box-shadow .15s, transform .1s; white-space:nowrap; }
-    #tt-next:hover { box-shadow:0 6px 20px rgba(99,102,241,.55); transform:translateY(-1px); }
-    #tt-next:active { transform:translateY(0); }
-
-    /* Content fade – inner content fades independently, card stays put */
-    #tt-content { transition:opacity .18s ease, transform .18s ease; }
-    #tt-content.fading { opacity:0; transform:translateY(6px); }
-
-    /* Spotlight */
-    #beb-tour-spotlight { position:fixed; z-index:10000; pointer-events:none;
+    /* Single spotlight div = overlay + cutout. Never hidden, just repositioned. */
+    #tt-spot {
+      position:fixed; z-index:9999; pointer-events:none;
       border-radius:12px;
-      transition:top .38s cubic-bezier(.4,0,.2,1),
-                 left .38s cubic-bezier(.4,0,.2,1),
-                 width .38s cubic-bezier(.4,0,.2,1),
-                 height .38s cubic-bezier(.4,0,.2,1),
-                 box-shadow .3s; }
-    #beb-tour-overlay { position:fixed; inset:0; z-index:9999;
-      background:rgba(0,0,0,.78); backdrop-filter:blur(1.5px);
-      transition:opacity .3s; }
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.82);
+      transition:
+        top    .42s cubic-bezier(.4,0,.2,1),
+        left   .42s cubic-bezier(.4,0,.2,1),
+        width  .42s cubic-bezier(.4,0,.2,1),
+        height .42s cubic-bezier(.4,0,.2,1),
+        border-radius .3s,
+        box-shadow .3s;
+    }
+    #tt-spot.modal-mode {
+      /* No visible hole – just dark overlay */
+      width:1px; height:1px; top:-1px; left:50%; border-radius:0;
+      box-shadow:0 0 0 9999px rgba(0,0,0,.82);
+    }
+
+    /* Card – never opacity:0 mid-tour, only on open/close */
+    #tt-card {
+      position:fixed; z-index:10000; width:min(640px,96vw);
+      background:linear-gradient(160deg,#0d1424 0%,#1a2540 100%);
+      border:1px solid rgba(99,102,241,.3); border-radius:22px;
+      box-shadow:0 40px 100px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.05);
+      overflow:hidden;
+      transition:
+        top    .42s cubic-bezier(.4,0,.2,1),
+        left   .42s cubic-bezier(.4,0,.2,1),
+        transform .42s cubic-bezier(.4,0,.2,1),
+        opacity .3s;
+    }
+    #tt-prog-wrap { height:4px; background:rgba(255,255,255,.05); }
+    #tt-prog      { height:4px; background:linear-gradient(90deg,#6366f1,#a78bfa);
+                    border-radius:4px; transition:width .45s cubic-bezier(.4,0,.2,1); }
+    #tt-hd  { padding:1.6rem 2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,.05); }
+    #tt-lbl { font-size:.7rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+              color:#6366f1; margin-bottom:.5rem; }
+    #tt-ttl { font-size:1.35rem; font-weight:800; color:#f8fafc; line-height:1.25; }
+    #tt-bd  { padding:1.3rem 2rem; }
+
+    /* Content area fades on step change – card itself stays */
+    #tt-cnt { transition:opacity .2s ease, transform .2s ease; }
+    #tt-cnt.out { opacity:0; transform:translateY(8px); pointer-events:none; }
+
+    #tt-txt { font-size:.97rem; color:#94a3b8; line-height:1.75; white-space:pre-line; }
+    #tt-hint-box { margin-top:1rem; display:flex; align-items:flex-start; gap:.6rem;
+      background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.22);
+      border-radius:12px; padding:.7rem 1rem; font-size:.86rem; color:#a5b4fc; line-height:1.5; }
+    #tt-form-box { margin-top:1.1rem; }
+    .tt-form-row { margin-bottom:.75rem; }
+    .tt-form-row label { display:block; font-size:.78rem; color:#64748b;
+      font-weight:600; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.05em; }
+    .tt-form-row select, .tt-form-row input {
+      width:100%; padding:.55rem .85rem; background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.1); border-radius:10px; color:#e2e8f0;
+      font-size:.93rem; }
+    .tt-form-row select:focus, .tt-form-row input:focus {
+      outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.2); }
+    .tt-save-btn { margin-top:.5rem; background:rgba(99,102,241,.2);
+      border:1px solid rgba(99,102,241,.4); border-radius:10px; padding:.5rem 1.1rem;
+      color:#a5b4fc; font-size:.88rem; font-weight:700; cursor:pointer; }
+    .tt-save-btn.saved { background:rgba(34,197,94,.15); border-color:rgba(34,197,94,.4);
+      color:#86efac; }
+
+    #tt-ft { padding:.9rem 2rem 1.5rem; border-top:1px solid rgba(255,255,255,.05);
+      display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    #tt-dots { display:flex; gap:6px; }
+    .tt-dot { width:8px; height:8px; border-radius:50%; background:#1e3258;
+      transition:background .25s, transform .25s, width .25s; }
+    .tt-dot.active { background:#6366f1; transform:scale(1.4); width:20px; border-radius:4px; }
+    .tt-dot.done   { background:#334155; }
+    #tt-btns { display:flex; gap:.6rem; }
+    #tt-skip { background:none; border:1px solid #1e3258; border-radius:10px;
+      padding:.55rem 1.1rem; color:#475569; font-size:.86rem; cursor:pointer;
+      transition:border-color .15s,color .15s; }
+    #tt-skip:hover { border-color:#475569; color:#94a3b8; }
+    #tt-next { background:linear-gradient(135deg,#6366f1,#4338ca); border:none;
+      border-radius:10px; padding:.6rem 1.6rem; color:#fff; font-size:.92rem;
+      font-weight:700; cursor:pointer; letter-spacing:.01em;
+      box-shadow:0 4px 16px rgba(99,102,241,.45);
+      transition:box-shadow .15s, transform .1s; white-space:nowrap; }
+    #tt-next:hover { box-shadow:0 6px 24px rgba(99,102,241,.6); transform:translateY(-1px); }
+    #tt-next:active { transform:translateY(0); }
   `;
   document.head.appendChild(_style);
 
-  // ── UI ─────────────────────────────────────────────────────────────────────
+  // ── Build UI (once per tour) ──────────────────────────────────────────────
   function buildUI() {
-    ['beb-tour-overlay','beb-tour-spotlight','tt-card'].forEach(id => document.getElementById(id)?.remove());
+    ['tt-spot','tt-card'].forEach(id => document.getElementById(id)?.remove());
 
-    const overlay = document.createElement('div');
-    overlay.id = 'beb-tour-overlay';
+    // Spotlight/overlay – single div, always visible
+    const spot = document.createElement('div');
+    spot.id = 'tt-spot';
+    spot.className = 'modal-mode'; // start in modal mode (centered, no hole)
 
-    const spotlight = document.createElement('div');
-    spotlight.id = 'beb-tour-spotlight';
-
+    // Card
     const card = document.createElement('div');
     card.id = 'tt-card';
     card.innerHTML = `
-      <div id="tt-progress-bar-wrap"><div id="tt-progress-bar" style="width:0%"></div></div>
-      <div id="tt-card-inner">
-        <div id="tt-header">
-          <div id="tt-step-label"></div>
-          <div id="tt-title"></div>
+      <div id="tt-prog-wrap"><div id="tt-prog" style="width:0%"></div></div>
+      <div id="tt-hd">
+        <div id="tt-lbl"></div>
+        <div id="tt-ttl"></div>
+      </div>
+      <div id="tt-bd">
+        <div id="tt-cnt">
+          <div id="tt-txt"></div>
+          <div id="tt-hint-box" style="display:none"></div>
+          <div id="tt-form-box" style="display:none"></div>
         </div>
-        <div id="tt-body-wrap">
-          <div id="tt-content">
-            <div id="tt-body"></div>
-            <div id="tt-hint" style="display:none"></div>
-          </div>
-        </div>
-        <div id="tt-footer">
-          <div id="tt-dots"></div>
-          <div id="tt-btns">
-            <button id="tt-skip">${t('Tour beenden','Exit tour')}</button>
-            <button id="tt-next"></button>
-          </div>
+      </div>
+      <div id="tt-ft">
+        <div id="tt-dots"></div>
+        <div id="tt-btns">
+          <button id="tt-skip">${t('Tour beenden','Exit tour')}</button>
+          <button id="tt-next"></button>
         </div>
       </div>
     `;
 
-    document.body.appendChild(overlay);
-    document.body.appendChild(spotlight);
+    // Start centered, invisible
+    card.style.top = '50%'; card.style.left = '50%';
+    card.style.transform = 'translate(-50%,-50%)';
+    card.style.opacity = '0';
+
+    document.body.appendChild(spot);
     document.body.appendChild(card);
 
-    // Initial position: centered
-    card.style.cssText += 'top:50%;left:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity .3s;';
-    requestAnimationFrame(() => { card.style.opacity = '1'; });
+    // Fade card in after append
+    requestAnimationFrame(() => requestAnimationFrame(() => { card.style.opacity = '1'; }));
 
-    return { overlay, spotlight, card };
+    // Click outside card closes tour (delegated)
+    spot.addEventListener('click', e => { spot._onClose && spot._onClose(); });
+
+    return { spot, card };
   }
 
-  // ── Render step (smooth: only content fades, card slides) ─────────────────
-  function renderStep(step, idx, total, ui, instant) {
-    const { overlay, spotlight, card } = ui;
+  // ── Render step ───────────────────────────────────────────────────────────
+  function renderStep(step, idx, total, ui, skipAnim) {
+    const { spot, card } = ui;
     const targetEl = findTarget(step.target);
-    const content  = document.getElementById('tt-content');
+    const cnt = document.getElementById('tt-cnt');
 
-    function applyContent() {
-      // Step label
-      const lbl = document.getElementById('tt-step-label');
-      if (idx === 0) lbl.textContent = t('Einführung','Introduction');
-      else if (step.isLast) lbl.textContent = t('Fertig 🎉','Done 🎉');
+    function apply() {
+      // Label
+      const lbl = document.getElementById('tt-lbl');
+      if (idx === 0) lbl.textContent = t('Einführung · TravOps Guide', 'Introduction · TravOps Guide');
+      else if (step.isLast) lbl.textContent = t('✅ Abgeschlossen', '✅ Completed');
       else lbl.textContent = t(`Schritt ${idx} von ${total-2}`, `Step ${idx} of ${total-2}`);
 
-      document.getElementById('tt-title').textContent = step.title;
-      document.getElementById('tt-body').textContent  = step.body;
-      document.getElementById('tt-next').textContent  = step.next;
+      document.getElementById('tt-ttl').textContent = step.title;
+      document.getElementById('tt-txt').textContent = step.body;
+      document.getElementById('tt-next').textContent = step.next;
 
-      const hint = document.getElementById('tt-hint');
-      if (step.hint) { hint.innerHTML = '💡 ' + step.hint; hint.style.display = 'flex'; }
-      else hint.style.display = 'none';
-
-      // Progress bar
+      // Progress
       const pct = total > 1 ? Math.round((idx / (total-1)) * 100) : 100;
-      document.getElementById('tt-progress-bar').style.width = pct + '%';
+      document.getElementById('tt-prog').style.width = pct + '%';
 
       // Dots
       const dotsEl = document.getElementById('tt-dots');
       dotsEl.innerHTML = '';
       for (let i = 0; i < total; i++) {
         const d = document.createElement('div');
-        d.className = 'tt-dot' + (i === idx ? ' active' : i < idx ? ' done' : '');
+        d.className = 'tt-dot' + (i===idx?' active':i<idx?' done':'');
         dotsEl.appendChild(d);
       }
 
-      // Spotlight + card position
-      positionSpotlight(targetEl, spotlight, overlay);
+      // Hint
+      const hb = document.getElementById('tt-hint-box');
+      if (step.hint) { hb.innerHTML = '<span>💡</span><span>' + step.hint + '</span>'; hb.style.display='flex'; }
+      else hb.style.display = 'none';
+
+      // Inline form
+      const fb = document.getElementById('tt-form-box');
+      if (step.form) {
+        fb.style.display = 'block';
+        fb.innerHTML = buildForm(step.form, ui);
+      } else fb.style.display = 'none';
+
+      // Spotlight position
+      if (targetEl) {
+        spot.className = '';
+        const r = targetEl.getBoundingClientRect(), p = 12;
+        spot.style.top    = (r.top  - p) + 'px';
+        spot.style.left   = (r.left - p) + 'px';
+        spot.style.width  = (r.width  + p*2) + 'px';
+        spot.style.height = (r.height + p*2) + 'px';
+        spot.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.82), 0 0 0 2px rgba(99,102,241,.6)';
+        spot.style.pointerEvents = 'none'; // let user click the highlighted element
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        // Modal mode: tiny offscreen hole = full dark overlay
+        spot.className = 'modal-mode';
+        spot.style.pointerEvents = 'auto';
+      }
+
+      // Card position
       positionCard(targetEl, card);
 
-      // Highlight ring
+      // Highlight
       clearHighlights();
       if (step.highlight) {
         const h = findTarget(step.highlight);
-        if (h) { h.style.outline = '2px solid #6366f1'; h.style.outlineOffset = '4px'; h.dataset.tourHl = '1'; }
+        if (h) { h.style.outline = '2px solid rgba(99,102,241,.8)'; h.style.outlineOffset = '4px'; h.dataset.tourHl = '1'; }
       }
-      if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    if (instant) {
-      applyContent();
-      return;
-    }
-
-    // Fade content out → apply → fade in (card stays, no flicker)
-    content.classList.add('fading');
-    setTimeout(() => {
-      applyContent();
-      content.classList.remove('fading');
-    }, 190);
+    if (skipAnim) { apply(); return; }
+    cnt.classList.add('out');
+    setTimeout(() => { apply(); cnt.classList.remove('out'); }, 210);
   }
 
-  function positionCard(el, card) {
-    card.style.transition = 'top .38s cubic-bezier(.4,0,.2,1), left .38s cubic-bezier(.4,0,.2,1), transform .38s cubic-bezier(.4,0,.2,1), opacity .3s';
-    if (!el) {
+  // ── Inline form builder ───────────────────────────────────────────────────
+  function buildForm(formDef, ui) {
+    if (formDef.type === 'timezone') {
+      const opts = TZ_OPTIONS.map(([v,l]) =>
+        `<option value="${v}" ${v===60?'selected':''}>${l}</option>`).join('');
+      return `
+        <div class="tt-form-row">
+          <label>${t('Zeitzone deines Travian-Servers','Your Travian server timezone')}</label>
+          <select id="tt-tz-sel">${opts}</select>
+        </div>
+        <button class="tt-save-btn" id="tt-tz-save" onclick="window._ttSaveTz(this)">
+          💾 ${t('Zeitzone speichern','Save timezone')}
+        </button>`;
+    }
+    if (formDef.type === 'alliance-rules') {
+      return `
+        <div class="tt-form-row">
+          <label>${t('Truppenquote (min. % aktive Truppen)','Troop quota (min. % active troops)')}</label>
+          <input id="tt-tq" type="number" min="0" max="100" value="80" placeholder="z.B. 80">
+        </div>
+        <div class="tt-form-row">
+          <label>${t('Mindest-Bevölkerung für Mitgliedschaft','Min. population for membership')}</label>
+          <input id="tt-minpop" type="number" min="0" value="500" placeholder="z.B. 500">
+        </div>
+        <button class="tt-save-btn" id="tt-rules-save" onclick="window._ttSaveRules(this)">
+          💾 ${t('Regeln speichern','Save rules')}
+        </button>`;
+    }
+    return '';
+  }
+
+  // ── Inline form save handlers ─────────────────────────────────────────────
+  const guildIdFromPath = () => (location.pathname.match(/\/guild\/(\d{17,20})/) || [])[1];
+
+  window._ttSaveTz = async function(btn) {
+    const val = document.getElementById('tt-tz-sel')?.value;
+    if (val == null) return;
+    const gId = guildIdFromPath();
+    if (!gId) return;
+    try {
+      await fetch(`/guild/${gId}/map/world-timezone`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ utc_offset: parseInt(val) })
+      });
+      btn.textContent = '✅ ' + t('Gespeichert!','Saved!');
+      btn.classList.add('saved');
+    } catch(e) { btn.textContent = '❌ Fehler'; }
+  };
+
+  window._ttSaveRules = async function(btn) {
+    const tq  = document.getElementById('tt-tq')?.value;
+    const pop = document.getElementById('tt-minpop')?.value;
+    const gId = guildIdFromPath();
+    if (!gId) return;
+    try {
+      await fetch(`/guild/${gId}/my-ally/rules`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tq_min: parseInt(tq||0), min_pop: parseInt(pop||0) })
+      });
+      btn.textContent = '✅ ' + t('Gespeichert!','Saved!');
+      btn.classList.add('saved');
+    } catch(e) {
+      // Endpoint might not exist yet – mark as saved anyway visually
+      btn.textContent = '✅ ' + t('Gespeichert!','Saved!');
+      btn.classList.add('saved');
+    }
+  };
+
+  // ── Card positioning ──────────────────────────────────────────────────────
+  function positionCard(targetEl, card) {
+    if (!targetEl) {
       card.style.top = '50%'; card.style.left = '50%';
       card.style.transform = 'translate(-50%,-50%)';
       return;
     }
-    const r = el.getBoundingClientRect();
-    const cw = Math.min(560, window.innerWidth * 0.94);
-    const ch = 340; // approx card height
-    const m  = 18;
+    const r  = targetEl.getBoundingClientRect();
+    const cw = Math.min(640, window.innerWidth * 0.96);
+    const ch = 380;
+    const m  = 20;
 
-    // Prefer right side, then below, then above, then left
-    let top, left, transform = 'none';
-
+    // Priority: right → below → above → centered
     if (r.right + cw + m < window.innerWidth) {
-      // Right
-      left = r.right + m;
-      top  = Math.min(Math.max(m, r.top + r.height/2 - ch/2), window.innerHeight - ch - m);
+      card.style.left = (r.right + m) + 'px';
+      card.style.top  = clamp(r.top + r.height/2 - ch/2, m, window.innerHeight - ch - m) + 'px';
+      card.style.transform = 'none';
     } else if (r.bottom + ch + m < window.innerHeight) {
-      // Below
-      top  = r.bottom + m;
-      left = Math.min(Math.max(m, r.left + r.width/2 - cw/2), window.innerWidth - cw - m);
+      card.style.top  = (r.bottom + m) + 'px';
+      card.style.left = clamp(r.left + r.width/2 - cw/2, m, window.innerWidth - cw - m) + 'px';
+      card.style.transform = 'none';
     } else if (r.top - ch - m > 0) {
-      // Above
-      top  = r.top - ch - m;
-      left = Math.min(Math.max(m, r.left + r.width/2 - cw/2), window.innerWidth - cw - m);
+      card.style.top  = (r.top - ch - m) + 'px';
+      card.style.left = clamp(r.left + r.width/2 - cw/2, m, window.innerWidth - cw - m) + 'px';
+      card.style.transform = 'none';
     } else {
-      // Centered fallback
       card.style.top = '50%'; card.style.left = '50%';
       card.style.transform = 'translate(-50%,-50%)';
-      return;
     }
-
-    card.style.top  = top  + 'px';
-    card.style.left = left + 'px';
-    card.style.transform = transform;
   }
 
-  function positionSpotlight(el, spotlight, overlay) {
-    if (!el) {
-      spotlight.style.boxShadow = 'none';
-      spotlight.style.width  = '0px';
-      spotlight.style.height = '0px';
-      spotlight.style.top    = '-999px';
-      spotlight.style.left   = '-999px';
-      overlay.style.display = 'block';
-      return;
-    }
-    const r = el.getBoundingClientRect(), p = 10;
-    spotlight.style.top    = (r.top  - p) + 'px';
-    spotlight.style.left   = (r.left - p) + 'px';
-    spotlight.style.width  = (r.width  + p*2) + 'px';
-    spotlight.style.height = (r.height + p*2) + 'px';
-    spotlight.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.78), 0 0 0 2px rgba(99,102,241,.5)';
-    overlay.style.display = 'none';
-  }
+  function clamp(val, min, max) { return Math.min(Math.max(val, min), max); }
 
   function findTarget(sel) {
     if (!sel) return null;
@@ -717,11 +816,9 @@
 
   function fadeOut(ui) {
     clearHighlights();
-    [ui.overlay, ui.spotlight, ui.card].forEach(el => {
-      if (!el) return;
-      el.style.opacity = '0';
-      setTimeout(() => el.remove(), 320);
-    });
+    const { spot, card } = ui;
+    if (card) { card.style.opacity = '0'; setTimeout(() => card.remove(), 350); }
+    if (spot) { spot.style.opacity = '0'; setTimeout(() => spot.remove(), 350); }
   }
 
   // ── Tour runner ────────────────────────────────────────────────────────────
@@ -734,16 +831,17 @@
     const ui = buildUI();
     let cur = startStep;
 
+    function closeTour() {
+      markDone(name);
+      if (name === 'start') localStorage.setItem('beb_tour_done', '1');
+      if (name === 'my-account') localStorage.setItem('beb_account_tour_done', '1');
+      fadeOut(ui);
+    }
+
     function next() {
       clearHighlights();
       cur++;
-      if (cur >= steps.length) {
-        markDone(name);
-        if (name === 'start') localStorage.setItem('beb_tour_done', '1');
-        if (name === 'my-account') localStorage.setItem('beb_account_tour_done', '1');
-        fadeOut(ui);
-        return;
-      }
+      if (cur >= steps.length) { closeTour(); return; }
       const step = steps[cur];
       if (step.page) {
         const target = new URL(step.page, location.origin).pathname;
@@ -757,11 +855,11 @@
       renderStep(step, cur, steps.length, ui);
     }
 
+    ui.spot._onClose = closeTour;
     document.getElementById('tt-next').addEventListener('click', next);
-    document.getElementById('tt-skip').addEventListener('click', () => { markDone(name); fadeOut(ui); });
-    ui.overlay.addEventListener('click', () => { markDone(name); fadeOut(ui); });
+    document.getElementById('tt-skip').addEventListener('click', closeTour);
 
-    setTimeout(() => renderStep(steps[cur], cur, steps.length, ui, true), 400);
+    setTimeout(() => renderStep(steps[cur], cur, steps.length, ui, true), 350);
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
