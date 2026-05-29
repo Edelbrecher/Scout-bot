@@ -114,8 +114,9 @@ async def seed(db, wipe=False):
         print("🗑️  Lösche alte Demo-Daten …")
         for tbl in ["guild_configs","ally_groups","map_snapshots","guild_own_villages",
                     "enemies","enemy_artifacts","incoming_attacks","op_plans",
-                    "op_targets","op_waves","scout_channels","scout_reports"]:
+                    "op_targets","op_waves","scout_reports"]:
             await db.execute(f"DELETE FROM {tbl} WHERE guild_id = ?", (DEMO_GUILD_ID,))
+        await db.execute("DELETE FROM scout_channels WHERE channel_id LIKE 'DEMO_CH_%'")
         await db.commit()
 
     # ── guild_config ──────────────────────────────────────────────────────────
@@ -329,7 +330,7 @@ async def seed(db, wipe=False):
     ]
     for player, item, reporter, ts in scout_entries:
         await db.execute("""
-            INSERT INTO scout_channels
+            INSERT OR REPLACE INTO scout_channels
               (channel_id, guild_id, created_at, player, additional_info)
             VALUES (?,?,?,?,?)
         """, (f"DEMO_CH_{player}", DEMO_GUILD_ID, ts, player,
