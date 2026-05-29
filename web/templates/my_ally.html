@@ -269,6 +269,82 @@
     {% endif %}
   </div>
 
+  {# ── Discord ↔ Travian Mapping ── #}
+  {% if approved_members %}
+  <div class="card" style="margin-top:1rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;flex-wrap:wrap;gap:0.5rem;">
+      <h2 style="margin:0;">🔗 Discord ↔ Travian Zuordnung</h2>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="text" id="mappingSearch" placeholder="🔍 Suchen…"
+               style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:0.82rem;width:180px;"
+               oninput="filterMapping(this.value)">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.85rem;" id="mappingTable">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);text-align:left;">
+            <th style="padding:0.45rem 0.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">#</th>
+            <th style="padding:0.45rem 0.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">Discord-Nutzer</th>
+            <th style="padding:0.45rem 0.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">Discord-ID</th>
+            <th style="padding:0.45rem 0.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">Travian-Account</th>
+            <th style="padding:0.45rem 0.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">Rolle</th>
+            <th style="padding:0.45rem 0.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">Flügel</th>
+          </tr>
+        </thead>
+        <tbody id="mappingBody">
+          {% for m in approved_members %}
+          {% set wing_label = "Hauptallianz" %}
+          {% if m.wing == 1 and ally_group.wing1_name %}{% set wing_label = ally_group.wing1_name %}
+          {% elif m.wing == 2 and ally_group.wing2_name %}{% set wing_label = ally_group.wing2_name %}
+          {% endif %}
+          <tr class="mapping-row" style="border-bottom:1px solid rgba(255,255,255,0.05);" data-search="{{ (m.discord_username or '') | lower }} {{ (m.travian_name or '') | lower }} {{ m.discord_id }}">
+            <td style="padding:0.4rem 0.75rem;color:var(--text-muted);">{{ loop.index }}</td>
+            <td style="padding:0.4rem 0.75rem;">
+              <span style="font-weight:600;">{{ m.discord_username or '—' }}</span>
+            </td>
+            <td style="padding:0.4rem 0.75rem;color:var(--text-muted);font-family:monospace;font-size:0.78rem;">{{ m.discord_id }}</td>
+            <td style="padding:0.4rem 0.75rem;">
+              {% if m.travian_name %}
+              <span style="color:#93c5fd;font-weight:600;">{{ m.travian_name }}</span>
+              {% else %}
+              <span style="color:var(--text-muted);font-style:italic;">nicht gesetzt</span>
+              {% endif %}
+            </td>
+            <td style="padding:0.4rem 0.75rem;">
+              {% if m.role_name %}
+              <span style="font-size:0.75rem;background:rgba(0,0,0,0.25);border:1px solid {{ m.role_color or '#94a3b8' }};color:{{ m.role_color or '#94a3b8' }};border-radius:10px;padding:1px 8px;font-weight:600;">{{ m.role_name }}</span>
+              {% else %}
+              <span style="color:var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+            <td style="padding:0.4rem 0.75rem;font-size:0.8rem;color:var(--text-muted);">{{ wing_label }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div id="mappingEmpty" style="display:none;text-align:center;color:var(--text-muted);padding:1rem;font-size:0.85rem;">Keine Treffer</div>
+    <div style="margin-top:0.6rem;font-size:0.75rem;color:var(--text-muted);">
+      {{ approved_members | length }} Mitglieder ·
+      {{ approved_members | selectattr('travian_name') | list | length }} mit Travian-Zuordnung ·
+      {{ approved_members | rejectattr('travian_name') | list | length }} ohne Zuordnung
+    </div>
+  </div>
+  <script>
+  function filterMapping(q) {
+    q = q.toLowerCase();
+    let shown = 0;
+    document.querySelectorAll('#mappingBody .mapping-row').forEach(tr => {
+      const match = !q || tr.dataset.search.includes(q);
+      tr.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    document.getElementById('mappingEmpty').style.display = shown === 0 ? '' : 'none';
+  }
+  </script>
+  {% endif %}
+
   {# ── Leaderboard ── #}
   {% if leaderboard %}
   <div class="card" style="margin-top:1rem;">
