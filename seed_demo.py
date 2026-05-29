@@ -350,12 +350,11 @@ async def main():
     parser.add_argument("--guild-id", default=DEMO_GUILD_ID, help="Guild-ID überschreiben")
     args = parser.parse_args()
 
-    global DEMO_GUILD_ID
-    DEMO_GUILD_ID = args.guild_id
+    guild_id = args.guild_id
 
     print(f"🌱 TravOps Demo-Seed startet …")
     print(f"   DB     : {DB_PATH}")
-    print(f"   Guild  : {DEMO_GUILD_ID}\n")
+    print(f"   Guild  : {guild_id}\n")
 
     async with aiosqlite.connect(DB_PATH) as db:
         # Prüfe ob Tabellen existieren
@@ -366,6 +365,9 @@ async def main():
             print("❌ Datenbank nicht initialisiert. Starte erst die Web-App einmal.")
             return
 
+        # Override module-level constant so seed() uses the right guild_id
+        import sys
+        sys.modules[__name__].DEMO_GUILD_ID = guild_id
         await seed(db, wipe=args.wipe)
 
 if __name__ == "__main__":
