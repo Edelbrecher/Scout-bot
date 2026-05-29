@@ -104,8 +104,14 @@
           style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;"></textarea>
         <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap;">
           <button type="submit" class="btn btn-primary">⬆️ Speichern &amp; Importieren</button>
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='flex'">
-            🏥 Lazarett{% if hospital_data %} <span style="background:rgba(239,68,68,.25);color:#f87171;border-radius:8px;padding:1px 6px;font-size:.75rem;margin-left:.3rem;">{{ hospital_data|length }}</span>{% endif %}
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='flex'" style="display:flex;align-items:center;gap:.4rem;">
+            🏥 Lazarett
+            {% if hospital_data %}
+            {% set total_healing = hospital_data | sum(attribute='count') %}
+            <span style="background:rgba(239,68,68,.25);color:#f87171;border-radius:8px;padding:1px 6px;font-size:.75rem;">{{ "{:,}".format(total_healing).replace(",",".") }} 🩺</span>
+            {% set timed = hospital_data | selectattr('heal_finish') | list %}
+            {% if timed %}<span id="hospitalBtnTimer" style="font-size:.72rem;color:#f59e0b;font-weight:600;"></span>{% endif %}
+            {% endif %}
           </button>
           {% if own_villages %}
           <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/clear" style="margin:0;"
@@ -517,6 +523,9 @@
       const el1=document.getElementById('hospitalTotalTime'), el2=document.getElementById('hospitalFinishAt');
       if(el1) el1.innerHTML=fmtRemaining(rem);
       if(el2) el2.textContent=fmtClock(maxFinish);
+      // Button inline timer
+      const btn=document.getElementById('hospitalBtnTimer');
+      if(btn) btn.innerHTML = rem>0 ? '⏱ '+fmtRemaining(rem) : '✓';
     }
   }
   update(); setInterval(update,1000);

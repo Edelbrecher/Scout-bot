@@ -6240,18 +6240,123 @@ async def api_popup_config():
 def parse_hospital(text: str) -> list[dict]:
     """Parse Travian hospital copy-paste into list of dicts.
 
-    Each dict: {village_name, troop_name, count, heal_finish}
+    Supports two formats:
 
-    Format:
+    FORMAT A — Table (Hospital Overview, EN + DE):
+      "in progress\tWounded troops"  or  "Im Gange\tVerwundete Truppen"
+      TroopA\tTroopB\tTroopC\t...        ← header row with troop names
+      Village1\t•\t0\t14\t0\t...         ← village rows (• or - as 2nd col)
+      Village2\t-\t10\t0\t0\t...
+
+    FORMAT B — Row-by-row with finish time (older / detail pages):
       Village name
-      TroopName\tCount\tHH:MM:SS  (or DD.MM.YYYY HH:MM:SS)
+      TroopName\tCount\tHH:MM:SS
+
+    Returns list of {village_name, troop_name, count, heal_finish}.
     """
     import re as _re
 
-    # Strip Unicode direction/formatting marks
+    # Known troop names (EN + DE) for header detection
+    _KNOWN_TROOPS = {
+        # Romans EN/DE
+        'legionnaire','praetorian','imperian','equites legati','equites imperatoris',
+        'equites caesaris','fire catapult','senator','settler',
+        'legionär','prätorianer','imperianer','feuerkatapult',
+        # Teutons EN/DE
+        'clubswinger','spearman','scout','paladin','teutonic knight','catapult','chief',
+        'keulenschwinger','speerkämpfer','späher','teutonischer ritter','katapult',
+        'häuptling','teutonen-rammbock',
+        # Gauls EN/DE
+        'phalanx','swordsman','pathfinder','theutates thunder','druidrider','haeduan',
+        'schwertkämpfer','kundschafter','theutates-blitz','druider','häduaner',
+        # shared
+        'ram','rammbock',
+        # Egyptians EN/DE
+        'slave militia','ash warden','khopesh warrior','sopdu explorer',
+        'anhur guard','resheph chariot','stone catapult','nomarch',
+        'sklavenmiliz','aschenwächter','khopesh-kämpfer','sopdu-kundschafter',
+        'anhur-wächter','resheph-streitwagen','steinkatapult',
+        # Huns EN/DE
+        'mercenary','bowman','spotter','steppe rider','marksman','marauder',
+        'logades','cataphract',
+        'söldner','bogenschütze','kundschafter','steppenreiter','scharfschütze',
+        # Spartans EN/DE
+        'hoplite','senator','spartan',
+        'hoplit',
+    }
+
+    # Strip Unicode bidirectional / formatting marks
     text = _re.sub(r'[​-‏‪-‮⁦-⁩﻿]', '', text)
     lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
 
+    # --- Detect format ---
+    _TABLE_INTRO = _re.compile(
+        r'^(in progress|im gange|wounded troops|verwundete truppen)', _re.IGNORECASE
+    )
+    _TIME_ONLY = _re.compile(r'^\d{1,2}:\d{2}:\d{2}$')
+    _DATETIME  = _re.compile(r'^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}:\d{2}$')
+    _INDICATOR = _re.compile(r'^[•\-–·]$')  # hospital present/absent indicator
+
+    def _clean_num(s: str) -> int:
+        cleaned = _re.sub(r'[^\d]', '', s)
+        return int(cleaned) if cleaned else 0
+
+    def _is_troop_header(parts: list) -> bool:
+        hits = sum(1 for p in parts if p.lower() in _KNOWN_TROOPS)
+        return hits >= 2
+
+    # Check for table format: find header row with troop names
+    header_idx = None
+    troop_cols: list[str] = []
+    for i, raw in enumerate(lines):
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if _TABLE_INTRO.match(stripped):
+            continue  # skip intro row
+        if '\t' in stripped:
+            parts = [p.strip() for p in stripped.split('\t')]
+            parts_clean = [p for p in parts if p]
+            if _is_troop_header(parts_clean):
+                header_idx = i
+                troop_cols = parts_clean
+                break
+
+    # --- FORMAT A: Table ---
+    if header_idx is not None:
+        entries = []
+        for raw in lines[header_idx + 1:]:
+            stripped = raw.strip()
+            if not stripped or '\t' not in stripped:
+                continue
+            parts = [p.strip() for p in stripped.split('\t')]
+            # First non-empty = village name
+            village = parts[0] if parts else ''
+            if not village:
+                continue
+            # Determine where counts start: skip •/- indicator col if present
+            rest = parts[1:]
+            start = 0
+            if rest and _INDICATOR.match(rest[0]):
+                start = 1
+            counts = rest[start:]
+            for j, troop in enumerate(troop_cols):
+                if j >= len(counts):
+                    break
+                try:
+                    cnt = _clean_num(counts[j])
+                except Exception:
+                    cnt = 0
+                if cnt > 0:
+                    entries.append({
+                        'village_name': village,
+                        'troop_name':   troop,
+                        'count':        cnt,
+                        'heal_finish':  None,
+                    })
+        return entries
+
+    # --- FORMAT B: Row-by-row (village header + tab-separated troop rows) ---
     _SKIP = _re.compile(
         r'^Lazarett$|^Hospital$|^Krankenhaus$|^Heilung$|^Truppe$|^Anzahl$|'
         r'^Fertig$|^Troop$|^Count$|^Healing finish$|^Finish$|'
@@ -6261,32 +6366,24 @@ def parse_hospital(text: str) -> list[dict]:
         r'^\s*Troop\s+Count\s+|^\s*Truppe\s+Anzahl',
         _re.IGNORECASE,
     )
-
-    # Time-like patterns
-    _TIME_ONLY = _re.compile(r'^\d{1,2}:\d{2}:\d{2}$')
-    _DATETIME  = _re.compile(r'^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}:\d{2}$')
-
     entries = []
     current_village = None
-
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
             continue
-
-        # Tab-separated data row?
         if '\t' in stripped:
             parts = [p.strip() for p in stripped.split('\t')]
             parts = [p for p in parts if p]
-            # Expect: TroopName, Count, Time  (at least 2 parts, count is numeric)
             if len(parts) >= 2:
                 troop_name = parts[0]
-                # Skip if first part looks like a header word
                 if _SKIP.match(troop_name):
                     continue
                 try:
-                    count = int(_re.sub(r'\D', '', parts[1]))
-                except (ValueError, IndexError):
+                    count = _clean_num(parts[1])
+                except Exception:
+                    continue
+                if count == 0:
                     continue
                 heal_finish = None
                 if len(parts) >= 3:
@@ -6294,26 +6391,20 @@ def parse_hospital(text: str) -> list[dict]:
                     if _TIME_ONLY.match(t) or _DATETIME.match(t):
                         heal_finish = t
                     elif len(parts) >= 4:
-                        # Maybe date and time split across columns
                         combined = f"{parts[2]} {parts[3]}".strip()
                         if _DATETIME.match(combined):
                             heal_finish = combined
-                if current_village and troop_name:
+                if current_village:
                     entries.append({
-                        "village_name": current_village,
-                        "troop_name": troop_name,
-                        "count": count,
-                        "heal_finish": heal_finish,
+                        'village_name': current_village,
+                        'troop_name':   troop_name,
+                        'count':        count,
+                        'heal_finish':  heal_finish,
                     })
             continue
-
-        # Skip known UI chrome
         if _SKIP.search(stripped):
             continue
-
-        # Otherwise treat as village name (non-tab line)
         current_village = stripped
-
     return entries
 
 
