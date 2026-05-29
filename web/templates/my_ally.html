@@ -611,44 +611,63 @@
   {% endif %}
 
   {# ── 5 Leaderboards ── #}
-  {% if member_leaderboard %}
-  {% set lb = member_leaderboard %}
+  {% set approved = member_view_members | selectattr("status","equalto","approved") | list %}
+  {% if approved %}
+  {# Build a lookup: travian_name → leaderboard stats #}
+  {% set lb_map = {} %}
+  {% for row in member_leaderboard %}
+    {% if row.travian_name %}{% set _ = lb_map.update({row.travian_name: row}) %}{% endif %}
+  {% endfor %}
+
+  {# Merge: all approved members + their stats (0 if not submitted) #}
+  {% set all_rows = [] %}
+  {% for m in approved %}
+    {% set stats = lb_map.get(m.travian_name or '', {}) %}
+    {% set _ = all_rows.append({
+      'name':        m.travian_name or m.discord_username,
+      'is_me':       m.discord_id == session.get('uid'),
+      'total_troops':  stats.get('total_troops', 0) or 0,
+      'total_off':     stats.get('total_off', 0) or 0,
+      'total_def':     stats.get('total_def', 0) or 0,
+      'population':    stats.get('population', 0) or 0,
+      'avg_population':stats.get('avg_population', 0) or 0,
+    }) %}
+  {% endfor %}
+
   {% set my_travian = membership.travian_name or '' %}
 
-  {# Helper macro: render one leaderboard card #}
+  <div style="margin-bottom:.5rem;">
+    <h2 style="margin:0 0 .25rem;font-size:1rem;">📊 Allianz-Rankings</h2>
+    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">Alle Mitglieder · Truppen aus letzter Eingabe · Einwohner aus Karten-Snapshot.</p>
+  </div>
+
+  {# Macro: one ranked bar-chart card #}
   {% macro rankcard(title, icon, field, color, fmt) %}
-  {% set sorted = lb | sort(attribute=field, reverse=True) %}
-  {% set top_val = (sorted[0][field] or 0) if sorted else 1 %}
+  {% set sorted_rows = all_rows | sort(attribute=field, reverse=True) %}
+  {% set top_val = (sorted_rows | map(attribute=field) | max) if sorted_rows else 1 %}
+  {% set top_val = top_val if top_val > 0 else 1 %}
   <div class="card" style="margin-bottom:1rem;">
     <h3 style="margin:0 0 .85rem;font-size:.92rem;">{{ icon }} {{ title }}</h3>
-    <div style="display:flex;flex-direction:column;gap:.35rem;">
-      {% for row in sorted if (row[field] or 0) > 0 %}
+    <div style="display:flex;flex-direction:column;gap:.4rem;">
+      {% for row in sorted_rows %}
       {% set val = row[field] or 0 %}
-      {% set pct = (val / top_val * 100) | round | int %}
-      {% set is_me = row.travian_name == my_travian %}
-      <div style="display:flex;align-items:center;gap:.6rem;">
-        <span style="font-size:.72rem;color:var(--text-muted);width:1.4rem;text-align:right;flex-shrink:0;">{{ loop.index }}</span>
-        <span style="font-size:.8rem;font-weight:{% if is_me %}700{% else %}400{% endif %};color:{% if is_me %}#a5b4fc{% else %}var(--text-primary){% endif %};width:110px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ row.travian_name or row.discord_name }}</span>
+      {% set pct = ((val / top_val) * 100) | round | int %}
+      <div style="display:flex;align-items:center;gap:.55rem;">
+        <span style="font-size:.7rem;color:var(--text-muted);width:1.2rem;text-align:right;flex-shrink:0;">{{ loop.index }}</span>
+        <span style="font-size:.8rem;font-weight:{% if row.is_me %}700{% else %}400{% endif %};color:{% if row.is_me %}#a5b4fc{% else %}var(--text-primary){% endif %};width:100px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ row.name }}">{{ row.name }}</span>
         <div style="flex:1;background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden;">
-          <div style="height:8px;border-radius:4px;background:{{ color }};width:{{ pct }}%;transition:width .5s;"></div>
+          <div style="height:8px;border-radius:4px;background:{{ color }};width:{{ pct }}%;"></div>
         </div>
-        <span style="font-size:.75rem;color:var(--text-muted);width:60px;text-align:right;flex-shrink:0;">
-          {% if fmt == 'k' %}{{ '{:,.0f}'.format(val / 1000) }}k{% else %}{{ '{:,.0f}'.format(val) }}{% endif %}
+        <span style="font-size:.73rem;color:{% if val == 0 %}var(--text-muted){% else %}var(--text-primary){% endif %};width:58px;text-align:right;flex-shrink:0;">
+          {% if val == 0 %}—{% elif fmt == 'k' and val >= 1000 %}{{ (val / 1000) | round(1) }}k{% else %}{{ '{:,}'.format(val) }}{% endif %}
         </span>
       </div>
-      {% else %}
-      <p style="font-size:.8rem;color:var(--text-muted);margin:0;">Noch keine Daten vorhanden.</p>
       {% endfor %}
     </div>
   </div>
   {% endmacro %}
 
-  <div style="margin-bottom:.5rem;">
-    <h2 style="margin:0 0 .25rem;font-size:1rem;">📊 Allianz-Rankings</h2>
-    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">Basierend auf eingereichten Truppen & Karten-Snapshot.</p>
-  </div>
-
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0;">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0 1rem;">
     {{ rankcard('Truppen gesamt',    '⚔️',  'total_troops',     'linear-gradient(90deg,#6366f1,#8b5cf6)', 'k') }}
     {{ rankcard('Off-Truppen',       '🗡️',  'total_off',        'linear-gradient(90deg,#ef4444,#f97316)', 'k') }}
     {{ rankcard('Def-Truppen',       '🛡️',  'total_def',        'linear-gradient(90deg,#3b82f6,#06b6d4)', 'k') }}
