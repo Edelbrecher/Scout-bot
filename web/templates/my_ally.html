@@ -130,34 +130,95 @@
     </div>
   </div>
 
-  {# ── Roles Card ── #}
+  {# ── Roles & Permissions Card ── #}
   <div class="card" style="margin-bottom:1rem;">
-    <h3 style="margin:0 0 0.75rem;font-size:0.95rem;">🏷️ Rollen ({{ roles|length }})</h3>
-    <div style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:0.75rem;">
+    <h3 style="margin:0 0 0.25rem;font-size:0.95rem;">🛡️ Rollen & Rechte ({{ roles|length }})</h3>
+    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .9rem;">Klicke auf eine Rolle um die Rechte zu konfigurieren.</p>
+
+    {# Permission legend #}
+    <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.85rem;">
+      <span style="font-size:.7rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:20px;padding:2px 8px;">👑 Leiter — alle Rechte</span>
+      <span style="font-size:.7rem;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);color:#fb923c;border-radius:20px;padding:2px 8px;">⚔️ Officer — ohne Einstellungen</span>
+      <span style="font-size:.7rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac;border-radius:20px;padding:2px 8px;">👤 Mitglied — lesen & eigene Daten</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem;">
       {% for r in roles %}
-      {% set has_ep_notify = 'ep_notify' in (r.permissions or '') %}
-      <div style="display:flex;align-items:center;gap:0.6rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;flex-wrap:wrap;">
-        <span style="width:10px;height:10px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
-        <span style="font-size:0.85rem;font-weight:600;flex:1;min-width:80px;">{{ r.role_name }}</span>
-        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/update" style="margin:0;display:flex;align-items:center;gap:.35rem;">
-          <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--text-muted);cursor:pointer;" title="Diese Rolle erhält Benachrichtigungen wenn Angreifer im EP ausfallen">
-            <input type="checkbox" name="ep_notify" value="1" {% if has_ep_notify %}checked{% endif %}
-                   onchange="this.form.submit()" style="accent-color:#6366f1;">
-            🔔 EP-Benachrichtigungen
-          </label>
-        </form>
-        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/update" style="margin:0;display:flex;align-items:center;gap:.3rem;">
-          <input type="color" name="color" value="{{ r.color }}" title="Farbe ändern"
-                 style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;padding:1px;background:var(--bg-main);cursor:pointer;"
-                 onchange="this.form.submit()">
-        </form>
-        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="margin:0;">
-          <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:.1rem .3rem;line-height:1;"
-                  onclick="return confirm('Rolle löschen?')" title="Rolle löschen">✕</button>
-        </form>
+      {% set rp = r.permissions or '' %}
+      <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        {# Role header — click to expand #}
+        <div onclick="toggleRole({{ r.id }})"
+             style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;cursor:pointer;user-select:none;">
+          <span style="width:10px;height:10px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
+          <span style="font-size:.88rem;font-weight:600;flex:1;">{{ r.role_name }}</span>
+          {# Permission summary badges #}
+          <span style="font-size:.68rem;color:var(--text-muted);">
+            {{ (rp.split(',') | select | list) | length }} Rechte
+          </span>
+          <span id="role-chevron-{{ r.id }}" style="font-size:.75rem;color:var(--text-muted);transition:transform .2s;">▼</span>
+        </div>
+
+        {# Expandable permissions form #}
+        <div id="role-panel-{{ r.id }}" style="display:none;border-top:1px solid var(--border);padding:.75rem;">
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/update">
+
+            {# Preset buttons #}
+            <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.75rem;">
+              <span style="font-size:.72rem;color:var(--text-muted);align-self:center;">Preset:</span>
+              <button type="submit" name="preset" value="leiter"
+                style="font-size:.72rem;background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;padding:2px 10px;border-radius:20px;cursor:pointer;">👑 Leiter</button>
+              <button type="submit" name="preset" value="officer"
+                style="font-size:.72rem;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.35);color:#fb923c;padding:2px 10px;border-radius:20px;cursor:pointer;">⚔️ Officer</button>
+              <button type="submit" name="preset" value="mitglied"
+                style="font-size:.72rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;padding:2px 10px;border-radius:20px;cursor:pointer;">👤 Mitglied</button>
+            </div>
+
+            {# Permission groups #}
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.5rem;margin-bottom:.75rem;">
+              {% set perm_groups = [
+                ("⚙️ Allianz", [("ally_manage", "Verwaltung")]),
+                ("📋 Einsatzplanung", [("ep_view","Ansehen"),("ep_manage","Verwalten"),("ep_notify","Benachrichtigungen")]),
+                ("⚔️ Angriffe", [("attack_view","Ansehen"),("attack_manage","Verwalten")]),
+                ("🔍 Aufklärung", [("scout_view","Ansehen"),("scout_manage","Verwalten")]),
+                ("🗺️ Karte", [("map_view","Ansehen"),("map_manage","Verwalten")]),
+                ("📡 Sektor", [("sector_view","Überwachung")]),
+                ("🏥 Hospital", [("hospital_view","Ansehen")]),
+              ] %}
+              {% for group_name, group_perms in perm_groups %}
+              <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem;">
+                <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:.35rem;">{{ group_name }}</div>
+                {% for flag, label in group_perms %}
+                <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;cursor:pointer;margin-bottom:.2rem;">
+                  <input type="checkbox" name="{{ flag }}" value="1"
+                         {% if flag in rp %}checked{% endif %}
+                         style="accent-color:#6366f1;width:13px;height:13px;">
+                  {{ label }}
+                </label>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+
+            {# Color + Save row #}
+            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-muted);">
+                Farbe
+                <input type="color" name="color" value="{{ r.color }}"
+                       style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;padding:1px;background:var(--bg-main);cursor:pointer;">
+              </label>
+              <button type="submit" class="btn btn-primary" style="font-size:.8rem;padding:.35rem .9rem;">💾 Speichern</button>
+              <div style="flex:1;"></div>
+              <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="margin:0;">
+                <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:.1rem .3rem;"
+                        onclick="return confirm('Rolle löschen?')">🗑️ Löschen</button>
+              </form>
+            </div>
+          </form>
+        </div>
       </div>
       {% endfor %}
     </div>
+
     <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/create"
           style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
       <input type="text" name="role_name" placeholder="Neue Rolle…" required maxlength="40"
@@ -167,6 +228,21 @@
       <button type="submit" class="btn btn-secondary" style="font-size:0.82rem;">➕ Rolle hinzufügen</button>
     </form>
   </div>
+
+  <script>
+  function toggleRole(id) {
+    const panel = document.getElementById('role-panel-' + id);
+    const ch = document.getElementById('role-chevron-' + id);
+    const open = panel.style.display !== 'none';
+    // Close all panels first
+    document.querySelectorAll('[id^="role-panel-"]').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('[id^="role-chevron-"]').forEach(c => c.style.transform = '');
+    if (!open) {
+      panel.style.display = 'block';
+      ch.style.transform = 'rotate(180deg)';
+    }
+  }
+  </script>
 
   {# ── Pending Members ── #}
   {% set pending_members = members | selectattr("status", "equalto", "pending") | list %}

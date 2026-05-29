@@ -340,7 +340,24 @@ def is_guild_owner(session: dict, guild: dict) -> bool:
     if session.get("type") == "admin":
         return True
     return session.get("uid", "") == (guild.get("owner_discord_id") or "")
-    return None
+
+
+async def has_perm(request: Request, guild_id: str, flag: str) -> bool:
+    """Check if the current user has a specific TravOps permission flag.
+    Guild owners and admin sessions always pass. Returns False if not logged in."""
+    session = request.session
+    if not session.get("uid"):
+        return False
+    if session.get("type") == "admin":
+        return True
+    uid = session["uid"]
+    # Check if guild subscription owner (they bypass everything)
+    guild = await database.get_guild(guild_id)
+    if guild and guild.get("owner_discord_id") == uid:
+        return True
+    # Delegate to alliance role permissions
+    perms = await database.get_member_permissions(guild_id, uid)
+    return flag in perms
 
 
 PREMIUM_STATUSES = ("active", "trialing")
@@ -4267,8 +4284,7 @@ async def my_ally_role_create(request: Request, guild_id: str,
 
 
 @app.post("/guild/{guild_id}/my-ally/roles/{role_id}/update")
-async def my_ally_role_update(request: Request, guild_id: str, role_id: int,
-                               color: str = Form(None), ep_notify: str = Form("0")):
+async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -4276,15 +4292,30 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int,
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
-        # Allow Lead/HC-Operations members to update permissions too
         ally_group = await database.get_ally_group_for_guild(guild_id)
         if not ally_group:
             return JSONResponse({"error": "not found"}, status_code=404)
-        member = await database.get_ally_membership(guild_id, uid)
-        if not member or member.get("role_name","").lower() not in ("lead","hc","hc-operations","hc operations"):
+        if not await has_perm(request, guild_id, "ally_manage"):
             return JSONResponse({"error": "no permission"}, status_code=403)
-    perms_flag = "ep_notify" if ep_notify == "1" else ""
-    await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_flag)
+    form = await request.form()
+    color = form.get("color") or None
+    ALL_FLAGS = [
+        "ally_manage", "ep_manage", "ep_view", "ep_notify",
+        "attack_manage", "attack_view", "scout_manage", "scout_view",
+        "map_manage", "map_view", "sector_view", "hospital_view",
+    ]
+    selected = [f for f in ALL_FLAGS if form.get(f) == "1"]
+    # Apply preset shortcut
+    preset = form.get("preset", "")
+    if preset == "leiter":
+        selected = ALL_FLAGS[:]
+    elif preset == "officer":
+        selected = ["ep_manage","ep_view","ep_notify","attack_manage","attack_view",
+                    "scout_manage","scout_view","map_view","sector_view","hospital_view"]
+    elif preset == "mitglied":
+        selected = ["ep_view","ep_notify","attack_view","scout_view","map_view","hospital_view"]
+    perms_str = ",".join(selected)
+    await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated", status_code=303)
 
 
