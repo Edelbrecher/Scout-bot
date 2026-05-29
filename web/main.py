@@ -4232,8 +4232,10 @@ async def my_ally_page(request: Request, guild_id: str):
     membership = await database.get_ally_membership(guild_id, uid) if not ally_group else None
     # Check if guild already has a group (owned by someone else)
     guild_group = await database.get_ally_group_for_guild(guild_id) if not ally_group else None
-    # When user is only a member (not owner), also check if they could create one
-    # guild_group is already set above via get_ally_group_for_guild if not ally_group
+    # For members: load the full member list so they can see their teammates
+    member_view_members = []
+    if membership and guild_group:
+        member_view_members = await database.get_ally_members(guild_group["id"])
 
     flash = request.query_params.get("flash", "")
     leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
@@ -4242,6 +4244,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
         "membership": membership, "guild_group": guild_group,
+        "member_view_members": member_view_members,
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
         "leaderboard": leaderboard,
         "meta_alliances": meta_alliances,

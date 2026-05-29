@@ -539,19 +539,76 @@
    MEMBER VIEW (joined someone else's group)
    ════════════════════════════════════════════════════════════════════════════ #}
 {% elif membership %}
-  <div class="card" style="max-width:480px;margin-bottom:1rem;">
-    <h2 style="margin:0 0 0.75rem;">🏰 {{ membership.ally_name }}</h2>
-    <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">
-      Allianz von <strong>{{ membership.owner_username or 'Unbekannt' }}</strong> ·
-      Beigetreten {{ (membership.member_since or '')[:10] }}
+  {# ── My membership card ── #}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;">
+        <h2 style="margin:0 0 0.2rem;font-size:1.15rem;">🏰 {{ membership.ally_name }}</h2>
+        <div style="font-size:.8rem;color:var(--text-muted);">
+          Allianz von <strong>{{ membership.owner_username or 'Unbekannt' }}</strong> · Beigetreten {{ (membership.member_since or '')[:10] }}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        {% if membership.travian_name %}
+        <div style="font-size:.82rem;color:var(--text-muted);">Travian-Name</div>
+        <div style="font-size:1rem;font-weight:700;color:#a5b4fc;">{{ membership.travian_name }}</div>
+        {% endif %}
+      </div>
     </div>
-    {% if membership.travian_name %}
-    <div style="margin-bottom:0.4rem;">Travian-Name: <strong>{{ membership.travian_name }}</strong></div>
-    {% endif %}
     {% if membership.note %}
-    <div style="color:var(--text-muted);font-size:0.85rem;margin-top:0.4rem;">📝 {{ membership.note }}</div>
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-top:0.6rem;padding-top:.6rem;border-top:1px solid var(--border);">📝 {{ membership.note }}</div>
     {% endif %}
   </div>
+
+  {# ── Member list ── #}
+  {% set approved = member_view_members | selectattr("status","equalto","approved") | list %}
+  {% if approved %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h3 style="margin:0 0 .9rem;font-size:.95rem;">👥 Mitglieder ({{ approved|length }})</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;">
+      {% for m in approved | sort(attribute='travian_name') %}
+      {% set is_me = m.discord_id == session.get('uid') %}
+      <div style="background:var(--bg-main);border:1px solid {% if is_me %}rgba(99,102,241,.5){% else %}var(--border){% endif %};border-radius:10px;padding:.55rem .8rem;display:flex;align-items:center;gap:.6rem;">
+        {# Role color dot #}
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ m.role_color or '#94a3b8' }};flex-shrink:0;"></span>
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:.88rem;font-weight:{% if is_me %}700{% else %}500{% endif %};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{% if is_me %}#a5b4fc{% else %}var(--text-primary){% endif %};">
+            {{ m.travian_name or m.discord_username }}{% if is_me %} <span style="font-size:.68rem;opacity:.7;">(du)</span>{% endif %}
+          </div>
+          {% if m.role_name %}
+          <div style="font-size:.68rem;color:{{ m.role_color or 'var(--text-muted)' }};margin-top:1px;">{{ m.role_name }}</div>
+          {% endif %}
+        </div>
+        {% if m.wing == 1 and guild_group and guild_group.wing1_name %}
+        <span style="font-size:.65rem;background:rgba(139,92,246,.2);color:#a78bfa;border-radius:6px;padding:1px 5px;white-space:nowrap;">{{ guild_group.wing1_name }}</span>
+        {% elif m.wing == 2 and guild_group and guild_group.wing2_name %}
+        <span style="font-size:.65rem;background:rgba(16,185,129,.2);color:#34d399;border-radius:6px;padding:1px 5px;white-space:nowrap;">{{ guild_group.wing2_name }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {# Stats row #}
+    <div style="display:flex;gap:1.5rem;margin-top:.9rem;padding-top:.75rem;border-top:1px solid var(--border);flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:1.4rem;font-weight:700;color:#a5b4fc;">{{ approved|length }}</div>
+        <div style="font-size:.7rem;color:var(--text-muted);">Mitglieder</div>
+      </div>
+      {% if guild_group and guild_group.wing1_name %}
+      <div style="text-align:center;">
+        <div style="font-size:1.4rem;font-weight:700;color:#a78bfa;">{{ approved | selectattr("wing","equalto",1) | list | length }}</div>
+        <div style="font-size:.7rem;color:var(--text-muted);">{{ guild_group.wing1_name }}</div>
+      </div>
+      {% endif %}
+      {% if guild_group and guild_group.wing2_name %}
+      <div style="text-align:center;">
+        <div style="font-size:1.4rem;font-weight:700;color:#34d399;">{{ approved | selectattr("wing","equalto",2) | list | length }}</div>
+        <div style="font-size:.7rem;color:var(--text-muted);">{{ guild_group.wing2_name }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
   {# Allow member to also create their own alliance on this server if none exists yet #}
   {% if not guild_group %}
