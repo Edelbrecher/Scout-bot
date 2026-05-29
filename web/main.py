@@ -2412,6 +2412,18 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/map/world-timezone")
+async def guild_map_set_timezone(request: Request, guild_id: str,
+                                  server_utc_offset: int = Form(60)):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    offset = max(-720, min(840, server_utc_offset))  # clamp to valid UTC range
+    await database.update_guild_config_fields(guild_id, server_utc_offset=offset)
+    return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
+
+
 @app.get("/guild/{guild_id}/map/data")
 async def guild_map_data(request: Request, guild_id: str):
     """Proxy Travian map.sql to avoid CORS issues."""

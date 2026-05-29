@@ -362,7 +362,8 @@ async def init_db():
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH) as db:
-        for col in ["alliance_manager_role_ids TEXT", "tw_alliance_name TEXT"]:
+        for col in ["alliance_manager_role_ids TEXT", "tw_alliance_name TEXT",
+                    "server_utc_offset INTEGER DEFAULT 60"]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
@@ -441,6 +442,22 @@ async def update_guild_config(
             WHERE guild_id = ?
         """, (category_id or None, archive_channel_id or None, allowed_role_ids or None,
               scout_channel_id, bot_language, guild_id))
+        await db.commit()
+
+
+async def update_guild_config_fields(guild_id: str, **fields):
+    """Update arbitrary guild_config columns by keyword argument."""
+    if not fields:
+        return
+    allowed = {"server_utc_offset", "tw_alliance_name", "alliance_manager_role_ids",
+               "bot_language", "poll_channel_id"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    vals = list(updates.values()) + [guild_id]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(f"UPDATE guild_configs SET {set_clause} WHERE guild_id = ?", vals)
         await db.commit()
 
 

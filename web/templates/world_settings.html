@@ -10,17 +10,37 @@
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Einstellungen gespeichert.</div>
   {% endif %}
 
+  {# ── Live Serverzeit ── #}
+  {% set utc_offset = guild.server_utc_offset if guild.server_utc_offset is not none else 60 %}
+  <div class="card" style="padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+    <div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.2rem;">🕐 Aktuelle Travian-Serverzeit</div>
+      <div id="serverClock" style="font-size:1.8rem;font-weight:800;letter-spacing:.04em;font-family:monospace;color:#f1f5f9;">--:--:--</div>
+      <div id="serverDate" style="font-size:.78rem;color:var(--text-muted);margin-top:.1rem;"></div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.2rem;">Eingestellte Zeitzone</div>
+      <div style="font-size:1.1rem;font-weight:700;color:#93c5fd;" id="tzBadge">
+        {{ "UTC+%d" % (utc_offset // 60) if utc_offset >= 0 else "UTC%d" % (utc_offset // 60) }}
+        ({% if utc_offset % 60 != 0 %}{{ "%+.1f" % (utc_offset / 60) }} h{% else %}{{ "%+d" % (utc_offset // 60) }} h{% endif %})
+      </div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;">gegenüber UTC</div>
+    </div>
+  </div>
+
+  {# ── Server URL ── #}
   <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
     <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Travian World URL</h3>
     <p class="hint" style="margin-bottom:1rem;">Diese URL wird für Karten-Snapshots, Farming-Analyse und alle Deep-Links benötigt.</p>
     <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
       <div class="form-group" style="margin:0;flex:1;min-width:260px;">
         <label>Travian World URL</label>
-        <input type="url" name="server_url" required
+        <input type="url" name="server_url" required id="serverUrlInput"
           placeholder="https://ts2.x1.europe.travian.com"
           list="worldlist"
           value="{{ guild.tw_world or '' }}"
-          style="width:100%;padding:.5rem;background:var(--bg-main);color:var(--text);border:1px solid {% if not guild.tw_world %}#f59e0b{% else %}var(--border){% endif %};border-radius:6px;" />
+          style="width:100%;padding:.5rem;background:var(--bg-main);color:var(--text);border:1px solid {% if not guild.tw_world %}#f59e0b{% else %}var(--border){% endif %};border-radius:6px;"
+          oninput="suggestTimezone(this.value)" />
         <datalist id="worldlist">
           <option value="https://ts1.x1.europe.travian.com">ts1.x1.europe (Speed 1x)</option>
           <option value="https://ts2.x1.europe.travian.com">ts2.x1.europe (Speed 1x)</option>
@@ -57,6 +77,55 @@
     {% endif %}
   </div>
 
+  {# ── Serverzeit / Timezone ── #}
+  <div class="card" style="padding:1.5rem;margin-bottom:1rem;" id="timezoneCard" data-tour="timezone">
+    <h3 style="margin:0 0 .5rem;font-size:.95rem;">⏰ Travian-Serverzeit</h3>
+    <p class="hint" style="margin-bottom:1rem;">
+      Alle Zeiten in TravOps (Einsatzplanung, Einschlagszeiten, Angriffserkennung) basieren auf dieser Zeitzone.
+      Travian-Server in Europa laufen typischerweise auf <strong>UTC+1 (CET)</strong> oder <strong>UTC+2 (CEST)</strong>.
+    </p>
+
+    <div id="tzSuggestion" style="display:none;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;">
+      <div style="font-size:.82rem;color:#fbbf24;">
+        💡 <strong>Vorschlag:</strong> Basierend auf der Server-URL: <span id="tzSuggestionText"></span>
+        <button type="button" onclick="applyTzSuggestion()" style="margin-left:.5rem;font-size:.78rem;background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);color:#fbbf24;border-radius:6px;padding:2px 8px;cursor:pointer;">Übernehmen</button>
+      </div>
+    </div>
+
+    <form method="post" action="/guild/{{ guild.guild_id }}/map/world-timezone" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
+      <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+        <label style="font-size:.85rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">UTC-Offset (Minuten)</label>
+        <select name="server_utc_offset" id="tzSelect"
+                style="background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:.9rem;width:100%;"
+                onchange="updateClockPreview()">
+          <option value="-120" {% if utc_offset == -120 %}selected{% endif %}>UTC−2 (−120 min)</option>
+          <option value="-60"  {% if utc_offset == -60  %}selected{% endif %}>UTC−1 (−60 min)</option>
+          <option value="0"    {% if utc_offset == 0    %}selected{% endif %}>UTC±0 (0 min) — z.B. UK, Portugal</option>
+          <option value="60"   {% if utc_offset == 60   %}selected{% endif %}>UTC+1 (60 min) — Europa (CET) ⭐</option>
+          <option value="120"  {% if utc_offset == 120  %}selected{% endif %}>UTC+2 (120 min) — Europa Sommer (CEST) ⭐</option>
+          <option value="180"  {% if utc_offset == 180  %}selected{% endif %}>UTC+3 (180 min) — Türkei, Arabien</option>
+          <option value="240"  {% if utc_offset == 240  %}selected{% endif %}>UTC+4 (240 min)</option>
+          <option value="300"  {% if utc_offset == 300  %}selected{% endif %}>UTC+5 (300 min)</option>
+          <option value="360"  {% if utc_offset == 360  %}selected{% endif %}>UTC+6 (360 min)</option>
+          <option value="420"  {% if utc_offset == 420  %}selected{% endif %}>UTC+7 (420 min)</option>
+          <option value="480"  {% if utc_offset == 480  %}selected{% endif %}>UTC+8 (480 min) — China, Singapur</option>
+          <option value="540"  {% if utc_offset == 540  %}selected{% endif %}>UTC+9 (540 min) — Japan, Korea</option>
+          <option value="600"  {% if utc_offset == 600  %}selected{% endif %}>UTC+10 (600 min) — Australien Ost</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.35rem;">
+        <button type="button" class="btn btn-secondary" style="font-size:.8rem;" onclick="autoDetectTimezone()">
+          🌐 Vom Browser erkennen
+        </button>
+        <button type="submit" class="btn btn-primary">💾 Speichern</button>
+      </div>
+    </form>
+
+    <div id="tzPreview" style="margin-top:.75rem;font-size:.82rem;color:var(--text-muted);">
+      Vorschau: Aktuelle Serverzeit wäre <strong id="tzPreviewTime" style="color:#93c5fd;"></strong>
+    </div>
+  </div>
+
   {% if guild.workspace_type != 'personal' %}
   <div class="card" style="padding:1.5rem;">
     <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Bot-Sprache</h3>
@@ -77,4 +146,101 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+const SERVER_UTC_OFFSET_MINUTES = {{ utc_offset }};
+let _tzSuggestedOffset = null;
+
+// ── Live clock ─────────────────────────────────────────────────────────────
+function getServerTime(offsetMinutes) {
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utcMs + offsetMinutes * 60000);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function tickClock() {
+  const sel = document.getElementById('tzSelect');
+  const offset = sel ? parseInt(sel.value) : SERVER_UTC_OFFSET_MINUTES;
+  const t = getServerTime(offset);
+  const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  document.getElementById('serverClock').textContent =
+    pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds());
+  document.getElementById('serverDate').textContent =
+    days[t.getDay()] + ', ' + pad(t.getDate()) + '.' + pad(t.getMonth()+1) + '.' + t.getFullYear();
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function updateClockPreview() {
+  const sel = document.getElementById('tzSelect');
+  if (!sel) return;
+  const offset = parseInt(sel.value);
+  const t = getServerTime(offset);
+  document.getElementById('tzPreviewTime').textContent =
+    pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds());
+  tickClock();
+}
+updateClockPreview();
+
+// ── Auto-detect from browser ───────────────────────────────────────────────
+function autoDetectTimezone() {
+  // Browser UTC offset (minutes, inverted sign)
+  const browserOffsetMin = -new Date().getTimezoneOffset();
+  applyOffset(browserOffsetMin, 'Browser-Zeitzone');
+}
+
+// ── Suggest from server URL ────────────────────────────────────────────────
+const TZ_BY_DOMAIN = [
+  [/\.de\.travian\.|\.europe\.travian\.|\.travian\.de/, 60],      // Europe CET
+  [/\.arabia\.travian\.|\.com\.tr\.travian\./, 180],               // Arabia / Turkey
+  [/\.international\.travian\./, 60],                              // International (mostly UTC+1)
+  [/\.ru\.travian\./, 180],                                        // Russia
+  [/\.com\.travian\.|\.us\.travian\./, -300],                      // Americas
+];
+
+function suggestTimezone(url) {
+  if (!url) return;
+  for (const [re, offset] of TZ_BY_DOMAIN) {
+    if (re.test(url)) {
+      const label = offset >= 0 ? `UTC+${offset/60}` : `UTC${offset/60}`;
+      _tzSuggestedOffset = offset;
+      document.getElementById('tzSuggestionText').textContent = label;
+      document.getElementById('tzSuggestion').style.display = '';
+      return;
+    }
+  }
+  document.getElementById('tzSuggestion').style.display = 'none';
+}
+
+function applyTzSuggestion() {
+  if (_tzSuggestedOffset !== null) {
+    applyOffset(_tzSuggestedOffset, null);
+    document.getElementById('tzSuggestion').style.display = 'none';
+  }
+}
+
+function applyOffset(offsetMin, source) {
+  // Find closest option
+  const sel = document.getElementById('tzSelect');
+  let best = null, bestDiff = Infinity;
+  for (const opt of sel.options) {
+    const diff = Math.abs(parseInt(opt.value) - offsetMin);
+    if (diff < bestDiff) { bestDiff = diff; best = opt; }
+  }
+  if (best) {
+    sel.value = best.value;
+    updateClockPreview();
+    if (source) {
+      document.getElementById('tzSuggestionText').textContent = best.text.split('—')[0].trim();
+      document.getElementById('tzSuggestion').style.display = '';
+    }
+  }
+}
+
+// Auto-suggest on page load if URL is set
+const currentUrl = document.getElementById('serverUrlInput');
+if (currentUrl && currentUrl.value) suggestTimezone(currentUrl.value);
+</script>
 {% endblock %}

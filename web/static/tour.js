@@ -59,6 +59,15 @@
       next: t('Weiter', 'Next'),
     },
     {
+      target: '[href*="/map/world-settings"], [data-tour="world-settings"]',
+      title: t('Serverzeit einstellen ⏰', 'Set Server Time ⏰'),
+      body: t(
+        'Wichtig: Stelle die Zeitzone deines Travian-Servers ein (meist UTC+1 für Europa). Alle Einsatzzeiten und Countdowns basieren darauf.',
+        'Important: Set your Travian server timezone (usually UTC+1 for Europe). All operation times and countdowns are based on this.'
+      ),
+      next: t('Weiter', 'Next'),
+    },
+    {
       target: null,
       title: t('Du sparst 3+ Stunden pro Woche! 🎉', 'You save 3+ hours per week! 🎉'),
       body: t(
