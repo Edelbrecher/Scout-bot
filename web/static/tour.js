@@ -473,112 +473,221 @@
     localStorage.removeItem('beb_account_tour_done');
   };
 
+  // ── CSS injekt ────────────────────────────────────────────────────────────
+  const _style = document.createElement('style');
+  _style.textContent = `
+    #tt-card { position:fixed; z-index:10001; width:min(560px,94vw);
+      background:linear-gradient(160deg,#0f172a 0%,#1e293b 100%);
+      border:1px solid rgba(99,102,241,.35); border-radius:20px;
+      box-shadow:0 32px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(99,102,241,.1);
+      overflow:hidden; }
+    #tt-card-inner { padding:0; }
+    #tt-header { padding:1.6rem 1.8rem 1.1rem;
+      border-bottom:1px solid rgba(255,255,255,.06); }
+    #tt-progress-bar-wrap { height:3px; background:rgba(255,255,255,.06); }
+    #tt-progress-bar { height:3px; background:linear-gradient(90deg,#6366f1,#818cf8);
+      transition:width .4s cubic-bezier(.4,0,.2,1); border-radius:3px; }
+    #tt-step-label { font-size:.7rem; font-weight:700; letter-spacing:.09em;
+      text-transform:uppercase; color:#6366f1; margin-bottom:.5rem; }
+    #tt-title { font-size:1.25rem; font-weight:800; color:#f8fafc;
+      line-height:1.3; margin-bottom:.1rem; }
+    #tt-body-wrap { padding:1.1rem 1.8rem; }
+    #tt-body { font-size:.95rem; color:#94a3b8; line-height:1.7;
+      white-space:pre-line; }
+    #tt-hint { margin-top:.85rem; display:flex; align-items:flex-start; gap:.5rem;
+      background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.25);
+      border-radius:10px; padding:.65rem .9rem; font-size:.84rem; color:#a5b4fc; }
+    #tt-footer { padding:.9rem 1.8rem 1.4rem;
+      border-top:1px solid rgba(255,255,255,.06);
+      display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+    #tt-dots { display:flex; gap:6px; align-items:center; }
+    .tt-dot { width:8px; height:8px; border-radius:50%;
+      background:#1e3a5f; transition:background .25s, transform .25s; }
+    .tt-dot.active { background:#6366f1; transform:scale(1.3); }
+    .tt-dot.done   { background:#334155; }
+    #tt-btns { display:flex; gap:.55rem; }
+    #tt-skip { background:none; border:1px solid #334155; border-radius:10px;
+      padding:.5rem 1rem; color:#64748b; font-size:.84rem; cursor:pointer;
+      transition:border-color .15s, color .15s; }
+    #tt-skip:hover { border-color:#64748b; color:#94a3b8; }
+    #tt-next { background:linear-gradient(135deg,#6366f1,#4338ca);
+      border:none; border-radius:10px; padding:.55rem 1.4rem;
+      color:#fff; font-size:.9rem; font-weight:700; cursor:pointer;
+      box-shadow:0 4px 14px rgba(99,102,241,.4);
+      transition:box-shadow .15s, transform .1s; white-space:nowrap; }
+    #tt-next:hover { box-shadow:0 6px 20px rgba(99,102,241,.55); transform:translateY(-1px); }
+    #tt-next:active { transform:translateY(0); }
+
+    /* Content fade – inner content fades independently, card stays put */
+    #tt-content { transition:opacity .18s ease, transform .18s ease; }
+    #tt-content.fading { opacity:0; transform:translateY(6px); }
+
+    /* Spotlight */
+    #beb-tour-spotlight { position:fixed; z-index:10000; pointer-events:none;
+      border-radius:12px;
+      transition:top .38s cubic-bezier(.4,0,.2,1),
+                 left .38s cubic-bezier(.4,0,.2,1),
+                 width .38s cubic-bezier(.4,0,.2,1),
+                 height .38s cubic-bezier(.4,0,.2,1),
+                 box-shadow .3s; }
+    #beb-tour-overlay { position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,.78); backdrop-filter:blur(1.5px);
+      transition:opacity .3s; }
+  `;
+  document.head.appendChild(_style);
+
   // ── UI ─────────────────────────────────────────────────────────────────────
   function buildUI() {
-    ['beb-tour-overlay','beb-tour-spotlight','beb-tour-tooltip'].forEach(id => document.getElementById(id)?.remove());
+    ['beb-tour-overlay','beb-tour-spotlight','tt-card'].forEach(id => document.getElementById(id)?.remove());
 
     const overlay = document.createElement('div');
     overlay.id = 'beb-tour-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.78);backdrop-filter:blur(2px);transition:opacity .3s;';
 
     const spotlight = document.createElement('div');
     spotlight.id = 'beb-tour-spotlight';
-    spotlight.style.cssText = 'position:fixed;z-index:10000;pointer-events:none;border-radius:10px;transition:all .35s cubic-bezier(.22,1,.36,1);box-shadow:0 0 0 9999px rgba(0,0,0,0.78);';
 
-    const tooltip = document.createElement('div');
-    tooltip.id = 'beb-tour-tooltip';
-    tooltip.style.cssText = `
-      position:fixed;z-index:10001;
-      background:#1e293b;border:1px solid #334155;
-      border-radius:16px;padding:1.4rem 1.5rem;max-width:390px;width:90vw;
-      box-shadow:0 20px 60px rgba(0,0,0,.65);
-      transition:opacity .25s,transform .25s;
-    `;
-    tooltip.innerHTML = `
-      <div id="tt-badge"  style="font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6366f1;margin-bottom:.4rem;display:none;"></div>
-      <div id="tt-title"  style="font-size:1.08rem;font-weight:700;color:#f1f5f9;margin-bottom:.45rem;"></div>
-      <div id="tt-body"   style="font-size:.875rem;color:#94a3b8;line-height:1.65;white-space:pre-line;margin-bottom:.7rem;"></div>
-      <div id="tt-hint"   style="display:none;font-size:.78rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:.4rem .7rem;color:#a5b4fc;margin-bottom:.8rem;"></div>
-      <div id="tt-action" style="display:none;margin-bottom:.8rem;">
-        <a id="tt-action-a" href="#" style="display:inline-flex;align-items:center;gap:.35rem;background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);border-radius:8px;padding:.38rem .85rem;color:#a5b4fc;font-size:.82rem;text-decoration:none;font-weight:600;">
-          🔗 <span id="tt-action-lbl"></span>
-        </a>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
-        <div id="tt-dots" style="display:flex;gap:5px;"></div>
-        <div style="display:flex;gap:.45rem;">
-          <button id="tt-skip" style="background:none;border:1px solid #334155;border-radius:8px;padding:.38rem .85rem;color:#94a3b8;font-size:.82rem;cursor:pointer;">${t('Beenden','Exit')}</button>
-          <button id="tt-next" style="background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;border-radius:8px;padding:.38rem 1.1rem;color:#fff;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;"></button>
+    const card = document.createElement('div');
+    card.id = 'tt-card';
+    card.innerHTML = `
+      <div id="tt-progress-bar-wrap"><div id="tt-progress-bar" style="width:0%"></div></div>
+      <div id="tt-card-inner">
+        <div id="tt-header">
+          <div id="tt-step-label"></div>
+          <div id="tt-title"></div>
+        </div>
+        <div id="tt-body-wrap">
+          <div id="tt-content">
+            <div id="tt-body"></div>
+            <div id="tt-hint" style="display:none"></div>
+          </div>
+        </div>
+        <div id="tt-footer">
+          <div id="tt-dots"></div>
+          <div id="tt-btns">
+            <button id="tt-skip">${t('Tour beenden','Exit tour')}</button>
+            <button id="tt-next"></button>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(overlay);
     document.body.appendChild(spotlight);
-    document.body.appendChild(tooltip);
-    return { overlay, spotlight, tooltip };
+    document.body.appendChild(card);
+
+    // Initial position: centered
+    card.style.cssText += 'top:50%;left:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity .3s;';
+    requestAnimationFrame(() => { card.style.opacity = '1'; });
+
+    return { overlay, spotlight, card };
   }
 
-  // ── Render step ────────────────────────────────────────────────────────────
-  function renderStep(step, idx, total, ui) {
-    const { overlay, spotlight, tooltip } = ui;
+  // ── Render step (smooth: only content fades, card slides) ─────────────────
+  function renderStep(step, idx, total, ui, instant) {
+    const { overlay, spotlight, card } = ui;
     const targetEl = findTarget(step.target);
+    const content  = document.getElementById('tt-content');
 
-    tooltip.style.opacity = '0';
-    setTimeout(() => {
-      // Badge
-      const badge = document.getElementById('tt-badge');
-      if (idx > 0 && !step.isLast && total > 3) {
-        badge.textContent = t(`Schritt ${idx} von ${total - 2}`, `Step ${idx} of ${total - 2}`);
-        badge.style.display = 'block';
-      } else { badge.style.display = 'none'; }
+    function applyContent() {
+      // Step label
+      const lbl = document.getElementById('tt-step-label');
+      if (idx === 0) lbl.textContent = t('Einführung','Introduction');
+      else if (step.isLast) lbl.textContent = t('Fertig 🎉','Done 🎉');
+      else lbl.textContent = t(`Schritt ${idx} von ${total-2}`, `Step ${idx} of ${total-2}`);
 
       document.getElementById('tt-title').textContent = step.title;
       document.getElementById('tt-body').textContent  = step.body;
       document.getElementById('tt-next').textContent  = step.next;
 
       const hint = document.getElementById('tt-hint');
-      if (step.hint) { hint.textContent = step.hint; hint.style.display = 'block'; }
+      if (step.hint) { hint.innerHTML = '💡 ' + step.hint; hint.style.display = 'flex'; }
       else hint.style.display = 'none';
 
-      const action = document.getElementById('tt-action');
-      if (step.action) {
-        document.getElementById('tt-action-lbl').textContent = step.action.label;
-        document.getElementById('tt-action-a').href = step.action.url;
-        action.style.display = 'block';
-      } else action.style.display = 'none';
+      // Progress bar
+      const pct = total > 1 ? Math.round((idx / (total-1)) * 100) : 100;
+      document.getElementById('tt-progress-bar').style.width = pct + '%';
 
-      buildDots(total, idx);
+      // Dots
+      const dotsEl = document.getElementById('tt-dots');
+      dotsEl.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const d = document.createElement('div');
+        d.className = 'tt-dot' + (i === idx ? ' active' : i < idx ? ' done' : '');
+        dotsEl.appendChild(d);
+      }
+
+      // Spotlight + card position
       positionSpotlight(targetEl, spotlight, overlay);
-      positionTooltip(targetEl, tooltip);
-
-      tooltip.style.opacity = '1';
-      tooltip.style.transform = 'none';
+      positionCard(targetEl, card);
 
       // Highlight ring
       clearHighlights();
       if (step.highlight) {
         const h = findTarget(step.highlight);
-        if (h) { h.style.outline = '2px solid #6366f1'; h.style.outlineOffset = '3px'; h.dataset.tourHl = '1'; }
+        if (h) { h.style.outline = '2px solid #6366f1'; h.style.outlineOffset = '4px'; h.dataset.tourHl = '1'; }
       }
       if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 180);
+    }
+
+    if (instant) {
+      applyContent();
+      return;
+    }
+
+    // Fade content out → apply → fade in (card stays, no flicker)
+    content.classList.add('fading');
+    setTimeout(() => {
+      applyContent();
+      content.classList.remove('fading');
+    }, 190);
   }
 
-  function buildDots(total, current) {
-    const c = document.getElementById('tt-dots');
-    if (!c) return;
-    c.innerHTML = '';
-    for (let i = 0; i < total; i++) {
-      const d = document.createElement('div');
-      d.style.cssText = `width:7px;height:7px;border-radius:50%;background:${i===current?'#6366f1':'#334155'};transition:background .2s;`;
-      c.appendChild(d);
+  function positionCard(el, card) {
+    card.style.transition = 'top .38s cubic-bezier(.4,0,.2,1), left .38s cubic-bezier(.4,0,.2,1), transform .38s cubic-bezier(.4,0,.2,1), opacity .3s';
+    if (!el) {
+      card.style.top = '50%'; card.style.left = '50%';
+      card.style.transform = 'translate(-50%,-50%)';
+      return;
     }
+    const r = el.getBoundingClientRect();
+    const cw = Math.min(560, window.innerWidth * 0.94);
+    const ch = 340; // approx card height
+    const m  = 18;
+
+    // Prefer right side, then below, then above, then left
+    let top, left, transform = 'none';
+
+    if (r.right + cw + m < window.innerWidth) {
+      // Right
+      left = r.right + m;
+      top  = Math.min(Math.max(m, r.top + r.height/2 - ch/2), window.innerHeight - ch - m);
+    } else if (r.bottom + ch + m < window.innerHeight) {
+      // Below
+      top  = r.bottom + m;
+      left = Math.min(Math.max(m, r.left + r.width/2 - cw/2), window.innerWidth - cw - m);
+    } else if (r.top - ch - m > 0) {
+      // Above
+      top  = r.top - ch - m;
+      left = Math.min(Math.max(m, r.left + r.width/2 - cw/2), window.innerWidth - cw - m);
+    } else {
+      // Centered fallback
+      card.style.top = '50%'; card.style.left = '50%';
+      card.style.transform = 'translate(-50%,-50%)';
+      return;
+    }
+
+    card.style.top  = top  + 'px';
+    card.style.left = left + 'px';
+    card.style.transform = transform;
   }
 
   function positionSpotlight(el, spotlight, overlay) {
     if (!el) {
-      spotlight.style.cssText += 'width:0;height:0;top:-999px;left:-999px;box-shadow:none;';
+      spotlight.style.boxShadow = 'none';
+      spotlight.style.width  = '0px';
+      spotlight.style.height = '0px';
+      spotlight.style.top    = '-999px';
+      spotlight.style.left   = '-999px';
       overlay.style.display = 'block';
       return;
     }
@@ -587,21 +696,8 @@
     spotlight.style.left   = (r.left - p) + 'px';
     spotlight.style.width  = (r.width  + p*2) + 'px';
     spotlight.style.height = (r.height + p*2) + 'px';
-    spotlight.style.boxShadow = '0 0 0 9999px rgba(0,0,0,0.78)';
+    spotlight.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.78), 0 0 0 2px rgba(99,102,241,.5)';
     overlay.style.display = 'none';
-  }
-
-  function positionTooltip(el, tooltip) {
-    if (!el) {
-      tooltip.style.top = '50%'; tooltip.style.left = '50%';
-      tooltip.style.transform = 'translate(-50%,-50%)';
-      return;
-    }
-    const r = el.getBoundingClientRect(), m = 16, h = 300;
-    const top  = r.bottom + h + m < window.innerHeight ? r.bottom + m : Math.max(m, r.top - h - m);
-    const left = Math.min(Math.max(m, r.left), window.innerWidth - 400);
-    tooltip.style.top = top + 'px'; tooltip.style.left = left + 'px';
-    tooltip.style.transform = 'none';
   }
 
   function findTarget(sel) {
@@ -621,10 +717,10 @@
 
   function fadeOut(ui) {
     clearHighlights();
-    [ui.overlay, ui.spotlight, ui.tooltip].forEach(el => {
+    [ui.overlay, ui.spotlight, ui.card].forEach(el => {
       if (!el) return;
       el.style.opacity = '0';
-      setTimeout(() => el.remove(), 300);
+      setTimeout(() => el.remove(), 320);
     });
   }
 
@@ -665,7 +761,7 @@
     document.getElementById('tt-skip').addEventListener('click', () => { markDone(name); fadeOut(ui); });
     ui.overlay.addEventListener('click', () => { markDone(name); fadeOut(ui); });
 
-    setTimeout(() => renderStep(steps[cur], cur, steps.length, ui), 600);
+    setTimeout(() => renderStep(steps[cur], cur, steps.length, ui, true), 400);
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
