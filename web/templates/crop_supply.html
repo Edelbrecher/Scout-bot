@@ -288,11 +288,16 @@ function isNoise(line) {
 function parseSectionLines(lines, isOutgoing) {
   const deliveries = [];
   const numBuf = [];   // buffer of numbers since last time marker
+  let currentBlockIsReturn = false; // "Return from" / "Rückgabe" = actually incoming
+
+  // Detect return-trip lines (merchant coming BACK to this village with resources)
+  // These appear in the outgoing section but carry resources INTO the village.
+  const reReturn = /^(return\s+from|rückgabe\s+(von|aus)|zurück\s+von|retour\s+(de|von))/i;
 
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    if (isNoise(line)) { numBuf.length = 0; continue; }
+    if (isNoise(line)) { numBuf.length = 0; currentBlockIsReturn = false; continue; }
 
     // Multiplier line: "3×" / "1×" — skip
     if (/^\d+\s*[×xX]/.test(line)) continue;
@@ -300,31 +305,38 @@ function parseSectionLines(lines, isOutgoing) {
     // Section total line: "= 582.052 ..." — stop parsing
     if (/^=\s*\d/.test(line)) break;
 
-    // Time line: "in 01:23:45 um 02:22"
-    const timeMatch = line.match(/^in\s+(\d{1,3}):(\d{2}):(\d{2})(?:\s+um\s+(\d{1,2}):(\d{2}))?/i);
+    // Time line: "in 01:23:45 um 02:22" (DE) or "In 00:19:34 at 08:17" (EN)
+    const timeMatch = line.match(/^in\s+(\d{1,3}):(\d{2}):(\d{2})(?:\s+(?:um|at)\s+(\d{1,2}):(\d{2}))?/i);
     if (timeMatch) {
       const offsetSec = +timeMatch[1] * 3600 + +timeMatch[2] * 60 + +timeMatch[3];
       const serverTime = timeMatch[4] ? `${timeMatch[4]}:${timeMatch[5]}` : null;
+      // Return trips are incoming even if we're in the outgoing section
+      const effectiveIsOutgoing = isOutgoing && !currentBlockIsReturn;
       // Drain numBuf in groups of 4 → one delivery per group
       while (numBuf.length >= 4) {
         const [wood, clay, iron, grain] = numBuf.splice(0, 4);
-        deliveries.push({ offsetSec, serverTime, wood, clay, iron, grain, isOutgoing });
+        deliveries.push({ offsetSec, serverTime, wood, clay, iron, grain,
+          isOutgoing: effectiveIsOutgoing, isReturn: currentBlockIsReturn });
       }
       numBuf.length = 0;
+      currentBlockIsReturn = false;
       continue;
     }
 
-    // Pure number line (German format)
+    // Pure number line (German/English format with dot or comma thousand sep)
     const numOnly = line.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2')
-                        .replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
+                        .replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2')
+                        .replace(/(\d),(\d{3})(?!\d)/g, '$1$2');
     if (/^\d+$/.test(numOnly)) {
       numBuf.push(parseInt(numOnly));
       continue;
     }
 
-    // Non-number, non-time, non-noise line → reset buffer (new transport block)
-    if (/[a-zA-ZäöüÄÖÜß]/.test(line) && !timeMatch) {
+    // Non-number, non-time, non-noise line → start of new transport block
+    if (/[a-zA-ZäöüÄÖÜß]/.test(line)) {
       numBuf.length = 0;
+      // Check if this new block is a return trip
+      currentBlockIsReturn = reReturn.test(line);
     }
   }
 
@@ -835,9 +847,11 @@ function renderResults(sim, params) {
     </td></tr>`;
   } else {
     tbody.innerHTML = allDel.map(d => {
-      const dir = d.isOutgoing
-        ? `<span class="cs-tag-out">↑ Ausgehend</span>`
-        : `<span class="cs-tag-in">↓ Eingehend</span>`;
+      const dir = d.isReturn
+        ? `<span class="cs-tag-in" style="background:rgba(96,165,250,.15);color:#93c5fd;border-color:rgba(96,165,250,.3);">↩ Rücksendung</span>`
+        : d.isOutgoing
+          ? `<span class="cs-tag-out">↑ Ausgehend</span>`
+          : `<span class="cs-tag-in">↓ Eingehend</span>`;
       const dur = fmtDuration(d.offsetSec);
       const when = d.serverTime || fmtAbsTime(nowMs, d.offsetSec);
       const grainStyle = d.grain > 0 ? 'font-weight:700;color:#f59e0b;' : 'color:var(--text-muted);';
