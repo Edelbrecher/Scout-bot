@@ -8,15 +8,15 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.2rem 0 0.15rem;">⚜️ Farming Intelligence</h1>
-      <p class="subtitle" style="margin:0;">
+      <h1 style="margin:0.2rem 0 0.15rem;" data-i18n="farming.title">⚜️ Farming Intelligence</h1>
+      <p class="subtitle" style="margin:0;" data-i18n="farming.subtitle">
         Inaktive Farmen erkennen · Wachstum verfolgen · Farmlisten auswerten
       </p>
     </div>
     {% if guild.tw_world %}
     <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshot" style="margin:0;align-self:flex-end;">
       <button type="submit" class="btn btn-primary" style="display:flex;align-items:center;gap:0.4rem;">
-        🔄 Snapshot holen
+        <span data-i18n="farming.snapshot.btn">🔄 Snapshot holen</span>
         {% if farm_stats.latest_snapshot %}
         <span id="snapAge" style="font-size:0.72rem;opacity:0.75;font-weight:400;"></span>
         {% endif %}

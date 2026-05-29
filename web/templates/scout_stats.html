@@ -5,14 +5,14 @@
 <div class="container" style="max-width:1100px;">
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}/scout" class="back-link">← Scout</a>
-    <h1 style="margin:0.25rem 0 0;">📊 Scout-Statistik</h1>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="scout.stats.title">📊 Scout-Statistik</h1>
     <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
   </div>
 
   {% if not stats %}
   <div class="card" style="text-align:center;padding:3rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🔍</div>
-    <h2 style="margin:0 0 0.5rem;">Noch keine Daten</h2>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="scout.stats.empty">Noch keine Daten</h2>
     <p style="color:var(--text-muted);">Scout-Berichte als Text in Discord-Scout-Channels einfügen.<br>Der Bot erkennt Travian-Report-Formate automatisch.</p>
   </div>
   {% else %}
@@ -37,17 +37,17 @@
 
   <!-- Player table -->
   <div class="card">
-    <h2 style="margin:0 0 1rem;">Spieler-Übersicht</h2>
+    <h2 style="margin:0 0 1rem;" data-i18n="scout.stats.players">Spieler-Übersicht</h2>
     <table class="table">
       <thead>
         <tr>
           <th>#</th>
-          <th>Spieler</th>
-          <th>Koordinaten</th>
-          <th>Scouts</th>
-          <th>Zuletzt gescautet</th>
-          <th>Truppen (letzte Meldung)</th>
-          <th>Ressourcen (letzte)</th>
+          <th data-i18n="scout.stats.th.player">Spieler</th>
+          <th data-i18n="scout.stats.th.coords">Koordinaten</th>
+          <th data-i18n="scout.stats.th.scouts">Scouts</th>
+          <th data-i18n="scout.stats.th.last_scouted">Zuletzt gescautet</th>
+          <th data-i18n="scout.stats.th.troops">Truppen (letzte Meldung)</th>
+          <th data-i18n="scout.stats.th.resources">Ressourcen (letzte)</th>
         </tr>
       </thead>
       <tbody>

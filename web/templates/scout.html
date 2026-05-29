@@ -6,7 +6,7 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🔍 Scout</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="scout.title">🔍 Scout</h1>
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
     <a href="/guild/{{ guild.guild_id }}/scout/stats" class="btn btn-secondary" style="align-self:flex-end;">📊 Statistik</a>
@@ -24,7 +24,7 @@
   <!-- ── Config + Status (eingeklappt) ── -->
   <details class="card" style="margin-bottom:1rem;" id="configDetails">
     <summary style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:0.1rem 0;">
-      <span style="font-size:1.05rem;font-weight:700;">⚙️ Konfiguration & Status</span>
+      <span style="font-size:1.05rem;font-weight:700;" data-i18n="scout.config.title">⚙️ Konfiguration & Status</span>
       <span style="font-size:0.8rem;color:var(--text-muted);">
         {% if guild.category_id and guild.archive_channel_id and guild.scout_channel_id %}
           <span style="color:#4ade80;">✅ Eingerichtet</span>

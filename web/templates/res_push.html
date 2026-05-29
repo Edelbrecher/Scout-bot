@@ -6,7 +6,7 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1>🪖 Res-Push</h1>
+      <h1 data-i18n="respush.title">🪖 Res-Push</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
     <a href="/guild/{{ guild.guild_id }}/stats" class="btn btn-secondary">📊 Statistics</a>
@@ -19,7 +19,7 @@
   <div class="grid-2">
     <!-- Config Form -->
     <div class="card">
-      <h2>Configuration</h2>
+      <h2 data-i18n="respush.config.title">Configuration</h2>
       <p class="hint">Copy IDs from Discord: right-click a channel/role → <strong>Copy ID</strong> (Developer Mode must be on).</p>
 
       <form method="post" action="/guild/{{ guild.guild_id }}/res-push">
@@ -47,12 +47,12 @@
             placeholder="e.g. 1234567890123456789" />
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <button type="submit" class="btn btn-primary" data-i18n="respush.save.btn">Save Settings</button>
       </form>
 
       {% if guild.res_request_channel_id and guild.res_answer_channel_id and guild.res_push_category_id %}
       <form method="post" action="/guild/{{ guild.guild_id }}/res-push/post-button" style="margin-top:1rem;">
-        <button type="submit" class="btn btn-primary">🔘 Post Res-Request Button in Discord</button>
+        <button type="submit" class="btn btn-primary" data-i18n="respush.post.btn">🔘 Post Res-Request Button in Discord</button>
       </form>
       {% endif %}
 
@@ -74,7 +74,7 @@
 
     <!-- Status -->
     <div class="card">
-      <h2>Status</h2>
+      <h2 data-i18n="respush.status.title">Status</h2>
       <ul class="status-list">
         <li>
           <span class="status-label">Res-Request Channel</span>

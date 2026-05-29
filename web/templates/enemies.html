@@ -7,8 +7,8 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🎯 Gegner-Kartei</h1>
-      <p class="subtitle" style="margin:0;">
+      <h1 style="margin:0.25rem 0 0;" data-i18n="enemies.title">🎯 Gegner-Kartei</h1>
+      <p class="subtitle" style="margin:0;" data-i18n="enemies.subtitle">
         Wird automatisch befüllt wenn Scout-Berichte im Discord eingehen
       </p>
     </div>
@@ -28,7 +28,7 @@
   <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
       <span style="font-size:1.1rem;">📋</span>
-      <strong style="font-size:1rem;">Bericht-Eingangskanal</strong>
+      <strong style="font-size:1rem;" data-i18n="enemies.report_channel">Bericht-Eingangskanal</strong>
     </div>
 
     {% if report_channel and report_channel.channel_id %}
@@ -39,7 +39,7 @@
         ✅ #{{ report_channel.channel_name or report_channel.channel_id }}
       </span>
       <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/clear" style="margin:0;">
-        <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.78rem;padding:0.2rem 0.65rem;">
+        <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.78rem;padding:0.2rem 0.65rem;" data-i18n="enemies.channel.remove">
           Entfernen
         </button>
       </form>
@@ -57,7 +57,7 @@
     <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;">
       <!-- 1-click create -->
       <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/create" style="margin:0;">
-        <button type="submit" class="btn btn-primary" style="font-size:0.875rem;">
+        <button type="submit" class="btn btn-primary" style="font-size:0.875rem;" data-i18n="enemies.channel.create">
           ➕ Channel erstellen
         </button>
       </form>
@@ -68,7 +68,7 @@
                style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid var(--border);
                       background:var(--bg-card);color:var(--text);font-size:0.875rem;width:185px;">
         <input type="hidden" name="channel_name" value="">
-        <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.85rem;">
+        <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.85rem;" data-i18n="enemies.channel.link">
           Verknüpfen
         </button>
       </form>
@@ -86,19 +86,19 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#f87171;">{{ enemies|length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">Gegner bekannt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.known">Gegner bekannt</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
         {{ enemies | sum(attribute='scout_count') | int }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">Scouts gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.scouts">Scouts gesamt</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
         {{ enemies | sum(attribute='report_count') | int }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">Berichte gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.reports">Berichte gesamt</div>
     </div>
   </div>
 
@@ -115,13 +115,13 @@
     <table class="table" id="enemyTable">
       <thead>
         <tr>
-          <th>Spieler</th>
-          <th>Koordinaten</th>
-          <th>Dorf</th>
-          <th style="text-align:center;">Scouts</th>
-          <th style="text-align:center;">Berichte</th>
-          <th>Zuletzt gesehen</th>
-          <th>Notizen</th>
+          <th data-i18n="enemies.th.player">Spieler</th>
+          <th data-i18n="enemies.th.coords">Koordinaten</th>
+          <th data-i18n="enemies.th.village">Dorf</th>
+          <th style="text-align:center;" data-i18n="enemies.th.scouts">Scouts</th>
+          <th style="text-align:center;" data-i18n="enemies.th.reports">Berichte</th>
+          <th data-i18n="enemies.th.last_seen">Zuletzt gesehen</th>
+          <th data-i18n="enemies.th.notes">Notizen</th>
           <th></th>
         </tr>
       </thead>

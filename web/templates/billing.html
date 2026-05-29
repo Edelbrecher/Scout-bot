@@ -111,7 +111,7 @@
 
   <div class="card" style="margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
     <div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;">Aktueller Plan</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;" data-i18n="billing.current_plan">Aktueller Plan</div>
       {% if sub_status == 'trialing' %}
         <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;">🎁 Testphase</span>
         {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ sub_tier|capitalize }}</span>{% endif %}
@@ -133,12 +133,12 @@
     {% if guild.stripe_customer_id and sub_status in ('active','trialing','past_due') %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
-        <button type="submit" class="btn btn-secondary">🔧 Verwalten</button>
+        <button type="submit" class="btn btn-secondary" data-i18n="billing.manage.btn">🔧 Verwalten</button>
       </form>
       {% if is_owner %}
       <form method="post" action="/guild/{{ guild.guild_id }}/billing/cancel"
             onsubmit="return confirm('Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.')">
-        <button type="submit" class="btn btn-danger">❌ Kündigen</button>
+        <button type="submit" class="btn btn-danger" data-i18n="billing.cancel.btn">❌ Kündigen</button>
       </form>
       {% endif %}
     </div>

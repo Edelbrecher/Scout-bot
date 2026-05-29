@@ -69,31 +69,31 @@
 
 <div class="ht-header">
   <div>
-    <h1 style="font-size:1.4rem;font-weight:800;margin-bottom:0.2rem;">🗡️ Heldenaufgaben</h1>
-    <p style="font-size:0.85rem;color:var(--text-muted);">Meilensteine abhaken → Ressourcen & XP-Belohnungen tracken</p>
+    <h1 style="font-size:1.4rem;font-weight:800;margin-bottom:0.2rem;" data-i18n="herotasks.title">🗡️ Heldenaufgaben</h1>
+    <p style="font-size:0.85rem;color:var(--text-muted);" data-i18n="herotasks.subtitle">Meilensteine abhaken → Ressourcen & XP-Belohnungen tracken</p>
   </div>
-  <button class="ht-reset-btn" onclick="resetAll()">🔄 Alles zurücksetzen</button>
+  <button class="ht-reset-btn" onclick="resetAll()" data-i18n="herotasks.reset.btn">🔄 Alles zurücksetzen</button>
 </div>
 
 <!-- Village tabs -->
 <div class="ht-tabs">
-  <button class="ht-tab active" onclick="switchVillage('start', this)">🏠 Startdorf</button>
-  <button class="ht-tab" onclick="switchVillage('settled', this)">🏘️ Gesiedeltes Dorf</button>
+  <button class="ht-tab active" onclick="switchVillage('start', this)" data-i18n="herotasks.tab.start">🏠 Startdorf</button>
+  <button class="ht-tab" onclick="switchVillage('settled', this)" data-i18n="herotasks.tab.settled">🏘️ Gesiedeltes Dorf</button>
 </div>
 
 <!-- Summary bar -->
 <div class="ht-summary">
   <div class="ht-stat">
     <div class="ht-stat-val" id="statDone">0</div>
-    <div class="ht-stat-label">Erledigt</div>
+    <div class="ht-stat-label" data-i18n="herotasks.stat.done">Erledigt</div>
   </div>
   <div class="ht-stat">
     <div class="ht-stat-val" id="statTotal">0</div>
-    <div class="ht-stat-label">Gesamt</div>
+    <div class="ht-stat-label" data-i18n="herotasks.stat.total">Gesamt</div>
   </div>
   <div class="ht-stat">
     <div class="ht-stat-val" id="statRes">0</div>
-    <div class="ht-stat-label">Res verdient</div>
+    <div class="ht-stat-label" data-i18n="herotasks.stat.res">Res verdient</div>
   </div>
   <div class="ht-stat">
     <div class="ht-stat-val" id="statXp">0</div>

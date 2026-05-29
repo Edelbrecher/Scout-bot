@@ -6,7 +6,7 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1>📅 Verfügbarkeits-Umfragen</h1>
+      <h1 data-i18n="polls.title">📅 Verfügbarkeits-Umfragen</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
   </div>
@@ -21,7 +21,7 @@
   <div class="grid-2">
     <!-- Config -->
     <div class="card">
-      <h2>Konfiguration</h2>
+      <h2 data-i18n="polls.config.title">Konfiguration</h2>
       <p class="hint">Copy IDs from Discord: right-click a channel/category → <strong>Copy ID</strong> (Developer Mode must be on).</p>
       <form method="post" action="/guild/{{ guild.guild_id }}/polls/config">
         <div class="form-group">
@@ -31,7 +31,7 @@
             value="{{ guild.poll_channel_id or '' }}"
             placeholder="z.B. 1234567890123456789" />
         </div>
-        <button type="submit" class="btn btn-primary">Speichern</button>
+        <button type="submit" class="btn btn-primary" data-i18n="polls.save.btn">Speichern</button>
       </form>
 
       <hr style="margin:1.5rem 0;">
@@ -52,7 +52,7 @@
 
     <!-- Status -->
     <div class="card">
-      <h2>Status</h2>
+      <h2 data-i18n="polls.status.title">Status</h2>
       <ul class="status-list">
         <li>
           <span class="status-label">Umfrage-Channel</span>
@@ -76,7 +76,7 @@
   <!-- Create poll -->
   {% if guild.poll_channel_id %}
   <div class="card mt-1">
-    <h2>Neue Umfrage erstellen</h2>
+    <h2 data-i18n="polls.create.title">Neue Umfrage erstellen</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" id="pollForm" style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:1rem; align-items:end; flex-wrap:wrap;">
       <div class="form-group" style="margin:0;">
         <label for="title">Title</label>

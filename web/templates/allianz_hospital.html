@@ -6,8 +6,8 @@
 
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;">🏥 Allianz-Lazarett</h1>
-    <p class="subtitle" style="margin:0;">Lazarett-Daten aller Mitglieder auf einen Blick</p>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="hospital.title">🏥 Allianz-Lazarett</h1>
+    <p class="subtitle" style="margin:0;" data-i18n="hospital.subtitle">Lazarett-Daten aller Mitglieder auf einen Blick</p>
   </div>
 
   {% if grouped %}
@@ -17,15 +17,15 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(grand_total).replace(",",".") }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🏥 Truppen in Heilung</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.healing">🏥 Truppen in Heilung</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;">{{ grouped | length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">👥 Mitglieder</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.members">👥 Mitglieder</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;">{{ all_entries | length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">📋 Einträge</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.entries">📋 Einträge</div>
     </div>
   </div>
 
@@ -46,10 +46,10 @@
       <table class="table" style="margin:0;">
         <thead>
           <tr>
-            <th>Dorf</th>
-            <th>Truppe</th>
-            <th style="text-align:right;">Anzahl</th>
-            <th>Fertig um</th>
+            <th data-i18n="hospital.th.village">Dorf</th>
+            <th data-i18n="hospital.th.troop">Truppe</th>
+            <th style="text-align:right;" data-i18n="hospital.th.count">Anzahl</th>
+            <th data-i18n="hospital.th.finish">Fertig um</th>
           </tr>
         </thead>
         <tbody>
@@ -70,7 +70,7 @@
   {% else %}
   <div class="card" style="text-align:center;padding:2.5rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🏥</div>
-    <h2 style="margin:0 0 0.5rem;">Keine Lazarett-Daten vorhanden</h2>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="hospital.empty.title">Keine Lazarett-Daten vorhanden</h2>
     <p style="color:var(--text-muted);">
       Mitglieder können ihre Lazarett-Daten unter
       <a href="/guild/{{ guild.guild_id }}/mein-account">Mein Account</a> importieren.

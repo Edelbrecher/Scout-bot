@@ -6,15 +6,15 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1>⏱️ Timer & Erinnerungen</h1>
+      <h1 data-i18n="timer.title">⏱️ Timer & Erinnerungen</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
-    <button id="btnSound" class="btn btn-secondary" title="Sound an/aus">🔔 Sound an</button>
+    <button id="btnSound" class="btn btn-secondary" title="Sound an/aus" data-i18n="timer.sound.on">🔔 Sound an</button>
   </div>
 
   <!-- ── Travian Profil ── -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;">🏰 Mein Travian-Profil</h2>
+    <h2 style="margin-top:0;" data-i18n="timer.profile.title">🏰 Mein Travian-Profil</h2>
     <p class="hint">Wird lokal gespeichert. Ermöglicht direkte Links zu deinem Versammlungsplatz.</p>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
       <div class="form-group" style="margin:0;">
@@ -40,7 +40,7 @@
   <!-- ── Farmlist-Timer ── -->
   <div class="card" style="margin-bottom:1rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
-      <h2 style="margin:0;">🌾 Farmlist-Timer</h2>
+      <h2 style="margin:0;" data-i18n="timer.farmlist.title">🌾 Farmlist-Timer</h2>
       <span class="badge badge-warn" id="farmBadge" style="font-size:0.85rem; display:none;">⏳ läuft</span>
     </div>
 
@@ -56,8 +56,8 @@
           style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
       <div style="display:flex; gap:0.5rem;">
-        <button id="btnFarmStart" class="btn btn-primary">▶ Start</button>
-        <button id="btnFarmStop" class="btn btn-secondary" disabled>■ Stop</button>
+        <button id="btnFarmStart" class="btn btn-primary" data-i18n="timer.farm.start">▶ Start</button>
+        <button id="btnFarmStop" class="btn btn-secondary" disabled data-i18n="timer.farm.stop">■ Stop</button>
       </div>
     </div>
 
@@ -75,7 +75,7 @@
 
   <!-- ── Erinnerungen ── -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;">🔔 Erinnerungen</h2>
+    <h2 style="margin-top:0;" data-i18n="timer.reminders.title">🔔 Erinnerungen</h2>
     <p class="hint">Trage Datum und Uhrzeit ein, wann du erinnert werden möchtest — z.B. wenn Truppen ankommen oder ein Gebäude fertig ist.</p>
 
     <form id="addTimerForm" style="display:grid; grid-template-columns:2fr 1fr auto auto; gap:0.75rem; align-items:end; margin-bottom:1.25rem; flex-wrap:wrap;">
@@ -97,7 +97,7 @@
           <option value="1">Ja</option>
         </select>
       </div>
-      <button type="submit" class="btn btn-primary" style="white-space:nowrap; margin-bottom:0;">+ Hinzufügen</button>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap; margin-bottom:0;" data-i18n="timer.add.btn">+ Hinzufügen</button>
     </form>
 
     <div id="timerList" style="display:flex; flex-direction:column; gap:0.6rem;">

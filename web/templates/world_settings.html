@@ -3,8 +3,8 @@
 {% block content %}
 <div class="container" style="max-width:700px;">
   <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-  <h1 style="margin:.5rem 0 .25rem;">🌍 World / Server</h1>
-  <p class="subtitle" style="margin:0 0 1.5rem;">Travian-Server-URL und Bot-Einstellungen</p>
+  <h1 style="margin:.5rem 0 .25rem;" data-i18n="worldsettings.title">🌍 World / Server</h1>
+  <p class="subtitle" style="margin:0 0 1.5rem;" data-i18n="worldsettings.subtitle">Travian-Server-URL und Bot-Einstellungen</p>
 
   {% if saved %}
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Einstellungen gespeichert.</div>
@@ -46,9 +46,9 @@
           <option value="https://ts1.x1.arabia.travian.com">ts1.x1.arabia</option>
           <option value="https://ts2.x1.arabia.travian.com">ts2.x1.arabia</option>
         </datalist>
-        <p style="margin:.4rem 0 0;font-size:.8rem;color:var(--text-muted);">Oder URL direkt eingeben.</p>
+        <p style="margin:.4rem 0 0;font-size:.8rem;color:var(--text-muted);" data-i18n="worldsettings.url.hint">Oder URL direkt eingeben.</p>
       </div>
-      <button type="submit" class="btn btn-primary">💾 Speichern</button>
+      <button type="submit" class="btn btn-primary" data-i18n="worldsettings.save.btn">💾 Speichern</button>
     </form>
     {% if guild.tw_world %}
     <p style="margin-top:.75rem;font-size:.83rem;color:#4caf82;">

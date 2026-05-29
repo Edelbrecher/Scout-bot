@@ -5,7 +5,7 @@
 <div class="container" style="max-width:1100px;">
 
   <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Verteidigung</a>
-  <h1 style="margin:0.25rem 0 1.5rem;">📊 Defend-Statistiken</h1>
+  <h1 style="margin:0.25rem 0 1.5rem;" data-i18n="defense.stats.title">📊 Defend-Statistiken</h1>
 
   <!-- Summary cards -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
@@ -40,7 +40,7 @@
 
     <!-- Nervig: Angreifer-Ranking -->
     <div class="card">
-      <h2 style="margin:0 0 0.75rem;font-size:1rem;">😤 Nervigste Angreifer</h2>
+      <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.attackers">😤 Nervigste Angreifer</h2>
       {% if stats.attackers %}
       <table class="table" style="font-size:0.83rem;">
         <thead><tr><th>#</th><th>Angreifer</th><th style="text-align:right;">Angriffe</th></tr></thead>
@@ -67,7 +67,7 @@
 
     <!-- Meistangegriffene unserer Spieler -->
     <div class="card">
-      <h2 style="margin:0 0 0.75rem;font-size:1rem;">🎯 Am meisten angegriffen (unsere Spieler)</h2>
+      <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.targeted">🎯 Am meisten angegriffen (unsere Spieler)</h2>
       {% if stats.targeted %}
       <table class="table" style="font-size:0.83rem;">
         <thead><tr><th>#</th><th>Spieler</th><th style="text-align:right;">Anfragen</th></tr></thead>
@@ -96,7 +96,7 @@
 
   <!-- Truppenbeiträge unserer Spieler -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin:0 0 0.75rem;font-size:1rem;">⚔️ Truppenbeiträge unserer Spieler</h2>
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.senders">⚔️ Truppenbeiträge unserer Spieler</h2>
     {% if stats.senders %}
     <div style="overflow-x:auto;">
     <table class="table" style="font-size:0.83rem;">
@@ -151,7 +151,7 @@
 
   <!-- Aktionen mit den meisten Truppen -->
   <div class="card">
-    <h2 style="margin:0 0 0.75rem;font-size:1rem;">🏆 Defend-Aktionen mit meisten Truppen</h2>
+    <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.top">🏆 Defend-Aktionen mit meisten Truppen</h2>
     {% if stats.top_defends %}
     <div style="overflow-x:auto;">
     <table class="table" style="font-size:0.83rem;">

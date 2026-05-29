@@ -464,6 +464,224 @@ const TRANSLATIONS = {
     "confirm.cancel_sub": "Really cancel subscription? It will continue until the end of the paid period.",
     "confirm.reset_attacks": "Reset attack configuration?",
     "confirm.delete_report": "Delete report?",
+
+    // defense.html
+    "defense.title": "🛡️ Defense",
+    "defense.subtitle": "Defend and Timed-Defend requests for this alliance",
+    "defense.stats.btn": "📊 Statistics",
+    "defense.heroscout.btn": "🗡️ Hero Scout",
+    "defense.filter.open": "🔴 Open",
+    "defense.filter.all": "📋 All",
+    "defense.filter.closed": "✅ Done",
+    "defense.field.attacker": "Attacker",
+    "defense.field.coords": "Target",
+    "defense.field.arrival": "Arrival",
+    "defense.field.reporter": "Reported by",
+    "defense.btn.close": "✅ Close",
+    "defense.btn.reopen": "🔄 Reopen",
+
+    // einsatz.html
+    "personal.title": "🎯 Operation Planning",
+    "personal.subtitle": "Coordinate attacks — with automatic march time & timer integration",
+    "personal.profile.title": "🏰 My Travian Profile",
+    "personal.profile.local": "(locally saved)",
+    "personal.create.title": "➕ Create New Operation",
+    "personal.save.btn": "💾 Save Operation",
+    "personal.plans.title": "📋 Active Operations",
+    "personal.empty": "No operations planned yet.",
+
+    // notifications.html
+    "notif.title": "🔔 Notifications",
+    "notif.mark_read": "✔ Mark all as read",
+    "notif.empty": "No notifications.",
+    "notif.to_plan": "→ To Operation Plan",
+
+    // allianz_hospital.html
+    "hospital.title": "🏥 Alliance Hospital",
+    "hospital.subtitle": "Hospital data of all members at a glance",
+    "hospital.kpi.healing": "🏥 Troops healing",
+    "hospital.kpi.members": "👥 Members",
+    "hospital.kpi.entries": "📋 Entries",
+    "hospital.th.village": "Village",
+    "hospital.th.troop": "Troop",
+    "hospital.th.count": "Count",
+    "hospital.th.finish": "Finish time",
+    "hospital.empty.title": "No hospital data available",
+
+    // allianz_sitter.html
+    "sitterlist.title": "🤝 Alliance Sitter Lists",
+    "sitterlist.subtitle": "Shared sitter and dual data of all members",
+    "sitterlist.th.discord": "Discord ID",
+    "sitterlist.th.sitter1": "Sitter 1",
+    "sitterlist.th.travian": "Travian",
+    "sitterlist.th.sitter2": "Sitter 2",
+    "sitterlist.th.sitting1": "Sitting for 1",
+    "sitterlist.th.sitting2": "Sitting for 2",
+    "sitterlist.th.updated": "Updated",
+    "sitterlist.empty.title": "No shared lists yet",
+
+    // enemies.html
+    "enemies.title": "🎯 Enemy Records",
+    "enemies.subtitle": "Filled automatically when scout reports arrive in Discord",
+    "enemies.report_channel": "Report Incoming Channel",
+    "enemies.channel.remove": "Remove",
+    "enemies.channel.create": "➕ Create Channel",
+    "enemies.channel.link": "Link",
+    "enemies.kpi.known": "Enemies known",
+    "enemies.kpi.scouts": "Total scouts",
+    "enemies.kpi.reports": "Total reports",
+    "enemies.th.player": "Player",
+    "enemies.th.coords": "Coordinates",
+    "enemies.th.village": "Village",
+    "enemies.th.scouts": "Scouts",
+    "enemies.th.reports": "Reports",
+    "enemies.th.last_seen": "Last seen",
+    "enemies.th.notes": "Notes",
+
+    // enemy_detail.html
+    "enemy.back": "← Enemy Records",
+    "enemy.delete.btn": "🗑 Delete",
+    "enemy.notes.title": "📝 Notes",
+    "enemy.notes.save": "Save",
+    "enemy.history.title": "📜 Scout History",
+
+    // farming.html
+    "farming.title": "⚜️ Farming Intelligence",
+    "farming.subtitle": "Detect inactive farms · Track growth · Analyze farm lists",
+    "farming.snapshot.btn": "🔄 Fetch Snapshot",
+
+    // farmlist_analyst.html
+    "farmlist.title": "📋 Farmlist Analyst",
+    "farmlist.subtitle": "Paste multiple farm lists at once and analyze",
+    "farmlist.saved.title": "🗂️ Saved Analyses",
+
+    // stats.html
+    "stats.title": "📊 Statistics",
+
+    // settle_list.html
+    "settle.title": "📍 Settle List",
+    "settle.subtitle": "Coordinate next settlement coordinates — no conflicts at world start",
+    "settle.add.title": "➕ Add New Entry",
+    "settle.add.btn": "📍 Add",
+    "settle.empty.title": "No entries yet",
+    "settle.empty.hint": "Enter your planned settlement coordinates before the world start.",
+
+    // timer.html
+    "timer.title": "⏱️ Timer & Reminders",
+    "timer.sound.on": "🔔 Sound on",
+    "timer.profile.title": "🏰 My Travian Profile",
+    "timer.farmlist.title": "🌾 Farmlist Timer",
+    "timer.farm.start": "▶ Start",
+    "timer.farm.stop": "■ Stop",
+    "timer.reminders.title": "🔔 Reminders",
+    "timer.add.btn": "+ Add",
+
+    // res_push.html
+    "respush.title": "🪖 Res-Push",
+    "respush.config.title": "Configuration",
+    "respush.save.btn": "Save Settings",
+    "respush.post.btn": "🔘 Post Res-Request Button in Discord",
+    "respush.status.title": "Status",
+
+    // polls.html
+    "polls.title": "📅 Availability Polls",
+    "polls.config.title": "Configuration",
+    "polls.save.btn": "Save",
+    "polls.status.title": "Status",
+    "polls.create.title": "Create New Poll",
+
+    // crop_calculator.html
+    "crop.title": "🌾 Crop Field Efficiency Calculator",
+    "crop.subtitle": "Optimal upgrade order for crop fields — ROI-based (T4.4 Extended)",
+    "crop.config.title": "Configuration",
+
+    // kampfkraft.html
+    "kk.title": "⚔️ Combat Power Calculator",
+    "kk.tab.stats": "📊 Troop Stats",
+    "kk.tab.calc": "🧮 Calculator",
+
+    // hero_tasks.html
+    "herotasks.title": "🗡️ Hero Tasks",
+    "herotasks.subtitle": "Check off milestones → track resources & XP rewards",
+    "herotasks.reset.btn": "🔄 Reset all",
+    "herotasks.tab.start": "🏠 Starting Village",
+    "herotasks.tab.settled": "🏘️ Settled Village",
+    "herotasks.stat.done": "Done",
+    "herotasks.stat.total": "Total",
+    "herotasks.stat.res": "Res earned",
+
+    // blueprints.html
+    "bp.title": "📋 Blueprints",
+    "bp.subtitle": "Build-Order Templates & Player Progress",
+    "bp.templates.title": "📋 Blueprint Templates",
+    "bp.import.btn": "📥 Import Preset",
+    "bp.new.btn": "＋ New Template",
+
+    // world_settings.html
+    "worldsettings.title": "🌍 World / Server",
+    "worldsettings.subtitle": "Travian server URL and bot settings",
+    "worldsettings.url.hint": "Or enter URL directly.",
+    "worldsettings.save.btn": "💾 Save",
+
+    // billing additions
+    "billing.current_plan": "Current Plan",
+    "billing.manage.btn": "🔧 Manage",
+    "billing.cancel.btn": "❌ Cancel",
+
+    // profile.html
+    "profile.title": "👤 My Profile",
+    "profile.subtitle": "Invitations, TravOps-Points and rewards",
+    "profile.points.label": "TravOps-Points",
+    "profile.redeem.btn": "🎁 Redeem 10 Points → 1 Month Pro",
+    "profile.reflink.title": "🔗 Your personal invite link",
+
+    // scout_stats.html
+    "scout.stats.title": "📊 Scout Statistics",
+    "scout.stats.empty": "No data yet",
+    "scout.stats.players": "Player Overview",
+    "scout.stats.th.player": "Player",
+    "scout.stats.th.coords": "Coordinates",
+    "scout.stats.th.scouts": "Scouts",
+    "scout.stats.th.last_scouted": "Last scouted",
+    "scout.stats.th.troops": "Troops (last report)",
+    "scout.stats.th.resources": "Resources (last)",
+
+    // defense stats
+    "defense.stats.title": "📊 Defend Statistics",
+    "defense.stats.attackers": "😤 Most Annoying Attackers",
+    "defense.stats.targeted": "🎯 Most Attacked (our players)",
+    "defense.stats.senders": "⚔️ Troop Contributions",
+    "defense.stats.top": "🏆 Defend Actions with Most Troops",
+
+    // res_push_stats.html
+    "respush.stats.title": "📊 Res-Push Statistics",
+    "respush.stats.by_status": "By Status",
+    "respush.stats.top_contrib": "Top Contributors",
+    "respush.stats.empty": "No contributions yet.",
+
+    // attack_analysis.html
+    "analysis.title": "🔬 Attack Analysis",
+
+    // ally_join.html
+    "allyjoin.invalid.title": "Invalid Link",
+    "allyjoin.welcome.title": "Welcome!",
+    "allyjoin.pending.title": "Request Sent",
+    "allyjoin.own.title": "Your Own Alliance",
+    "allyjoin.join.title": "Join Alliance",
+    "allyjoin.join.btn": "🤝 Join",
+
+    // dual_join.html
+    "dualjoin.already.title": "Dual Already Connected",
+    "dualjoin.success.title": "✅ Successfully Connected!",
+    "dualjoin.invite.title": "Dual Invitation",
+    "dualjoin.accept.btn": "🔗 Accept Invitation",
+
+    // plans.html
+    "plans.title": "Choose Your Plan",
+
+    // scout.html
+    "scout.title": "🔍 Scout",
+    "scout.config.title": "⚙️ Configuration & Status",
   },
   de: {
     // Nav
@@ -923,6 +1141,224 @@ const TRANSLATIONS = {
     "confirm.cancel_sub": "Abo wirklich kündigen? Es läuft bis zum Ende der bezahlten Periode weiter.",
     "confirm.reset_attacks": "Angriff-Konfiguration zurücksetzen?",
     "confirm.delete_report": "Meldung löschen?",
+
+    // defense.html
+    "defense.title": "🛡️ Verteidigung",
+    "defense.subtitle": "Defend- und Timed-Defend Anfragen dieser Allianz",
+    "defense.stats.btn": "📊 Statistiken",
+    "defense.heroscout.btn": "🗡️ Helden-Scout",
+    "defense.filter.open": "🔴 Offen",
+    "defense.filter.all": "📋 Alle",
+    "defense.filter.closed": "✅ Erledigt",
+    "defense.field.attacker": "Angreifer",
+    "defense.field.coords": "Ziel",
+    "defense.field.arrival": "Ankunft",
+    "defense.field.reporter": "Gemeldet von",
+    "defense.btn.close": "✅ Schließen",
+    "defense.btn.reopen": "🔄 Öffnen",
+
+    // einsatz.html
+    "personal.title": "🎯 Einsatzplanung",
+    "personal.subtitle": "Koordinierte Angriffe planen – mit automatischer Marschzeit & Timer-Integration",
+    "personal.profile.title": "🏰 Mein Travian-Profil",
+    "personal.profile.local": "(lokal gespeichert)",
+    "personal.create.title": "➕ Neuen Einsatz erstellen",
+    "personal.save.btn": "💾 Einsatz speichern",
+    "personal.plans.title": "📋 Aktive Einsätze",
+    "personal.empty": "Noch keine Einsätze geplant.",
+
+    // notifications.html
+    "notif.title": "🔔 Benachrichtigungen",
+    "notif.mark_read": "✔ Alle als gelesen markieren",
+    "notif.empty": "Keine Benachrichtigungen.",
+    "notif.to_plan": "→ Zum Einsatzplan",
+
+    // allianz_hospital.html
+    "hospital.title": "🏥 Allianz-Lazarett",
+    "hospital.subtitle": "Lazarett-Daten aller Mitglieder auf einen Blick",
+    "hospital.kpi.healing": "🏥 Truppen in Heilung",
+    "hospital.kpi.members": "👥 Mitglieder",
+    "hospital.kpi.entries": "📋 Einträge",
+    "hospital.th.village": "Dorf",
+    "hospital.th.troop": "Truppe",
+    "hospital.th.count": "Anzahl",
+    "hospital.th.finish": "Fertig um",
+    "hospital.empty.title": "Keine Lazarett-Daten vorhanden",
+
+    // allianz_sitter.html
+    "sitterlist.title": "🤝 Allianz-Sitter-Listen",
+    "sitterlist.subtitle": "Freigegebene Sitter- und Dual-Daten aller Mitglieder",
+    "sitterlist.th.discord": "Discord-ID",
+    "sitterlist.th.sitter1": "Sitter 1",
+    "sitterlist.th.travian": "Travian",
+    "sitterlist.th.sitter2": "Sitter 2",
+    "sitterlist.th.sitting1": "Sittet für 1",
+    "sitterlist.th.sitting2": "Sittet für 2",
+    "sitterlist.th.updated": "Aktualisiert",
+    "sitterlist.empty.title": "Noch keine freigegebenen Listen",
+
+    // enemies.html
+    "enemies.title": "🎯 Gegner-Kartei",
+    "enemies.subtitle": "Wird automatisch befüllt wenn Scout-Berichte im Discord eingehen",
+    "enemies.report_channel": "Bericht-Eingangskanal",
+    "enemies.channel.remove": "Entfernen",
+    "enemies.channel.create": "➕ Channel erstellen",
+    "enemies.channel.link": "Verknüpfen",
+    "enemies.kpi.known": "Gegner bekannt",
+    "enemies.kpi.scouts": "Scouts gesamt",
+    "enemies.kpi.reports": "Berichte gesamt",
+    "enemies.th.player": "Spieler",
+    "enemies.th.coords": "Koordinaten",
+    "enemies.th.village": "Dorf",
+    "enemies.th.scouts": "Scouts",
+    "enemies.th.reports": "Berichte",
+    "enemies.th.last_seen": "Zuletzt gesehen",
+    "enemies.th.notes": "Notizen",
+
+    // enemy_detail.html
+    "enemy.back": "← Gegner-Kartei",
+    "enemy.delete.btn": "🗑 Löschen",
+    "enemy.notes.title": "📝 Notizen",
+    "enemy.notes.save": "Speichern",
+    "enemy.history.title": "📜 Scout-Verlauf",
+
+    // farming.html
+    "farming.title": "⚜️ Farming Intelligence",
+    "farming.subtitle": "Inaktive Farmen erkennen · Wachstum verfolgen · Farmlisten auswerten",
+    "farming.snapshot.btn": "🔄 Snapshot holen",
+
+    // farmlist_analyst.html
+    "farmlist.title": "📋 Farmlist-Analyst",
+    "farmlist.subtitle": "Mehrere Farmlisten auf einmal einfügen und auswerten",
+    "farmlist.saved.title": "🗂️ Gespeicherte Analysen",
+
+    // stats.html
+    "stats.title": "📊 Statistics",
+
+    // settle_list.html
+    "settle.title": "📍 Settle-Liste",
+    "settle.subtitle": "Nächste Siedlungskoordinaten koordinieren — keine Konflikte beim Worldstart",
+    "settle.add.title": "➕ Neuen Eintrag hinzufügen",
+    "settle.add.btn": "📍 Eintragen",
+    "settle.empty.title": "Noch keine Einträge",
+    "settle.empty.hint": "Trage deine geplanten Siedlungskoordinaten ein, bevor der Worldstart losgeht.",
+
+    // timer.html
+    "timer.title": "⏱️ Timer & Erinnerungen",
+    "timer.sound.on": "🔔 Sound an",
+    "timer.profile.title": "🏰 Mein Travian-Profil",
+    "timer.farmlist.title": "🌾 Farmlist-Timer",
+    "timer.farm.start": "▶ Start",
+    "timer.farm.stop": "■ Stop",
+    "timer.reminders.title": "🔔 Erinnerungen",
+    "timer.add.btn": "+ Hinzufügen",
+
+    // res_push.html
+    "respush.title": "🪖 Res-Push",
+    "respush.config.title": "Configuration",
+    "respush.save.btn": "Save Settings",
+    "respush.post.btn": "🔘 Post Res-Request Button in Discord",
+    "respush.status.title": "Status",
+
+    // polls.html
+    "polls.title": "📅 Verfügbarkeits-Umfragen",
+    "polls.config.title": "Konfiguration",
+    "polls.save.btn": "Speichern",
+    "polls.status.title": "Status",
+    "polls.create.title": "Neue Umfrage erstellen",
+
+    // crop_calculator.html
+    "crop.title": "🌾 Getreidefeld-Effizienz-Rechner",
+    "crop.subtitle": "Optimale Upgrade-Reihenfolge für Getreidefelder — ROI-basiert (T4.4 Extended)",
+    "crop.config.title": "Konfiguration",
+
+    // kampfkraft.html
+    "kk.title": "⚔️ Kampfkraft-Rechner",
+    "kk.tab.stats": "📊 Truppenwerte",
+    "kk.tab.calc": "🧮 Hochrechner",
+
+    // hero_tasks.html
+    "herotasks.title": "🗡️ Heldenaufgaben",
+    "herotasks.subtitle": "Meilensteine abhaken → Ressourcen & XP-Belohnungen tracken",
+    "herotasks.reset.btn": "🔄 Alles zurücksetzen",
+    "herotasks.tab.start": "🏠 Startdorf",
+    "herotasks.tab.settled": "🏘️ Gesiedeltes Dorf",
+    "herotasks.stat.done": "Erledigt",
+    "herotasks.stat.total": "Gesamt",
+    "herotasks.stat.res": "Res verdient",
+
+    // blueprints.html
+    "bp.title": "📋 Blueprints",
+    "bp.subtitle": "Build-Order Vorlagen & Spieler-Fortschritt",
+    "bp.templates.title": "📋 Blueprint-Vorlagen",
+    "bp.import.btn": "📥 Preset importieren",
+    "bp.new.btn": "＋ Neue Vorlage",
+
+    // world_settings.html
+    "worldsettings.title": "🌍 World / Server",
+    "worldsettings.subtitle": "Travian-Server-URL und Bot-Einstellungen",
+    "worldsettings.url.hint": "Oder URL direkt eingeben.",
+    "worldsettings.save.btn": "💾 Speichern",
+
+    // billing additions
+    "billing.current_plan": "Aktueller Plan",
+    "billing.manage.btn": "🔧 Verwalten",
+    "billing.cancel.btn": "❌ Kündigen",
+
+    // profile.html
+    "profile.title": "👤 Mein Profil",
+    "profile.subtitle": "Einladungen, TravOps-Points und Belohnungen",
+    "profile.points.label": "TravOps-Points",
+    "profile.redeem.btn": "🎁 10 Points einlösen → 1 Monat Pro",
+    "profile.reflink.title": "🔗 Dein persönlicher Einladungslink",
+
+    // scout_stats.html
+    "scout.stats.title": "📊 Scout-Statistik",
+    "scout.stats.empty": "Noch keine Daten",
+    "scout.stats.players": "Spieler-Übersicht",
+    "scout.stats.th.player": "Spieler",
+    "scout.stats.th.coords": "Koordinaten",
+    "scout.stats.th.scouts": "Scouts",
+    "scout.stats.th.last_scouted": "Zuletzt gescautet",
+    "scout.stats.th.troops": "Truppen (letzte Meldung)",
+    "scout.stats.th.resources": "Ressourcen (letzte)",
+
+    // defense stats
+    "defense.stats.title": "📊 Defend-Statistiken",
+    "defense.stats.attackers": "😤 Nervigste Angreifer",
+    "defense.stats.targeted": "🎯 Am meisten angegriffen (unsere Spieler)",
+    "defense.stats.senders": "⚔️ Truppenbeiträge unserer Spieler",
+    "defense.stats.top": "🏆 Defend-Aktionen mit meisten Truppen",
+
+    // res_push_stats.html
+    "respush.stats.title": "📊 Res-Push Statistics",
+    "respush.stats.by_status": "By Status",
+    "respush.stats.top_contrib": "Top Contributors",
+    "respush.stats.empty": "No contributions yet.",
+
+    // attack_analysis.html
+    "analysis.title": "🔬 Angriffs-Analyse",
+
+    // ally_join.html
+    "allyjoin.invalid.title": "Ungültiger Link",
+    "allyjoin.welcome.title": "Willkommen!",
+    "allyjoin.pending.title": "Anfrage gesendet",
+    "allyjoin.own.title": "Eigene Allianz",
+    "allyjoin.join.title": "Allianz beitreten",
+    "allyjoin.join.btn": "🤝 Beitreten",
+
+    // dual_join.html
+    "dualjoin.already.title": "Dual bereits verbunden",
+    "dualjoin.success.title": "✅ Erfolgreich verbunden!",
+    "dualjoin.invite.title": "Dual-Einladung",
+    "dualjoin.accept.btn": "🔗 Einladung annehmen",
+
+    // plans.html
+    "plans.title": "Wähle deinen Plan",
+
+    // scout.html
+    "scout.title": "🔍 Scout",
+    "scout.config.title": "⚙️ Konfiguration & Status",
   },
 };
 

@@ -152,19 +152,19 @@
   <!-- ── Hero ── -->
   <div class="hero-section" style="text-align:center;padding:2.5rem 1rem 1.5rem;">
     <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:20px;padding:0.3rem 1rem;font-size:0.8rem;color:#93c5fd;margin-bottom:1rem;">
-      ⏱️ Spare 3+ Stunden pro Woche — automatisch.
+      <span data-i18n="hero.tagline">⏱️ Spare 3+ Stunden pro Woche — automatisch.</span>
     </div>
     <h1 class="hero-title" style="font-size:2rem;font-weight:800;margin:0 0 0.75rem;background:linear-gradient(135deg,#f1f5f9,#93c5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
       TravOps
     </h1>
-    <p style="color:var(--text-muted);font-size:1rem;max-width:520px;margin:0 auto;">
+    <p style="color:var(--text-muted);font-size:1rem;max-width:520px;margin:0 auto;" data-i18n="hero.sub">
       TravOps übernimmt die mühsame Arbeit, damit deine Allianz sich auf das Wesentliche konzentrieren kann: Gewinnen.
     </p>
   </div>
 
   <!-- ── Benefits Grid ── -->
   <div style="margin:1.25rem 0 1.75rem;">
-    <h2 style="text-align:center;font-size:0.9rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">
+    <h2 style="text-align:center;font-size:0.9rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;" data-i18n="benefits.title">
       Warum tausende Gilden auf TravOps vertrauen
     </h2>
     <div class="benefits-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.85rem;">
@@ -253,7 +253,7 @@
   <!-- ── Server-Liste ── -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-      <h2 style="margin:0;font-size:1.05rem;">Deine Workspaces &amp; Server</h2>
+      <h2 style="margin:0;font-size:1.05rem;" data-i18n="dashboard.servers">Deine Workspaces &amp; Server</h2>
       {% if slots_max > 0 %}
       <span style="font-size:0.75rem;padding:2px 10px;border-radius:20px;border:1px solid {% if slots_full %}rgba(220,38,38,0.5);background:rgba(220,38,38,0.1);color:#f87171;{% else %}var(--border);background:var(--bg-card);color:var(--text-muted);{% endif %}">
         🖥️ {{ slots_used }}/{{ slots_max }} Discord-Server

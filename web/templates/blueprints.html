@@ -117,8 +117,8 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1>📋 Blueprints</h1>
-      <p class="subtitle">Build-Order Vorlagen & Spieler-Fortschritt</p>
+      <h1 data-i18n="bp.title">📋 Blueprints</h1>
+      <p class="subtitle" data-i18n="bp.subtitle">Build-Order Vorlagen & Spieler-Fortschritt</p>
     </div>
     <a href="/guild/{{ guild.guild_id }}/blueprints/layouts" class="btn btn-secondary" style="display:flex; align-items:center; gap:0.4rem; font-size:0.9rem;">
       🏘️ Dorf-Layouts
@@ -141,10 +141,10 @@
     <!-- LEFT: Templates -->
     <div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 style="font-size:1.1rem; font-weight:700;">📋 Blueprint-Vorlagen</h2>
+        <h2 style="font-size:1.1rem; font-weight:700;" data-i18n="bp.templates.title">📋 Blueprint-Vorlagen</h2>
         <div style="display:flex; gap:0.5rem;">
-          <button class="btn btn-secondary" onclick="openPresetModal()" style="font-size:0.85rem; padding:0.4rem 0.9rem;">📥 Preset importieren</button>
-          <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new" class="btn btn-primary" style="font-size:0.85rem; padding:0.4rem 0.9rem;">＋ Neue Vorlage</a>
+          <button class="btn btn-secondary" onclick="openPresetModal()" style="font-size:0.85rem; padding:0.4rem 0.9rem;" data-i18n="bp.import.btn">📥 Preset importieren</button>
+          <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new" class="btn btn-primary" style="font-size:0.85rem; padding:0.4rem 0.9rem;" data-i18n="bp.new.btn">＋ Neue Vorlage</a>
         </div>
       </div>
 

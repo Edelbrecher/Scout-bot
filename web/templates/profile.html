@@ -6,8 +6,8 @@
 
   <div style="margin-bottom:1.5rem;">
     <a href="/dashboard" class="back-link">← Dashboard</a>
-    <h1 style="margin:0.25rem 0 0;">👤 Mein Profil</h1>
-    <p class="subtitle" style="margin:0;">Einladungen, TravOps-Points und Belohnungen</p>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="profile.title">👤 Mein Profil</h1>
+    <p class="subtitle" style="margin:0;" data-i18n="profile.subtitle">Einladungen, TravOps-Points und Belohnungen</p>
   </div>
 
   {% if redeemed == '1' %}
@@ -24,7 +24,7 @@
   <div class="card" style="margin-bottom:1.25rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
       <div>
-        <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.25rem;">TravOps-Points</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.25rem;" data-i18n="profile.points.label">TravOps-Points</div>
         <div style="font-size:2.5rem;font-weight:700;color:#f59e0b;line-height:1;">
           {{ ref_stats.points }}
           <span style="font-size:1rem;color:var(--text-muted);font-weight:400;">/ 10 für 1 Monat Pro</span>
@@ -39,7 +39,7 @@
       </div>
       {% if ref_stats.points >= 10 %}
       <form method="post" action="/profile/redeem">
-        <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;padding:0.65rem 1.4rem;border-radius:10px;font-weight:600;cursor:pointer;color:#fff;white-space:nowrap;">
+        <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;padding:0.65rem 1.4rem;border-radius:10px;font-weight:600;cursor:pointer;color:#fff;white-space:nowrap;" data-i18n="profile.redeem.btn">
           🎁 10 Points einlösen → 1 Monat Pro
         </button>
       </form>
@@ -54,7 +54,7 @@
 
   <!-- ── REF-LINK ── -->
   <div class="card" style="margin-bottom:1.25rem;">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;">🔗 Dein persönlicher Einladungslink</h3>
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;" data-i18n="profile.reflink.title">🔗 Dein persönlicher Einladungslink</h3>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:0.85rem;">
       Teile diesen Link. Sobald jemand über deinen Link ein <strong>Pro-Abo</strong> kauft, bekommst du automatisch <strong>+1 TravOps-Point</strong>. Pro eingeladener Person einmalig.
     </p>

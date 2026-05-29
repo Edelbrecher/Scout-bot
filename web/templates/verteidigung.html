@@ -7,21 +7,21 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">🛡️ Verteidigung</h1>
-      <p class="subtitle" style="margin:0;">Defend- und Timed-Defend Anfragen dieser Allianz</p>
+      <h1 style="margin:0.25rem 0 0;"><span data-i18n="defense.title">🛡️ Verteidigung</span></h1>
+      <p class="subtitle" style="margin:0;" data-i18n="defense.subtitle">Defend- und Timed-Defend Anfragen dieser Allianz</p>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
       <a href="/guild/{{ guild.guild_id }}/verteidigung/stats"
          style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
                 background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);
                 border-radius:8px;font-size:0.85rem;font-weight:600;color:#818cf8;text-decoration:none;">
-        📊 Statistiken
+        <span data-i18n="defense.stats.btn">📊 Statistiken</span>
       </a>
       <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
          style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
                 background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);
                 border-radius:8px;font-size:0.85rem;font-weight:600;color:#f59e0b;text-decoration:none;">
-        🗡️ Helden-Scout
+        <span data-i18n="defense.heroscout.btn">🗡️ Helden-Scout</span>
       </a>
     </div>
   </div>
@@ -41,17 +41,17 @@
     <a href="?show=open" style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.83rem;font-weight:600;text-decoration:none;
       {% if show == 'open' %}background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);
       {% else %}color:var(--text-muted);border:1px solid transparent;{% endif %}">
-      🔴 Offen <span style="opacity:.7;">({{ total_open }})</span>
+      <span data-i18n="defense.filter.open">🔴 Offen</span> <span style="opacity:.7;">({{ total_open }})</span>
     </a>
     <a href="?show=all" style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.83rem;font-weight:600;text-decoration:none;
       {% if show == 'all' %}background:rgba(148,163,184,0.15);color:var(--text);border:1px solid var(--border);
       {% else %}color:var(--text-muted);border:1px solid transparent;{% endif %}">
-      📋 Alle <span style="opacity:.7;">({{ total_open + total_closed }})</span>
+      <span data-i18n="defense.filter.all">📋 Alle</span> <span style="opacity:.7;">({{ total_open + total_closed }})</span>
     </a>
     <a href="?show=closed" style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.83rem;font-weight:600;text-decoration:none;
       {% if show == 'closed' %}background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);
       {% else %}color:var(--text-muted);border:1px solid transparent;{% endif %}">
-      ✅ Erledigt <span style="opacity:.7;">({{ total_closed }})</span>
+      <span data-i18n="defense.filter.closed">✅ Erledigt</span> <span style="opacity:.7;">({{ total_closed }})</span>
     </a>
   </div>
 
@@ -79,15 +79,15 @@
           <form method="post" action="/guild/{{ guild.guild_id }}/defend/{{ ch.channel_id }}/close" style="margin:0;"
                 onsubmit="return confirm('Defend-Anfrage als erledigt markieren?')">
             <button type="submit" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
-              border-radius:6px;padding:0.25rem 0.75rem;color:#22c55e;cursor:pointer;font-size:0.78rem;font-weight:600;">
-              ✅ Schließen
+              border-radius:6px;padding:0.25rem 0.75rem;color:#22c55e;cursor:pointer;font-size:0.78rem;font-weight:600;"
+              data-i18n="defense.btn.close">✅ Schließen
             </button>
           </form>
           {% else %}
           <form method="post" action="/guild/{{ guild.guild_id }}/defend/{{ ch.channel_id }}/reopen" style="margin:0;">
             <button type="submit" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);
-              border-radius:6px;padding:0.25rem 0.75rem;color:#818cf8;cursor:pointer;font-size:0.78rem;font-weight:600;">
-              🔄 Öffnen
+              border-radius:6px;padding:0.25rem 0.75rem;color:#818cf8;cursor:pointer;font-size:0.78rem;font-weight:600;"
+              data-i18n="defense.btn.reopen">🔄 Öffnen
             </button>
           </form>
           {% endif %}
@@ -96,19 +96,19 @@
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;margin-top:0.75rem;">
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Angreifer</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.attacker">Angreifer</div>
           <div style="font-weight:600;color:#f87171;">{{ ch.attacker or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ziel</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.coords">Ziel</div>
           <div style="font-family:monospace;color:#93c5fd;">{{ ch.coords or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ankunft</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.arrival">Ankunft</div>
           <div style="font-weight:600;color:#f59e0b;">{{ ch.arrival_time or '—' }}</div>
         </div>
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Gemeldet von</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="defense.field.reporter">Gemeldet von</div>
           <div style="font-size:0.85rem;">{{ ch.requested_by_name or '—' }}</div>
         </div>
         {% if ch.goal %}

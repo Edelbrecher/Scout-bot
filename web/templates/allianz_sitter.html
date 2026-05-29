@@ -6,8 +6,8 @@
 
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;">🤝 Allianz-Sitter-Listen</h1>
-    <p class="subtitle" style="margin:0;">Freigegebene Sitter- und Dual-Daten aller Mitglieder</p>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="sitterlist.title">🤝 Allianz-Sitter-Listen</h1>
+    <p class="subtitle" style="margin:0;" data-i18n="sitterlist.subtitle">Freigegebene Sitter- und Dual-Daten aller Mitglieder</p>
   </div>
 
   {% if shared_sitters %}
@@ -15,16 +15,16 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Discord-ID</th>
-          <th>Sitter 1</th>
-          <th>Travian</th>
-          <th>Sitter 2</th>
-          <th>Travian</th>
-          <th>Sittet für 1</th>
-          <th>Travian</th>
-          <th>Sittet für 2</th>
-          <th>Travian</th>
-          <th>Aktualisiert</th>
+          <th data-i18n="sitterlist.th.discord">Discord-ID</th>
+          <th data-i18n="sitterlist.th.sitter1">Sitter 1</th>
+          <th data-i18n="sitterlist.th.travian">Travian</th>
+          <th data-i18n="sitterlist.th.sitter2">Sitter 2</th>
+          <th data-i18n="sitterlist.th.travian">Travian</th>
+          <th data-i18n="sitterlist.th.sitting1">Sittet für 1</th>
+          <th data-i18n="sitterlist.th.travian">Travian</th>
+          <th data-i18n="sitterlist.th.sitting2">Sittet für 2</th>
+          <th data-i18n="sitterlist.th.travian">Travian</th>
+          <th data-i18n="sitterlist.th.updated">Aktualisiert</th>
         </tr>
       </thead>
       <tbody>
@@ -48,7 +48,7 @@
   {% else %}
   <div class="card" style="text-align:center;padding:3rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🤝</div>
-    <h2 style="margin:0 0 0.5rem;">Noch keine freigegebenen Listen</h2>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="sitterlist.empty.title">Noch keine freigegebenen Listen</h2>
     <p style="color:var(--text-muted);">
       Mitglieder können ihre Sitter-Liste unter <strong>Mein Account → Sitter-Verwaltung</strong>
       freigeben, indem sie die Checkbox „Liste freigeben" aktivieren.

@@ -6,7 +6,7 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/res-push" class="back-link">← Res-Push</a>
-      <h1>📊 Res-Push Statistics</h1>
+      <h1 data-i18n="respush.stats.title">📊 Res-Push Statistics</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
   </div>
@@ -30,7 +30,7 @@
   <div class="grid-2 mt-1">
     <!-- Status breakdown -->
     <div class="card">
-      <h2>By Status</h2>
+      <h2 data-i18n="respush.stats.by_status">By Status</h2>
       <ul class="status-list">
         <li><span class="status-label">Pending</span><span>{{ stats.by_status.get('pending', 0) }}</span></li>
         <li><span class="status-label">On Hold</span><span>{{ stats.by_status.get('hold', 0) }}</span></li>
@@ -41,7 +41,7 @@
 
     <!-- Top contributors -->
     <div class="card">
-      <h2>Top Contributors</h2>
+      <h2 data-i18n="respush.stats.top_contrib">Top Contributors</h2>
       {% if stats.top_contributors %}
       <table class="table">
         <thead><tr><th>#</th><th>Member</th><th>Contributions</th><th>Total Sent</th></tr></thead>
@@ -57,7 +57,7 @@
         </tbody>
       </table>
       {% else %}
-      <p class="empty">No contributions yet.</p>
+      <p class="empty" data-i18n="respush.stats.empty">No contributions yet.</p>
       {% endif %}
     </div>
   </div>

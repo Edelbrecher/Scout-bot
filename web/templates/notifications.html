@@ -7,12 +7,12 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.25rem 0 0;">🔔 Benachrichtigungen</h1>
+      <h1 style="margin:.25rem 0 0;" data-i18n="notif.title">🔔 Benachrichtigungen</h1>
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
     {% if notifications %}
     <form method="post" action="/guild/{{ guild.guild_id }}/notifications/clear" style="align-self:flex-end;">
-      <button type="submit" class="btn btn-secondary" style="font-size:.8rem;">✔ Alle als gelesen markieren</button>
+      <button type="submit" class="btn btn-secondary" style="font-size:.8rem;" data-i18n="notif.mark_read">✔ Alle als gelesen markieren</button>
     </form>
     {% endif %}
   </div>
@@ -20,7 +20,7 @@
   {% if not notifications %}
   <div class="card" style="text-align:center;padding:2.5rem;opacity:.7;">
     <div style="font-size:2rem;margin-bottom:.5rem;">🔕</div>
-    <p style="color:var(--text-muted);margin:0;">Keine Benachrichtigungen.</p>
+    <p style="color:var(--text-muted);margin:0;" data-i18n="notif.empty">Keine Benachrichtigungen.</p>
   </div>
   {% else %}
   <div style="display:flex;flex-direction:column;gap:.5rem;">
@@ -43,7 +43,7 @@
           <div style="display:flex;gap:.75rem;align-items:center;margin-top:.4rem;flex-wrap:wrap;">
             <span style="font-size:.72rem;color:var(--text-muted);">{{ n.created_at[:16].replace('T',' ') }}</span>
             {% if n.plan_id %}
-            <a href="/guild/{{ guild.guild_id }}/operations" style="font-size:.75rem;color:#6366f1;">→ Zum Einsatzplan</a>
+            <a href="/guild/{{ guild.guild_id }}/operations" style="font-size:.75rem;color:#6366f1;" data-i18n="notif.to_plan">→ Zum Einsatzplan</a>
             {% endif %}
           </div>
         </div>
