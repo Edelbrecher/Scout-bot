@@ -2369,6 +2369,7 @@ async def guild_map(request: Request, guild_id: str):
     scouted = await database.get_scouted_coordinates(guild_id)
     ally_group = await database.get_ally_group_for_guild(guild_id)
     meta_alliances = await database.get_meta_alliances(guild_id)
+    meta_groups = await database.get_meta_groups(guild_id)
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
@@ -2376,6 +2377,7 @@ async def guild_map(request: Request, guild_id: str):
         "is_admin": is_admin,
         "ally_group": ally_group,
         "meta_alliances": meta_alliances,
+        "meta_groups": meta_groups,
     })
 
 

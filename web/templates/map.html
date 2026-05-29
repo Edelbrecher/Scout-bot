@@ -142,6 +142,16 @@
     </button>
     {% endif %}
     {% endif %}
+    {# Meta-Builder Gruppen — ein Button pro Gruppe, hebt alle Allianzen darin hervor #}
+    {% set grp_colors = ['#a78bfa','#f97316','#06b6d4','#ec4899','#84cc16','#f59e0b','#10b981','#e11d48','#0ea5e9','#d946ef'] %}
+    {% for g in meta_groups %}
+    {% set col = grp_colors[loop.index0 % grp_colors|length] %}
+    <button class="meta-btn" style="color:{{ col }}; border-color:{{ col }};"
+      onclick="addMetaGroup({{ g.alliances | tojson }}, '{{ col }}')">
+      ✦ {{ g.meta_name }}
+    </button>
+    {% endfor %}
+    {# Zusätzlich gespeicherte Einzelallianzen aus my-ally #}
     {% for ma in meta_alliances %}
     <button class="meta-btn" style="color:{{ ma.color }}; border-color:{{ ma.color }};" id="meta-btn-{{ loop.index }}"
       onclick="addAllianceFilterValue('{{ ma.alliance_name | e }}', '{{ ma.color }}')">
@@ -149,7 +159,7 @@
       {% if ally_group %}<span onclick="event.stopPropagation();removeMetaAlliance('{{ ma.alliance_name | e }}',{{ loop.index }})" style="margin-left:.3rem;opacity:.5;font-size:.75rem;" title="Entfernen">✕</span>{% endif %}
     </button>
     {% endfor %}
-    {% set total_meta = (meta_alliances|length) + (1 if ally_group and ally_group.wing1_name else 0) + (1 if ally_group and ally_group.wing2_name else 0) %}
+    {% set total_meta = (meta_groups|length) + (meta_alliances|length) + (1 if ally_group and ally_group.wing1_name else 0) + (1 if ally_group and ally_group.wing2_name else 0) %}
     {% if total_meta > 0 %}
     <button class="meta-btn" style="color:#888; border-color:#555;"
       onclick="addAllMetaAlliances()">
@@ -583,8 +593,21 @@ const META_ALLIANCES = [
   {name: {{ ma.alliance_name | tojson }}, color: {{ ma.color | tojson }}},
   {% endfor %}
 ];
+{% set grp_colors = ['#a78bfa','#f97316','#06b6d4','#ec4899','#84cc16','#f59e0b','#10b981','#e11d48','#0ea5e9','#d946ef'] %}
+const META_GROUPS = [
+  {% for g in meta_groups %}
+  {% set col = grp_colors[loop.index0 % grp_colors|length] %}
+  {name: {{ g.meta_name | tojson }}, alliances: {{ g.alliances | tojson }}, color: {{ col | tojson }}},
+  {% endfor %}
+];
+function addMetaGroup(alliances, color) {
+  // Verteile Farb-Abstufungen innerhalb der Gruppe
+  const shades = ['#a78bfa','#7c3aed','#c4b5fd','#ddd6fe','#ede9fe'];
+  alliances.forEach((a, i) => addAllianceFilterValue(a, color));
+}
 function addAllMetaAlliances() {
   for (const m of META_ALLIANCES) addAllianceFilterValue(m.name, m.color);
+  for (const g of META_GROUPS) addMetaGroup(g.alliances, g.color);
 }
 
 const GUILD_ID_MAP = '{{ guild.guild_id }}';
