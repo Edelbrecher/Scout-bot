@@ -119,8 +119,7 @@
     <span id="searchInfo" style="align-self:flex-end; font-size:0.78rem; color:var(--text-muted);"></span>
   </div>
 
-  {% if ally_group or meta_alliances %}
-  <!-- Meta-Allianz Schnellfilter -->
+  <!-- Meta-Allianz Schnellfilter (immer sichtbar wenn ally_group oder meta_alliances) -->
   <div style="display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; margin-bottom:0.5rem; padding:0.5rem 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
     <span style="font-size:0.75rem; color:var(--text-muted); margin-right:0.25rem;">🏰 Meta:</span>
     {% if ally_group %}
@@ -144,15 +143,35 @@
     {% endif %}
     {% endif %}
     {% for ma in meta_alliances %}
-    <button class="meta-btn" style="color:{{ ma.color }}; border-color:{{ ma.color }};"
+    <button class="meta-btn" style="color:{{ ma.color }}; border-color:{{ ma.color }};" id="meta-btn-{{ loop.index }}"
       onclick="addAllianceFilterValue('{{ ma.alliance_name | e }}', '{{ ma.color }}')">
       ✦ {{ ma.alliance_name }}
+      {% if ally_group %}<span onclick="event.stopPropagation();removeMetaAlliance('{{ ma.alliance_name | e }}',{{ loop.index }})" style="margin-left:.3rem;opacity:.5;font-size:.75rem;" title="Entfernen">✕</span>{% endif %}
     </button>
     {% endfor %}
+    {% set total_meta = (meta_alliances|length) + (1 if ally_group and ally_group.wing1_name else 0) + (1 if ally_group and ally_group.wing2_name else 0) %}
+    {% if total_meta > 0 %}
     <button class="meta-btn" style="color:#888; border-color:#555;"
       onclick="addAllMetaAlliances()">
       Alle anzeigen
     </button>
+    {% endif %}
+    {# ➕ Schnell hinzufügen #}
+    {% if ally_group %}
+    <button class="meta-btn" style="color:#64b5f6;border-color:#64b5f6;padding:.15rem .5rem;"
+            onclick="document.getElementById('metaAddBar').style.display=document.getElementById('metaAddBar').style.display==='none'?'flex':'none'"
+            title="Allianz zu Meta hinzufügen">➕</button>
+    {% endif %}
+  </div>
+  {% if ally_group %}
+  <div id="metaAddBar" style="display:none;flex-wrap:wrap;gap:.4rem;align-items:center;margin-bottom:.5rem;padding:.5rem .75rem;background:var(--bg-card);border:1px solid rgba(100,181,246,.3);border-radius:8px;">
+    <span style="font-size:.75rem;color:var(--text-muted);">Allianz merken:</span>
+    <input id="metaAddName" type="text" placeholder="Allianzname (wie in Travian)" maxlength="80"
+           style="flex:1;min-width:160px;padding:.28rem .55rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+    <input id="metaAddColor" type="color" value="#94a3b8"
+           style="width:34px;height:28px;border:1px solid var(--border);border-radius:5px;padding:2px;background:var(--bg-main);cursor:pointer;">
+    <button class="btn btn-primary" style="font-size:.78rem;padding:.25rem .7rem;" onclick="saveMetaAlliance()">💾 Speichern</button>
+    <button class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .6rem;" onclick="document.getElementById('metaAddBar').style.display='none'">✕</button>
   </div>
   {% endif %}
 
@@ -567,6 +586,34 @@ const META_ALLIANCES = [
 function addAllMetaAlliances() {
   for (const m of META_ALLIANCES) addAllianceFilterValue(m.name, m.color);
 }
+
+const GUILD_ID_MAP = '{{ guild.guild_id }}';
+
+async function saveMetaAlliance() {
+  const name = document.getElementById('metaAddName').value.trim();
+  const color = document.getElementById('metaAddColor').value;
+  if (!name) return;
+  const fd = new FormData();
+  fd.append('alliance_name', name);
+  fd.append('color', color);
+  const r = await fetch(`/guild/${GUILD_ID_MAP}/my-ally/meta-alliance/add`, {method:'POST', body:fd});
+  if (r.ok || r.redirected) {
+    // Add button immediately + reload to persist
+    addAllianceFilterValue(name, color);
+    location.reload();
+  }
+}
+
+async function removeMetaAlliance(name, idx) {
+  if (!confirm(`"${name}" aus Meta entfernen?`)) return;
+  const fd = new FormData();
+  fd.append('alliance_name', name);
+  await fetch(`/guild/${GUILD_ID_MAP}/my-ally/meta-alliance/remove`, {method:'POST', body:fd});
+  const btn = document.getElementById(`meta-btn-${idx}`);
+  if (btn) btn.remove();
+}
+
+document.getElementById('metaAddName')?.addEventListener('keydown', e => e.key==='Enter' && saveMetaAlliance());
 
 document.getElementById('searchPlayer').addEventListener('keydown', e => e.key==='Enter' && addPlayerFilter());
 document.getElementById('searchAlliance').addEventListener('keydown', e => e.key==='Enter' && addAllianceFilter());
