@@ -1045,11 +1045,21 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
     )
 
     session_type = "admin" if discord_id in ADMIN_DISCORD_IDS else "discord"
+
+    # If this user is a dual, merge the anchor's owned/member guilds into their session
+    dual_anchor_id = await database.get_dual_anchor(discord_id)
+    if dual_anchor_id and session_type != "admin":
+        # Guilds where anchor is subscription owner or ally member
+        anchor_guilds = await database.get_guild_ids_for_discord_user(dual_anchor_id)
+        if anchor_guilds:
+            accessible = list(set(accessible) | set(anchor_guilds))
+
     session_data = {
         "type": session_type,
         "uid": discord_id,
         "username": username,
         "guilds": None if session_type == "admin" else accessible,
+        "dual_anchor": dual_anchor_id,  # store for display purposes
     }
     token = create_session(session_data)
     # Cache username in user_subscriptions so admin can see who is who
@@ -1394,13 +1404,25 @@ async def profile_page(request: Request):
     uid = session.get("uid", "")
     ref_stats = await database.get_referral_stats(uid) if uid else {"code": "", "points": 0, "referred_count": 0}
     user_sub = await database.get_user_subscription(uid) if uid else None
+    dual_info = await database.get_dual_info(uid) if uid else {}
     redeemed = request.query_params.get("redeemed")
+    dual_flash = request.query_params.get("dual_flash")
+    # Resolve display names for duals
+    dual_names: dict[str, str] = {}
+    if dual_info.get("duals"):
+        for d in dual_info["duals"]:
+            dual_names[d["dual_discord_id"]] = d["dual_discord_id"]
+    if dual_info.get("anchor_id"):
+        dual_names[dual_info["anchor_id"]] = dual_info["anchor_id"]
     return templates.TemplateResponse("profile.html", {
         "request": request,
         "session": session,
         "ref_stats": ref_stats,
         "user_sub": user_sub,
+        "dual_info": dual_info,
+        "dual_names": dual_names,
         "redeemed": redeemed,
+        "dual_flash": dual_flash,
         "base_url": str(request.base_url).rstrip("/"),
     })
 
@@ -1415,6 +1437,55 @@ async def redeem_points(request: Request):
     if ok:
         return RedirectResponse("/profile?redeemed=1", status_code=303)
     return RedirectResponse("/profile?redeemed=0", status_code=303)
+
+
+@app.post("/profile/dual/link")
+async def dual_link(request: Request, code: str = Form(...)):
+    """Link current user as a dual using another user's dual code."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    result = await database.link_dual(code.strip().upper(), uid)
+    if result["ok"]:
+        return RedirectResponse("/profile?dual_flash=linked", status_code=303)
+    err_map = {
+        "invalid_code": "Ungültiger Code.",
+        "self_link": "Du kannst dich nicht mit dir selbst verlinken.",
+        "already_anchor": "Du hast bereits Duals – du kannst nicht gleichzeitig Dual eines anderen sein.",
+        "already_dual": "Du bist bereits als Dual verlinkt.",
+        "max_duals": "Dieser Account hat bereits 10 Duals (Maximum).",
+        "already_linked": "Diese Verbindung besteht bereits.",
+    }
+    msg = err_map.get(result.get("error", ""), "Fehler beim Verlinken.")
+    return RedirectResponse(f"/profile?dual_flash={result.get('error','error')}", status_code=303)
+
+
+@app.post("/profile/dual/unlink/{target_id}")
+async def dual_unlink(request: Request, target_id: str):
+    """Remove a dual link."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    await database.unlink_dual(uid, target_id)
+    return RedirectResponse("/profile?dual_flash=unlinked", status_code=303)
+
+
+@app.post("/profile/dual/regenerate")
+async def dual_regenerate_code(request: Request):
+    """Generate a fresh dual code (invalidates old one for new links)."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    import secrets as _sec
+    new_code = "D-" + _sec.token_urlsafe(8).upper()[:10]
+    async with __import__('aiosqlite').connect(database.DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO dual_codes (discord_user_id, code, created_at) VALUES (?,?,datetime('now')) "
+            "ON CONFLICT(discord_user_id) DO UPDATE SET code=excluded.code, created_at=excluded.created_at",
+            (uid, new_code),
+        )
+        await db.commit()
+    return RedirectResponse("/profile?dual_flash=code_reset", status_code=303)
 
 
 # ---------------------------------------------------------------------------

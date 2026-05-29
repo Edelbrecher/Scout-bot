@@ -125,6 +125,117 @@
   }
   </script>
 
+  <!-- ── DUAL-SPIELER ── -->
+  {% set df = dual_flash %}
+  {% if df == 'linked' %}
+  <div class="alert" style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#86efac;">
+    👥 Dual-Verbindung hergestellt!
+  </div>
+  {% elif df == 'unlinked' %}
+  <div class="alert" style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#f87171;">
+    🔗 Dual-Verbindung getrennt.
+  </div>
+  {% elif df == 'code_reset' %}
+  <div class="alert" style="background:rgba(99,102,241,0.1);border:1px solid #6366f1;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#a5b4fc;">
+    🔄 Neuer Dual-Code generiert.
+  </div>
+  {% elif df and df not in ('linked','unlinked','code_reset') %}
+  {% set err_msgs = {
+    'invalid_code': 'Ungültiger Code — bitte prüfen.',
+    'self_link': 'Du kannst dich nicht mit dir selbst verlinken.',
+    'already_anchor': 'Du hast bereits Duals – du kannst nicht gleichzeitig Dual eines anderen sein.',
+    'already_dual': 'Du bist bereits als Dual verlinkt. Erst trennen, dann neu verbinden.',
+    'max_duals': 'Dieser Account hat bereits 10 Duals (Maximum).',
+    'already_linked': 'Diese Verbindung besteht bereits.',
+  } %}
+  <div class="alert" style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#f87171;">
+    ❌ {{ err_msgs.get(df, 'Fehler beim Verlinken.') }}
+  </div>
+  {% endif %}
+
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h3 style="margin:0 0 0.25rem;font-size:0.95rem;">👥 Dual-Spieler</h3>
+    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">
+      Spielst du einen Travian-Account gemeinsam mit anderen? Verlinke deine Duals — sie sehen dann alle deine Allianz-Inhalte und erhalten dieselben Benachrichtigungen.
+    </p>
+
+    {% if dual_info.is_dual %}
+    {# This user is a dual of someone else #}
+    <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:.9rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.15rem;">Du bist Dual von</div>
+        <div style="font-size:.92rem;font-weight:600;">🎮 Discord-ID: {{ dual_info.anchor_id }}</div>
+      </div>
+      <form method="post" action="/profile/dual/unlink/{{ dual_info.anchor_id }}">
+        <button type="submit" style="background:none;border:1px solid rgba(239,68,68,.4);color:#f87171;border-radius:8px;padding:.35rem .8rem;cursor:pointer;font-size:.78rem;"
+                onclick="return confirm('Dual-Verbindung trennen?')">✕ Trennen</button>
+      </form>
+    </div>
+
+    {% else %}
+    {# This user is the anchor (or unlinked) — show their code + dual list #}
+
+    <!-- My Dual-Code -->
+    <div style="margin-bottom:.9rem;">
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.35rem;">🔑 Dein Dual-Code <span style="opacity:.6;">(gib ihn deinem Dual-Partner)</span></div>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <input id="dualCodeInput" type="text" readonly value="{{ dual_info.code }}"
+               style="flex:1;min-width:160px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;color:var(--text-primary);font-size:1rem;font-weight:700;letter-spacing:.08em;cursor:pointer;font-family:monospace;"
+               onclick="this.select()">
+        <button onclick="copyDualCode()" id="copyDualBtn"
+                style="background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.85rem;white-space:nowrap;">
+          📋 Kopieren
+        </button>
+        <form method="post" action="/profile/dual/regenerate" style="margin:0;">
+          <button type="submit" title="Neuen Code generieren"
+                  style="background:none;border:1px solid var(--border);color:var(--text-muted);padding:.5rem .7rem;border-radius:8px;cursor:pointer;font-size:.78rem;"
+                  onclick="return confirm('Neuen Code generieren? Der alte Code funktioniert dann nicht mehr für neue Verlinkungen (bestehende Verbindungen bleiben bestehen).')">
+            🔄
+          </button>
+        </form>
+      </div>
+      <div id="dualCopiedHint" style="display:none;margin-top:.3rem;font-size:.75rem;color:#86efac;">✓ Code kopiert!</div>
+    </div>
+
+    <!-- Current Duals -->
+    {% if dual_info.duals %}
+    <div style="margin-bottom:.9rem;">
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.4rem;">Verlinkte Duals ({{ dual_info.dual_count }}/10)</div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;">
+        {% for d in dual_info.duals %}
+        <div style="display:flex;align-items:center;gap:.6rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;">
+          <span style="font-size:.85rem;">👤</span>
+          <span style="font-size:.83rem;flex:1;color:var(--text-primary);">Discord-ID: {{ d.dual_discord_id }}</span>
+          <span style="font-size:.7rem;color:var(--text-muted);">seit {{ d.created_at[:10] }}</span>
+          <form method="post" action="/profile/dual/unlink/{{ d.dual_discord_id }}" style="margin:0;">
+            <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:.1rem .25rem;"
+                    onclick="return confirm('Dual-Verbindung trennen?')">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Link a new Dual -->
+    {% if dual_info.dual_count < 10 %}
+    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;">➕ Dual hinzufügen</div>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .6rem;">Dein Dual-Partner gibt seinen eigenen Code bei dir ein — oder du gibst deinen Code bei ihm ein.</p>
+      <form method="post" action="/profile/dual/link" style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <input type="text" name="code" placeholder="Dual-Code (z.B. D-ABCDE12345)" required
+               style="flex:1;min-width:180px;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;color:var(--text-primary);font-size:.85rem;font-family:monospace;text-transform:uppercase;"
+               maxlength="14">
+        <button type="submit" class="btn btn-primary" style="font-size:.82rem;padding:.5rem 1rem;white-space:nowrap;">
+          🔗 Verlinken
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% endif %}{# end is_dual check #}
+  </div>
+
   <!-- ── HOW IT WORKS ── -->
   <div class="card" style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);">
     <h3 style="margin:0 0 0.75rem;font-size:0.95rem;color:#a5b4fc;">ℹ️ So funktioniert es</h3>
@@ -148,6 +259,17 @@ function copyRef() {
     setTimeout(() => {
       document.getElementById('copiedHint').style.display = 'none';
       document.getElementById('copyBtn').textContent = '📋 Kopieren';
+    }, 2500);
+  });
+}
+function copyDualCode() {
+  const val = document.getElementById('dualCodeInput').value;
+  navigator.clipboard.writeText(val).then(() => {
+    document.getElementById('dualCopiedHint').style.display = 'block';
+    document.getElementById('copyDualBtn').textContent = '✓ Kopiert';
+    setTimeout(() => {
+      document.getElementById('dualCopiedHint').style.display = 'none';
+      document.getElementById('copyDualBtn').textContent = '📋 Kopieren';
     }, 2500);
   });
 }

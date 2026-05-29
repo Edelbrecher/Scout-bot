@@ -247,6 +247,28 @@ async def init_db():
         except Exception:
             pass
 
+        # Dual-player links
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS dual_links (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                anchor_discord_id TEXT NOT NULL,
+                dual_discord_id   TEXT NOT NULL,
+                created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(anchor_discord_id, dual_discord_id)
+            )
+        """)
+        await db.commit()
+
+        # Dual invite codes (one per user, reusable by up to 10 duals)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS dual_codes (
+                discord_user_id TEXT PRIMARY KEY,
+                code            TEXT UNIQUE NOT NULL,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS attack_reports (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4853,6 +4875,185 @@ async def redeem_travops_points(discord_user_id: str) -> bool:
     return True
 
 
+async def get_guild_ids_for_discord_user(discord_user_id: str) -> list[str]:
+    """Return all guild_ids where this user is subscription owner or an ally member."""
+    await _init_db()
+    async with aiosqlite.connect(DB_PATH) as db:
+        # As subscription/guild owner
+        async with db.execute(
+            "SELECT guild_id FROM guild_configs WHERE owner_discord_id=?",
+            (discord_user_id,)
+        ) as cur:
+            owned = [r[0] for r in await cur.fetchall()]
+        # As ally member
+        async with db.execute("""
+            SELECT DISTINCT ag.guild_id
+            FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE am.discord_id = ?
+        """, (discord_user_id,)) as cur:
+            member_guilds = [r[0] for r in await cur.fetchall()]
+    return list(set(owned + member_guilds))
+
+
+async def get_or_create_dual_code(discord_user_id: str) -> str:
+    """Return (or create) the dual invite code for a user."""
+    import secrets as _sec
+    await _init_db()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT code FROM dual_codes WHERE discord_user_id=?", (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if row:
+            return row["code"]
+        # Generate unique code
+        while True:
+            code = "D-" + _sec.token_urlsafe(8).upper()[:10]
+            async with db.execute("SELECT 1 FROM dual_codes WHERE code=?", (code,)) as cur:
+                if not await cur.fetchone():
+                    break
+        await db.execute(
+            "INSERT INTO dual_codes (discord_user_id, code, created_at) VALUES (?,?,datetime('now'))",
+            (discord_user_id, code),
+        )
+        await db.commit()
+        return code
+
+
+async def get_dual_info(discord_user_id: str) -> dict:
+    """Return dual status for a user:
+      {code, is_anchor, anchor_id, anchor_username (if dual), duals: [{discord_id, username}]}
+    """
+    await _init_db()
+    code = await get_or_create_dual_code(discord_user_id)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Duals linked TO this user (they are the anchor)
+        async with db.execute(
+            "SELECT dual_discord_id, created_at FROM dual_links WHERE anchor_discord_id=? ORDER BY created_at ASC",
+            (discord_user_id,)
+        ) as cur:
+            my_duals = [dict(r) for r in await cur.fetchall()]
+        # Is this user a dual of someone else?
+        async with db.execute(
+            "SELECT anchor_discord_id FROM dual_links WHERE dual_discord_id=?",
+            (discord_user_id,)
+        ) as cur:
+            anchor_row = await cur.fetchone()
+    return {
+        "code": code,
+        "is_anchor": len(my_duals) > 0,
+        "is_dual": anchor_row is not None,
+        "anchor_id": anchor_row["anchor_discord_id"] if anchor_row else None,
+        "duals": my_duals,
+        "dual_count": len(my_duals),
+    }
+
+
+async def link_dual(code: str, requester_discord_id: str) -> dict:
+    """Link requester as a dual of the code owner. Returns {ok, error}."""
+    await _init_db()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Find anchor
+        async with db.execute(
+            "SELECT discord_user_id FROM dual_codes WHERE code=?", (code,)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return {"ok": False, "error": "invalid_code"}
+        anchor_id = row["discord_user_id"]
+        if anchor_id == requester_discord_id:
+            return {"ok": False, "error": "self_link"}
+        # Check if requester is already someone's anchor (can't be dual if you have duals)
+        async with db.execute(
+            "SELECT 1 FROM dual_links WHERE anchor_discord_id=?", (requester_discord_id,)
+        ) as cur:
+            if await cur.fetchone():
+                return {"ok": False, "error": "already_anchor"}
+        # Check if requester is already a dual of someone else
+        async with db.execute(
+            "SELECT 1 FROM dual_links WHERE dual_discord_id=?", (requester_discord_id,)
+        ) as cur:
+            if await cur.fetchone():
+                return {"ok": False, "error": "already_dual"}
+        # Check anchor's dual count
+        async with db.execute(
+            "SELECT COUNT(*) AS cnt FROM dual_links WHERE anchor_discord_id=?", (anchor_id,)
+        ) as cur:
+            cnt_row = await cur.fetchone()
+        if cnt_row and cnt_row["cnt"] >= 10:
+            return {"ok": False, "error": "max_duals"}
+        # Create link
+        try:
+            await db.execute(
+                "INSERT INTO dual_links (anchor_discord_id, dual_discord_id) VALUES (?,?)",
+                (anchor_id, requester_discord_id),
+            )
+            await db.commit()
+        except Exception:
+            return {"ok": False, "error": "already_linked"}
+        return {"ok": True, "anchor_id": anchor_id}
+
+
+async def unlink_dual(discord_user_id: str, target_discord_id: str) -> bool:
+    """Remove a dual link. Works whether called by anchor or dual."""
+    await _init_db()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """DELETE FROM dual_links WHERE
+               (anchor_discord_id=? AND dual_discord_id=?)
+               OR (anchor_discord_id=? AND dual_discord_id=?)""",
+            (discord_user_id, target_discord_id, target_discord_id, discord_user_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_dual_anchor(discord_user_id: str) -> str | None:
+    """If this user is a dual, return the anchor's discord_id. Else None."""
+    await _init_db()
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT anchor_discord_id FROM dual_links WHERE dual_discord_id=?",
+            (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return row[0] if row else None
+
+
+async def get_dual_partners(discord_user_id: str) -> list[str]:
+    """Return all discord_ids that share the same Travian account (excluding self)."""
+    await _init_db()
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Is this user an anchor?
+        async with db.execute(
+            "SELECT dual_discord_id FROM dual_links WHERE anchor_discord_id=?",
+            (discord_user_id,)
+        ) as cur:
+            duals = [r[0] for r in await cur.fetchall()]
+        if duals:
+            return duals
+        # Is this user a dual?
+        async with db.execute(
+            "SELECT anchor_discord_id FROM dual_links WHERE dual_discord_id=?",
+            (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return []
+        anchor = row[0]
+        # Get all other duals of same anchor
+        async with db.execute(
+            "SELECT dual_discord_id FROM dual_links WHERE anchor_discord_id=? AND dual_discord_id!=?",
+            (anchor, discord_user_id)
+        ) as cur:
+            others = [r[0] for r in await cur.fetchall()]
+        return [anchor] + others
+
+
 async def get_scout_report_by_id(report_id: int, guild_id: str) -> dict | None:
     """Return a single scout report row, verified to belong to guild_id."""
     async with aiosqlite.connect(DB_PATH) as db:
@@ -5930,7 +6131,12 @@ async def get_ep_notify_members(guild_id: str) -> list[str]:
     ids = list({r["discord_id"] for r in rows})
     if owner and owner[0] and owner[0] not in ids:
         ids.append(owner[0])
-    return ids
+    # Expand to include dual partners of each notified member
+    expanded = set(ids)
+    for discord_id in list(ids):
+        partners = await get_dual_partners(discord_id)
+        expanded.update(partners)
+    return list(expanded)
 
 
 async def get_notifications(guild_id: str, discord_id: str, unread_only: bool = False, limit: int = 50) -> list[dict]:
