@@ -771,6 +771,10 @@ function renderPlanInfo() {
         <button class="btn btn-secondary" style="font-size:.78rem;color:#f87171;" onclick="setPlanStatus('cancelled')" title="Einsatz abbrechen">
           ❌ Abbrechen
         </button>` : ''}
+      ${p.status === 'cancelled' ? `
+        <button class="btn" style="background:#16a34a;color:#fff;font-size:.82rem;font-weight:600;" onclick="setPlanStatus('active')" title="Einsatz reaktivieren und erneut Spieler benachrichtigen">
+          🚀 Erneut aktivieren
+        </button>` : ''}
       ${p.status === 'completed' || p.status === 'cancelled' ? `
         <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Zurück zu Entwurf">
           ↩ Zurück zu Entwurf
