@@ -136,9 +136,11 @@ async def seed(db, wipe=False):
     print("👥 Allianz-Struktur …")
     await db.execute("""
         INSERT INTO ally_groups
-          (guild_id, ally_name, owner_discord_id, owner_username, wing1_name, wing2_name)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (DEMO_GUILD_ID, "DEMO", MEMBERS[0][0], MEMBERS[0][1], "DEMO2", "DEMO3"))
+          (guild_id, ally_name, owner_discord_id, owner_username,
+           wing1_name, wing2_name, invite_token)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (DEMO_GUILD_ID, "DEMO", MEMBERS[0][0], MEMBERS[0][1],
+          "DEMO2", "DEMO3", "DEMO_TOKEN_001"))
     await db.commit()
     row = await (await db.execute(
         "SELECT id FROM ally_groups WHERE guild_id=? LIMIT 1", (DEMO_GUILD_ID,))).fetchone()
