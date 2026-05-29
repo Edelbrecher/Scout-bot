@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 DEMO_GUILD_ID   = "999000000000000001"
 DEMO_GUILD_NAME = "DEMO · TravOps Beispiel-Allianz"
-DB_PATH         = "data/bot.db"
+DB_PATH         = "/app/data/scouter.db"
 
 # Fiktive Allianz-Mitglieder (Discord-ID, Discord-Name, Travian-Name, Stamm)
 MEMBERS = [
