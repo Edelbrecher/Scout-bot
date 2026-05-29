@@ -4793,7 +4793,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
             return
         landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
         plan_name = plan.get("name", "Einsatzplan")
-        server_host = os.environ.get("SERVER_HOST", "https://travops.app")
+        server_host = os.environ.get("SERVER_HOST", "https://travops.online")
         plan_url = f"{server_host}/guild/{guild_id}/operations"
 
         # Get all approved ally members
@@ -4804,6 +4804,16 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
             member_ids = [str(m["discord_id"]) for m in members
                           if m.get("discord_id") and m.get("status", "approved") == "approved"]
 
+        # Build per-member earliest wave send_time for personal countdown
+        waves = await database.get_all_op_waves(plan_id)
+        member_wave_times: dict[str, str] = {}
+        for w in (waves or []):
+            disc_id = str(w.get("attacker_discord_id") or "")
+            st = str(w.get("send_time") or "")
+            if disc_id and st:
+                if disc_id not in member_wave_times or st < member_wave_times[disc_id]:
+                    member_wave_times[disc_id] = st
+
         # 1. Discord DMs via bot (no channel needed)
         payload = {
             "guild_id": guild_id,
@@ -4812,6 +4822,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
             "plan_url": plan_url,
             "poll_channel_id": "",   # no channel post
             "member_discord_ids": member_ids,
+            "member_wave_times": member_wave_times,
         }
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post("http://bot:7777/api/announce-ep", json=payload)

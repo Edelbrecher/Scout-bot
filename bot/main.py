@@ -767,6 +767,7 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
         plan_url   = str(data.get("plan_url", ""))
         poll_channel_id = str(data.get("poll_channel_id", ""))
         member_ids = data.get("member_discord_ids", [])   # list of discord id strings
+        member_wave_times = data.get("member_wave_times", {})  # {discord_id: send_time_iso}
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
 
@@ -804,13 +805,17 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
                 print(f"[announce-ep] channel send error: {e}")
 
     # DM all approved members
+    import calendar as _calendar
+    import datetime as _datetime_mod
+
+    def _iso_to_unix(iso: str) -> int | None:
+        try:
+            dt = _datetime_mod.datetime.fromisoformat(iso.replace("Z", ""))
+            return int(_calendar.timegm(dt.timetuple()))
+        except Exception:
+            return None
+
     dm_sent = 0
-    dm_text = (
-        f"⚔️ **Neuer Einsatz: {plan_name}**\n"
-        f"{('🕐 Einschlag: **' + landing + '**') if landing else ''}\n\n"
-        f"Du könntest für diesen Einsatz eingeplant sein.\n"
-        f"{'➡️ ' + plan_url if plan_url else 'Bitte prüfe TravOps → Einsatzplanung.'}"
-    )
     for uid in member_ids:
         if not uid or not str(uid).isdigit():
             print(f"[announce-ep] skipping invalid uid: {uid!r}")
@@ -824,6 +829,28 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
                 print(f"[announce-ep] fetch_member {uid} failed: {e}")
                 continue
         try:
+            # Build personal countdown for this member's earliest wave
+            wave_iso = member_wave_times.get(str(uid)) or member_wave_times.get(uid)
+            if wave_iso:
+                unix_ts = _iso_to_unix(wave_iso)
+                countdown_line = (
+                    f"\n⏱️ **Dein Angriff:** <t:{unix_ts}:F> (<t:{unix_ts}:R>)"
+                    if unix_ts else ""
+                )
+            else:
+                # Fallback: show landing time countdown if no personal wave assigned
+                unix_ts = _iso_to_unix(landing.replace(" ", "T")) if landing else None
+                countdown_line = (
+                    f"\n⏱️ **Einschlag:** <t:{unix_ts}:F> (<t:{unix_ts}:R>)"
+                    if unix_ts else ""
+                )
+            dm_text = (
+                f"⚔️ **Neuer Einsatz: {plan_name}**\n"
+                f"{('🕐 Einschlag: **' + landing + '**') if landing else ''}"
+                f"{countdown_line}\n\n"
+                f"{'Du bist für diesen Einsatz eingeplant.' if wave_iso else 'Du könntest für diesen Einsatz eingeplant sein.'}\n"
+                f"{'➡️ ' + plan_url if plan_url else 'Bitte prüfe TravOps → Einsatzplanung.'}"
+            )
             await member.send(dm_text)
             dm_sent += 1
             print(f"[announce-ep] DM sent to {uid} ({member.name})")

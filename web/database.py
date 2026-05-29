@@ -5399,6 +5399,18 @@ async def delete_op_wave(wave_id: int, guild_id: str):
         await db.commit()
 
 
+async def get_all_op_waves(plan_id: int) -> list[dict]:
+    """Return all waves for a plan (attacker_discord_id + send_time + target info)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, attacker_discord_id, send_time, landing_time, wave_type, order_idx "
+            "FROM op_waves WHERE plan_id=? ORDER BY attacker_discord_id, send_time",
+            (plan_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
 async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
     """Return all waves assigned to a user across all active/draft plans, with plan + target info."""
     async with aiosqlite.connect(DB_PATH) as db:
