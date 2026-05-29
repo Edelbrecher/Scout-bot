@@ -1,0 +1,936 @@
+{% extends "base.html" %}
+{% block title %}Getreide-Versorgungsrechner · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.cs-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.cs-card h2 {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.cs-input {
+  background: var(--bg-main);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.cs-input:focus { outline: none; border-color: #22c55e; }
+.cs-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+.cs-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; }
+.cs-kpi {
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  min-width: 140px;
+  flex: 1;
+}
+.cs-kpi-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+.cs-kpi-value { font-size: 1.2rem; font-weight: 800; font-family: monospace; line-height: 1; }
+.cs-ok    { color: #22c55e; }
+.cs-warn  { color: #f59e0b; }
+.cs-danger{ color: #ef4444; }
+.cs-alert {
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.cs-alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.05rem; }
+.cs-alert-danger { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.35); }
+.cs-alert-warn   { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.35); }
+.cs-alert-ok     { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.35);  }
+.cs-tag-in  { display:inline-flex;align-items:center;gap:3px;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3); }
+.cs-tag-out { display:inline-flex;align-items:center;gap:3px;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3); }
+.cs-btn-primary {
+  padding: 0.6rem 1.5rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.cs-btn-primary:hover { opacity: .88; }
+.cs-btn-secondary {
+  padding: 0.6rem 1rem;
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.cs-btn-secondary:hover { border-color: #22c55e; color: var(--text); }
+</style>
+
+<div class="container-wide" style="max-width:1100px;margin:0 auto;">
+
+  <!-- ── Header ── -->
+  <div style="margin-bottom:1.5rem;">
+    <a href="/guild/{{ guild_id }}/tools/crop-calculator" class="back-link">← Getreidefeld-Rechner</a>
+    <h1 style="margin:.25rem 0 0;">🌾 Getreide-Versorgungsrechner</h1>
+    <p style="color:var(--text-muted);margin:.25rem 0 0;font-size:.88rem;">
+      Simuliert Getreide-Verlauf über die Zeit — Truppensterben, Speicher-Überlauf und Händler-Lieferungen auf einen Blick
+    </p>
+  </div>
+
+  <!-- ── Step 1: Dorf-Parameter ── -->
+  <div class="cs-card">
+    <h2>⚙️ Dorf-Parameter</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem;">
+
+      <div>
+        <label class="cs-label">Aktuelles Getreide</label>
+        <input type="text" id="currentGrain" class="cs-input" placeholder="z.B. 481.744">
+        <div class="cs-hint">Aus dem Dorf-Ressourcenanzeige</div>
+      </div>
+
+      <div>
+        <label class="cs-label">Brutto-Produktion / h</label>
+        <input type="text" id="grainProduction" class="cs-input" placeholder="z.B. 8.400">
+        <div class="cs-hint">Felder + Oasen + Held (ohne Verbrauch)</div>
+      </div>
+
+      <div>
+        <label class="cs-label">Gesamtverbrauch / h</label>
+        <input type="text" id="grainConsumption" class="cs-input" placeholder="z.B. 12.000">
+        <div class="cs-hint">Truppen + Bevölkerung</div>
+      </div>
+
+      <div>
+        <label class="cs-label">Speicher-Kapazität</label>
+        <input type="text" id="granaryCapacity" class="cs-input" placeholder="z.B. 960.000">
+        <div class="cs-hint">Maximaler Getreide-Speicher</div>
+      </div>
+
+      <div>
+        <label class="cs-label">Simulationsdauer</label>
+        <select id="simHours" class="cs-input" style="cursor:pointer;">
+          <option value="24">24 Stunden</option>
+          <option value="48" selected>48 Stunden</option>
+          <option value="72">72 Stunden</option>
+          <option value="96">96 Stunden</option>
+        </select>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Step 2: Marktplatz einfügen ── -->
+  <div class="cs-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+      <div>
+        <h2 style="margin:0 0 .25rem;">📋 Marktplatz-Daten einfügen</h2>
+        <p style="font-size:.82rem;color:var(--text-muted);margin:0;">
+          Öffne im Travian-Marktplatz <strong>Lieferübersicht → Alle anzeigen</strong>,
+          markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
+          Ausgehende Lieferungen werden automatisch erkannt.
+        </p>
+      </div>
+      <button class="cs-btn-secondary" onclick="document.getElementById('marketPaste').value='';document.getElementById('parseStatus').textContent='';">✕ Leeren</button>
+    </div>
+
+    <textarea id="marketPaste" rows="9" class="cs-input"
+      style="font-family:monospace;font-size:.79rem;resize:vertical;min-height:120px;line-height:1.5;"
+      placeholder="Hier gesamten Marktplatz-Inhalt einfügen (Strg+V) …&#10;&#10;Das System erkennt automatisch alle eingehenden und ausgehenden Lieferungen&#10;inklusive Ankunftszeiten und Rohstoffmengen."></textarea>
+
+    <div style="margin-top:.75rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;">
+      <button class="cs-btn-primary" onclick="parseAndSimulate()">🌾 Analysieren &amp; Simulieren</button>
+      <button class="cs-btn-secondary" onclick="loadExample()">📄 Beispiel-Daten laden</button>
+      <span id="parseStatus" style="font-size:.82rem;color:var(--text-muted);"></span>
+    </div>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="resultsSection" style="display:none;">
+
+    <!-- Alert banners -->
+    <div id="alertsSection" style="margin-bottom:1.25rem;"></div>
+
+    <!-- KPI row -->
+    <div id="kpiRow" style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;"></div>
+
+    <!-- Chart -->
+    <div class="cs-card" style="padding:1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+        <div>
+          <div style="font-size:.95rem;font-weight:700;">📈 Getreide-Verlauf</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;" id="chartSubtitle"></div>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:.72rem;color:var(--text-muted);">Legende:</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#22c55e;">
+            <span style="width:12px;height:3px;background:#22c55e;display:inline-block;border-radius:2px;"></span> Getreide
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#ef4444;">
+            <span style="width:12px;height:2px;background:#ef4444;display:inline-block;border-radius:2px;border-top:2px dashed #ef4444;"></span> Grenze 0
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#f59e0b;">
+            <span style="width:12px;height:2px;background:#f59e0b;display:inline-block;border-radius:2px;border-top:2px dashed #f59e0b;"></span> Speicher voll
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#4ade80;">
+            <span style="width:8px;height:8px;background:#4ade80;display:inline-block;border-radius:50%;"></span> Lieferung ein
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#f87171;">
+            <span style="width:8px;height:8px;background:#f87171;display:inline-block;border-radius:50%;"></span> Lieferung aus
+          </span>
+        </div>
+      </div>
+      <div style="position:relative;height:340px;">
+        <canvas id="grainChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Starvation detail box (shown when starvation detected) -->
+    <div id="starvationBox" style="display:none;" class="cs-card" style="border-color:rgba(239,68,68,.4);">
+      <h2 style="color:#ef4444;">⚠️ Truppensterben — Details</h2>
+      <div id="starvationDetails"></div>
+    </div>
+
+    <!-- Delivery table -->
+    <div class="cs-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+        <h2 style="margin:0;">📦 Erkannte Lieferungen</h2>
+        <span id="deliveryCount" style="font-size:.82rem;color:var(--text-muted);"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:.5rem .75rem;text-align:left;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">Richtung</th>
+              <th style="padding:.5rem .75rem;text-align:left;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">Ankunft in</th>
+              <th style="padding:.5rem .75rem;text-align:left;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">Uhrzeit</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#f59e0b;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">🌾 Getreide</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#4ade80;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">🪵 Holz</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#fb923c;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">🧱 Lehm</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#94a3b8;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">⚙️ Eisen</th>
+            </tr>
+          </thead>
+          <tbody id="deliveryTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- end resultsSection -->
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARSER — Travian Marktplatz Text
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Remove all Unicode bidi/control/format chars that Travian embeds */
+function cleanUnicode(s) {
+  return s.replace(/[‏‎‪‫‬‭‮​‌‍ ⁦⁧⁨⁩؜  ﻿]/g, '');
+}
+
+/** Parse German-formatted number: "22.000" → 22000, "1.741" → 1741 */
+function parseGermanNum(s) {
+  if (!s) return 0;
+  s = s.trim();
+  // German thousand separator: dot before exactly 3 digits (may repeat)
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2'); // handle 1.234.567
+  s = s.replace(/,/g, '');
+  return parseInt(s, 10) || 0;
+}
+
+/** True if this line is a UI label / navigation element we should skip */
+function isNoise(line) {
+  return /^(transport\s+von|rohstoffe|ankunft|erwartet\s+gesamt|alle\s+anzeigen|keine\s+(ein|aus)|ankommende|ausgehende|händler|kapazit|gesamt|lieferübers|privacy|serverzeit|allianzbanner|marktplatz\s+stufe|verwaltung|verschick|handelsrouten|kaufen|verkaufen|startseite|discord|impressum|linkliste|farm|tropps|top10|forge|aufgaben|dorfname|spieler|dauer|allianz|ankunft\s+\-|jeder\s+deiner|© |dörfer|bevölkerung|zustimmung|dorfgruppen|main\s+-|start\s+village|close\s+support|outside\s+support|north|south|adw)/i.test(line)
+    || /^\(\d+\|\d+\)$/.test(line)           // coordinates like (102|47)
+    || /^[─━═]+$/.test(line)                 // separators
+    || /^-\s+\d+/.test(line);                // village list items "- 00 Valhalla"
+}
+
+/**
+ * Parse a section of lines (incoming or outgoing) into deliveries.
+ * Each delivery = 4 resource numbers (wood, clay, iron, grain) + an "in HH:MM:SS" time.
+ * Multiple 4-number groups before one time line → all arrive at that time.
+ * @param {string[]} lines
+ * @param {boolean} isOutgoing
+ * @returns {Array<{offsetSec, wood, clay, iron, grain, serverTime, isOutgoing}>}
+ */
+function parseSectionLines(lines, isOutgoing) {
+  const deliveries = [];
+  const numBuf = [];   // buffer of numbers since last time marker
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (isNoise(line)) { numBuf.length = 0; continue; }
+
+    // Multiplier line: "3×" / "1×" — skip
+    if (/^\d+\s*[×xX]/.test(line)) continue;
+
+    // Section total line: "= 582.052 ..." — stop parsing
+    if (/^=\s*\d/.test(line)) break;
+
+    // Time line: "in 01:23:45 um 02:22"
+    const timeMatch = line.match(/^in\s+(\d{1,3}):(\d{2}):(\d{2})(?:\s+um\s+(\d{1,2}):(\d{2}))?/i);
+    if (timeMatch) {
+      const offsetSec = +timeMatch[1] * 3600 + +timeMatch[2] * 60 + +timeMatch[3];
+      const serverTime = timeMatch[4] ? `${timeMatch[4]}:${timeMatch[5]}` : null;
+      // Drain numBuf in groups of 4 → one delivery per group
+      while (numBuf.length >= 4) {
+        const [wood, clay, iron, grain] = numBuf.splice(0, 4);
+        deliveries.push({ offsetSec, serverTime, wood, clay, iron, grain, isOutgoing });
+      }
+      numBuf.length = 0;
+      continue;
+    }
+
+    // Pure number line (German format)
+    const numOnly = line.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2')
+                        .replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
+    if (/^\d+$/.test(numOnly)) {
+      numBuf.push(parseInt(numOnly));
+      continue;
+    }
+
+    // Non-number, non-time, non-noise line → reset buffer (new transport block)
+    if (/[a-zA-ZäöüÄÖÜß]/.test(line) && !timeMatch) {
+      numBuf.length = 0;
+    }
+  }
+
+  return deliveries;
+}
+
+/**
+ * Main parser entry point.
+ * Returns { incoming: [...], outgoing: [...] }
+ */
+function parseMarketText(rawText) {
+  const text = cleanUnicode(rawText);
+  const lines = text.split('\n').map(l => l.trim());
+
+  // Find section boundaries
+  let inStart = -1, outStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (inStart < 0 && /ankommende\s+lieferungen/i.test(lines[i])) inStart = i + 1;
+    if (/ausgehende\s+lieferungen/i.test(lines[i])) { outStart = i + 1; break; }
+  }
+
+  const inEnd  = outStart > 0 ? outStart - 1 : lines.length;
+  const outEnd = lines.length;
+
+  // Fall back: if no section headers found, try the whole text as incoming
+  const inLines  = inStart  >= 0 ? lines.slice(inStart, inEnd)  : lines;
+  const outLines = outStart >= 0 ? lines.slice(outStart, outEnd) : [];
+
+  return {
+    incoming: parseSectionLines(inLines,  false),
+    outgoing: parseSectionLines(outLines, true),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUT HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function readNum(id) {
+  const val = document.getElementById(id).value.trim();
+  return parseGermanNum(val.replace(/[^\d.,]/g, ''));
+}
+
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  n = Math.round(n);
+  if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(2).replace('.', ',') + ' M';
+  if (Math.abs(n) >= 1_000)     return (n / 1_000).toFixed(1).replace('.', ',') + ' k';
+  return n.toLocaleString('de-DE');
+}
+
+function fmtDuration(sec) {
+  if (sec < 0) return '—';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  return `${m}m ${String(s).padStart(2,'0')}s`;
+}
+
+function fmtAbsTime(nowMs, offsetSec) {
+  const d = new Date(nowMs + offsetSec * 1000);
+  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SIMULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Simulate grain level over time.
+ * Returns data points for chart + key events (starvation, overflow).
+ */
+function simulate({ currentGrain, productionPerH, consumptionPerH, granaryCapacity, incoming, outgoing, durationH }) {
+  const netPerH   = productionPerH - consumptionPerH;
+  const netPerSec = netPerH / 3600;
+  const durationSec = durationH * 3600;
+  const STEP = 120; // 2-minute steps for accuracy
+  const totalSteps = Math.ceil(durationSec / STEP);
+
+  // Merge all events, sorted by time
+  const events = [
+    ...incoming.map(d => ({ ...d, grainDelta: +d.grain, sign: +1 })),
+    ...outgoing.map(d => ({ ...d, grainDelta: -d.grain, sign: -1 })),
+  ].sort((a, b) => a.offsetSec - b.offsetSec);
+
+  let grain = currentGrain;
+  let evIdx = 0;
+
+  const labels = [];        // x-axis time labels
+  const grainData = [];     // grain at each step
+  const deliveryPoints = { // scatter: {x, y, delta, isOut}
+    incoming: [],
+    outgoing: [],
+  };
+
+  let zeroSec      = null;  // first moment grain < 0
+  let overflowSec  = null;  // first moment grain > capacity
+  let prevGrain    = currentGrain;
+
+  for (let step = 0; step <= totalSteps; step++) {
+    const t = step * STEP;
+
+    // Apply all events arriving in (prevT, t]
+    const prevT = (step - 1) * STEP;
+    while (evIdx < events.length && events[evIdx].offsetSec <= t) {
+      const ev = events[evIdx++];
+      if (ev.offsetSec > prevT || step === 0) {
+        grain += ev.grainDelta;
+        // Record for scatter chart (at the step where this event fires)
+        const point = { x: step, y: Math.max(0, grain), label: ev };
+        if (ev.sign > 0) deliveryPoints.incoming.push(point);
+        else             deliveryPoints.outgoing.push(point);
+      }
+    }
+
+    // Apply continuous rate for this step (skip step 0)
+    if (step > 0) {
+      grain += netPerSec * STEP;
+    }
+
+    // Zero detection (before clamp)
+    if (grain < 0 && zeroSec === null) {
+      // Interpolate: find exact second between prevGrain→grain crossing 0
+      const rate = (grain - prevGrain) / STEP;
+      if (rate < 0) {
+        zeroSec = t - STEP + (-prevGrain / rate);
+      } else {
+        zeroSec = t;
+      }
+    }
+
+    // Overflow detection
+    if (granaryCapacity > 0 && grain >= granaryCapacity && overflowSec === null) {
+      const rate = (grain - prevGrain) / STEP;
+      if (rate > 0) {
+        overflowSec = t - STEP + (granaryCapacity - prevGrain) / rate;
+      } else {
+        overflowSec = t;
+      }
+    }
+
+    prevGrain = grain;
+    labels.push(step);
+    grainData.push(Math.round(grain));
+  }
+
+  return { labels, grainData, deliveryPoints, zeroSec, overflowSec, netPerH, totalSteps, STEP };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHART
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let chartInstance = null;
+
+function buildChart(simResult, granaryCapacity, durationH, nowMs) {
+  const { labels, grainData, deliveryPoints, zeroSec, overflowSec, STEP } = simResult;
+  const canvas = document.getElementById('grainChart');
+  const ctx = canvas.getContext('2d');
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  // Build x-axis labels (every hour)
+  const xLabels = labels.map(step => {
+    const sec = step * STEP;
+    const d = new Date(nowMs + sec * 1000);
+    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  });
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, 340);
+  grad.addColorStop(0.0, 'rgba(34,197,94,0.35)');
+  grad.addColorStop(0.5, 'rgba(34,197,94,0.12)');
+  grad.addColorStop(1.0, 'rgba(34,197,94,0.02)');
+
+  // Segment color: red when grain < 0 or near 0
+  const segmentColor = (ctx2) => {
+    const g = grainData[ctx2.p0DataIndex];
+    if (g <= 0)                      return 'rgba(239,68,68,0.9)';
+    if (granaryCapacity > 0 && g >= granaryCapacity * 0.95) return 'rgba(245,158,11,0.9)';
+    if (granaryCapacity > 0 && g < granaryCapacity * 0.1)  return 'rgba(251,191,36,0.9)';
+    return 'rgba(34,197,94,0.9)';
+  };
+
+  // Reference line data (zero and capacity)
+  const zeroLine     = grainData.map(() => 0);
+  const capacityLine = granaryCapacity > 0 ? grainData.map(() => granaryCapacity) : null;
+
+  // Scatter for delivery events
+  const scatterIn = deliveryPoints.incoming.map(p => ({ x: p.x, y: Math.max(0, p.y) }));
+  const scatterOut = deliveryPoints.outgoing.map(p => ({ x: p.x, y: Math.max(0, p.y) }));
+
+  // Reduce x-axis labels density
+  const tickEvery = Math.max(1, Math.floor(3600 / STEP)); // one label per hour
+
+  const datasets = [
+    {
+      label: '🌾 Getreide',
+      data: grainData,
+      borderColor: segmentColor,
+      backgroundColor: grad,
+      segment: { borderColor: segmentColor },
+      borderWidth: 2,
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      order: 1,
+    },
+    {
+      label: 'Grenze 0',
+      data: zeroLine,
+      borderColor: 'rgba(239,68,68,0.6)',
+      borderWidth: 1.5,
+      borderDash: [6, 4],
+      fill: false,
+      pointRadius: 0,
+      order: 3,
+    },
+  ];
+
+  if (capacityLine) {
+    datasets.push({
+      label: 'Speicher voll',
+      data: capacityLine,
+      borderColor: 'rgba(245,158,11,0.6)',
+      borderWidth: 1.5,
+      borderDash: [6, 4],
+      fill: false,
+      pointRadius: 0,
+      order: 4,
+    });
+  }
+
+  if (scatterIn.length) {
+    datasets.push({
+      label: '↓ Lieferung ein',
+      data: scatterIn,
+      type: 'scatter',
+      borderColor: '#4ade80',
+      backgroundColor: '#4ade80',
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      showLine: false,
+      order: 2,
+    });
+  }
+  if (scatterOut.length) {
+    datasets.push({
+      label: '↑ Lieferung aus',
+      data: scatterOut,
+      type: 'scatter',
+      borderColor: '#f87171',
+      backgroundColor: '#f87171',
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      showLine: false,
+      order: 2,
+    });
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: xLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#9ca3af', font: { size: 11 }, usePointStyle: true, pointStyleWidth: 10, padding: 14 },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15,20,35,.95)',
+          borderColor: 'rgba(255,255,255,.12)',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            title: (items) => xLabels[items[0].dataIndex] || '',
+            label: (item) => {
+              if (item.dataset.label.includes('Grenze') || item.dataset.label.includes('voll')) return null;
+              const val = item.raw?.y !== undefined ? item.raw.y : item.raw;
+              return ` ${item.dataset.label}: ${fmt(val)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,.04)', drawTicks: false },
+          ticks: {
+            color: '#6b7280',
+            font: { size: 10 },
+            maxRotation: 0,
+            callback: (val, idx) => idx % tickEvery === 0 ? xLabels[idx] : '',
+          },
+          border: { color: 'rgba(255,255,255,.08)' },
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,.05)', drawTicks: false },
+          ticks: { color: '#9ca3af', font: { size: 10 }, callback: v => fmt(v), padding: 6 },
+          border: { display: false },
+          beginAtZero: true,
+          min: granaryCapacity > 0 ? -(granaryCapacity * 0.08) : undefined,
+        },
+      },
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN ENTRY POINT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function parseAndSimulate() {
+  const rawText        = document.getElementById('marketPaste').value;
+  const currentGrain   = readNum('currentGrain');
+  const productionPerH = readNum('grainProduction');
+  const consumptionPerH= readNum('grainConsumption');
+  const granaryCapacity= readNum('granaryCapacity');
+  const durationH      = parseInt(document.getElementById('simHours').value) || 48;
+
+  // Validate minimum inputs
+  if (!currentGrain && !productionPerH && !consumptionPerH) {
+    alert('Bitte mindestens "Aktuelles Getreide" und Produktions-/Verbrauchswerte eingeben.');
+    return;
+  }
+
+  // Parse marketplace text
+  let parsed = { incoming: [], outgoing: [] };
+  const statusEl = document.getElementById('parseStatus');
+
+  if (rawText.trim().length > 20) {
+    try {
+      parsed = parseMarketText(rawText);
+      const total = parsed.incoming.length + parsed.outgoing.length;
+      statusEl.textContent = `✅ ${parsed.incoming.length} eingehende, ${parsed.outgoing.length} ausgehende Lieferungen erkannt`;
+      statusEl.style.color = '#4ade80';
+    } catch(e) {
+      statusEl.textContent = '⚠️ Parsing-Fehler: ' + e.message;
+      statusEl.style.color = '#f87171';
+    }
+  } else {
+    statusEl.textContent = 'Keine Marktplatz-Daten — reine Produktions-Simulation';
+    statusEl.style.color = 'var(--text-muted)';
+  }
+
+  const simResult = simulate({
+    currentGrain,
+    productionPerH,
+    consumptionPerH,
+    granaryCapacity,
+    incoming: parsed.incoming,
+    outgoing: parsed.outgoing,
+    durationH,
+  });
+
+  renderResults(simResult, {
+    currentGrain, productionPerH, consumptionPerH, granaryCapacity, durationH,
+    incoming: parsed.incoming, outgoing: parsed.outgoing,
+  });
+}
+
+function renderResults(sim, params) {
+  const { zeroSec, overflowSec, netPerH, grainData } = sim;
+  const { currentGrain, productionPerH, consumptionPerH, granaryCapacity, durationH, incoming, outgoing } = params;
+  const nowMs = Date.now();
+
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // ── Alerts ─────────────────────────────────────────────────────────────────
+  const alerts = [];
+
+  if (zeroSec !== null && zeroSec >= 0) {
+    const when = fmtAbsTime(nowMs, zeroSec);
+    const inDur = fmtDuration(zeroSec);
+    const deficit = Math.abs(netPerH); // grain/h deficit after all deliveries
+    // How much extra grain needed to bridge until zero time
+    const needed = Math.max(0, Math.ceil(-grainData[Math.floor(zeroSec / sim.STEP)] || 0));
+    alerts.push({ type: 'danger', icon: '💀', html:
+      `<strong>Truppensterben droht!</strong> Getreide läuft <strong>in ${inDur} (um ${when})</strong> auf 0.
+       ${netPerH < 0 ? `Netto-Defizit: <strong>${fmt(Math.abs(netPerH))} G/h</strong>. ` : ''}
+       Um Truppensterben zu verhindern, müssen noch mindestens <strong>${fmt(Math.ceil(Math.abs(netPerH) * (zeroSec / 3600) - currentGrain - incoming.reduce((s,d)=>s+d.grain,0)))} Getreide</strong> zusätzlich geliefert werden.` });
+  } else {
+    if (zeroSec === null) {
+      alerts.push({ type: 'ok', icon: '✅', html: `Getreide-Versorgung für <strong>${durationH} Stunden</strong> gesichert. Kein Truppensterben droht.` });
+    }
+  }
+
+  if (overflowSec !== null && granaryCapacity > 0) {
+    const when = fmtAbsTime(nowMs, overflowSec);
+    const inDur = fmtDuration(overflowSec);
+    alerts.push({ type: 'warn', icon: '🏚️', html:
+      `<strong>Speicher läuft über</strong> in ${inDur} (um ${when}). Getreide geht verloren — Speicher vergrößern oder Truppen anwerben.` });
+  }
+
+  const alertsEl = document.getElementById('alertsSection');
+  alertsEl.innerHTML = alerts.map(a =>
+    `<div class="cs-alert cs-alert-${a.type}">
+      <span class="cs-alert-icon">${a.icon}</span>
+      <div>${a.html}</div>
+    </div>`
+  ).join('');
+
+  // ── KPIs ───────────────────────────────────────────────────────────────────
+  const totalIncoming = incoming.reduce((s, d) => s + d.grain, 0);
+  const totalOutgoing = outgoing.reduce((s, d) => s + d.grain, 0);
+  const maxGrain      = Math.max(...grainData);
+  const minGrain      = Math.min(...grainData);
+
+  const kpis = [
+    { label: '🌾 Aktuell',          value: fmt(currentGrain),        cls: '' },
+    { label: '📈 Produktion / h',   value: fmt(productionPerH) + ' G/h', cls: 'cs-ok' },
+    { label: '📉 Verbrauch / h',    value: fmt(consumptionPerH) + ' G/h', cls: 'cs-danger' },
+    { label: '⚖️ Netto / h',        value: (netPerH >= 0 ? '+' : '') + fmt(netPerH) + ' G/h', cls: netPerH >= 0 ? 'cs-ok' : 'cs-danger' },
+    { label: '↓ Eingehend',         value: fmt(totalIncoming) + ' G', cls: 'cs-ok' },
+    { label: '↑ Ausgehend',         value: fmt(totalOutgoing) + ' G', cls: totalOutgoing > 0 ? 'cs-warn' : '' },
+    { label: '📊 Max Getreide',     value: fmt(maxGrain),             cls: granaryCapacity > 0 && maxGrain >= granaryCapacity ? 'cs-warn' : '' },
+    { label: '📊 Min Getreide',     value: fmt(minGrain),             cls: minGrain < 0 ? 'cs-danger' : minGrain < (granaryCapacity * 0.1 || 5000) ? 'cs-warn' : '' },
+  ];
+  if (zeroSec !== null)     kpis.push({ label: '💀 Truppensterben', value: fmtDuration(zeroSec),      cls: 'cs-danger' });
+  if (overflowSec !== null) kpis.push({ label: '🏚️ Speicher voll',  value: fmtDuration(overflowSec), cls: 'cs-warn' });
+
+  document.getElementById('kpiRow').innerHTML = kpis.map(k =>
+    `<div class="cs-kpi">
+      <div class="cs-kpi-label">${k.label}</div>
+      <div class="cs-kpi-value ${k.cls}">${k.value}</div>
+    </div>`
+  ).join('');
+
+  // ── Chart subtitle ─────────────────────────────────────────────────────────
+  const allDeliveries = [...incoming, ...outgoing].sort((a,b) => a.offsetSec - b.offsetSec);
+  document.getElementById('chartSubtitle').textContent =
+    `${durationH}h Simulation · ${allDeliveries.length} Lieferungen · Netto ${netPerH >= 0 ? '+' : ''}${fmt(netPerH)} G/h`;
+
+  // ── Starvation detail ──────────────────────────────────────────────────────
+  if (zeroSec !== null) {
+    document.getElementById('starvationBox').style.display = 'block';
+    const neededToSurvive48h = Math.max(0, Math.ceil(
+      consumptionPerH * durationH - productionPerH * durationH - currentGrain - totalIncoming + totalOutgoing
+    ));
+    document.getElementById('starvationDetails').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem;">
+        <div class="cs-kpi" style="border-color:rgba(239,68,68,.35);">
+          <div class="cs-kpi-label">Zeit bis Truppensterben</div>
+          <div class="cs-kpi-value cs-danger">${fmtDuration(zeroSec)}</div>
+        </div>
+        <div class="cs-kpi" style="border-color:rgba(239,68,68,.35);">
+          <div class="cs-kpi-label">Defizit nach 0-Punkt</div>
+          <div class="cs-kpi-value cs-danger">${fmt(Math.abs(netPerH))} G/h</div>
+        </div>
+        <div class="cs-kpi" style="border-color:rgba(245,158,11,.35);">
+          <div class="cs-kpi-label">Fehlende Getreide (${durationH}h)</div>
+          <div class="cs-kpi-value cs-warn">${fmt(neededToSurvive48h)}</div>
+        </div>
+      </div>
+      <p style="font-size:.84rem;color:var(--text-muted);margin:0;line-height:1.6;">
+        ⚠️ Truppen verbrauchen <strong style="color:#f87171;">${fmt(consumptionPerH)} G/h</strong>,
+        Produktion liefert <strong style="color:#4ade80;">${fmt(productionPerH)} G/h</strong> —
+        Defizit <strong style="color:#f87171;">${fmt(Math.abs(netPerH))} G/h</strong>.
+        ${neededToSurvive48h > 0
+          ? `Um für ${durationH}h keinen Truppensterben zu riskieren, musst du noch <strong>${fmt(neededToSurvive48h)} Getreide</strong> zusätzlich liefern lassen.`
+          : 'Mit den aktuellen Lieferungen wird der Zeitraum gedeckt.'}
+      </p>`;
+  } else {
+    document.getElementById('starvationBox').style.display = 'none';
+  }
+
+  // ── Delivery table ─────────────────────────────────────────────────────────
+  const allDel = allDeliveries;
+  document.getElementById('deliveryCount').textContent =
+    `${incoming.length} eingehend · ${outgoing.length} ausgehend · ${fmt(totalIncoming)} G eingehend`;
+
+  const tbody = document.getElementById('deliveryTableBody');
+  if (allDel.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.85rem;">
+      Keine Lieferungen erkannt — Marktplatz-Daten einfügen für Händler-Analyse.
+    </td></tr>`;
+  } else {
+    tbody.innerHTML = allDel.map(d => {
+      const dir = d.isOutgoing
+        ? `<span class="cs-tag-out">↑ Ausgehend</span>`
+        : `<span class="cs-tag-in">↓ Eingehend</span>`;
+      const dur = fmtDuration(d.offsetSec);
+      const when = d.serverTime || fmtAbsTime(nowMs, d.offsetSec);
+      const grainStyle = d.grain > 0 ? 'font-weight:700;color:#f59e0b;' : 'color:var(--text-muted);';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+        <td style="padding:.45rem .75rem;">${dir}</td>
+        <td style="padding:.45rem .75rem;font-family:monospace;font-size:.82rem;color:#fbbf24;">${dur}</td>
+        <td style="padding:.45rem .75rem;font-family:monospace;font-size:.82rem;color:var(--text-muted);">${when}</td>
+        <td style="padding:.45rem .75rem;text-align:right;${grainStyle}">${d.grain > 0 ? fmt(d.grain) : '—'}</td>
+        <td style="padding:.45rem .75rem;text-align:right;color:var(--text-muted);">${d.wood > 0 ? fmt(d.wood) : '—'}</td>
+        <td style="padding:.45rem .75rem;text-align:right;color:var(--text-muted);">${d.clay > 0 ? fmt(d.clay) : '—'}</td>
+        <td style="padding:.45rem .75rem;text-align:right;color:var(--text-muted);">${d.iron > 0 ? fmt(d.iron) : '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Build chart ────────────────────────────────────────────────────────────
+  buildChart(sim, granaryCapacity, durationH, nowMs);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXAMPLE DATA LOADER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function loadExample() {
+  document.getElementById('currentGrain').value    = '481.743';
+  document.getElementById('grainProduction').value = '8.400';
+  document.getElementById('grainConsumption').value= '12.200';
+  document.getElementById('granaryCapacity').value = '960.000';
+  document.getElementById('simHours').value        = '48';
+
+  document.getElementById('marketPaste').value = `Ankommende Lieferungen
+57
+Rohstoffe
+Ankunft
+Transport von - 11 Oddysee : Currax
+3×
+0
+22.000
+0
+0
+0
+22.000
+0
+0
+in 00:06:33 um 02:05
+0
+22.000
+0
+0
+in 01:00:37 um 02:59
+Transport von - 12 Pointed : Currax
+1×
+0
+0
+0
+2.700
+in 00:14:38 um 02:13
+Transport von - 15 Buddystore : Currax
+1×
+0
+0
+0
+2.000
+in 00:18:16 um 02:17
+Transport von 01 - In Flames : Borknagar_sk
+1×
+33.000
+33.000
+33.000
+0
+in 00:25:25 um 02:24
+Transport von - 17 a-d thanks : Currax
+1×
+1.741
+1.741
+2.000
+3.000
+in 00:30:52 um 02:30
+Transport von - 16 bybybaby : Currax
+1×
+0
+0
+0
+2.500
+in 00:34:50 um 02:33
+Transport von - 01 Astoncia : Currax
+1×
+1.500
+1.500
+1.500
+1.000
+in 00:39:16 um 02:38
+Transport von Goldkurs : Goldhand
+3×
+17.820
+17.820
+17.820
+0
+17.820
+17.820
+17.820
+0
+in 00:43:25 um 02:42
+17.820
+17.820
+17.820
+0
+in 06:19:01 um 08:18
+Alle anzeigen
+Ausgehende Lieferungen
+0
+Rohstoffe
+Ankunft
+Keine ausgehenden Lieferungen`;
+
+  parseAndSimulate();
+}
+
+function clearPaste() {
+  document.getElementById('marketPaste').value = '';
+  document.getElementById('parseStatus').textContent = '';
+}
+</script>
+{% endblock %}
