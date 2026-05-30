@@ -889,7 +889,8 @@
   function removeNavShield() {
     const shield = document.getElementById('tt-nav-shield');
     if (!shield) return;
-    shield.style.opacity = '0';
+    // Swap to a fade-out version, then remove
+    shield.textContent = 'body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;opacity:0;transition:opacity .35s ease;}';
     setTimeout(() => shield.remove(), 380);
   }
 
