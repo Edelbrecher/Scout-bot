@@ -482,116 +482,163 @@
     [540,'UTC+9 (Japan)'],[600,'UTC+10 (Australien Ost)'],[660,'UTC+11'],[720,'UTC+12'],
   ];
 
-  // ── CSS inject ────────────────────────────────────────────────────────────
+  // ── CSS ───────────────────────────────────────────────────────────────────
   const _style = document.createElement('style');
   _style.textContent = `
-    /* Single spotlight div = overlay + cutout. Never hidden, just repositioned. */
-    #tt-spot {
-      position:fixed; z-index:9999; pointer-events:none;
-      border-radius:12px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,.82);
-      transition:
-        top    .42s cubic-bezier(.4,0,.2,1),
-        left   .42s cubic-bezier(.4,0,.2,1),
-        width  .42s cubic-bezier(.4,0,.2,1),
-        height .42s cubic-bezier(.4,0,.2,1),
-        border-radius .3s,
-        box-shadow .3s;
+    /* ── Backdrop ── */
+    #tt-backdrop {
+      position:fixed; inset:0; z-index:9998;
+      background:rgba(5,8,18,.78);
+      backdrop-filter:blur(2px);
+      opacity:0; transition:opacity .25s ease;
+      pointer-events:none;
     }
-    #tt-spot.modal-mode {
-      /* No visible hole – just dark overlay */
-      width:1px; height:1px; top:-1px; left:50%; border-radius:0;
-      box-shadow:0 0 0 9999px rgba(0,0,0,.82);
-    }
+    #tt-backdrop.tt-visible { opacity:1; pointer-events:auto; }
 
-    /* Card – never opacity:0 mid-tour, only on open/close */
+    /* ── Modal card ── */
     #tt-card {
-      position:fixed; z-index:10000; width:min(640px,96vw);
-      background:linear-gradient(160deg,#0d1424 0%,#1a2540 100%);
-      border:1px solid rgba(99,102,241,.3); border-radius:22px;
-      box-shadow:0 40px 100px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.05);
+      position:fixed; z-index:9999;
+      left:50%; top:50%;
+      transform:translate(-50%,-50%) scale(.96);
+      width:min(520px,94vw);
+      background:#0f172a;
+      border:1px solid rgba(99,102,241,.25);
+      border-radius:20px;
+      box-shadow:0 32px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.03) inset;
       overflow:hidden;
-      transition:
-        top    .42s cubic-bezier(.4,0,.2,1),
-        left   .42s cubic-bezier(.4,0,.2,1),
-        transform .42s cubic-bezier(.4,0,.2,1),
-        opacity .3s;
+      opacity:0;
+      transition:opacity .22s ease, transform .22s cubic-bezier(.34,1.56,.64,1);
+      pointer-events:auto;
     }
-    #tt-prog-wrap { height:4px; background:rgba(255,255,255,.05); }
-    #tt-prog      { height:4px; background:linear-gradient(90deg,#6366f1,#a78bfa);
-                    border-radius:4px; transition:width .45s cubic-bezier(.4,0,.2,1); }
-    #tt-hd  { padding:1.6rem 2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,.05); }
-    #tt-lbl { font-size:.7rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
-              color:#6366f1; margin-bottom:.5rem; }
-    #tt-ttl { font-size:1.35rem; font-weight:800; color:#f8fafc; line-height:1.25; }
-    #tt-bd  { padding:1.3rem 2rem; }
+    #tt-card.tt-visible {
+      opacity:1;
+      transform:translate(-50%,-50%) scale(1);
+    }
 
-    /* Content area fades on step change – card itself stays */
-    #tt-cnt { transition:opacity .2s ease, transform .2s ease; }
-    #tt-cnt.out { opacity:0; transform:translateY(8px); pointer-events:none; }
+    /* ── Progress bar ── */
+    #tt-prog-wrap { height:3px; background:rgba(255,255,255,.06); }
+    #tt-prog {
+      height:3px;
+      background:linear-gradient(90deg,#6366f1,#a78bfa);
+      border-radius:3px;
+      transition:width .4s cubic-bezier(.4,0,.2,1);
+    }
 
-    #tt-txt { font-size:.97rem; color:#94a3b8; line-height:1.75; white-space:pre-line; }
-    #tt-hint-box { margin-top:1rem; display:flex; align-items:flex-start; gap:.6rem;
-      background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.22);
-      border-radius:12px; padding:.7rem 1rem; font-size:.86rem; color:#a5b4fc; line-height:1.5; }
-    #tt-form-box { margin-top:1.1rem; }
-    .tt-form-row { margin-bottom:.75rem; }
-    .tt-form-row label { display:block; font-size:.78rem; color:#64748b;
-      font-weight:600; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.05em; }
+    /* ── Header ── */
+    #tt-hd {
+      padding:1.5rem 1.75rem 1rem;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;
+    }
+    #tt-hd-left { flex:1; }
+    #tt-step-badge {
+      display:inline-flex; align-items:center; gap:.35rem;
+      font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+      color:#6366f1; margin-bottom:.5rem;
+    }
+    #tt-step-badge .tt-pip {
+      display:flex; gap:4px;
+    }
+    .tt-pip-dot {
+      width:6px; height:6px; border-radius:50%;
+      background:#1e293b; transition:background .2s, width .2s;
+    }
+    .tt-pip-dot.active { background:#6366f1; width:16px; border-radius:3px; }
+    .tt-pip-dot.done   { background:#334155; }
+    #tt-ttl {
+      font-size:1.2rem; font-weight:800; color:#f1f5f9; line-height:1.3;
+    }
+    #tt-close-btn {
+      flex-shrink:0; width:28px; height:28px; border-radius:8px;
+      background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+      color:#475569; font-size:1rem; cursor:pointer; line-height:1;
+      display:flex; align-items:center; justify-content:center;
+      transition:background .15s, color .15s;
+    }
+    #tt-close-btn:hover { background:rgba(239,68,68,.15); color:#f87171; border-color:rgba(239,68,68,.3); }
+
+    /* ── Body ── */
+    #tt-bd { padding:.2rem 1.75rem 1.25rem; }
+    #tt-cnt { transition:opacity .18s ease, transform .18s ease; }
+    #tt-cnt.tt-out { opacity:0; transform:translateY(6px); pointer-events:none; }
+    #tt-txt {
+      font-size:.9rem; color:#94a3b8; line-height:1.75; white-space:pre-line;
+    }
+    #tt-hint-box {
+      margin-top:.85rem;
+      display:flex; align-items:flex-start; gap:.5rem;
+      background:rgba(99,102,241,.08); border:1px solid rgba(99,102,241,.18);
+      border-radius:10px; padding:.65rem .9rem;
+      font-size:.83rem; color:#a5b4fc; line-height:1.55;
+    }
+    #tt-form-box { margin-top:1rem; }
+    .tt-form-row { margin-bottom:.7rem; }
+    .tt-form-row label {
+      display:block; font-size:.73rem; font-weight:700; letter-spacing:.06em;
+      text-transform:uppercase; color:#475569; margin-bottom:.3rem;
+    }
     .tt-form-row select, .tt-form-row input {
-      width:100%; padding:.55rem .85rem; background:rgba(255,255,255,.05);
-      border:1px solid rgba(255,255,255,.1); border-radius:10px; color:#e2e8f0;
-      font-size:.93rem; }
+      width:100%; padding:.5rem .8rem;
+      background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09);
+      border-radius:9px; color:#e2e8f0; font-size:.9rem;
+    }
     .tt-form-row select:focus, .tt-form-row input:focus {
-      outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.2); }
-    .tt-save-btn { margin-top:.5rem; background:rgba(99,102,241,.2);
-      border:1px solid rgba(99,102,241,.4); border-radius:10px; padding:.5rem 1.1rem;
-      color:#a5b4fc; font-size:.88rem; font-weight:700; cursor:pointer; }
-    .tt-save-btn.saved { background:rgba(34,197,94,.15); border-color:rgba(34,197,94,.4);
-      color:#86efac; }
+      outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.18);
+    }
+    .tt-save-btn {
+      margin-top:.4rem; background:rgba(99,102,241,.18);
+      border:1px solid rgba(99,102,241,.35); border-radius:9px;
+      padding:.45rem 1rem; color:#a5b4fc; font-size:.85rem; font-weight:700; cursor:pointer;
+      transition:background .15s;
+    }
+    .tt-save-btn:hover { background:rgba(99,102,241,.28); }
+    .tt-save-btn.saved { background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.35); color:#86efac; }
 
-    #tt-ft { padding:.9rem 2rem 1.5rem; border-top:1px solid rgba(255,255,255,.05);
-      display:flex; align-items:center; justify-content:space-between; gap:1rem; }
-    #tt-dots { display:flex; gap:6px; }
-    .tt-dot { width:8px; height:8px; border-radius:50%; background:#1e3258;
-      transition:background .25s, transform .25s, width .25s; }
-    .tt-dot.active { background:#6366f1; transform:scale(1.4); width:20px; border-radius:4px; }
-    .tt-dot.done   { background:#334155; }
-    #tt-btns { display:flex; gap:.6rem; }
-    #tt-skip { background:none; border:1px solid #1e3258; border-radius:10px;
-      padding:.55rem 1.1rem; color:#475569; font-size:.86rem; cursor:pointer;
-      transition:border-color .15s,color .15s; }
-    #tt-skip:hover { border-color:#475569; color:#94a3b8; }
-    #tt-next { background:linear-gradient(135deg,#6366f1,#4338ca); border:none;
-      border-radius:10px; padding:.6rem 1.6rem; color:#fff; font-size:.92rem;
-      font-weight:700; cursor:pointer; letter-spacing:.01em;
-      box-shadow:0 4px 16px rgba(99,102,241,.45);
-      transition:box-shadow .15s, transform .1s; white-space:nowrap; }
-    #tt-next:hover { box-shadow:0 6px 24px rgba(99,102,241,.6); transform:translateY(-1px); }
-    #tt-next:active { transform:translateY(0); }
+    /* ── Footer ── */
+    #tt-ft {
+      padding:.9rem 1.75rem 1.4rem;
+      display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+      border-top:1px solid rgba(255,255,255,.05);
+    }
+    #tt-counter { font-size:.75rem; color:#334155; }
+    #tt-btns { display:flex; gap:.5rem; }
+    #tt-skip {
+      background:none; border:1px solid #1e293b; border-radius:9px;
+      padding:.45rem .95rem; color:#334155; font-size:.82rem; cursor:pointer;
+      transition:border-color .15s, color .15s;
+    }
+    #tt-skip:hover { border-color:#475569; color:#64748b; }
+    #tt-next {
+      background:linear-gradient(135deg,#6366f1,#4f46e5); border:none;
+      border-radius:9px; padding:.5rem 1.4rem; color:#fff; font-size:.88rem;
+      font-weight:700; cursor:pointer;
+      box-shadow:0 2px 12px rgba(99,102,241,.4);
+      transition:box-shadow .15s, transform .1s;
+    }
+    #tt-next:hover { box-shadow:0 4px 20px rgba(99,102,241,.55); transform:translateY(-1px); }
+    #tt-next:active { transform:none; }
   `;
   document.head.appendChild(_style);
 
-  // ── Build UI (once per tour) ──────────────────────────────────────────────
+  // ── Build UI ──────────────────────────────────────────────────────────────
   function buildUI() {
-    ['tt-spot','tt-card'].forEach(id => document.getElementById(id)?.remove());
+    ['tt-backdrop','tt-card'].forEach(id => document.getElementById(id)?.remove());
 
-    // Spotlight/overlay – single div, always visible, never className-toggled
-    const spot = document.createElement('div');
-    spot.id = 'tt-spot';
-    // Start: full dark overlay, no hole (0x0 off-screen)
-    spot.style.top = '-2px'; spot.style.left = '50%';
-    spot.style.width = '0'; spot.style.height = '0';
-    spot.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.82)';
+    const backdrop = document.createElement('div');
+    backdrop.id = 'tt-backdrop';
 
-    // Card
     const card = document.createElement('div');
     card.id = 'tt-card';
     card.innerHTML = `
       <div id="tt-prog-wrap"><div id="tt-prog" style="width:0%"></div></div>
       <div id="tt-hd">
-        <div id="tt-lbl"></div>
-        <div id="tt-ttl"></div>
+        <div id="tt-hd-left">
+          <div id="tt-step-badge">
+            <span id="tt-step-label"></span>
+            <div class="tt-pip" id="tt-pips"></div>
+          </div>
+          <div id="tt-ttl"></div>
+        </div>
+        <button id="tt-close-btn" title="${t('Schließen','Close')}">✕</button>
       </div>
       <div id="tt-bd">
         <div id="tt-cnt">
@@ -601,119 +648,90 @@
         </div>
       </div>
       <div id="tt-ft">
-        <div id="tt-dots"></div>
+        <span id="tt-counter"></span>
         <div id="tt-btns">
-          <button id="tt-skip">${t('Tour beenden','Exit tour')}</button>
+          <button id="tt-skip">${t('Beenden','Exit')}</button>
           <button id="tt-next"></button>
         </div>
       </div>
     `;
 
-    document.body.appendChild(spot);
+    document.body.appendChild(backdrop);
     document.body.appendChild(card);
-
-    // Dissolve the head-injected navigation shield (if present) now that
-    // our own overlay (spot) is in place and will cover the page.
     removeNavShield();
 
-    // Start centered (pixels), invisible — no transition yet so no initial slide
-    const cw = Math.min(640, window.innerWidth * 0.96);
-    card.style.transition = 'none';
-    card.style.transform  = 'none';
-    card.style.left   = Math.round((window.innerWidth  - cw) / 2) + 'px';
-    card.style.top    = Math.round((window.innerHeight - 400) / 2) + 'px';
-    card.style.opacity = '0';
-
-    // Enable transitions after paint, then fade in
+    // Animate in on next frame
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      card.style.transition = '';  // restore CSS transition
-      card.style.opacity = '1';
+      backdrop.classList.add('tt-visible');
+      card.classList.add('tt-visible');
     }));
 
-    // Click outside card closes tour (delegated)
-    spot.addEventListener('click', e => { spot._onClose && spot._onClose(); });
-
-    return { spot, card };
+    return { backdrop, card };
   }
 
   // ── Render step ───────────────────────────────────────────────────────────
   function renderStep(step, idx, total, ui, skipAnim) {
-    const { spot, card } = ui;
-    const targetEl = findTarget(step.target);
+    const { card } = ui;
     const cnt = document.getElementById('tt-cnt');
 
     function apply() {
-      // Label
-      const lbl = document.getElementById('tt-lbl');
-      if (idx === 0) lbl.textContent = t('Einführung · TravOps Guide', 'Introduction · TravOps Guide');
-      else if (step.isLast) lbl.textContent = t('✅ Abgeschlossen', '✅ Completed');
-      else lbl.textContent = t(`Schritt ${idx} von ${total-2}`, `Step ${idx} of ${total-2}`);
+      // Step label
+      const label = document.getElementById('tt-step-label');
+      if (idx === 0) label.textContent = t('TravOps Guide','TravOps Guide');
+      else if (step.isLast) label.textContent = t('✅ Fertig','✅ Done');
+      else label.textContent = t(`Schritt ${idx} / ${total - 2}`, `Step ${idx} / ${total - 2}`);
+
+      // Pip indicators
+      const pips = document.getElementById('tt-pips');
+      pips.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const d = document.createElement('div');
+        d.className = 'tt-pip-dot' + (i === idx ? ' active' : i < idx ? ' done' : '');
+        pips.appendChild(d);
+      }
 
       document.getElementById('tt-ttl').textContent = step.title;
       document.getElementById('tt-txt').textContent = step.body;
       document.getElementById('tt-next').textContent = step.next;
+      document.getElementById('tt-counter').textContent =
+        total > 2 ? `${Math.min(idx + 1, total)} / ${total}` : '';
 
-      // Progress
-      const pct = total > 1 ? Math.round((idx / (total-1)) * 100) : 100;
+      // Progress bar
+      const pct = total > 1 ? Math.round((idx / (total - 1)) * 100) : 100;
       document.getElementById('tt-prog').style.width = pct + '%';
-
-      // Dots
-      const dotsEl = document.getElementById('tt-dots');
-      dotsEl.innerHTML = '';
-      for (let i = 0; i < total; i++) {
-        const d = document.createElement('div');
-        d.className = 'tt-dot' + (i===idx?' active':i<idx?' done':'');
-        dotsEl.appendChild(d);
-      }
 
       // Hint
       const hb = document.getElementById('tt-hint-box');
-      if (step.hint) { hb.innerHTML = '<span>💡</span><span>' + step.hint + '</span>'; hb.style.display='flex'; }
-      else hb.style.display = 'none';
+      if (step.hint) {
+        hb.innerHTML = '<span>💡</span><span>' + step.hint + '</span>';
+        hb.style.display = 'flex';
+      } else {
+        hb.style.display = 'none';
+      }
 
       // Inline form
       const fb = document.getElementById('tt-form-box');
-      if (step.form) {
-        fb.style.display = 'block';
-        fb.innerHTML = buildForm(step.form, ui);
-      } else fb.style.display = 'none';
+      if (step.form) { fb.style.display = 'block'; fb.innerHTML = buildForm(step.form, ui); }
+      else fb.style.display = 'none';
 
-      // Spotlight — never change className, always use inline styles for smooth transition
-      if (targetEl) {
-        const r = targetEl.getBoundingClientRect(), p = 12;
-        spot.style.top          = (r.top  - p) + 'px';
-        spot.style.left         = (r.left - p) + 'px';
-        spot.style.width        = (r.width  + p*2) + 'px';
-        spot.style.height       = (r.height + p*2) + 'px';
-        spot.style.borderRadius = '12px';
-        spot.style.boxShadow    = '0 0 0 9999px rgba(0,0,0,.82), 0 0 0 2px rgba(99,102,241,.55)';
-        spot.style.pointerEvents = 'none';
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        // No spotlight — shrink to 0x0 off-screen, box-shadow still provides full dark overlay
-        spot.style.top          = '-2px';
-        spot.style.left         = '50%';
-        spot.style.width        = '0px';
-        spot.style.height       = '0px';
-        spot.style.borderRadius = '0';
-        spot.style.boxShadow    = '0 0 0 9999px rgba(0,0,0,.82)';
-        spot.style.pointerEvents = 'auto';
-      }
-
-      // Card position
-      positionCard(targetEl, card);
-
-      // Highlight
+      // Spotlight target: scroll into view for context but don't alter the card position
       clearHighlights();
+      const targetEl = findTarget(step.target);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl.style.outline = '2px solid rgba(99,102,241,.7)';
+        targetEl.style.outlineOffset = '4px';
+        targetEl.dataset.tourHl = '1';
+      }
       if (step.highlight) {
         const h = findTarget(step.highlight);
-        if (h) { h.style.outline = '2px solid rgba(99,102,241,.8)'; h.style.outlineOffset = '4px'; h.dataset.tourHl = '1'; }
+        if (h) { h.style.outline = '2px solid rgba(99,102,241,.7)'; h.style.outlineOffset = '4px'; h.dataset.tourHl = '1'; }
       }
     }
 
     if (skipAnim) { apply(); return; }
-    cnt.classList.add('out');
-    setTimeout(() => { apply(); cnt.classList.remove('out'); }, 210);
+    cnt.classList.add('tt-out');
+    setTimeout(() => { apply(); cnt.classList.remove('tt-out'); }, 185);
   }
 
   // ── Inline form builder ───────────────────────────────────────────────────
@@ -784,44 +802,6 @@
     }
   };
 
-  // ── Card positioning — always pixel values, never % + transform ───────────
-  function positionCard(targetEl, card) {
-    const cw = Math.min(640, window.innerWidth * 0.96);
-    const ch = card.offsetHeight || 400;
-    const m  = 20;
-
-    card.style.transform = 'none'; // always none so transitions are smooth
-
-    if (!targetEl) {
-      // Centered — calculated in pixels
-      card.style.left = Math.round((window.innerWidth  - cw) / 2) + 'px';
-      card.style.top  = Math.round((window.innerHeight - ch) / 2) + 'px';
-      return;
-    }
-
-    const r = targetEl.getBoundingClientRect();
-
-    if (r.right + cw + m < window.innerWidth) {
-      // Right of element
-      card.style.left = (r.right + m) + 'px';
-      card.style.top  = clamp(Math.round(r.top + r.height/2 - ch/2), m, window.innerHeight - ch - m) + 'px';
-    } else if (r.bottom + ch + m < window.innerHeight) {
-      // Below element
-      card.style.top  = (r.bottom + m) + 'px';
-      card.style.left = clamp(Math.round(r.left + r.width/2 - cw/2), m, window.innerWidth - cw - m) + 'px';
-    } else if (r.top - ch - m > 0) {
-      // Above element
-      card.style.top  = (r.top - ch - m) + 'px';
-      card.style.left = clamp(Math.round(r.left + r.width/2 - cw/2), m, window.innerWidth - cw - m) + 'px';
-    } else {
-      // Fallback: centered
-      card.style.left = Math.round((window.innerWidth  - cw) / 2) + 'px';
-      card.style.top  = Math.round((window.innerHeight - ch) / 2) + 'px';
-    }
-  }
-
-  function clamp(val, min, max) { return Math.min(Math.max(val, min), max); }
-
   function findTarget(sel) {
     if (!sel) return null;
     for (const s of sel.split(',').map(s => s.trim())) {
@@ -839,9 +819,9 @@
 
   function fadeOut(ui) {
     clearHighlights();
-    const { spot, card } = ui;
-    if (card) { card.style.opacity = '0'; setTimeout(() => card.remove(), 350); }
-    if (spot) { spot.style.opacity = '0'; setTimeout(() => spot.remove(), 350); }
+    const { backdrop, card } = ui;
+    if (card)     { card.classList.remove('tt-visible');     setTimeout(() => card.remove(),     260); }
+    if (backdrop) { backdrop.classList.remove('tt-visible'); setTimeout(() => backdrop.remove(), 280); }
   }
 
   // ── Tour runner ────────────────────────────────────────────────────────────
@@ -871,18 +851,18 @@
         if (location.pathname !== target) {
           setState({ name, step: cur, guildId });
           fadeOut(ui);
-          setTimeout(() => { window.location.href = step.page; }, 340);
+          setTimeout(() => { window.location.href = step.page; }, 270);
           return;
         }
       }
       renderStep(step, cur, steps.length, ui);
     }
 
-    ui.spot._onClose = closeTour;
     document.getElementById('tt-next').addEventListener('click', next);
     document.getElementById('tt-skip').addEventListener('click', closeTour);
+    document.getElementById('tt-close-btn').addEventListener('click', closeTour);
 
-    setTimeout(() => renderStep(steps[cur], cur, steps.length, ui, true), 350);
+    setTimeout(() => renderStep(steps[cur], cur, steps.length, ui, true), 60);
   }
 
   // ── Remove head-injected nav shield once tour card is ready ───────────────
