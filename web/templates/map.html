@@ -121,6 +121,7 @@
       </select>
     </div>
     <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;">✕ Reset</button>
+    <button onclick="shareMapView(this)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Aktuellen Kartenausschnitt als Link teilen">🔗 Teilen</button>
     <span id="searchInfo" style="align-self:flex-end; font-size:0.78rem; color:var(--text-muted);"></span>
   </div>
 
@@ -885,6 +886,72 @@ function resize() {
   window.addEventListener('touchend', () => { resizing = false; });
 })();
 
+window.addEventListener('resize',resize);
+resize();
+
+// ── Map share / restore ───────────────────────────────────────────────────────
+function buildShareUrl() {
+  const p = new URLSearchParams();
+  p.set('v',  viewMode);
+  p.set('cx', Math.round(camX));
+  p.set('cy', Math.round(camY));
+  p.set('z',  scale.toFixed(3));
+  if (playerFilters.length)   p.set('pf', playerFilters.map(f => f.name + ':' + f.color).join(','));
+  if (allianceFilters.length) p.set('af', allianceFilters.map(f => f.name + ':' + f.color).join(','));
+  return location.origin + location.pathname + '?' + p.toString();
+}
+
+function shareMapView(btn) {
+  const url = buildShareUrl();
+  navigator.clipboard.writeText(url).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ Kopiert!';
+    btn.style.color = '#4ade80';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2200);
+  }).catch(() => {
+    // Fallback: select from prompt
+    prompt('Link kopieren:', url);
+  });
+}
+
+function restoreFromUrl() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has('v') && !p.has('pf') && !p.has('af')) return;
+
+  if (p.has('v'))  { viewMode = p.get('v'); const sel = document.getElementById('viewMode'); if (sel) sel.value = viewMode; }
+  if (p.has('cx')) camX = parseFloat(p.get('cx')) || 0;
+  if (p.has('cy')) camY = parseFloat(p.get('cy')) || 0;
+  if (p.has('z'))  scale = parseFloat(p.get('z'))  || scale;
+
+  if (p.has('pf')) {
+    p.get('pf').split(',').forEach(seg => {
+      const idx = seg.lastIndexOf(':');
+      if (idx < 1) return;
+      const name  = seg.slice(0, idx);
+      const color = seg.slice(idx + 1) || nextTagColor();
+      if (!playerFilters.find(f => f.name === name)) {
+        playerFilters.push({ name, color });
+        playerColorMap.set(name, color);
+      }
+    });
+    renderTags();
+  }
+
+  if (p.has('af')) {
+    p.get('af').split(',').forEach(seg => {
+      const idx = seg.lastIndexOf(':');
+      if (idx < 1) return;
+      const name  = seg.slice(0, idx);
+      const color = seg.slice(idx + 1) || nextTagColor();
+      if (!allianceFilters.find(f => f.name === name)) {
+        allianceFilters.push({ name, color });
+        allianceColorMap.set(name, color);
+      }
+    });
+    renderTags();
+  }
+}
+
 async function loadMap() {
   statusEl.textContent='Lade Kartendaten…';
   try {
@@ -897,14 +964,23 @@ async function loadMap() {
     maxPop    = Math.max(1,...villages.map(v=>v.pop||0));
     const natars=villages.filter(v=>v.isNatar).length;
     statusEl.textContent=`${(villages.length-natars).toLocaleString()} Dörfer · ${natars.toLocaleString()} Natars · ${scoutMap.size} Scout`;
-    scale=Math.min(canvas.width,canvas.height)/(mapRadius*2+4);
-    camX=0;camY=0;
+
+    // Default scale/cam only if not restored from URL
+    const hasUrlState = new URLSearchParams(location.search).has('cx');
+    if (!hasUrlState) {
+      scale=Math.min(canvas.width,canvas.height)/(mapRadius*2+4);
+      camX=0;camY=0;
+    }
+
+    // Apply filters → highlight
+    if (playerFilters.length || allianceFilters.length) doSearch();
+
     draw();
   } catch(e){ statusEl.textContent=`Fehler: ${e.message}`; }
 }
 
-window.addEventListener('resize',resize);
-resize();
+// Restore URL state before loading (so scale/cam are set before first draw)
+restoreFromUrl();
 loadMap();
 </script>
 {% endif %}
