@@ -166,18 +166,29 @@
 .alert-ok   { padding:.6rem 1rem;border-radius:8px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e; }
 .alert-muted{ padding:.6rem 1rem;border-radius:8px;background:rgba(148,163,184,.1);border:1px solid var(--border);color:var(--text-muted); }
 .alert-err  { padding:.6rem 1rem;border-radius:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171; }
-.player-card { background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-bottom:.75rem; }
-.player-card.anomaly { border-color:rgba(239,68,68,.45); }
-.charts-row { display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin:.6rem 0; }
-@media(max-width:700px) { .charts-row { grid-template-columns:repeat(2,1fr); } }
-.chart-box { background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;padding:.4rem .5rem; }
-.chart-label { font-size:.68rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem; }
-.chart-val { font-size:.82rem;font-weight:700;margin-bottom:.15rem; }
-canvas.spark { width:100%;height:36px;display:block; }
-.fazit { margin-top:.6rem;padding:.45rem .65rem;border-radius:6px;font-size:.78rem;line-height:1.5;
-         background:rgba(99,102,241,.06);border-left:3px solid rgba(99,102,241,.3);color:var(--text); }
-.fazit.warn { background:rgba(239,68,68,.07);border-left-color:rgba(239,68,68,.4); }
-.fazit.good { background:rgba(34,197,94,.07);border-left-color:rgba(34,197,94,.4); }
+/* Compact table layout */
+.stats-table { width:100%;border-collapse:collapse; }
+.stats-table th {
+  font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+  letter-spacing:.05em;padding:.4rem .6rem;border-bottom:2px solid var(--border);
+  text-align:left;white-space:nowrap;
+}
+.stats-table th.right { text-align:right; }
+.stats-row { border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .1s; }
+.stats-row:hover { background:rgba(255,255,255,.03); }
+.stats-row.anomaly { border-left:3px solid rgba(239,68,68,.5); }
+.stats-row td { padding:.35rem .6rem;font-size:.82rem;vertical-align:middle; }
+.stats-row td.num { text-align:right;font-variant-numeric:tabular-nums;font-size:.78rem; }
+.delta-pos { color:#4ade80;font-size:.7rem; }
+.delta-neg { color:#f87171;font-size:.7rem; }
+.delta-neu { color:var(--text-muted);font-size:.7rem; }
+canvas.spark { display:block; }
+/* Expandable fazit row */
+.fazit-row { display:none; }
+.fazit-row.open { display:table-row; }
+.fazit-row td { padding:.3rem .6rem .5rem 2rem;font-size:.76rem;line-height:1.5;color:var(--text-muted); }
+.fazit-row.warn td { color:#fca5a5; }
+.fazit-row.good td { color:#86efac; }
 </style>
 
 <script>
@@ -261,6 +272,45 @@ function drawSpark(canvas, values, color) {
   ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
   // Dot
   if (last) { ctx.beginPath();ctx.arc(last.x,last.y,3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill(); }
+}
+
+function drawSparkFixed(canvas, values, color, W, H) {
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const valid = values.filter(v => v !== null && v !== undefined);
+  if (valid.length < 2) {
+    ctx.strokeStyle = 'rgba(148,163,184,.25)';
+    ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+    return;
+  }
+  const min = Math.min(...valid), max = Math.max(...valid);
+  const range = max - min || 1;
+  const pts = values.map((v,i) => ({
+    x: (i/(values.length-1))*W,
+    y: v === null ? null : H - ((v-min)/range)*(H-4) - 2
+  }));
+  ctx.beginPath();
+  const first = pts.find(p=>p.y!==null);
+  ctx.moveTo(first.x, H);
+  pts.forEach(p => { if (p.y!==null) ctx.lineTo(p.x,p.y); });
+  const lastP = [...pts].reverse().find(p=>p.y!==null);
+  ctx.lineTo(lastP.x,H); ctx.closePath();
+  ctx.fillStyle = color+'20'; ctx.fill();
+  ctx.beginPath(); let started=false;
+  pts.forEach(p => {
+    if (p.y===null){started=false;return;}
+    if (!started){ctx.moveTo(p.x,p.y);started=true;}
+    else ctx.lineTo(p.x,p.y);
+  });
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.stroke();
+  if (lastP) { ctx.beginPath();ctx.arc(lastP.x,lastP.y,2,0,Math.PI*2);ctx.fillStyle=color;ctx.fill(); }
+}
+
+function toggleFazit(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.classList.toggle('open');
 }
 
 // ── Fazit generator ──────────────────────────────────────────────────────────
@@ -366,70 +416,90 @@ function renderView(view) {
   const anomOnly   = document.getElementById(anomCheckId)?.checked || false;
 
   const CATS = [
-    { key:'raid_points', delta:'raid_delta', label:'⛏️ Räuber',   color:'#f59e0b' },
-    { key:'off_points',  delta:'off_delta',  label:'⚔️ PvP',      color:'#f87171' },
-    { key:'pve_points',  delta:'pve_delta',  label:'🐾 PvE',      color:'#a78bfa' },
-    { key:'def_points',  delta:'def_delta',  label:'🛡️ Def',      color:'#4ade80' },
+    { key:'raid_points', delta:'raid_delta', label:'⛏️ Räuber', color:'#f59e0b' },
+    { key:'off_points',  delta:'off_delta',  label:'⚔️ PvP',    color:'#f87171' },
+    { key:'pve_points',  delta:'pve_delta',  label:'🐾 PvE',    color:'#a78bfa' },
+    { key:'def_points',  delta:'def_delta',  label:'🛡️ Def',    color:'#4ade80' },
   ];
 
   let allAnomalies = [];
-  let html = '';
 
   const entries = Object.entries(data)
     .filter(([name]) => !filter || name.toLowerCase().includes(filter))
     .filter(([, tl]) => !anomOnly || isAnomalous(tl))
-    .sort(([a],[b]) => a.localeCompare(b));
+    .sort(([a],[b]) => {
+      // Anomalien zuerst
+      const aA = isAnomalous(a[1]??data[a]), aB = isAnomalous(b[1]??data[b]);
+      if (aA && !aB) return -1; if (!aA && aB) return 1;
+      return a.localeCompare(b);
+    });
 
-  for (const [name, timeline] of entries) {
-    const last = timeline.at(-1) || {};
-    const anomaly = isAnomalous(timeline);
-    if (anomaly) allAnomalies.push(name);
-
-    const fazit = makeFazit(name, timeline);
-    const snapTime = (last.snapshot_at||'').slice(5,16).replace('T',' ');
-
-    // Sparkline values per cat
-    const catHtml = CATS.map(cat => {
-      const vals   = timeline.map(p => p[cat.key]);
-      const deltas = timeline.slice(1).map(p => p[cat.delta]);
-      const lastVal   = last[cat.key] || 0;
-      const lastDelta = last[cat.delta];
-      const canvasId  = `spark-${view}-${name.replace(/\W/g,'_')}-${cat.key}`;
-      return `<div class="chart-box">
-        <div class="chart-label">${cat.label}</div>
-        <div class="chart-val" style="color:${cat.color};">${fmtNum(lastVal)}</div>
-        ${lastDelta !== null && lastDelta !== undefined
-          ? `<div style="font-size:.68rem;color:${lastDelta>=0?'#4ade80':'#f87171'};">${fmtDelta(lastDelta)}</div>`
-          : '<div style="font-size:.68rem;color:var(--text-muted);">—</div>'}
-        <canvas class="spark" id="${canvasId}"
-                data-vals='${JSON.stringify(vals)}'
-                data-color="${cat.color}"></canvas>
-      </div>`;
-    }).join('');
-
-    html += `<div class="player-card${anomaly?' anomaly':''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.4rem;margin-bottom:.2rem;">
-        <div>
-          <span style="font-weight:700;font-size:.95rem;">${escHtml(name)}</span>
-          ${last.alliance_name ? `<span style="font-size:.72rem;color:var(--text-muted);margin-left:.4rem;">[${escHtml(last.alliance_name)}]</span>` : ''}
-          ${anomaly ? '<span style="font-size:.68rem;background:rgba(239,68,68,.15);color:#f87171;border-radius:10px;padding:1px 7px;margin-left:.3rem;font-weight:700;">⚠️ Anomalie</span>' : ''}
-        </div>
-        <span style="font-size:.7rem;color:var(--text-muted);">📅 ${snapTime} UTC · ${timeline.length} Snapshots</span>
-      </div>
-      <div class="charts-row">${catHtml}</div>
-      ${fazit ? `<div class="fazit ${fazit.level==='warn'?'warn':fazit.level==='good'?'good':''}">💬 <strong>Fazit:</strong> ${escHtml(fazit.text)}</div>` : ''}
-    </div>`;
+  if (!entries.length) {
+    grid.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;padding:.5rem;">Keine Spieler gefunden.</p>';
+    document.getElementById(anomBarId).style.display='none';
+    return;
   }
 
-  if (!html) html = '<p style="color:var(--text-muted);font-size:.85rem;">Keine Spieler gefunden.</p>';
+  // Table header
+  let html = `<table class="stats-table"><thead><tr>
+    <th style="width:180px;">Spieler</th>
+    ${CATS.map(c=>`<th class="right" style="width:80px;">${c.label}</th><th style="width:80px;padding-left:0;"></th>`).join('')}
+    <th style="width:20px;"></th>
+  </tr></thead><tbody>`;
+
+  for (const [name, timeline] of entries) {
+    const last    = timeline.at(-1) || {};
+    const anomaly = isAnomalous(timeline);
+    if (anomaly) allAnomalies.push(name);
+    const fazit   = makeFazit(name, timeline);
+    const rowId   = `row-${view}-${name.replace(/\W/g,'_')}`;
+    const fazId   = `faz-${view}-${name.replace(/\W/g,'_')}`;
+
+    const catCells = CATS.map(cat => {
+      const vals      = timeline.map(p => p[cat.key]);
+      const lastVal   = last[cat.key] || 0;
+      const lastDelta = last[cat.delta];
+      const sid       = `sp-${view}-${name.replace(/\W/g,'_')}-${cat.key}`;
+      const deltaHtml = lastDelta === null || lastDelta === undefined
+        ? `<span class="delta-neu">—</span>`
+        : `<span class="${lastDelta>0?'delta-pos':lastDelta<0?'delta-neg':'delta-neu'}">${fmtDelta(lastDelta)}</span>`;
+      return `<td class="num">
+          <div style="font-weight:700;color:${cat.color};">${fmtNum(lastVal)}</div>
+          ${deltaHtml}
+        </td>
+        <td style="padding:0 .4rem 0 0;vertical-align:middle;">
+          <canvas class="spark" id="${sid}" width="70" height="28"
+                  data-vals='${JSON.stringify(vals)}' data-color="${cat.color}"></canvas>
+        </td>`;
+    }).join('');
+
+    html += `<tr class="stats-row${anomaly?' anomaly':''}" onclick="toggleFazit('${fazId}')">
+      <td>
+        <span style="font-weight:600;">${escHtml(name)}</span>
+        ${anomaly?'<span style="color:#f87171;font-size:.68rem;margin-left:.3rem;">⚠️</span>':''}
+        ${last.alliance_name?`<div style="font-size:.68rem;color:var(--text-muted);">[${escHtml(last.alliance_name)}]</div>`:''}
+      </td>
+      ${catCells}
+      <td style="color:var(--text-muted);font-size:.75rem;text-align:center;">▾</td>
+    </tr>
+    <tr class="fazit-row ${fazit?.level==='warn'?'warn':fazit?.level==='good'?'good':''}" id="${fazId}">
+      <td colspan="${2+CATS.length*2}">
+        💬 ${fazit ? escHtml(fazit.text) : '—'}
+        <span style="color:var(--text-muted);font-size:.68rem;margin-left:.5rem;">· ${timeline.length} Snapshots · zuletzt ${(last.snapshot_at||'').slice(5,16).replace('T',' ')} UTC</span>
+      </td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
   grid.innerHTML = html;
 
-  // Draw all sparklines
+  // Draw sparklines at fixed size (no offsetWidth needed — width attr set in HTML)
   requestAnimationFrame(() => {
     grid.querySelectorAll('canvas.spark').forEach(c => {
       const vals  = JSON.parse(c.dataset.vals || '[]');
       const color = c.dataset.color || '#6366f1';
-      drawSpark(c, vals, color);
+      // Use attribute dimensions directly
+      drawSparkFixed(c, vals, color, parseInt(c.getAttribute('width')||70), parseInt(c.getAttribute('height')||28));
     });
   });
 
