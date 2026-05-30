@@ -887,4 +887,122 @@ function renderResults(steps, finalState, totalOasisPct) {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 buildFieldInputs();
 </script>
+
+{# ══════════════════════════════════════════════════════════════
+   TRADEROUTEN-RECHNER
+══════════════════════════════════════════════════════════════ #}
+<div class="cc-section" style="margin-top:2rem;">
+  <h2>🚛 Traderouten-Rechner</h2>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.25rem;">
+    Berechnet wie viele Traderouten du brauchst, um einen Getreidemangel dauerhaft auszugleichen.
+    Basiert auf Marktplatzstufe, Händlerkapazität und Handelsgeschwindigkeit deines Stammes.
+  </p>
+
+  <div class="cc-row" style="gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">
+
+    <div class="cc-field">
+      <label>Stamm</label>
+      <select id="tr-tribe" onchange="calcTradeRoutes()">
+        <option value="roman">Römer</option>
+        <option value="teuton">Germanen</option>
+        <option value="gaul">Gallier</option>
+        <option value="egyptian">Ägypter</option>
+        <option value="hun">Hunnen</option>
+      </select>
+    </div>
+
+    <div class="cc-field">
+      <label>Marktplatzstufe</label>
+      <input type="number" id="tr-market-lvl" min="1" max="20" value="10" oninput="calcTradeRoutes()">
+    </div>
+
+    <div class="cc-field">
+      <label>Servergeschwindigkeit (×)</label>
+      <input type="number" id="tr-speed" min="1" max="10" value="1" oninput="calcTradeRoutes()">
+    </div>
+
+    <div class="cc-field">
+      <label>Getreidemangel / h</label>
+      <input type="number" id="tr-deficit" min="0" value="5000" oninput="calcTradeRoutes()">
+    </div>
+
+    <div class="cc-field">
+      <label>Entfernung (Felder)</label>
+      <input type="number" id="tr-distance" min="1" value="20" oninput="calcTradeRoutes()">
+    </div>
+
+  </div>
+
+  <div id="tr-result" style="margin-top:1.5rem;display:none;">
+    <div class="cc-summary-row">
+      <div class="cc-kpi"><div class="cc-kpi-label">Händlerkapazität</div><div class="cc-kpi-value" id="tr-capacity">—</div></div>
+      <div class="cc-kpi"><div class="cc-kpi-label">Routen gesamt (max)</div><div class="cc-kpi-value" id="tr-max-routes">—</div></div>
+      <div class="cc-kpi"><div class="cc-kpi-label">Umlaufzeit / Route</div><div class="cc-kpi-value" id="tr-roundtrip">—</div></div>
+      <div class="cc-kpi"><div class="cc-kpi-label">Crop/h pro Route</div><div class="cc-kpi-value" id="tr-crop-per-route">—</div></div>
+      <div class="cc-kpi" style="border-color:rgba(99,102,241,.5);"><div class="cc-kpi-label">Benötigte Routen</div><div class="cc-kpi-value" id="tr-needed" style="color:#a5b4fc;">—</div></div>
+    </div>
+    <div id="tr-info" class="cc-info-box" style="margin-top:0;"></div>
+  </div>
+</div>
+
+<script>
+// ── Traderouten-Rechner ───────────────────────────────────────────────────
+const TR_TRIBE = {
+  roman:    { speed: 16, carry: 500,  merchants_per_level: 3  },
+  teuton:   { speed: 12, carry: 1000, merchants_per_level: 1  },
+  gaul:     { speed: 24, carry: 750,  merchants_per_level: 2  },
+  egyptian: { speed: 14, carry: 900,  merchants_per_level: 3  },
+  hun:      { speed: 20, carry: 500,  merchants_per_level: 2  },
+};
+
+// Merchant capacity scales with market level (lvl 1 = base, each +1 adds +20%)
+function merchantCapacity(tribe, marketLvl) {
+  const base = TR_TRIBE[tribe].carry;
+  return Math.round(base * (1 + (marketLvl - 1) * 0.1));
+}
+
+function calcTradeRoutes() {
+  const tribe    = document.getElementById('tr-tribe').value;
+  const mLvl     = Math.max(1, parseInt(document.getElementById('tr-market-lvl').value) || 1);
+  const speed    = Math.max(1, parseFloat(document.getElementById('tr-speed').value) || 1);
+  const deficit  = Math.max(0, parseInt(document.getElementById('tr-deficit').value) || 0);
+  const distance = Math.max(1, parseInt(document.getElementById('tr-distance').value) || 1);
+
+  const t = TR_TRIBE[tribe];
+  const tileTime = 3600 / (t.speed * speed); // seconds per tile, one-way
+  const roundtrip_s = tileTime * distance * 2;
+  const roundtrip_h = roundtrip_s / 3600;
+
+  const capacity = merchantCapacity(tribe, mLvl);
+  const maxRoutes = t.merchants_per_level * mLvl;
+  const cropPerRoute = roundtrip_h > 0 ? capacity / roundtrip_h : 0;
+  const needed = cropPerRoute > 0 ? Math.ceil(deficit / cropPerRoute) : 99;
+
+  document.getElementById('tr-capacity').textContent    = capacity.toLocaleString('de') + ' ☀️';
+  document.getElementById('tr-max-routes').textContent  = maxRoutes;
+  document.getElementById('tr-roundtrip').textContent   = formatMinutes(roundtrip_s / 60);
+  document.getElementById('tr-crop-per-route').textContent = Math.round(cropPerRoute).toLocaleString('de');
+  document.getElementById('tr-needed').textContent      = deficit === 0 ? '0' : needed > maxRoutes ? `${needed} ⚠️` : String(needed);
+
+  let info = '';
+  if (deficit === 0) {
+    info = '✅ Kein Getreidemangel — keine Traderouten nötig.';
+  } else if (needed > maxRoutes) {
+    info = `⚠️ ${needed} Routen benötigt, aber dein Marktplatz (Stufe ${mLvl}) erlaubt nur ${maxRoutes} gleichzeitige Händler. `
+         + `Erhöhe den Marktplatz auf mindestens Stufe ${Math.ceil(needed / t.merchants_per_level)} oder reduziere die Entfernung zur Lieferfarm.`;
+  } else {
+    info = `✅ ${needed} von ${maxRoutes} möglichen Traderouten reichen aus, um den Mangel von ${deficit.toLocaleString('de')} ☀️/h auszugleichen.`;
+  }
+  document.getElementById('tr-info').textContent = info;
+  document.getElementById('tr-result').style.display = 'block';
+}
+
+function formatMinutes(mins) {
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
+
+calcTradeRoutes(); // initial render
+</script>
 {% endblock %}

@@ -4266,6 +4266,21 @@ async def my_ally_page(request: Request, guild_id: str):
     leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
     member_leaderboard = await database.get_member_leaderboard(guild_id) if membership else []
     meta_alliances = await database.get_meta_alliances(guild_id)
+
+    # EP indicator: who has active waves in op_plans
+    ep_members: set = set()
+    all_member_ids: list = []
+    growth_data: dict = {}
+
+    if ally_group and members:
+        ep_members = await database.get_active_ep_members(guild_id)
+        all_member_ids = [m["discord_id"] for m in members if m.get("discord_id")]
+        growth_data = await database.get_member_growth(guild_id, all_member_ids)
+    elif membership and member_view_members:
+        ep_members = await database.get_active_ep_members(guild_id)
+        all_member_ids = [m["discord_id"] for m in member_view_members if m.get("discord_id")]
+        growth_data = await database.get_member_growth(guild_id, all_member_ids)
+
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
@@ -4276,6 +4291,8 @@ async def my_ally_page(request: Request, guild_id: str):
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
         "leaderboard": leaderboard,
         "meta_alliances": meta_alliances,
+        "ep_members": list(ep_members),
+        "growth_data": growth_data,
     })
 
 

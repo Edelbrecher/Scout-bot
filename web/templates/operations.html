@@ -2267,9 +2267,12 @@ function switchPanel(name, el) {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// Close modal on overlay click
+// Close modal only when mousedown AND mouseup both land on the overlay itself
+// (prevents accidental close when dragging a selection out of the modal)
 document.querySelectorAll('.op-modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+  let _mdOnOverlay = false;
+  o.addEventListener('mousedown', e => { _mdOnOverlay = e.target === o; });
+  o.addEventListener('click',     e => { if(e.target === o && _mdOnOverlay) o.classList.remove('open'); });
 });
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') document.querySelectorAll('.op-modal-overlay.open').forEach(o=>o.classList.remove('open'));

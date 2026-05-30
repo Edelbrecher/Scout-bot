@@ -5899,6 +5899,53 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
     return result
 
 
+async def get_active_ep_members(guild_id: str) -> set:
+    """Return set of discord_ids that have waves in active plans."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        rows = await db.execute_fetchall("""
+            SELECT DISTINCT w.attacker_discord_id
+            FROM op_waves w
+            JOIN op_plans p ON p.id = w.plan_id
+            WHERE w.guild_id = ? AND p.status = 'active'
+              AND w.attacker_discord_id != ''
+        """, (guild_id,))
+        return {r["attacker_discord_id"] for r in rows}
+
+
+async def get_member_growth(guild_id: str, discord_ids: list) -> dict:
+    """Return village history per discord_id for growth charts.
+    Returns dict: discord_id → list of {uploaded_at, village_count, total_off, total_def, total_crop}
+    Only last 14 entries per member."""
+    if not discord_ids:
+        return {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        placeholders = ",".join("?" * len(discord_ids))
+        rows = await db.execute_fetchall(f"""
+            SELECT discord_id, uploaded_at, village_count, total_off, total_def, total_crop
+            FROM guild_own_villages_history
+            WHERE guild_id = ? AND discord_id IN ({placeholders})
+            ORDER BY discord_id, uploaded_at ASC
+        """, [guild_id] + discord_ids)
+    result: dict = {}
+    for r in rows:
+        did = r["discord_id"]
+        if did not in result:
+            result[did] = []
+        result[did].append({
+            "uploaded_at": r["uploaded_at"][:10],
+            "village_count": r["village_count"] or 0,
+            "total_off": r["total_off"] or 0,
+            "total_def": r["total_def"] or 0,
+            "total_crop": r["total_crop"] or 0,
+        })
+    # Keep last 14 snapshots per member
+    for did in result:
+        result[did] = result[did][-14:]
+    return result
+
+
 # ── Personal missions (per member) ─────────────────────────────────────────────
 
 async def get_personal_missions(guild_id: str, discord_id: str) -> list[dict]:

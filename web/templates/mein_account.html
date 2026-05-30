@@ -316,6 +316,96 @@
   </div>
   {% endif %}
 
+  <!-- Troop projection -->
+  {% if history and history | length >= 2 %}
+  <div class="card" style="margin-bottom:1.25rem;padding:1.25rem;">
+    <h2 style="margin:0 0 .85rem;font-size:1rem;">🔮 Truppenstärke-Projektion</h2>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">
+      Hochrechnung basierend auf deinem durchschnittlichen Wachstum zwischen den letzten Importen.
+    </p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+      {% for d, label in [(7,'7 Tage'),(14,'14 Tage'),(30,'30 Tage'),(60,'60 Tage')] %}
+      <button class="proj-day-btn{% if loop.first %} active{% endif %}" data-days="{{ d }}"
+              onclick="selectProjDays({{ d }},this)"
+              style="font-size:.77rem;padding:.2rem .75rem;border-radius:12px;border:1px solid var(--border);background:{% if loop.first %}rgba(99,102,241,.2){% else %}var(--bg-main){% endif %};color:{% if loop.first %}#a5b4fc{% else %}var(--text-muted){% endif %};cursor:pointer;">
+        {{ label }}
+      </button>
+      {% endfor %}
+    </div>
+    <div id="projResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;"></div>
+  </div>
+  <script>
+  (function(){
+    const history = {{ history | tojson }};
+    if (history.length < 2) return;
+
+    function daysBetween(a, b) {
+      return (new Date(b) - new Date(a)) / 86400000;
+    }
+
+    function projectTroops(days) {
+      // Use linear regression over all snapshots for each metric
+      const fields = ['total_off','total_def','total_crop','village_count'];
+      const result = {};
+      for (const f of fields) {
+        const pts = history.map((h,i) => {
+          const d = i === 0 ? 0 : daysBetween(history[0].uploaded_at, h.uploaded_at);
+          return {x: d, y: h[f] || 0};
+        });
+        // simple linear regression
+        const n = pts.length;
+        const sumX = pts.reduce((a,p) => a+p.x, 0);
+        const sumY = pts.reduce((a,p) => a+p.y, 0);
+        const sumXY= pts.reduce((a,p) => a+p.x*p.y, 0);
+        const sumX2= pts.reduce((a,p) => a+p.x*p.x, 0);
+        const denom = n*sumX2 - sumX*sumX;
+        const slope = denom ? (n*sumXY - sumX*sumY)/denom : 0;
+        const intercept = (sumY - slope*sumX)/n;
+        const lastDay = pts[pts.length-1].x;
+        const projected = Math.max(0, Math.round(intercept + slope*(lastDay + days)));
+        const current   = pts[pts.length-1].y;
+        result[f] = {current, projected, delta: projected - current, slope};
+      }
+      return result;
+    }
+
+    function fmt(n) { return n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n); }
+
+    window.selectProjDays = function(days, btn) {
+      document.querySelectorAll('.proj-day-btn').forEach(b => {
+        b.style.background = 'var(--bg-main)'; b.style.color = 'var(--text-muted)';
+      });
+      btn.style.background = 'rgba(99,102,241,.2)'; btn.style.color = '#a5b4fc';
+      renderProj(days);
+    };
+
+    function renderProj(days) {
+      const proj = projectTroops(days);
+      const configs = [
+        {f:'total_off',   label:'⚔️ Off',       color:'#ef4444'},
+        {f:'total_def',   label:'🛡️ Def',       color:'#22c55e'},
+        {f:'total_crop',  label:'🌾 Crop',      color:'#f59e0b'},
+        {f:'village_count',label:'🏘️ Dörfer',  color:'#a5b4fc'},
+      ];
+      const wrap = document.getElementById('projResult');
+      wrap.innerHTML = configs.map(c => {
+        const {current, projected, delta} = proj[c.f];
+        const sign = delta >= 0 ? '+' : '';
+        const dColor = delta >= 0 ? '#4ade80' : '#f87171';
+        return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.75rem;">
+          <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.3rem;">${c.label}</div>
+          <div style="font-size:1.15rem;font-weight:700;color:${c.color};">${fmt(projected)}</div>
+          <div style="font-size:.73rem;color:${dColor};margin-top:.15rem;">${sign}${fmt(delta)} in ${days}d</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem;">jetzt: ${fmt(current)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    renderProj(7);
+  })();
+  </script>
+  {% endif %}
+
   <!-- Villages table -->
   {% if own_villages %}
   <div class="card">

@@ -119,6 +119,7 @@
                 <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.25rem;">
                   {% if m.role_name %}<span style="font-size:.68rem;background:rgba(0,0,0,.25);border:1px solid {{ m.role_color or '#94a3b8' }};color:{{ m.role_color or '#94a3b8' }};border-radius:10px;padding:1px 7px;font-weight:600;">{{ m.role_name }}</span>{% endif %}
                   {% if wing_label %}<span style="font-size:.68rem;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);color:#a78bfa;border-radius:10px;padding:1px 7px;">{{ wing_label }}</span>{% endif %}
+                  {% if m.discord_id in ep_members %}<span style="font-size:.68rem;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.4);color:#fb923c;border-radius:10px;padding:1px 7px;">⚔️ im EP</span>{% endif %}
                 </div>
               </div>
               <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/remove" style="margin:0;">
@@ -152,50 +153,98 @@
         {% endif %}
       </div>
 
-      {# Right: Discord ↔ Travian mapping table #}
+      {# Right: Member details + growth charts #}
       {% if approved_members %}
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.5rem;">
-          <h2 style="margin:0;font-size:1rem;">🔗 Discord ↔ Travian</h2>
-          <input type="text" id="mappingSearch" placeholder="🔍 Suchen…"
-                 style="padding:.3rem .7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:150px;"
-                 oninput="filterMapping(this.value)">
+      <div style="display:flex;flex-direction:column;gap:1rem;">
+
+        {# Mapping table #}
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.5rem;">
+            <h2 style="margin:0;font-size:1rem;">🔗 Discord ↔ Travian</h2>
+            <input type="text" id="mappingSearch" placeholder="🔍 Suchen…"
+                   style="padding:.3rem .7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:150px;"
+                   oninput="filterMapping(this.value)">
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.83rem;" id="mappingTable">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">#</th>
+                  <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Discord</th>
+                  <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Travian</th>
+                  <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Rolle</th>
+                  <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">EP</th>
+                </tr>
+              </thead>
+              <tbody id="mappingBody">
+                {% for m in approved_members %}
+                <tr class="mapping-row" style="border-bottom:1px solid rgba(255,255,255,.04);"
+                    data-search="{{ (m.discord_username or '')|lower }} {{ (m.travian_name or '')|lower }} {{ m.discord_id }}">
+                  <td style="padding:.35rem .6rem;color:var(--text-muted);">{{ loop.index }}</td>
+                  <td style="padding:.35rem .6rem;font-weight:600;">{{ m.discord_username or '—' }}</td>
+                  <td style="padding:.35rem .6rem;color:#93c5fd;">{{ m.travian_name or '—' }}</td>
+                  <td style="padding:.35rem .6rem;">
+                    {% if m.role_name %}<span style="font-size:.7rem;background:rgba(0,0,0,.25);border:1px solid {{ m.role_color or '#94a3b8' }};color:{{ m.role_color or '#94a3b8' }};border-radius:10px;padding:1px 7px;">{{ m.role_name }}</span>{% else %}—{% endif %}
+                  </td>
+                  <td style="padding:.35rem .6rem;">
+                    {% if m.discord_id in ep_members %}<span style="font-size:.7rem;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.4);color:#fb923c;border-radius:10px;padding:1px 7px;">⚔️</span>{% else %}<span style="color:var(--text-muted);font-size:.78rem;">—</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div id="mappingEmpty" style="display:none;text-align:center;color:var(--text-muted);padding:1rem;font-size:.85rem;">Keine Treffer</div>
+          <div style="margin-top:.5rem;font-size:.73rem;color:var(--text-muted);">
+            {{ approved_members|length }} Mitglieder · {{ approved_members|selectattr('travian_name')|list|length }} mit Zuordnung
+          </div>
         </div>
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:.83rem;" id="mappingTable">
-            <thead>
-              <tr style="border-bottom:1px solid var(--border);">
-                <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">#</th>
-                <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Discord</th>
-                <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Travian</th>
-                <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Rolle</th>
-                <th style="padding:.4rem .6rem;color:var(--text-muted);font-weight:600;">Flügel</th>
-              </tr>
-            </thead>
-            <tbody id="mappingBody">
-              {% for m in approved_members %}
-              {% set wing_label = "Haupt" %}
-              {% if m.wing == 1 and ally_group.wing1_name %}{% set wing_label = ally_group.wing1_name %}
-              {% elif m.wing == 2 and ally_group.wing2_name %}{% set wing_label = ally_group.wing2_name %}{% endif %}
-              <tr class="mapping-row" style="border-bottom:1px solid rgba(255,255,255,.04);"
-                  data-search="{{ (m.discord_username or '')|lower }} {{ (m.travian_name or '')|lower }} {{ m.discord_id }}">
-                <td style="padding:.35rem .6rem;color:var(--text-muted);">{{ loop.index }}</td>
-                <td style="padding:.35rem .6rem;font-weight:600;">{{ m.discord_username or '—' }}</td>
-                <td style="padding:.35rem .6rem;color:#93c5fd;">{{ m.travian_name or '—' }}</td>
-                <td style="padding:.35rem .6rem;">
-                  {% if m.role_name %}<span style="font-size:.7rem;background:rgba(0,0,0,.25);border:1px solid {{ m.role_color or '#94a3b8' }};color:{{ m.role_color or '#94a3b8' }};border-radius:10px;padding:1px 7px;">{{ m.role_name }}</span>{% else %}—{% endif %}
-                </td>
-                <td style="padding:.35rem .6rem;font-size:.78rem;color:var(--text-muted);">{{ wing_label }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+
+        {# Growth Charts — per member, last 14 snapshots #}
+        {% if growth_data %}
+        <div class="card">
+          <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Account-Wachstum (letzte 2 Wochen)</h2>
+
+          {# Metric selector #}
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;">
+            {% for metric, label, color in [
+              ('village_count','🏘️ Dörfer','#34d399'),
+              ('total_off','🗡️ Off','#f87171'),
+              ('total_def','🛡️ Def','#60a5fa'),
+              ('total_crop','🌾 Crop','#fbbf24'),
+            ] %}
+            <button class="growth-metric-btn{% if loop.first %} active{% endif %}"
+                    data-metric="{{ metric }}" data-color="{{ color }}"
+                    onclick="selectGrowthMetric('{{ metric }}','{{ color }}',this)"
+                    style="font-size:.75rem;padding:.2rem .7rem;border-radius:12px;border:1px solid var(--border);background:{% if loop.first %}rgba(52,211,153,.15){% else %}var(--bg-main){% endif %};color:{% if loop.first %}{{ color }}{% else %}var(--text-muted){% endif %};cursor:pointer;">
+              {{ label }}
+            </button>
+            {% endfor %}
+          </div>
+
+          <div id="growthChartsWrap" style="display:flex;flex-direction:column;gap:.75rem;">
+            {% for m in approved_members %}
+            {% set gdata = growth_data.get(m.discord_id, []) %}
+            {% if gdata | length >= 2 %}
+            <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.6rem .9rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;">
+                <div style="font-size:.82rem;font-weight:700;">{{ m.discord_username or m.discord_id }}</div>
+                {% if m.travian_name %}<div style="font-size:.72rem;color:#93c5fd;">{{ m.travian_name }}</div>{% endif %}
+              </div>
+              <canvas id="gc-{{ m.discord_id }}"
+                      data-history="{{ gdata | tojson | e }}"
+                      style="width:100%;height:60px;" height="60"></canvas>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+          <p style="font-size:.72rem;color:var(--text-muted);margin-top:.75rem;">
+            Daten basieren auf manuell hochgeladenen Truppenmeldungen. Wird automatisch aktualisiert sobald Mitglieder ihre Dörfer neu hochladen.
+          </p>
         </div>
-        <div id="mappingEmpty" style="display:none;text-align:center;color:var(--text-muted);padding:1rem;font-size:.85rem;">Keine Treffer</div>
-        <div style="margin-top:.5rem;font-size:.73rem;color:var(--text-muted);">
-          {{ approved_members|length }} Mitglieder · {{ approved_members|selectattr('travian_name')|list|length }} mit Zuordnung
-        </div>
-      </div>
+        {% endif %}
+
+      </div>{# end right column wrapper #}
       {% endif %}
 
     </div>{# end grid #}
@@ -524,6 +573,7 @@
           {% elif m.wing == 2 and guild_group and guild_group.wing2_name %}
           <span style="font-size:.62rem;background:rgba(16,185,129,.2);color:#34d399;border-radius:6px;padding:1px 5px;white-space:nowrap;">{{ guild_group.wing2_name }}</span>
           {% endif %}
+          {% if m.discord_id in ep_members %}<span style="font-size:.62rem;background:rgba(251,146,60,.15);color:#fb923c;border-radius:6px;padding:1px 5px;white-space:nowrap;">⚔️ EP</span>{% endif %}
         </div>
         {% endfor %}
       </div>
@@ -716,5 +766,102 @@ if (hash) {
   const btn = document.querySelector(`.ma-tab[onclick*="${hash}"]`);
   if (btn) showTab(hash, btn);
 }
+
+// ── Growth Charts ──────────────────────────────────────────────────────────
+let currentGrowthMetric = 'village_count';
+let currentGrowthColor  = '#34d399';
+
+function selectGrowthMetric(metric, color, btn) {
+  currentGrowthMetric = metric;
+  currentGrowthColor  = color;
+  document.querySelectorAll('.growth-metric-btn').forEach(b => {
+    b.style.background = 'var(--bg-main)';
+    b.style.color = 'var(--text-muted)';
+    b.style.borderColor = 'var(--border)';
+  });
+  btn.style.background = `${color}22`;
+  btn.style.color = color;
+  btn.style.borderColor = `${color}66`;
+  renderGrowthCharts();
+}
+
+function renderGrowthCharts() {
+  document.querySelectorAll('[id^="gc-"]').forEach(canvas => {
+    const history = JSON.parse(canvas.dataset.history || '[]');
+    if (!history.length) return;
+    const vals   = history.map(h => h[currentGrowthMetric] || 0);
+    const labels = history.map(h => h.uploaded_at ? h.uploaded_at.slice(5) : '');
+    drawSparkline(canvas, vals, labels, currentGrowthColor);
+  });
+}
+
+function drawSparkline(canvas, vals, labels, color) {
+  const W = canvas.offsetWidth || 300;
+  const H = canvas.offsetHeight || 60;
+  canvas.width  = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0, 0, W, H);
+
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || 1;
+  const pad = { l: 4, r: 4, t: 8, b: 18 };
+  const gw = W - pad.l - pad.r;
+  const gh = H - pad.t - pad.b;
+
+  const pts = vals.map((v, i) => ({
+    x: pad.l + (i / (vals.length - 1 || 1)) * gw,
+    y: pad.t + (1 - (v - min) / range) * gh,
+  }));
+
+  // Fill
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + gh);
+  grad.addColorStop(0, color + '44');
+  grad.addColorStop(1, color + '06');
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pad.t + gh);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, pad.t + gh);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+
+  // Dots at first + last
+  [pts[0], pts[pts.length-1]].forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+
+  // Labels: first and last date
+  ctx.fillStyle = 'rgba(148,163,184,.7)';
+  ctx.font = `${10 * devicePixelRatio / devicePixelRatio}px sans-serif`;
+  ctx.textAlign = 'left';  ctx.fillText(labels[0] || '', pad.l, H - 4);
+  ctx.textAlign = 'right'; ctx.fillText(labels[labels.length-1] || '', W - pad.r, H - 4);
+
+  // Last value top-right
+  const lastVal = vals[vals.length-1];
+  const display = lastVal >= 1000 ? (lastVal/1000).toFixed(1)+'k' : String(lastVal);
+  ctx.fillStyle = color;
+  ctx.font = `bold ${11}px sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(display, W - pad.r, pad.t + 10);
+}
+
+// Initial render after paint
+requestAnimationFrame(() => requestAnimationFrame(renderGrowthCharts));
 </script>
 {% endblock %}
