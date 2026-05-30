@@ -381,6 +381,7 @@ async def init_db():
     await _init_farmlist_analyses_table()
     await _init_hospital_table()
     await _init_alliance_members_table()
+    await _init_scout_incidents_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH) as db:
@@ -3335,13 +3336,26 @@ async def set_ally_member_status(ally_group_id: int, discord_id: str, status: st
         await db.commit()
 
 
-async def update_ally_member(ally_group_id: int, discord_id: str, travian_name: str, note: str,
-                             role_id: int | None = None, wing: int = 0):
+async def update_ally_member(ally_group_id: int, discord_id: str, travian_name, note,
+                             role_id=None, wing=None):
+    """Update member fields — pass None to leave a field unchanged."""
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
+        sets, vals = [], []
+        if travian_name is not None:
+            sets.append("travian_name=?"); vals.append(travian_name)
+        if note is not None:
+            sets.append("note=?"); vals.append(note)
+        if role_id is not False:   # None means clear, False means skip
+            sets.append("role_id=?"); vals.append(role_id)
+        if wing is not None:
+            sets.append("wing=?"); vals.append(wing)
+        if not sets:
+            return
+        vals += [ally_group_id, discord_id]
         await db.execute(
-            "UPDATE ally_members SET travian_name=?, note=?, role_id=?, wing=? WHERE ally_group_id=? AND discord_id=?",
-            (travian_name, note, role_id, wing, ally_group_id, discord_id),
+            f"UPDATE ally_members SET {','.join(sets)} WHERE ally_group_id=? AND discord_id=?",
+            vals,
         )
         await db.commit()
 
@@ -6454,6 +6468,15 @@ async def _init_attack_detection_tables():
                 await db.execute(f"ALTER TABLE incoming_attacks ADD COLUMN {col} TEXT DEFAULT {default}")
             except Exception:
                 pass
+        # Unique index so duplicate imports are silently skipped (INSERT OR IGNORE)
+        try:
+            await db.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_incoming_attacks_unique
+                ON incoming_attacks(guild_id, own_village_x, own_village_y,
+                                    attacker_x, attacker_y, arrival_time)
+            """)
+        except Exception:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS enemy_artifacts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6484,7 +6507,7 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
         for atk in attacks:
             try:
                 await db.execute("""
-                    INSERT INTO incoming_attacks (
+                    INSERT OR IGNORE INTO incoming_attacks (
                         guild_id, imported_by_discord_id, imported_by_name, import_time,
                         server_time_at_import,
                         own_village_name, own_village_x, own_village_y,
@@ -6492,7 +6515,6 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
                         attack_type, troops_hidden, troop_count, troop_details,
                         arrival_time, fake_score, fake_reasons
                     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                    ON CONFLICT DO NOTHING
                 """, (
                     guild_id,
                     imported_by_discord_id,
@@ -6905,3 +6927,378 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
             )
             await db.commit()
             return True
+
+
+# ---------------------------------------------------------------------------
+# Scout Incidents (enemy scouted our member)
+# ---------------------------------------------------------------------------
+
+async def _init_scout_incidents_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scout_incidents (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id          TEXT NOT NULL,
+                reported_by_id    TEXT NOT NULL,
+                reported_by_name  TEXT NOT NULL,
+                victim_player     TEXT NOT NULL,
+                victim_village    TEXT DEFAULT '',
+                victim_coords     TEXT DEFAULT '',
+                enemy_player      TEXT NOT NULL,
+                enemy_village     TEXT DEFAULT '',
+                scout_time        TEXT DEFAULT '',
+                notes             TEXT DEFAULT '',
+                created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def add_scout_incident(
+    guild_id: str, reported_by_id: str, reported_by_name: str,
+    victim_player: str, victim_village: str, victim_coords: str,
+    enemy_player: str, enemy_village: str, scout_time: str, notes: str,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO scout_incidents
+                (guild_id, reported_by_id, reported_by_name,
+                 victim_player, victim_village, victim_coords,
+                 enemy_player, enemy_village, scout_time, notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (guild_id, reported_by_id, reported_by_name,
+              victim_player, victim_village, victim_coords,
+              enemy_player, enemy_village, scout_time, notes))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_scout_incidents(guild_id: str, enemy_filter: str = "", limit: int = 200) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if enemy_filter:
+            cur = await db.execute("""
+                SELECT * FROM scout_incidents
+                WHERE guild_id=? AND LOWER(enemy_player) LIKE ?
+                ORDER BY created_at DESC LIMIT ?
+            """, (guild_id, f"%{enemy_filter.lower()}%", limit))
+        else:
+            cur = await db.execute("""
+                SELECT * FROM scout_incidents WHERE guild_id=?
+                ORDER BY created_at DESC LIMIT ?
+            """, (guild_id, limit))
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_scout_incident_stats(guild_id: str) -> list[dict]:
+    """Return enemy players ranked by scout count (last 30 days)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("""
+            SELECT enemy_player, COUNT(*) as cnt,
+                   MAX(created_at) as last_seen
+            FROM scout_incidents
+            WHERE guild_id=? AND created_at >= datetime('now', '-30 days')
+            GROUP BY LOWER(enemy_player)
+            ORDER BY cnt DESC
+            LIMIT 20
+        """, (guild_id,))
+        return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Ally Bonus Order
+# ---------------------------------------------------------------------------
+
+async def _init_ally_bonus_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_bonuses (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                ally_group_id INTEGER NOT NULL,
+                position      INTEGER DEFAULT 0,
+                name          TEXT NOT NULL,
+                max_level     INTEGER DEFAULT 20,
+                current_level INTEGER DEFAULT 0,
+                description   TEXT DEFAULT '',
+                created_at    TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def get_ally_bonuses(ally_group_id: int) -> list[dict]:
+    await _init_ally_bonus_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM ally_bonuses WHERE ally_group_id=? ORDER BY position, id",
+            (ally_group_id,)
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_ally_bonus(ally_group_id: int, name: str, max_level: int, description: str) -> int:
+    await _init_ally_bonus_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT COALESCE(MAX(position),0)+1 FROM ally_bonuses WHERE ally_group_id=?",
+            (ally_group_id,)
+        )
+        pos = (await cur.fetchone())[0]
+        cur = await db.execute(
+            "INSERT INTO ally_bonuses (ally_group_id, position, name, max_level, description) VALUES (?,?,?,?,?)",
+            (ally_group_id, pos, name[:60], max_level, description[:200])
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_ally_bonus(bonus_id: int, ally_group_id: int,
+                             name: str, max_level: int, current_level: int, description: str):
+    await _init_ally_bonus_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE ally_bonuses SET name=?, max_level=?, current_level=?, description=?
+            WHERE id=? AND ally_group_id=?
+        """, (name[:60], max_level, current_level, description[:200], bonus_id, ally_group_id))
+        await db.commit()
+
+
+async def delete_ally_bonus(bonus_id: int, ally_group_id: int):
+    await _init_ally_bonus_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ally_bonuses WHERE id=? AND ally_group_id=?",
+                         (bonus_id, ally_group_id))
+        await db.commit()
+
+
+async def reorder_ally_bonuses(ally_group_id: int, ordered_ids: list[int]):
+    """Set position = index for each bonus id in the given order."""
+    await _init_ally_bonus_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        for pos, bid in enumerate(ordered_ids):
+            await db.execute(
+                "UPDATE ally_bonuses SET position=? WHERE id=? AND ally_group_id=?",
+                (pos, bid, ally_group_id)
+            )
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Enemy Troop Entries (manual troop records with history)
+# ---------------------------------------------------------------------------
+
+async def _init_enemy_troops_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemy_troop_entries (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                player_name  TEXT NOT NULL,
+                off_troops   INTEGER DEFAULT 0,
+                def_troops   INTEGER DEFAULT 0,
+                total_troops INTEGER DEFAULT 0,
+                notes        TEXT DEFAULT '',
+                reported_by  TEXT DEFAULT '',
+                entry_time   TEXT DEFAULT '',
+                created_at   TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def add_enemy_troop_entry(guild_id: str, player_name: str,
+                                 off_troops: int, def_troops: int, total_troops: int,
+                                 notes: str, reported_by: str, entry_time: str) -> int:
+    await _init_enemy_troops_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO enemy_troop_entries
+                (guild_id, player_name, off_troops, def_troops, total_troops,
+                 notes, reported_by, entry_time)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (guild_id, player_name, off_troops, def_troops, total_troops,
+              notes, reported_by, entry_time))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_enemy_troop_entries(guild_id: str, player_name: str) -> list[dict]:
+    await _init_enemy_troops_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("""
+            SELECT * FROM enemy_troop_entries
+            WHERE guild_id=? AND player_name=?
+            ORDER BY created_at DESC
+        """, (guild_id, player_name))
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_enemy_troop_entry(entry_id: int, guild_id: str):
+    await _init_enemy_troops_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM enemy_troop_entries WHERE id=? AND guild_id=?",
+                         (entry_id, guild_id))
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Travian Statistics Snapshots
+# ---------------------------------------------------------------------------
+
+async def _init_travian_stats_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS travian_stats_snapshots (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                imported_by  TEXT DEFAULT '',
+                snapshot_at  TEXT NOT NULL,
+                raw_text     TEXT DEFAULT '',
+                row_count    INTEGER DEFAULT 0,
+                created_at   TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS travian_stats_entries (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id   INTEGER NOT NULL REFERENCES travian_stats_snapshots(id) ON DELETE CASCADE,
+                guild_id      TEXT NOT NULL,
+                snapshot_at   TEXT NOT NULL,
+                player_name   TEXT NOT NULL,
+                alliance_name TEXT DEFAULT '',
+                population    INTEGER DEFAULT 0,
+                off_points    INTEGER DEFAULT 0,
+                def_points    INTEGER DEFAULT 0,
+                raid_points   INTEGER DEFAULT 0,
+                off_rank      INTEGER DEFAULT 0,
+                def_rank      INTEGER DEFAULT 0,
+                raid_rank     INTEGER DEFAULT 0,
+                pop_rank      INTEGER DEFAULT 0
+            )
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_stats_entries_guild_player
+            ON travian_stats_entries(guild_id, player_name, snapshot_at)
+        """)
+        await db.commit()
+
+
+async def save_stats_snapshot(guild_id: str, imported_by: str,
+                               snapshot_at: str, raw_text: str,
+                               entries: list[dict]) -> int:
+    await _init_travian_stats_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO travian_stats_snapshots
+                (guild_id, imported_by, snapshot_at, raw_text, row_count)
+            VALUES (?,?,?,?,?)
+        """, (guild_id, imported_by, snapshot_at, raw_text, len(entries)))
+        snap_id = cur.lastrowid
+        for e in entries:
+            await db.execute("""
+                INSERT INTO travian_stats_entries
+                    (snapshot_id, guild_id, snapshot_at, player_name, alliance_name,
+                     population, off_points, def_points, raid_points,
+                     off_rank, def_rank, raid_rank, pop_rank)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (snap_id, guild_id, snapshot_at,
+                  e.get("player_name",""), e.get("alliance_name",""),
+                  e.get("population",0), e.get("off_points",0),
+                  e.get("def_points",0), e.get("raid_points",0),
+                  e.get("off_rank",0), e.get("def_rank",0),
+                  e.get("raid_rank",0), e.get("pop_rank",0)))
+        await db.commit()
+        return snap_id
+
+
+async def get_stats_snapshots(guild_id: str) -> list[dict]:
+    await _init_travian_stats_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("""
+            SELECT * FROM travian_stats_snapshots
+            WHERE guild_id=? ORDER BY snapshot_at DESC
+        """, (guild_id,))
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_stats_snapshot(snapshot_id: int, guild_id: str):
+    await _init_travian_stats_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM travian_stats_snapshots WHERE id=? AND guild_id=?",
+            (snapshot_id, guild_id)
+        )
+        await db.commit()
+
+
+async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20) -> dict:
+    """
+    Returns per-player timeline data for trend analysis.
+    Each player gets a list of {snapshot_at, off_points, def_points, raid_points,
+                                 population, off_rank, raid_rank,
+                                 off_rate, raid_rate, def_rate}
+    Rates are points-per-hour between this and the previous snapshot.
+    """
+    await _init_travian_stats_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Get relevant snapshot IDs (most recent N)
+        cur = await db.execute("""
+            SELECT id, snapshot_at FROM travian_stats_snapshots
+            WHERE guild_id=? ORDER BY snapshot_at DESC LIMIT ?
+        """, (guild_id, limit_snapshots))
+        snaps = [dict(r) for r in await cur.fetchall()]
+        if not snaps:
+            return {}
+
+        snap_ids = [s["id"] for s in snaps]
+        placeholders = ",".join("?" * len(snap_ids))
+        cur = await db.execute(f"""
+            SELECT * FROM travian_stats_entries
+            WHERE guild_id=? AND snapshot_id IN ({placeholders})
+            ORDER BY player_name, snapshot_at ASC
+        """, (guild_id, *snap_ids))
+        rows = [dict(r) for r in await cur.fetchall()]
+
+    # Group by player
+    from collections import defaultdict
+    from datetime import datetime as _dt
+    players: dict[str, list] = defaultdict(list)
+    for r in rows:
+        players[r["player_name"]].append(r)
+
+    # Calculate rates (pts/hour) between consecutive snapshots
+    result = {}
+    for pname, entries in players.items():
+        entries.sort(key=lambda x: x["snapshot_at"])
+        timeline = []
+        for i, e in enumerate(entries):
+            point = {
+                "snapshot_at": e["snapshot_at"],
+                "off_points":  e["off_points"],
+                "def_points":  e["def_points"],
+                "raid_points": e["raid_points"],
+                "population":  e["population"],
+                "off_rank":    e["off_rank"],
+                "raid_rank":   e["raid_rank"],
+                "off_rate": None, "def_rate": None, "raid_rate": None,
+            }
+            if i > 0:
+                prev = entries[i - 1]
+                try:
+                    t1 = _dt.fromisoformat(prev["snapshot_at"])
+                    t2 = _dt.fromisoformat(e["snapshot_at"])
+                    hours = max((t2 - t1).total_seconds() / 3600, 0.1)
+                    point["off_rate"]  = round((e["off_points"]  - prev["off_points"])  / hours, 1)
+                    point["def_rate"]  = round((e["def_points"]  - prev["def_points"])  / hours, 1)
+                    point["raid_rate"] = round((e["raid_points"] - prev["raid_points"]) / hours, 1)
+                    point["hours_since_prev"] = round(hours, 1)
+                except Exception:
+                    pass
+            timeline.append(point)
+        result[pname] = timeline
+    return result

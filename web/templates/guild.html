@@ -361,6 +361,16 @@
       </div>
       {{ LOCK_ARROW if is_personal else OK_ARROW }}
     </a>
+
+    <!-- Statistiken-Verlauf -->
+    <a href="/guild/{{ guild.guild_id }}/travian-stats" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">📊</div>
+      <div class="feature-body">
+        <div class="feature-title">Statistiken-Verlauf</div>
+        <div class="feature-desc">Farm-, Off- & Def-Trends aus Travian-Statistiken — Anomalien & Muster erkennen</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
     {% endif %}
 
   </div>
@@ -439,6 +449,16 @@
       <div class="feature-body">
         <div class="feature-title" data-i18n="guild.feature.defense.title">Verteidigung</div>
         <div class="feature-desc" data-i18n="guild.feature.defense.desc">Defend- und Timed-Defend Anfragen koordinieren und verwalten</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
+
+    <!-- Gegner-Scouts -->
+    <a href="/guild/{{ guild.guild_id }}/scout-incidents" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">👁️</div>
+      <div class="feature-body">
+        <div class="feature-title">Gegner-Scouts</div>
+        <div class="feature-desc">Gemeldete Späh-Aktionen auf Allianz-Mitglieder – Häufungen frühzeitig erkennen</div>
       </div>
       {{ OK_ARROW }}
     </a>

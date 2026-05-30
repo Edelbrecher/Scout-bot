@@ -4328,6 +4328,8 @@ async def my_ally_page(request: Request, guild_id: str):
         all_member_ids = [m["discord_id"] for m in member_view_members if m.get("discord_id")]
         growth_data = await database.get_member_growth(guild_id, all_member_ids)
 
+    bonuses = await database.get_ally_bonuses(ally_group["id"]) if ally_group else []
+
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
@@ -4340,6 +4342,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "meta_alliances": meta_alliances,
         "ep_members": list(ep_members),
         "growth_data": growth_data,
+        "bonuses": bonuses,
     })
 
 
@@ -4559,6 +4562,125 @@ async def my_ally_member_reject(request: Request, guild_id: str, discord_id: str
         return JSONResponse({"error": "not owner"}, status_code=403)
     await database.remove_ally_member(ally_group["id"], discord_id)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=rejected", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Ally Bonus Routes
+# ---------------------------------------------------------------------------
+
+async def _require_ally_owner(request: Request, guild_id: str):
+    """Return (ally_group, None) or (None, redirect) — owner or ally_manage only."""
+    session, err = _require_session(request)
+    if err: return None, err
+    err = _require_guild(session, guild_id)
+    if err: return None, err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        if not ally_group:
+            return None, RedirectResponse(f"/guild/{guild_id}/my-ally", status_code=303)
+        if not await has_perm(request, guild_id, "ally_manage"):
+            return None, RedirectResponse(f"/guild/{guild_id}/my-ally?flash=no_permission", status_code=303)
+    return ally_group, None
+
+
+@app.post("/guild/{guild_id}/my-ally/bonuses/add")
+async def my_ally_bonus_add(request: Request, guild_id: str):
+    ally_group, err = await _require_ally_owner(request, guild_id)
+    if err: return err
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    if not name:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_empty#bonus", status_code=303)
+    max_level = int(form.get("max_level") or 20)
+    description = (form.get("description") or "").strip()
+    await database.add_ally_bonus(ally_group["id"], name, max_level, description)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_added#bonus", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/bonuses/{bonus_id}/update")
+async def my_ally_bonus_update(request: Request, guild_id: str, bonus_id: int):
+    ally_group, err = await _require_ally_owner(request, guild_id)
+    if err: return err
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    max_level = int(form.get("max_level") or 20)
+    current_level = int(form.get("current_level") or 0)
+    description = (form.get("description") or "").strip()
+    await database.update_ally_bonus(bonus_id, ally_group["id"], name, max_level, current_level, description)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_saved#bonus", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/bonuses/{bonus_id}/delete")
+async def my_ally_bonus_delete(request: Request, guild_id: str, bonus_id: int):
+    ally_group, err = await _require_ally_owner(request, guild_id)
+    if err: return err
+    await database.delete_ally_bonus(bonus_id, ally_group["id"])
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_deleted#bonus", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/bonuses/reorder")
+async def my_ally_bonus_reorder(request: Request, guild_id: str):
+    ally_group, err = await _require_ally_owner(request, guild_id)
+    if err: return err
+    body = await request.json()
+    ordered_ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
+    await database.reorder_ally_bonuses(ally_group["id"], ordered_ids)
+    return _JSONResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Rights Management — inline role assignment per member
+# ---------------------------------------------------------------------------
+
+@app.post("/guild/{guild_id}/my-ally/member/{discord_id}/set-role")
+async def my_ally_set_member_role(request: Request, guild_id: str, discord_id: str):
+    ally_group, err = await _require_ally_owner(request, guild_id)
+    if err: return err
+    form = await request.form()
+    role_id_raw = form.get("role_id", "")
+    rid = int(role_id_raw) if role_id_raw and role_id_raw.isdigit() else None
+    await database.update_ally_member(ally_group["id"], discord_id, None, None, rid, None)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_set#rechte", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Enemy Troop Entries
+# ---------------------------------------------------------------------------
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/troops/add")
+async def enemy_troops_add(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    form = await request.form()
+    off_troops   = int(form.get("off_troops")   or 0)
+    def_troops   = int(form.get("def_troops")   or 0)
+    total_troops = int(form.get("total_troops") or 0)
+    notes        = (form.get("notes") or "").strip()
+    entry_time   = (form.get("entry_time") or "").strip()
+    reported_by  = session.get("username", "")
+    await database.add_enemy_troop_entry(
+        guild_id, player_name, off_troops, def_troops, total_troops,
+        notes, reported_by, entry_time
+    )
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies/{player_name}?flash=troops_added", status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/troops/{entry_id}/delete")
+async def enemy_troops_delete(request: Request, guild_id: str, player_name: str, entry_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_enemy_troop_entry(entry_id, guild_id)
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies/{player_name}?flash=troops_deleted", status_code=303
+    )
 
 
 @app.get("/ally/join/{token}", response_class=HTMLResponse)
@@ -7354,12 +7476,14 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
     if not enemy:
         return RedirectResponse(f"/guild/{guild_id}/enemies", status_code=303)
     history = await database.get_enemy_scout_history(guild_id, player_name)
-    # Also get all scout images for this player's channels
+    troop_entries = await database.get_enemy_troop_entries(guild_id, player_name)
     return templates.TemplateResponse("enemy_detail.html", {
         "request": request,
         "guild": guild,
         "enemy": enemy,
         "history": history,
+        "troop_entries": troop_entries,
+        "flash": request.query_params.get("flash", ""),
     })
 
 
@@ -9027,6 +9151,80 @@ async def crop_supply_page(request: Request, guild_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Routes — Travian Statistics Import & Trends
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/travian-stats", response_class=HTMLResponse)
+async def travian_stats_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    snapshots = await database.get_stats_snapshots(guild_id)
+    trend_data = await database.get_stats_trend_data(guild_id)
+    return templates.TemplateResponse("travian_stats.html", {
+        "request": request,
+        "guild": guild,
+        "snapshots": snapshots,
+        "trend_data": trend_data,
+        "flash": request.query_params.get("flash", ""),
+        "error": request.query_params.get("error", ""),
+    })
+
+
+@app.post("/guild/{guild_id}/travian-stats/import")
+async def travian_stats_import(request: Request, guild_id: str):
+    import json as _json
+    from stats_parser import parse_travian_stats_smart
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    form = await request.form()
+    raw_text     = (form.get("stats_text") or "").strip()
+    snapshot_at  = (form.get("snapshot_at") or "").strip()
+    imported_by  = session.get("username", "")
+
+    if not raw_text:
+        return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=empty", status_code=303)
+    if not snapshot_at:
+        from datetime import datetime as _dt
+        snapshot_at = _dt.utcnow().strftime("%Y-%m-%dT%H:%M")
+
+    entries = parse_travian_stats_smart(raw_text)
+    if not entries:
+        return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=parse", status_code=303)
+
+    await database.save_stats_snapshot(guild_id, imported_by, snapshot_at, raw_text, entries)
+    return RedirectResponse(
+        f"/guild/{guild_id}/travian-stats?flash=imported&count={len(entries)}", status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/travian-stats/snapshot/{snap_id}/delete")
+async def travian_stats_delete(request: Request, guild_id: str, snap_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_stats_snapshot(snap_id, guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/travian-stats?flash=deleted", status_code=303)
+
+
+@app.get("/guild/{guild_id}/travian-stats/api/trends")
+async def travian_stats_trends_api(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    data = await database.get_stats_trend_data(guild_id)
+    return _JSONResponse(data)
+
+
+# ---------------------------------------------------------------------------
 # Routes — Chrome Extension download
 # ---------------------------------------------------------------------------
 
@@ -9050,3 +9248,43 @@ async def download_extension():
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=travops-extension.zip"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Routes — Scout Incidents (enemy scouted our members)
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/scout-incidents", response_class=HTMLResponse)
+async def scout_incidents_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+
+    enemy_filter = request.query_params.get("enemy", "").strip()
+    incidents = await database.get_scout_incidents(guild_id, enemy_filter=enemy_filter)
+    stats = await database.get_scout_incident_stats(guild_id)
+
+    return templates.TemplateResponse("scout_incidents.html", {
+        "request": request,
+        "guild": guild,
+        "incidents": incidents,
+        "stats": stats,
+        "enemy_filter": enemy_filter,
+        "flash": request.query_params.get("flash", ""),
+    })
+
+
+@app.post("/guild/{guild_id}/scout-incidents/delete/{incident_id}")
+async def delete_scout_incident(request: Request, guild_id: str, incident_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    async with __import__("aiosqlite").connect(database.DB_PATH) as db:
+        await db.execute("DELETE FROM scout_incidents WHERE id=? AND guild_id=?", (incident_id, guild_id))
+        await db.commit()
+    return RedirectResponse(f"/guild/{guild_id}/scout-incidents?flash=deleted", status_code=303)

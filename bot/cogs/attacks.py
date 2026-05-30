@@ -266,7 +266,7 @@ class AttackModal(discord.ui.Modal, title="Angriff melden"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             raw = self.attack_text.value
-            coords_raw = self.def_coords.value.strip()
+            coords_raw = self.def_coords.value.strip().strip("()[]")
             offline_raw = self.offline_time.value.strip()
 
             # Parse defender coords

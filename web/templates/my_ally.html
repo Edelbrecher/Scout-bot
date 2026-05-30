@@ -49,7 +49,9 @@
   <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
     <button class="ma-tab active" onclick="showTab('mitglieder',this)">👥 Mitglieder ({{ (members | rejectattr("status","equalto","pending") | list)|length }})</button>
     <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Einladungen</button>
+    <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Rechteverwaltung</button>
     <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Rollen & Rechte</button>
+    <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Allianz-Bonus</button>
     <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Einstellungen</button>
     {% if leaderboard %}
     <button class="ma-tab" onclick="showTab('leaderboard',this)">🏆 Leaderboard</button>
@@ -313,6 +315,158 @@
           <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕</button>
         </form>
       </div>
+    </div>
+  </div>
+
+  {# ══════════════════════════════ TAB: RECHTEVERWALTUNG ══════════════════════════════ #}
+  <div id="tab-rechte" class="ma-tab-panel" style="display:none;">
+    <div class="card">
+      <h3 style="margin:0 0 .25rem;font-size:.95rem;">🔑 Rechteverwaltung — Rollen pro Mitglied</h3>
+      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">Weise jedem Mitglied direkt eine Rolle zu. Berechtigungen werden über die Rolle gesteuert.</p>
+
+      {% set approved = members | rejectattr("status","equalto","pending") | list %}
+      {% if approved %}
+      <div style="display:flex;flex-direction:column;gap:.4rem;">
+        {% for m in approved | sort(attribute='travian_name') %}
+        <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;
+                    background:var(--bg-main);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;">
+            <div style="font-weight:600;font-size:.88rem;">{{ m.travian_name or m.discord_username or '—' }}</div>
+            {% if m.travian_name and m.discord_username %}
+            <div style="font-size:.72rem;color:var(--text-muted);">@{{ m.discord_username }}</div>
+            {% endif %}
+          </div>
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/set-role"
+                style="display:flex;align-items:center;gap:.5rem;margin:0;">
+            <select name="role_id"
+                    style="padding:.3rem .5rem;background:var(--bg-main);border:1px solid var(--border);
+                           border-radius:6px;color:var(--text);font-size:.82rem;"
+                    onchange="this.form.submit()">
+              <option value="">— Keine Rolle —</option>
+              {% for r in roles %}
+              <option value="{{ r.id }}" {% if m.role_id == r.id %}selected{% endif %}
+                      style="color:{{ r.color }}">{{ r.role_name }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          {% if m.role_id %}
+          {% set cur_role = roles | selectattr("id","equalto",m.role_id) | first %}
+          {% if cur_role %}
+          <span style="font-size:.72rem;padding:2px 8px;border-radius:10px;font-weight:600;
+                       background:rgba(0,0,0,.2);border:1px solid {{ cur_role.color }};color:{{ cur_role.color }};">
+            {{ cur_role.role_name }}
+          </span>
+          {% endif %}
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Noch keine Mitglieder.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ══════════════════════════════ TAB: ALLIANZ-BONUS ══════════════════════════════ #}
+  <div id="tab-bonus" class="ma-tab-panel" style="display:none;">
+    {% if flash in ['bonus_added','bonus_saved','bonus_deleted'] %}
+    <div class="alert alert-success" style="margin-bottom:.75rem;">✅ Gespeichert.</div>
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+
+      {# Bonus-Liste #}
+      <div class="card">
+        <h3 style="margin:0 0 .25rem;font-size:.95rem;">🎁 Bonus-Reihenfolge</h3>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Ziehe Einträge per Drag &amp; Drop in die gewünschte Reihenfolge.</p>
+
+        {% if bonuses %}
+        <ul id="bonus-sortable" style="list-style:none;padding:0;margin:0 0 .75rem;display:flex;flex-direction:column;gap:.4rem;">
+          {% for b in bonuses %}
+          <li data-id="{{ b.id }}"
+              style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
+                     background:var(--bg-main);border:1px solid var(--border);border-radius:8px;cursor:grab;">
+            <span style="color:var(--text-muted);font-size:.85rem;">⠿</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:.88rem;">{{ b.name }}</div>
+              {% if b.description %}<div style="font-size:.72rem;color:var(--text-muted);">{{ b.description }}</div>{% endif %}
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+              <span style="font-size:.78rem;color:#60a5fa;font-weight:700;">
+                Lv {{ b.current_level }}/{{ b.max_level }}
+              </span>
+              <div style="width:60px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;">
+                <div style="width:{{ ((b.current_level / b.max_level) * 100) | int }}%;height:100%;
+                            background:linear-gradient(90deg,#6366f1,#818cf8);border-radius:3px;"></div>
+              </div>
+            </div>
+            <button onclick="editBonus({{ b.id }},'{{ b.name | replace("'","\\'") }}',{{ b.max_level }},{{ b.current_level }},'{{ b.description | replace("'","\\'") }}')"
+                    style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.8rem;padding:2px 5px;">✏️</button>
+            <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/bonuses/{{ b.id }}/delete"
+                  onsubmit="return confirm('Bonus löschen?')" style="margin:0;">
+              <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.8rem;padding:2px 5px;">🗑️</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0 0 .75rem;">Noch keine Boni eingetragen.</p>
+        {% endif %}
+
+        {# Add bonus form #}
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/bonuses/add"
+              style="display:flex;flex-direction:column;gap:.5rem;border-top:1px solid var(--border);padding-top:.75rem;">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <input type="text" name="name" placeholder="Bonus-Name…" required maxlength="60"
+                   style="flex:1;min-width:130px;padding:.35rem .6rem;background:var(--bg-main);
+                          color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+            <input type="number" name="max_level" value="20" min="1" max="999"
+                   style="width:70px;padding:.35rem .5rem;background:var(--bg-main);
+                          color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;"
+                   title="Max. Level">
+          </div>
+          <input type="text" name="description" placeholder="Beschreibung (optional)…" maxlength="200"
+                 style="padding:.35rem .6rem;background:var(--bg-main);color:var(--text);
+                        border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;align-self:flex-start;">➕ Bonus hinzufügen</button>
+        </form>
+      </div>
+
+      {# Edit panel #}
+      <div class="card" id="bonus-edit-panel" style="display:none;">
+        <h3 style="margin:0 0 .75rem;font-size:.95rem;">✏️ Bonus bearbeiten</h3>
+        <form id="bonus-edit-form" method="post" style="display:flex;flex-direction:column;gap:.6rem;">
+          <input type="hidden" name="_method" value="POST">
+          <label style="font-size:.82rem;color:var(--text-muted);">Name
+            <input type="text" name="name" id="edit-bonus-name" required maxlength="60"
+                   style="width:100%;margin-top:.2rem;padding:.35rem .6rem;background:var(--bg-main);
+                          color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+          </label>
+          <div style="display:flex;gap:.75rem;">
+            <label style="font-size:.82rem;color:var(--text-muted);flex:1;">Max. Level
+              <input type="number" name="max_level" id="edit-bonus-max" min="1" max="999"
+                     style="width:100%;margin-top:.2rem;padding:.35rem .5rem;background:var(--bg-main);
+                            color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+            </label>
+            <label style="font-size:.82rem;color:var(--text-muted);flex:1;">Aktuell
+              <input type="number" name="current_level" id="edit-bonus-cur" min="0"
+                     style="width:100%;margin-top:.2rem;padding:.35rem .5rem;background:var(--bg-main);
+                            color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+            </label>
+          </div>
+          <label style="font-size:.82rem;color:var(--text-muted);">Beschreibung
+            <input type="text" name="description" id="edit-bonus-desc" maxlength="200"
+                   style="width:100%;margin-top:.2rem;padding:.35rem .6rem;background:var(--bg-main);
+                          color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          </label>
+          <div style="display:flex;gap:.5rem;">
+            <button type="submit" class="btn btn-primary" style="font-size:.82rem;">💾 Speichern</button>
+            <button type="button" onclick="document.getElementById('bonus-edit-panel').style.display='none'"
+                    class="btn btn-secondary" style="font-size:.82rem;">✕ Abbrechen</button>
+          </div>
+        </form>
+      </div>
+
     </div>
   </div>
 
@@ -863,5 +1017,67 @@ function drawSparkline(canvas, vals, labels, color) {
 
 // Initial render after paint
 requestAnimationFrame(() => requestAnimationFrame(renderGrowthCharts));
+
+// ── Bonus Tab: Drag & Drop sort ──────────────────────────────────────────
+(function() {
+  const GUILD_ID = '{{ guild.guild_id }}';
+  let dragSrc = null;
+
+  function initDrag() {
+    const list = document.getElementById('bonus-sortable');
+    if (!list) return;
+    list.querySelectorAll('li').forEach(li => {
+      li.draggable = true;
+      li.addEventListener('dragstart', e => {
+        dragSrc = li;
+        e.dataTransfer.effectAllowed = 'move';
+        li.style.opacity = '0.5';
+      });
+      li.addEventListener('dragend', () => {
+        li.style.opacity = '';
+        saveOrder();
+      });
+      li.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (li !== dragSrc) {
+          const rect = li.getBoundingClientRect();
+          const after = e.clientY > rect.top + rect.height / 2;
+          list.insertBefore(dragSrc, after ? li.nextSibling : li);
+        }
+      });
+    });
+  }
+
+  async function saveOrder() {
+    const list = document.getElementById('bonus-sortable');
+    if (!list) return;
+    const ids = [...list.querySelectorAll('li')].map(li => li.dataset.id);
+    await fetch(`/guild/${GUILD_ID}/my-ally/bonuses/reorder`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ids})
+    });
+  }
+
+  window.editBonus = function(id, name, maxLevel, curLevel, desc) {
+    document.getElementById('bonus-edit-panel').style.display = 'block';
+    document.getElementById('bonus-edit-form').action =
+      `/guild/${GUILD_ID}/my-ally/bonuses/${id}/update`;
+    document.getElementById('edit-bonus-name').value = name;
+    document.getElementById('edit-bonus-max').value  = maxLevel;
+    document.getElementById('edit-bonus-cur').value  = curLevel;
+    document.getElementById('edit-bonus-desc').value = desc;
+    document.getElementById('bonus-edit-panel').scrollIntoView({behavior:'smooth'});
+  };
+
+  document.addEventListener('DOMContentLoaded', initDrag);
+  // Re-init after tab switch (panels hidden by default)
+  const origShowTab = window.showTab;
+  window.showTab = function(name, btn) {
+    origShowTab(name, btn);
+    if (name === 'bonus') initDrag();
+  };
+})();
 </script>
 {% endblock %}

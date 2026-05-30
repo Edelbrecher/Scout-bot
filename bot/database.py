@@ -1237,3 +1237,37 @@ async def get_private_channel_by_channel_id(channel_id: str) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
+    """Return the permission flag set for a user (mirrors web/database.py logic)."""
+    ALL_PERMS = {
+        "ally_manage", "ep_manage", "ep_view", "ep_notify",
+        "attack_manage", "attack_view", "scout_manage", "scout_view",
+        "map_manage", "map_view", "sector_view", "hospital_view",
+        "defend_manage",
+    }
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id FROM ally_groups WHERE guild_id=? AND owner_discord_id=?",
+            (guild_id, discord_id),
+        ) as cur:
+            if await cur.fetchone():
+                return ALL_PERMS
+        async with db.execute("""
+            SELECT ar.permissions
+            FROM ally_members am
+            JOIN ally_roles ar ON ar.id = am.role_id
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE ag.guild_id = ? AND am.discord_id = ?
+            LIMIT 1
+        """, (guild_id, discord_id)) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return set()
+            raw = row["permissions"] or ""
+            flags = {f.strip() for f in raw.split(",") if f.strip()}
+            if "ally_manage" in flags:
+                return ALL_PERMS
+            return flags

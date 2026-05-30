@@ -644,19 +644,20 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             if role:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True)
 
+        coords = self.coordinates.value.strip().strip("()[]")
         safe_player = re.sub(r"[^a-z0-9]", "-", self.player.value.lower())
-        safe_coords = self.coordinates.value.replace("|", "-").replace(" ", "")
+        safe_coords = coords.replace("|", "-").replace(" ", "")
         channel_name = f"scout-{safe_player}-{safe_coords}"[:100]
 
         new_channel = await guild.create_text_channel(
             name=channel_name, category=category,
-            topic=f"Scout: {self.player.value} @ {self.coordinates.value}",
+            topic=f"Scout: {self.player.value} @ {coords}",
             overwrites=overwrites,
         )
 
         await database.add_scout_channel(
             channel_id=str(new_channel.id), guild_id=str(guild.id),
-            player=self.player.value, coordinates=self.coordinates.value,
+            player=self.player.value, coordinates=coords,
             village=self.village.value, scout_time=self.time.value,
             additional_info=self.additional_info.value or "",
             requested_by_id=str(interaction.user.id),
@@ -670,7 +671,7 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
         )
         embed.add_field(name=t(lang, "scout.field.player"), value=self.player.value, inline=True)
         embed.add_field(name=t(lang, "scout.field.village"), value=self.village.value, inline=True)
-        embed.add_field(name=t(lang, "scout.field.coords"), value=self.coordinates.value, inline=True)
+        embed.add_field(name=t(lang, "scout.field.coords"), value=coords, inline=True)
         embed.add_field(name=t(lang, "scout.field.time"), value=self.time.value, inline=True)
         if self.corn_scout:
             embed.add_field(name="🌾 Corn Scout", value=t(lang, "corn.yes"), inline=True)
@@ -679,7 +680,7 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
         embed.set_footer(**travops_footer(t(lang, "requested_by", user=interaction.user.display_name)))
 
         tw_world = (config or {}).get("tw_world") or ""
-        coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", self.coordinates.value)
+        coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", coords)
         scout_troop_link = ""
         if coord_match and tw_world:
             cx, cy = coord_match.group(1), coord_match.group(2)

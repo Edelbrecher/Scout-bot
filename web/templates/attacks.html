@@ -208,6 +208,29 @@
 .wave-group-header {
   font-size:0.78rem; color:#f87171; font-weight:700; margin-bottom:0.4rem;
 }
+/* CSS Tooltips */
+[data-tip] {
+  position:relative; cursor:default;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:#1e2030; color:#e2e8f0; font-size:0.72rem; font-weight:500;
+  white-space:nowrap; padding:0.3rem 0.6rem; border-radius:5px;
+  border:1px solid rgba(148,163,184,0.2);
+  box-shadow:0 4px 12px rgba(0,0,0,0.5);
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+  z-index:9999;
+}
+[data-tip]::before {
+  content:'';
+  position:absolute; bottom:calc(100% + 1px); left:50%; transform:translateX(-50%);
+  border:5px solid transparent; border-top-color:#1e2030;
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+  z-index:9999;
+}
+[data-tip]:hover::after,
+[data-tip]:hover::before { opacity:1; }
 </style>
 
 <script>
@@ -439,15 +462,15 @@
   }
 
   function fakeBadge(score) {
-    if (score >= 90) return '<span class="fake-badge fake-red">🔴 Fake</span>';
-    if (score >= 70) return '<span class="fake-badge fake-orange">🟠 Wahrsch. Fake</span>';
-    if (score >= 40) return '<span class="fake-badge fake-yellow">🟡 Unbekannt</span>';
-    return '<span class="fake-badge fake-green">🟢 Mögl. Echt</span>';
+    if (score >= 90) return `<span class="fake-badge fake-red" data-tip="Fake-Score ${score}% – sehr wahrsch. Fake">🔴 Fake</span>`;
+    if (score >= 70) return `<span class="fake-badge fake-orange" data-tip="Fake-Score ${score}% – wahrscheinlich Fake">🟠 Wahrsch. Fake</span>`;
+    if (score >= 40) return `<span class="fake-badge fake-yellow" data-tip="Fake-Score ${score}% – nicht eindeutig">🟡 Unbekannt</span>`;
+    return `<span class="fake-badge fake-green" data-tip="Fake-Score ${score}% – mögl. echter Angriff">🟢 Mögl. Echt</span>`;
   }
 
   function typeBadge(t) {
-    if (t === 'raid') return '<span class="type-raid">💰 Raubzug</span>';
-    return '<span class="type-attack">⚔️ Angriff</span>';
+    if (t === 'raid') return '<span class="type-raid" data-tip="Raubzug (+15% Fake-Wahrscheinlichkeit)">💰 Raubzug</span>';
+    return '<span class="type-attack" data-tip="Normaler Angriff">⚔️ Angriff</span>';
   }
 
   function fmtArrival(t) {
@@ -678,22 +701,22 @@
         ${labelBadge(a.label||'')}
         ${CAN_LABEL ? labelButtons(a.id, a.label||'') : ''}
         ${importedBy}
-        <button onclick="dismissAttack(${a.id})" title="Abweisen"
+        <button onclick="dismissAttack(${a.id})" data-tip="Angriff ausblenden"
           style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>
       </span>
     </div>`;
   }
 
   const LABEL_CFG = {
-    fake: { color:'#94a3b8', bg:'rgba(148,163,184,.15)', border:'rgba(148,163,184,.35)', icon:'👻', text:'Fake' },
-    hard: { color:'#f87171', bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.35)', icon:'💀', text:'Hard' },
-    low:  { color:'#fbbf24', bg:'rgba(251,191,36,.12)',  border:'rgba(251,191,36,.3)',   icon:'⚠️', text:'Low'  },
+    fake: { color:'#94a3b8', bg:'rgba(148,163,184,.15)', border:'rgba(148,163,184,.35)', icon:'👻', text:'Fake',  tip:'Als Fake markieren' },
+    hard: { color:'#f87171', bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.35)', icon:'💀', text:'Hard',  tip:'Als harten Angriff markieren' },
+    low:  { color:'#fbbf24', bg:'rgba(251,191,36,.12)',  border:'rgba(251,191,36,.3)',   icon:'⚠️', text:'Low',   tip:'Als schwachen Angriff markieren' },
   };
 
   function labelBadge(label) {
     if (!label || !LABEL_CFG[label]) return '';
     const c = LABEL_CFG[label];
-    return `<span style="font-size:.7rem;padding:1px 7px;border-radius:10px;font-weight:700;
+    return `<span data-tip="${c.tip}" style="font-size:.7rem;padding:1px 7px;border-radius:10px;font-weight:700;
       background:${c.bg};border:1px solid ${c.border};color:${c.color};">${c.icon} ${c.text}</span>`;
   }
 
@@ -702,11 +725,14 @@
       ['fake','hard','low'].map(lbl => {
         const c = LABEL_CFG[lbl];
         const active = current === lbl;
-        return `<button onclick="labelAttack(${id},'${active ? '' : lbl}')" title="${c.text}"
-          style="font-size:.68rem;padding:1px 6px;border-radius:8px;cursor:pointer;font-weight:700;
-          background:${active ? c.bg : 'rgba(255,255,255,.04)'};
-          border:1px solid ${active ? c.border : 'rgba(255,255,255,.08)'};
-          color:${active ? c.color : 'var(--text-muted)'};">${c.icon}</button>`;
+        const tip = active ? `${c.text}-Label entfernen` : c.tip;
+        return `<span data-tip="${tip}" style="position:relative;display:inline-flex;">
+          <button onclick="labelAttack(${id},'${active ? '' : lbl}')"
+            style="font-size:.68rem;padding:1px 6px;border-radius:8px;cursor:pointer;font-weight:700;
+            background:${active ? c.bg : 'rgba(255,255,255,.04)'};
+            border:1px solid ${active ? c.border : 'rgba(255,255,255,.08)'};
+            color:${active ? c.color : 'var(--text-muted)'};">${c.icon}</button>
+        </span>`;
       }).join('') + '</span>';
   }
 

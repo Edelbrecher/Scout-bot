@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% block title %}Statistiken · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1200px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1 style="margin:0.25rem 0 0;">📊 Statistiken-Verlauf</h1>
+      <p class="subtitle" style="margin:0;">Snapshots der Travian-Statistikseite — Trends & Anomalien erkennen</p>
+    </div>
+    <button onclick="document.getElementById('importModal').style.display='flex'"
+            style="padding:0.45rem 1.1rem;border-radius:8px;font-size:0.88rem;font-weight:700;cursor:pointer;
+                   background:#6366f1;border:none;color:#fff;">
+      📋 Statistiken importieren
+    </button>
+  </div>
+
+  {% if flash == 'imported' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;
+              background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;">
+    ✅ {{ request.query_params.get('count','?') }} Spieler importiert.
+  </div>
+  {% elif flash == 'deleted' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;
+              background:rgba(148,163,184,0.1);border:1px solid var(--border);color:var(--text-muted);">
+    🗑️ Snapshot gelöscht.
+  </div>
+  {% elif error == 'parse' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;
+              background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;">
+    ❌ Text konnte nicht geparst werden. Bitte die Statistik-Tabelle direkt von Travian kopieren (Strg+A → Strg+C auf der Stats-Seite).
+  </div>
+  {% elif error == 'empty' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;
+              background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;">
+    ❌ Kein Text eingefügt.
+  </div>
+  {% endif %}
+
+  {% if not snapshots %}
+  <!-- Empty state -->
+  <div class="card" style="text-align:center;padding:3rem 1rem;">
+    <div style="font-size:3rem;margin-bottom:0.75rem;">📊</div>
+    <h2 style="margin:0 0 0.5rem;font-size:1.1rem;">Noch keine Statistiken importiert</h2>
+    <p style="color:var(--text-muted);font-size:0.88rem;max-width:420px;margin:0 auto 1.25rem;">
+      Öffne auf Travian die Statistik-Seite (Spieler-Ranking), markiere alles mit <kbd>Strg+A</kbd>,
+      kopiere mit <kbd>Strg+C</kbd> und füge den Text hier ein.
+    </p>
+    <button onclick="document.getElementById('importModal').style.display='flex'"
+            style="padding:0.5rem 1.25rem;border-radius:8px;font-size:0.88rem;font-weight:700;cursor:pointer;
+                   background:#6366f1;border:none;color:#fff;">
+      📋 Ersten Import starten
+    </button>
+  </div>
+
+  {% else %}
+
+  <!-- ── Tabs ── -->
+  <div style="display:flex;gap:0.35rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:0.75rem;">
+    <button class="st-tab active" onclick="stShowTab('trends',this)">📈 Trends & Anomalien</button>
+    <button class="st-tab" onclick="stShowTab('snapshots',this)">📋 Snapshots ({{ snapshots|length }})</button>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: TRENDS ═══════════════════════════════ -->
+  <div id="st-trends" class="st-panel">
+
+    <!-- Filter -->
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;">
+      <input type="text" id="playerFilter" placeholder="Spieler suchen…" oninput="renderTrends()"
+             style="padding:0.4rem 0.75rem;border-radius:6px;background:var(--card);border:1px solid var(--border);
+                    color:var(--text);font-size:0.85rem;min-width:200px;">
+      <select id="metricSelect" onchange="renderTrends()"
+              style="padding:0.4rem 0.6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);
+                     color:var(--text);font-size:0.85rem;">
+        <option value="raid_rate">⛏️ Farm-Rate (Punkte/Std)</option>
+        <option value="off_rate">⚔️ Off-Rate (Punkte/Std)</option>
+        <option value="def_rate">🛡️ Def-Rate (Punkte/Std)</option>
+        <option value="raid_points">⛏️ Farm-Punkte (gesamt)</option>
+        <option value="off_points">⚔️ Off-Punkte (gesamt)</option>
+        <option value="def_points">🛡️ Def-Punkte (gesamt)</option>
+        <option value="population">🏘️ Bevölkerung</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--text-muted);cursor:pointer;">
+        <input type="checkbox" id="anomalyOnly" onchange="renderTrends()" style="accent-color:#f87171;">
+        Nur Anomalien
+      </label>
+    </div>
+
+    <!-- Anomaly summary bar -->
+    <div id="anomalyBar" style="display:none;margin-bottom:1rem;padding:0.65rem 1rem;border-radius:8px;
+         background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);">
+      <div style="font-size:0.82rem;font-weight:700;color:#f87171;margin-bottom:0.4rem;">⚠️ Erkannte Anomalien</div>
+      <div id="anomalyList" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+    </div>
+
+    <div id="trendsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:0.75rem;">
+      <div style="color:var(--text-muted);font-size:0.85rem;">Lade…</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: SNAPSHOTS ═══════════════════════════════ -->
+  <div id="st-snapshots" class="st-panel" style="display:none;">
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+      {% for snap in snapshots %}
+      <div class="card" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;padding:0.6rem 0.85rem;">
+        <div style="flex:1;">
+          <div style="font-weight:600;font-size:0.88rem;">
+            {{ snap.snapshot_at[:16].replace('T',' ') }} UTC
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">
+            {{ snap.row_count }} Spieler · importiert von {{ snap.imported_by }}
+            · {{ snap.created_at[:16].replace('T',' ') }} UTC
+          </div>
+        </div>
+        <form method="post"
+              action="/guild/{{ guild.guild_id }}/travian-stats/snapshot/{{ snap.id }}/delete"
+              onsubmit="return confirm('Snapshot löschen?')" style="margin:0;">
+          <button type="submit"
+                  style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:0.2rem 0.4rem;">
+            🗑️
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% endif %}
+
+</div>
+
+<!-- ═══════════════════════════════ IMPORT MODAL ═══════════════════════════════ -->
+<div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
+     z-index:9000;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;
+              width:100%;max-width:620px;max-height:90vh;overflow-y:auto;padding:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h2 style="margin:0;font-size:1.05rem;">📋 Statistiken importieren</h2>
+      <button onclick="document.getElementById('importModal').style.display='none'"
+              style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--text-muted);">✕</button>
+    </div>
+
+    <div style="padding:0.6rem 0.85rem;border-radius:7px;margin-bottom:1rem;font-size:0.82rem;
+                background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);color:#a5b4fc;line-height:1.55;">
+      <strong>So geht's:</strong> Öffne auf Travian die <strong>Statistik-Seite</strong> (z.B. Spieler-Ranking nach Angreifer/Verteidiger/Räuber).
+      Markiere die gesamte Tabelle, kopiere sie (<kbd>Strg+C</kbd>) und füge sie unten ein.
+      Du kannst auch mehrere Tabellen (Off, Def, Räuber) in einem Durchgang einfügen.
+    </div>
+
+    <form method="post" action="/guild/{{ guild.guild_id }}/travian-stats/import">
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.82rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">
+          📅 Zeitpunkt der Statistik (UTC) — wann wurden die Daten abgelesen?
+        </label>
+        <input type="datetime-local" name="snapshot_at" id="snapshotTime"
+               style="padding:0.4rem 0.6rem;background:var(--bg-main);border:1px solid var(--border);
+                      border-radius:6px;color:var(--text);font-size:0.85rem;width:100%;">
+      </div>
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.82rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">
+          Statistik-Text einfügen (von Travian kopiert):
+        </label>
+        <textarea name="stats_text" rows="10" required
+                  placeholder="Hier den kopierten Text der Travian-Statistikseite einfügen…"
+                  style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
+                         border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;
+                         font-size:0.78rem;font-family:monospace;line-height:1.45;"></textarea>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button type="submit"
+                style="padding:0.5rem 1.25rem;border-radius:8px;font-size:0.88rem;font-weight:700;
+                       cursor:pointer;background:#6366f1;border:none;color:#fff;">
+          💾 Importieren
+        </button>
+        <button type="button" onclick="document.getElementById('importModal').style.display='none'"
+                style="padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;cursor:pointer;
+                       background:var(--bg-main);border:1px solid var(--border);color:var(--text-muted);">
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.st-tab {
+  font-size:0.82rem;padding:0.35rem 0.85rem;border-radius:8px;
+  border:1px solid var(--border);background:var(--bg-main);
+  color:var(--text-muted);cursor:pointer;transition:all .15s;
+}
+.st-tab.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
+.st-tab:hover:not(.active) { border-color:#3b82f6;color:var(--text); }
+.trend-card {
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:0.75rem 0.9rem;transition:border-color .15s;
+}
+.trend-card.anomaly { border-color:rgba(239,68,68,0.45); }
+.spark { width:100%;height:40px; }
+</style>
+
+<script>
+// Trend data from server
+const TREND_DATA = {{ trend_data | tojson }};
+const GUILD_ID   = '{{ guild.guild_id }}';
+
+function stShowTab(name, btn) {
+  document.querySelectorAll('.st-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.st-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('st-' + name).style.display = 'block';
+  btn.classList.add('active');
+}
+
+// ── Set default datetime to now UTC ────────────────────────────────────────
+(function() {
+  const el = document.getElementById('snapshotTime');
+  if (el) {
+    const now = new Date();
+    const iso = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+                  .toISOString().slice(0, 16);
+    el.value = iso;
+  }
+})();
+
+// ── Anomaly detection ───────────────────────────────────────────────────────
+function detectAnomalies(player, timeline, metric) {
+  // Need at least 3 data points with rates
+  const rates = timeline
+    .map(p => p[metric])
+    .filter(v => v !== null && v !== undefined);
+  if (rates.length < 3) return null;
+
+  const recent = rates[rates.length - 1];
+  const avg    = rates.slice(0, -1).reduce((a, b) => a + b, 0) / (rates.length - 1);
+  if (avg <= 0) return null;
+
+  const ratio = recent / avg;
+  if (ratio < 0.3) return { type: 'drop',  ratio, avg, recent, metric };
+  if (ratio > 3.0) return { type: 'spike', ratio, avg, recent, metric };
+  return null;
+}
+
+function fmtRate(v) {
+  if (v === null || v === undefined) return '—';
+  if (Math.abs(v) >= 10000) return (v/1000).toFixed(1) + 'k/h';
+  return v.toFixed(0) + '/h';
+}
+
+function fmtNum(v) {
+  if (!v) return '—';
+  if (v >= 1000000) return (v/1000000).toFixed(2) + 'M';
+  if (v >= 1000) return (v/1000).toFixed(1) + 'k';
+  return String(v);
+}
+
+// ── Sparkline canvas draw ───────────────────────────────────────────────────
+function drawSparkline(canvas, values, anomalyType) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 300;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0, 0, W, H);
+
+  const valid = values.filter(v => v !== null && v !== undefined);
+  if (valid.length < 2) {
+    ctx.fillStyle = 'rgba(148,163,184,0.3)';
+    ctx.fillRect(0, H/2 - 1, W, 2);
+    return;
+  }
+
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const range = max - min || 1;
+
+  const pts = values.map((v, i) => ({
+    x: (i / (values.length - 1)) * W,
+    y: v === null ? null : H - ((v - min) / range) * (H - 8) - 4
+  }));
+
+  // Color based on anomaly
+  const color = anomalyType === 'drop'  ? '#f87171' :
+                anomalyType === 'spike' ? '#fbbf24' : '#6366f1';
+
+  // Fill area
+  ctx.beginPath();
+  const firstValid = pts.find(p => p.y !== null);
+  if (!firstValid) return;
+  ctx.moveTo(firstValid.x, H);
+  pts.forEach(p => {
+    if (p.y !== null) ctx.lineTo(p.x, p.y);
+  });
+  const lastValid = [...pts].reverse().find(p => p.y !== null);
+  ctx.lineTo(lastValid.x, H);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  let started = false;
+  pts.forEach(p => {
+    if (p.y === null) { started = false; return; }
+    if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Last dot
+  if (lastValid) {
+    ctx.beginPath();
+    ctx.arc(lastValid.x, lastValid.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+}
+
+// ── Main render ─────────────────────────────────────────────────────────────
+function renderTrends() {
+  const metric      = document.getElementById('metricSelect')?.value || 'raid_rate';
+  const filter      = (document.getElementById('playerFilter')?.value || '').toLowerCase();
+  const anomalyOnly = document.getElementById('anomalyOnly')?.checked || false;
+
+  const isRate = metric.endsWith('_rate');
+  const grid   = document.getElementById('trendsGrid');
+  if (!grid) return;
+
+  // Collect anomalies
+  const anomalies = [];
+  let cards = [];
+
+  for (const [player, timeline] of Object.entries(TREND_DATA)) {
+    if (filter && !player.toLowerCase().includes(filter)) continue;
+    if (timeline.length < 2) continue;
+
+    const anomaly = isRate ? detectAnomalies(player, timeline, metric) : null;
+    if (anomalyOnly && !anomaly) continue;
+
+    if (anomaly) anomalies.push({ player, ...anomaly });
+
+    const values    = timeline.map(p => p[metric] ?? null);
+    const latest    = timeline[timeline.length - 1];
+    const latestVal = latest[metric] ?? null;
+    const snapTime  = latest.snapshot_at?.slice(0, 16).replace('T', ' ') + ' UTC' || '—';
+
+    // Change indicator vs second-to-last
+    let changeHtml = '';
+    if (isRate && timeline.length >= 2) {
+      const prev = timeline[timeline.length - 2][metric];
+      if (prev !== null && prev !== undefined && latestVal !== null) {
+        const avg = timeline.slice(0, -1)
+          .map(p => p[metric]).filter(v => v !== null && v !== undefined);
+        const avgVal = avg.length ? avg.reduce((a,b)=>a+b,0)/avg.length : 0;
+        if (avgVal > 0) {
+          const ratio = latestVal / avgVal;
+          if (ratio < 0.3)
+            changeHtml = `<span style="color:#f87171;font-size:.75rem;font-weight:700;">⬇ ${Math.round((1-ratio)*100)}% unter Schnitt</span>`;
+          else if (ratio > 3)
+            changeHtml = `<span style="color:#fbbf24;font-size:.75rem;font-weight:700;">⬆ ${Math.round((ratio-1)*100)}% über Schnitt</span>`;
+        }
+      }
+    }
+
+    const isAnomaly = !!anomaly;
+    cards.push({ player, values, latestVal, snapTime, changeHtml, isAnomaly, anomaly, timeline });
+  }
+
+  // Sort: anomalies first
+  cards.sort((a, b) => {
+    if (a.isAnomaly && !b.isAnomaly) return -1;
+    if (!a.isAnomaly && b.isAnomaly) return 1;
+    return a.player.localeCompare(b.player);
+  });
+
+  if (!cards.length) {
+    grid.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;">Keine Spieler gefunden.</p>';
+    return;
+  }
+
+  grid.innerHTML = cards.map(c => `
+    <div class="trend-card ${c.isAnomaly ? 'anomaly' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.35rem;">
+        <div>
+          <span style="font-weight:700;font-size:.9rem;">${escHtml(c.player)}</span>
+          ${c.timeline[c.timeline.length-1]?.alliance_name ?
+            `<span style="font-size:.72rem;color:var(--text-muted);margin-left:.4rem;">[${escHtml(c.timeline[c.timeline.length-1].alliance_name)}]</span>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:.88rem;font-weight:700;color:#a5b4fc;">${isRate ? fmtRate(c.latestVal) : fmtNum(c.latestVal)}</div>
+          <div style="font-size:.68rem;color:var(--text-muted);">${c.snapTime}</div>
+        </div>
+      </div>
+      ${c.changeHtml ? `<div style="margin-bottom:.35rem;">${c.changeHtml}</div>` : ''}
+      <canvas class="spark" height="40" data-values='${JSON.stringify(c.values)}'
+              data-anomaly="${c.anomaly?.type || ''}"></canvas>
+      ${c.timeline.length >= 2 ? `
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem;">
+        ${c.timeline.slice(-4).filter((_,i,a) => i < a.length).map(p => `
+          <span style="font-size:.68rem;color:var(--text-muted);">
+            ${p.snapshot_at?.slice(5,16).replace('T',' ')}:
+            <span style="color:var(--text);">${isRate ? fmtRate(p[metric]) : fmtNum(p[metric])}</span>
+          </span>`).join('')}
+      </div>` : ''}
+    </div>
+  `).join('');
+
+  // Draw sparklines
+  grid.querySelectorAll('canvas.spark').forEach(canvas => {
+    const values = JSON.parse(canvas.dataset.values);
+    const anomaly = canvas.dataset.anomaly;
+    requestAnimationFrame(() => drawSparkline(canvas, values, anomaly));
+  });
+
+  // Anomaly bar
+  const bar = document.getElementById('anomalyBar');
+  const list = document.getElementById('anomalyList');
+  if (anomalies.length) {
+    bar.style.display = 'block';
+    list.innerHTML = anomalies.map(a => `
+      <span style="font-size:.75rem;padding:2px 9px;border-radius:10px;font-weight:700;cursor:pointer;
+                   background:${a.type==='drop'?'rgba(239,68,68,.15)':'rgba(251,191,36,.15)'};
+                   border:1px solid ${a.type==='drop'?'rgba(239,68,68,.4)':'rgba(251,191,36,.4)'};
+                   color:${a.type==='drop'?'#f87171':'#fbbf24'};"
+            onclick="document.getElementById('playerFilter').value='${escHtml(a.player)}';renderTrends()">
+        ${a.type==='drop'?'⬇':'⬆'} ${escHtml(a.player)}
+      </span>`).join('');
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+const isRate = (v) => v?.endsWith?.('_rate');
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Initial render
+document.addEventListener('DOMContentLoaded', renderTrends);
+</script>
+{% endblock %}

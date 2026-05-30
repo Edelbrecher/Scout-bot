@@ -89,6 +89,11 @@ def _safe(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "-", s.lower())[:40].strip("-")
 
 
+def _clean_coords(raw: str) -> str:
+    """Strip surrounding parentheses/brackets and whitespace from coordinate strings."""
+    return raw.strip().strip("()[]")
+
+
 # ---------------------------------------------------------------------------
 # Modals
 # ---------------------------------------------------------------------------
@@ -184,13 +189,14 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
 
         await interaction.response.defer(ephemeral=True)
 
+        coords = _clean_coords(self.coordinates.value)
         prefix = "perm-scout" if self.permanent else ("corn-scout" if self.corn else "scout")
-        channel_name = f"{prefix}-{_safe(self.player.value)}-{_safe(self.coordinates.value)}"[:100]
+        channel_name = f"{prefix}-{_safe(self.player.value)}-{_safe(coords)}"[:100]
 
         overwrites = _build_overwrites(guild, config, interaction.user)
         new_channel = await guild.create_text_channel(
             name=channel_name, category=category,
-            topic=f"{'Permanent-Scout' if self.permanent else ('Corn-Scout' if self.corn else 'Scout')}: {self.player.value} @ {self.coordinates.value}",
+            topic=f"{'Permanent-Scout' if self.permanent else ('Corn-Scout' if self.corn else 'Scout')}: {self.player.value} @ {coords}",
             overwrites=overwrites,
         )
 
@@ -198,19 +204,19 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
             color = discord.Color.teal()
             title = t(lang, "perm_scout.title")
             desc = t(lang, "perm_scout.desc", village=self.village.value or "—",
-                     player=self.player.value, coords=self.coordinates.value)
+                     player=self.player.value, coords=coords)
         elif self.corn:
             color = discord.Color.gold()
             title = t(lang, "corn.title")
-            desc = t(lang, "corn.desc", player=self.player.value, coords=self.coordinates.value)
+            desc = t(lang, "corn.desc", player=self.player.value, coords=coords)
         else:
             color = discord.Color.blurple()
             title = t(lang, "scout.title")
-            desc = t(lang, "hub.scout.desc", player=self.player.value, coords=self.coordinates.value)
+            desc = t(lang, "hub.scout.desc", player=self.player.value, coords=coords)
 
         embed = discord.Embed(title=title, description=desc, color=color)
         embed.add_field(name=t(lang, "hub.scout.field.player_embed"), value=self.player.value, inline=True)
-        embed.add_field(name=t(lang, "hub.scout.field.coords_embed"), value=self.coordinates.value, inline=True)
+        embed.add_field(name=t(lang, "hub.scout.field.coords_embed"), value=coords, inline=True)
         if self.village.value:
             embed.add_field(name=t(lang, "hub.scout.field.village_embed"), value=self.village.value, inline=True)
         embed.add_field(name=t(lang, "hub.scout.field.time_embed"), value=self.time.value, inline=True)
@@ -220,7 +226,7 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
 
         # Build Travian map link for the scout target
         tw_world = (config or {}).get("tw_world") or ""
-        coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", self.coordinates.value)
+        coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", coords)
         scout_troop_link = ""
         if coord_match and tw_world:
             cx, cy = coord_match.group(1), coord_match.group(2)
@@ -237,7 +243,7 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
         # Save to DB (reuse scout channel registration)
         await database.add_scout_channel(
             channel_id=str(new_channel.id), guild_id=str(guild.id),
-            player=self.player.value, coordinates=self.coordinates.value,
+            player=self.player.value, coordinates=coords,
             village=self.village.value or "", scout_time=self.time.value,
             additional_info=self.additional_info.value or "",
             requested_by_id=str(interaction.user.id),
@@ -487,7 +493,7 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
         _defend_pending[key] = dict(
             defender  = self.defender.value.strip(),
             attacker  = self.attacker.value.strip(),
-            coords    = self.coords.value.strip(),
+            coords    = _clean_coords(self.coords.value),
             notes     = self.notes.value.strip(),
             arrival_1 = self.arrival.value.strip(),
             arrival_2 = "",
@@ -513,7 +519,7 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend (1/2)"):
         _defend_pending[key] = dict(
             defender  = self.defender.value.strip(),
             attacker  = self.attacker.value.strip(),
-            coords    = self.coords.value.strip(),
+            coords    = _clean_coords(self.coords.value),
             notes     = "",
             arrival_1 = self.arrival.value.strip(),
             arrival_2 = self.arrival_2.value.strip(),
@@ -866,19 +872,29 @@ class DefendTroopSelectView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 
+async def _can_manage_defend(interaction: discord.Interaction) -> bool:
+    """True if the user may close/done a defend channel (admin, ally_manage, or defend_manage)."""
+    if interaction.user.guild_permissions.administrator:
+        return True
+    perms = await database.get_member_permissions(
+        str(interaction.guild_id), str(interaction.user.id)
+    )
+    return bool(perms & {"ally_manage", "defend_manage"})
+
+
 class DefendCloseView(discord.ui.View):
     def __init__(self, troop_link: str = ""):
         super().__init__(timeout=None)
         if troop_link:
             self.add_item(discord.ui.Button(
-                label="🏘️ Zum Dorf",
+                label="🏹 Rally Point",
                 style=discord.ButtonStyle.link,
                 url=troop_link,
                 row=1,
             ))
 
     @discord.ui.button(
-        label="⚔️ I sent",
+        label="⚔️ I send",
         style=discord.ButtonStyle.secondary,
         custom_id="persistent:defend_sent",
         row=0,
@@ -897,6 +913,10 @@ class DefendCloseView(discord.ui.View):
     )
     async def done_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         lang = await get_guild_lang(str(interaction.guild_id))
+        if not await _can_manage_defend(interaction):
+            msg = "⛔ Nur Leader/HC können Defend-Anfragen abschließen." if lang == "de" else "⛔ Only Leader/HC can close defend requests."
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
         await database.close_defend_channel(str(interaction.channel.id))
         await interaction.response.send_message(
             t(lang, "defend.done", user=interaction.user.mention)
@@ -912,6 +932,10 @@ class DefendCloseView(discord.ui.View):
     )
     async def close_defend(self, interaction: discord.Interaction, button: discord.ui.Button):
         lang = await get_guild_lang(str(interaction.guild_id))
+        if not await _can_manage_defend(interaction):
+            msg = "⛔ Nur Leader/HC können den Channel schließen." if lang == "de" else "⛔ Only Leader/HC can close the channel."
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
         await interaction.response.send_message(
             t(lang, "defend.closing", user=interaction.user.mention)
         )
@@ -1291,6 +1315,34 @@ class PrivateChannelNameModal(discord.ui.Modal):
 # Request Hub View (7 buttons, persistent)
 # ---------------------------------------------------------------------------
 
+class EnemyScoutModal(discord.ui.Modal, title="👁️ Gegner-Scout melden"):
+    victim_player  = discord.ui.TextInput(label="Dein Spielername (Gespähter)", placeholder="z.B. Currax", max_length=100)
+    victim_village = discord.ui.TextInput(label="Dein Dorf", placeholder="z.B. Hauptdorf", max_length=100, required=False)
+    victim_coords  = discord.ui.TextInput(label="Koordinaten deines Dorfes", placeholder="z.B. 102|47", max_length=30, required=False)
+    enemy_player   = discord.ui.TextInput(label="Gegner-Spieler (hat gespäht)", placeholder="z.B. Maximus", max_length=100)
+    scout_time     = discord.ui.TextInput(label="Uhrzeit des Scouts (UTC)", placeholder="z.B. 22:45 UTC oder 2025-05-30 22:45", max_length=60)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        coords = _clean_coords(self.victim_coords.value) if self.victim_coords.value else ""
+        await database.add_scout_incident(
+            guild_id=str(interaction.guild_id),
+            reported_by_id=str(interaction.user.id),
+            reported_by_name=interaction.user.display_name,
+            victim_player=self.victim_player.value.strip(),
+            victim_village=self.victim_village.value.strip() if self.victim_village.value else "",
+            victim_coords=coords,
+            enemy_player=self.enemy_player.value.strip(),
+            enemy_village="",
+            scout_time=self.scout_time.value.strip(),
+            notes="",
+        )
+        await interaction.followup.send(
+            f"✅ Gegner-Scout von **{self.enemy_player.value.strip()}** auf **{self.victim_player.value.strip()}** gespeichert.",
+            ephemeral=True,
+        )
+
+
 class RequestHubView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -1361,6 +1413,15 @@ class RequestHubView(discord.ui.View):
             return
         lang = await get_guild_lang(str(interaction.guild_id))
         await interaction.response.send_modal(PrivateChannelNameModal(lang=lang))
+
+    @discord.ui.button(
+        label="Gegner-Scout", emoji="👁️", style=discord.ButtonStyle.danger,
+        custom_id="persistent:hub_enemy_scout", row=2,
+    )
+    async def hub_enemy_scout(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await require_premium(interaction):
+            return
+        await interaction.response.send_modal(EnemyScoutModal())
 
     async def _create_private_channel(self, interaction: discord.Interaction, channel_label: str):
         await _do_create_private_channel(interaction, channel_label)
