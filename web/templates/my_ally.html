@@ -232,7 +232,7 @@
                 {% if m.travian_name %}<div style="font-size:.72rem;color:#93c5fd;">{{ m.travian_name }}</div>{% endif %}
               </div>
               <canvas id="gc-{{ m.discord_id }}"
-                      data-history="{{ gdata | tojson | e }}"
+                      data-history='{{ gdata | tojson }}'
                       style="width:100%;height:60px;" height="60"></canvas>
             </div>
             {% endif %}

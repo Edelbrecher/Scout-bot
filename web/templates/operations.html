@@ -2267,12 +2267,17 @@ function switchPanel(name, el) {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// Close modal only when mousedown AND mouseup both land on the overlay itself
-// (prevents accidental close when dragging a selection out of the modal)
+// Close modal only when clicking the dark overlay backdrop, never when clicking inside the card
 document.querySelectorAll('.op-modal-overlay').forEach(o => {
+  // Stop all events from bubbling out of the modal card itself
+  const modal = o.querySelector('.op-modal, .pb-modal');
+  if (modal) {
+    modal.addEventListener('mousedown', e => e.stopPropagation());
+    modal.addEventListener('click',     e => e.stopPropagation());
+  }
   let _mdOnOverlay = false;
-  o.addEventListener('mousedown', e => { _mdOnOverlay = e.target === o; });
-  o.addEventListener('click',     e => { if(e.target === o && _mdOnOverlay) o.classList.remove('open'); });
+  o.addEventListener('mousedown', e => { _mdOnOverlay = (e.target === o); });
+  o.addEventListener('click',     e => { if (_mdOnOverlay && e.target === o) o.classList.remove('open'); });
 });
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') document.querySelectorAll('.op-modal-overlay.open').forEach(o=>o.classList.remove('open'));
