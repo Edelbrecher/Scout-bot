@@ -214,7 +214,8 @@
 (function() {
   'use strict';
 
-  const GUILD_ID = '{{ guild.guild_id }}';
+  const GUILD_ID  = '{{ guild.guild_id }}';
+  const CAN_LABEL = {{ 'true' if can_label else 'false' }};
   let parsedAttacks = [];
   let allianceAttacks = [];
   let allianceLoaded = false;
@@ -245,29 +246,51 @@
     let inSection = false;
     const attacks = [];
     let currentAttack = null;
+    let lastPlainLine = '';   // tracks last non-special line as potential src-village
 
     // Attack line format variants:
     // DE (old):  "- 04 VillageName  Angriff markieren PlayerName greift TargetVillage an"
     // DE (new):  "- 04:32:10  VillageName  PlayerName greift TargetVillage an"
     // DE (alt):  "VillageName  PlayerName greift TargetVillage an  04:32:10"
     // EN:        "- 04 VillageName  Mark attack  PlayerName attacks TargetVillage"
+    // Pre-process: split tab-separated lines into logical sub-lines
+    // Real Travian format: "SrcVillage\tmark attackPlayer attacks DstVillage"
+    const expandedLines = [];
+    for (const line of lines) {
+      if (line.includes('\t')) {
+        // Split on tab — each tab-segment is treated as a separate line
+        line.split('\t').forEach(seg => { if (seg.trim()) expandedLines.push(seg.trim()); });
+      } else {
+        expandedLines.push(line);
+      }
+    }
+    // Replace lines with expanded version
+    lines.length = 0;
+    expandedLines.forEach(l => lines.push(l));
+
     const PATTERNS = [
-      // Classic DE: dash + counter + src-village + "Angriff markieren" + player + greift/raubt + dst-village + an/aus
+      // Real EN format: "mark attackPlayerName attacks DstVillage"  (mark attack + player concatenated)
+      { re: /^mark attack(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
+        mk: (m, src) => ({ src, player: m[1].trim(), type: m[2]==='raids'?'raid':'attack', dst: m[3].trim() }) },
+      // Real DE format: "Angriff markierenSpielerName greift DstVillage an"
+      { re: /^Angriff markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+        mk: (m, src) => ({ src, player: m[1].trim(), type: m[4]==='aus'?'raid':'attack', dst: m[3].trim() }) },
+      // Classic DE: dash + counter + src + "Angriff markieren" + player + greift/raubt + dst + an/aus
       { re: /^[-–]\s*\d+\s+(.+?)\s+Angriff markieren\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: m => ({ src: m[1], player: m[2], type: m[5]==='aus'?'raid':'attack', dst: m[4] }) },
-      // Modern DE: dash + time/counter + src-village + player + greift/raubt + dst + an/aus
+      // Classic EN: dash + counter + src + "mark attack" + player + attacks/raids + dst
+      { re: /^[-–]\s*\d+\s+(.+?)\s+mark attack\s*(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
+        mk: m => ({ src: m[1], player: m[2], type: m[3]==='raids'?'raid':'attack', dst: m[4] }) },
+      // Modern DE no "markieren": dash + time + src + player + greift/raubt + dst + an/aus
       { re: /^[-–]\s*[\d:]+\s+(.+?)\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: m => ({ src: m[1], player: m[2], type: m[5]==='aus'?'raid':'attack', dst: m[4] }) },
-      // EN: dash + counter + src + "Mark attack" + player + (attacks|raids) + dst
-      { re: /^[-–]\s*\d+\s+(.+?)\s+Mark attack\s+(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
-        mk: m => ({ src: m[1], player: m[2], type: m[3]==='raids'?'raid':'attack', dst: m[4] }) },
-      // EN modern: dash + time + src + player + attacks/raids + dst
+      // Modern EN no header: dash + time + src + player + attacks/raids + dst
       { re: /^[-–]\s*[\d:]+\s+(.+?)\s+(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
         mk: m => ({ src: m[1], player: m[2], type: m[3]==='raids'?'raid':'attack', dst: m[4] }) },
-      // Fallback: any line with greift/raubt ... an/aus (no leading dash required)
+      // Fallback DE: any line with greift/raubt
       { re: /^(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: m => ({ src: '', player: m[1], type: m[4]==='aus'?'raid':'attack', dst: m[3] }) },
-      // EN fallback: any line with attacks/raids
+      // Fallback EN: any line with attacks/raids
       { re: /^(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
         mk: m => ({ src: '', player: m[1], type: m[2]==='raids'?'raid':'attack', dst: m[3] }) },
     ];
@@ -287,7 +310,7 @@
       for (const { re, mk } of PATTERNS) {
         const m = line.match(re);
         if (m) {
-          const p = mk(m);
+          const p = mk(m, lastPlainLine);
           // Skip lines that are obviously not attacks (too short player name etc.)
           if (!p.player || p.player.length < 2) continue;
           if (currentAttack) attacks.push(currentAttack);
@@ -649,15 +672,72 @@
       <span style="color:var(--text-muted); font-size:0.8rem;">${escHtml(a.attacker_village_name||'')}${escHtml(coordStr)}</span>
       <span style="color:var(--text-muted);">→</span>
       <span style="font-size:0.8rem; color:var(--text-muted);">${fmtArrival(a.arrival_time)}</span>
-      <span style="margin-left:auto; display:flex; align-items:center; gap:0.4rem;">
+      <span style="margin-left:auto; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
         ${troopStr}
         ${fakeBadge(a.fake_score||50)}
+        ${labelBadge(a.label||'')}
+        ${CAN_LABEL ? labelButtons(a.id, a.label||'') : ''}
         ${importedBy}
         <button onclick="dismissAttack(${a.id})" title="Abweisen"
           style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>
       </span>
     </div>`;
   }
+
+  const LABEL_CFG = {
+    fake: { color:'#94a3b8', bg:'rgba(148,163,184,.15)', border:'rgba(148,163,184,.35)', icon:'👻', text:'Fake' },
+    hard: { color:'#f87171', bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.35)', icon:'💀', text:'Hard' },
+    low:  { color:'#fbbf24', bg:'rgba(251,191,36,.12)',  border:'rgba(251,191,36,.3)',   icon:'⚠️', text:'Low'  },
+  };
+
+  function labelBadge(label) {
+    if (!label || !LABEL_CFG[label]) return '';
+    const c = LABEL_CFG[label];
+    return `<span style="font-size:.7rem;padding:1px 7px;border-radius:10px;font-weight:700;
+      background:${c.bg};border:1px solid ${c.border};color:${c.color};">${c.icon} ${c.text}</span>`;
+  }
+
+  function labelButtons(id, current) {
+    return `<span style="display:inline-flex;gap:2px;" data-label-group="${id}">` +
+      ['fake','hard','low'].map(lbl => {
+        const c = LABEL_CFG[lbl];
+        const active = current === lbl;
+        return `<button onclick="labelAttack(${id},'${active ? '' : lbl}')" title="${c.text}"
+          style="font-size:.68rem;padding:1px 6px;border-radius:8px;cursor:pointer;font-weight:700;
+          background:${active ? c.bg : 'rgba(255,255,255,.04)'};
+          border:1px solid ${active ? c.border : 'rgba(255,255,255,.08)'};
+          color:${active ? c.color : 'var(--text-muted)'};">${c.icon}</button>`;
+      }).join('') + '</span>';
+  }
+
+  window.labelAttack = async function(id, label) {
+    try {
+      const r = await fetch('/guild/' + GUILD_ID + '/attacks/label/' + id, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({label}),
+      });
+      const data = await r.json();
+      if (!data.ok && data.error === 'no_permission') {
+        alert('Keine Berechtigung. Nur Leader/HC können Angriffe markieren.');
+        return;
+      }
+      // Re-render buttons + badge in the row
+      const row = document.querySelector('[data-id="'+id+'"]');
+      if (row) {
+        const bg = row.querySelector('[data-label-group]');
+        if (bg) bg.outerHTML = labelButtons(id, data.label||'');
+        // Update badge next to fake score
+        const badges = row.querySelectorAll('span[style*="border-radius:10px"]');
+        badges.forEach(b => { if (['👻','💀','⚠️'].some(i => b.textContent.includes(i))) b.remove(); });
+        const newBadge = labelBadge(data.label||'');
+        if (newBadge) {
+          const grp = row.querySelector('[data-label-group]');
+          if (grp) grp.insertAdjacentHTML('beforebegin', newBadge);
+        }
+      }
+    } catch(e) { console.error('labelAttack error', e); }
+  };
 
   window.dismissAttack = async function(id) {
     const row = document.querySelector('[data-id="'+id+'"]');

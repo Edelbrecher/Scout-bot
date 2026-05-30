@@ -3811,11 +3811,14 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
         return RedirectResponse("/dashboard")
     attack_stats = await database.get_attack_stats(guild_id)
     attack_reports = await database.get_attack_reports(guild_id, limit=50)
-    is_admin = session.get("type") == "admin" or session.get("uid") == guild.get("owner_discord_id")
+    uid = session.get("uid", "")
+    is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id")
+    perms = await database.get_member_permissions(guild_id, uid)
+    can_label = is_admin or "ally_manage" in perms or "defend_manage" in perms
     return templates.TemplateResponse("attacks.html", {
         "request": request, "guild": guild, "guild_id": guild_id,
         "attack_stats": attack_stats, "attack_reports": attack_reports,
-        "is_admin": is_admin, "saved": saved,
+        "is_admin": is_admin, "saved": saved, "can_label": can_label,
     })
 
 
@@ -4001,6 +4004,28 @@ async def attacks_dismiss(request: Request, guild_id: str, attack_id: int):
         return _JSONResponse({"error": "forbidden"}, status_code=403)
     await database.dismiss_attack(attack_id, guild_id)
     return _JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/attacks/label/{attack_id}")
+async def attacks_label(request: Request, guild_id: str, attack_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    # Only guild owner, admin, or members with ally_manage/defend_manage permission
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    is_admin  = session.get("type") == "admin"
+    is_owner  = guild and guild.get("owner_discord_id") == uid
+    perms     = await database.get_member_permissions(guild_id, uid)
+    has_right = "ally_manage" in perms or "defend_manage" in perms
+    if not (is_admin or is_owner or has_right):
+        return _JSONResponse({"error": "no_permission"}, status_code=403)
+    body = await request.json()
+    label = body.get("label", "")
+    username = session.get("username", uid)
+    ok = await database.label_attack(attack_id, guild_id, label, username)
+    return _JSONResponse({"ok": ok, "label": label})
 
 
 @app.get("/guild/{guild_id}/api/player-info")
@@ -7480,6 +7505,13 @@ async def verteidigung_page(request: Request, guild_id: str):
         channels = [c for c in all_channels if c.get("status") == "closed"]
     else:
         channels = all_channels
+    uid = session.get("uid", "")
+    can_close = (
+        session.get("type") == "admin"
+        or guild.get("owner_discord_id") == uid
+        or "defend_manage" in await database.get_member_permissions(guild_id, uid)
+        or "ally_manage"   in await database.get_member_permissions(guild_id, uid)
+    )
     return templates.TemplateResponse("verteidigung.html", {
         "request": request,
         "guild": guild,
@@ -7489,6 +7521,7 @@ async def verteidigung_page(request: Request, guild_id: str):
         "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),
         "saved": request.query_params.get("saved", ""),
         "flash": request.query_params.get("flash", ""),
+        "can_close": can_close,
     })
 
 
@@ -7498,6 +7531,14 @@ async def defend_close(request: Request, guild_id: str, channel_id: str):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    is_admin   = session.get("type") == "admin"
+    is_owner   = guild and guild.get("owner_discord_id") == uid
+    perms      = await database.get_member_permissions(guild_id, uid)
+    has_rights = "defend_manage" in perms or "ally_manage" in perms
+    if not (is_admin or is_owner or has_rights):
+        return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=no_permission", status_code=303)
     await database.close_defend_channel(channel_id)
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=closed", status_code=303)
 

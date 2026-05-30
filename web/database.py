@@ -6433,6 +6433,9 @@ async def _init_attack_detection_tables():
                 fake_score INTEGER DEFAULT 50,
                 fake_reasons TEXT DEFAULT '[]',
                 is_dismissed INTEGER DEFAULT 0,
+                label TEXT DEFAULT '',
+                labeled_by TEXT DEFAULT '',
+                labeled_at TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now'))
             )
@@ -6445,6 +6448,12 @@ async def _init_attack_detection_tables():
             CREATE INDEX IF NOT EXISTS idx_incoming_attacks_arrival
             ON incoming_attacks(arrival_time)
         """)
+        # Migration: add label columns if missing
+        for col, default in [("label","''"), ("labeled_by","''"), ("labeled_at","''")]:
+            try:
+                await db.execute(f"ALTER TABLE incoming_attacks ADD COLUMN {col} TEXT DEFAULT {default}")
+            except Exception:
+                pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS enemy_artifacts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6545,6 +6554,25 @@ async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list
             (guild_id, limit)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def label_attack(attack_id: int, guild_id: str, label: str, labeled_by: str) -> bool:
+    """Set label on an attack: 'fake' | 'hard' | 'low' | '' (clear).
+    Returns True if row was found and updated."""
+    import datetime as _dt
+    await _init_attack_detection_tables()
+    valid = {"fake", "hard", "low", ""}
+    if label not in valid:
+        return False
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """UPDATE incoming_attacks
+               SET label=?, labeled_by=?, labeled_at=?
+               WHERE id=? AND guild_id=?""",
+            (label, labeled_by, _dt.datetime.utcnow().isoformat(), attack_id, guild_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
 
 
 async def dismiss_attack(attack_id: int, guild_id: str):
