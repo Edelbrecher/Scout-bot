@@ -76,6 +76,12 @@
     {% endif %}
   </div>
 
+  {% if is_share_viewer %}
+  <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:.6rem 1rem;margin-bottom:.75rem;font-size:.83rem;color:#a5b4fc;display:flex;align-items:center;gap:.6rem;">
+    🔗 <span>Geteilte Kartenansicht — du siehst diese Karte über einen freigegebenen Link. Allianz-Daten sind nicht sichtbar.</span>
+  </div>
+  {% endif %}
+
   {% if not guild.tw_world %}
   <div class="card"><p class="empty">{% if is_admin %}Bitte zuerst einen Travian-Server eintragen.{% else %}Kein Travian-Server konfiguriert.{% endif %}</p></div>
   {% else %}

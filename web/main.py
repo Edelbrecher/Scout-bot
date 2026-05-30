@@ -2484,20 +2484,38 @@ async def guild_timer(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/map", response_class=HTMLResponse)
 async def guild_map(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
+    # If not logged in → Discord auth with redirect back to this URL (preserving share params)
+    session = _get_session(request)
+    if not session:
+        next_url = str(request.url.path)
+        if request.url.query:
+            next_url += "?" + request.url.query
+        return RedirectResponse(f"/auth/discord?next={next_url}", status_code=303)
+
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
+
+    # Check if this is a shared-link access (has share params) vs normal member access
+    is_share_link = bool(request.query_params.get("cx") or request.query_params.get("v"))
+    is_member = can_access_guild(session, guild_id) or await can_access_guild_async(session, guild_id)
+
+    if not is_member and not is_share_link:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    # Premium check only for members (shared links just show public map data)
+    if is_member:
+        err = await _require_premium(guild, guild_id)
+        if err: return err
+
     is_admin = session.get("type") == "admin"
     scouted = await database.get_scouted_coordinates(guild_id)
-    ally_group = await database.get_ally_group_for_guild(guild_id)
-    meta_alliances = await database.get_meta_alliances(guild_id)
-    meta_groups = await database.get_meta_groups(guild_id)
+
+    # Ally-specific data only for actual guild members — hide from external share viewers
+    ally_group = await database.get_ally_group_for_guild(guild_id) if is_member else None
+    meta_alliances = await database.get_meta_alliances(guild_id) if is_member else []
+    meta_groups = await database.get_meta_groups(guild_id) if is_member else []
+
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
@@ -2506,6 +2524,7 @@ async def guild_map(request: Request, guild_id: str):
         "ally_group": ally_group,
         "meta_alliances": meta_alliances,
         "meta_groups": meta_groups,
+        "is_share_viewer": not is_member,
     })
 
 
@@ -2648,11 +2667,14 @@ async def sector_monitor_dismiss_all(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/map/data")
 async def guild_map_data(request: Request, guild_id: str):
-    """Proxy Travian map.sql to avoid CORS issues."""
-    session, err = _require_session(request)
-    if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
-    err = _require_guild(session, guild_id)
-    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    """Proxy Travian map.sql to avoid CORS issues. Allow logged-in share viewers."""
+    session = _get_session(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    # Allow access if guild member OR if user is logged in (share viewer)
+    if not can_access_guild(session, guild_id):
+        if not await can_access_guild_async(session, guild_id):
+            pass  # share viewer — still allow map data, just no ally context
     guild = await database.get_guild(guild_id)
     server_url = (guild or {}).get("tw_world", "")
     if not server_url:
