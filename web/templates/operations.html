@@ -85,7 +85,7 @@
 }
 
 /* ── Player Browser Modal ────────────────────────────────────── */
-.pb-modal { width:98vw; max-width:1600px; height:92vh; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; }
+.pb-modal { width:98vw; max-width:1600px; height:92vh; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; pointer-events:auto; }
 .pb-split { display:flex; flex:1; min-height:0; }
 .pb-left  { flex:0 0 60%; width:60%; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); overflow:hidden; }
 .pb-right { flex:0 0 40%; width:40%; display:flex; flex-direction:column; background:rgba(0,0,0,.12); overflow-y:auto; }
@@ -171,12 +171,14 @@
 .op-modal-overlay {
   position:fixed; inset:0; background:rgba(0,0,0,.65);
   display:none; align-items:center; justify-content:center; z-index:900;
+  pointer-events:none;  /* backdrop is not clickable — prevents any accidental close */
 }
 .op-modal-overlay.open { display:flex; }
 .op-modal {
   background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
   width:min(680px, 96vw); max-height:92vh; overflow-y:auto;
   box-shadow:0 20px 60px rgba(0,0,0,.6);
+  pointer-events:auto;  /* modal card is fully interactive */
 }
 .op-modal-header { padding:1rem 1.25rem; border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between; }
@@ -2267,18 +2269,7 @@ function switchPanel(name, el) {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// Close modal only when clicking the dark overlay backdrop, never when clicking inside the card
-document.querySelectorAll('.op-modal-overlay').forEach(o => {
-  // Stop all events from bubbling out of the modal card itself
-  const modal = o.querySelector('.op-modal, .pb-modal');
-  if (modal) {
-    modal.addEventListener('mousedown', e => e.stopPropagation());
-    modal.addEventListener('click',     e => e.stopPropagation());
-  }
-  let _mdOnOverlay = false;
-  o.addEventListener('mousedown', e => { _mdOnOverlay = (e.target === o); });
-  o.addEventListener('click',     e => { if (_mdOnOverlay && e.target === o) o.classList.remove('open'); });
-});
+// Overlay backdrop has pointer-events:none via CSS — only ✕ button and Escape close modals.
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') document.querySelectorAll('.op-modal-overlay.open').forEach(o=>o.classList.remove('open'));
   if (e.key==='Escape') document.getElementById('searchDropdown').style.display='none';
