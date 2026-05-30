@@ -7158,6 +7158,7 @@ async def _init_travian_stats_tables():
                 snapshot_at  TEXT NOT NULL,
                 raw_text     TEXT DEFAULT '',
                 row_count    INTEGER DEFAULT 0,
+                stats_type   TEXT DEFAULT 'player',
                 created_at   TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -7191,19 +7192,23 @@ async def _init_travian_stats_tables():
                 await db.execute(f"ALTER TABLE travian_stats_entries ADD COLUMN {col}")
             except Exception:
                 pass
+        try:
+            await db.execute("ALTER TABLE travian_stats_snapshots ADD COLUMN stats_type TEXT DEFAULT 'player'")
+        except Exception:
+            pass
         await db.commit()
 
 
 async def save_stats_snapshot(guild_id: str, imported_by: str,
                                snapshot_at: str, raw_text: str,
-                               entries: list[dict]) -> int:
+                               entries: list[dict], stats_type: str = 'player') -> int:
     await _init_travian_stats_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("""
             INSERT INTO travian_stats_snapshots
-                (guild_id, imported_by, snapshot_at, raw_text, row_count)
-            VALUES (?,?,?,?,?)
-        """, (guild_id, imported_by, snapshot_at, raw_text, len(entries)))
+                (guild_id, imported_by, snapshot_at, raw_text, row_count, stats_type)
+            VALUES (?,?,?,?,?,?)
+        """, (guild_id, imported_by, snapshot_at, raw_text, len(entries), stats_type))
         snap_id = cur.lastrowid
         for e in entries:
             await db.execute("""
@@ -7245,22 +7250,22 @@ async def delete_stats_snapshot(snapshot_id: int, guild_id: str):
         await db.commit()
 
 
-async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20) -> dict:
+async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20,
+                               stats_type: str = 'player') -> dict:
     """
     Returns per-player timeline data for trend analysis.
     Each player gets a list of {snapshot_at, off_points, def_points, raid_points,
-                                 population, off_rank, raid_rank,
-                                 off_rate, raid_rate, def_rate}
-    Rates are points-per-hour between this and the previous snapshot.
+                                 pve_points, population, off_rank, raid_rank,
+                                 off_rate, raid_rate, def_rate, pve_rate}
+    Rates are points-per-snapshot between this and the previous snapshot.
     """
     await _init_travian_stats_tables()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        # Get relevant snapshot IDs (most recent N)
         cur = await db.execute("""
             SELECT id, snapshot_at FROM travian_stats_snapshots
-            WHERE guild_id=? ORDER BY snapshot_at DESC LIMIT ?
-        """, (guild_id, limit_snapshots))
+            WHERE guild_id=? AND stats_type=? ORDER BY snapshot_at DESC LIMIT ?
+        """, (guild_id, stats_type, limit_snapshots))
         snaps = [dict(r) for r in await cur.fetchall()]
         if not snaps:
             return {}
@@ -7289,13 +7294,19 @@ async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20) -> dict
         for i, e in enumerate(entries):
             point = {
                 "snapshot_at": e["snapshot_at"],
-                "off_points":  e["off_points"],
-                "def_points":  e["def_points"],
-                "raid_points": e["raid_points"],
-                "population":  e["population"],
-                "off_rank":    e["off_rank"],
-                "raid_rank":   e["raid_rank"],
-                "off_rate": None, "def_rate": None, "raid_rate": None,
+                "off_points":  e.get("off_points", 0),
+                "def_points":  e.get("def_points", 0),
+                "raid_points": e.get("raid_points", 0),
+                "pve_points":  e.get("pve_points", 0),
+                "population":  e.get("population", 0),
+                "off_rank":    e.get("off_rank", 0),
+                "raid_rank":   e.get("raid_rank", 0),
+                "def_rank":    e.get("def_rank", 0),
+                "pve_rank":    e.get("pve_rank", 0),
+                # Deltas vs previous snapshot (week-over-week change)
+                "off_delta": None, "def_delta": None,
+                "raid_delta": None, "pve_delta": None,
+                "hours_since_prev": None,
             }
             if i > 0:
                 prev = entries[i - 1]
@@ -7303,9 +7314,10 @@ async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20) -> dict
                     t1 = _dt.fromisoformat(prev["snapshot_at"])
                     t2 = _dt.fromisoformat(e["snapshot_at"])
                     hours = max((t2 - t1).total_seconds() / 3600, 0.1)
-                    point["off_rate"]  = round((e["off_points"]  - prev["off_points"])  / hours, 1)
-                    point["def_rate"]  = round((e["def_points"]  - prev["def_points"])  / hours, 1)
-                    point["raid_rate"] = round((e["raid_points"] - prev["raid_points"]) / hours, 1)
+                    point["off_delta"]  = e.get("off_points", 0)  - prev.get("off_points", 0)
+                    point["def_delta"]  = e.get("def_points", 0)  - prev.get("def_points", 0)
+                    point["raid_delta"] = e.get("raid_points", 0) - prev.get("raid_points", 0)
+                    point["pve_delta"]  = e.get("pve_points", 0)  - prev.get("pve_points", 0)
                     point["hours_since_prev"] = round(hours, 1)
                 except Exception:
                     pass

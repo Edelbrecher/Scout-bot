@@ -9163,44 +9163,50 @@ async def travian_stats_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    snapshots = await database.get_stats_snapshots(guild_id)
-    trend_data = await database.get_stats_trend_data(guild_id)
+    all_snapshots = await database.get_stats_snapshots(guild_id)
+    player_snapshots   = [s for s in all_snapshots if s.get("stats_type","player") == "player"]
+    alliance_snapshots = [s for s in all_snapshots if s.get("stats_type") == "alliance"]
+    player_trends   = await database.get_stats_trend_data(guild_id, stats_type="player")
+    alliance_trends = await database.get_stats_trend_data(guild_id, stats_type="alliance")
     return templates.TemplateResponse("travian_stats.html", {
         "request": request,
         "guild": guild,
-        "snapshots": snapshots,
-        "trend_data": trend_data,
+        "player_snapshots": player_snapshots,
+        "alliance_snapshots": alliance_snapshots,
+        "player_trends": player_trends,
+        "alliance_trends": alliance_trends,
         "flash": request.query_params.get("flash", ""),
         "error": request.query_params.get("error", ""),
+        "active_tab": request.query_params.get("tab", "player"),
     })
 
 
 @app.post("/guild/{guild_id}/travian-stats/import")
 async def travian_stats_import(request: Request, guild_id: str):
-    import json as _json
     from stats_parser import parse_travian_stats_smart
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     form = await request.form()
-    raw_text     = (form.get("stats_text") or "").strip()
-    snapshot_at  = (form.get("snapshot_at") or "").strip()
-    imported_by  = session.get("username", "")
+    raw_text    = (form.get("stats_text") or "").strip()
+    snapshot_at = (form.get("snapshot_at") or "").strip()
+    stats_type  = (form.get("stats_type") or "player").strip()
+    imported_by = session.get("username", "")
 
     if not raw_text:
-        return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=empty", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=empty&tab={stats_type}", status_code=303)
     if not snapshot_at:
         from datetime import datetime as _dt
         snapshot_at = _dt.utcnow().strftime("%Y-%m-%dT%H:%M")
 
     entries = parse_travian_stats_smart(raw_text)
     if not entries:
-        return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=parse", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=parse&tab={stats_type}", status_code=303)
 
-    await database.save_stats_snapshot(guild_id, imported_by, snapshot_at, raw_text, entries)
+    await database.save_stats_snapshot(guild_id, imported_by, snapshot_at, raw_text, entries, stats_type)
     return RedirectResponse(
-        f"/guild/{guild_id}/travian-stats?flash=imported&count={len(entries)}", status_code=303
+        f"/guild/{guild_id}/travian-stats?flash=imported&count={len(entries)}&tab={stats_type}", status_code=303
     )
 
 
@@ -9220,7 +9226,8 @@ async def travian_stats_trends_api(request: Request, guild_id: str):
     if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
     if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
-    data = await database.get_stats_trend_data(guild_id)
+    stats_type = request.query_params.get("type", "player")
+    data = await database.get_stats_trend_data(guild_id, stats_type=stats_type)
     return _JSONResponse(data)
 
 
