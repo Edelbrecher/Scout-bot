@@ -612,6 +612,10 @@
     document.body.appendChild(spot);
     document.body.appendChild(card);
 
+    // Dissolve the head-injected navigation shield (if present) now that
+    // our own overlay (spot) is in place and will cover the page.
+    removeNavShield();
+
     // Start centered (pixels), invisible — no transition yet so no initial slide
     const cw = Math.min(640, window.innerWidth * 0.96);
     card.style.transition = 'none';
@@ -881,33 +885,13 @@
     setTimeout(() => renderStep(steps[cur], cur, steps.length, ui, true), 350);
   }
 
-  // ── Instant overlay on navigation resume ──────────────────────────────────
-  // If a tour navigation is pending, inject a full-screen overlay immediately
-  // (before DOMContentLoaded) so there's no bare-page flash when the new page loads.
-  (function injectInstantOverlay() {
-    try {
-      const raw = localStorage.getItem('travops_tour');
-      if (!raw) return;
-      const state = JSON.parse(raw);
-      if (!state || !state.name) return;
-      const el = document.createElement('div');
-      el.id = 'tt-instant-overlay';
-      el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;transition:opacity .35s ease;opacity:1;';
-      // Append as early as possible — body may not exist yet, use documentElement
-      (document.body || document.documentElement).appendChild(el);
-      // Remove it once the tour card has been built (runTour calls buildUI → appends spot)
-      const obs = new MutationObserver(() => {
-        if (document.getElementById('tt-spot')) {
-          el.style.opacity = '0';
-          setTimeout(() => el.remove(), 380);
-          obs.disconnect();
-        }
-      });
-      obs.observe(document.documentElement, { childList: true, subtree: true });
-      // Safety fallback: remove after 2s even if tour didn't start
-      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 380); }, 2000);
-    } catch(_) {}
-  })();
+  // ── Remove head-injected nav shield once tour card is ready ───────────────
+  function removeNavShield() {
+    const shield = document.getElementById('tt-nav-shield');
+    if (!shield) return;
+    shield.style.opacity = '0';
+    setTimeout(() => shield.remove(), 380);
+  }
 
   // ── Init ───────────────────────────────────────────────────────────────────
   function init() {
@@ -933,6 +917,8 @@
       }
       setState(null);
     }
+
+    removeNavShield(); // safety: clear shield if no tour resumes
 
     // Auto-start: first guild visit
     if (guildId && /^\/guild\/\d{17,20}\/?$/.test(path) && !isDone('start') && !localStorage.getItem('beb_tour_done')) {

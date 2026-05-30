@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}TravOps{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <!-- Tour navigation overlay: injected before paint so page never flashes uncovered -->
+  <script>
+    (function(){try{var s=localStorage.getItem('travops_tour');if(!s)return;var st=JSON.parse(s);if(!st||!st.name)return;var d=document.createElement('div');d.id='tt-nav-shield';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;opacity:1;transition:opacity .35s ease;';document.head.appendChild(d);}catch(e){}})();
+  </script>
 </head>
 <body>
   {% if request.cookies.get("scouter_session") %}
