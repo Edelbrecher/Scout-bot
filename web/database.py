@@ -4908,7 +4908,7 @@ async def redeem_travops_points(discord_user_id: str) -> bool:
 
 async def get_guild_ids_for_discord_user(discord_user_id: str) -> list[str]:
     """Return all guild_ids where this user is subscription owner or an ally member."""
-    await _init_db()
+    await init_db()
     async with aiosqlite.connect(DB_PATH) as db:
         # As subscription/guild owner
         async with db.execute(
@@ -4930,7 +4930,7 @@ async def get_guild_ids_for_discord_user(discord_user_id: str) -> list[str]:
 async def get_or_create_dual_code(discord_user_id: str) -> str:
     """Return (or create) the dual invite code for a user."""
     import secrets as _sec
-    await _init_db()
+    await init_db()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
@@ -4957,7 +4957,7 @@ async def get_dual_info(discord_user_id: str) -> dict:
     """Return dual status for a user:
       {code, is_anchor, anchor_id, anchor_username (if dual), duals: [{discord_id, username}]}
     """
-    await _init_db()
+    await init_db()
     code = await get_or_create_dual_code(discord_user_id)
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -4985,7 +4985,7 @@ async def get_dual_info(discord_user_id: str) -> dict:
 
 async def link_dual(code: str, requester_discord_id: str) -> dict:
     """Link requester as a dual of the code owner. Returns {ok, error}."""
-    await _init_db()
+    await init_db()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         # Find anchor
@@ -5031,7 +5031,7 @@ async def link_dual(code: str, requester_discord_id: str) -> dict:
 
 async def unlink_dual(discord_user_id: str, target_discord_id: str) -> bool:
     """Remove a dual link. Works whether called by anchor or dual."""
-    await _init_db()
+    await init_db()
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """DELETE FROM dual_links WHERE
@@ -5045,7 +5045,7 @@ async def unlink_dual(discord_user_id: str, target_discord_id: str) -> bool:
 
 async def get_dual_anchor(discord_user_id: str) -> str | None:
     """If this user is a dual, return the anchor's discord_id. Else None."""
-    await _init_db()
+    await init_db()
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
             "SELECT anchor_discord_id FROM dual_links WHERE dual_discord_id=?",
@@ -5057,7 +5057,7 @@ async def get_dual_anchor(discord_user_id: str) -> str | None:
 
 async def get_dual_partners(discord_user_id: str) -> list[str]:
     """Return all discord_ids that share the same Travian account (excluding self)."""
-    await _init_db()
+    await init_db()
     async with aiosqlite.connect(DB_PATH) as db:
         # Is this user an anchor?
         async with db.execute(
