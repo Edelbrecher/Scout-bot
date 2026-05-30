@@ -1,47 +1,46 @@
 """
 Parser for Travian Legends statistics page (copy-paste text).
 
-Travian stats tables when copy-pasted from browser typically look like:
+Handles two formats:
 
-  1\tPlayerName\tAllianceName\t12.345\t1.234.567\t987.654\t456.789
-  2\tOtherPlayer\t...\t...
+1. WEEKLY stats page ("General" tab) — sections like:
+     PvP of the week  /  PvE of the week  /  Defenders of the week  /  Robbers of the week
+   Each section: Rank | Player | Points
 
-Columns vary by which stats page:
-  - Overall rankings: Rank | Player | Alliance | Pop | Off | Def | Raids
-  - Weekly:           Rank | Player | Alliance | Points this week | ...
-
-Numbers use either '.' or ',' as thousands separator depending on locale.
-We try to detect columns by position and header keywords.
+2. OVERALL ranking table — one big table:
+     Rank | Player | Alliance | Population | Off | Def | Raids
 """
 
 import re
 from typing import Optional
 
 
-_NUM_RE = re.compile(r'^[\d.,]+$')
+# ── Unicode cleaner ──────────────────────────────────────────────────────────
+# Travian injects LTR/RTL marks and non-breaking spaces into numbers
+_UNICODE_JUNK = re.compile(r'[‎‏‪-‮⁦-⁩ ​﻿]')
+
+def _clean(s: str) -> str:
+    return _UNICODE_JUNK.sub('', s).strip()
 
 
 def _parse_num(s: str) -> int:
-    """Parse '1.234.567' or '1,234,567' or '1234567' → int."""
-    s = s.strip()
-    if not s or s == '-' or s == '—':
+    s = _clean(s)
+    if not s or s in ('-', '—', ''):
         return 0
-    # Remove thousands separators: if there are multiple dots/commas, strip them
-    # Keep the last separator as decimal only if it separates exactly 2 digits
-    s = s.replace(' ', '')
-    # European format: 1.234.567 → remove dots
-    # US format: 1,234,567 → remove commas
-    # Try to detect which is thousands separator
+    # Remove thousands separators (., ,) — keep last dot only if decimal
+    # Travian uses ‭1,234,567‬ or ‭1.234.567‬
+    s = s.replace('‭', '').replace('‬', '')
+    # Multiple dots → European thousands  e.g. 1.234.567
     if s.count('.') > 1:
         s = s.replace('.', '')
+    # Multiple commas → US thousands  e.g. 1,234,567
     elif s.count(',') > 1:
         s = s.replace(',', '')
-    elif '.' in s and ',' in s:
-        # e.g. 1.234,56 → European decimal
+    elif ',' in s and '.' in s:
+        # e.g. 1.234,56  European decimal
         s = s.replace('.', '').replace(',', '.')
-    elif s.endswith(',00') or s.endswith('.00'):
-        s = s[:-3]
     else:
+        # Single separator — likely thousands
         s = s.replace(',', '').replace('.', '')
     try:
         return int(float(s))
@@ -49,197 +48,236 @@ def _parse_num(s: str) -> int:
         return 0
 
 
-def _is_number_col(values: list[str]) -> bool:
-    """True if most non-empty values in a column look like numbers."""
-    nums = [v for v in values if v.strip() and v.strip() not in ('-', '—')]
-    if not nums:
-        return False
-    num_count = sum(1 for v in nums if _NUM_RE.match(v.replace('.', '').replace(',', '')))
-    return num_count / len(nums) >= 0.7
+def _strip_rank(s: str) -> int:
+    """'1.' or '1' → 1"""
+    s = _clean(s).rstrip('.')
+    try:
+        return int(s)
+    except ValueError:
+        return 0
 
 
-def parse_travian_stats(text: str) -> list[dict]:
+# ── Section header detection ─────────────────────────────────────────────────
+_SECTION_HEADERS = {
+    'pvp':      re.compile(r'pvp\s+of\s+the\s+week|attacker\s+of\s+the\s+week', re.I),
+    'pve':      re.compile(r'pve\s+of\s+the\s+week|farmer\s+of\s+the\s+week', re.I),
+    'def':      re.compile(r'defender', re.I),
+    'raid':     re.compile(r'robber|raider|räuber', re.I),
+    'climber':  re.compile(r'climber|aufsteiger', re.I),
+}
+
+_COL_HEADER = re.compile(
+    r'no\.?\s*\t|rank\s*\t|player|spieler|points|punkte|resources|ressourcen',
+    re.I
+)
+
+
+def _classify_line(line: str) -> Optional[str]:
+    """Return section key if line is a section header, else None."""
+    line_clean = _clean(line)
+    for key, pat in _SECTION_HEADERS.items():
+        if pat.search(line_clean):
+            return key
+    return None
+
+
+def _is_col_header(line: str) -> bool:
+    return bool(_COL_HEADER.search(_clean(line)))
+
+
+def _parse_row(parts: list[str]) -> Optional[tuple[int, str, int]]:
     """
-    Parse copy-pasted Travian statistics text.
-    Returns list of dicts with keys:
-      player_name, alliance_name, population,
-      off_points, def_points, raid_points,
-      off_rank, def_rank, raid_rank, pop_rank
+    Parse a data row from a weekly section.
+    Returns (rank, player_name, points) or None.
+    Parts come from tab-split, may have empty strings from double-tab alignment.
+    """
+    # Remove empty strings at start (double-tab padding)
+    parts = [_clean(p) for p in parts]
+    non_empty = [p for p in parts if p]
+    if len(non_empty) < 2:
+        return None
+
+    # First non-empty should be rank
+    rank_str = non_empty[0].rstrip('.')
+    if not rank_str.isdigit():
+        return None
+    rank = int(rank_str)
+
+    # Last non-empty should be the number (points/resources)
+    points_str = non_empty[-1]
+    points_clean = points_str.replace(',', '').replace('.', '')
+    if not points_clean.isdigit():
+        return None
+    points = _parse_num(points_str)
+
+    # Middle part(s) = player name
+    player = ' '.join(non_empty[1:-1]) if len(non_empty) > 2 else non_empty[1]
+    if not player:
+        return None
+
+    return rank, player, points
+
+
+def parse_weekly_stats(text: str) -> tuple[str, list[dict]]:
+    """
+    Parse the Travian weekly stats page (General tab).
+    Returns (detected_type, entries) where detected_type is 'weekly'.
+    Entries are merged per player across all sections.
+    """
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+
+    players: dict[str, dict] = {}
+    current_section = None
+
+    for line in lines:
+        clean_line = _clean(line)
+        if not clean_line:
+            continue
+
+        # Check section header
+        sec = _classify_line(clean_line)
+        if sec:
+            current_section = sec
+            continue
+
+        # Skip column headers
+        if _is_col_header(clean_line):
+            continue
+
+        # Skip navigation / footer noise
+        if any(w in clean_line.lower() for w in [
+            'homepage', 'discord', 'support', 'game rules', 'imprint', 'travian games',
+            'overview', 'attacker', 'defender', 'top 10', 'general', 'wonderof',
+            'statistics', 'alliance', 'player(s)', 'village', 'hero', 'link list',
+            'farm list', 'recall', 'incoming', 'troop', 'kirilloid', 'friso',
+            'switch to', 'server time', 'privacy', 'population:', 'loyalty:',
+            'villages', 'spawn', 'task overview', 'farm builder',
+        ]):
+            continue
+
+        if current_section is None:
+            continue
+
+        parts = line.split('\t')
+        result = _parse_row(parts)
+        if not result:
+            continue
+
+        rank, player, points = result
+
+        if player not in players:
+            players[player] = {
+                'player_name':   player,
+                'alliance_name': '',
+                'population':    0,
+                'off_points':    0,
+                'def_points':    0,
+                'raid_points':   0,
+                'pve_points':    0,
+                'off_rank':      0,
+                'def_rank':      0,
+                'raid_rank':     0,
+                'pop_rank':      0,
+                'pve_rank':      0,
+            }
+
+        if current_section == 'pvp':
+            players[player]['off_points'] = points
+            players[player]['off_rank']   = rank
+        elif current_section == 'pve':
+            players[player]['pve_points'] = points
+            players[player]['pve_rank']   = rank
+        elif current_section == 'def':
+            players[player]['def_points'] = points
+            players[player]['def_rank']   = rank
+        elif current_section == 'raid':
+            players[player]['raid_points'] = points
+            players[player]['raid_rank']   = rank
+        elif current_section == 'climber':
+            players[player]['population'] = points
+            players[player]['pop_rank']   = rank
+
+    return 'weekly', list(players.values())
+
+
+# ── Overall ranking table parser ─────────────────────────────────────────────
+
+def parse_overall_stats(text: str) -> list[dict]:
+    """
+    Parse the Travian overall player ranking table.
+    Format: Rank | Player | Alliance | Population | Off | Def | Raids
     """
     lines = text.replace('\r\n', '\n').replace('\r', '\n').strip().split('\n')
     rows = []
     for line in lines:
-        line = line.strip()
-        if not line:
+        line_clean = _clean(line)
+        if not line_clean:
             continue
-        parts = line.split('\t')
+        parts = [_clean(p) for p in line.split('\t')]
         if len(parts) < 3:
-            # Try space-separated fallback (unlikely but safe)
             continue
-        rows.append([p.strip() for p in parts])
+        rows.append(parts)
 
-    if not rows:
-        return []
-
-    # Detect header row
-    header_idx = 0
-    for i, row in enumerate(rows[:5]):
-        joined = ' '.join(row).lower()
-        if any(k in joined for k in ['player', 'spieler', 'rank', 'alliance', 'allianz', 'population']):
-            header_idx = i
-            break
-
-    # Try to figure out column layout from headers or positions
-    data_rows = rows[header_idx + 1:] if header_idx < len(rows) - 1 else rows
-
-    # Heuristic column detection:
-    # Col 0: rank (number)
-    # Col 1: player name (text)
-    # Col 2: alliance name (text)  — sometimes missing
-    # Remaining: numeric columns (pop, off, def, raid) in that rough order
     entries = []
-    for row in data_rows:
-        if len(row) < 3:
+    for row in rows:
+        non_empty = [p for p in row if p]
+        if len(non_empty) < 3:
             continue
-        # Skip rows that look like sub-headers or empty
-        if not row[0] or (not row[0].replace('.', '').replace(',', '').isdigit() and
-                           not row[0].isdigit()):
-            # rank col should be a number
-            clean = row[0].replace('.', '').replace(',', '').strip()
-            if not clean.isdigit():
-                continue
-
-        try:
-            rank = int(row[0].replace('.', '').replace(',', '').strip())
-        except ValueError:
+        rank_str = non_empty[0].rstrip('.')
+        if not rank_str.isdigit():
             continue
+        rank = int(rank_str)
 
-        if len(row) < 4:
-            continue
+        # Col 2: alliance (text) or number?
+        col2 = non_empty[2].replace(',', '').replace('.', '').strip()
+        has_alliance = not col2.isdigit() if col2 else True
 
-        # Detect if col 2 is alliance (text) or a number (no alliance col)
-        col2_clean = row[2].replace('.', '').replace(',', '').strip()
-        has_alliance_col = not col2_clean.isdigit() if col2_clean else True
-
-        if has_alliance_col:
-            player_name   = row[1]
-            alliance_name = row[2]
-            num_cols      = row[3:]
+        if has_alliance:
+            player_name   = non_empty[1]
+            alliance_name = non_empty[2]
+            nums          = [_parse_num(v) for v in non_empty[3:]]
         else:
-            player_name   = row[1]
-            alliance_name = ""
-            num_cols      = row[2:]
+            player_name   = non_empty[1]
+            alliance_name = ''
+            nums          = [_parse_num(v) for v in non_empty[2:]]
 
-        if not player_name:
-            continue
-
-        nums = [_parse_num(v) for v in num_cols]
-        # Pad to at least 4 numeric columns
         while len(nums) < 4:
             nums.append(0)
 
-        # Column order heuristic: pop, off, def, raids
-        # Population is usually the smallest, raids usually largest among off/def/raids
-        # We just assign positionally — user pastes all-player stats which has this order
-        pop   = nums[0] if len(nums) > 0 else 0
-        off   = nums[1] if len(nums) > 1 else 0
-        defen = nums[2] if len(nums) > 2 else 0
-        raid  = nums[3] if len(nums) > 3 else 0
-
         entries.append({
-            "player_name":   player_name,
-            "alliance_name": alliance_name,
-            "pop_rank":      rank,
-            "population":    pop,
-            "off_points":    off,
-            "def_points":    defen,
-            "raid_points":   raid,
-            "off_rank":      0,   # filled later if off-ranking page imported
-            "def_rank":      0,
-            "raid_rank":     0,
+            'player_name':   player_name,
+            'alliance_name': alliance_name,
+            'pop_rank':      rank,
+            'population':    nums[0],
+            'off_points':    nums[1],
+            'def_points':    nums[2],
+            'raid_points':   nums[3],
+            'off_rank':      0,
+            'def_rank':      0,
+            'raid_rank':     0,
         })
 
     return entries
 
 
+# ── Auto-detect & dispatch ────────────────────────────────────────────────────
+
 def parse_travian_stats_smart(text: str) -> list[dict]:
     """
-    Smarter multi-section parser.
-    Travian stats page often has sections:
-      - Population ranking
-      - Attacker ranking (off)
-      - Defender ranking (def)
-      - Raider ranking
-
-    If we get multiple sections in one paste, merge them by player name.
+    Auto-detect format and parse.
+    Returns list of player dicts with standardised keys.
     """
-    # Split into sections by detecting rank-1 rows resetting
-    sections = _split_sections(text)
-    if len(sections) <= 1:
-        return parse_travian_stats(text)
+    text_lower = text.lower()
 
-    merged: dict[str, dict] = {}
-    section_types = ['pop', 'off', 'def', 'raid']
+    # Weekly stats detection: look for known section headers
+    is_weekly = any(
+        pat.search(text_lower)
+        for pat in _SECTION_HEADERS.values()
+    )
 
-    for idx, section_text in enumerate(sections[:4]):
-        entries = parse_travian_stats(section_text)
-        stype = section_types[idx] if idx < len(section_types) else 'pop'
-        for e in entries:
-            pname = e["player_name"]
-            if pname not in merged:
-                merged[pname] = {
-                    "player_name": pname,
-                    "alliance_name": e["alliance_name"],
-                    "population": 0, "off_points": 0,
-                    "def_points": 0, "raid_points": 0,
-                    "pop_rank": 0, "off_rank": 0,
-                    "def_rank": 0, "raid_rank": 0,
-                }
-            if e["alliance_name"] and not merged[pname]["alliance_name"]:
-                merged[pname]["alliance_name"] = e["alliance_name"]
+    if is_weekly:
+        _, entries = parse_weekly_stats(text)
+        return entries
 
-            rank = e["pop_rank"]
-            if stype == 'pop':
-                merged[pname]["population"] = e["population"]
-                merged[pname]["pop_rank"]   = rank
-            elif stype == 'off':
-                merged[pname]["off_points"] = e["off_points"] or e["population"]
-                merged[pname]["off_rank"]   = rank
-            elif stype == 'def':
-                merged[pname]["def_points"] = e["def_points"] or e["population"]
-                merged[pname]["def_rank"]   = rank
-            elif stype == 'raid':
-                merged[pname]["raid_points"] = e["raid_points"] or e["population"]
-                merged[pname]["raid_rank"]   = rank
-
-    return list(merged.values())
-
-
-def _split_sections(text: str) -> list[str]:
-    """Split text into sections when rank resets to 1."""
-    lines = text.replace('\r\n', '\n').split('\n')
-    sections = []
-    current: list[str] = []
-    last_rank = 0
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            if current:
-                current.append(line)
-            continue
-        parts = stripped.split('\t')
-        if parts:
-            clean = parts[0].replace('.', '').replace(',', '').strip()
-            if clean.isdigit():
-                r = int(clean)
-                if r == 1 and last_rank > 5 and current:
-                    # New section starting
-                    sections.append('\n'.join(current))
-                    current = []
-                last_rank = r
-        current.append(line)
-
-    if current:
-        sections.append('\n'.join(current))
-    return sections if sections else [text]
+    # Fallback: overall ranking table
+    return parse_overall_stats(text)

@@ -7176,13 +7176,21 @@ async def _init_travian_stats_tables():
                 off_rank      INTEGER DEFAULT 0,
                 def_rank      INTEGER DEFAULT 0,
                 raid_rank     INTEGER DEFAULT 0,
-                pop_rank      INTEGER DEFAULT 0
+                pop_rank      INTEGER DEFAULT 0,
+                pve_points    INTEGER DEFAULT 0,
+                pve_rank      INTEGER DEFAULT 0
             )
         """)
         await db.execute("""
             CREATE INDEX IF NOT EXISTS idx_stats_entries_guild_player
             ON travian_stats_entries(guild_id, player_name, snapshot_at)
         """)
+        # Migrations for existing installs
+        for col in ["pve_points INTEGER DEFAULT 0", "pve_rank INTEGER DEFAULT 0"]:
+            try:
+                await db.execute(f"ALTER TABLE travian_stats_entries ADD COLUMN {col}")
+            except Exception:
+                pass
         await db.commit()
 
 
@@ -7202,14 +7210,16 @@ async def save_stats_snapshot(guild_id: str, imported_by: str,
                 INSERT INTO travian_stats_entries
                     (snapshot_id, guild_id, snapshot_at, player_name, alliance_name,
                      population, off_points, def_points, raid_points,
-                     off_rank, def_rank, raid_rank, pop_rank)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     off_rank, def_rank, raid_rank, pop_rank,
+                     pve_points, pve_rank)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (snap_id, guild_id, snapshot_at,
                   e.get("player_name",""), e.get("alliance_name",""),
                   e.get("population",0), e.get("off_points",0),
                   e.get("def_points",0), e.get("raid_points",0),
                   e.get("off_rank",0), e.get("def_rank",0),
-                  e.get("raid_rank",0), e.get("pop_rank",0)))
+                  e.get("raid_rank",0), e.get("pop_rank",0),
+                  e.get("pve_points",0), e.get("pve_rank",0)))
         await db.commit()
         return snap_id
 
