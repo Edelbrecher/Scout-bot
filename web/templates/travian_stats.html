@@ -56,12 +56,27 @@
     </div>
     {% else %}
     <div id="player-content">
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;">
-        <input type="text" id="playerFilter" placeholder="Spieler filtern…" oninput="renderView('player')"
-               style="padding:.4rem .75rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.85rem;min-width:200px;">
-        <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--text-muted);cursor:pointer;">
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
+        <input type="text" id="playerFilter" placeholder="🔍 Spieler suchen…" oninput="renderView('player')"
+               style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
+        <select id="sortKeyP" onchange="renderView('player')"
+                style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
+          <option value="name">↕ Name</option>
+          <option value="raid_points">↕ ⛏️ Räuber</option>
+          <option value="off_points">↕ ⚔️ PvP</option>
+          <option value="pve_points">↕ 🐾 PvE</option>
+          <option value="def_points">↕ 🛡️ Def</option>
+          <option value="raid_delta">↕ ⛏️ Δ Räuber</option>
+          <option value="off_delta">↕ ⚔️ Δ PvP</option>
+          <option value="anomaly">↕ Anomalien zuerst</option>
+        </select>
+        <button id="sortDirP" onclick="toggleDir('player')"
+                style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text-muted);font-size:.83rem;cursor:pointer;min-width:36px;">
+          ↓
+        </button>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--text-muted);cursor:pointer;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--border);background:var(--card);">
           <input type="checkbox" id="anomalyOnlyP" onchange="renderView('player')" style="accent-color:#f87171;">
-          Nur Anomalien
+          ⚠️ Nur Anomalien
         </label>
       </div>
       <div id="anomaly-bar-player" style="display:none;margin-bottom:1rem;padding:.65rem 1rem;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);">
@@ -88,12 +103,27 @@
     </div>
     {% else %}
     <div id="alliance-content">
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;">
-        <input type="text" id="allianceFilter" placeholder="Allianz filtern…" oninput="renderView('alliance')"
-               style="padding:.4rem .75rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.85rem;min-width:200px;">
-        <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--text-muted);cursor:pointer;">
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
+        <input type="text" id="allianceFilter" placeholder="🔍 Allianz suchen…" oninput="renderView('alliance')"
+               style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
+        <select id="sortKeyA" onchange="renderView('alliance')"
+                style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
+          <option value="name">↕ Name</option>
+          <option value="raid_points">↕ ⛏️ Räuber</option>
+          <option value="off_points">↕ ⚔️ PvP</option>
+          <option value="pve_points">↕ 🐾 PvE</option>
+          <option value="def_points">↕ 🛡️ Def</option>
+          <option value="raid_delta">↕ ⛏️ Δ Räuber</option>
+          <option value="off_delta">↕ ⚔️ Δ PvP</option>
+          <option value="anomaly">↕ Anomalien zuerst</option>
+        </select>
+        <button id="sortDirA" onclick="toggleDir('alliance')"
+                style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text-muted);font-size:.83rem;cursor:pointer;min-width:36px;">
+          ↓
+        </button>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--text-muted);cursor:pointer;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--border);background:var(--card);">
           <input type="checkbox" id="anomalyOnlyA" onchange="renderView('alliance')" style="accent-color:#f87171;">
-          Nur Anomalien
+          ⚠️ Nur Anomalien
         </label>
       </div>
       <div id="anomaly-bar-alliance" style="display:none;margin-bottom:1rem;padding:.65rem 1rem;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);">
@@ -195,6 +225,16 @@ canvas.spark { display:block; }
 const PLAYER_DATA   = {{ player_trends   | tojson }};
 const ALLIANCE_DATA = {{ alliance_trends | tojson }};
 const GUILD_ID = '{{ guild.guild_id }}';
+
+// Sort state per view
+const sortState = { player: { key:'name', dir:1 }, alliance: { key:'name', dir:1 } };
+
+function toggleDir(view) {
+  sortState[view].dir *= -1;
+  const btn = document.getElementById('sortDir'+( view==='player'?'P':'A' ));
+  if (btn) btn.textContent = sortState[view].dir === 1 ? '↓' : '↑';
+  renderView(view);
+}
 
 // ── Set default datetime ─────────────────────────────────────────────────────
 (function() {
@@ -424,13 +464,28 @@ function renderView(view) {
 
   let allAnomalies = [];
 
+  const sortKey = document.getElementById('sortKey'+(view==='player'?'P':'A'))?.value || 'name';
+  const sortDir = sortState[view].dir;
+  // Sync select with current state
+  const selEl = document.getElementById('sortKey'+(view==='player'?'P':'A'));
+  if (selEl && selEl.value !== sortState[view].key) sortState[view].key = selEl.value;
+
+  const getVal = (name, tl) => {
+    const last = tl.at(-1) || {};
+    if (sortKey === 'name')       return name.toLowerCase();
+    if (sortKey === 'anomaly')    return isAnomalous(tl) ? 0 : 1;
+    if (sortKey === 'raid_delta') return last.raid_delta ?? -Infinity;
+    if (sortKey === 'off_delta')  return last.off_delta  ?? -Infinity;
+    return last[sortKey] ?? 0;
+  };
+
   const entries = Object.entries(data)
     .filter(([name]) => !filter || name.toLowerCase().includes(filter))
     .filter(([, tl]) => !anomOnly || isAnomalous(tl))
-    .sort(([a],[b]) => {
-      // Anomalien zuerst
-      const aA = isAnomalous(a[1]??data[a]), aB = isAnomalous(b[1]??data[b]);
-      if (aA && !aB) return -1; if (!aA && aB) return 1;
+    .sort(([a, tA], [b, tB]) => {
+      const va = getVal(a, tA), vb = getVal(b, tB);
+      if (va < vb) return -1 * sortDir;
+      if (va > vb) return  1 * sortDir;
       return a.localeCompare(b);
     });
 
