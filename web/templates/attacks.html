@@ -239,52 +239,84 @@
       if (m) { serverTime = m[1]; break; }
     }
 
-    const TROOP_HEADERS_RE = /^(Legio|Prätor|Imperia|Equites|Rammbock|Feuerkata|Senator|Siedler|Held|Phalanx|Schwertkämpfer|Pathfinder|Theutates|Druide|Eduier|Trebuchet|Häuptling|Keule|Speer|Sklave|Axtkämpfer|Aufklärer|Paladin|Ritter|Katapult|Stammesführer)/i;
+    const TROOP_HEADERS_RE = /^(Legio|Prätor|Imperia|Equites|Rammbock|Feuerkata|Senator|Siedler|Held|Phalanx|Schwertkämpfer|Pathfinder|Theutates|Druide|Eduier|Trebuchet|Häuptling|Keule|Speer|Sklave|Axtkämpfer|Aufklärer|Paladin|Ritter|Katapult|Stammesführer|Legionnaire|Praetorian|Imperian|Equites\s+Legati|Equites\s+Impe|Equites\s+Caes|Battering|Fire\s+Cat|Senator|Clubswinger|Spearman|Slave|Axeman|Scout|Paladin|Teutonic|Catapult|Chief|Phalanx|Swordsman|Pathfinder|Theutates|Druidrider|Haeduan|Ram|Trebuchet|Chieftain)/i;
 
+    // Allow starting without the "Ankommende Truppen" header — some browsers omit it
     let inSection = false;
     const attacks = [];
     let currentAttack = null;
-    let awaitingOwnCoords = false;
+
+    // Attack line format variants:
+    // DE (old):  "- 04 VillageName  Angriff markieren PlayerName greift TargetVillage an"
+    // DE (new):  "- 04:32:10  VillageName  PlayerName greift TargetVillage an"
+    // DE (alt):  "VillageName  PlayerName greift TargetVillage an  04:32:10"
+    // EN:        "- 04 VillageName  Mark attack  PlayerName attacks TargetVillage"
+    const PATTERNS = [
+      // Classic DE: dash + counter + src-village + "Angriff markieren" + player + greift/raubt + dst-village + an/aus
+      { re: /^[-–]\s*\d+\s+(.+?)\s+Angriff markieren\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+        mk: m => ({ src: m[1], player: m[2], type: m[5]==='aus'?'raid':'attack', dst: m[4] }) },
+      // Modern DE: dash + time/counter + src-village + player + greift/raubt + dst + an/aus
+      { re: /^[-–]\s*[\d:]+\s+(.+?)\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+        mk: m => ({ src: m[1], player: m[2], type: m[5]==='aus'?'raid':'attack', dst: m[4] }) },
+      // EN: dash + counter + src + "Mark attack" + player + (attacks|raids) + dst
+      { re: /^[-–]\s*\d+\s+(.+?)\s+Mark attack\s+(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
+        mk: m => ({ src: m[1], player: m[2], type: m[3]==='raids'?'raid':'attack', dst: m[4] }) },
+      // EN modern: dash + time + src + player + attacks/raids + dst
+      { re: /^[-–]\s*[\d:]+\s+(.+?)\s+(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
+        mk: m => ({ src: m[1], player: m[2], type: m[3]==='raids'?'raid':'attack', dst: m[4] }) },
+      // Fallback: any line with greift/raubt ... an/aus (no leading dash required)
+      { re: /^(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+        mk: m => ({ src: '', player: m[1], type: m[4]==='aus'?'raid':'attack', dst: m[3] }) },
+      // EN fallback: any line with attacks/raids
+      { re: /^(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
+        mk: m => ({ src: '', player: m[1], type: m[2]==='raids'?'raid':'attack', dst: m[3] }) },
+    ];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (/Ankommende Truppen/i.test(line)) {
+      if (/Ankommende Truppen|Incoming troops/i.test(line)) {
         inSection = true;
         continue;
       }
-      if (!inSection) continue;
+      // Auto-start section if we see a clear attack pattern even without the header
       if (/Aufgaben|Startseite|©\s*200/i.test(line)) break;
 
-      // Attack line patterns:
-      // "- 04 VillageName  Angriff markieren PlayerName greift TargetVillage an"
-      // "- 04 VillageName  Angriff markieren PlayerName raubt TargetVillage aus"
-      const attackLineRe = /^[-–]\s*\d+\s+(.+?)\s+Angriff markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i;
-      const m = line.match(attackLineRe);
-      if (m) {
-        if (currentAttack) attacks.push(currentAttack);
-        currentAttack = {
-          attacker_village_name: m[1].trim(),
-          attacker_player:       m[2].trim(),
-          attack_type:           m[5] === 'aus' ? 'raid' : 'attack',
-          own_village_name:      m[4].trim(),
-          attacker_x: null, attacker_y: null,
-          own_x: null, own_y: null,
-          troops_hidden: false,
-          troop_count: 0,
-          troop_details: {},
-          arrival_time: '',
-          server_time_at_import: serverTime,
-          fake_score: 50,
-          fake_reasons: [],
-        };
-        awaitingOwnCoords = false;
-        continue;
+      // Try all attack line patterns
+      let matched = false;
+      for (const { re, mk } of PATTERNS) {
+        const m = line.match(re);
+        if (m) {
+          const p = mk(m);
+          // Skip lines that are obviously not attacks (too short player name etc.)
+          if (!p.player || p.player.length < 2) continue;
+          if (currentAttack) attacks.push(currentAttack);
+          inSection = true;
+          currentAttack = {
+            attacker_village_name: p.src.trim(),
+            attacker_player:       p.player.trim(),
+            attack_type:           p.type,
+            own_village_name:      p.dst.trim(),
+            attacker_x: null, attacker_y: null,
+            own_x: null, own_y: null,
+            troops_hidden: false,
+            troop_count: 0,
+            troop_details: {},
+            arrival_time: '',
+            server_time_at_import: serverTime,
+            fake_score: 50,
+            fake_reasons: [],
+          };
+          matched = true;
+          break;
+        }
       }
+      if (matched) continue;
+      if (!inSection) continue;
 
       if (currentAttack) {
         // Coords: "(104|46)" or "104|46"
-        const coordM = line.match(/\(?(\d+)[|\/\\](\d+)\)?/);
+        const coordM = line.match(/\(?(-?\d+)[|\/\\](-?\d+)\)?/);
         if (coordM) {
           if (currentAttack.attacker_x === null) {
             currentAttack.attacker_x = parseInt(coordM[1]);
@@ -298,9 +330,9 @@
 
         if (TROOP_HEADERS_RE.test(line)) continue;
 
-        // Troop count line
-        if (/^Einheiten/i.test(line)) {
-          const parts = line.replace(/^Einheiten\s*/i, '').trim().split(/\s+/);
+        // Troop count line: "Einheiten 5 0 3 ..." or "Units 5 0 3 ..."
+        if (/^(Einheiten|Units)\b/i.test(line)) {
+          const parts = line.replace(/^(Einheiten|Units)\s*/i, '').trim().split(/\s+/);
           if (parts[0] === '?') {
             currentAttack.troops_hidden = true;
             currentAttack.troop_count = 0;
@@ -311,9 +343,9 @@
           continue;
         }
 
-        // Arrival line
-        if (/^Ankunft/i.test(line)) {
-          const absM = line.match(/um\s+(\d{1,2}:\d{2}:\d{2})\s*(AM|PM)?/i);
+        // Arrival line: "Ankunft um 12:45:00" or "Arrival at 12:45:00"
+        if (/^(Ankunft|Arrival)\b/i.test(line)) {
+          const absM = line.match(/(?:um|at)\s+(\d{1,2}:\d{2}:\d{2})\s*(AM|PM)?/i);
           if (absM) {
             let timeStr = absM[1];
             if (absM[2]) {
@@ -338,6 +370,15 @@
     if (currentAttack) attacks.push(currentAttack);
     return attacks;
   }
+
+  // Debug helper: show raw lines in console when parse fails
+  window._debugRallyParse = function(raw) {
+    const text = cleanUnicode(raw);
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    console.group('Rally Point Debug (' + lines.length + ' lines)');
+    lines.forEach((l,i) => console.log(i, JSON.stringify(l)));
+    console.groupEnd();
+  };
 
   // =========================================================
   // FAKE SCORE (client-side preview, server recalculates)
@@ -431,8 +472,17 @@
     });
 
     const cnt = parsedAttacks.length;
-    document.getElementById('parseStatus').textContent =
-      cnt > 0 ? cnt + ' Angriffe erkannt.' : 'Keine Angriffe erkannt. Prüfe das Format.';
+    if (cnt > 0) {
+      document.getElementById('parseStatus').textContent = cnt + ' Angriffe erkannt.';
+      document.getElementById('parseStatus').style.color = '#4ade80';
+    } else {
+      document.getElementById('parseStatus').innerHTML =
+        'Keine Angriffe erkannt. ' +
+        '<span style="color:#f87171;">Kopiere den kompletten Versammlungsplatz (alle Zeilen ab "Ankommende Truppen").</span> ' +
+        '<a href="#" onclick="window._debugRallyParse(document.getElementById(\'rallyInput\').value);return false;" ' +
+        'style="color:#a5b4fc;font-size:.8rem;">Debug in Console</a>';
+      document.getElementById('parseStatus').style.color = 'var(--text-muted)';
+    }
     document.getElementById('previewCount').textContent = cnt;
 
     const list = document.getElementById('previewList');
