@@ -61,7 +61,7 @@
           next: t('Weiter', 'Next'),
         },
         {
-          page: `${base}/map/own-villages`, target: null,
+          page: `${base}/mein-account`, target: null,
           title: t('🏘️ Eigene Dörfer hochladen', '🏘️ Upload your villages'),
           body: t(
             'Lade die Koordinaten deiner Dörfer hoch — das ist die Grundlage für präzise Marschzeit-Berechnungen.\n\nOhne Dörfer rechnet der Einsatzplaner trotzdem, aber mit Dorf-Daten wählt er automatisch das optimale Startdorf für jede Welle.',
