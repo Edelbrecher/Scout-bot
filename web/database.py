@@ -1758,6 +1758,17 @@ async def get_inactive_farms(
         return result
 
 
+async def get_snapshot_pop_range(guild_id: str) -> dict:
+    """Return min/max population seen in snapshots for this guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT MIN(population), MAX(population) FROM map_snapshots WHERE guild_id=? AND population > 0",
+            (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return {"min_pop": row[0] or 0, "max_pop": row[1] or 9999} if row else {"min_pop": 0, "max_pop": 9999}
+
+
 async def search_inactive_advanced(
     guild_id: str,
     ref_x: int = 0,

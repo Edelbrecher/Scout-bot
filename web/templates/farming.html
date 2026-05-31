@@ -169,12 +169,17 @@
                 <input type="number" id="min_days" name="min_days" value="{{ min_days }}" min="0" max="365" />
               </div>
               <div class="form-group" style="margin:0;min-width:120px;">
-                <label for="min_pop" style="font-size:0.8rem;">Min. Bevölkerung</label>
-                <input type="number" id="min_pop" name="min_pop" value="{{ min_pop }}" min="0" />
+                <label for="min_pop" style="font-size:0.8rem;">Min. Bevölkerung
+                  {% if snap_pop_range %}<span style="font-size:.7rem;color:var(--text-muted);font-weight:400;">(Welt: {{ snap_pop_range.min_pop }}–{{ snap_pop_range.max_pop }})</span>{% endif %}
+                </label>
+                <input type="number" id="min_pop" name="min_pop" value="{{ min_pop }}" min="0"
+                       {% if snap_pop_range %}max="{{ snap_pop_range.max_pop }}"{% endif %}/>
               </div>
               <div class="form-group" style="margin:0;min-width:120px;">
                 <label for="max_pop" style="font-size:0.8rem;">Max. Bevölkerung</label>
-                <input type="number" id="max_pop" name="max_pop" value="{{ max_pop }}" min="0" />
+                <input type="number" id="max_pop" name="max_pop" value="{{ max_pop }}" min="0"
+                       {% if snap_pop_range %}max="{{ snap_pop_range.max_pop }}"{% endif %}
+                       placeholder="{{ snap_pop_range.max_pop if snap_pop_range else 9999 }}"/>
               </div>
               <div style="display:flex;gap:0.4rem;">
                 <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">Anwenden</button>

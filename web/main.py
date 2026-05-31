@@ -5769,6 +5769,7 @@ async def farming_page(
                 auto_fetch_error = str(e)
 
     farm_stats = await database.get_farm_stats(guild_id)
+    snap_pop_range = await database.get_snapshot_pop_range(guild_id)
     inactive_farms = await database.get_inactive_farms(guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
     farm_list = await database.get_farm_list(guild_id)
     cross_reference = await database.get_farming_cross_reference(guild_id, min_days=min_days)
@@ -5818,6 +5819,7 @@ async def farming_page(
         "auto_fetched": auto_fetched,
         "auto_fetch_error": auto_fetch_error,
         "snap_count_for_search": snap_count_for_search,
+        "snap_pop_range": snap_pop_range,
     })
 
 
