@@ -4013,8 +4013,9 @@ async def mein_account_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
 
-    discord_id   = session.get("uid", "")
+    discord_id   = session.get("uid", "") or session.get("discord_id", "")
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, discord_id))
+    scout_village = await database.get_scout_village(guild_id, discord_id)
     history      = await database.get_own_villages_history(guild_id, discord_id)
     my_troops    = await database.get_member_troops_single(guild_id, discord_id)
     uploaded     = request.query_params.get("uploaded")
@@ -4074,6 +4075,7 @@ async def mein_account_page(request: Request, guild_id: str):
         "my_population":      my_population,
         "tq_min":             tq_min,
         "lock_travian_name":  lock_travian_name and not _is_account_editor,
+        "scout_village":      scout_village,
     })
 
 
@@ -4133,6 +4135,20 @@ async def mein_account_upload(
             total_crop=total_crop, total_units=total_units, total_scouts=total_scouts,
         )
     return RedirectResponse(f"/guild/{guild_id}/mein-account?uploaded={len(parsed)}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/mein-account/set-scout-village")
+async def mein_account_set_scout_village(
+    request: Request, guild_id: str,
+    x: int = Form(...), y: int = Form(...),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    discord_id = session.get("uid", "") or session.get("discord_id", "")
+    await database.set_scout_village(guild_id, discord_id, x, y)
+    return RedirectResponse(f"/guild/{guild_id}/mein-account?saved=scout_village", status_code=303)
 
 
 @app.post("/guild/{guild_id}/mein-account/clear")
@@ -5827,9 +5843,10 @@ async def farming_page(
             except Exception as e:
                 auto_fetch_error = str(e)
 
-    farm_stats   = await database.get_farm_stats(guild_id)
+    farm_stats     = await database.get_farm_stats(guild_id)
     snap_pop_range = await database.get_snapshot_pop_range(guild_id)
-    farm_list    = await database.get_farm_list(guild_id)
+    farm_list      = await database.get_farm_list(guild_id)
+    scout_village  = await database.get_scout_village(guild_id, uid)
     cross_reference  = await database.get_farming_cross_reference(guild_id, min_days=min_days_i)
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
     farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
@@ -5935,6 +5952,7 @@ async def farming_page(
         "auto_fetch_error": auto_fetch_error,
         "snap_count_for_search": snap_count_for_search,
         "snap_pop_range": snap_pop_range,
+        "scout_village": scout_village,
         # Advanced filter values
         "ref_x": ref_x_i or 0, "ref_y": ref_y_i or 0,
         "min_dist": min_dist_f or 0, "max_dist": max_dist_f or "",

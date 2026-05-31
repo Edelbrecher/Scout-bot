@@ -2704,7 +2704,48 @@ async def _init_own_villages_table():
             await db.execute("ALTER TABLE guild_own_villages ADD COLUMN discord_id TEXT NOT NULL DEFAULT ''")
         except Exception:
             pass
+        # Migration: scout village flag
+        try:
+            await db.execute("ALTER TABLE guild_own_villages ADD COLUMN is_scout_village INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await db.commit()
+
+
+async def set_scout_village(guild_id: str, discord_id: str, x: int, y: int) -> None:
+    """Toggle a village as scout village — unsets all others first."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Check if this village is already the scout village
+        async with db.execute(
+            "SELECT is_scout_village FROM guild_own_villages WHERE guild_id=? AND discord_id=? AND x=? AND y=?",
+            (guild_id, discord_id, x, y)
+        ) as cur:
+            row = await cur.fetchone()
+        already = row and row[0]
+        # Clear all scout flags for this user
+        await db.execute(
+            "UPDATE guild_own_villages SET is_scout_village=0 WHERE guild_id=? AND discord_id=?",
+            (guild_id, discord_id)
+        )
+        # Set this one (unless it was already set — toggle off)
+        if not already:
+            await db.execute(
+                "UPDATE guild_own_villages SET is_scout_village=1 WHERE guild_id=? AND discord_id=? AND x=? AND y=?",
+                (guild_id, discord_id, x, y)
+            )
+        await db.commit()
+
+
+async def get_scout_village(guild_id: str, discord_id: str) -> dict | None:
+    """Return the marked scout village for a user, or None."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_own_villages WHERE guild_id=? AND discord_id=? AND is_scout_village=1 LIMIT 1",
+            (guild_id, discord_id)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: str, discord_id: str = ""):

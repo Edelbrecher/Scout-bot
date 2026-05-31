@@ -37,6 +37,9 @@
   {% if hospital_cleared %}
   <div class="alert alert-success">🗑️ Lazarett-Daten gelöscht.</div>
   {% endif %}
+  {% if saved == 'scout_village' %}
+  <div class="alert alert-success">🔭 Scout-Dorf {% if scout_village %}gesetzt: {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}entfernt{% endif %}.</div>
+  {% endif %}
 
   <!-- KPI Strip mit Delta (nur wenn Daten vorhanden) -->
   {% if own_villages %}
@@ -484,6 +487,22 @@
             <td style="color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">
               {{ v.uploaded_at[:10] if v.uploaded_at else '—' }}<br>
               <span>{{ v.uploaded_by or '' }}</span>
+            </td>
+            <td>
+              {% if v.x is not none %}
+              {% set is_sv = scout_village and scout_village.x == v.x and scout_village.y == v.y %}
+              <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/set-scout-village" style="margin:0;">
+                <input type="hidden" name="x" value="{{ v.x }}">
+                <input type="hidden" name="y" value="{{ v.y }}">
+                <button type="submit" title="{% if is_sv %}Scout-Dorf entfernen{% else %}Als Scout-Dorf markieren{% endif %}"
+                        style="background:{% if is_sv %}rgba(99,102,241,.25){% else %}none{% endif %};
+                               border:1px solid {% if is_sv %}#818cf8{% else %}var(--border){% endif %};
+                               border-radius:6px;cursor:pointer;font-size:.82rem;padding:3px 8px;
+                               color:{% if is_sv %}#818cf8{% else %}var(--text-muted){% endif %};">
+                  🔭{% if is_sv %} Scout{% endif %}
+                </button>
+              </form>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
