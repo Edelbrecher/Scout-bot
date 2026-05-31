@@ -3183,6 +3183,11 @@ async def _init_ally_tables():
             await db.execute("ALTER TABLE ally_groups ADD COLUMN tq_min INTEGER DEFAULT 0")
         except Exception:
             pass
+        # lock_travian_name: 1 = only editors (lead/HC) may change the travian name
+        try:
+            await db.execute("ALTER TABLE ally_groups ADD COLUMN lock_travian_name INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -3232,8 +3237,8 @@ async def delete_ally_group(ally_group_id: int, owner_id: str):
 
 
 async def update_ally_group(ally_group_id: int, owner_id: str, **kwargs):
-    """Update ally_group fields: ally_name, wing1_name, wing2_name, wing1_token, wing2_token, tq_min."""
-    allowed = {"ally_name", "wing1_name", "wing2_name", "wing1_token", "wing2_token", "tq_min"}
+    """Update ally_group fields."""
+    allowed = {"ally_name", "wing1_name", "wing2_name", "wing1_token", "wing2_token", "tq_min", "lock_travian_name"}
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if not updates:
         return

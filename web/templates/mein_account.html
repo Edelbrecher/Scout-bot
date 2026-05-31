@@ -92,12 +92,22 @@
           <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.25rem;">
             🏷 <span data-i18n="account.import.name_label">Dein Travian Spielername</span> <span style="color:#f87171;">*</span>
           </label>
+          {% if lock_travian_name %}
+          <input type="text" name="travian_name" value="{{ my_travian_name or '' }}"
+            readonly
+            style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);color:var(--text-muted);
+                   border:1px solid var(--border);border-radius:6px;padding:.4rem .7rem;font-size:.9rem;cursor:not-allowed;">
+          <div style="font-size:.73rem;color:#f59e0b;margin-top:.25rem;">
+            🔒 Dein Spielername wurde von einem Admin gesetzt und kann nicht geändert werden.
+          </div>
+          {% else %}
           <input type="text" name="travian_name" value="{{ my_travian_name or '' }}"
             placeholder="z.B. MaxMustermann" required
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .7rem;font-size:.9rem;">
           <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;" data-i18n="account.import.name_hint">
             Genau wie in Travian angezeigt — wird für die EP-Planung und Allianz-Verifikation genutzt.
           </div>
+          {% endif %}
         </div>
         <textarea name="troop_text" rows="7"
           placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."

@@ -377,7 +377,7 @@ def is_guild_owner(session: dict, guild: dict) -> bool:
 async def has_perm(request: Request, guild_id: str, flag: str) -> bool:
     """Check if the current user has a specific TravOps permission flag.
     Guild owners and admin sessions always pass. Returns False if not logged in."""
-    session = request.session
+    session = get_session(request) or {}
     if not session.get("uid"):
         return False
     if session.get("type") == "admin":
@@ -3981,6 +3981,12 @@ async def mein_account_page(request: Request, guild_id: str):
     # Alliance TQ requirement
     ally_group_info = await database.get_ally_group_for_guild(guild_id)
     tq_min = (ally_group_info or {}).get("tq_min", 0) or 0
+    lock_travian_name = bool((ally_group_info or {}).get("lock_travian_name"))
+    # Is the current user an editor (lead or HC)?
+    _is_account_editor = (
+        (ally_group_info or {}).get("owner_discord_id") == discord_id
+        or await has_perm(request, guild_id, "ally_manage")
+    )
 
     sitters = await database.get_account_sitters(guild_id, session.get("uid", ""))
     dual_links = await database.get_dual_links_for_owner(guild_id, session.get("uid", ""))
@@ -4013,6 +4019,7 @@ async def mein_account_page(request: Request, guild_id: str):
         "my_waves":           my_waves,
         "my_population":      my_population,
         "tq_min":             tq_min,
+        "lock_travian_name":  lock_travian_name and not _is_account_editor,
     })
 
 
@@ -4034,6 +4041,16 @@ async def mein_account_upload(
     discord_id  = session.get("uid","")
     uploaded_by = session.get("username") or session.get("discord_username") or "unknown"
     tname       = travian_name.strip()
+
+    # If the alliance has lock_travian_name=1, members may not change their stored name
+    ally_group_info = await database.get_ally_group_for_guild(guild_id)
+    if ally_group_info and ally_group_info.get("lock_travian_name"):
+        is_editor = await has_perm(request, guild_id, "ally_manage") or \
+                    (ally_group_info.get("owner_discord_id") == discord_id)
+        if not is_editor:
+            # Ignore the submitted travian_name — keep whatever is stored
+            existing = await database.get_member_troops_single(guild_id, discord_id)
+            tname = (existing or {}).get("travian_name", "") or ""
 
     # Persist travian_name to member_troops even without a troop upload
     parsed = parse_own_villages(troop_text)
@@ -4687,6 +4704,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "is_lead": is_lead,
         "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
+        "lock_travian_name": bool((ally_group or guild_group or {}).get("lock_travian_name")),
     })
 
 
@@ -4723,7 +4741,8 @@ async def my_ally_settings(request: Request, guild_id: str,
                              ally_name: str = Form(""),
                              wing1_name: str = Form(""),
                              wing2_name: str = Form(""),
-                             tq_min: int = Form(0)):
+                             tq_min: int = Form(0),
+                             lock_travian_name: str = Form("0")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -4738,6 +4757,7 @@ async def my_ally_settings(request: Request, guild_id: str,
         wing1_name=wing1_name.strip()[:40],
         wing2_name=wing2_name.strip()[:40],
         tq_min=max(0, tq_min),
+        lock_travian_name=1 if lock_travian_name in ("1", "on", "true") else 0,
     )
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved", status_code=303)
 
