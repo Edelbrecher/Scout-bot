@@ -2714,6 +2714,7 @@ async def _init_own_villages_table():
 
 async def set_scout_village(guild_id: str, discord_id: str, x: int, y: int) -> None:
     """Toggle a village as scout village — unsets all others first."""
+    await _init_own_villages_table()
     async with aiosqlite.connect(DB_PATH) as db:
         # Check if this village is already the scout village
         async with db.execute(
@@ -2738,6 +2739,7 @@ async def set_scout_village(guild_id: str, discord_id: str, x: int, y: int) -> N
 
 async def get_scout_village(guild_id: str, discord_id: str) -> dict | None:
     """Return the marked scout village for a user, or None."""
+    await _init_own_villages_table()
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(

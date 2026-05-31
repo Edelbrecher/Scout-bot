@@ -5827,7 +5827,7 @@ async def farming_page(
     max_player_pop_i = _int_or_none(max_player_pop)
     max_pop_inc_i    = _int_or_none(max_pop_increase)
 
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     is_admin = session.get("guilds") is None
     tw_world = (guild.get("tw_world") or "").strip()
 
