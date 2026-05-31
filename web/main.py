@@ -4657,6 +4657,15 @@ async def my_ally_page(request: Request, guild_id: str):
 
     bonuses = await database.get_ally_bonuses(ally_group["id"]) if ally_group else []
 
+    # Determine editor access: Lead (owns the group) OR has ally_manage permission (HC)
+    is_lead = bool(ally_group)
+    is_editor = is_lead or await has_perm(request, guild_id, "ally_manage")
+
+    # For members: load leaderboard data (troop stats) to enrich member view
+    # Build a dict: travian_name -> leaderboard row for quick lookup
+    all_leaderboard = await database.get_member_leaderboard(guild_id) if (ally_group or membership) else []
+    lb_by_travian: dict = {r["travian_name"]: r for r in all_leaderboard if r.get("travian_name")}
+
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
@@ -4670,6 +4679,9 @@ async def my_ally_page(request: Request, guild_id: str):
         "ep_members": list(ep_members),
         "growth_data": growth_data,
         "bonuses": bonuses,
+        "is_editor": is_editor,
+        "is_lead": is_lead,
+        "lb_by_travian": lb_by_travian,
     })
 
 
