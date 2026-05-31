@@ -1838,7 +1838,7 @@ async def reset_res_push(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     await database.reset_res_config(guild_id)
-    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 
 @app.post("/guild/{guild_id}/auto-setup")
@@ -2004,6 +2004,45 @@ async def post_button(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/res-push", response_class=HTMLResponse)
 async def res_push_page(request: Request, guild_id: str, saved: str = ""):
+    """Main res-push board — shows all requests with contribution breakdown."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    show = request.query_params.get("show", "active")
+    all_requests = await database.get_res_requests(guild_id)
+    contributions = await database.get_res_contributions_per_request(guild_id)
+
+    ACTIVE_STATUSES   = {"pending", "accepted", "hold"}
+    DONE_STATUSES     = {"completed", "rejected", "inactive"}
+    if show == "active":
+        requests = [r for r in all_requests if r.get("status") in ACTIVE_STATUSES]
+    elif show == "done":
+        requests = [r for r in all_requests if r.get("status") in DONE_STATUSES]
+    else:
+        requests = all_requests
+
+    total_active = sum(1 for r in all_requests if r.get("status") in ACTIVE_STATUSES)
+    total_done   = sum(1 for r in all_requests if r.get("status") in DONE_STATUSES)
+
+    return templates.TemplateResponse("res_push_board.html", {
+        "request": request,
+        "guild": guild,
+        "requests": requests,
+        "contributions": contributions,
+        "show": show,
+        "total_active": total_active,
+        "total_done": total_done,
+        "flash": request.query_params.get("flash", ""),
+    })
+
+
+@app.get("/guild/{guild_id}/res-push/settings", response_class=HTMLResponse)
+async def res_push_settings_page(request: Request, guild_id: str, saved: str = ""):
+    """Res-push configuration page (channel IDs, roles)."""
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -2012,7 +2051,10 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard")
     res_requests = await database.get_res_requests(guild_id)
-    return templates.TemplateResponse("res_push.html", {"request": request, "guild": guild, "res_requests": res_requests, "saved": saved})
+    return templates.TemplateResponse("res_push.html", {
+        "request": request, "guild": guild,
+        "res_requests": res_requests, "saved": saved,
+    })
 
 
 @app.post("/guild/{guild_id}/res-push")
@@ -2036,7 +2078,7 @@ async def res_push_save(
         res_push_category_id=sanitize_snowflake(res_push_category_id),
         res_manager_role_ids=sanitize_snowflake_list(res_manager_role_ids),
     )
-    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push/settings?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/post-button")
@@ -2061,7 +2103,7 @@ async def res_post_button(request: Request, guild_id: str):
     if resp.status_code in (200, 201):
         msg_id = resp.json().get("id", "")
         await database.update_res_button(guild_id, channel_id, msg_id)
-        return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
     return RedirectResponse(f"/guild/{guild_id}/res-push?error=discord_{resp.status_code}", status_code=303)
 
 
@@ -2114,7 +2156,7 @@ async def res_auto_setup(request: Request, guild_id: str):
 
     await database.update_res_config(guild_id=guild_id, res_request_channel_id=res_request_channel_id, res_answer_channel_id=res_answer_channel_id, res_push_category_id=category_id, res_manager_role_ids=guild.get("res_manager_role_ids") or "")
     await database.update_res_button(guild_id, res_request_channel_id, res_button_message_id)
-    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 
 @app.get("/guild/{guild_id}/res-push/stats", response_class=HTMLResponse)
@@ -2150,7 +2192,7 @@ async def res_request_inactive(request: Request, guild_id: str, request_id: int)
             )
     except Exception:
         pass
-    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/activate")
@@ -2172,7 +2214,7 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
             )
     except Exception:
         pass
-    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 
 async def _close_scout_channel_after_delay(channel_id: str, token: str, delay: int = 120):
@@ -2798,7 +2840,7 @@ async def res_request_remove(request: Request, guild_id: str, request_id: int):
         async with httpx.AsyncClient() as client:
             await client.delete(f"https://discord.com/api/v10/channels/{req['push_channel_id']}", headers={"Authorization": f"Bot {bot_token}"})
     await database.delete_res_request(request_id)
-    return RedirectResponse(f"/guild/{guild_id}/res-push?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 
 # ---------------------------------------------------------------------------

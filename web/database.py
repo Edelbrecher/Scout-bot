@@ -670,6 +670,25 @@ async def get_res_requests(guild_id: str) -> list[dict]:
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_res_contributions_per_request(guild_id: str) -> dict[str, list]:
+    """Return {request_id: [contributions]} for all requests in a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT rc.request_id, rc.user_name, rc.amount, rc.created_at
+            FROM res_contributions rc
+            JOIN res_requests rr ON rr.id = rc.request_id
+            WHERE rr.guild_id = ?
+            ORDER BY rc.request_id, rc.created_at ASC
+        """, (guild_id,)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    result: dict[str, list] = {}
+    for r in rows:
+        rid = str(r.pop("request_id"))
+        result.setdefault(rid, []).append(r)
+    return result
+
+
 async def get_poll_participation_stats(guild_id: str) -> list[dict]:
     """Per-user participation rate across all polls in the guild."""
     async with aiosqlite.connect(DB_PATH) as db:
