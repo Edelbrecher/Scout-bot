@@ -9227,11 +9227,8 @@ _STATS_IMPORT_COOLDOWN_MINUTES = 60
 
 def _last_snapshot_at(snapshots: list[dict]) -> str | None:
     """Return the most recent created_at (= when the import happened) or None."""
-    for s in snapshots:
-        v = s.get("created_at")   # actual import time, not the Travian data timestamp
-        if v:
-            return v
-    return None
+    values = [s["created_at"] for s in snapshots if s.get("created_at")]
+    return max(values) if values else None   # ISO string max works correctly
 
 
 def _minutes_since(iso: str) -> float | None:

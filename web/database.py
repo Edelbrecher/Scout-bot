@@ -7266,7 +7266,7 @@ async def get_stats_snapshots(guild_id: str) -> list[dict]:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("""
             SELECT * FROM travian_stats_snapshots
-            WHERE guild_id=? ORDER BY snapshot_at DESC
+            WHERE guild_id=? ORDER BY created_at DESC
         """, (guild_id,))
         return [dict(r) for r in await cur.fetchall()]
 
