@@ -916,6 +916,24 @@ buildFieldInputs();
       <input type="number" id="tr-market-lvl" min="1" max="20" value="10" oninput="calcTradeRoutes()">
     </div>
 
+    <div class="cc-field" title="Handelskontor — jede Stufe erhöht die Händlerkapazität um 5 % (max. Stufe 20 = +100 %)">
+      <label style="display:flex;align-items:center;gap:.35rem;">
+        Handelskontor
+        <span style="font-size:.68rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);
+                     color:#a5b4fc;border-radius:10px;padding:1px 6px;">+5 % / Stufe</span>
+      </label>
+      <input type="number" id="tr-trade-center" min="0" max="20" value="0" oninput="calcTradeRoutes()">
+    </div>
+
+    <div class="cc-field" title="Allianz-Bonus auf Händlerkapazität — z. B. 5 für +5 %">
+      <label style="display:flex;align-items:center;gap:.35rem;">
+        Allianz-Bonus
+        <span style="font-size:.68rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);
+                     color:#4ade80;border-radius:10px;padding:1px 6px;">% auf Kapazität</span>
+      </label>
+      <input type="number" id="tr-ally-bonus" min="0" max="100" value="0" step="1" oninput="calcTradeRoutes()">
+    </div>
+
     <div class="cc-field">
       <label>Servergeschwindigkeit (×)</label>
       <input type="number" id="tr-speed" min="1" max="10" value="1" oninput="calcTradeRoutes()">
@@ -935,63 +953,119 @@ buildFieldInputs();
 
   <div id="tr-result" style="margin-top:1.5rem;display:none;">
     <div class="cc-summary-row">
-      <div class="cc-kpi"><div class="cc-kpi-label">Händlerkapazität</div><div class="cc-kpi-value" id="tr-capacity">—</div></div>
-      <div class="cc-kpi"><div class="cc-kpi-label">Routen gesamt (max)</div><div class="cc-kpi-value" id="tr-max-routes">—</div></div>
-      <div class="cc-kpi"><div class="cc-kpi-label">Umlaufzeit / Route</div><div class="cc-kpi-value" id="tr-roundtrip">—</div></div>
-      <div class="cc-kpi"><div class="cc-kpi-label">Crop/h pro Route</div><div class="cc-kpi-value" id="tr-crop-per-route">—</div></div>
-      <div class="cc-kpi" style="border-color:rgba(99,102,241,.5);"><div class="cc-kpi-label">Benötigte Routen</div><div class="cc-kpi-value" id="tr-needed" style="color:#a5b4fc;">—</div></div>
+      <div class="cc-kpi">
+        <div class="cc-kpi-label">Basis-Kapazität</div>
+        <div class="cc-kpi-value" id="tr-base-capacity">—</div>
+      </div>
+      <div class="cc-kpi" style="border-color:rgba(99,102,241,.4);">
+        <div class="cc-kpi-label">Kapazität mit Boni</div>
+        <div class="cc-kpi-value" id="tr-capacity" style="color:#a5b4fc;">—</div>
+      </div>
+      <div class="cc-kpi">
+        <div class="cc-kpi-label">Routen gesamt (max)</div>
+        <div class="cc-kpi-value" id="tr-max-routes">—</div>
+      </div>
+      <div class="cc-kpi">
+        <div class="cc-kpi-label">Umlaufzeit / Route</div>
+        <div class="cc-kpi-value" id="tr-roundtrip">—</div>
+      </div>
+      <div class="cc-kpi">
+        <div class="cc-kpi-label">Crop/h pro Route</div>
+        <div class="cc-kpi-value" id="tr-crop-per-route">—</div>
+      </div>
+      <div class="cc-kpi" style="border-color:rgba(34,197,94,.5);">
+        <div class="cc-kpi-label">Benötigte Routen</div>
+        <div class="cc-kpi-value" id="tr-needed" style="color:#4ade80;">—</div>
+      </div>
     </div>
-    <div id="tr-info" class="cc-info-box" style="margin-top:0;"></div>
+    <div id="tr-bonus-breakdown" style="margin-top:.65rem;font-size:.78rem;color:var(--text-muted);
+         background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.55rem .85rem;">
+    </div>
+    <div id="tr-info" class="cc-info-box" style="margin-top:.5rem;"></div>
   </div>
 </div>
 
 <script>
 // ── Traderouten-Rechner ───────────────────────────────────────────────────
 const TR_TRIBE = {
-  roman:    { speed: 16, carry: 500,  merchants_per_level: 3  },
-  teuton:   { speed: 12, carry: 1000, merchants_per_level: 1  },
-  gaul:     { speed: 24, carry: 750,  merchants_per_level: 2  },
-  egyptian: { speed: 14, carry: 900,  merchants_per_level: 3  },
-  hun:      { speed: 20, carry: 500,  merchants_per_level: 2  },
+  roman:    { speed: 16, carry: 500,  merchants_per_level: 3 },
+  teuton:   { speed: 12, carry: 1000, merchants_per_level: 1 },
+  gaul:     { speed: 24, carry: 750,  merchants_per_level: 2 },
+  egyptian: { speed: 14, carry: 900,  merchants_per_level: 3 },
+  hun:      { speed: 20, carry: 500,  merchants_per_level: 2 },
 };
 
-// Merchant capacity scales with market level (lvl 1 = base, each +1 adds +20%)
-function merchantCapacity(tribe, marketLvl) {
-  const base = TR_TRIBE[tribe].carry;
-  return Math.round(base * (1 + (marketLvl - 1) * 0.1));
-}
-
 function calcTradeRoutes() {
-  const tribe    = document.getElementById('tr-tribe').value;
-  const mLvl     = Math.max(1, parseInt(document.getElementById('tr-market-lvl').value) || 1);
-  const speed    = Math.max(1, parseFloat(document.getElementById('tr-speed').value) || 1);
-  const deficit  = Math.max(0, parseInt(document.getElementById('tr-deficit').value) || 0);
-  const distance = Math.max(1, parseInt(document.getElementById('tr-distance').value) || 1);
+  const tribe       = document.getElementById('tr-tribe').value;
+  const mLvl        = Math.max(1,  parseInt(document.getElementById('tr-market-lvl').value)    || 1);
+  const tcLvl       = Math.max(0,  Math.min(20, parseInt(document.getElementById('tr-trade-center').value) || 0));
+  const allyBonus   = Math.max(0,  parseFloat(document.getElementById('tr-ally-bonus').value)  || 0);
+  const speed       = Math.max(1,  parseFloat(document.getElementById('tr-speed').value)       || 1);
+  const deficit     = Math.max(0,  parseInt(document.getElementById('tr-deficit').value)       || 0);
+  const distance    = Math.max(1,  parseInt(document.getElementById('tr-distance').value)      || 1);
 
   const t = TR_TRIBE[tribe];
-  const tileTime = 3600 / (t.speed * speed); // seconds per tile, one-way
-  const roundtrip_s = tileTime * distance * 2;
+
+  // ── Capacity calculation ──────────────────────────────────────────
+  // Base carry from tribe
+  const baseCarry = t.carry;
+  // Market level scaling: each level adds 10% of base (Stufe 1 = 100 %, Stufe 20 = 290 %)
+  const marketMult  = 1 + (mLvl - 1) * 0.10;
+  // Trade Center: each level +5 % of base capacity (stacks additively before ally bonus)
+  const tcMult      = 1 + tcLvl * 0.05;
+  // Alliance bonus: % on top of everything
+  const allyMult    = 1 + allyBonus / 100;
+
+  const baseCapacity = Math.round(baseCarry * marketMult);    // without bonuses
+  const fullCapacity = Math.round(baseCarry * marketMult * tcMult * allyMult);
+
+  // ── Route calculation ──────────────────────────────────────────────
+  const tileTime_s  = 3600 / (t.speed * speed);  // seconds per tile one-way
+  const roundtrip_s = tileTime_s * distance * 2;
   const roundtrip_h = roundtrip_s / 3600;
 
-  const capacity = merchantCapacity(tribe, mLvl);
-  const maxRoutes = t.merchants_per_level * mLvl;
-  const cropPerRoute = roundtrip_h > 0 ? capacity / roundtrip_h : 0;
-  const needed = cropPerRoute > 0 ? Math.ceil(deficit / cropPerRoute) : 99;
+  const maxRoutes    = t.merchants_per_level * mLvl;
+  const cropPerRoute = roundtrip_h > 0 ? fullCapacity / roundtrip_h : 0;
+  const needed       = cropPerRoute > 0 ? Math.ceil(deficit / cropPerRoute) : 99;
 
-  document.getElementById('tr-capacity').textContent    = capacity.toLocaleString('de') + ' ☀️';
-  document.getElementById('tr-max-routes').textContent  = maxRoutes;
-  document.getElementById('tr-roundtrip').textContent   = formatMinutes(roundtrip_s / 60);
-  document.getElementById('tr-crop-per-route').textContent = Math.round(cropPerRoute).toLocaleString('de');
-  document.getElementById('tr-needed').textContent      = deficit === 0 ? '0' : needed > maxRoutes ? `${needed} ⚠️` : String(needed);
+  // ── Update DOM ────────────────────────────────────────────────────
+  document.getElementById('tr-base-capacity').textContent     = baseCapacity.toLocaleString('de') + ' ☀️';
+  document.getElementById('tr-capacity').textContent          = fullCapacity.toLocaleString('de') + ' ☀️';
+  document.getElementById('tr-max-routes').textContent        = maxRoutes;
+  document.getElementById('tr-roundtrip').textContent         = formatMinutes(roundtrip_s / 60);
+  document.getElementById('tr-crop-per-route').textContent    = Math.round(cropPerRoute).toLocaleString('de');
+  document.getElementById('tr-needed').textContent            = deficit === 0 ? '0' : needed > maxRoutes ? `${needed} ⚠️` : String(needed);
+  document.getElementById('tr-needed').style.color            = needed > maxRoutes ? '#f87171' : '#4ade80';
 
+  // ── Bonus breakdown ───────────────────────────────────────────────
+  const breakdownParts = [
+    `Stamm-Basis: <strong>${baseCarry.toLocaleString('de')}</strong>`,
+    `Marktplatz Stufe ${mLvl}: <strong>×${marketMult.toFixed(2)}</strong> → ${baseCapacity.toLocaleString('de')}`,
+  ];
+  if (tcLvl > 0) {
+    breakdownParts.push(`Handelskontor Stufe ${tcLvl}: <strong>+${(tcLvl * 5)} %</strong>`);
+  }
+  if (allyBonus > 0) {
+    breakdownParts.push(`Allianz-Bonus: <strong>+${allyBonus} %</strong>`);
+  }
+  if (tcLvl > 0 || allyBonus > 0) {
+    const totalBonus = Math.round((fullCapacity / baseCapacity - 1) * 100);
+    breakdownParts.push(`Gesamt-Bonus auf Basis-Kapazität: <strong>+${totalBonus} %</strong> → ${fullCapacity.toLocaleString('de')} ☀️`);
+  }
+  document.getElementById('tr-bonus-breakdown').innerHTML = breakdownParts.join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+
+  // ── Info message ──────────────────────────────────────────────────
   let info = '';
   if (deficit === 0) {
     info = '✅ Kein Getreidemangel — keine Traderouten nötig.';
   } else if (needed > maxRoutes) {
-    info = `⚠️ ${needed} Routen benötigt, aber dein Marktplatz (Stufe ${mLvl}) erlaubt nur ${maxRoutes} gleichzeitige Händler. `
-         + `Erhöhe den Marktplatz auf mindestens Stufe ${Math.ceil(needed / t.merchants_per_level)} oder reduziere die Entfernung zur Lieferfarm.`;
+    const minMarketLvl = Math.ceil(needed / t.merchants_per_level);
+    info = `⚠️ ${needed} Routen benötigt, aber Marktplatz Stufe ${mLvl} erlaubt nur ${maxRoutes} Händler gleichzeitig. `
+         + `Lösungen: Marktplatz auf Stufe ${minMarketLvl} erhöhen, Entfernung verkürzen, `
+         + (tcLvl < 20 ? `Handelskontor ausbauen (aktuell Stufe ${tcLvl}), ` : '')
+         + 'oder Allianz-Bonus nutzen.';
   } else {
-    info = `✅ ${needed} von ${maxRoutes} möglichen Traderouten reichen aus, um den Mangel von ${deficit.toLocaleString('de')} ☀️/h auszugleichen.`;
+    info = `✅ ${needed} von ${maxRoutes} möglichen Traderouten reichen aus, um ${deficit.toLocaleString('de')} ☀️/h auszugleichen.`;
   }
   document.getElementById('tr-info').textContent = info;
   document.getElementById('tr-result').style.display = 'block';
@@ -1003,6 +1077,6 @@ function formatMinutes(mins) {
   return h > 0 ? `${h}h ${m}min` : `${m}min`;
 }
 
-calcTradeRoutes(); // initial render
+calcTradeRoutes();
 </script>
 {% endblock %}
