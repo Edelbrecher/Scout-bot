@@ -41,30 +41,136 @@
           {% endif %}
         </div>
 
-        {# Bounding Box #}
-        <div style="margin-bottom:1.25rem;">
-          <div style="font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:0.5rem;">📐 Beobachtungsbereich (Koordinaten)</div>
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.75rem; max-width:480px;">
-            <div>
-              <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">X von</label>
-              <input type="number" name="x1" value="{{ monitor.get('x1', -50) }}" min="-500" max="500"
-                style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+        {# ── Beobachtungsbereich ── #}
+        <div style="margin-bottom:1.5rem;">
+          <div style="font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:0.75rem;">📐 Beobachtungsbereich</div>
+
+          {# Mode toggle #}
+          <div style="display:flex;gap:.35rem;margin-bottom:1rem;">
+            <button type="button" id="modeQuadrant"
+                    onclick="setMode('quadrant')"
+                    style="padding:.32rem .85rem;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer;
+                           background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.5);color:#818cf8;">
+              🗺️ Quadrant
+            </button>
+            <button type="button" id="modeRadius"
+                    onclick="setMode('radius')"
+                    style="padding:.32rem .85rem;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer;
+                           background:transparent;border:1px solid var(--border);color:var(--text-muted);">
+              🎯 Mittelpunkt + Radius
+            </button>
+            <button type="button" id="modeManual"
+                    onclick="setMode('manual')"
+                    style="padding:.32rem .85rem;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer;
+                           background:transparent;border:1px solid var(--border);color:var(--text-muted);">
+              ✏️ Manuell
+            </button>
+          </div>
+
+          {# Quadrant picker #}
+          <div id="panelQuadrant">
+            <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .6rem;">
+              Klicke auf einen oder mehrere Bereiche der Karte. Die Koordinaten werden automatisch gesetzt.
+            </p>
+            {# 3×3 visual grid — Travian map center is 0|0 #}
+            <div style="display:inline-grid;grid-template-columns:repeat(3,72px);grid-template-rows:repeat(3,52px);gap:3px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:4px;margin-bottom:.75rem;">
+              {% set cells = [
+                ('NW',  -200, 0,    0,  200, 'NW'),
+                ('N',      0, 0,  200,  200, 'N'),
+                ('NE',   200, 0,  400,  200, 'NE'),
+                ('W',   -200,-200,  0,    0, 'W'),
+                ('C',      0,-100,100,  100, 'Zentrum'),
+                ('E',    200,-200,400,    0, 'E'),
+                ('SW',  -200,-400,  0, -200, 'SW'),
+                ('S',      0,-400,200, -200, 'S'),
+                ('SE',   200,-400,400, -200, 'SE'),
+              ] %}
+              {% for key, cx1, cy1, cx2, cy2, label in cells %}
+              <div class="qcell" id="qc-{{ key }}"
+                   data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
+                   onclick="toggleQuadrant('{{ key }}')"
+                   title="{{ label }} ({{ cx1 }}|{{ cy2 }}) – ({{ cx2 }}|{{ cy1 }})"
+                   style="display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;
+                          border-radius:5px;cursor:pointer;border:1px solid var(--border);
+                          background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;
+                          {% if key == 'C' %}color:#6366f1;border-color:#6366f1;{% endif %}">
+                {{ label }}
+              </div>
+              {% endfor %}
             </div>
-            <div>
-              <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">Y von</label>
-              <input type="number" name="y1" value="{{ monitor.get('y1', -50) }}" min="-500" max="500"
-                style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+            <div id="quadrantSummary" style="font-size:.78rem;color:var(--text-muted);">Kein Bereich ausgewählt</div>
+          </div>
+
+          {# Radius picker #}
+          <div id="panelRadius" style="display:none;">
+            <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .6rem;">
+              Gib die Koordinaten deines Hauptdorfs und den Überwachungsradius ein.
+            </p>
+            <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+              <div>
+                <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:3px;">Mittelpunkt X</label>
+                <input type="number" id="rCenterX" value="0" min="-500" max="500" oninput="applyRadius()"
+                       style="width:90px;padding:.38rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+              </div>
+              <div>
+                <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:3px;">Mittelpunkt Y</label>
+                <input type="number" id="rCenterY" value="0" min="-500" max="500" oninput="applyRadius()"
+                       style="width:90px;padding:.38rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+              </div>
+              <div>
+                <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:3px;">Radius (Felder)</label>
+                <input type="number" id="rRadius" value="50" min="5" max="400" oninput="applyRadius()"
+                       style="width:90px;padding:.38rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+              </div>
+              <div style="margin-top:1.1rem;">
+                <div id="radiusSummary" style="font-size:.78rem;color:var(--text-muted);"></div>
+              </div>
             </div>
-            <div>
-              <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">X bis</label>
-              <input type="number" name="x2" value="{{ monitor.get('x2', 50) }}" min="-500" max="500"
-                style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+          </div>
+
+          {# Manual #}
+          <div id="panelManual" style="display:none;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.75rem; max-width:480px;">
+              <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">X von</label>
+                <input type="number" id="manX1" oninput="syncFromManual()" min="-500" max="500"
+                  value="{{ monitor.get('x1', -50) }}"
+                  style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+              </div>
+              <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">Y von</label>
+                <input type="number" id="manY1" oninput="syncFromManual()" min="-500" max="500"
+                  value="{{ monitor.get('y1', -50) }}"
+                  style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+              </div>
+              <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">X bis</label>
+                <input type="number" id="manX2" oninput="syncFromManual()" min="-500" max="500"
+                  value="{{ monitor.get('x2', 50) }}"
+                  style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+              </div>
+              <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">Y bis</label>
+                <input type="number" id="manY2" oninput="syncFromManual()" min="-500" max="500"
+                  value="{{ monitor.get('y2', 50) }}"
+                  style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
+              </div>
             </div>
-            <div>
-              <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:3px;">Y bis</label>
-              <input type="number" name="y2" value="{{ monitor.get('y2', 50) }}" min="-500" max="500"
-                style="width:100%; padding:0.4rem; background:var(--bg-main); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.9rem;">
-            </div>
+          </div>
+
+          {# Hidden actual form fields — always submitted #}
+          <input type="hidden" name="x1" id="hX1" value="{{ monitor.get('x1', -50) }}">
+          <input type="hidden" name="y1" id="hY1" value="{{ monitor.get('y1', -50) }}">
+          <input type="hidden" name="x2" id="hX2" value="{{ monitor.get('x2',  50) }}">
+          <input type="hidden" name="y2" id="hY2" value="{{ monitor.get('y2',  50) }}">
+
+          {# Live preview strip #}
+          <div style="margin-top:.75rem;font-size:.75rem;color:var(--text-muted);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            <span>📍 Aktuell:</span>
+            <code id="coordPreview" style="background:rgba(255,255,255,.06);border-radius:4px;padding:1px 7px;font-size:.78rem;color:var(--text);">
+              ({{ monitor.get('x1',-50) }}|{{ monitor.get('y1',-50) }}) → ({{ monitor.get('x2',50) }}|{{ monitor.get('y2',50) }})
+            </code>
+            <span id="coordArea" style="color:var(--text-muted);"></span>
           </div>
         </div>
 
@@ -286,4 +392,119 @@
   {% endif %}
 
 </div>
+
+<script>
+// ── Coordinate state ──────────────────────────────────────────────────────────
+let cx1 = {{ monitor.get('x1', -50) }},
+    cy1 = {{ monitor.get('y1', -50) }},
+    cx2 = {{ monitor.get('x2',  50) }},
+    cy2 = {{ monitor.get('y2',  50) }};
+
+function setCoords(x1, y1, x2, y2) {
+  cx1 = Math.min(x1,x2); cy1 = Math.min(y1,y2);
+  cx2 = Math.max(x1,x2); cy2 = Math.max(y1,y2);
+  document.getElementById('hX1').value = cx1;
+  document.getElementById('hY1').value = cy1;
+  document.getElementById('hX2').value = cx2;
+  document.getElementById('hY2').value = cy2;
+  document.getElementById('manX1').value = cx1;
+  document.getElementById('manY1').value = cy1;
+  document.getElementById('manX2').value = cx2;
+  document.getElementById('manY2').value = cy2;
+  const w = cx2-cx1, h = cy2-cy1;
+  document.getElementById('coordPreview').textContent = `(${cx1}|${cy1}) → (${cx2}|${cy2})`;
+  document.getElementById('coordArea').textContent = `${w}×${h} Felder = ${(w*h).toLocaleString()} Dörfer max.`;
+}
+
+// ── Mode switch ───────────────────────────────────────────────────────────────
+let currentMode = 'quadrant';
+function setMode(m) {
+  currentMode = m;
+  ['quadrant','radius','manual'].forEach(id => {
+    const btn = document.getElementById('mode' + id.charAt(0).toUpperCase() + id.slice(1));
+    const panel = document.getElementById('panel' + id.charAt(0).toUpperCase() + id.slice(1));
+    const active = id === m;
+    btn.style.background = active ? 'rgba(99,102,241,.2)' : 'transparent';
+    btn.style.borderColor = active ? 'rgba(99,102,241,.5)' : 'var(--border)';
+    btn.style.color       = active ? '#818cf8' : 'var(--text-muted)';
+    panel.style.display   = active ? '' : 'none';
+  });
+}
+
+// ── Quadrant mode ─────────────────────────────────────────────────────────────
+const selectedQuads = new Set();
+
+// Pre-select cell matching current coords on load
+(function detectInitialQuad() {
+  document.querySelectorAll('.qcell').forEach(el => {
+    const qx1 = +el.dataset.x1, qy1 = +el.dataset.y1;
+    const qx2 = +el.dataset.x2, qy2 = +el.dataset.y2;
+    // Check if current bounding box is "close" to this cell
+    if (cx1 >= qx1 && cy1 >= qy1 && cx2 <= qx2 && cy2 <= qy2) {
+      selectedQuads.add(el.dataset.key);
+      highlightCell(el, true);
+    }
+  });
+  refreshQuadrantSummary();
+})();
+
+function highlightCell(el, on) {
+  el.style.background = on ? 'rgba(99,102,241,.25)' : 'rgba(255,255,255,.03)';
+  el.style.borderColor = on ? '#818cf8' : 'var(--border)';
+  el.style.color = on ? '#c4b5fd' : (el.dataset.key==='C' ? '#6366f1' : 'var(--text-muted)');
+}
+
+function toggleQuadrant(key) {
+  const el = document.getElementById('qc-' + key);
+  if (selectedQuads.has(key)) {
+    selectedQuads.delete(key);
+    highlightCell(el, false);
+  } else {
+    selectedQuads.add(key);
+    highlightCell(el, true);
+  }
+  refreshQuadrantSummary();
+}
+
+function refreshQuadrantSummary() {
+  const cells = document.querySelectorAll('.qcell');
+  if (selectedQuads.size === 0) {
+    document.getElementById('quadrantSummary').textContent = 'Kein Bereich ausgewählt';
+    return;
+  }
+  // Union bounding box of all selected cells
+  let minX = 999, minY = 999, maxX = -999, maxY = -999;
+  cells.forEach(el => {
+    if (!selectedQuads.has(el.dataset.key)) return;
+    minX = Math.min(minX, +el.dataset.x1); minY = Math.min(minY, +el.dataset.y1);
+    maxX = Math.max(maxX, +el.dataset.x2); maxY = Math.max(maxY, +el.dataset.y2);
+  });
+  setCoords(minX, minY, maxX, maxY);
+  const names = [...selectedQuads].join(' + ');
+  document.getElementById('quadrantSummary').textContent =
+    `Ausgewählt: ${names} → (${cx1}|${cy1}) bis (${cx2}|${cy2})`;
+}
+
+// ── Radius mode ───────────────────────────────────────────────────────────────
+function applyRadius() {
+  const cx = parseInt(document.getElementById('rCenterX').value) || 0;
+  const cy = parseInt(document.getElementById('rCenterY').value) || 0;
+  const r  = Math.max(5, parseInt(document.getElementById('rRadius').value) || 50);
+  setCoords(cx - r, cy - r, cx + r, cy + r);
+  document.getElementById('radiusSummary').textContent =
+    `→ (${cx1}|${cy1}) bis (${cx2}|${cy2}) · ${r*2}×${r*2} Felder`;
+}
+
+// ── Manual mode ───────────────────────────────────────────────────────────────
+function syncFromManual() {
+  const x1 = parseInt(document.getElementById('manX1').value) || 0;
+  const y1 = parseInt(document.getElementById('manY1').value) || 0;
+  const x2 = parseInt(document.getElementById('manX2').value) || 0;
+  const y2 = parseInt(document.getElementById('manY2').value) || 0;
+  setCoords(x1, y1, x2, y2);
+}
+
+// Initial coord area display
+setCoords(cx1, cy1, cx2, cy2);
+</script>
 {% endblock %}
