@@ -128,6 +128,32 @@
     </div>
     <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;">✕ Reset</button>
     <button onclick="shareMapView(this)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Aktuellen Kartenausschnitt als Link teilen">🔗 Teilen</button>
+    <!-- Draw toolbar -->
+    <div id="drawToolbar" style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;padding:0.25rem 0.5rem;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);">
+      <button id="drawToggleBtn" onclick="toggleDraw()" title="Zeichnen an/aus"
+              style="font-size:0.85rem;padding:0.2rem 0.5rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;">
+        ✏️
+      </button>
+      <span id="drawControls" style="display:none;align-items:center;gap:0.3rem;flex-wrap:wrap;">
+        <input type="color" id="drawColor" value="#ff4444" title="Farbe"
+               style="width:26px;height:26px;border:none;border-radius:4px;padding:1px;cursor:pointer;background:none;">
+        <select id="drawSize" title="Strichbreite"
+                style="font-size:0.75rem;padding:0.15rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);">
+          <option value="2">Dünn</option>
+          <option value="4" selected>Normal</option>
+          <option value="8">Dick</option>
+          <option value="16">Sehr dick</option>
+        </select>
+        <button onclick="setDrawMode('draw')" id="modeDraw" title="Stift"
+                style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid rgba(99,102,241,.5);background:rgba(99,102,241,.2);color:#a5b4fc;cursor:pointer;">✏️</button>
+        <button onclick="setDrawMode('erase')" id="modeErase" title="Radierer"
+                style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;">🧹</button>
+        <button onclick="drawUndo()" title="Rückgängig (Strg+Z)"
+                style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;">↩️</button>
+        <button onclick="drawClear()" title="Alles löschen"
+                style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;">🗑️</button>
+      </span>
+    </div>
     <span id="searchInfo" style="align-self:flex-end; font-size:0.78rem; color:var(--text-muted);"></span>
   </div>
 
@@ -216,6 +242,7 @@
   <!-- Map canvas -->
   <div id="mapWrap" style="height:520px;">
     <canvas id="mapCanvas"></canvas>
+    <canvas id="drawCanvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
     <div id="mapTooltip"></div>
     <div id="mapStatus">Lade Kartendaten…</div>
     <div id="coordDisplay">—|—</div>
@@ -988,6 +1015,216 @@ async function loadMap() {
 // Restore URL state before loading (so scale/cam are set before first draw)
 restoreFromUrl();
 loadMap();
+
+// ═══════════════════════════════════════════════════════════════
+// DRAW SYSTEM — freehand drawing anchored to world coordinates
+// ═══════════════════════════════════════════════════════════════
+
+const drawCanvas = document.getElementById('drawCanvas');
+const dctx       = drawCanvas.getContext('2d');
+
+let drawMode    = 'draw';   // 'draw' | 'erase'
+let drawEnabled = false;
+let drawPaths   = [];       // [{color, width, pts:[[wx,wy],...]}]
+let drawCurrent = null;     // path being drawn
+let drawMouseDown = false;
+
+// Keep draw canvas same size as map canvas
+function syncDrawCanvas() {
+  drawCanvas.width  = canvas.width;
+  drawCanvas.height = canvas.height;
+  redrawPaths();
+}
+
+// Convert world coords array to screen, draw the stroke
+function renderPath(path) {
+  if (!path.pts || path.pts.length < 1) return;
+  dctx.save();
+  if (path.erase) {
+    dctx.globalCompositeOperation = 'destination-out';
+    dctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.strokeStyle = path.color || '#ff4444';
+  }
+  dctx.lineWidth   = (path.width || 4) * Math.max(1, scale / 4);
+  dctx.lineCap     = 'round';
+  dctx.lineJoin    = 'round';
+  dctx.beginPath();
+  path.pts.forEach(([wx, wy], i) => {
+    const [sx, sy] = worldToCanvas(wx, wy);
+    if (i === 0) dctx.moveTo(sx, sy);
+    else dctx.lineTo(sx, sy);
+  });
+  dctx.stroke();
+  dctx.restore();
+}
+
+function redrawPaths() {
+  dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawPaths.forEach(renderPath);
+  if (drawCurrent) renderPath(drawCurrent);
+}
+
+// ── Toggle draw mode ──────────────────────────────────────────
+function toggleDraw() {
+  drawEnabled = !drawEnabled;
+  const btn  = document.getElementById('drawToggleBtn');
+  const ctrl = document.getElementById('drawControls');
+  if (drawEnabled) {
+    btn.style.background  = 'rgba(99,102,241,.25)';
+    btn.style.borderColor = 'rgba(99,102,241,.6)';
+    btn.style.color       = '#a5b4fc';
+    ctrl.style.display    = 'flex';
+    drawCanvas.style.pointerEvents = 'all';
+    drawCanvas.style.cursor = 'crosshair';
+    canvas.style.pointerEvents = 'none';   // map below ignores mouse while drawing
+  } else {
+    btn.style.background  = '';
+    btn.style.borderColor = '';
+    btn.style.color       = '';
+    ctrl.style.display    = 'none';
+    drawCanvas.style.pointerEvents = 'none';
+    drawCanvas.style.cursor = '';
+    canvas.style.pointerEvents = '';
+  }
+}
+
+function setDrawMode(m) {
+  drawMode = m;
+  document.getElementById('modeDraw').style.background  = m==='draw'  ? 'rgba(99,102,241,.2)' : '';
+  document.getElementById('modeErase').style.background = m==='erase' ? 'rgba(239,68,68,.15)'  : '';
+}
+
+function drawUndo() {
+  drawPaths.pop();
+  redrawPaths();
+}
+
+function drawClear() {
+  if (!confirm('Alle Zeichnungen löschen?')) return;
+  drawPaths = [];
+  dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+}
+
+// ── Mouse events ──────────────────────────────────────────────
+function drawPos(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  return canvasToWorld(x, y);
+}
+
+drawCanvas.addEventListener('mousedown', e => {
+  if (!drawEnabled) return;
+  drawMouseDown = true;
+  const [wx, wy] = drawPos(e);
+  drawCurrent = {
+    color: document.getElementById('drawColor').value,
+    width: parseInt(document.getElementById('drawSize').value),
+    erase: drawMode === 'erase',
+    pts:   [[wx, wy]],
+  };
+  redrawPaths();
+});
+
+drawCanvas.addEventListener('mousemove', e => {
+  if (!drawEnabled || !drawMouseDown || !drawCurrent) return;
+  const [wx, wy] = drawPos(e);
+  const last = drawCurrent.pts.at(-1);
+  // Minimum world-distance to avoid too many points
+  const minD = 0.5 / scale;
+  if (Math.abs(wx - last[0]) > minD || Math.abs(wy - last[1]) > minD) {
+    drawCurrent.pts.push([wx, wy]);
+    redrawPaths();
+  }
+});
+
+const endDraw = () => {
+  if (!drawCurrent) return;
+  if (drawCurrent.pts.length > 1) {
+    drawPaths.push(drawCurrent);
+  }
+  drawCurrent = null;
+  drawMouseDown = false;
+  redrawPaths();
+};
+drawCanvas.addEventListener('mouseup',    endDraw);
+drawCanvas.addEventListener('mouseleave', endDraw);
+
+// Touch support
+drawCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  drawCanvas.dispatchEvent(new MouseEvent('mousedown', { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }));
+}, { passive: false });
+drawCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  drawCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }));
+}, { passive: false });
+drawCanvas.addEventListener('touchend', e => { e.preventDefault(); endDraw(); }, { passive: false });
+
+// Ctrl+Z
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); drawUndo(); }
+});
+
+// ── Redraw on map move/zoom ───────────────────────────────────
+// Wrap the existing draw() to also call redrawPaths()
+const _origDraw = draw;
+draw = function(...args) { _origDraw(...args); syncDrawCanvas(); };
+
+// ── Serialize / deserialize ───────────────────────────────────
+// Simple LZ-style: store paths as compact JSON, base64url-encode
+function drawSerialize() {
+  if (!drawPaths.length) return '';
+  // Compact format: [{c:color, w:width, e:erase, p:[[x,y],...]}]
+  const data = drawPaths.map(path => ({
+    c: path.color,
+    w: path.width,
+    e: path.erase ? 1 : 0,
+    // Round to 1 decimal to save space
+    p: path.pts.map(([x, y]) => [Math.round(x * 2) / 2, Math.round(y * 2) / 2]),
+  }));
+  const json = JSON.stringify(data);
+  // btoa with URI encoding
+  try { return btoa(encodeURIComponent(json)); } catch { return ''; }
+}
+
+function drawDeserialize(str) {
+  if (!str) return;
+  try {
+    const json = decodeURIComponent(atob(str));
+    const data = JSON.parse(json);
+    drawPaths = data.map(d => ({
+      color: d.c,
+      width: d.w,
+      erase: !!d.e,
+      pts:   d.p,
+    }));
+    redrawPaths();
+  } catch(e) { console.warn('draw restore failed', e); }
+}
+
+// ── Hook into share URL ───────────────────────────────────────
+const _origBuildShareUrl = buildShareUrl;
+buildShareUrl = function() {
+  const url = _origBuildShareUrl();
+  const serialized = drawSerialize();
+  if (!serialized) return url;
+  return url + '&draw=' + encodeURIComponent(serialized);
+};
+
+const _origRestoreFromUrl = restoreFromUrl;
+restoreFromUrl = function() {
+  _origRestoreFromUrl();
+  const p = new URLSearchParams(location.search);
+  if (p.has('draw')) {
+    // Restore after map loads so canvas size is set
+    setTimeout(() => drawDeserialize(decodeURIComponent(p.get('draw'))), 200);
+  }
+};
+
+// Init canvas size
+syncDrawCanvas();
 </script>
 {% endif %}
 {% endblock %}
