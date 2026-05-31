@@ -8933,12 +8933,28 @@ async def village_layout_set_slot(request: Request, guild_id: str, layout_id: in
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
-    slot_num = int(body.get("slot_num", 0))
-    zone = body.get("zone", "")
+    slot_num      = int(body.get("slot_num", 0))
+    zone          = body.get("zone", "")
     building_type = body.get("building_type", "")
-    target_level = int(body.get("target_level", 0))
-    notes = body.get("notes", "")
-    await database.set_village_slot(layout_id, guild_id, slot_num, zone, building_type, target_level, notes)
+    target_level  = int(body.get("target_level", 0))
+    notes         = body.get("notes", "")
+    pos_x         = float(body.get("pos_x", 50))
+    pos_y         = float(body.get("pos_y", 50))
+    await database.set_village_slot(
+        layout_id, guild_id, slot_num, zone, building_type, target_level, notes, pos_x, pos_y
+    )
+    return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/blueprints/layouts/{layout_id}/slot/delete")
+async def village_layout_delete_slot(request: Request, guild_id: str, layout_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    slot_id = int(body.get("slot_id", 0))
+    await database.delete_village_slot_by_id(slot_id, layout_id, guild_id)
     return JSONResponse({"ok": True})
 
 

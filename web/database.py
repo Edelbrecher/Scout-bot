@@ -4687,9 +4687,16 @@ async def init_village_layout_tables():
                 building_type   TEXT DEFAULT '',
                 target_level    INTEGER DEFAULT 0,
                 notes           TEXT DEFAULT '',
+                pos_x           REAL DEFAULT 50,
+                pos_y           REAL DEFAULT 50,
                 UNIQUE(layout_id, slot_num)
             )
         """)
+        for col in ["pos_x REAL DEFAULT 50", "pos_y REAL DEFAULT 50"]:
+            try:
+                await db.execute(f"ALTER TABLE village_slots ADD COLUMN {col}")
+            except Exception:
+                pass
         await db.commit()
 
 
@@ -4757,20 +4764,26 @@ async def delete_village_layout(guild_id: str, layout_id: int):
         await db.commit()
 
 
-async def set_village_slot(layout_id: int, guild_id: str, slot_num: int, zone: str, building_type: str, target_level: int, notes: str):
-    # Verify layout belongs to guild
+async def set_village_slot(
+    layout_id: int, guild_id: str, slot_num: int, zone: str,
+    building_type: str, target_level: int, notes: str,
+    pos_x: float = 50.0, pos_y: float = 50.0,
+):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
             if not await cur.fetchone():
                 return
         await db.execute(
-            """INSERT INTO village_slots (layout_id, slot_num, slot_zone, building_type, target_level, notes)
-               VALUES (?, ?, ?, ?, ?, ?)
+            """INSERT INTO village_slots
+                   (layout_id, slot_num, slot_zone, building_type, target_level, notes, pos_x, pos_y)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(layout_id, slot_num) DO UPDATE SET
                  building_type=excluded.building_type,
                  target_level=excluded.target_level,
-                 notes=excluded.notes""",
-            (layout_id, slot_num, zone, building_type, target_level, notes)
+                 notes=excluded.notes,
+                 pos_x=excluded.pos_x,
+                 pos_y=excluded.pos_y""",
+            (layout_id, slot_num, zone, building_type, target_level, notes, pos_x, pos_y)
         )
         await db.commit()
 
@@ -4783,6 +4796,17 @@ async def clear_village_slot(layout_id: int, guild_id: str, slot_num: int):
         await db.execute(
             "DELETE FROM village_slots WHERE layout_id=? AND slot_num=?",
             (layout_id, slot_num)
+        )
+        await db.commit()
+
+
+async def delete_village_slot_by_id(slot_id: int, layout_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
+            if not await cur.fetchone():
+                return
+        await db.execute(
+            "DELETE FROM village_slots WHERE id=? AND layout_id=?", (slot_id, layout_id)
         )
         await db.commit()
 

@@ -193,55 +193,73 @@
 
     <!-- Right panel -->
     <div class="slot-panel" id="slot-panel">
+
+      <!-- Add new slot -->
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">Add to map</div>
+        <div style="display:flex;flex-direction:column;gap:.35rem;">
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
+            <button onclick="addSlot('resource','wood')"   style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#15532e;border:1px solid #22c55e;color:#86efac;font-size:.75rem;cursor:pointer;">🌲 Wood</button>
+            <button onclick="addSlot('resource','clay')"   style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#7c2d12;border:1px solid #f97316;color:#fed7aa;font-size:.75rem;cursor:pointer;">🏺 Clay</button>
+            <button onclick="addSlot('resource','iron')"   style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#1e293b;border:1px solid #94a3b8;color:#e2e8f0;font-size:.75rem;cursor:pointer;">⚙️ Iron</button>
+            <button onclick="addSlot('resource','wheat')"  style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#713f12;border:1px solid #eab308;color:#fef08a;font-size:.75rem;cursor:pointer;">🌾 Wheat</button>
+          </div>
+          <div style="display:flex;gap:.3rem;align-items:center;">
+            <select id="new-bld-type" class="form-input" style="flex:1;font-size:.78rem;padding:.3rem .5rem;">
+              <option value="">— Building type —</option>
+            </select>
+            <button onclick="addSlot('building', document.getElementById('new-bld-type').value)"
+                    style="padding:.3rem .65rem;border-radius:6px;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#818cf8;font-size:.75rem;cursor:pointer;">
+              ➕
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:.5rem 0 .85rem;">
+
+      <!-- Selected slot editor -->
       <div id="panel-placeholder" class="panel-placeholder">
         <div style="font-size:2rem; margin-bottom:0.5rem;">👆</div>
-        <div>Wähle einen Slot auf der Karte aus</div>
+        <div style="font-size:.83rem;">Click a slot to edit it<br><span style="font-size:.75rem;opacity:.6;">Drag slots freely on the map</span></div>
       </div>
       <div id="panel-content" style="display:none;">
-        <h3 id="panel-title">Slot #1</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem;">
+          <h3 id="panel-title" style="margin:0;font-size:.92rem;">Slot</h3>
+          <button onclick="deleteSelectedSlot()" title="Remove from map"
+                  style="background:none;border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:5px;
+                         padding:.2rem .5rem;font-size:.72rem;cursor:pointer;">🗑️ Remove</button>
+        </div>
         <span class="panel-zone-badge" id="panel-zone-badge"></span>
-        <div id="panel-current" style="margin-bottom:1rem; font-size:0.82rem; color:var(--text-muted);"></div>
 
         <!-- Resource form -->
-        <div id="form-resource" style="display:none;">
-          <div class="form-group">
-            <label class="form-label">Ressource</label>
-            <select class="form-input" id="res-type">
-              <option value="">— leer —</option>
-              <option value="wood">🌲 Holz (Holzfäller)</option>
-              <option value="clay">🏺 Lehm (Lehmgrube)</option>
-              <option value="iron">⚙️ Eisen (Eisenmine)</option>
-              <option value="wheat">🌾 Getreide (Getreidefeld)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Ziel-Level <span class="level-display" id="res-level-display">0</span></label>
-            <input type="range" class="form-range" id="res-level" min="0" max="20" value="0">
-          </div>
+        <div id="form-resource" style="display:none;margin-top:.65rem;">
+          <label class="form-label">Resource type</label>
+          <select class="form-input" id="res-type">
+            <option value="wood">🌲 Wood</option>
+            <option value="clay">🏺 Clay</option>
+            <option value="iron">⚙️ Iron</option>
+            <option value="wheat">🌾 Wheat</option>
+          </select>
+          <label class="form-label" style="margin-top:.6rem;">Target level <span class="level-display" id="res-level-display">0</span></label>
+          <input type="range" class="form-range" id="res-level" min="0" max="20" value="0">
         </div>
 
         <!-- Building form -->
-        <div id="form-building" style="display:none;">
-          <div class="form-group">
-            <label class="form-label">Gebäude</label>
-            <select class="form-input" id="bld-type">
-              <option value="">— leer —</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Ziel-Level <span class="level-display" id="bld-level-display">0</span></label>
-            <input type="range" class="form-range" id="bld-level" min="0" max="20" value="0">
-          </div>
+        <div id="form-building" style="display:none;margin-top:.65rem;">
+          <label class="form-label">Building</label>
+          <select class="form-input" id="bld-type"></select>
+          <label class="form-label" style="margin-top:.6rem;">Target level <span class="level-display" id="bld-level-display">0</span></label>
+          <input type="range" class="form-range" id="bld-level" min="0" max="20" value="0">
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Notizen</label>
-          <textarea class="form-input" id="slot-notes" rows="2" placeholder="Optionale Notizen..."></textarea>
+        <div class="form-group" style="margin-top:.65rem;">
+          <label class="form-label">Notes</label>
+          <textarea class="form-input" id="slot-notes" rows="2" placeholder="Optional notes…"></textarea>
         </div>
 
-        <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-          <button class="btn btn-primary" style="flex:1;" onclick="saveSlot()">💾 Speichern</button>
-          <button class="btn btn-secondary" onclick="clearSlot()">🗑️ Leeren</button>
+        <div style="display:flex; gap:0.5rem; margin-top:.85rem;">
+          <button class="btn btn-primary" style="flex:1;font-size:.82rem;" onclick="saveSlot()">💾 Save</button>
         </div>
         <div id="panel-msg" style="font-size:0.8rem; margin-top:0.6rem; min-height:1.2em;"></div>
       </div>
@@ -250,334 +268,338 @@
 </div>
 
 <script>
-// ── Data ──────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════
+// FREE-DRAG VILLAGE LAYOUT EDITOR
+// ════════════════════════════════════════════════════════════════════
 const LAYOUT_ID = {{ layout.id }};
 const GUILD_ID  = "{{ guild.guild_id }}";
 const BASE_URL  = `/guild/${GUILD_ID}/blueprints/layouts/${LAYOUT_ID}`;
 
-// Pre-existing slots from server
-const INITIAL_SLOTS = {
-  {% for s in layout.slots %}
-  {{ s.slot_num }}: {
-    zone: "{{ s.slot_zone }}",
-    building_type: {{ s.building_type | tojson }},
-    target_level: {{ s.target_level }},
-    notes: {{ s.notes | tojson }}
-  },
-  {% endfor %}
-};
-
+// ── Static data ───────────────────────────────────────────────────
 const BUILDINGS = [
   'Hauptgebäude','Kaserne','Stall','Werkstatt','Akademie',
   'Schmiede','Versammlungsplatz','Botschaft','Marktplatz',
   'Kornspeicher','Lager','Versteck','Stadtmauer',
   'Rathaus','Residenz','Palast','Schatzhaus','Wunderwerk',
   'Turniersplatz','Heldenresidenz','Sägewerk','Ziegelei',
-  'Eisengießerei','Getreidemühle','Bäckerei','Falle'
+  'Eisengießerei','Getreidemühle','Bäckerei','Falle',
 ];
-
 const BUILDING_CATEGORIES = {
-  military:  ['Kaserne','Stall','Werkstatt','Akademie','Schmiede'],
-  economy:   ['Marktplatz','Lager','Kornspeicher','Sägewerk','Ziegelei','Eisengießerei','Getreidemühle','Bäckerei'],
-  admin:     ['Hauptgebäude','Rathaus','Botschaft','Residenz','Palast'],
-  defense:   ['Stadtmauer','Falle','Versammlungsplatz'],
-  other:     ['Versteck','Heldenresidenz','Schatzhaus','Turniersplatz','Wunderwerk'],
+  military: ['Kaserne','Stall','Werkstatt','Akademie','Schmiede'],
+  economy:  ['Marktplatz','Lager','Kornspeicher','Sägewerk','Ziegelei','Eisengießerei','Getreidemühle','Bäckerei'],
+  admin:    ['Hauptgebäude','Rathaus','Botschaft','Residenz','Palast'],
+  defense:  ['Stadtmauer','Falle','Versammlungsplatz'],
+  other:    ['Versteck','Heldenresidenz','Schatzhaus','Turniersplatz','Wunderwerk'],
 };
-
-const BUILDING_COLORS = {
-  military: 'military', economy: 'economy', admin: 'admin', defense: 'defense', other: 'other'
-};
-
 function getBuildingCategory(b) {
   for (const [cat, list] of Object.entries(BUILDING_CATEGORIES)) {
     if (list.includes(b)) return cat;
   }
   return 'other';
 }
-
 const RESOURCE_EMOJIS = { wood:'🌲', clay:'🏺', iron:'⚙️', wheat:'🌾' };
 const RESOURCE_LABELS = { wood:'Holz', clay:'Lehm', iron:'Eisen', wheat:'Getreide' };
 
-// ── Slot positions ────────────────────────────────────────────────────────
-// Travian-accurate resource field positions:
-// Outer ring (slots 1-12) + inner ring (slots 13-18)
-// [left%, top%] within the map container
-const RESOURCE_POS = {
-  // Outer ring — 12 fields, clockwise from top
-  1:  [50,  5],   // top
-  2:  [66,  7],   // top-right
-  3:  [79, 15],   // right-top
-  4:  [88, 28],   // right-upper
-  5:  [91, 44],   // right
-  6:  [88, 60],   // right-lower
-  7:  [79, 73],   // right-bottom
-  8:  [63, 82],   // bottom-right
-  9:  [50, 86],   // bottom
-  10: [37, 82],   // bottom-left
-  11: [21, 73],   // left-bottom
-  12: [12, 60],   // left-lower
-  13: [ 9, 44],   // left
-  14: [12, 28],   // left-upper
-  15: [21, 15],   // left-top
-  16: [34,  7],   // top-left
-  // Inner ring — 2 extra fields
-  17: [32, 26],   // inner top-left
-  18: [68, 26],   // inner top-right
-};
+// ── Runtime state ─────────────────────────────────────────────────
+// slots: Map<slot_num, {id, slot_num, zone, building_type, target_level, notes, pos_x, pos_y}>
+const slots = new Map();
+let nextSlotNum = 1;       // auto-increment for new slots
+let selectedSlotNum = null;
+let saveTimer = null;
 
-// Mark which slots are inner ring (slightly smaller)
-const INNER_RING_SLOTS = new Set([17, 18]);
+// Load from server
+{% for s in layout.slots %}
+slots.set({{ s.slot_num }}, {
+  id:            {{ s.id }},
+  slot_num:      {{ s.slot_num }},
+  zone:          {{ s.slot_zone | tojson }},
+  building_type: {{ s.building_type | tojson }},
+  target_level:  {{ s.target_level }},
+  notes:         {{ s.notes | tojson }},
+  pos_x:         {{ s.pos_x | default(50) }},
+  pos_y:         {{ s.pos_y | default(50) }},
+});
+nextSlotNum = Math.max(nextSlotNum, {{ s.slot_num }} + 1);
+{% endfor %}
 
-// Inner building positions (slots 19-39) — clustered village center
-const BUILDING_POS = {
-  19:[38,35], 20:[50,29], 21:[62,35],
-  22:[29,46], 23:[42,41], 24:[58,41], 25:[71,46],
-  26:[34,55], 27:[50,51], 28:[66,55],
-  29:[40,64], 30:[60,64],
-  31:[50,71], 32:[36,42], 33:[64,42],
-  34:[43,60], 35:[57,60], 36:[27,55], 37:[73,55],
-  38:[50,45], 39:[50,62],
-};
-
-// ── State ─────────────────────────────────────────────────────────────────
-const slotData = { ...INITIAL_SLOTS }; // mutable slot state
-let selectedSlot = null;
-
-// ── Build select options ──────────────────────────────────────────────────
-const bldSelect = document.getElementById('bld-type');
-BUILDINGS.forEach(b => {
-  const opt = document.createElement('option');
-  opt.value = b; opt.textContent = b;
-  bldSelect.appendChild(opt);
+// ── Build select options ──────────────────────────────────────────
+[document.getElementById('bld-type'), document.getElementById('new-bld-type')].forEach(sel => {
+  if (!sel) return;
+  BUILDINGS.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b; opt.textContent = b;
+    sel.appendChild(opt);
+  });
 });
 
-// ── Render helpers ────────────────────────────────────────────────────────
-function getSlotClasses(slotNum) {
-  const d = slotData[slotNum];
-  const isRes = slotNum <= 18;
+// ── Slot rendering ────────────────────────────────────────────────
+function slotEl(num) { return document.getElementById(`slot-${num}`); }
+
+function slotClasses(s) {
+  const isRes = s.zone === 'resource';
   let cls = ['slot', isRes ? 'slot-resource' : 'slot-building'];
-  if (isRes && INNER_RING_SLOTS.has(slotNum)) cls.push('slot-inner');
-  if (d && d.building_type) {
-    if (isRes) {
-      cls.push(`slot-filled-${d.building_type}`);
-    } else {
-      const cat = getBuildingCategory(d.building_type);
-      cls.push(`slot-filled-${BUILDING_COLORS[cat]}`);
-    }
+  if (s.building_type) {
+    cls.push(isRes
+      ? `slot-filled-${s.building_type}`
+      : `slot-filled-${getBuildingCategory(s.building_type)}`);
   }
   return cls;
 }
 
-function getSlotContent(slotNum) {
-  const d = slotData[slotNum];
-  const isRes = slotNum <= 18;
-  if (!d || !d.building_type) {
-    return `<span style="font-size:.62rem;opacity:.55">${slotNum}</span>`;
-  }
+function slotHTML(s) {
+  const isRes = s.zone === 'resource';
+  if (!s.building_type)
+    return `<span style="font-size:.6rem;opacity:.45;">${isRes?'🌾':'🏛️'}</span>`;
   if (isRes) {
-    const lvl = d.target_level > 0 ? `<span class="slot-lv">Lv${d.target_level}</span>` : '';
-    return `<span class="slot-emoji">${RESOURCE_EMOJIS[d.building_type] || ''}</span>${lvl}`;
-  } else {
-    const short = d.building_type.substring(0, 5);
-    const lvl = d.target_level > 0 ? `<span class="slot-lv">Lv${d.target_level}</span>` : '';
-    return `<span style="font-size:0.48rem;line-height:1.1;opacity:.9;">${short}</span>${lvl}`;
+    const lv = s.target_level > 0 ? `<span class="slot-lv">Lv${s.target_level}</span>` : '';
+    return `<span class="slot-emoji">${RESOURCE_EMOJIS[s.building_type]||''}</span>${lv}`;
   }
+  const short = s.building_type.substring(0,5);
+  const lv = s.target_level > 0 ? `<span class="slot-lv">Lv${s.target_level}</span>` : '';
+  return `<span style="font-size:.46rem;line-height:1.1;">${short}</span>${lv}`;
 }
 
-function getSlotTitle(slotNum) {
-  const d = slotData[slotNum];
-  if (!d || !d.building_type) return `Slot ${slotNum} — leer`;
-  const lvl = d.target_level > 0 ? ` Lv${d.target_level}` : '';
-  const label = slotNum <= 18 ? (RESOURCE_LABELS[d.building_type] || d.building_type) : d.building_type;
-  return `Slot ${slotNum}: ${label}${lvl}`;
-}
-
-function renderSlot(slotNum) {
-  const el = document.getElementById(`slot-${slotNum}`);
+function renderSlotEl(s) {
+  let el = slotEl(s.slot_num);
   if (!el) return;
-  el.className = getSlotClasses(slotNum).join(' ');
-  if (slotNum === selectedSlot) el.classList.add('selected');
-  el.innerHTML = getSlotContent(slotNum);
-  el.title = getSlotTitle(slotNum);
+  el.className = slotClasses(s).join(' ');
+  if (s.slot_num === selectedSlotNum) el.classList.add('selected');
+  el.innerHTML = slotHTML(s);
+  const label = s.zone === 'resource'
+    ? (RESOURCE_LABELS[s.building_type] || 'Field')
+    : (s.building_type || 'Building');
+  const lv = s.target_level > 0 ? ` Lv${s.target_level}` : '';
+  el.title = `${label}${lv} — drag to move`;
 }
 
-// ── Initialize map ────────────────────────────────────────────────────────
-function buildMap() {
+// ── Create DOM element for a slot ────────────────────────────────
+function createSlotElement(s) {
   const container = document.getElementById('village-map-inner');
-
-  // Resource slots
-  for (let i = 1; i <= 18; i++) {
-    const [x, y] = RESOURCE_POS[i];
-    const div = document.createElement('div');
-    div.id = `slot-${i}`;
-    div.style.left = `${x}%`;
-    div.style.top = `${y}%`;
-    div.dataset.slot = i;
-    div.dataset.zone = 'resource';
-    div.addEventListener('click', () => selectSlot(i));
-    container.appendChild(div);
-    renderSlot(i);
-  }
-
-  // Building slots
-  for (let i = 19; i <= 39; i++) {
-    const pos = BUILDING_POS[i];
-    if (!pos) continue;
-    const [x, y] = pos;
-    const div = document.createElement('div');
-    div.id = `slot-${i}`;
-    div.style.left = `${x}%`;
-    div.style.top = `${y}%`;
-    div.dataset.slot = i;
-    div.dataset.zone = 'building';
-    div.addEventListener('click', () => selectSlot(i));
-    container.appendChild(div);
-    renderSlot(i);
-  }
+  const div = document.createElement('div');
+  div.id = `slot-${s.slot_num}`;
+  div.dataset.slotNum = s.slot_num;
+  div.style.left = `${s.pos_x}%`;
+  div.style.top  = `${s.pos_y}%`;
+  makeDraggable(div, s.slot_num);
+  container.appendChild(div);
+  renderSlotEl(s);
 }
 
-// ── Slot selection ────────────────────────────────────────────────────────
-function selectSlot(slotNum) {
-  // Deselect old
-  if (selectedSlot !== null) {
-    const old = document.getElementById(`slot-${selectedSlot}`);
+// ── Drag logic ────────────────────────────────────────────────────
+function makeDraggable(el, slotNum) {
+  let dragging = false, didDrag = false;
+  let startX, startY, startLeft, startTop;
+
+  el.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    dragging = true; didDrag = false;
+    const container = document.getElementById('village-map-inner');
+    const rect = container.getBoundingClientRect();
+    startX    = e.clientX;
+    startY    = e.clientY;
+    startLeft = parseFloat(el.style.left);
+    startTop  = parseFloat(el.style.top);
+    el.style.zIndex = 50;
+    e.preventDefault();
+
+    function onMove(ev) {
+      const dx = ((ev.clientX - startX) / rect.width)  * 100;
+      const dy = ((ev.clientY - startY) / rect.height) * 100;
+      if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) didDrag = true;
+      const nx = Math.max(2, Math.min(98, startLeft + dx));
+      const ny = Math.max(2, Math.min(98, startTop  + dy));
+      el.style.left = `${nx}%`;
+      el.style.top  = `${ny}%`;
+      const s = slots.get(slotNum);
+      if (s) { s.pos_x = nx; s.pos_y = ny; }
+    }
+    function onUp() {
+      dragging = false;
+      el.style.zIndex = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+      if (didDrag) {
+        // Auto-save position
+        scheduleSave(slotNum);
+      } else {
+        // It was a click — select
+        selectSlot(slotNum);
+      }
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
+  });
+
+  // Touch support
+  el.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    const container = document.getElementById('village-map-inner');
+    const rect = container.getBoundingClientRect();
+    let tdidDrag = false;
+    startX = t.clientX; startY = t.clientY;
+    startLeft = parseFloat(el.style.left);
+    startTop  = parseFloat(el.style.top);
+    el.style.zIndex = 50;
+    function onTMove(ev) {
+      const tt = ev.touches[0];
+      const dx = ((tt.clientX - startX) / rect.width)  * 100;
+      const dy = ((tt.clientY - startY) / rect.height) * 100;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) tdidDrag = true;
+      el.style.left = `${Math.max(2,Math.min(98,startLeft+dx))}%`;
+      el.style.top  = `${Math.max(2,Math.min(98,startTop+dy))}%`;
+      const s = slots.get(slotNum);
+      if (s) { s.pos_x = parseFloat(el.style.left); s.pos_y = parseFloat(el.style.top); }
+      ev.preventDefault();
+    }
+    function onTEnd() {
+      el.style.zIndex = '';
+      el.removeEventListener('touchmove', onTMove);
+      el.removeEventListener('touchend',  onTEnd);
+      if (tdidDrag) scheduleSave(slotNum);
+      else selectSlot(slotNum);
+    }
+    el.addEventListener('touchmove', onTMove, {passive:false});
+    el.addEventListener('touchend',  onTEnd);
+  }, {passive:true});
+}
+
+// ── Add new slot ──────────────────────────────────────────────────
+function addSlot(zone, building_type) {
+  if (!building_type) { alert('Please select a building type first.'); return; }
+  const num = nextSlotNum++;
+  // Place near center with slight random offset
+  const px = 45 + Math.random() * 10;
+  const py = 45 + Math.random() * 10;
+  const s = { id: null, slot_num: num, zone, building_type, target_level: 0, notes: '', pos_x: px, pos_y: py };
+  slots.set(num, s);
+  createSlotElement(s);
+  selectSlot(num);
+  // Immediately save to DB to get an id
+  saveSlotToServer(num);
+}
+
+// ── Select slot ───────────────────────────────────────────────────
+function selectSlot(num) {
+  if (selectedSlotNum !== null) {
+    const old = slotEl(selectedSlotNum);
     if (old) old.classList.remove('selected');
   }
-  selectedSlot = slotNum;
-  const el = document.getElementById(`slot-${slotNum}`);
+  selectedSlotNum = num;
+  const el = slotEl(num);
   if (el) el.classList.add('selected');
-
-  updatePanel(slotNum);
+  updatePanel(num);
 }
 
-function updatePanel(slotNum) {
-  const isRes = slotNum <= 18;
-  const d = slotData[slotNum];
-
+function updatePanel(num) {
+  const s = slots.get(num);
+  if (!s) return;
+  const isRes = s.zone === 'resource';
   document.getElementById('panel-placeholder').style.display = 'none';
   document.getElementById('panel-content').style.display = '';
-
-  document.getElementById('panel-title').textContent = `Slot #${slotNum}`;
-
-  const zoneBadge = document.getElementById('panel-zone-badge');
-  if (isRes) {
-    zoneBadge.textContent = '🌾 Ressourcenfeld';
-    zoneBadge.style.cssText = 'background:#1a2a1a; color:#4ade80; border:1px solid #166534;';
-  } else {
-    zoneBadge.textContent = '🏛️ Gebäude-Slot';
-    zoneBadge.style.cssText = 'background:#1e1b4b; color:#818cf8; border:1px solid #3730a3;';
-  }
-
-  // Current assignment info
-  const cur = document.getElementById('panel-current');
-  if (d && d.building_type) {
-    const label = isRes ? (RESOURCE_LABELS[d.building_type] || d.building_type) : d.building_type;
-    const lvl = d.target_level > 0 ? ` · Lv ${d.target_level}` : '';
-    cur.innerHTML = `<strong>Aktuell:</strong> ${label}${lvl}`;
-  } else {
-    cur.innerHTML = '<em>Noch nicht belegt</em>';
-  }
-
-  // Show correct form
+  document.getElementById('panel-title').textContent = isRes ? '🌾 Resource Field' : '🏛️ Building';
+  const badge = document.getElementById('panel-zone-badge');
+  badge.textContent = isRes ? '🌾 Resource' : '🏛️ Building';
+  badge.style.cssText = isRes
+    ? 'background:#1a2a1a;color:#4ade80;border:1px solid #166534;'
+    : 'background:#1e1b4b;color:#818cf8;border:1px solid #3730a3;';
   document.getElementById('form-resource').style.display = isRes ? '' : 'none';
   document.getElementById('form-building').style.display = isRes ? 'none' : '';
-
   if (isRes) {
-    document.getElementById('res-type').value = (d && d.building_type) ? d.building_type : '';
-    const lvl = (d && d.target_level) ? d.target_level : 0;
-    document.getElementById('res-level').value = lvl;
-    document.getElementById('res-level-display').textContent = lvl;
+    document.getElementById('res-type').value = s.building_type || 'wood';
+    document.getElementById('res-level').value = s.target_level || 0;
+    document.getElementById('res-level-display').textContent = s.target_level || 0;
   } else {
-    document.getElementById('bld-type').value = (d && d.building_type) ? d.building_type : '';
-    const lvl = (d && d.target_level) ? d.target_level : 0;
-    document.getElementById('bld-level').value = lvl;
-    document.getElementById('bld-level-display').textContent = lvl;
+    document.getElementById('bld-type').value = s.building_type || '';
+    document.getElementById('bld-level').value = s.target_level || 0;
+    document.getElementById('bld-level-display').textContent = s.target_level || 0;
   }
-
-  document.getElementById('slot-notes').value = (d && d.notes) ? d.notes : '';
+  document.getElementById('slot-notes').value = s.notes || '';
   document.getElementById('panel-msg').textContent = '';
 }
 
 // Range display
-document.getElementById('res-level').addEventListener('input', e => {
-  document.getElementById('res-level-display').textContent = e.target.value;
-});
-document.getElementById('bld-level').addEventListener('input', e => {
-  document.getElementById('bld-level-display').textContent = e.target.value;
-});
+document.getElementById('res-level').addEventListener('input', e =>
+  document.getElementById('res-level-display').textContent = e.target.value);
+document.getElementById('bld-level').addEventListener('input', e =>
+  document.getElementById('bld-level-display').textContent = e.target.value);
 
-// ── Save / Clear ──────────────────────────────────────────────────────────
+// ── Save ──────────────────────────────────────────────────────────
+function scheduleSave(num) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveSlotToServer(num), 400);
+}
+
 async function saveSlot() {
-  if (selectedSlot === null) return;
-  const isRes = selectedSlot <= 18;
-  const building_type = isRes
+  if (selectedSlotNum === null) return;
+  const s = slots.get(selectedSlotNum);
+  if (!s) return;
+  const isRes = s.zone === 'resource';
+  s.building_type = isRes
     ? document.getElementById('res-type').value
     : document.getElementById('bld-type').value;
-  const target_level = parseInt(isRes
+  s.target_level = parseInt(isRes
     ? document.getElementById('res-level').value
     : document.getElementById('bld-level').value) || 0;
-  const notes = document.getElementById('slot-notes').value;
-  const zone = isRes ? 'resource' : 'building';
+  s.notes = document.getElementById('slot-notes').value;
+  renderSlotEl(s);
+  await saveSlotToServer(selectedSlotNum);
+}
 
+async function saveSlotToServer(num) {
+  const s = slots.get(num);
+  if (!s) return;
   const msg = document.getElementById('panel-msg');
-  msg.style.color = '#a78bfa';
-  msg.textContent = 'Speichern...';
-
   try {
     const resp = await fetch(`${BASE_URL}/slot`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ slot_num: selectedSlot, zone, building_type, target_level, notes })
+      body: JSON.stringify({
+        slot_num: s.slot_num, zone: s.zone,
+        building_type: s.building_type, target_level: s.target_level,
+        notes: s.notes, pos_x: s.pos_x, pos_y: s.pos_y,
+      }),
     });
-    if (!resp.ok) throw new Error(resp.statusText);
-    // Update local state
-    if (building_type) {
-      slotData[selectedSlot] = { zone, building_type, target_level, notes };
-    } else {
-      delete slotData[selectedSlot];
+    if (!resp.ok) throw new Error();
+    if (msg && selectedSlotNum === num) {
+      msg.style.color = '#4ade80';
+      msg.textContent = '✓ Saved';
+      setTimeout(() => { if (msg) msg.textContent = ''; }, 1800);
     }
-    renderSlot(selectedSlot);
-    // Re-add selected class
-    const el = document.getElementById(`slot-${selectedSlot}`);
-    if (el) el.classList.add('selected');
-    updatePanel(selectedSlot);
-    msg.style.color = '#4ade80';
-    msg.textContent = '✓ Gespeichert';
-    setTimeout(() => { msg.textContent = ''; }, 2000);
-  } catch (e) {
-    msg.style.color = '#f87171';
-    msg.textContent = 'Fehler beim Speichern';
+  } catch {
+    if (msg && selectedSlotNum === num) {
+      msg.style.color = '#f87171';
+      msg.textContent = '✗ Save failed';
+    }
   }
 }
 
-async function clearSlot() {
-  if (selectedSlot === null) return;
-  const msg = document.getElementById('panel-msg');
-  msg.style.color = '#a78bfa';
-  msg.textContent = 'Leeren...';
+// ── Delete slot ───────────────────────────────────────────────────
+async function deleteSelectedSlot() {
+  if (selectedSlotNum === null) return;
+  const s = slots.get(selectedSlotNum);
+  if (!s) return;
+  if (!confirm(`Remove "${s.building_type || 'slot'}" from the map?`)) return;
 
-  try {
-    const resp = await fetch(`${BASE_URL}/slot/clear`, {
+  // Remove from DOM
+  const el = slotEl(selectedSlotNum);
+  if (el) el.remove();
+  slots.delete(selectedSlotNum);
+
+  // Delete from server
+  if (s.id) {
+    await fetch(`${BASE_URL}/slot/delete`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ slot_num: selectedSlot })
+      body: JSON.stringify({ slot_id: s.id }),
     });
-    if (!resp.ok) throw new Error(resp.statusText);
-    delete slotData[selectedSlot];
-    renderSlot(selectedSlot);
-    const el = document.getElementById(`slot-${selectedSlot}`);
-    if (el) el.classList.add('selected');
-    updatePanel(selectedSlot);
-    msg.style.color = '#4ade80';
-    msg.textContent = '✓ Geleert';
-    setTimeout(() => { msg.textContent = ''; }, 2000);
-  } catch (e) {
-    msg.style.color = '#f87171';
-    msg.textContent = 'Fehler beim Leeren';
   }
+
+  selectedSlotNum = null;
+  document.getElementById('panel-placeholder').style.display = '';
+  document.getElementById('panel-content').style.display = 'none';
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────
-buildMap();
+// ── Boot ──────────────────────────────────────────────────────────
+slots.forEach(s => createSlotElement(s));
 </script>
 {% endblock %}
