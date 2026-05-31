@@ -2650,18 +2650,17 @@ async def guild_map(request: Request, guild_id: str):
     if not is_member and not is_share_link:
         return RedirectResponse("/dashboard", status_code=303)
 
-    # Premium check only for members (shared links just show public map data)
-    if is_member:
-        err = await _require_premium(guild, guild_id)
-        if err: return err
-
+    # Map is free for all members — no premium gate
     is_admin = session.get("type") == "admin"
     scouted = await database.get_scouted_coordinates(guild_id)
 
     # Ally-specific data only for actual guild members — hide from external share viewers
     ally_group = await database.get_ally_group_for_guild(guild_id) if is_member else None
-    meta_alliances = await database.get_meta_alliances(guild_id) if is_member else []
-    meta_groups = await database.get_meta_groups(guild_id) if is_member else []
+
+    # Meta-alliances (quick-filter buttons) are a premium feature
+    has_premium = _has_alliance_pro(await _enrich_guild_subscription(guild)) if guild else False
+    meta_alliances = await database.get_meta_alliances(guild_id) if (is_member and has_premium) else []
+    meta_groups    = await database.get_meta_groups(guild_id)    if (is_member and has_premium) else []
 
     return templates.TemplateResponse("map.html", {
         "request": request,
@@ -2672,6 +2671,7 @@ async def guild_map(request: Request, guild_id: str):
         "meta_alliances": meta_alliances,
         "meta_groups": meta_groups,
         "is_share_viewer": not is_member,
+        "has_meta_premium": has_premium,
     })
 
 
