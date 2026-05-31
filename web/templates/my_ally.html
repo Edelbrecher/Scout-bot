@@ -491,20 +491,20 @@
     <style>
     .perm-label { position:relative; display:flex; align-items:center; gap:.4rem; font-size:.8rem; cursor:pointer; margin-bottom:.25rem; }
     .perm-label input { accent-color:#6366f1; width:14px; height:14px; flex-shrink:0; }
-    .perm-label .perm-tip {
-      visibility:hidden; opacity:0; pointer-events:none;
-      position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%);
-      background:#1e293b; border:1px solid rgba(99,102,241,.4); color:#cbd5e1;
-      font-size:.72rem; padding:.35rem .6rem; border-radius:6px; white-space:nowrap; z-index:100;
-      transition:opacity .15s; box-shadow:0 4px 16px rgba(0,0,0,.5);
-      max-width:240px; white-space:normal; line-height:1.4;
-    }
-    .perm-label:hover .perm-tip { visibility:visible; opacity:1; }
     .perm-info {
       display:inline-flex; align-items:center; justify-content:center;
       width:13px; height:13px; border-radius:50%; background:rgba(99,102,241,.2);
       border:1px solid rgba(99,102,241,.4); color:#818cf8; font-size:.6rem;
       font-weight:700; flex-shrink:0; cursor:default;
+    }
+    /* Global floating tooltip — rendered at body level, never clipped */
+    #perm-tooltip {
+      position:fixed; z-index:9999; pointer-events:none;
+      background:#1e293b; border:1px solid rgba(99,102,241,.45); color:#cbd5e1;
+      font-size:.73rem; padding:.4rem .65rem; border-radius:7px;
+      box-shadow:0 6px 24px rgba(0,0,0,.6); line-height:1.45;
+      max-width:240px; opacity:0; transition:opacity .12s;
+      white-space:normal;
     }
     .role-card { background:var(--bg-main); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:box-shadow .15s; }
     .role-card.drag-over { box-shadow:0 0 0 2px #6366f1; }
@@ -598,9 +598,7 @@
                     <label class="perm-label">
                       <input type="checkbox" name="{{ flag }}" value="1" {% if flag in rp %}checked{% endif %}>
                       <span>{{ label }}</span>
-                      <span class="perm-info" aria-label="{{ tip }}">?
-                        <span class="perm-tip">{{ tip }}</span>
-                      </span>
+                      <span class="perm-info" data-tip="{{ tip }}">?</span>
                     </label>
                     {% endfor %}
                   </div>
@@ -1273,6 +1271,47 @@ requestAnimationFrame(() => requestAnimationFrame(renderGrowthCharts));
     origShowTab(name, btn);
     if (name === 'bonus') initDrag();
   };
+})();
+
+// ── Permission tooltips (fixed-position, viewport-aware) ─────────────────────
+(function() {
+  const tip = document.createElement('div');
+  tip.id = 'perm-tooltip';
+  document.body.appendChild(tip);
+
+  let hideTimer = null;
+
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (!el) return;
+    clearTimeout(hideTimer);
+    tip.textContent = el.dataset.tip;
+    tip.style.opacity = '0';
+    tip.style.display = 'block';
+
+    // Position: prefer right of element, flip left if not enough space
+    const r = el.getBoundingClientRect();
+    const tw = tip.offsetWidth || 220;
+    const th = tip.offsetHeight || 40;
+    const margin = 8;
+    let left = r.right + margin;
+    let top  = r.top + r.height / 2 - th / 2;
+
+    // Flip left if overflows right edge
+    if (left + tw > window.innerWidth - 8) left = r.left - tw - margin;
+    // Clamp vertically
+    top = Math.max(8, Math.min(top, window.innerHeight - th - 8));
+
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+    tip.style.opacity = '1';
+  });
+
+  document.addEventListener('mouseout', e => {
+    const el = e.target.closest('[data-tip]');
+    if (!el) return;
+    hideTimer = setTimeout(() => { tip.style.opacity = '0'; }, 80);
+  });
 })();
 </script>
 {% endblock %}
