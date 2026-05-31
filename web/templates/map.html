@@ -292,9 +292,30 @@ let playerFilters   = [];   // [{name, color}]
 let allianceFilters = [];   // [{name, color}]
 
 // Tag color palette (rotates through distinct colors)
-const TAG_COLORS = ['#f1c40f','#e74c3c','#3498db','#2ecc71','#e67e22','#9b59b6','#1abc9c','#e91e63','#ff9800','#00bcd4'];
+const TAG_COLORS = ['#f1c40f','#e74c3c','#3498db','#2ecc71','#e67e22','#9b59b6','#1abc9c','#e91e63','#ff9800','#00bcd4','#06b6d4','#84cc16','#f43f5e','#a78bfa','#fb923c'];
 let tagColorIdx = 0;
-function nextTagColor() { return TAG_COLORS[tagColorIdx++ % TAG_COLORS.length]; }
+function _usedColors() {
+  // Collect all colors currently in use by active filters and meta definitions
+  const used = new Set();
+  allianceFilters.forEach(f => used.add(f.color.toLowerCase()));
+  playerFilters.forEach(f => used.add(f.color.toLowerCase()));
+  META_ALLIANCES.forEach(m => used.add(m.color.toLowerCase()));
+  META_GROUPS.forEach(g => used.add(g.color.toLowerCase()));
+  return used;
+}
+function nextTagColor() {
+  const used = _usedColors();
+  // Find first unused color starting from tagColorIdx
+  for (let i = 0; i < TAG_COLORS.length; i++) {
+    const c = TAG_COLORS[(tagColorIdx + i) % TAG_COLORS.length];
+    if (!used.has(c.toLowerCase())) {
+      tagColorIdx = (tagColorIdx + i + 1) % TAG_COLORS.length;
+      return c;
+    }
+  }
+  // All colors used — just advance and return next (fallback)
+  return TAG_COLORS[tagColorIdx++ % TAG_COLORS.length];
+}
 let allianceColorMap = new Map();  // alliance name → color
 let playerColorMap   = new Map();  // player name → color
 let maxPop = 1;
