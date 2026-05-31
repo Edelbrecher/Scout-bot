@@ -10026,3 +10026,65 @@ async def delete_scout_incident(request: Request, guild_id: str, incident_id: in
         await db.execute("DELETE FROM scout_incidents WHERE id=? AND guild_id=?", (incident_id, guild_id))
         await db.commit()
     return RedirectResponse(f"/guild/{guild_id}/scout-incidents?flash=deleted", status_code=303)
+
+
+# ── Alliance Bonuses ──────────────────────────────────────────────────────────
+
+ALLIANCE_BONUS_DEFS = [
+    {"key": "recruitment",  "label": "Recruitment",  "icon": "⚔️",  "desc": "Faster troop production",     "levels": [2, 4, 6, 8, 10],  "unit": "%"},
+    {"key": "philosophy",   "label": "Philosophy",   "icon": "🎓",  "desc": "Culture Points production",   "levels": [4, 8, 12, 16, 20], "unit": "%"},
+    {"key": "metallurgy",   "label": "Metallurgy",   "icon": "⚒️",  "desc": "Weapons & armor strength",    "levels": [2, 4, 6, 8, 10],  "unit": "%"},
+    {"key": "commerce",     "label": "Commerce",     "icon": "🏪",  "desc": "Merchant capacity",           "levels": [30, 60, 90, 120, 150], "unit": "%"},
+    {"key": "bowyer",       "label": "Bowyer",       "icon": "🏹",  "desc": "Bow unit attack bonus",       "levels": [2, 4, 6, 8, 10],  "unit": "%"},
+    {"key": "artisanship",  "label": "Artisanship",  "icon": "🏗️",  "desc": "Building speed bonus",        "levels": [2, 4, 6, 8, 10],  "unit": "%"},
+    {"key": "healing",      "label": "Healing",      "icon": "💊",  "desc": "Hospital healing capacity",   "levels": [10, 20, 30, 40, 50], "unit": "%"},
+    {"key": "scouting",     "label": "Scouting",     "icon": "🔭",  "desc": "Spy attack & defense bonus",  "levels": [10, 20, 30, 40, 50], "unit": "%"},
+]
+
+
+@app.get("/guild/{guild_id}/my-ally/bonuses", response_class=HTMLResponse)
+async def alliance_bonuses_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if guild_id.startswith("ws_"):
+        real_guild_id = await database.get_ally_membership_guild_id(session.get("discord_id", ""))
+        if real_guild_id:
+            return RedirectResponse(f"/guild/{real_guild_id}/my-ally/bonuses", status_code=302)
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("discord_id", "")
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    if not ally_group:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally")
+    is_editor = (ally_group.get("owner_discord_id") == uid or await has_perm(request, guild_id, "ally_manage"))
+    bonuses = await database.get_alliance_bonuses(guild_id)
+    return templates.TemplateResponse("alliance_bonuses.html", {
+        "request": request, "guild": guild, "ally_group": ally_group,
+        "is_editor": is_editor, "bonuses": bonuses,
+        "bonus_defs": ALLIANCE_BONUS_DEFS,
+    })
+
+
+@app.post("/guild/{guild_id}/my-ally/bonuses/save")
+async def alliance_bonuses_save(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if not await has_perm(request, guild_id, "ally_manage"):
+        uid = session.get("discord_id", "")
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        if not ally_group or ally_group.get("owner_discord_id") != uid:
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    bonuses = {}
+    for b in ALLIANCE_BONUS_DEFS:
+        val = form.get(b["key"], "0")
+        try:
+            bonuses[b["key"]] = max(0, min(5, int(val)))
+        except (ValueError, TypeError):
+            bonuses[b["key"]] = 0
+    await database.save_alliance_bonuses(guild_id, bonuses)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally/bonuses?saved=1", status_code=303)

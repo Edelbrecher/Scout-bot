@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Alliance Bonuses · {{ ally_group.ally_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:860px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}/my-ally" class="back-link">← My Alliance</a>
+      <h1 style="margin:.25rem 0 0;">🏛️ Alliance Bonuses</h1>
+      <p class="subtitle" style="margin:0;">{{ ally_group.ally_name }} — current research progress</p>
+    </div>
+    {% if is_editor %}
+    <button onclick="document.getElementById('editMode').classList.toggle('hidden');this.textContent=this.textContent.includes('Edit')?'✕ Cancel':'✏️ Edit Bonuses'"
+            class="btn btn-secondary" style="font-size:.85rem;">✏️ Edit Bonuses</button>
+    {% endif %}
+  </div>
+
+  {% if request.query_params.get('saved') %}
+  <div style="background:#052e16;border:1px solid #16a34a;color:#bbf7d0;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;">
+    ✅ Alliance bonuses saved.
+  </div>
+  {% endif %}
+
+  {# ── Edit form (hidden by default, editors only) ── #}
+  {% if is_editor %}
+  <div id="editMode" class="hidden" style="margin-bottom:1.5rem;">
+    <div class="card" style="padding:1.5rem;">
+      <h2 style="margin:0 0 1rem;font-size:1rem;">✏️ Update Bonus Levels</h2>
+      <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/bonuses/save">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;margin-bottom:1.25rem;">
+          {% for b in bonus_defs %}
+          {% set cur = bonuses.get(b.key, 0) | int %}
+          <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:1rem;">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;">
+              <span style="font-size:1.3rem;">{{ b.icon }}</span>
+              <div>
+                <div style="font-weight:700;font-size:.9rem;">{{ b.label }}</div>
+                <div style="font-size:.72rem;color:var(--text-muted);">{{ b.desc }}</div>
+              </div>
+            </div>
+            {# Level selector: 0 = not researched, 1-5 = level #}
+            <div style="display:flex;gap:4px;align-items:center;">
+              <label style="font-size:.72rem;color:var(--text-muted);width:60px;">None</label>
+              {% for lvl in range(1, 6) %}
+              <label style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;">
+                <input type="radio" name="{{ b.key }}" value="{{ lvl }}"
+                       {% if cur == lvl %}checked{% endif %}
+                       style="accent-color:#6366f1;">
+                <span style="font-size:.68rem;color:{% if cur >= lvl %}#6366f1{% else %}var(--text-muted){% endif %};">
+                  +{{ b.levels[lvl-1] }}{{ b.unit }}
+                </span>
+              </label>
+              {% endfor %}
+              <label style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;margin-left:4px;">
+                <input type="radio" name="{{ b.key }}" value="0"
+                       {% if cur == 0 %}checked{% endif %}
+                       style="accent-color:#6366f1;">
+                <span style="font-size:.68rem;color:var(--text-muted);">—</span>
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Save</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Visual timeline / overview ── #}
+  <div style="display:flex;flex-direction:column;gap:.85rem;">
+    {% for b in bonus_defs %}
+    {% set cur = bonuses.get(b.key, 0) | int %}
+    <div class="card" style="padding:1rem 1.25rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        {# Icon + label #}
+        <div style="display:flex;align-items:center;gap:.5rem;min-width:170px;">
+          <span style="font-size:1.4rem;">{{ b.icon }}</span>
+          <div>
+            <div style="font-weight:700;font-size:.9rem;">{{ b.label }}</div>
+            <div style="font-size:.72rem;color:var(--text-muted);">{{ b.desc }}</div>
+          </div>
+        </div>
+
+        {# Current badge #}
+        <div style="min-width:72px;text-align:center;">
+          {% if cur > 0 %}
+          <span style="background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;
+                       border-radius:20px;padding:.2rem .7rem;font-size:.82rem;font-weight:700;">
+            +{{ b.levels[cur-1] }}{{ b.unit }}
+          </span>
+          {% else %}
+          <span style="color:var(--text-muted);font-size:.78rem;">Not researched</span>
+          {% endif %}
+        </div>
+
+        {# Timeline bar #}
+        <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:0;">
+          {% for lvl in range(1, 6) %}
+          {% set active = cur >= lvl %}
+          {% set is_cur = cur == lvl %}
+          <div style="flex:1;position:relative;display:flex;flex-direction:column;align-items:center;">
+            {# Connector line before dot (except first) #}
+            {% if lvl > 1 %}
+            <div style="position:absolute;top:9px;left:0;right:50%;height:3px;
+                        background:{% if active %}#6366f1{% else %}rgba(255,255,255,.1){% endif %};
+                        z-index:0;"></div>
+            {% endif %}
+            {# Connector line after dot (except last) #}
+            {% if lvl < 5 %}
+            <div style="position:absolute;top:9px;left:50%;right:0;height:3px;
+                        background:{% if cur >= lvl %}#6366f1{% else %}rgba(255,255,255,.1){% endif %};
+                        z-index:0;"></div>
+            {% endif %}
+            {# Dot #}
+            <div style="width:20px;height:20px;border-radius:50%;z-index:1;position:relative;
+                        border:2px solid {% if active %}#6366f1{% else %}rgba(255,255,255,.15){% endif %};
+                        background:{% if is_cur %}#6366f1{% elif active %}rgba(99,102,241,.4){% else %}rgba(255,255,255,.05){% endif %};
+                        display:flex;align-items:center;justify-content:center;
+                        box-shadow:{% if is_cur %}0 0 8px rgba(99,102,241,.6){% else %}none{% endif %};">
+              {% if is_cur %}<span style="font-size:9px;color:#fff;font-weight:800;">✓</span>{% endif %}
+            </div>
+            {# Level label #}
+            <div style="font-size:.65rem;margin-top:4px;font-weight:{% if is_cur %}700{% else %}400{% endif %};
+                        color:{% if is_cur %}#818cf8{% elif active %}var(--text-muted){% else %}rgba(255,255,255,.2){% endif %};">
+              +{{ b.levels[lvl-1] }}{{ b.unit }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {# Progress fraction #}
+        <div style="min-width:40px;text-align:right;font-size:.75rem;color:var(--text-muted);">
+          {{ cur }}/5
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Summary card #}
+  {% set active_count = namespace(n=0) %}
+  {% for b in bonus_defs %}{% if bonuses.get(b.key, 0) | int > 0 %}{% set active_count.n = active_count.n + 1 %}{% endif %}{% endfor %}
+  <div class="card" style="margin-top:1rem;padding:1rem 1.25rem;background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.25);">
+    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;">
+      <div>
+        <div style="font-size:.72rem;color:var(--text-muted);">Researched</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#818cf8;">{{ active_count.n }}/{{ bonus_defs|length }}</div>
+      </div>
+      {% for b in bonus_defs %}{% set cur = bonuses.get(b.key, 0) | int %}{% if cur > 0 %}
+      <div style="display:flex;align-items:center;gap:.35rem;">
+        <span>{{ b.icon }}</span>
+        <span style="font-size:.78rem;font-weight:600;color:#a5b4fc;">+{{ b.levels[cur-1] }}{{ b.unit }}</span>
+        <span style="font-size:.7rem;color:var(--text-muted);">{{ b.label }}</span>
+      </div>
+      {% endif %}{% endfor %}
+    </div>
+  </div>
+</div>
+
+<style>
+.hidden { display: none !important; }
+</style>
+{% endblock %}

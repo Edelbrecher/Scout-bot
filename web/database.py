@@ -3189,6 +3189,11 @@ async def _init_ally_tables():
             await db.execute("ALTER TABLE ally_groups ADD COLUMN lock_travian_name INTEGER DEFAULT 0")
         except Exception:
             pass
+        # alliance_bonuses: JSON blob storing current bonus levels
+        try:
+            await db.execute("ALTER TABLE ally_groups ADD COLUMN alliance_bonuses TEXT DEFAULT '{}'")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -3234,6 +3239,33 @@ async def delete_ally_group(ally_group_id: int, owner_id: str):
             "DELETE FROM ally_roles WHERE ally_group_id=?", (ally_group_id,))
         await db.execute(
             "DELETE FROM ally_groups WHERE id=? AND owner_discord_id=?", (ally_group_id, owner_id))
+        await db.commit()
+
+
+async def get_alliance_bonuses(guild_id: str) -> dict:
+    """Return current alliance bonus levels as dict, e.g. {'recruitment': 2, 'philosophy': 1}."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT alliance_bonuses FROM ally_groups WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            if row and row[0]:
+                import json as _json
+                try:
+                    return _json.loads(row[0])
+                except Exception:
+                    pass
+    return {}
+
+
+async def save_alliance_bonuses(guild_id: str, bonuses: dict) -> None:
+    """Persist alliance bonus levels for a guild."""
+    import json as _json
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_groups SET alliance_bonuses=? WHERE guild_id=?",
+            (_json.dumps(bonuses), guild_id)
+        )
         await db.commit()
 
 
