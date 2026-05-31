@@ -7324,3 +7324,211 @@ async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20,
             timeline.append(point)
         result[pname] = timeline
     return result
+
+
+# ---------------------------------------------------------------------------
+# Enemy Village Tracking
+# ---------------------------------------------------------------------------
+
+async def _init_enemy_villages_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemy_village_snapshots (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                snapshot_at TEXT NOT NULL,
+                imported_by TEXT DEFAULT '',
+                raw_text    TEXT DEFAULT '',
+                village_count INTEGER DEFAULT 0,
+                population  INTEGER DEFAULT 0,
+                created_at  TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemy_villages (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id   INTEGER NOT NULL REFERENCES enemy_village_snapshots(id) ON DELETE CASCADE,
+                guild_id      TEXT NOT NULL,
+                player_name   TEXT NOT NULL,
+                village_name  TEXT NOT NULL,
+                coords_x      INTEGER,
+                coords_y      INTEGER,
+                population    INTEGER DEFAULT 0,
+                is_capital    INTEGER DEFAULT 0,
+                label         TEXT DEFAULT '',
+                snapshot_at   TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemy_village_events (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                player_name  TEXT NOT NULL,
+                event_type   TEXT NOT NULL,
+                village_name TEXT NOT NULL,
+                coords_x     INTEGER,
+                coords_y     INTEGER,
+                label        TEXT DEFAULT '',
+                detected_at  TEXT NOT NULL,
+                snapshot_at  TEXT NOT NULL,
+                created_at   TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ev_snapshots_player
+            ON enemy_village_snapshots(guild_id, player_name)
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ev_events_player
+            ON enemy_village_events(guild_id, player_name)
+        """)
+        await db.commit()
+
+
+async def save_enemy_village_snapshot(
+    guild_id: str, player_name: str, snapshot_at: str,
+    imported_by: str, raw_text: str, villages: list[dict]
+) -> tuple[int, list[dict]]:
+    """
+    Save a village snapshot and auto-detect events by comparing to the previous snapshot.
+    Returns (snapshot_id, new_events).
+    """
+    from datetime import datetime as _dt
+    await _init_enemy_villages_tables()
+
+    total_pop = sum(v.get("population", 0) for v in villages)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Get previous snapshot villages for diff
+        cur = await db.execute("""
+            SELECT ev.village_name, ev.coords_x, ev.coords_y, ev.is_capital, ev.label
+            FROM enemy_villages ev
+            JOIN enemy_village_snapshots s ON s.id = ev.snapshot_id
+            WHERE ev.guild_id=? AND ev.player_name=?
+            ORDER BY s.snapshot_at DESC
+            LIMIT 200
+        """, (guild_id, player_name))
+        prev_rows = await cur.fetchall()
+
+        # Build previous village set (by coords key if available, else name)
+        prev = {}
+        for r in prev_rows:
+            key = (r["coords_x"], r["coords_y"]) if r["coords_x"] is not None else r["village_name"]
+            prev[key] = dict(r)
+
+        # Insert snapshot
+        cur = await db.execute("""
+            INSERT INTO enemy_village_snapshots
+                (guild_id, player_name, snapshot_at, imported_by, raw_text, village_count, population)
+            VALUES (?,?,?,?,?,?,?)
+        """, (guild_id, player_name, snapshot_at, imported_by, raw_text, len(villages), total_pop))
+        snap_id = cur.lastrowid
+
+        # Insert villages
+        for v in villages:
+            await db.execute("""
+                INSERT INTO enemy_villages
+                    (snapshot_id, guild_id, player_name, village_name, coords_x, coords_y,
+                     population, is_capital, label, snapshot_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, (snap_id, guild_id, player_name,
+                  v.get("village_name",""), v.get("coords_x"), v.get("coords_y"),
+                  v.get("population",0), 1 if v.get("is_capital") else 0,
+                  v.get("label",""), snapshot_at))
+
+        # Detect events
+        now_set = {}
+        for v in villages:
+            key = (v.get("coords_x"), v.get("coords_y")) if v.get("coords_x") is not None else v.get("village_name","")
+            now_set[key] = v
+
+        events = []
+        if prev:  # only diff if we have a previous snapshot
+            # New villages
+            for key, v in now_set.items():
+                if key not in prev:
+                    etype = "capital_settled" if v.get("is_capital") else "village_settled"
+                    if v.get("label"):
+                        etype = "village_conquered"
+                    events.append({
+                        "event_type": etype,
+                        "village_name": v.get("village_name",""),
+                        "coords_x": v.get("coords_x"),
+                        "coords_y": v.get("coords_y"),
+                        "label": v.get("label",""),
+                    })
+            # Lost villages
+            for key, v in prev.items():
+                if key not in now_set:
+                    events.append({
+                        "event_type": "village_lost",
+                        "village_name": v["village_name"],
+                        "coords_x": v["coords_x"],
+                        "coords_y": v["coords_y"],
+                        "label": v.get("label",""),
+                    })
+
+        for e in events:
+            await db.execute("""
+                INSERT INTO enemy_village_events
+                    (guild_id, player_name, event_type, village_name, coords_x, coords_y,
+                     label, detected_at, snapshot_at)
+                VALUES (?,?,?,?,?,?,?,?,?)
+            """, (guild_id, player_name, e["event_type"], e["village_name"],
+                  e.get("coords_x"), e.get("coords_y"), e.get("label",""),
+                  _dt.utcnow().isoformat(), snapshot_at))
+
+        await db.commit()
+        return snap_id, events
+
+
+async def get_enemy_village_history(guild_id: str, player_name: str) -> dict:
+    """Return snapshots, latest villages, and events for a player."""
+    await _init_enemy_villages_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        cur = await db.execute("""
+            SELECT * FROM enemy_village_snapshots
+            WHERE guild_id=? AND player_name=?
+            ORDER BY snapshot_at DESC LIMIT 50
+        """, (guild_id, player_name))
+        snapshots = [dict(r) for r in await cur.fetchall()]
+
+        latest_snap_id = snapshots[0]["id"] if snapshots else None
+        villages = []
+        if latest_snap_id:
+            cur = await db.execute("""
+                SELECT * FROM enemy_villages WHERE snapshot_id=?
+                ORDER BY is_capital DESC, population DESC
+            """, (latest_snap_id,))
+            villages = [dict(r) for r in await cur.fetchall()]
+
+        cur = await db.execute("""
+            SELECT * FROM enemy_village_events
+            WHERE guild_id=? AND player_name=?
+            ORDER BY snapshot_at DESC
+        """, (guild_id, player_name))
+        events = [dict(r) for r in await cur.fetchall()]
+
+        return {"snapshots": snapshots, "villages": villages, "events": events}
+
+
+async def get_enemy_village_all_snapshots(guild_id: str, player_name: str) -> list[dict]:
+    """Return all village lists per snapshot for population trend."""
+    await _init_enemy_villages_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("""
+            SELECT s.snapshot_at, s.village_count, s.population,
+                   ev.village_name, ev.coords_x, ev.coords_y, ev.population as vpop,
+                   ev.is_capital, ev.label
+            FROM enemy_village_snapshots s
+            JOIN enemy_villages ev ON ev.snapshot_id = s.id
+            WHERE s.guild_id=? AND s.player_name=?
+            ORDER BY s.snapshot_at ASC
+        """, (guild_id, player_name))
+        return [dict(r) for r in await cur.fetchall()]

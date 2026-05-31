@@ -26,6 +26,15 @@
   {% if request.query_params.get('saved') %}
   <div class="alert alert-success">✅ Notizen gespeichert.</div>
   {% endif %}
+  {% if flash == 'villages_imported' %}
+  <div class="alert alert-success">✅ {{ vcount }} Dörfer importiert{% if ecount and ecount != '0' %} · <strong>{{ ecount }} neue Events erkannt</strong>{% endif %}.</div>
+  {% elif flash == 'village_parse_fail' %}
+  <div class="alert alert-danger">❌ Profil konnte nicht geparst werden. Bitte direkt von der Travian-Spieler-Seite kopieren.</div>
+  {% elif flash == 'troops_added' %}
+  <div class="alert alert-success">✅ Truppen-Eintrag gespeichert.</div>
+  {% elif flash == 'troops_deleted' %}
+  <div class="alert alert-success">🗑️ Eintrag gelöscht.</div>
+  {% endif %}
 
   <!-- KPI strip -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
@@ -38,10 +47,16 @@
       <div style="font-size:0.78rem;color:var(--text-muted);">📋 Berichte</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
-        {{ history | map(attribute='images') | map('length') | sum }}
+      <div style="font-size:1.6rem;font-weight:800;color:#a78bfa;">
+        {{ village_history.villages | length }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🖼️ Screenshots</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🏘️ Dörfer</div>
+    </div>
+    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
+        {{ village_history.events | length }}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">⚡ Events</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">
@@ -50,6 +65,17 @@
       <div style="font-size:0.78rem;color:var(--text-muted);">📅 Letzter Scout</div>
     </div>
   </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:.35rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
+    <button class="ed-tab active" onclick="edTab('uebersicht',this)">📋 Übersicht</button>
+    <button class="ed-tab" onclick="edTab('doerfer',this)">🏘️ Dörfer{% if village_history.villages %} ({{ village_history.villages|length }}){% endif %}</button>
+    <button class="ed-tab" onclick="edTab('truppen',this)">⚔️ Truppen{% if troop_entries %} ({{ troop_entries|length }}){% endif %}</button>
+    <button class="ed-tab" onclick="edTab('scouts',this)">🔭 Scout-Berichte{% if history %} ({{ history|length }}){% endif %}</button>
+  </div>
+
+  <!-- ═══ TAB: ÜBERSICHT ═══ -->
+  <div id="ed-uebersicht" class="ed-panel">
 
   <!-- Notes -->
   <div class="card" style="margin-bottom:1.25rem;">
@@ -66,7 +92,103 @@
     </form>
   </div>
 
-  <!-- Scout history -->
+  </div>{# end ed-uebersicht #}
+
+  <!-- ═══ TAB: DÖRFER ═══ -->
+  <div id="ed-doerfer" class="ed-panel" style="display:none;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:.5rem;">
+      <h2 style="margin:0;font-size:1.05rem;">🏘️ Dorf-Tracker</h2>
+      <button onclick="document.getElementById('village-import-modal').style.display='flex'"
+              style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;
+                     background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);color:#818cf8;">
+        📋 Profil importieren
+      </button>
+    </div>
+
+    {% if village_history.snapshots %}
+    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">
+      {{ village_history.snapshots|length }} Snapshot(s) ·
+      Letzter Import: {{ village_history.snapshots[0].snapshot_at[:16].replace('T',' ') }} UTC
+    </p>
+    {% endif %}
+
+    {# ── Aktuelle Dorfliste ── #}
+    {% if village_history.villages %}
+    <div class="card" style="margin-bottom:1.25rem;padding:.75rem 1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;">📍 Aktuelle Dörfer ({{ village_history.villages|length }})</h3>
+      <div style="display:grid;gap:.4rem;">
+        {% for v in village_history.villages %}
+        <div style="display:flex;align-items:center;gap:.6rem;padding:.4rem .6rem;
+                    background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;flex-wrap:wrap;
+                    {% if v.is_capital %}border-left:3px solid rgba(251,191,36,.6);{% endif %}">
+          <div style="flex:1;min-width:120px;">
+            <span style="font-weight:600;font-size:.88rem;">{{ v.village_name }}</span>
+            {% if v.is_capital %}<span style="font-size:.68rem;color:#fbbf24;margin-left:.35rem;">👑 Hauptstadt</span>{% endif %}
+            {% if v.label and not v.is_capital %}<span style="font-size:.7rem;color:#a78bfa;margin-left:.35rem;">{{ v.label }}</span>{% endif %}
+          </div>
+          <span style="font-family:monospace;font-size:.82rem;color:#93c5fd;">
+            {% if v.coords_x is not none %}({{ v.coords_x }}|{{ v.coords_y }}){% endif %}
+          </span>
+          {% if v.population %}<span style="font-size:.75rem;color:var(--text-muted);">👥 {{ v.population }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card" style="margin-bottom:1.25rem;text-align:center;padding:2rem 1rem;">
+      <div style="font-size:2.5rem;margin-bottom:.5rem;">🏘️</div>
+      <p style="color:var(--text-muted);font-size:.88rem;margin:0 0 .75rem;">
+        Noch keine Dörfer importiert. Öffne auf Travian das Profil von <strong>{{ enemy.player_name }}</strong>,
+        markiere alles, kopiere und importiere es hier.
+      </p>
+      <button onclick="document.getElementById('village-import-modal').style.display='flex'"
+              style="padding:.4rem 1rem;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer;
+                     background:#6366f1;border:none;color:#fff;">
+        📋 Jetzt importieren
+      </button>
+    </div>
+    {% endif %}
+
+    {# ── Event-Timeline ── #}
+    {% if village_history.events %}
+    <h3 style="margin:0 0 .75rem;font-size:.9rem;">⚡ Erkannte Ereignisse</h3>
+    <div style="position:relative;">
+      <div style="position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(99,102,241,.2);border-radius:1px;"></div>
+      <div style="display:flex;flex-direction:column;gap:.5rem;padding-left:38px;">
+        {% for ev in village_history.events %}
+        {% set ecol = '#4ade80' if ev.event_type in ['village_settled','capital_settled'] else '#f87171' if ev.event_type == 'village_lost' else '#fbbf24' %}
+        {% set eicon = '🏗️' if 'settled' in ev.event_type else '⚔️' if 'conquered' in ev.event_type else '💥' if 'lost' in ev.event_type else '📌' %}
+        {% set elabel = 'Neu gesiedelt' if ev.event_type == 'village_settled' else 'Hauptstadt gesiedelt' if ev.event_type == 'capital_settled' else 'Geadelt/Erobert' if ev.event_type == 'village_conquered' else 'Dorf verloren' if ev.event_type == 'village_lost' else ev.event_type %}
+        <div style="position:relative;">
+          <div style="position:absolute;left:-28px;top:50%;transform:translateY(-50%);
+                      width:11px;height:11px;border-radius:50%;background:{{ ecol }};
+                      border:2px solid var(--bg-main);"></div>
+          <div class="card" style="padding:.45rem .75rem;border-left:2px solid {{ ecol }}20;">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+              <span style="font-size:.75rem;font-weight:700;color:{{ ecol }};">{{ eicon }} {{ elabel }}</span>
+              <span style="font-weight:600;font-size:.85rem;">{{ ev.village_name }}</span>
+              {% if ev.coords_x is not none %}
+              <span style="font-family:monospace;font-size:.75rem;color:#93c5fd;">({{ ev.coords_x }}|{{ ev.coords_y }})</span>
+              {% endif %}
+              {% if ev.label %}<span style="font-size:.7rem;color:#a78bfa;">{{ ev.label }}</span>{% endif %}
+              <span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;">
+                📅 {{ ev.snapshot_at[:16].replace('T',' ') }} UTC
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% elif village_history.snapshots|length > 1 %}
+    <div class="card"><p style="color:var(--text-muted);font-size:.85rem;margin:0;">✅ Keine Änderungen zwischen den Snapshots erkannt.</p></div>
+    {% endif %}
+
+  </div>{# end ed-doerfer #}
+
+  <!-- ═══ TAB: SCOUT-BERICHTE ═══ -->
+  <div id="ed-scouts" class="ed-panel" style="display:none;">
   <h2 style="margin:0 0 0.75rem;font-size:1.05rem;" data-i18n="enemy.history.title">📜 Scout-Verlauf</h2>
 
   {% if history %}
@@ -240,8 +362,11 @@
   </div>
   {% endif %}
 
-  <!-- ── Truppen-Verlauf ───────────────────────────────────────────────── -->
-  <div style="margin-top:1.5rem;">
+  </div>{# end ed-scouts #}
+
+  <!-- ═══ TAB: TRUPPEN ═══ -->
+  <div id="ed-truppen" class="ed-panel" style="display:none;">
+  <div style="margin-top:0;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
       <h2 style="margin:0;font-size:1.05rem;">⚔️ Truppen-Verlauf</h2>
       <button onclick="document.getElementById('troop-form').style.display=document.getElementById('troop-form').style.display==='none'?'block':'none'"
@@ -357,6 +482,83 @@
     </div>
     {% endif %}
   </div>
+  </div>{# end ed-truppen #}
 
+</div>{# container #}
+
+<!-- ═══ VILLAGE IMPORT MODAL ═══ -->
+<div id="village-import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+     z-index:9000;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;
+              width:100%;max-width:580px;max-height:90vh;overflow-y:auto;padding:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h2 style="margin:0;font-size:1.05rem;">📋 Spielerprofil importieren</h2>
+      <button onclick="document.getElementById('village-import-modal').style.display='none'"
+              style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--text-muted);">✕</button>
+    </div>
+    <div style="padding:.55rem .8rem;border-radius:7px;margin-bottom:1rem;font-size:.8rem;line-height:1.55;
+                background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;">
+      Öffne auf Travian das <strong>Profil von {{ enemy.player_name }}</strong>,
+      markiere alles mit <kbd>Strg+A</kbd>, kopiere mit <kbd>Strg+C</kbd> und füge den Text hier ein.
+      TravOps erkennt automatisch alle Dörfer, Koordinaten und Labels (Hauptstadt, Off Villa, etc.).
+    </div>
+    <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/villages/import">
+      <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">
+        📅 Zeitpunkt des Profil-Abrufs (UTC)
+      </label>
+      <input type="datetime-local" name="snapshot_at" id="vilSnapshotTime"
+             style="width:100%;margin-bottom:.75rem;padding:.4rem .6rem;background:var(--bg-main);
+                    border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;">
+      <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">
+        Profil-Text einfügen:
+      </label>
+      <textarea name="profile_text" rows="12" required
+                placeholder="Hier den kopierten Travian-Profiltext einfügen…"
+                style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
+                       border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;
+                       font-size:.78rem;font-family:monospace;line-height:1.45;"></textarea>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+        <button type="submit" style="padding:.5rem 1.25rem;border-radius:8px;font-size:.88rem;font-weight:700;
+                cursor:pointer;background:#6366f1;border:none;color:#fff;">💾 Importieren</button>
+        <button type="button" onclick="document.getElementById('village-import-modal').style.display='none'"
+                style="padding:.5rem 1rem;border-radius:8px;font-size:.85rem;cursor:pointer;
+                       background:var(--bg-main);border:1px solid var(--border);color:var(--text-muted);">Abbrechen</button>
+      </div>
+    </form>
+  </div>
 </div>
+
+<style>
+.ed-tab {
+  font-size:.82rem;padding:.35rem .85rem;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.ed-tab.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
+.ed-tab:hover:not(.active) { border-color:#3b82f6;color:var(--text); }
+.ed-panel { }
+</style>
+
+<script>
+function edTab(name, btn) {
+  document.querySelectorAll('.ed-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.ed-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('ed-' + name).style.display = 'block';
+  btn.classList.add('active');
+}
+// Set datetime default
+(function() {
+  const el = document.getElementById('vilSnapshotTime');
+  if (!el) return;
+  const now = new Date();
+  el.value = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+})();
+// Open doerfer tab if flash=villages_imported
+(function() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('flash') === 'villages_imported') {
+    const btn = document.querySelector('.ed-tab[onclick*="doerfer"]');
+    if (btn) edTab('doerfer', btn);
+  }
+})();
+</script>
 {% endblock %}

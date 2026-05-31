@@ -281,3 +281,148 @@ def parse_travian_stats_smart(text: str) -> list[dict]:
 
     # Fallback: overall ranking table
     return parse_overall_stats(text)
+
+
+# ---------------------------------------------------------------------------
+# Travian Player Profile Parser (village list)
+# ---------------------------------------------------------------------------
+
+_COORD_RE = re.compile(r'\(\s*(-?\d+)\s*[|,]\s*(-?\d+)\s*\)')
+_POP_RE    = re.compile(r'Population:\s*([\d.,\s‭‬]+)', re.I)
+_VIL_COUNT = re.compile(r'Villages?\s+([\d,. ]+)/([\d,. ]+)', re.I)
+
+_LABEL_KEYWORDS = {
+    'capital': 'Hauptstadt', 'hauptstadt': 'Hauptstadt',
+    'off villa': 'Off Villa', 'off village': 'Off Villa',
+    'def villa': 'Def Villa', 'def village': 'Def Villa',
+    'sup': 'Support', 'support': 'Support',
+    'spawn': 'Spawn',
+    'oasis': 'Oase',
+}
+
+_NOISE_LINES = re.compile(
+    r'^(Homepage|Discord|Support|Game rules|Terms|Imprint|Travian Games|'
+    r'Switch to|Server time|Privacy|©|Alliance|Members|Ranking|Profile|'
+    r'Attacks|Bonuses|Forum|Options|Overview|Statistics|Task overview|'
+    r'Village groups|Farm List|Recall|Incoming|Troop|CP |Send Hero|'
+    r'Farm Builder|Kirilloid|Friso|GT |Elephant|Cropper|Smithy|TravOps|'
+    r'top10|Loyalty:|Population:|Link list)',
+    re.I
+)
+
+
+def parse_player_profile(text: str) -> dict:
+    """
+    Parse a Travian player profile page (copy-paste).
+    Returns:
+      {
+        player_name: str,
+        population: int,
+        village_count: int,
+        villages: [ {village_name, coords_x, coords_y, is_capital, label, population} ]
+      }
+    """
+    text = _UNICODE_JUNK.sub('', text)
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+    lines = [l.strip() for l in lines if l.strip()]
+
+    player_name = ""
+    population  = 0
+    vil_count   = 0
+    villages    = []
+
+    # Extract player name (first non-noise non-number line)
+    for line in lines[:10]:
+        if _NOISE_LINES.match(line):
+            continue
+        if re.match(r'^[\d.,%]+$', line):
+            continue
+        if len(line) > 2 and not any(kw in line.lower() for kw in ['travian', 'alliance', 'server']):
+            player_name = line
+            break
+
+    # Extract global population
+    for line in lines:
+        m = _POP_RE.search(line)
+        if m:
+            population = _parse_num(m.group(1))
+            break
+
+    # Extract village count
+    for line in lines:
+        m = _VIL_COUNT.search(line)
+        if m:
+            vil_count = _parse_num(m.group(1))
+            break
+
+    # Parse village list
+    # Pattern: a line has coords (x|y), preceded or followed by village name
+    # Labels like "Capital", "Off Villa" may be on the same line or next line
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        # Skip noisy lines
+        if _NOISE_LINES.match(line):
+            i += 1
+            continue
+
+        coord_m = _COORD_RE.search(line)
+        if coord_m:
+            cx = int(coord_m.group(1))
+            cy = int(coord_m.group(2))
+
+            # Village name: everything before the coord on this line
+            before = line[:coord_m.start()].strip()
+            # or previous line if before is empty/just whitespace
+            if not before and i > 0:
+                prev = lines[i-1].strip()
+                if prev and not _NOISE_LINES.match(prev) and not _COORD_RE.search(prev):
+                    before = prev
+
+            # Label: everything after coord on this line, or next line
+            after = line[coord_m.end():].strip()
+            label_src = (after + ' ' + (lines[i+1].strip() if i+1 < len(lines) else '')).lower()
+
+            # Detect label
+            label = ""
+            is_capital = False
+            for kw, lbl in _LABEL_KEYWORDS.items():
+                if kw in label_src:
+                    label = lbl
+                    if lbl == 'Hauptstadt':
+                        is_capital = True
+                    break
+            # Capital also detected by "Capital" keyword alone
+            if 'capital' in label_src or 'hauptdorf' in label_src or 'hauptstadt' in label_src:
+                is_capital = True
+                label = label or 'Hauptstadt'
+
+            village_name = _clean(before) or f"({cx}|{cy})"
+            villages.append({
+                "village_name": village_name,
+                "coords_x":     cx,
+                "coords_y":     cy,
+                "population":   0,
+                "is_capital":   is_capital,
+                "label":        label,
+            })
+
+        i += 1
+
+    # Deduplicate by coords
+    seen = set()
+    unique = []
+    for v in villages:
+        k = (v["coords_x"], v["coords_y"])
+        if k not in seen:
+            seen.add(k)
+            unique.append(v)
+
+    return {
+        "player_name":   player_name,
+        "population":    population,
+        "village_count": vil_count or len(unique),
+        "villages":      unique,
+    }

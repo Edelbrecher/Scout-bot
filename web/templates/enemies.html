@@ -12,6 +12,19 @@
         Wird automatisch befüllt wenn Scout-Berichte im Discord eingehen
       </p>
     </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+      <form method="post" action="/guild/{{ guild.guild_id }}/enemies/add"
+            style="display:flex;gap:.4rem;margin:0;">
+        <input type="text" name="player_name" placeholder="Spielername…" required maxlength="100"
+               style="padding:.4rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);
+                      color:var(--text);font-size:.85rem;width:180px;">
+        <button type="submit"
+                style="padding:.4rem .9rem;border-radius:6px;background:rgba(99,102,241,.15);
+                       border:1px solid rgba(99,102,241,.35);color:#818cf8;font-size:.85rem;font-weight:600;cursor:pointer;">
+          ➕ Gegner hinzufügen
+        </button>
+      </form>
+    </div>
   </div>
 
   {% if saved == 'deleted' %}

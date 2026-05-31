@@ -4683,6 +4683,70 @@ async def enemy_troops_delete(request: Request, guild_id: str, player_name: str,
     )
 
 
+# ---------------------------------------------------------------------------
+# Enemy Village Tracking Routes
+# ---------------------------------------------------------------------------
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/villages/import")
+async def enemy_villages_import(request: Request, guild_id: str, player_name: str):
+    from stats_parser import parse_player_profile
+    from urllib.parse import unquote
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    form = await request.form()
+    raw_text    = (form.get("profile_text") or "").strip()
+    snapshot_at = (form.get("snapshot_at") or "").strip()
+    player_name = unquote(player_name)
+
+    if not raw_text:
+        return RedirectResponse(
+            f"/guild/{guild_id}/enemies/{player_name}?flash=village_empty", status_code=303)
+    if not snapshot_at:
+        from datetime import datetime as _dt
+        snapshot_at = _dt.utcnow().strftime("%Y-%m-%dT%H:%M")
+
+    parsed = parse_player_profile(raw_text)
+    villages = parsed.get("villages", [])
+    if not villages:
+        return RedirectResponse(
+            f"/guild/{guild_id}/enemies/{player_name}?flash=village_parse_fail", status_code=303)
+
+    # Ensure enemy exists in DB
+    detected_name = parsed.get("player_name") or player_name
+    await database.upsert_enemy(guild_id, player_name)
+
+    snap_id, events = await database.save_enemy_village_snapshot(
+        guild_id, player_name, snapshot_at,
+        imported_by=session.get("username",""),
+        raw_text=raw_text,
+        villages=villages,
+    )
+    evt_count = len(events)
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies/{player_name}?flash=villages_imported&vcount={len(villages)}&ecount={evt_count}",
+        status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/enemies/add")
+async def enemy_add(request: Request, guild_id: str):
+    """Manually add an enemy player to the kartei."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    form = await request.form()
+    player_name = (form.get("player_name") or "").strip()
+    if not player_name:
+        return RedirectResponse(f"/guild/{guild_id}/enemies", status_code=303)
+    await database.upsert_enemy(guild_id, player_name)
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies/{player_name}", status_code=303
+    )
+
+
 @app.get("/ally/join/{token}", response_class=HTMLResponse)
 async def ally_join_page(request: Request, token: str):
     session = get_session(request)
@@ -7476,14 +7540,18 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
     if not enemy:
         return RedirectResponse(f"/guild/{guild_id}/enemies", status_code=303)
     history = await database.get_enemy_scout_history(guild_id, player_name)
-    troop_entries = await database.get_enemy_troop_entries(guild_id, player_name)
+    troop_entries   = await database.get_enemy_troop_entries(guild_id, player_name)
+    village_history = await database.get_enemy_village_history(guild_id, player_name)
     return templates.TemplateResponse("enemy_detail.html", {
         "request": request,
         "guild": guild,
         "enemy": enemy,
         "history": history,
         "troop_entries": troop_entries,
+        "village_history": village_history,
         "flash": request.query_params.get("flash", ""),
+        "vcount": request.query_params.get("vcount",""),
+        "ecount": request.query_params.get("ecount",""),
     })
 
 
