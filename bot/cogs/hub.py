@@ -364,7 +364,7 @@ async def _create_defend_channel(
         embed.add_field(name=t(lang, "defend.field.arrival"), value=arrival_1, inline=True)
 
     if troop_goal:
-        embed.add_field(name="🎯 Truppenziel", value=f"**{troop_goal}**", inline=True)
+        embed.add_field(name="🎯 Kornziel", value=f"**{troop_goal}** 🌾/h", inline=True)
     if ratio:
         embed.add_field(name="⚖️ Verteilung Fuß/Pferd", value=ratio, inline=True)
     if notes:
@@ -428,10 +428,10 @@ def _parse_coords_time(raw: str) -> tuple[str, str]:
     return coords, arrival
 
 
-class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Truppenziel"):
+class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Kornziel"):
     troop_goal = discord.ui.TextInput(
-        label="Benötigte Truppen (Ziel)",
-        placeholder="z.B. 10k oder 5000",
+        label="Benötigtes Korn/h (Ziel)",
+        placeholder="z.B. 80k oder 50000",
         required=False, max_length=20,
     )
     ratio = discord.ui.TextInput(
@@ -604,31 +604,32 @@ def _build_defend_tracking_embed(
     goal_raw: str = "", ratio: str = "",
 ) -> discord.Embed:
     from cogs.res_push import _parse_amount
+    from collections import defaultdict
+
     total_troops = sum(c.get("amount_parsed", 0) for c in contributions)
     total_grain  = sum(
         (c.get("amount_parsed") or 0) * (c.get("grain_per_unit") or 1)
         for c in contributions
     )
-    # goal_raw is now always a plain numeric string (e.g. "10k")
     goal_parsed = _parse_amount(goal_raw.strip()) if goal_raw and goal_raw.strip() else None
 
-    # ── Progress bar ──────────────────────────────────────────────────────────
+    # ── Progress bar — in GRAIN (Korn/h) ────────────────────────────────────
     BAR_LEN = 20
     if goal_parsed and goal_parsed > 0:
-        pct = min(total_troops / goal_parsed, 1.0)
+        pct = min(total_grain / goal_parsed, 1.0)
         filled = round(pct * BAR_LEN)
-        goal_reached = total_troops >= goal_parsed
+        goal_reached = total_grain >= goal_parsed
         fill_emoji = "🟩" if goal_reached else "🟥"
         bar = fill_emoji * filled + "⬜" * (BAR_LEN - filled)
-        pct_text = f"**{int(pct * 100)}%**  ({_fmt_troops(total_troops)} / {_fmt_troops(goal_parsed)})"
-        if total_troops > goal_parsed:
-            pct_text += f"  (+{_fmt_troops(total_troops - goal_parsed)})"
+        pct_text = f"**{int(pct * 100)}%**  ({_fmt_troops(total_grain)} / {_fmt_troops(goal_parsed)}) 🌾/h"
+        if total_grain > goal_parsed:
+            pct_text += f"  (+{_fmt_troops(total_grain - goal_parsed)})"
         progress_text = f"{bar}\n{pct_text}"
         color = discord.Color.from_rgb(34, 197, 94) if goal_reached else discord.Color.from_rgb(239, 68, 68)
     else:
         bar_filled = min(BAR_LEN, max(1, len(contributions)))
         bar = "🟥" * bar_filled + "⬜" * (BAR_LEN - bar_filled)
-        progress_text = f"{bar}\n**{_fmt_troops(total_troops)}** Truppen"
+        progress_text = f"{bar}\n**{_fmt_troops(total_grain)}** 🌾/h"
         color = discord.Color.from_rgb(239, 68, 68)
 
     # ── Travian link ──────────────────────────────────────────────────────────
@@ -648,28 +649,45 @@ def _build_defend_tracking_embed(
     if travian_link:
         embed.description = f"### [🗺️ Ziel-Dorf öffnen — {coords}]({travian_link})"
 
-    # Progress + total troops
+    # ── Primary: Korn/h progress ──────────────────────────────────────────────
     embed.add_field(
-        name="📊 Gesamt Truppen" if lang == "de" else "📊 Total Troops",
+        name="🌾 Korn/h gesamt" if lang == "de" else "🌾 Total Grain/h",
         value=progress_text,
         inline=False,
     )
-    # Grain consumption
-    embed.add_field(
-        name="🌾 Getreide/h gesamt",
-        value=f"**{_fmt_troops(total_grain)}** /h",
-        inline=True,
-    )
+
+    # ── Troop-type breakdown (how many of each type total) ────────────────────
+    type_totals: dict[str, int] = defaultdict(int)
+    for c in contributions:
+        tt = (c.get("troop_type") or "").strip()
+        if tt:
+            type_totals[tt] += c.get("amount_parsed", 0)
+
+    if type_totals:
+        # Sort by count desc
+        sorted_types = sorted(type_totals.items(), key=lambda x: x[1], reverse=True)
+        troop_lines = [f"**{_fmt_troops(cnt)}×** {ttype}" for ttype, cnt in sorted_types]
+        embed.add_field(
+            name="🪖 Truppenarten (gesamt)" if lang == "de" else "🪖 Troop Types",
+            value="\n".join(troop_lines) or "—",
+            inline=True,
+        )
+        embed.add_field(
+            name="📊 Truppen gesamt",
+            value=f"**{_fmt_troops(total_troops)}**",
+            inline=True,
+        )
+
     if ratio:
         embed.add_field(name="⚖️ Verteilung", value=ratio, inline=True)
 
-    # Individual contributions (newest 15)
+    # ── Individual contributions (newest 15) ──────────────────────────────────
     if contributions:
         lines = []
         for c in contributions[-15:]:
-            grain_info = f" · {_fmt_troops((c.get('amount_parsed') or 0) * (c.get('grain_per_unit') or 1))} 🌾/h"
+            grain = (c.get("amount_parsed") or 0) * (c.get("grain_per_unit") or 1)
             lines.append(
-                f"• **{c['user_name']}** — {_fmt_troops(c.get('amount_parsed', 0))} {c.get('troop_type', '')}{grain_info}"
+                f"• **{c['user_name']}** — {_fmt_troops(c.get('amount_parsed', 0))} {c.get('troop_type', '')} · {_fmt_troops(grain)} 🌾/h"
             )
         embed.add_field(
             name="👥 Beiträge" if lang == "de" else "👥 Contributions",
