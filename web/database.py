@@ -3701,6 +3701,54 @@ async def get_farmlist_analyses(guild_id: str, discord_user_id: str, limit: int 
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str) -> dict:
+    """Returns {(x,y): [list_name, ...]} from user's most recent farmlist analysis,
+    cross-referenced with map_snapshots to get coordinates."""
+    await _init_farmlist_analyses_table()
+    import json as _json
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT farms_json FROM farmlist_analyses
+               WHERE guild_id = ? AND discord_user_id = ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (guild_id, discord_user_id)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row or not row["farms_json"]:
+            return {}
+        farms = _json.loads(row["farms_json"])
+        # Build village_name -> list of list_names
+        name_to_lists: dict = {}
+        for f in farms:
+            if not isinstance(f, dict):
+                continue
+            vname = (f.get("village_name") or "").strip().lower()
+            if not vname:
+                continue
+            lname = f.get("list_name") or f.get("group") or ""
+            name_to_lists.setdefault(vname, [])
+            if lname and lname not in name_to_lists[vname]:
+                name_to_lists[vname].append(lname)
+        if not name_to_lists:
+            return {}
+        # Get latest snapshot coords, match by village_name
+        async with db.execute("""
+            SELECT DISTINCT village_name, x, y FROM map_snapshots
+            WHERE guild_id = ? AND fetched_at = (
+                SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?
+            )
+        """, (guild_id, guild_id)) as cur:
+            snapshot_rows = await cur.fetchall()
+    result: dict = {}
+    for r in snapshot_rows:
+        vname_lower = (r["village_name"] or "").strip().lower()
+        if vname_lower in name_to_lists:
+            key = (r["x"], r["y"])
+            result[key] = name_to_lists[vname_lower]
+    return result
+
+
 async def get_farmlist_analysis(analysis_id: int, discord_user_id: str) -> dict | None:
     await _init_farmlist_analyses_table()
     async with aiosqlite.connect(DB_PATH) as db:

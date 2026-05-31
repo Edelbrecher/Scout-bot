@@ -10,7 +10,7 @@ import smtplib
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List
 from email.mime.text import MIMEText
 from urllib.parse import urlencode
 
@@ -18,7 +18,7 @@ import httpx
 import stripe
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Query, Request
 from fastapi import Request as StarletteRequest
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -5667,6 +5667,8 @@ async def farming_inactive_search(
     exclude_players: str = "",
     exclude_alliances: str = "",
     include_natars: bool = False,
+    tribes: Optional[List[int]] = Query(default=None),
+    in_farmlist: str = "",
     searched: bool = False,
 ):
     session, err = _require_session(request)
@@ -5692,6 +5694,10 @@ async def farming_inactive_search(
     min_dist = min_dist or 0.0
     max_dist = max_dist if max_dist is not None else 9999.0
 
+    uid = session.get("uid", "")
+    farmlist_xy_lookup = await database.get_farmlist_xy_lookup(guild_id, uid)
+    has_farmlist = bool(farmlist_xy_lookup)
+
     if searched and snap_count >= 1:
         result = await database.search_inactive_advanced(
             guild_id=guild_id,
@@ -5705,8 +5711,19 @@ async def farming_inactive_search(
             exclude_players=exclude_players,
             exclude_alliances=exclude_alliances,
             include_natars=include_natars,
+            tribes=tribes or None,
             limit=300,
         )
+        # Annotate villages with farmlist info
+        for v in result.get("villages", []):
+            key = (v["x"], v["y"])
+            v["farmlist_groups"] = farmlist_xy_lookup.get(key, [])
+        # Apply in_farmlist filter
+        if in_farmlist == "no":
+            result["villages"] = [v for v in result["villages"] if not v["farmlist_groups"]]
+        elif in_farmlist == "yes":
+            result["villages"] = [v for v in result["villages"] if v["farmlist_groups"]]
+        result["total"] = len(result["villages"])
 
     # Alliance names from snapshot for autocomplete
     alliance_names = await database.get_alliance_names_from_snapshot(guild_id)
@@ -5729,6 +5746,9 @@ async def farming_inactive_search(
         "exclude_players": exclude_players,
         "exclude_alliances": exclude_alliances,
         "include_natars": include_natars,
+        "tribes": tribes or [],
+        "in_farmlist": in_farmlist,
+        "has_farmlist": has_farmlist,
         "alliance_names": [a["alliance_name"] for a in alliance_names],
     })
 

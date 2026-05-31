@@ -64,14 +64,52 @@
         </div>
       </div>
 
-      <!-- Erweiterte Filterung toggle -->
-      <button type="button" id="extToggle"
-              onclick="toggleExt()"
-              style="background:none;border:1px solid var(--border);border-radius:6px;
-                     color:#93c5fd;font-size:0.82rem;padding:0.3rem 0.75rem;cursor:pointer;
-                     margin-bottom:0.75rem;">
-        ⚙️ Erweiterte Filterung ▾
-      </button>
+      <!-- Tribe filter chips -->
+      <div class="form-group" style="margin:0 0 0.75rem;">
+        <label style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.35rem;display:block;">Volk</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;" id="tribeChips">
+          {% set tribe_defs = [(1,'🦅 Römer'),(2,'⚔️ Teutonen'),(3,'🛡️ Gallier'),(5,'🌊 Hunnen'),(6,'🌙 Ägypter'),(7,'⚡ Spartaner')] %}
+          {% for tid, tlabel in tribe_defs %}
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="tribes" value="{{ tid }}"
+                   {% if tid in tribes %}checked{% endif %}
+                   style="display:none;" class="tribe-cb" onchange="updateChips()">
+            <span class="tribe-chip {% if tid in tribes %}tribe-chip-active{% endif %}"
+                  data-tid="{{ tid }}"
+                  onclick="this.previousElementSibling.click()"
+                  style="display:inline-block;padding:0.25rem 0.6rem;border-radius:20px;
+                         font-size:0.8rem;cursor:pointer;border:1px solid var(--border);
+                         background:{% if tid in tribes %}rgba(147,197,253,0.2){% else %}var(--bg-main){% endif %};
+                         color:{% if tid in tribes %}#93c5fd{% else %}var(--text-muted){% endif %};">
+              {{ tlabel }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Farmlist & Erweiterte Filterung toggle -->
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
+        <!-- Farmlist filter -->
+        <div class="form-group" style="margin:0;display:flex;align-items:center;gap:0.5rem;">
+          <label style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">📋 Farmliste</label>
+          <select name="in_farmlist" class="form-control" style="width:auto;font-size:0.82rem;">
+            <option value="" {% if in_farmlist == '' %}selected{% endif %}>Alle</option>
+            <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>Nicht in Farmliste</option>
+            <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>In Farmliste</option>
+          </select>
+          {% if not has_farmlist %}
+          <span style="font-size:0.75rem;color:var(--text-muted);">(keine Farmlistenanalyse vorhanden)</span>
+          {% endif %}
+        </div>
+
+        <button type="button" id="extToggle"
+                onclick="toggleExt()"
+                style="background:none;border:1px solid var(--border);border-radius:6px;
+                       color:#93c5fd;font-size:0.82rem;padding:0.3rem 0.75rem;cursor:pointer;">
+          ⚙️ Erweiterte Filterung ▾
+        </button>
+      </div>
 
       <div id="extFilters" style="display:none;">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1rem;">
@@ -177,6 +215,7 @@
           <th onclick="sortResults(1)" style="cursor:pointer;">Distanz ▲</th>
           <th onclick="sortResults(2)" style="cursor:pointer;">Travian-Account</th>
           <th onclick="sortResults(3)" style="cursor:pointer;">Dorf</th>
+          <th style="text-align:center;">📋 Farmliste</th>
           {% for ts in result.snap_dates %}
           <th style="text-align:center;color:var(--text-muted);font-size:0.75rem;">
             {{ ts[5:10] }}
@@ -209,10 +248,24 @@
                  style="color:#93c5fd;text-decoration:none;font-family:monospace;">
                 [{{ v.x }}|{{ v.y }}]
               </a>
+              <a href="{{ tw_world }}/karte.php?x={{ v.x }}&y={{ v.y }}" target="_blank"
+                 title="Karte öffnen"
+                 style="margin-left:0.3rem;text-decoration:none;font-size:0.85rem;">🗺️</a>
               <span style="color:var(--text-muted);margin-left:0.3rem;">
                 👥 {{ v.population }}
               </span>
             </div>
+          </td>
+          <!-- Farmlist column -->
+          <td style="text-align:center;white-space:nowrap;">
+            {% if v.farmlist_groups %}
+              {% for g in v.farmlist_groups %}
+              <span style="display:inline-block;background:rgba(147,197,253,0.15);color:#93c5fd;
+                           border-radius:4px;padding:0.1rem 0.4rem;font-size:0.72rem;margin:0.1rem;">{{ g }}</span>
+              {% endfor %}
+            {% else %}
+              <span style="color:var(--text-muted);">—</span>
+            {% endif %}
           </td>
           <!-- Pop delta per snapshot date -->
           {% for delta in v.pop_history %}
@@ -271,6 +324,19 @@
   const ext = {{ 'true' if (min_pop or max_pop < 9999 or min_player_pop or max_player_pop < 999999 or min_dist or max_dist < 9999 or player_filter or alliance_filter or exclude_players or exclude_alliances or include_natars) else 'false' }};
   if (ext) toggleExt();
 })();
+
+function updateChips() {
+  document.querySelectorAll('.tribe-cb').forEach(function(cb) {
+    const chip = cb.nextElementSibling;
+    if (cb.checked) {
+      chip.style.background = 'rgba(147,197,253,0.2)';
+      chip.style.color = '#93c5fd';
+    } else {
+      chip.style.background = 'var(--bg-main)';
+      chip.style.color = 'var(--text-muted)';
+    }
+  });
+}
 
 function toggleExt() {
   const el  = document.getElementById('extFilters');
