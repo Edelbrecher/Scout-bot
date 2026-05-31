@@ -2677,7 +2677,7 @@ async def guild_map(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/map/share")
 async def map_create_share(request: Request, guild_id: str):
-    """Save map state (camera + filters + drawing) and return a short share ID."""
+    """Save map state and return a short share ID (member-only or public)."""
     session, err = _require_session(request)
     if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
@@ -2687,12 +2687,17 @@ async def map_create_share(request: Request, guild_id: str):
         body = await request.json()
     except Exception:
         return _JSONResponse({"error": "invalid json"}, status_code=400)
+    is_public = bool(body.pop("_public", False))
     state_json = _json.dumps(body)
     short_id = await database.create_map_share(
-        guild_id, state_json, created_by=session.get("username", "")
+        guild_id, state_json, created_by=session.get("username", ""), is_public=is_public
     )
     base = str(request.base_url).rstrip("/")
-    return _JSONResponse({"short_id": short_id, "url": f"{base}/guild/{guild_id}/map/s/{short_id}"})
+    if is_public:
+        url = f"{base}/map/open/{short_id}"
+    else:
+        url = f"{base}/guild/{guild_id}/map/s/{short_id}"
+    return _JSONResponse({"short_id": short_id, "url": url, "is_public": is_public})
 
 
 @app.get("/guild/{guild_id}/map/s/{short_id}", response_class=HTMLResponse)
@@ -2728,6 +2733,30 @@ async def map_share_view(request: Request, guild_id: str, short_id: str):
         "meta_groups": meta_groups,
         "is_share_viewer": not is_member,
         "share_state_json": share["state_json"],  # embedded in template
+    })
+
+
+@app.get("/map/open/{short_id}", response_class=HTMLResponse)
+async def map_public_view(request: Request, short_id: str):
+    """Public read-only map — no auth required. Only works for links created with is_public=True."""
+    share = await database.get_map_share(short_id)
+    if not share or not share.get("is_public"):
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;color:#ccc;background:#0f172a;'>"
+            "<h2>🔒 This link is not publicly accessible.</h2>"
+            "<p>Ask the creator to share a public link.</p></body></html>",
+            status_code=403,
+        )
+    guild = await database.get_guild(share["guild_id"])
+    if not guild:
+        return HTMLResponse("<h2>Not found.</h2>", status_code=404)
+
+    scouted = await database.get_scouted_coordinates(share["guild_id"])
+    return templates.TemplateResponse("map_public.html", {
+        "request":        request,
+        "guild":          guild,
+        "scouted":        scouted,
+        "share_state_json": share["state_json"],
     })
 
 
@@ -4685,9 +4714,14 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     form = await request.form()
     color = form.get("color") or None
     ALL_FLAGS = [
-        "ally_manage", "ep_manage", "ep_view", "ep_notify",
-        "attack_manage", "attack_view", "scout_manage", "scout_view",
-        "map_manage", "map_view", "sector_view", "hospital_view",
+        "ally_manage",
+        "defend_view", "defend_manage",
+        "ep_manage", "ep_view", "ep_notify",
+        "attack_manage", "attack_view",
+        "scout_manage", "scout_view",
+        "map_manage", "map_view",
+        "res_push_view", "res_push_manage",
+        "sector_view", "hospital_view",
     ]
     selected = [f for f in ALL_FLAGS if form.get(f) == "1"]
     # Apply preset shortcut
@@ -4695,10 +4729,17 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     if preset == "leiter":
         selected = ALL_FLAGS[:]
     elif preset == "officer":
-        selected = ["ep_manage","ep_view","ep_notify","attack_manage","attack_view",
-                    "scout_manage","scout_view","map_view","sector_view","hospital_view"]
+        selected = [
+            "defend_view", "defend_manage",
+            "ep_manage", "ep_view", "ep_notify",
+            "attack_manage", "attack_view",
+            "scout_manage", "scout_view",
+            "map_view", "map_manage",
+            "res_push_view", "res_push_manage",
+            "sector_view", "hospital_view",
+        ]
     elif preset == "mitglied":
-        selected = ["ep_view","ep_notify","attack_view","scout_view","map_view","hospital_view"]
+        selected = ["defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated", status_code=303)

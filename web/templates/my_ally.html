@@ -47,12 +47,12 @@
 
   {# ── Tab nav ── #}
   <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
-    <button class="ma-tab active" onclick="showTab('mitglieder',this)">👥 Mitglieder ({{ (members | rejectattr("status","equalto","pending") | list)|length }})</button>
-    <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Einladungen</button>
-    <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Rechteverwaltung</button>
-    <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Rollen & Rechte</button>
-    <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Allianz-Bonus</button>
-    <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Einstellungen</button>
+    <button class="ma-tab active" onclick="showTab('mitglieder',this)">👥 Members ({{ (members | rejectattr("status","equalto","pending") | list)|length }})</button>
+    <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Invitations</button>
+    <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Member Roles</button>
+    <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Roles & Permissions</button>
+    <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Alliance Bonus</button>
+    <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Settings</button>
     {% if leaderboard %}
     <button class="ma-tab" onclick="showTab('leaderboard',this)">🏆 Leaderboard</button>
     {% endif %}
@@ -318,51 +318,65 @@
     </div>
   </div>
 
-  {# ══════════════════════════════ TAB: RECHTEVERWALTUNG ══════════════════════════════ #}
+  {# ══════════════════════════════ TAB: MEMBER ROLES ══════════════════════════════ #}
   <div id="tab-rechte" class="ma-tab-panel" style="display:none;">
     <div class="card">
-      <h3 style="margin:0 0 .25rem;font-size:.95rem;">🔑 Rechteverwaltung — Rollen pro Mitglied</h3>
-      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">Weise jedem Mitglied direkt eine Rolle zu. Berechtigungen werden über die Rolle gesteuert.</p>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+        <div>
+          <h3 style="margin:0 0 .15rem;font-size:.95rem;">🔑 Member Roles</h3>
+          <p style="font-size:.78rem;color:var(--text-muted);margin:0;">Assign a role to each member. Permissions are controlled through the role. <a href="#" onclick="showTab('rollen',document.querySelector('[onclick*=rollen]'));return false;" style="color:#818cf8;">Manage roles →</a></p>
+        </div>
+        {% if roles %}
+        <div style="display:flex;gap:.35rem;flex-wrap:wrap;">
+          {% for r in roles %}
+          <span style="font-size:.7rem;padding:2px 9px;border-radius:20px;font-weight:600;border:1px solid {{ r.color }};color:{{ r.color }};background:{{ r.color }}15;">
+            {{ r.role_name }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
 
       {% set approved = members | rejectattr("status","equalto","pending") | list %}
       {% if approved %}
-      <div style="display:flex;flex-direction:column;gap:.4rem;">
+      <div style="display:flex;flex-direction:column;gap:.35rem;">
         {% for m in approved | sort(attribute='travian_name') %}
-        <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;
-                    background:var(--bg-main);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;">
+        {% set cur_role = roles | selectattr("id","equalto",m.role_id) | first if m.role_id else None %}
+        <div style="display:flex;align-items:center;gap:.75rem;padding:.45rem .75rem;
+                    background:var(--bg-main);border:1px solid var(--border);border-radius:8px;
+                    border-left:3px solid {{ cur_role.color if cur_role else 'var(--border)' }};flex-wrap:wrap;">
           <div style="flex:1;min-width:140px;">
-            <div style="font-weight:600;font-size:.88rem;">{{ m.travian_name or m.discord_username or '—' }}</div>
+            <div style="font-weight:600;font-size:.87rem;">{{ m.travian_name or m.discord_username or '—' }}</div>
             {% if m.travian_name and m.discord_username %}
-            <div style="font-size:.72rem;color:var(--text-muted);">@{{ m.discord_username }}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);">@{{ m.discord_username }}</div>
             {% endif %}
           </div>
           <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/set-role"
                 style="display:flex;align-items:center;gap:.5rem;margin:0;">
             <select name="role_id"
-                    style="padding:.3rem .5rem;background:var(--bg-main);border:1px solid var(--border);
+                    style="padding:.28rem .5rem;background:var(--bg-main);border:1px solid var(--border);
                            border-radius:6px;color:var(--text);font-size:.82rem;"
                     onchange="this.form.submit()">
-              <option value="">— Keine Rolle —</option>
+              <option value="">— No role —</option>
               {% for r in roles %}
               <option value="{{ r.id }}" {% if m.role_id == r.id %}selected{% endif %}
                       style="color:{{ r.color }}">{{ r.role_name }}</option>
               {% endfor %}
             </select>
           </form>
-          {% if m.role_id %}
-          {% set cur_role = roles | selectattr("id","equalto",m.role_id) | first %}
           {% if cur_role %}
-          <span style="font-size:.72rem;padding:2px 8px;border-radius:10px;font-weight:600;
-                       background:rgba(0,0,0,.2);border:1px solid {{ cur_role.color }};color:{{ cur_role.color }};">
+          <span style="font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600;
+                       background:{{ cur_role.color }}18;border:1px solid {{ cur_role.color }};color:{{ cur_role.color }};">
             {{ cur_role.role_name }}
           </span>
-          {% endif %}
+          {% else %}
+          <span style="font-size:.7rem;padding:2px 8px;border-radius:10px;color:var(--text-muted);border:1px solid var(--border);">No role</span>
           {% endif %}
         </div>
         {% endfor %}
       </div>
       {% else %}
-      <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Noch keine Mitglieder.</p>
+      <p style="color:var(--text-muted);font-size:.85rem;margin:0;">No approved members yet.</p>
       {% endif %}
     </div>
   </div>
@@ -470,117 +484,233 @@
     </div>
   </div>
 
-  {# ══════════════════════════════ TAB: ROLLEN ══════════════════════════════ #}
+  {# ══════════════════════════════ TAB: ROLES & PERMISSIONS ══════════════════════════════ #}
   <div id="tab-rollen" class="ma-tab-panel" style="display:none;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
 
+    {# ── Tooltip styles ── #}
+    <style>
+    .perm-label { position:relative; display:flex; align-items:center; gap:.4rem; font-size:.8rem; cursor:pointer; margin-bottom:.25rem; }
+    .perm-label input { accent-color:#6366f1; width:14px; height:14px; flex-shrink:0; }
+    .perm-label .perm-tip {
+      visibility:hidden; opacity:0; pointer-events:none;
+      position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%);
+      background:#1e293b; border:1px solid rgba(99,102,241,.4); color:#cbd5e1;
+      font-size:.72rem; padding:.35rem .6rem; border-radius:6px; white-space:nowrap; z-index:100;
+      transition:opacity .15s; box-shadow:0 4px 16px rgba(0,0,0,.5);
+      max-width:240px; white-space:normal; line-height:1.4;
+    }
+    .perm-label:hover .perm-tip { visibility:visible; opacity:1; }
+    .perm-info {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:13px; height:13px; border-radius:50%; background:rgba(99,102,241,.2);
+      border:1px solid rgba(99,102,241,.4); color:#818cf8; font-size:.6rem;
+      font-weight:700; flex-shrink:0; cursor:default;
+    }
+    .role-card { background:var(--bg-main); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    .role-card-header { display:flex; align-items:center; gap:.6rem; padding:.55rem .75rem; cursor:pointer; user-select:none; }
+    .role-card-header:hover { background:rgba(255,255,255,.02); }
+    .perm-group {
+      background:rgba(255,255,255,.025); border:1px solid var(--border);
+      border-radius:8px; padding:.55rem .65rem;
+    }
+    .perm-group-title { font-size:.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.4rem; }
+    </style>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:1rem;align-items:start;">
+
+      {# ── Left: role list + permission editor ── #}
       <div class="card">
-        <h3 style="margin:0 0 .25rem;font-size:.95rem;">🛡️ Rollen & Rechte ({{ roles|length }})</h3>
-        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Klicke auf eine Rolle um die Rechte zu konfigurieren.</p>
-        <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.85rem;">
-          <span style="font-size:.7rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:20px;padding:2px 8px;">👑 Leiter — alle Rechte</span>
-          <span style="font-size:.7rem;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);color:#fb923c;border-radius:20px;padding:2px 8px;">⚔️ Officer — ohne Einstellungen</span>
-          <span style="font-size:.7rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac;border-radius:20px;padding:2px 8px;">👤 Mitglied — lesen & eigene Daten</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem;">
+          <h3 style="margin:0;font-size:.95rem;">🛡️ Roles <span style="font-size:.75rem;font-weight:400;color:var(--text-muted);">({{ roles|length }})</span></h3>
+          <div style="display:flex;gap:.4rem;font-size:.7rem;flex-wrap:wrap;">
+            <span style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:20px;padding:2px 9px;" title="Full access to all features including alliance settings">👑 Leader — all permissions</span>
+            <span style="background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);color:#fb923c;border-radius:20px;padding:2px 9px;" title="Can view and manage operations, attacks, scouting — cannot change alliance settings">⚔️ Officer — no settings</span>
+            <span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac;border-radius:20px;padding:2px 9px;" title="Can view shared data and submit their own reports">👤 Member — read + own data</span>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem;">
+        <p style="font-size:.76rem;color:var(--text-muted);margin:0 0 .85rem;">Click a role to expand its permission settings.</p>
+
+        <div style="display:flex;flex-direction:column;gap:.45rem;margin-bottom:.85rem;">
           {% for r in roles %}
           {% set rp = r.permissions or '' %}
-          <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
-            <div onclick="toggleRole({{ r.id }})" style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;cursor:pointer;user-select:none;">
-              <span style="width:10px;height:10px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
-              <span style="font-size:.88rem;font-weight:600;flex:1;">{{ r.role_name }}</span>
-              <span style="font-size:.68rem;color:var(--text-muted);">{{ (rp.split(',') | select | list) | length }} Rechte</span>
-              <span id="role-chevron-{{ r.id }}" style="font-size:.75rem;color:var(--text-muted);transition:transform .2s;">▼</span>
+          {% set pcount = (rp.split(',') | select | list) | length %}
+          <div class="role-card" style="border-left:3px solid {{ r.color }};">
+            <div class="role-card-header" onclick="toggleRole({{ r.id }})">
+              <span style="width:11px;height:11px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
+              <span style="font-size:.9rem;font-weight:700;flex:1;color:{{ r.color }};">{{ r.role_name }}</span>
+              <span style="font-size:.7rem;color:var(--text-muted);background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:20px;padding:1px 8px;">
+                {{ pcount }} permission{{ 's' if pcount != 1 }}
+              </span>
+              <span id="role-chevron-{{ r.id }}" style="font-size:.75rem;color:var(--text-muted);transition:transform .25s;">▼</span>
             </div>
-            <div id="role-panel-{{ r.id }}" style="display:none;border-top:1px solid var(--border);padding:.75rem;">
+
+            <div id="role-panel-{{ r.id }}" style="display:none;border-top:1px solid var(--border);padding:.85rem;">
               <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/update">
-                <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.75rem;">
-                  <span style="font-size:.72rem;color:var(--text-muted);align-self:center;">Preset:</span>
-                  <button type="submit" name="preset" value="leiter" style="font-size:.72rem;background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;padding:2px 10px;border-radius:20px;cursor:pointer;">👑 Leiter</button>
-                  <button type="submit" name="preset" value="officer" style="font-size:.72rem;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.35);color:#fb923c;padding:2px 10px;border-radius:20px;cursor:pointer;">⚔️ Officer</button>
-                  <button type="submit" name="preset" value="mitglied" style="font-size:.72rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;padding:2px 10px;border-radius:20px;cursor:pointer;">👤 Mitglied</button>
+
+                {# Presets #}
+                <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;margin-bottom:.85rem;">
+                  <span style="font-size:.72rem;color:var(--text-muted);">Quick preset:</span>
+                  <button type="submit" name="preset" value="leiter" title="Grant all permissions"
+                    style="font-size:.72rem;background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;padding:2px 11px;border-radius:20px;cursor:pointer;">👑 Leader</button>
+                  <button type="submit" name="preset" value="officer" title="View + manage ops, attacks, scouting — no alliance settings"
+                    style="font-size:.72rem;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.35);color:#fb923c;padding:2px 11px;border-radius:20px;cursor:pointer;">⚔️ Officer</button>
+                  <button type="submit" name="preset" value="mitglied" title="Read-only access to shared features"
+                    style="font-size:.72rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;padding:2px 11px;border-radius:20px;cursor:pointer;">👤 Member</button>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.5rem;margin-bottom:.75rem;">
-                  {% set perm_groups = [
-                    ("⚙️ Allianz", [("ally_manage","Verwaltung")]),
-                    ("📋 Einsatzplanung", [("ep_view","Ansehen"),("ep_manage","Verwalten"),("ep_notify","Benachrichtigungen")]),
-                    ("⚔️ Angriffe", [("attack_view","Ansehen"),("attack_manage","Verwalten")]),
-                    ("🔍 Aufklärung", [("scout_view","Ansehen"),("scout_manage","Verwalten")]),
-                    ("🗺️ Karte", [("map_view","Ansehen"),("map_manage","Verwalten")]),
-                    ("📡 Sektor", [("sector_view","Überwachung")]),
-                    ("🏥 Hospital", [("hospital_view","Ansehen")]),
-                  ] %}
+
+                {# Permission matrix #}
+                {% set perm_groups = [
+                  ("⚙️ Alliance", [
+                    ("ally_manage","Manage Alliance","Full alliance administration: approve members, edit settings, manage roles and invite tokens."),
+                  ]),
+                  ("🛡️ Defense", [
+                    ("defend_view","View Defense","Can see the defense board and channel summaries."),
+                    ("defend_manage","Manage Defense","Can close, reopen and archive defense channels."),
+                  ]),
+                  ("📋 Operations", [
+                    ("ep_view","View Ops","Can view planned operations (Einsatzplanung)."),
+                    ("ep_manage","Manage Ops","Can create, edit and delete operations."),
+                    ("ep_notify","Op Notifications","Receives Discord notifications when new operations are posted."),
+                  ]),
+                  ("⚔️ Attacks", [
+                    ("attack_view","View Attacks","Can view incoming attack reports and the attack board."),
+                    ("attack_manage","Manage Attacks","Can add, edit and delete attack entries."),
+                  ]),
+                  ("🔍 Scouting", [
+                    ("scout_view","View Reports","Can view scout reports and enemy data."),
+                    ("scout_manage","Manage Scouting","Can assign scouts and manage enemy troop records."),
+                  ]),
+                  ("🗺️ Map", [
+                    ("map_view","View Map","Can access the alliance map."),
+                    ("map_manage","Manage Map","Can update map settings, world data, and sector monitors."),
+                  ]),
+                  ("📦 Resource Push", [
+                    ("res_push_view","View Requests","Can view all resource push requests on the board."),
+                    ("res_push_manage","Manage Requests","Can accept, archive and manage resource push channels."),
+                  ]),
+                  ("📡 Sector", [
+                    ("sector_view","Sector Monitor","Can view the sector monitoring dashboard."),
+                  ]),
+                  ("🏥 Hospital", [
+                    ("hospital_view","View Hospital","Can view the hospital / troop recovery tracker."),
+                  ]),
+                ] %}
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.45rem;margin-bottom:.85rem;">
                   {% for group_name, group_perms in perm_groups %}
-                  <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem;">
-                    <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:.35rem;">{{ group_name }}</div>
-                    {% for flag, label in group_perms %}
-                    <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;cursor:pointer;margin-bottom:.2rem;">
-                      <input type="checkbox" name="{{ flag }}" value="1" {% if flag in rp %}checked{% endif %} style="accent-color:#6366f1;width:13px;height:13px;">
-                      {{ label }}
+                  <div class="perm-group">
+                    <div class="perm-group-title">{{ group_name }}</div>
+                    {% for flag, label, tip in group_perms %}
+                    <label class="perm-label">
+                      <input type="checkbox" name="{{ flag }}" value="1" {% if flag in rp %}checked{% endif %}>
+                      <span>{{ label }}</span>
+                      <span class="perm-info" aria-label="{{ tip }}">?
+                        <span class="perm-tip">{{ tip }}</span>
+                      </span>
                     </label>
                     {% endfor %}
                   </div>
                   {% endfor %}
                 </div>
-                <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
-                  <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-muted);">
-                    Farbe <input type="color" name="color" value="{{ r.color }}" style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;padding:1px;background:var(--bg-main);cursor:pointer;">
+
+                <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:.65rem;">
+                  <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-muted);" title="Role badge colour">
+                    Color
+                    <input type="color" name="color" value="{{ r.color }}"
+                           style="width:28px;height:28px;border:1px solid var(--border);border-radius:5px;padding:2px;background:var(--bg-main);cursor:pointer;">
                   </label>
-                  <button type="submit" class="btn btn-primary" style="font-size:.8rem;padding:.35rem .9rem;">💾 Speichern</button>
+                  <button type="submit" class="btn btn-primary" style="font-size:.8rem;padding:.35rem .9rem;">💾 Save</button>
                   <div style="flex:1;"></div>
                   <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="margin:0;">
-                    <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;" onclick="return confirm('Rolle löschen?')">🗑️ Löschen</button>
+                    <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;"
+                            onclick="return confirm('Delete this role? Members with this role will lose their permissions.')">🗑️ Delete role</button>
                   </form>
                 </div>
+
               </form>
             </div>
           </div>
           {% endfor %}
         </div>
+
+        {# Create new role #}
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/create"
-              style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-          <input type="text" name="role_name" placeholder="Neue Rolle…" required maxlength="40"
+              style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;border-top:1px solid var(--border);padding-top:.75rem;">
+          <input type="text" name="role_name" placeholder="New role name…" required maxlength="40"
                  style="padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;flex:1;min-width:120px;">
-          <input type="color" name="color" value="#94a3b8" style="width:38px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;">
-          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕ Rolle hinzufügen</button>
+          <input type="color" name="color" value="#94a3b8"
+                 style="width:38px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;"
+                 title="Pick a colour for this role">
+          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕ Create role</button>
         </form>
       </div>
 
-      {# Role overview - who has which role #}
-      {% if roles and (members | rejectattr("status","equalto","pending") | list) %}
-      <div class="card">
-        <h3 style="margin:0 0 .9rem;font-size:.95rem;">👥 Rollenzuweisung</h3>
-        {% for r in roles %}
-        {% set role_members = members | selectattr("role_id","equalto",r.id) | rejectattr("status","equalto","pending") | list %}
-        {% if role_members %}
-        <div style="margin-bottom:.75rem;">
-          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
-            <span style="width:8px;height:8px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
-            <span style="font-size:.82rem;font-weight:600;">{{ r.role_name }}</span>
-            <span style="font-size:.7rem;color:var(--text-muted);">({{ role_members|length }})</span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:.3rem;padding-left:1.1rem;">
-            {% for m in role_members %}
-            <span style="font-size:.75rem;background:rgba(0,0,0,.2);border:1px solid {{ r.color }};color:{{ r.color }};border-radius:10px;padding:1px 8px;">{{ m.travian_name or m.discord_username }}</span>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-        {% endfor %}
-        {% set no_role = members | selectattr("role_id","none") | rejectattr("status","equalto","pending") | list %}
-        {% if no_role %}
-        <div>
-          <div style="font-size:.82rem;font-weight:600;color:var(--text-muted);margin-bottom:.35rem;">Ohne Rolle</div>
-          <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
-            {% for m in no_role %}
-            <span style="font-size:.75rem;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 8px;">{{ m.travian_name or m.discord_username }}</span>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-      </div>
-      {% endif %}
+      {# ── Right: who has which role ── #}
+      <div style="display:flex;flex-direction:column;gap:.75rem;">
 
+        {# Role overview card #}
+        {% if roles and (members | rejectattr("status","equalto","pending") | list) %}
+        <div class="card">
+          <h3 style="margin:0 0 .85rem;font-size:.92rem;">👥 Role assignments</h3>
+          {% for r in roles %}
+          {% set role_members = members | selectattr("role_id","equalto",r.id) | rejectattr("status","equalto","pending") | list %}
+          {% if role_members %}
+          <div style="margin-bottom:.7rem;">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
+              <span style="font-size:.82rem;font-weight:600;color:{{ r.color }};">{{ r.role_name }}</span>
+              <span style="font-size:.7rem;color:var(--text-muted);">({{ role_members|length }})</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.3rem;padding-left:1.1rem;">
+              {% for m in role_members %}
+              <span style="font-size:.75rem;background:{{ r.color }}15;border:1px solid {{ r.color }};color:{{ r.color }};border-radius:10px;padding:1px 8px;">{{ m.travian_name or m.discord_username }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+          {% set no_role = members | selectattr("role_id","none") | rejectattr("status","equalto","pending") | list %}
+          {% if no_role %}
+          <div style="border-top:1px solid var(--border);padding-top:.6rem;margin-top:.2rem;">
+            <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.3rem;">⚫ No role assigned</div>
+            <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+              {% for m in no_role %}
+              <span style="font-size:.75rem;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 8px;">{{ m.travian_name or m.discord_username }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# Permission legend card #}
+        <div class="card" style="font-size:.78rem;">
+          <h4 style="margin:0 0 .65rem;font-size:.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">📖 Permission reference</h4>
+          <div style="display:flex;flex-direction:column;gap:.55rem;">
+            {% set legend = [
+              ("⚙️ Alliance","ally_manage","Manage alliance: approve members, change settings, manage roles."),
+              ("🛡️ Defense","defend_view / defend_manage","View: see defense board. Manage: close & archive defense channels."),
+              ("📋 Operations","ep_view / ep_manage / ep_notify","View ops, manage ops, or receive Discord notifications for new ops."),
+              ("⚔️ Attacks","attack_view / attack_manage","View or manage incoming attack reports."),
+              ("🔍 Scouting","scout_view / scout_manage","View enemy scouts; manage scout assignments & enemy troop entries."),
+              ("🗺️ Map","map_view / map_manage","Access the map; manage world data and sector settings."),
+              ("📦 Res-Push","res_push_view / res_push_manage","View resource requests; accept, archive and manage push channels."),
+              ("📡 Sector","sector_view","View sector monitoring."),
+              ("🏥 Hospital","hospital_view","View troop recovery tracker."),
+            ] %}
+            {% for icon_label, flags, desc in legend %}
+            <div style="display:flex;gap:.5rem;">
+              <div style="min-width:80px;font-weight:600;font-size:.76rem;">{{ icon_label }}</div>
+              <div>
+                <div style="font-family:monospace;font-size:.7rem;color:#818cf8;margin-bottom:1px;">{{ flags }}</div>
+                <div style="color:var(--text-muted);font-size:.73rem;">{{ desc }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 

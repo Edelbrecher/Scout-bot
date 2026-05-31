@@ -127,7 +127,8 @@
       </select>
     </div>
     <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;">✕ Reset</button>
-    <button onclick="shareMapView(this)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Aktuellen Kartenausschnitt als Link teilen">🔗 Teilen</button>
+    <button onclick="shareMapView(this,false)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Share with alliance members (requires Discord login)">🔗 Share</button>
+    <button onclick="shareMapView(this,true)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;color:#a5b4fc;border-color:rgba(99,102,241,.45);" title="Create a public link — anyone with the URL can view this map (read-only, no login required)">🌐 Public Link</button>
     <!-- Draw toolbar -->
     <div id="drawToolbar" style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;padding:0.25rem 0.5rem;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);">
       <button id="drawToggleBtn" onclick="toggleDraw()" title="Zeichnen an/aus"
@@ -935,17 +936,17 @@ function buildShareUrl() {
   return location.origin + location.pathname + '?' + p.toString();
 }
 
-async function shareMapView(btn) {
+async function shareMapView(btn, isPublic = false) {
   const orig = btn.textContent;
   btn.textContent = '⏳';
   btn.disabled = true;
 
-  // Build state object
   const state = {
     v:  viewMode,
     cx: Math.round(camX),
     cy: Math.round(camY),
     z:  parseFloat(scale.toFixed(3)),
+    _public: isPublic,
   };
   if (playerFilters.length)   state.pf = playerFilters.map(f => f.name + ':' + f.color).join(',');
   if (allianceFilters.length) state.af = allianceFilters.map(f => f.name + ':' + f.color).join(',');
@@ -959,13 +960,13 @@ async function shareMapView(btn) {
       body: JSON.stringify(state),
     });
     const data = await resp.json();
-    if (!resp.ok || !data.url) throw new Error(data.error || 'Fehler');
-    await navigator.clipboard.writeText(data.url).catch(() => prompt('Link kopieren:', data.url));
-    btn.textContent = '✅ Kopiert!';
+    if (!resp.ok || !data.url) throw new Error(data.error || 'Error');
+    await navigator.clipboard.writeText(data.url).catch(() => prompt('Copy link:', data.url));
+    btn.textContent = isPublic ? '✅ Public link copied!' : '✅ Copied!';
     btn.style.color = '#4ade80';
-    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 2200);
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 2500);
   } catch(e) {
-    btn.textContent = '❌ Fehler';
+    btn.textContent = '❌ Error';
     setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
   }
 }

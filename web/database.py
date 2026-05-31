@@ -7620,24 +7620,29 @@ async def _init_map_share_table():
                 short_id   TEXT UNIQUE NOT NULL,
                 state_json TEXT NOT NULL,
                 created_by TEXT DEFAULT '',
+                is_public  INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)
+        # migration: add is_public if missing
+        try:
+            await db.execute("ALTER TABLE map_share_links ADD COLUMN is_public INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await db.commit()
 
 
-async def create_map_share(guild_id: str, state_json: str, created_by: str = "") -> str:
+async def create_map_share(guild_id: str, state_json: str, created_by: str = "", is_public: bool = False) -> str:
     import secrets
     await _init_map_share_table()
-    short_id = secrets.token_urlsafe(6)   # 8 chars, URL-safe
+    short_id = secrets.token_urlsafe(6)   # ~8 chars, URL-safe
     async with aiosqlite.connect(DB_PATH) as db:
-        # Ensure uniqueness
         for _ in range(5):
             try:
                 await db.execute("""
-                    INSERT INTO map_share_links (guild_id, short_id, state_json, created_by)
-                    VALUES (?,?,?,?)
-                """, (guild_id, short_id, state_json, created_by))
+                    INSERT INTO map_share_links (guild_id, short_id, state_json, created_by, is_public)
+                    VALUES (?,?,?,?,?)
+                """, (guild_id, short_id, state_json, created_by, 1 if is_public else 0))
                 await db.commit()
                 return short_id
             except Exception:
