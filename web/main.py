@@ -7784,10 +7784,12 @@ async def verteidigung_page(request: Request, guild_id: str):
         or "defend_manage" in await database.get_member_permissions(guild_id, uid)
         or "ally_manage"   in await database.get_member_permissions(guild_id, uid)
     )
+    contributions = await database.get_defend_contributions_for_guild(guild_id)
     return templates.TemplateResponse("verteidigung.html", {
         "request": request,
         "guild": guild,
         "channels": channels,
+        "contributions": contributions,
         "show": show,
         "total_open":   sum(1 for c in all_channels if c.get("status") != "closed"),
         "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),

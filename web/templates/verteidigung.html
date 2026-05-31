@@ -137,6 +137,62 @@
         {{ ch.notes }}
       </div>
       {% endif %}
+
+      {# ── Beiträge ── #}
+      {% set ch_contribs = contributions.get(ch.channel_id, []) %}
+      {% if ch_contribs %}
+      {% set total_troops = ch_contribs | sum(attribute='total_troops') %}
+      {% set total_grain  = ch_contribs | sum(attribute='total_grain') %}
+      <div style="margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.6rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.45rem;">
+          <span style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">
+            👥 {{ ch_contribs|length }} Verteidiger
+          </span>
+          <span style="font-size:0.75rem;color:#93c5fd;font-weight:600;">
+            🌾 {{ "{:,}".format(total_grain|int).replace(",",".") }}/h gesamt
+          </span>
+        </div>
+
+        {# Progress bar wenn Ziel gesetzt #}
+        {% if ch.goal %}
+        {% set goal_num = ch.goal | int(default=0) %}
+        {% if goal_num > 0 %}
+        {% set pct = [((total_grain / goal_num) * 100)|int, 100] | min %}
+        <div style="margin-bottom:0.5rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:0.2rem;">
+            <span style="color:{% if pct >= 100 %}#4ade80{% else %}#f59e0b{% endif %};font-weight:700;">{{ pct }}%</span>
+            <span style="color:var(--text-muted);">{{ "{:,}".format(total_grain|int).replace(",",".") }} / {{ "{:,}".format(goal_num).replace(",",".") }} 🌾/h</span>
+          </div>
+          <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.08);">
+            <div style="height:5px;border-radius:3px;background:{% if pct >= 100 %}#4ade80{% else %}#f59e0b{% endif %};width:{{ pct }}%;"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {# Spieler-Liste #}
+        <div style="display:flex;flex-direction:column;gap:0.25rem;">
+          {% for c in ch_contribs %}
+          {% set bar_w = ((c.total_troops / total_troops) * 100)|int if total_troops > 0 else 0 %}
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
+            <span style="font-weight:600;min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              {{ c.user_name }}
+            </span>
+            <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);">
+              <div style="height:4px;border-radius:2px;background:#6366f1;width:{{ bar_w }}%;"></div>
+            </div>
+            <span style="color:#93c5fd;font-weight:600;white-space:nowrap;min-width:55px;text-align:right;">
+              {{ "{:,}".format(c.total_troops|int).replace(",",".") }}
+            </span>
+            <span style="color:#86efac;font-size:0.72rem;white-space:nowrap;min-width:60px;text-align:right;">
+              {{ "{:,}".format(c.total_grain|int).replace(",",".") }}/h
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
     </div>
     {% endfor %}
   </div>

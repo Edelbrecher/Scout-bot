@@ -4304,6 +4304,29 @@ async def get_defend_channels(guild_id: str) -> list[dict]:
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
+    """Return {channel_id: [contribution_dicts]} for all channels in a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT channel_id, user_name, user_id,
+                   SUM(amount_parsed) as total_troops,
+                   SUM(amount_parsed * grain_per_unit) as total_grain,
+                   GROUP_CONCAT(troop_type, ', ') as troop_types,
+                   MIN(sent_at) as first_sent
+            FROM defend_sent
+            WHERE guild_id=?
+            GROUP BY channel_id, user_name
+            ORDER BY channel_id, total_troops DESC
+        """, (guild_id,)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    result: dict[str, list] = {}
+    for r in rows:
+        cid = r.pop("channel_id")
+        result.setdefault(cid, []).append(r)
+    return result
+
+
 async def close_defend_channel(channel_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
