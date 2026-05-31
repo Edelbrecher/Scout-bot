@@ -901,8 +901,36 @@ async def handle_announce_ep_cancelled(request: aiohttp_web.Request) -> aiohttp_
     return aiohttp_web.json_response({"ok": True, "dms": dm_sent})
 
 
+async def _get_or_create_archive_category(guild: discord.Guild) -> discord.CategoryChannel:
+    """Return the '📦 Archiv' category, creating it if needed."""
+    ARCHIVE_NAME = "📦 Archiv"
+    for cat in guild.categories:
+        if cat.name == ARCHIVE_NAME:
+            return cat
+    # Create with restricted permissions — only bot + admins see it
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, manage_channels=True,
+        ),
+    }
+    # Grant view to anyone who already had it (admins etc.) by inheriting nothing
+    return await guild.create_category(
+        ARCHIVE_NAME,
+        overwrites=overwrites,
+        reason="Defend-Archiv-Kategorie automatisch erstellt",
+    )
+
+
+async def _get_defend_channel(guild: discord.Guild, channel_id: str):
+    channel = guild.get_channel(int(channel_id))
+    if not channel:
+        channel = await guild.fetch_channel(int(channel_id))
+    return channel
+
+
 async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
-    """Archive a defend channel: make it read-only and rename with 🔒 prefix."""
+    """Move defend channel into the 📦 Archiv category and make it read-only."""
     try:
         data = await request.json()
     except Exception:
@@ -916,31 +944,39 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
         return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 
     try:
-        channel = guild.get_channel(int(channel_id))
-        if not channel:
-            channel = await guild.fetch_channel(int(channel_id))
+        channel = await _get_defend_channel(guild, channel_id)
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
 
     try:
-        # Make channel read-only for everyone (keep viewing rights, remove send)
-        overwrites = dict(channel.overwrites)
-        for target, ow in overwrites.items():
-            ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
-            ow.update(send_messages=False, add_reactions=False)
-            overwrites[target] = ow
-        # Also lock @everyone
-        ow_everyone = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-        ow_everyone.update(send_messages=False, add_reactions=False)
-        overwrites[guild.default_role] = ow_everyone
+        archive_cat = await _get_or_create_archive_category(guild)
 
-        new_name = channel.name
-        if not new_name.startswith("🔒-"):
-            new_name = "🔒-" + new_name[:90]
+        # Read-only overwrites: keep who can view, remove send
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False, send_messages=False
+            ),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, manage_channels=True
+            ),
+        }
+        # Copy existing view_channel permissions (so the right people can still read)
+        for target, ow in channel.overwrites.items():
+            if target == guild.default_role or target == guild.me:
+                continue
+            new_ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+            new_ow.update(send_messages=False, add_reactions=False)
+            overwrites[target] = new_ow
 
-        await channel.edit(name=new_name, overwrites=overwrites,
-                           reason="Defend-Channel archiviert (via Web)")
-        await channel.send("🔒 **Dieser Channel wurde archiviert.** Keine weiteren Beiträge möglich.")
+        await channel.edit(
+            category=archive_cat,
+            overwrites=overwrites,
+            reason="Defend-Channel archiviert",
+        )
+        await channel.send(
+            "📦 **Dieser Defend-Channel wurde archiviert** und ins Archiv verschoben. "
+            "Weitere Nachrichten sind nicht mehr möglich."
+        )
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
@@ -948,7 +984,7 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
 
 
 async def handle_unarchive_defend_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
-    """Reopen an archived defend channel: restore send permissions."""
+    """Move defend channel back from archive to original category and restore permissions."""
     try:
         data = await request.json()
     except Exception:
@@ -956,33 +992,42 @@ async def handle_unarchive_defend_channel(request: aiohttp_web.Request) -> aioht
 
     guild_id   = str(data.get("guild_id", ""))
     channel_id = str(data.get("channel_id", ""))
+    # Optionally the caller can pass the original category id
+    orig_category_id = data.get("category_id")
 
     guild = bot.get_guild(int(guild_id)) if guild_id else None
     if not guild:
         return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 
     try:
-        channel = guild.get_channel(int(channel_id))
-        if not channel:
-            channel = await guild.fetch_channel(int(channel_id))
+        channel = await _get_defend_channel(guild, channel_id)
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
 
     try:
-        # Re-enable send_messages (reset to None = inherit)
-        overwrites = dict(channel.overwrites)
-        for target, ow in overwrites.items():
-            ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
-            ow.update(send_messages=None, add_reactions=None)
-            overwrites[target] = ow
+        # Find original category from config or fall back to first non-archive category
+        config = await database.get_guild_config(guild_id)
+        cat_id = orig_category_id or (config or {}).get("category_id")
+        target_cat = None
+        if cat_id:
+            target_cat = guild.get_channel(int(cat_id))
 
-        new_name = channel.name
-        if new_name.startswith("🔒-"):
-            new_name = new_name[len("🔒-"):]
+        # Re-enable send_messages for all existing overwrites
+        overwrites = {}
+        for target, ow in channel.overwrites.items():
+            new_ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+            new_ow.update(send_messages=None, add_reactions=None)
+            overwrites[target] = new_ow
 
-        await channel.edit(name=new_name, overwrites=overwrites,
-                           reason="Defend-Channel wieder geöffnet (via Web)")
-        await channel.send("🔓 **Channel wieder geöffnet!** Weitere Beiträge sind jetzt möglich.")
+        edit_kwargs = {"overwrites": overwrites, "reason": "Defend-Channel wieder geöffnet"}
+        if target_cat:
+            edit_kwargs["category"] = target_cat
+
+        await channel.edit(**edit_kwargs)
+        await channel.send(
+            "🔓 **Dieser Channel wurde wieder geöffnet!** "
+            "Beiträge sind erneut möglich."
+        )
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 

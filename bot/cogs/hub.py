@@ -956,27 +956,52 @@ class DefendCloseView(discord.ui.View):
             return
         await database.close_defend_channel(str(interaction.channel.id))
         await interaction.response.send_message(
-            f"🔒 Channel wird archiviert von {interaction.user.mention}…"
+            f"📦 Channel wird ins Archiv verschoben von {interaction.user.mention}…"
         )
         try:
             channel = interaction.channel
             guild   = interaction.guild
-            # Make read-only for all
-            overwrites = dict(channel.overwrites)
-            for target, ow in overwrites.items():
-                ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
-                ow.update(send_messages=False, add_reactions=False)
-                overwrites[target] = ow
-            ow_e = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-            ow_e.update(send_messages=False, add_reactions=False)
-            overwrites[guild.default_role] = ow_e
+            ARCHIVE_NAME = "📦 Archiv"
 
-            new_name = channel.name
-            if not new_name.startswith("🔒-"):
-                new_name = "🔒-" + new_name[:90]
+            # Find or create archive category
+            archive_cat = None
+            for cat in guild.categories:
+                if cat.name == ARCHIVE_NAME:
+                    archive_cat = cat
+                    break
+            if not archive_cat:
+                archive_cat = await guild.create_category(
+                    ARCHIVE_NAME,
+                    overwrites={
+                        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                        guild.me: discord.PermissionOverwrite(
+                            view_channel=True, send_messages=True, manage_channels=True
+                        ),
+                    },
+                    reason="Defend-Archiv-Kategorie erstellt",
+                )
 
-            await channel.edit(name=new_name, overwrites=overwrites,
-                               reason="Defend-Channel archiviert")
+            # Build read-only overwrites
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(
+                    view_channel=False, send_messages=False
+                ),
+                guild.me: discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, manage_channels=True
+                ),
+            }
+            for target, ow in channel.overwrites.items():
+                if target in (guild.default_role, guild.me):
+                    continue
+                new_ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+                new_ow.update(send_messages=False, add_reactions=False)
+                overwrites[target] = new_ow
+
+            await channel.edit(
+                category=archive_cat,
+                overwrites=overwrites,
+                reason="Defend-Channel archiviert",
+            )
         except Exception as e:
             print(f"[hub] archive defend channel error: {e}")
 
