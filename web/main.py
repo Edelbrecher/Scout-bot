@@ -4694,7 +4694,7 @@ async def my_ally_role_create(request: Request, guild_id: str,
     if not ally_group:
         return JSONResponse({"error": "not owner"}, status_code=403)
     await database.create_ally_role(ally_group["id"], role_name.strip(), color)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_created", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_created#rollen", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/roles/{role_id}/update")
@@ -4742,7 +4742,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         selected = ["defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/roles/{role_id}/delete")
@@ -4756,7 +4756,7 @@ async def my_ally_role_delete(request: Request, guild_id: str, role_id: int):
     if not ally_group:
         return JSONResponse({"error": "not owner"}, status_code=403)
     await database.delete_ally_role(ally_group["id"], role_id)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_deleted", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_deleted#rollen", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/member/{discord_id}/update")
