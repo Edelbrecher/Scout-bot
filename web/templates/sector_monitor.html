@@ -73,16 +73,17 @@
             <div style="display:inline-grid;grid-template-columns:repeat(3,72px);grid-template-rows:repeat(3,52px);gap:3px;
                         background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:4px;margin-bottom:.75rem;">
               {# cells: (key, x1, y1, x2, y2, label)  — y1=south edge, y2=north edge #}
+              {# 3x3 non-overlapping thirds: x cols at -133/133, y rows at -133/133 #}
               {% set cells = [
-                ('NW', -400,   0,   0, 400, 'NW'),
-                ('N',     0,   0, 400, 400, 'N'),
-                ('NE',    0,   0, 400, 400, 'NE'),
-                ('W',  -400,-400,   0,   0, 'W'),
-                ('C',  -100,-100, 100, 100, 'Center'),
-                ('E',     0,-400, 400,   0, 'E'),
-                ('SW', -400,-400,   0,   0, 'SW'),
-                ('S',  -400,-400, 400,   0, 'S'),
-                ('SE',    0,-400, 400,   0, 'SE'),
+                ('NW', -400, 133, -133, 400, 'NW'),
+                ('N',  -133, 133,  133, 400, 'N'),
+                ('NE',  133, 133,  400, 400, 'NE'),
+                ('W',  -400,-133, -133, 133, 'W'),
+                ('C',  -133,-133,  133, 133, 'Center'),
+                ('E',   133,-133,  400, 133, 'E'),
+                ('SW', -400,-400, -133,-133, 'SW'),
+                ('S',  -133,-400,  133,-133, 'S'),
+                ('SE',  133,-400,  400,-133, 'SE'),
               ] %}
               {% for key, cx1, cy1, cx2, cy2, label in cells %}
               <div class="qcell" id="qc-{{ key }}"
@@ -279,13 +280,14 @@
     {% set my2 = monitor.get('y2',  50) | int %}
     {% set world = 400 %}
     {% set sz = 180 %}
-    {% set sc = sz / world %}
-    {# SVG x: (travian_x + world/2) * scale  — no inversion #}
-    {# SVG y: (world/2 - travian_y) * scale  — INVERTED (north = top) #}
-    {% set rx  = ((mx1 + world/2) * sc) | round | int %}
-    {% set ry  = ((world/2 - my2) * sc) | round | int %}   {# use my2 (north edge) for SVG top #}
-    {% set rw  = ((mx2 - mx1)     * sc) | round | int %}
-    {% set rh  = ((my2 - my1)     * sc) | round | int %}
+    {% set sc = sz / (world * 2) %}
+    {# Full world: -400..400 = 800 units → sc = sz/800 #}
+    {# SVG x: (travian_x + world) * sc         — maps -400→0, 0→sz/2, 400→sz #}
+    {# SVG y: (world - travian_y) * sc          — INVERTED: north=top #}
+    {% set rx  = ((mx1 + world) * sc) | round | int %}
+    {% set ry  = ((world - my2) * sc) | round | int %}   {# my2=north edge → SVG top #}
+    {% set rw  = ((mx2 - mx1)   * sc) | round | int %}
+    {% set rh  = ((my2 - my1)   * sc) | round | int %}
     <div class="card" style="padding:.85rem;display:inline-block;flex-shrink:0;">
       <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.4rem;">📍 Sector preview</div>
       <svg width="{{ sz }}" height="{{ sz }}" style="background:#0f1f0f;border:1px solid var(--border);border-radius:6px;display:block;">
@@ -303,8 +305,8 @@
               fill="rgba(59,130,246,0.18)" stroke="#3b82f6" stroke-width="1.5" rx="1"/>
         {# Alert dots — same Y inversion #}
         {% for alert in alerts %}
-        {% set ax = ((alert.x + world/2) * sc) | round | int %}
-        {% set ay = ((world/2 - alert.y) * sc) | round | int %}
+        {% set ax = ((alert.x + world) * sc) | round | int %}
+        {% set ay = ((world - alert.y) * sc) | round | int %}
         {% if alert.alert_type == 'new_village' %}
           <circle cx="{{ ax }}" cy="{{ ay }}" r="3" fill="#60a5fa" opacity="0.9"/>
         {% elif alert.alert_type == 'nobling' %}
