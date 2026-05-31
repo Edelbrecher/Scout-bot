@@ -1096,7 +1096,7 @@ async def handle_archive_res_push_channel(request: aiohttp_web.Request) -> aioht
 
 
 async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
-    """Move a res-push channel back from archive and restore send permissions."""
+    """Move a res-push channel back from archive and fully restore permissions from config."""
     try:
         data = await request.json()
     except Exception:
@@ -1104,6 +1104,7 @@ async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aio
 
     guild_id   = str(data.get("guild_id", ""))
     channel_id = str(data.get("channel_id", ""))
+    requester_id = str(data.get("requester_id", ""))
 
     guild = bot.get_guild(int(guild_id)) if guild_id else None
     if not guild:
@@ -1118,20 +1119,53 @@ async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aio
 
     try:
         config = await database.get_guild_config(guild_id)
-        cat_id = (config or {}).get("res_push_category_id")
-        target_cat = guild.get_channel(int(cat_id)) if cat_id else None
 
-        # Restore send_messages permissions
-        overwrites = {}
-        for target, ow in channel.overwrites.items():
-            allow, deny = ow.pair()
-            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
-            new_ow.update(send_messages=None, add_reactions=None)
-            overwrites[target] = new_ow
+        # Find "🪖 Active Pushes" category (same one used on accept)
+        PUSH_CAT_NAME = "🪖 Active Pushes"
+        push_cat = None
+        for cat in guild.categories:
+            if cat.name == PUSH_CAT_NAME:
+                push_cat = cat
+                break
+
+        # Rebuild permissions from config (same logic as accept)
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, embed_links=True,
+                manage_channels=True, manage_messages=True,
+            ),
+        }
+        # Manager roles
+        for role_id_str in ((config or {}).get("res_manager_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = guild.get_role(int(role_id_str))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, manage_messages=True,
+                )
+        # Member roles
+        for role_id_str in ((config or {}).get("allowed_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = guild.get_role(int(role_id_str))
+            if role and role not in overwrites:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        # Original requester
+        if requester_id:
+            try:
+                member = guild.get_member(int(requester_id))
+                if member:
+                    overwrites[member] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            except Exception:
+                pass
 
         edit_kwargs = {"overwrites": overwrites, "reason": "Res-Push channel reactivated"}
-        if target_cat:
-            edit_kwargs["category"] = target_cat
+        if push_cat:
+            edit_kwargs["category"] = push_cat
 
         await channel.edit(**edit_kwargs)
         await channel.send("🔓 **This push channel has been reactivated!** Contributions are open again.")

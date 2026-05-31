@@ -401,18 +401,55 @@ class ResAnswerView(discord.ui.View):
                     view_channel=True, send_messages=True,
                 )
 
+        # Use or create an "Active Pushes" sub-category
+        PUSH_CAT_NAME = "🪖 Active Pushes"
+        push_cat = None
+        for cat in interaction.guild.categories:
+            if cat.name == PUSH_CAT_NAME:
+                push_cat = cat
+                break
+        if not push_cat:
+            try:
+                push_cat = await interaction.guild.create_category(
+                    PUSH_CAT_NAME,
+                    reason="Active Pushes category auto-created by TravOps",
+                )
+                # Position it right below the configured res-push category if possible
+                if category:
+                    try:
+                        await push_cat.edit(position=category.position + 1)
+                    except Exception:
+                        pass
+            except Exception:
+                push_cat = category   # fallback to configured category
+
         safe_player = re.sub(r"[^a-z0-9]", "-", req["player_name"].lower())
         channel_name = f"push-{safe_player}"[:100]
 
         push_channel = await interaction.guild.create_text_channel(
             name=channel_name,
-            category=category,
+            category=push_cat or category,
             topic=f"Res-Push: {req['player_name']} @ {req['coordinates']} — Goal: {req['push_height']}",
             overwrites=overwrites,
         )
 
+        # Build marketplace link with target coordinates
+        tw_world = (config or {}).get("tw_world", "").rstrip("/")
+        market_view = ResPushChannelView()
+        if tw_world:
+            coord_m = re.search(r"(-?\d+)\s*[|,]\s*(-?\d+)", req.get("coordinates", ""))
+            if coord_m:
+                cx, cy = coord_m.group(1), coord_m.group(2)
+                market_url = f"{tw_world}/build.php?gid=17&tt=2&x={cx}&y={cy}"
+                market_view.add_item(discord.ui.Button(
+                    label="🏪 Send Resources",
+                    style=discord.ButtonStyle.link,
+                    url=market_url,
+                    row=1,
+                ))
+
         push_embed = _build_push_embed(req, [])
-        await push_channel.send(embed=push_embed, view=ResPushChannelView())
+        await push_channel.send(embed=push_embed, view=market_view)
 
         await database.update_res_request_status(
             answer_message_id=str(interaction.message.id),

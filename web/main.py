@@ -2204,13 +2204,14 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "accepted")
-    # Move Discord channel back from archive
+    # Move Discord channel back from archive, pass requester_id to restore their access
     channel_id = req.get("push_channel_id") or ""
     if channel_id:
         try:
             async with httpx.AsyncClient(timeout=8) as client:
                 await client.post("http://bot:7777/api/unarchive-res-push-channel",
-                                  json={"guild_id": guild_id, "channel_id": channel_id})
+                                  json={"guild_id": guild_id, "channel_id": channel_id,
+                                        "requester_id": req.get("user_id", "")})
         except Exception:
             pass
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
