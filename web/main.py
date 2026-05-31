@@ -780,26 +780,55 @@ async def _sync_private_channel_permissions(guild_id: str, private_channel_role_
 
 
 async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str, archive_role_ids: str = "") -> tuple[int, str]:
-    """Set archive channel: @everyone hidden, archive_role_ids (or fallback scout roles) can view.
-    Returns (status_code, response_text)."""
+    """Set archive channel visibility via individual PUT/DELETE per overwrite.
+    @everyone gets VIEW_CHANNEL denied. Effective roles get VIEW_CHANNEL allowed.
+    Returns (last_status_code, summary_text)."""
     token = os.environ.get("DISCORD_TOKEN", "")
     if not token:
         return 0, "no token"
+
     # Use dedicated archive roles if set, otherwise fall back to scout roles
-    effective_roles = archive_role_ids.strip() if archive_role_ids and archive_role_ids.strip() else allowed_role_ids
-    overwrites = [
-        {"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL},  # @everyone deny view
-    ]
-    for role_id in [r.strip() for r in effective_roles.split(",") if r.strip()]:
-        overwrites.append({"id": role_id, "type": 0, "allow": VIEW_CHANNEL, "deny": "0"})
-    async with httpx.AsyncClient() as client:
-        r = await client.patch(
-            f"https://discord.com/api/v10/channels/{archive_channel_id}",
-            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
-            json={"permission_overwrites": overwrites},
-            timeout=10,
+    effective_roles = [r.strip() for r in (archive_role_ids.strip() or allowed_role_ids).split(",") if r.strip()]
+
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    base = f"https://discord.com/api/v10/channels/{archive_channel_id}/permissions"
+    last_status = 204
+    last_body = ""
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        # 1) Deny @everyone VIEW_CHANNEL
+        r = await client.put(
+            f"{base}/{guild_id}",
+            headers=headers,
+            json={"type": 0, "allow": "0", "deny": VIEW_CHANNEL},
         )
-    return r.status_code, r.text
+        last_status, last_body = r.status_code, r.text
+
+        # 2) Allow each permitted role to view the channel
+        for role_id in effective_roles:
+            r = await client.put(
+                f"{base}/{role_id}",
+                headers=headers,
+                json={"type": 0, "allow": VIEW_CHANNEL, "deny": "0"},
+            )
+            if r.status_code not in (200, 204):
+                last_status, last_body = r.status_code, r.text
+
+        # 3) Read current overwrites and DELETE any role overwrites NOT in effective_roles
+        ch = await client.get(
+            f"https://discord.com/api/v10/channels/{archive_channel_id}",
+            headers=headers,
+        )
+        if ch.status_code == 200:
+            keep = {guild_id} | set(effective_roles)
+            bot_data = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
+            if bot_data.status_code == 200:
+                keep.add(bot_data.json()["id"])
+            for ow in ch.json().get("permission_overwrites", []):
+                if ow["id"] not in keep:
+                    await client.delete(f"{base}/{ow['id']}", headers=headers)
+
+    return last_status, last_body
 
 
 async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str):
