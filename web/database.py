@@ -6848,6 +6848,7 @@ async def _init_sector_monitor_tables():
                 watch_fast_growth  INTEGER DEFAULT 1,
                 growth_threshold   INTEGER DEFAULT 200,
                 nobling_threshold  INTEGER DEFAULT 500,
+                sectors     TEXT DEFAULT '',
                 updated_at  TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -6870,6 +6871,12 @@ async def _init_sector_monitor_tables():
         await db.commit()
         try:
             await db.execute("CREATE INDEX IF NOT EXISTS idx_sector_alerts_guild ON sector_alerts(guild_id, dismissed)")
+            await db.commit()
+        except Exception:
+            pass
+        # Migration: add sectors column if missing
+        try:
+            await db.execute("ALTER TABLE sector_monitors ADD COLUMN sectors TEXT DEFAULT ''")
             await db.commit()
         except Exception:
             pass
@@ -6903,8 +6910,8 @@ async def upsert_sector_monitor(guild_id: str, **fields) -> None:
             INSERT OR REPLACE INTO sector_monitors
                 (guild_id, enabled, x1, y1, x2, y2,
                  watch_new_village, watch_nobling, watch_fast_growth,
-                 growth_threshold, nobling_threshold, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+                 growth_threshold, nobling_threshold, sectors, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
         """, (
             guild_id,
             int(existing.get("enabled", 1)),
@@ -6915,6 +6922,7 @@ async def upsert_sector_monitor(guild_id: str, **fields) -> None:
             int(existing.get("watch_fast_growth", 1)),
             int(existing.get("growth_threshold", 200)),
             int(existing.get("nobling_threshold", 500)),
+            str(existing.get("sectors", "")),
         ))
         await db.commit()
 

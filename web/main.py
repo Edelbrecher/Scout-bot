@@ -2848,6 +2848,7 @@ async def sector_monitor_save(
     watch_fast_growth: int = Form(0),
     growth_threshold: int = Form(200),
     nobling_threshold: int = Form(500),
+    sectors: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -2862,6 +2863,7 @@ async def sector_monitor_save(
         watch_fast_growth=watch_fast_growth,
         growth_threshold=growth_threshold,
         nobling_threshold=nobling_threshold,
+        sectors=sectors,
     )
     return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor?saved=1", status_code=303)
 

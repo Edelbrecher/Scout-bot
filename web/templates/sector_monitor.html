@@ -114,7 +114,7 @@
             {% set cells = [
               ('NW', -400,   0,   0, 400, 'NW'),
               ('NE',    0,   0, 400, 400, 'NE'),
-              ('C',  -100,-100, 100, 100, 'Center'),
+              ('C',   -20, -20,  20,  20, 'Center'),
               ('SW', -400,-400,   0,   0, 'SW'),
               ('SE',    0,-400, 400,   0, 'SE'),
             ] %}
@@ -222,6 +222,7 @@
           <input type="hidden" name="y1" id="hY1" value="{{ monitor.get('y1', -50) }}">
           <input type="hidden" name="x2" id="hX2" value="{{ monitor.get('x2',  50) }}">
           <input type="hidden" name="y2" id="hY2" value="{{ monitor.get('y2',  50) }}">
+          <input type="hidden" name="sectors" id="hSectors" value="{{ monitor.get('sectors', '') }}">
 
           {# Live preview strip #}
           <div style="margin-top:.75rem;font-size:.75rem;color:var(--text-muted);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
@@ -359,9 +360,30 @@
         <text x="{{ sz//2 }}" y="{{ sz-2 }}" text-anchor="middle" font-size="6" fill="#2d5a2d">S</text>
         <text x="5"           y="{{ sz//2+2 }}" text-anchor="start"  font-size="6" fill="#2d5a2d">W</text>
         <text x="{{ sz-2 }}"  y="{{ sz//2+2 }}" text-anchor="end"    font-size="6" fill="#2d5a2d">E</text>
-        {# Sector box #}
+        {# Sector shapes — one per saved sector key #}
+        {% set saved_sectors = monitor.get('sectors', '') %}
+        {% set sector_defs = {'NW': (-400,0,0,400), 'NE': (0,0,400,400), 'SW': (-400,-400,0,0), 'SE': (0,-400,400,0)} %}
+        {% for skey, scoords in sector_defs.items() %}
+        {% if skey in saved_sectors %}
+        {% set sx1 = ((scoords[0] + world) * sc) | round | int %}
+        {% set sy1 = ((world - scoords[3]) * sc) | round | int %}
+        {% set sw  = ((scoords[2] - scoords[0]) * sc) | round | int %}
+        {% set sh  = ((scoords[3] - scoords[1]) * sc) | round | int %}
+        <rect x="{{ sx1 }}" y="{{ sy1 }}" width="{{ sw }}" height="{{ sh }}"
+              fill="rgba(59,130,246,0.18)" stroke="#3b82f6" stroke-width="1.5" rx="1"/>
+        {% endif %}
+        {% endfor %}
+        {# Center = circle with radius 20 fields → scale to SVG pixels #}
+        {% if 'C' in saved_sectors %}
+        {% set cr = (20 * sc) | round | int %}
+        <circle cx="{{ sz//2 }}" cy="{{ sz//2 }}" r="{{ cr }}"
+                fill="rgba(99,102,241,0.25)" stroke="#818cf8" stroke-width="1.5"/>
+        {% endif %}
+        {# Fallback: if no sectors saved but coords exist, draw the bounding box #}
+        {% if not saved_sectors %}
         <rect x="{{ rx }}" y="{{ ry }}" width="{{ rw }}" height="{{ rh }}"
               fill="rgba(59,130,246,0.18)" stroke="#3b82f6" stroke-width="1.5" rx="1"/>
+        {% endif %}
         {# Alert dots — same Y inversion #}
         {% for alert in alerts %}
         {% set ax = ((alert.x + world) * sc) | round | int %}
@@ -505,6 +527,10 @@ function toggleQuadrant(key) {
 
 function refreshQuadrantSummary() {
   const summaryEl = el('quadrantSummary');
+  // Save selected keys to hidden field
+  const sectorsEl = el('hSectors');
+  if(sectorsEl) sectorsEl.value = [...selectedQuads].join(',');
+
   if(selectedQuads.size === 0) {
     if(summaryEl) summaryEl.textContent = 'No area selected';
     return;
@@ -526,21 +552,21 @@ function refreshQuadrantSummary() {
   }
 }
 
-// Pre-select cells on load whose area overlaps the stored bounding box
-(function detectInitialQuad() {
-  document.querySelectorAll('.qcell').forEach(cellEl => {
-    const qx1=+cellEl.dataset.x1, qy1=+cellEl.dataset.y1;
-    const qx2=+cellEl.dataset.x2, qy2=+cellEl.dataset.y2;
-    // Overlap check: stored box intersects this cell
-    const overlaps = cx1 < qx2 && cx2 > qx1 && cy1 < qy2 && cy2 > qy1;
-    // Containment check: stored box is fully inside this cell
-    const inside   = cx1 >= qx1 && cy1 >= qy1 && cx2 <= qx2 && cy2 <= qy2;
-    if(inside || overlaps) {
-      selectedQuads.add(cellEl.dataset.key);
-      highlightCell(cellEl, true);
-    }
-  });
-  refreshQuadrantSummary();
+// Restore selected sectors from saved keys (not bounding-box inference)
+(function restoreInitialQuad() {
+  const saved = (el('hSectors')?.value || '').trim();
+  if(saved) {
+    // Restore from stored sector keys directly
+    saved.split(',').forEach(key => {
+      key = key.trim();
+      const cellEl = el('qc-'+key);
+      if(cellEl) {
+        selectedQuads.add(key);
+        highlightCell(cellEl, true);
+      }
+    });
+  }
+  if(selectedQuads.size > 0) refreshQuadrantSummary();
 })();
 
 // ── Center + Radius ───────────────────────────────────────────────────────────
