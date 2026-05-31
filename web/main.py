@@ -7820,14 +7820,23 @@ async def defend_close(request: Request, guild_id: str, channel_id: str):
     if not (is_admin or is_owner or has_rights):
         return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=no_permission", status_code=303)
     await database.close_defend_channel(channel_id)
-    # Tell bot to archive the Discord channel (read-only, not deleted)
+    # Tell bot to move channel to archive category
+    bot_msg = ""
     try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            await client.post("http://bot:7777/api/archive-defend-channel",
-                              json={"guild_id": guild_id, "channel_id": channel_id})
-    except Exception:
-        pass  # Bot might be offline; DB is updated regardless
-    return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=closed", status_code=303)
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post("http://bot:7777/api/archive-defend-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id})
+            data = r.json()
+            if data.get("ok"):
+                bot_msg = "archived"
+            else:
+                bot_msg = f"bot_error:{data.get('error','?')[:80]}"
+    except Exception as e:
+        bot_msg = f"bot_offline:{str(e)[:60]}"
+    from urllib.parse import quote
+    return RedirectResponse(
+        f"/guild/{guild_id}/verteidigung?flash=closed&bot={quote(bot_msg)}", status_code=303
+    )
 
 
 @app.post("/guild/{guild_id}/defend/{channel_id}/reopen")
@@ -7847,14 +7856,19 @@ async def defend_reopen(request: Request, guild_id: str, channel_id: str):
     async with __import__("aiosqlite").connect(database.DB_PATH) as db:
         await db.execute("UPDATE defend_channels SET status='open' WHERE channel_id=?", (channel_id,))
         await db.commit()
-    # Tell bot to unarchive the Discord channel
+    bot_msg = ""
     try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            await client.post("http://bot:7777/api/unarchive-defend-channel",
-                              json={"guild_id": guild_id, "channel_id": channel_id})
-    except Exception:
-        pass
-    return RedirectResponse(f"/guild/{guild_id}/verteidigung?show=closed&flash=reopened", status_code=303)
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post("http://bot:7777/api/unarchive-defend-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id})
+            data = r.json()
+            bot_msg = "archived" if data.get("ok") else f"bot_error:{data.get('error','?')[:80]}"
+    except Exception as e:
+        bot_msg = f"bot_offline:{str(e)[:60]}"
+    from urllib.parse import quote
+    return RedirectResponse(
+        f"/guild/{guild_id}/verteidigung?show=closed&flash=reopened&bot={quote(bot_msg)}", status_code=303
+    )
 
 
 @app.get("/guild/{guild_id}/verteidigung/stats", response_class=HTMLResponse)

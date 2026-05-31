@@ -26,13 +26,32 @@
     </div>
   </div>
 
+  {% set bot_msg = request.query_params.get('bot','') %}
   {% if flash == 'closed' %}
   <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;">
-    ✅ Defend-Anfrage als erledigt markiert.
+    ✅ Defend-Anfrage geschlossen.
+    {% if bot_msg == 'archived' %}
+      📦 Channel wurde ins <strong>📦 Archiv</strong> verschoben.
+    {% elif bot_msg.startswith('bot_error:') %}
+      <br><span style="color:#f87171;font-size:.82rem;">⚠️ Discord-Fehler: {{ bot_msg[10:] }}</span>
+    {% elif bot_msg.startswith('bot_offline:') %}
+      <br><span style="color:#f87171;font-size:.82rem;">⚠️ Bot nicht erreichbar — Channel wurde nicht verschoben. ({{ bot_msg[12:] }})</span>
+    {% endif %}
   </div>
   {% elif flash == 'reopened' %}
   <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#818cf8;">
     🔄 Defend-Anfrage wieder geöffnet.
+    {% if bot_msg == 'archived' %}
+      Channel wurde zurück in die Defend-Kategorie verschoben.
+    {% elif bot_msg.startswith('bot_error:') %}
+      <br><span style="color:#f87171;font-size:.82rem;">⚠️ Discord-Fehler: {{ bot_msg[10:] }}</span>
+    {% elif bot_msg.startswith('bot_offline:') %}
+      <br><span style="color:#f87171;font-size:.82rem;">⚠️ Bot nicht erreichbar. ({{ bot_msg[12:] }})</span>
+    {% endif %}
+  </div>
+  {% elif flash == 'no_permission' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;">
+    ⛔ Keine Berechtigung.
   </div>
   {% endif %}
 
