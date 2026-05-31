@@ -59,10 +59,17 @@ def _strip_rank(s: str) -> int:
 
 # ── Section header detection ─────────────────────────────────────────────────
 _SECTION_HEADERS = {
-    'pvp':      re.compile(r'pvp\s+of\s+the\s+week|attacker\s+of\s+the\s+week', re.I),
-    'pve':      re.compile(r'pve\s+of\s+the\s+week|farmer\s+of\s+the\s+week', re.I),
-    'def':      re.compile(r'defender', re.I),
-    'raid':     re.compile(r'robber|raider|räuber', re.I),
+    # EN: "Attacker of the week" / "PvP of the week"
+    # DE: "Angreifer der Woche"
+    'pvp':      re.compile(r'pvp\s+of\s+the\s+week|attacker\s+of\s+the\s+week|angreifer\s+der\s+woche', re.I),
+    # EN: "PvE of the week" / "Farmer of the week"
+    # DE: "Tiervertilger der Woche" / "Tierjäger der Woche"
+    'pve':      re.compile(r'pve\s+of\s+the\s+week|farmer\s+of\s+the\s+week|tiervertilger|tierj[äa]ger', re.I),
+    # EN: "Defender"  DE: "Verteidiger"
+    'def':      re.compile(r'defender|verteidiger', re.I),
+    # EN: "Robber" / "Raider"  DE: "Räuber" / "Plünderer"
+    'raid':     re.compile(r'robber|raider|räuber|plünderer', re.I),
+    # EN: "Climber"  DE: "Aufsteiger"
     'climber':  re.compile(r'climber|aufsteiger', re.I),
 }
 
