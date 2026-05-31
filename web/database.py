@@ -1859,16 +1859,18 @@ async def search_inactive_advanced(
         # Collect only the xy coords that pass text/distance filters first
         filtered = []
         for v in raw:
-            pname = (v["player_name"] or "").strip()
-            aname = (v["alliance_name"] or "").strip()
+            pname = (v["player_name"] or "").strip().lower()
+            aname = (v["alliance_name"] or "").strip().lower()
 
-            if incl_players and pname.lower() not in incl_players:
+            # Inclusion filters: substring match (any of the comma-separated terms)
+            if incl_players and not any(f in pname for f in incl_players):
                 continue
-            if incl_alliances and aname.lower() not in incl_alliances:
+            if incl_alliances and not any(f in aname for f in incl_alliances):
                 continue
-            if excl_players and pname.lower() in excl_players:
+            # Exclusion filters: substring match
+            if excl_players and any(f in pname for f in excl_players):
                 continue
-            if excl_alliances and aname.lower() in excl_alliances:
+            if excl_alliances and any(f in aname for f in excl_alliances):
                 continue
             pp = player_pop.get(pname, 0) or 0
             if pp < min_player_pop or pp > max_player_pop:
