@@ -951,7 +951,13 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
     try:
         archive_cat = await _get_or_create_archive_category(guild)
 
-        # Read-only overwrites: keep who can view, remove send
+        # Load archive role config: only these roles may view archived channels
+        config = await database.get_guild_config(guild_id) or {}
+        archive_role_ids_str = config.get("archive_role_ids") or config.get("allowed_role_ids") or ""
+        allowed_role_ids = {r.strip() for r in archive_role_ids_str.split(",") if r.strip()}
+
+        # Build fresh overwrites — do NOT copy old defend-channel overwrites,
+        # those grant view to all defend participants which must not carry over.
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(
                 view_channel=False, send_messages=False
@@ -960,14 +966,13 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
                 view_channel=True, send_messages=True, manage_channels=True
             ),
         }
-        # Copy existing permissions but disable writing
-        for target, ow in channel.overwrites.items():
-            if target == guild.default_role or target == guild.me:
-                continue
-            allow, deny = ow.pair()
-            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
-            new_ow.update(send_messages=False, add_reactions=False)
-            overwrites[target] = new_ow
+        # Grant view (read-only) only to explicitly configured archive roles
+        for role_id_str in allowed_role_ids:
+            role = guild.get_role(int(role_id_str))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=False, add_reactions=False
+                )
 
         await channel.edit(
             category=archive_cat,
