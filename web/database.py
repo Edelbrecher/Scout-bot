@@ -3435,6 +3435,21 @@ async def remove_ally_member(ally_group_id: int, discord_id: str):
         await db.commit()
 
 
+async def get_ally_membership_guild_id(discord_id: str) -> str | None:
+    """Return the guild_id of any approved ally membership for this user (latest joined)."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT ag.guild_id FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE am.discord_id = ? AND am.status = 'approved'
+            ORDER BY am.joined_at DESC LIMIT 1
+        """, (discord_id,)) as cur:
+            row = await cur.fetchone()
+            return row["guild_id"] if row else None
+
+
 async def get_ally_membership(guild_id: str, discord_id: str) -> dict | None:
     """Return the ally_group this user has joined (not owner) in this guild."""
     await _init_ally_tables()

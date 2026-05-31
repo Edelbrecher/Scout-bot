@@ -4638,6 +4638,12 @@ async def my_ally_page(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
 
+    # If accessing via personal workspace but user has an ally membership elsewhere → redirect
+    if guild_id.startswith("ws_"):
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            return RedirectResponse(f"/guild/{real_guild_id}/my-ally", status_code=302)
+
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     members = []
     roles = []
@@ -8142,6 +8148,11 @@ async def verteidigung_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
+    # If workspace guild → try to redirect to the real guild where the user is an ally member
+    if guild_id.startswith("ws_"):
+        membership_guild = await database.get_ally_membership_guild_id(uid)
+        if membership_guild:
+            return RedirectResponse(f"/guild/{membership_guild}/verteidigung", status_code=302)
     # Allow access if: alliance plan OR user is member of the guild's ally group
     alliance_err = await _require_alliance(guild, guild_id)
     if alliance_err:

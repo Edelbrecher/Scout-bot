@@ -958,36 +958,99 @@
   {% endif %}
 
 {# ══════════════════════════════════════════════════════════════════════════════
-   NO GROUP
+   NO GROUP — show join-code input prominently, create as secondary option
 ══════════════════════════════════════════════════════════════════════════════ #}
 {% else %}
   {% if guild_group %}
-  <div class="card" style="max-width:500px;">
+  {# Guild has an alliance but this user isn't a member yet #}
+  <div class="card" style="max-width:520px;">
     <h2 style="margin:0 0 .5rem;">🏰 {{ guild_group.ally_name }}</h2>
     <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:.75rem;">
-      Allianz von <strong>{{ guild_group.owner_username or 'Unbekannt' }}</strong> · Du bist noch nicht Mitglied oder dein Beitritt wird geprüft.
+      Allianz von <strong>{{ guild_group.owner_username or 'Unbekannt' }}</strong>
     </p>
     {% if guild_group.invite_token %}
     <a href="/ally/join/{{ guild_group.invite_token }}" class="btn btn-primary" style="font-size:.85rem;">🤝 Jetzt beitreten</a>
     {% else %}
     <p style="font-size:.8rem;color:var(--text-muted);">Bitte den Allianz-Verwalter um einen Einladungslink.</p>
     {% endif %}
-  </div>
-  {% else %}
-  <div class="card" style="max-width:500px;">
-    <h2 style="margin:0 0 .75rem;">🤝 Allianz erstellen</h2>
-    <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:1rem;">Erstelle eine Allianz für diesen Server.</p>
-    <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/create">
-      <div class="form-group">
-        <label>Allianz-Name</label>
-        <input type="text" name="ally_name" required placeholder="z.B. BLOOD Allianz" maxlength="80"
-               style="width:100%;padding:.5rem .75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.95rem;">
+    {# Also show the code input as alternative #}
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+      <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .5rem;">Oder Einladungslink/-code eingeben:</p>
+      <div style="display:flex;gap:.4rem;">
+        <input type="text" id="joinCodeInput" placeholder="https://travops.online/ally/join/… oder Code"
+               style="flex:1;padding:.42rem .7rem;border-radius:7px;background:var(--bg-main);border:1px solid var(--border);color:var(--text);font-size:.85rem;">
+        <button onclick="doJoinCode()" class="btn btn-secondary" style="white-space:nowrap;font-size:.85rem;">Beitreten</button>
       </div>
-      <button type="submit" class="btn btn-primary">➕ Allianz erstellen</button>
-    </form>
+    </div>
+  </div>
+
+  {% else %}
+  {# No alliance on this server at all #}
+  <div class="card" style="max-width:520px;">
+    <h2 style="margin:0 0 .3rem;font-size:1.1rem;">🤝 Allianz beitreten</h2>
+    <p style="color:var(--text-muted);font-size:.88rem;margin:0 0 1rem;">Hast du einen Einladungslink? Gib ihn hier ein:</p>
+
+    {# PRIMARY: Join via code #}
+    <div style="display:flex;gap:.4rem;margin-bottom:1.25rem;">
+      <input type="text" id="joinCodeInput" placeholder="https://travops.online/ally/join/… oder Code einfügen"
+             style="flex:1;padding:.45rem .75rem;border-radius:8px;background:var(--bg-main);
+                    border:1px solid var(--border);color:var(--text);font-size:.9rem;"
+             onkeydown="if(event.key==='Enter')doJoinCode()">
+      <button onclick="doJoinCode()"
+              style="padding:.45rem 1.1rem;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer;
+                     background:#5865f2;border:none;color:#fff;white-space:nowrap;">
+        🚀 Beitreten
+      </button>
+    </div>
+    <div id="joinCodeError" style="display:none;font-size:.8rem;color:#f87171;margin-bottom:.75rem;">
+      ⚠️ Ungültiger Link oder Code. Bitte den vollständigen Einladungslink einfügen.
+    </div>
+
+    {# SECONDARY: Create alliance (collapsed) #}
+    <details style="border-top:1px solid var(--border);padding-top:.9rem;">
+      <summary style="font-size:.82rem;color:var(--text-muted);cursor:pointer;user-select:none;list-style:none;
+                      display:flex;align-items:center;gap:.35rem;">
+        <span style="font-size:.7rem;">▶</span> Neue Allianz für diesen Server erstellen
+      </summary>
+      <div style="margin-top:.75rem;">
+        <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .6rem;">
+          Nur wenn du der Lead bist und noch keine Allianz existiert.
+        </p>
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/create"
+              style="display:flex;flex-direction:column;gap:.5rem;">
+          <input type="text" name="ally_name" required placeholder="Allianz-Name (z.B. BLOOD)" maxlength="80"
+                 style="width:100%;padding:.42rem .7rem;background:var(--bg-main);color:var(--text);
+                        border:1px solid var(--border);border-radius:7px;font-size:.9rem;box-sizing:border-box;">
+          <div>
+            <button type="submit"
+                    style="padding:.38rem 1rem;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer;
+                           background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text-muted);">
+              ➕ Allianz erstellen
+            </button>
+          </div>
+        </form>
+      </div>
+    </details>
   </div>
   {% endif %}
 {% endif %}
+
+<script>
+function doJoinCode() {
+  const val = (document.getElementById('joinCodeInput')?.value || '').trim();
+  if (!val) return;
+  // Extract token from full URL or use raw token
+  let token = val;
+  const m = val.match(/\/ally\/join\/([A-Za-z0-9_\-]+)/);
+  if (m) token = m[1];
+  // Validate: token should be alphanumeric + - _
+  if (!/^[A-Za-z0-9_\-]{10,}$/.test(token)) {
+    document.getElementById('joinCodeError').style.display = '';
+    return;
+  }
+  window.location.href = '/ally/join/' + token;
+}
+</script>
 
 </div>
 
