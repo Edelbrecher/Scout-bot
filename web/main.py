@@ -9222,6 +9222,30 @@ async def crop_supply_page(request: Request, guild_id: str):
 # Routes — Travian Statistics Import & Trends
 # ---------------------------------------------------------------------------
 
+_STATS_IMPORT_COOLDOWN_MINUTES = 60
+
+
+def _last_snapshot_at(snapshots: list[dict]) -> str | None:
+    """Return the most recent snapshot_at (ISO string) or None."""
+    for s in snapshots:
+        v = s.get("snapshot_at") or s.get("created_at")
+        if v:
+            return v
+    return None
+
+
+def _minutes_since(iso: str) -> float | None:
+    from datetime import datetime as _dt, timezone
+    try:
+        t = _dt.fromisoformat(iso.replace("Z", "+00:00"))
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        now = _dt.now(timezone.utc)
+        return (now - t).total_seconds() / 60
+    except Exception:
+        return None
+
+
 @app.get("/guild/{guild_id}/travian-stats", response_class=HTMLResponse)
 async def travian_stats_page(request: Request, guild_id: str):
     session, err = _require_session(request)
@@ -9236,6 +9260,13 @@ async def travian_stats_page(request: Request, guild_id: str):
     alliance_snapshots = [s for s in all_snapshots if s.get("stats_type") == "alliance"]
     player_trends   = await database.get_stats_trend_data(guild_id, stats_type="player")
     alliance_trends = await database.get_stats_trend_data(guild_id, stats_type="alliance")
+
+    # Cooldown info for both types
+    player_last_at   = _last_snapshot_at(player_snapshots)
+    alliance_last_at = _last_snapshot_at(alliance_snapshots)
+    player_mins_ago   = _minutes_since(player_last_at)   if player_last_at   else None
+    alliance_mins_ago = _minutes_since(alliance_last_at) if alliance_last_at else None
+
     return templates.TemplateResponse("travian_stats.html", {
         "request": request,
         "guild": guild,
@@ -9246,6 +9277,11 @@ async def travian_stats_page(request: Request, guild_id: str):
         "flash": request.query_params.get("flash", ""),
         "error": request.query_params.get("error", ""),
         "active_tab": request.query_params.get("tab", "player"),
+        "player_last_at":   player_last_at,
+        "alliance_last_at": alliance_last_at,
+        "player_mins_ago":   player_mins_ago,
+        "alliance_mins_ago": alliance_mins_ago,
+        "cooldown_minutes": _STATS_IMPORT_COOLDOWN_MINUTES,
     })
 
 
@@ -9264,6 +9300,20 @@ async def travian_stats_import(request: Request, guild_id: str):
 
     if not raw_text:
         return RedirectResponse(f"/guild/{guild_id}/travian-stats?error=empty&tab={stats_type}", status_code=303)
+
+    # Cooldown check
+    all_snaps = await database.get_stats_snapshots(guild_id)
+    type_snaps = [s for s in all_snaps if s.get("stats_type", "player") == stats_type]
+    last_at = _last_snapshot_at(type_snaps)
+    if last_at:
+        mins_ago = _minutes_since(last_at)
+        if mins_ago is not None and mins_ago < _STATS_IMPORT_COOLDOWN_MINUTES:
+            wait = int(_STATS_IMPORT_COOLDOWN_MINUTES - mins_ago)
+            return RedirectResponse(
+                f"/guild/{guild_id}/travian-stats?error=cooldown&wait={wait}&tab={stats_type}",
+                status_code=303
+            )
+
     if not snapshot_at:
         from datetime import datetime as _dt
         snapshot_at = _dt.utcnow().strftime("%Y-%m-%dT%H:%M")

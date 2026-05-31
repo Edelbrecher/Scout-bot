@@ -25,7 +25,25 @@
   <div class="alert-err" style="margin-bottom:1rem;">❌ Text konnte nicht geparst werden. Bitte die Tabelle direkt von Travian kopieren.</div>
   {% elif error == 'empty' %}
   <div class="alert-err" style="margin-bottom:1rem;">❌ Kein Text eingefügt.</div>
+  {% elif error == 'cooldown' %}
+  <div class="alert-err" style="margin-bottom:1rem;">
+    ⏳ Import zu früh — bitte noch <strong>{{ request.query_params.get('wait','?') }} Minuten</strong> warten. Erlaubt ist maximal 1× pro {{ cooldown_minutes }} Minuten.
+  </div>
   {% endif %}
+
+  <!-- ── Import-Timer-Leiste ── -->
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <div id="timer-player" class="import-timer">
+      <span class="timer-dot" id="dot-player">●</span>
+      <span style="font-size:.78rem;color:var(--text-muted);">Spieler-Import:</span>
+      <span id="timer-player-text" style="font-size:.82rem;font-weight:700;">—</span>
+    </div>
+    <div id="timer-alliance" class="import-timer">
+      <span class="timer-dot" id="dot-alliance">●</span>
+      <span style="font-size:.78rem;color:var(--text-muted);">Allianz-Import:</span>
+      <span id="timer-alliance-text" style="font-size:.82rem;font-weight:700;">—</span>
+    </div>
+  </div>
 
   <!-- ── Spieler / Allianz Toggle ── -->
   <div style="display:flex;gap:.35rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
@@ -206,6 +224,8 @@
 
 <style>
 .st-tab { font-size:.82rem;padding:.35rem .85rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s; }
+.import-timer { display:flex;align-items:center;gap:.4rem;padding:.3rem .75rem;border-radius:7px;background:var(--card);border:1px solid var(--border); }
+.timer-dot { font-size:.65rem;transition:color .5s; }
 .st-tab.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
 .st-tab:hover:not(.active) { border-color:#3b82f6;color:var(--text); }
 .cat-btn { font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap; }
@@ -241,6 +261,52 @@ canvas.spark { display:block; }
 
 <script>
 const PLAYER_DATA   = {{ player_trends   | tojson }};
+
+// ── Import-Cooldown Timer ────────────────────────────────────────────────────
+const COOLDOWN_MIN = {{ cooldown_minutes }};
+const LAST_IMPORT = {
+  player:   {{ ('"' + player_last_at + '"') if player_last_at else 'null' }},
+  alliance: {{ ('"' + alliance_last_at + '"') if alliance_last_at else 'null' }},
+};
+
+function updateTimers() {
+  ['player','alliance'].forEach(view => {
+    const last = LAST_IMPORT[view];
+    const textEl = document.getElementById('timer-'+view+'-text');
+    const dotEl  = document.getElementById('dot-'+view);
+    if (!textEl) return;
+
+    if (!last) {
+      textEl.textContent = 'Noch kein Import';
+      textEl.style.color = 'var(--text-muted)';
+      dotEl.style.color  = 'var(--text-muted)';
+      return;
+    }
+
+    const lastMs  = new Date(last.replace(' ','T') + (last.includes('+') || last.endsWith('Z') ? '' : 'Z'));
+    const agoMin  = (Date.now() - lastMs.getTime()) / 60000;
+    const readyIn = COOLDOWN_MIN - agoMin;
+
+    if (readyIn <= 0) {
+      // Ready
+      const ago = Math.floor(agoMin);
+      textEl.textContent = `vor ${ago < 60 ? ago+' Min' : Math.floor(ago/60)+'h '+Math.floor(ago%60)+'m'} — ✅ Import möglich`;
+      textEl.style.color = '#4ade80';
+      dotEl.style.color  = '#4ade80';
+    } else {
+      // Blocked
+      const mins = Math.floor(readyIn);
+      const secs = Math.floor((readyIn - mins) * 60);
+      textEl.textContent = `Noch ${mins}:${String(secs).padStart(2,'0')} Min warten`;
+      textEl.style.color = '#f87171';
+      dotEl.style.color  = '#f87171';
+    }
+  });
+}
+
+updateTimers();
+setInterval(updateTimers, 10000); // update every 10s
+
 const ALLIANCE_DATA = {{ alliance_trends | tojson }};
 const GUILD_ID = '{{ guild.guild_id }}';
 
