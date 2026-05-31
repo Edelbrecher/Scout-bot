@@ -5760,26 +5760,26 @@ async def farming_page(
     saved: str = "",
     tab: str = "inactive",
     q: str = "",
-    # Basic inactive filters
-    min_days: int = 1,
-    min_pop: int = 0,
-    max_pop: int = 9999,
-    # Advanced filters (merged from inactive-search)
-    ref_x: Optional[int] = None,
-    ref_y: Optional[int] = None,
-    min_dist: Optional[float] = None,
-    max_dist: Optional[float] = None,
-    min_player_pop: Optional[int] = None,
-    max_player_pop: Optional[int] = None,
-    max_pop_increase: Optional[int] = None,
+    # Basic inactive filters (str to handle empty string from form)
+    min_days: str = "1",
+    min_pop: str = "0",
+    max_pop: str = "9999",
+    # Advanced filters — all str to avoid FastAPI parse errors on empty inputs
+    ref_x: str = "",
+    ref_y: str = "",
+    min_dist: str = "",
+    max_dist: str = "",
+    min_player_pop: str = "",
+    max_player_pop: str = "",
+    max_pop_increase: str = "",
     player_filter: str = "",
     alliance_filter: str = "",
     exclude_players: str = "",
     exclude_alliances: str = "",
     include_natars: bool = False,
     tribes: Optional[List[int]] = Query(default=None),
-    in_farmlist: str = "",   # "" | "no" | "yes"
-    advanced: bool = False,  # show advanced filter panel
+    in_farmlist: str = "",
+    advanced: bool = False,
 ):
     session, err = _require_session(request)
     if err: return err
@@ -5788,6 +5788,28 @@ async def farming_page(
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
+
+    # Convert str params (empty string → default/None)
+    def _int(v: str, default: int) -> int:
+        try: return int(v) if v.strip() else default
+        except (ValueError, AttributeError): return default
+    def _float_or_none(v: str) -> "float | None":
+        try: return float(v) if v.strip() else None
+        except (ValueError, AttributeError): return None
+    def _int_or_none(v: str) -> "int | None":
+        try: return int(v) if v.strip() else None
+        except (ValueError, AttributeError): return None
+
+    min_days_i       = _int(min_days, 1)
+    min_pop_i        = _int(min_pop, 0)
+    max_pop_i        = _int(max_pop, 9999)
+    ref_x_i          = _int_or_none(ref_x)
+    ref_y_i          = _int_or_none(ref_y)
+    min_dist_f       = _float_or_none(min_dist)
+    max_dist_f       = _float_or_none(max_dist)
+    min_player_pop_i = _int_or_none(min_player_pop)
+    max_player_pop_i = _int_or_none(max_player_pop)
+    max_pop_inc_i    = _int_or_none(max_pop_increase)
 
     uid = session.get("discord_id", "")
     is_admin = session.get("guilds") is None
@@ -5808,7 +5830,7 @@ async def farming_page(
     farm_stats   = await database.get_farm_stats(guild_id)
     snap_pop_range = await database.get_snapshot_pop_range(guild_id)
     farm_list    = await database.get_farm_list(guild_id)
-    cross_reference  = await database.get_farming_cross_reference(guild_id, min_days=min_days)
+    cross_reference  = await database.get_farming_cross_reference(guild_id, min_days=min_days_i)
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
     farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
 
@@ -5818,10 +5840,10 @@ async def farming_page(
 
     # Detect if any advanced filter is active
     _advanced_active = any([
-        ref_x is not None, ref_y is not None,
-        min_dist is not None, max_dist is not None,
-        min_player_pop is not None, max_player_pop is not None,
-        max_pop_increase is not None,
+        ref_x_i is not None, ref_y_i is not None,
+        min_dist_f is not None, max_dist_f is not None,
+        min_player_pop_i is not None, max_player_pop_i is not None,
+        max_pop_inc_i is not None,
         player_filter.strip(), alliance_filter.strip(),
         exclude_players.strip(), exclude_alliances.strip(),
         include_natars, tribes, in_farmlist,
@@ -5831,15 +5853,15 @@ async def farming_page(
     if _advanced_active and farm_stats.get("snapshot_count", 0) >= 2:
         adv_result = await database.search_inactive_advanced(
             guild_id=guild_id,
-            ref_x=ref_x or 0,
-            ref_y=ref_y or 0,
-            max_pop_increase=max_pop_increase if max_pop_increase is not None else 999,
-            min_pop=min_pop,
-            max_pop=max_pop if max_pop < 9999 else (snap_pop_range.get("max_pop", 9999) if snap_pop_range else 9999),
-            min_player_pop=min_player_pop or 0,
-            max_player_pop=max_player_pop if max_player_pop is not None else 999999,
-            min_distance=min_dist or 0.0,
-            max_distance=max_dist if max_dist is not None else 9999.0,
+            ref_x=ref_x_i or 0,
+            ref_y=ref_y_i or 0,
+            max_pop_increase=max_pop_inc_i if max_pop_inc_i is not None else 999,
+            min_pop=min_pop_i,
+            max_pop=max_pop_i if max_pop_i < 9999 else (snap_pop_range.get("max_pop", 9999) if snap_pop_range else 9999),
+            min_player_pop=min_player_pop_i or 0,
+            max_player_pop=max_player_pop_i if max_player_pop_i is not None else 999999,
+            min_distance=min_dist_f or 0.0,
+            max_distance=max_dist_f if max_dist_f is not None else 9999.0,
             player_filter=player_filter,
             alliance_filter=alliance_filter,
             exclude_players=exclude_players,
@@ -5849,12 +5871,9 @@ async def farming_page(
             limit=500,
         )
         inactive_farms_raw = adv_result.get("villages", [])
-        # Annotate with farmlist info
         for v in inactive_farms_raw:
             v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
             v.setdefault("days_tracked", 0)
-            v.setdefault("population", v.get("population", 0))
-        # Apply in_farmlist filter
         if in_farmlist == "no":
             inactive_farms = [v for v in inactive_farms_raw if not v["farmlist_groups"]]
         elif in_farmlist == "yes":
@@ -5863,7 +5882,7 @@ async def farming_page(
             inactive_farms = inactive_farms_raw
     else:
         inactive_farms_raw = await database.get_inactive_farms(
-            guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
+            guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i)
         for v in inactive_farms_raw:
             v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
         if in_farmlist == "no":
@@ -5904,9 +5923,9 @@ async def farming_page(
         "cross_reference": cross_reference,
         "cross_ref_coords": cross_ref_coords,
         "farm_list_coords": farm_list_coords,
-        "min_days": min_days,
-        "min_pop": min_pop,
-        "max_pop": max_pop,
+        "min_days": min_days_i,
+        "min_pop": min_pop_i,
+        "max_pop": max_pop_i,
         "tab": tab,
         "q": q,
         "growth_data": growth_data,
@@ -5917,11 +5936,11 @@ async def farming_page(
         "snap_count_for_search": snap_count_for_search,
         "snap_pop_range": snap_pop_range,
         # Advanced filter values
-        "ref_x": ref_x or 0, "ref_y": ref_y or 0,
-        "min_dist": min_dist or 0, "max_dist": max_dist or "",
-        "min_player_pop": min_player_pop or 0,
-        "max_player_pop": max_player_pop or "",
-        "max_pop_increase": max_pop_increase if max_pop_increase is not None else "",
+        "ref_x": ref_x_i or 0, "ref_y": ref_y_i or 0,
+        "min_dist": min_dist_f or 0, "max_dist": max_dist_f or "",
+        "min_player_pop": min_player_pop_i or 0,
+        "max_player_pop": max_player_pop_i or "",
+        "max_pop_increase": max_pop_inc_i if max_pop_inc_i is not None else "",
         "player_filter": player_filter,
         "alliance_filter": alliance_filter,
         "exclude_players": exclude_players,
