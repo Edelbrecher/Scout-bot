@@ -20,32 +20,32 @@
 .village-map-container {
   position: relative;
   width: 100%;
-  padding-bottom: 100%;  /* square */
+  padding-bottom: 90%;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
-  background: radial-gradient(ellipse at center, #1e2d1e 0%, #0f1a0f 60%, #0a0f0a 100%);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 55%, #2a4a20 0%, #1a3212 40%, #0e1f0a 70%, #080f06 100%);
 }
 .village-map-inner {
   position: absolute; inset: 0;
 }
-/* subtle terrain texture overlay */
+/* Terrain rings */
 .village-map-inner::before {
   content: '';
   position: absolute; inset: 0;
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(34,197,94,0.04) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(34,197,94,0.04) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(99,102,241,0.06) 0%, transparent 60%);
+    radial-gradient(ellipse 55% 48% at 50% 52%, rgba(34,197,94,0.07) 0%, transparent 100%),
+    radial-gradient(ellipse 85% 78% at 50% 52%, rgba(22,101,52,0.12) 0%, transparent 100%);
   pointer-events: none;
 }
-/* outer boundary circle */
+/* Village border ring */
 .village-map-inner::after {
   content: '';
   position: absolute;
-  top: 6%; left: 6%; right: 6%; bottom: 6%;
+  top: 5%; left: 4%; right: 4%; bottom: 8%;
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px dashed rgba(255,255,255,0.07);
   pointer-events: none;
 }
 
@@ -57,51 +57,58 @@
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   flex-direction: column;
-  font-size: 0.55rem;
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
   user-select: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.13s ease, box-shadow 0.13s ease, border-color 0.13s ease;
   border: 2px solid transparent;
   z-index: 2;
 }
-.slot:hover { transform: translate(-50%, -50%) scale(1.18); z-index: 10; }
+.slot:hover { transform: translate(-50%, -50%) scale(1.22); z-index: 10; }
 .slot.selected {
   border-color: #fff !important;
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.35), 0 0 16px rgba(255,255,255,0.25) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.3) !important;
   z-index: 20;
 }
 
-/* resource slots — 38px */
+/* resource slots — outer ring bigger, inner ring smaller */
 .slot-resource {
-  width: 38px; height: 38px;
-  background: #1a2a1a;
-  border-color: rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.5);
-  font-size: 0.52rem;
+  width: 44px; height: 44px;
+  background: radial-gradient(circle at 35% 35%, #243b1e, #111e0d);
+  border-color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55);
+  font-size: 0.58rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.5);
 }
-/* building slots — 34px */
+.slot-resource.slot-inner {
+  width: 40px; height: 40px;
+}
+/* building slots */
 .slot-building {
-  width: 34px; height: 34px;
-  background: #1e1e30;
-  border-color: rgba(255,255,255,0.1);
+  width: 38px; height: 38px;
+  background: radial-gradient(circle at 35% 35%, #1a1a2e, #0d0d1f);
+  border-color: rgba(255,255,255,0.12);
   color: rgba(255,255,255,0.45);
-  font-size: 0.48rem;
+  font-size: 0.5rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 5px rgba(0,0,0,0.5);
 }
 
-/* filled variants */
-.slot-filled-wood   { background: #15532e; border-color: #22c55e; color:#86efac; box-shadow: 0 0 12px rgba(34,197,94,0.4); }
-.slot-filled-clay   { background: #7c2d12; border-color: #f97316; color:#fed7aa; box-shadow: 0 0 12px rgba(249,115,22,0.4); }
-.slot-filled-iron   { background: #1e293b; border-color: #94a3b8; color:#e2e8f0; box-shadow: 0 0 12px rgba(148,163,184,0.35); }
-.slot-filled-wheat  { background: #713f12; border-color: #eab308; color:#fef08a; box-shadow: 0 0 12px rgba(234,179,8,0.4); }
-.slot-filled-military  { background: #450a0a; border-color: #ef4444; color:#fca5a5; box-shadow: 0 0 10px rgba(239,68,68,0.35); }
-.slot-filled-economy   { background: #451a03; border-color: #f59e0b; color:#fcd34d; box-shadow: 0 0 10px rgba(245,158,11,0.35); }
-.slot-filled-admin     { background: #1e1b4b; border-color: #6366f1; color:#a5b4fc; box-shadow: 0 0 10px rgba(99,102,241,0.35); }
-.slot-filled-defense   { background: #0c1a2e; border-color: #3b82f6; color:#93c5fd; box-shadow: 0 0 10px rgba(59,130,246,0.35); }
-.slot-filled-other     { background: #2e1065; border-color: #8b5cf6; color:#c4b5fd; box-shadow: 0 0 10px rgba(139,92,246,0.35); }
+/* filled variants — resource */
+.slot-filled-wood  { background: radial-gradient(circle at 35% 35%, #166534, #0f3d1e); border-color: #4ade80; color:#bbf7d0; box-shadow: 0 0 14px rgba(74,222,128,0.45), inset 0 1px 0 rgba(255,255,255,0.1); }
+.slot-filled-clay  { background: radial-gradient(circle at 35% 35%, #92400e, #5c2800); border-color: #fb923c; color:#fed7aa; box-shadow: 0 0 14px rgba(251,146,60,0.45), inset 0 1px 0 rgba(255,255,255,0.1); }
+.slot-filled-iron  { background: radial-gradient(circle at 35% 35%, #334155, #1e293b); border-color: #94a3b8; color:#e2e8f0; box-shadow: 0 0 14px rgba(148,163,184,0.4), inset 0 1px 0 rgba(255,255,255,0.1); }
+.slot-filled-wheat { background: radial-gradient(circle at 35% 35%, #854d0e, #4d2d05); border-color: #fbbf24; color:#fef9c3; box-shadow: 0 0 14px rgba(251,191,36,0.45), inset 0 1px 0 rgba(255,255,255,0.1); }
 
-.slot-emoji { font-size: 1rem; line-height: 1; }
+/* filled variants — building */
+.slot-filled-military { background: radial-gradient(circle at 35% 35%, #5c0a0a, #3b0606); border-color: #ef4444; color:#fca5a5; box-shadow: 0 0 12px rgba(239,68,68,0.4); }
+.slot-filled-economy  { background: radial-gradient(circle at 35% 35%, #5c3205, #3a1e03); border-color: #f59e0b; color:#fcd34d; box-shadow: 0 0 12px rgba(245,158,11,0.4); }
+.slot-filled-admin    { background: radial-gradient(circle at 35% 35%, #1e1b4b, #13113a); border-color: #818cf8; color:#c7d2fe; box-shadow: 0 0 12px rgba(99,102,241,0.4); }
+.slot-filled-defense  { background: radial-gradient(circle at 35% 35%, #0c1e40, #071226); border-color: #3b82f6; color:#bfdbfe; box-shadow: 0 0 12px rgba(59,130,246,0.4); }
+.slot-filled-other    { background: radial-gradient(circle at 35% 35%, #3b0f6e, #24094a); border-color: #a78bfa; color:#ede9fe; box-shadow: 0 0 12px rgba(167,139,250,0.4); }
+
+.slot-emoji { font-size: 1.1rem; line-height: 1; display: block; }
+.slot-lv    { font-size: 0.5rem; opacity: .85; margin-top: 1px; }
 
 /* ── Right panel ────────────────────────────────────── */
 .slot-panel {
@@ -292,29 +299,44 @@ const RESOURCE_EMOJIS = { wood:'🌲', clay:'🏺', iron:'⚙️', wheat:'🌾' 
 const RESOURCE_LABELS = { wood:'Holz', clay:'Lehm', iron:'Eisen', wheat:'Getreide' };
 
 // ── Slot positions ────────────────────────────────────────────────────────
-// Resource fields: 18 slots evenly around a circle (center 50%, radius 43%)
-function computeResourcePositions() {
-  const positions = {};
-  for (let i = 1; i <= 18; i++) {
-    const angle = ((i - 1) * (360 / 18) - 90) * (Math.PI / 180);
-    const x = 50 + 43 * Math.cos(angle);
-    const y = 50 + 43 * Math.sin(angle);
-    positions[i] = [x, y];
-  }
-  return positions;
-}
+// Travian-accurate resource field positions:
+// Outer ring (slots 1-12) + inner ring (slots 13-18)
+// [left%, top%] within the map container
+const RESOURCE_POS = {
+  // Outer ring — 12 fields, clockwise from top
+  1:  [50,  5],   // top
+  2:  [66,  7],   // top-right
+  3:  [79, 15],   // right-top
+  4:  [88, 28],   // right-upper
+  5:  [91, 44],   // right
+  6:  [88, 60],   // right-lower
+  7:  [79, 73],   // right-bottom
+  8:  [63, 82],   // bottom-right
+  9:  [50, 86],   // bottom
+  10: [37, 82],   // bottom-left
+  11: [21, 73],   // left-bottom
+  12: [12, 60],   // left-lower
+  13: [ 9, 44],   // left
+  14: [12, 28],   // left-upper
+  15: [21, 15],   // left-top
+  16: [34,  7],   // top-left
+  // Inner ring — 2 extra fields
+  17: [32, 26],   // inner top-left
+  18: [68, 26],   // inner top-right
+};
 
-const RESOURCE_POS = computeResourcePositions();
+// Mark which slots are inner ring (slightly smaller)
+const INNER_RING_SLOTS = new Set([17, 18]);
 
-// Inner building positions (slots 19-39), hand-tuned grid in center region
+// Inner building positions (slots 19-39) — clustered village center
 const BUILDING_POS = {
-  19:[38,33], 20:[50,27], 21:[62,33],
-  22:[30,44], 23:[43,40], 24:[57,40], 25:[70,44],
-  26:[35,54], 27:[50,50], 28:[65,54],
-  29:[40,63], 30:[60,63],
-  31:[50,70], 32:[35,39], 33:[65,39],
-  34:[43,58], 35:[57,58], 36:[28,54], 37:[72,54],
-  38:[50,44], 39:[50,60],
+  19:[38,35], 20:[50,29], 21:[62,35],
+  22:[29,46], 23:[42,41], 24:[58,41], 25:[71,46],
+  26:[34,55], 27:[50,51], 28:[66,55],
+  29:[40,64], 30:[60,64],
+  31:[50,71], 32:[36,42], 33:[64,42],
+  34:[43,60], 35:[57,60], 36:[27,55], 37:[73,55],
+  38:[50,45], 39:[50,62],
 };
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -334,6 +356,7 @@ function getSlotClasses(slotNum) {
   const d = slotData[slotNum];
   const isRes = slotNum <= 18;
   let cls = ['slot', isRes ? 'slot-resource' : 'slot-building'];
+  if (isRes && INNER_RING_SLOTS.has(slotNum)) cls.push('slot-inner');
   if (d && d.building_type) {
     if (isRes) {
       cls.push(`slot-filled-${d.building_type}`);
@@ -349,15 +372,15 @@ function getSlotContent(slotNum) {
   const d = slotData[slotNum];
   const isRes = slotNum <= 18;
   if (!d || !d.building_type) {
-    return `<span>${slotNum}</span>`;
+    return `<span style="font-size:.62rem;opacity:.55">${slotNum}</span>`;
   }
   if (isRes) {
-    const lvl = d.target_level > 0 ? `<span>Lv${d.target_level}</span>` : '';
+    const lvl = d.target_level > 0 ? `<span class="slot-lv">Lv${d.target_level}</span>` : '';
     return `<span class="slot-emoji">${RESOURCE_EMOJIS[d.building_type] || ''}</span>${lvl}`;
   } else {
     const short = d.building_type.substring(0, 5);
-    const lvl = d.target_level > 0 ? `<span>Lv${d.target_level}</span>` : '';
-    return `<span style="font-size:0.44rem; line-height:1.1;">${short}</span>${lvl}`;
+    const lvl = d.target_level > 0 ? `<span class="slot-lv">Lv${d.target_level}</span>` : '';
+    return `<span style="font-size:0.48rem;line-height:1.1;opacity:.9;">${short}</span>${lvl}`;
   }
 }
 
