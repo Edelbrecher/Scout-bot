@@ -9,11 +9,50 @@
       <h1 style="margin:.25rem 0 0;">🗺️ Sector Monitor</h1>
       <p class="subtitle" style="margin:0;">Watch enemy meta-alliances in your sector — {{ guild.guild_name }}</p>
     </div>
+    {% if not has_player_pro %}
+    <a href="{{ billing_url }}" class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;gap:.4rem;display:flex;align-items:center;">
+      ⚡ Upgrade to Player Pro
+    </a>
+    {% endif %}
   </div>
 
-  {% if scanned %}
+  {% if not has_player_pro %}
+  {# ── Premium upsell banner ── #}
+  <div style="background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(217,119,6,.08));
+              border:1px solid rgba(245,158,11,.35);border-radius:12px;
+              padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+    <div style="font-size:2rem;">🔒</div>
+    <div style="flex:1;min-width:200px;">
+      <div style="font-weight:700;font-size:1rem;color:#f59e0b;margin-bottom:.25rem;">Player Pro required</div>
+      <div style="font-size:.85rem;color:var(--text-muted);">
+        Sector Monitor automatically scans your watch area for new enemy villages, noblings, and fast-growing players.
+        Upgrade to <strong style="color:var(--text);">Player Pro</strong> to activate alerts.
+      </div>
+    </div>
+    <a href="{{ billing_url }}" class="btn btn-primary"
+       style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;white-space:nowrap;">
+      ⚡ Upgrade — €2.99/mo
+    </a>
+  </div>
+  {% endif %}
+
+  {% if scanned and has_player_pro %}
   <div class="alert alert-success" style="margin-bottom:1rem;background:#052e16;border:1px solid #16a34a;color:#bbf7d0;border-radius:8px;padding:.75rem 1rem;">
     ✅ Scan complete — {{ new_count }} new alert{{ 's' if new_count != 1 else '' }}
+  </div>
+  {% endif %}
+
+  {# ── Locked overlay wrapper for non-pro users ── #}
+  <div style="position:relative;{% if not has_player_pro %}pointer-events:none;user-select:none;{% endif %}">
+  {% if not has_player_pro %}
+  <div style="position:absolute;inset:0;z-index:10;background:rgba(10,10,20,.55);backdrop-filter:blur(3px);
+              border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;">
+    <div style="font-size:2.5rem;">🔒</div>
+    <div style="font-weight:700;font-size:1.05rem;color:#f59e0b;">Player Pro required</div>
+    <a href="{{ billing_url }}" style="pointer-events:all;"
+       class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;">
+      ⚡ Upgrade to activate
+    </a>
   </div>
   {% endif %}
 
@@ -396,6 +435,7 @@
   </div>
   {% endif %}
 
+  </div>{# end locked overlay wrapper #}
 </div>
 
 <script>

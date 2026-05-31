@@ -2809,11 +2809,10 @@ async def sector_monitor_page(request: Request, guild_id: str):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    err = await _require_premium(guild, guild_id)
-    if err: return err
-    monitor = await database.get_sector_monitor(guild_id) or {}
-    alerts = await database.get_sector_alerts(guild_id, include_dismissed=False, limit=100)
-    meta_groups = await database.get_meta_groups(guild_id)
+    has_player_pro = _has_player_pro(guild)
+    monitor = await database.get_sector_monitor(guild_id) or {} if has_player_pro else {}
+    alerts = await database.get_sector_alerts(guild_id, include_dismissed=False, limit=100) if has_player_pro else []
+    meta_groups = await database.get_meta_groups(guild_id) if has_player_pro else []
     scanned = request.query_params.get("scanned")
     new_count = int(request.query_params.get("new_count", 0))
     # Count stats
@@ -2823,9 +2822,12 @@ async def sector_monitor_page(request: Request, guild_id: str):
         "nobling": sum(1 for a in alerts if a["alert_type"] == "nobling"),
         "fast_growth": sum(1 for a in alerts if a["alert_type"] == "fast_growth"),
     }
+    billing_url = _billing_url(guild, guild_id, "premium_required")
     return templates.TemplateResponse("sector_monitor.html", {
         "request": request,
         "guild": guild,
+        "has_player_pro": has_player_pro,
+        "billing_url": billing_url,
         "monitor": monitor,
         "alerts": alerts,
         "meta_groups": meta_groups,
