@@ -7762,7 +7762,7 @@ async def clear_stale_channels(request: Request, guild_id: str):
 async def verteidigung_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -7809,7 +7809,7 @@ async def verteidigung_page(request: Request, guild_id: str):
 async def defend_close(request: Request, guild_id: str, channel_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
@@ -7827,7 +7827,7 @@ async def defend_close(request: Request, guild_id: str, channel_id: str):
 async def defend_reopen(request: Request, guild_id: str, channel_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     async with __import__("aiosqlite").connect(database.DB_PATH) as db:
         await db.execute("UPDATE defend_channels SET status='open' WHERE channel_id=?", (channel_id,))
@@ -7839,7 +7839,7 @@ async def defend_reopen(request: Request, guild_id: str, channel_id: str):
 async def verteidigung_stats_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
