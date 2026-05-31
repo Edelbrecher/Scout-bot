@@ -7517,6 +7517,54 @@ async def _init_enemy_villages_tables():
             CREATE INDEX IF NOT EXISTS idx_ev_events_player
             ON enemy_village_events(guild_id, player_name)
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS enemy_village_details (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                player_name  TEXT NOT NULL,
+                coords_key   TEXT NOT NULL,
+                detail_json  TEXT DEFAULT '',
+                updated_at   TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, player_name, coords_key)
+            )
+        """)
+        await db.commit()
+
+
+async def get_enemy_village_details(guild_id: str, player_name: str) -> dict:
+    """Return {coords_key: detail_dict} for all villages of a player."""
+    await _init_enemy_villages_tables()
+    import json as _json
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT coords_key, detail_json FROM enemy_village_details WHERE guild_id=? AND player_name=?",
+            (guild_id, player_name),
+        ) as cur:
+            result = {}
+            for row in await cur.fetchall():
+                try:
+                    result[row["coords_key"]] = _json.loads(row["detail_json"] or "{}")
+                except Exception:
+                    result[row["coords_key"]] = {}
+            return result
+
+
+async def save_enemy_village_detail(
+    guild_id: str, player_name: str, coords_key: str, detail: dict
+):
+    """Upsert building/field detail for a specific village."""
+    import json as _json
+    from datetime import datetime as _dt
+    await _init_enemy_villages_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO enemy_village_details (guild_id, player_name, coords_key, detail_json, updated_at)
+            VALUES (?,?,?,?,?)
+            ON CONFLICT(guild_id, player_name, coords_key) DO UPDATE SET
+                detail_json = excluded.detail_json,
+                updated_at  = excluded.updated_at
+        """, (guild_id, player_name, coords_key, _json.dumps(detail), _dt.utcnow().isoformat()))
         await db.commit()
 
 

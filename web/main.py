@@ -7907,8 +7907,9 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
     if not enemy:
         return RedirectResponse(f"/guild/{guild_id}/enemies", status_code=303)
     history = await database.get_enemy_scout_history(guild_id, player_name)
-    troop_entries   = await database.get_enemy_troop_entries(guild_id, player_name)
-    village_history = await database.get_enemy_village_history(guild_id, player_name)
+    troop_entries    = await database.get_enemy_troop_entries(guild_id, player_name)
+    village_history  = await database.get_enemy_village_history(guild_id, player_name)
+    village_details  = await database.get_enemy_village_details(guild_id, player_name)
     return templates.TemplateResponse("enemy_detail.html", {
         "request": request,
         "guild": guild,
@@ -7916,6 +7917,7 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
         "history": history,
         "troop_entries": troop_entries,
         "village_history": village_history,
+        "village_details": village_details,
         "flash": request.query_params.get("flash", ""),
         "vcount": request.query_params.get("vcount",""),
         "ecount": request.query_params.get("ecount",""),
@@ -8190,6 +8192,26 @@ async def enemy_update_notes(
     return RedirectResponse(
         f"/guild/{guild_id}/enemies/{player_name}?saved=1", status_code=303
     )
+
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/village-detail")
+async def enemy_village_detail_save(request: Request, guild_id: str, player_name: str):
+    """Save building/field detail for a specific village."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    import json as _json
+    try:
+        body = await request.json()
+        coords_key = str(body.get("coords_key", "")).strip()
+        detail     = body.get("detail", {})
+        if not coords_key:
+            return _JSONResponse({"error": "missing coords_key"}, status_code=400)
+        await database.save_enemy_village_detail(guild_id, player_name, coords_key, detail)
+        return _JSONResponse({"ok": True})
+    except Exception as e:
+        return _JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.post("/guild/{guild_id}/enemies/{player_name}/meta")

@@ -154,75 +154,226 @@
 
   <!-- ═══ TAB: DÖRFER ═══ -->
   <div id="ed-doerfer" class="ed-panel" style="display:none;">
+  <style>
+  /* Village layout styles */
+  .vil-card {
+    background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
+    overflow:hidden; cursor:pointer; transition:border-color .15s, box-shadow .15s;
+  }
+  .vil-card:hover { border-color:rgba(99,102,241,.5); box-shadow:0 0 0 2px rgba(99,102,241,.12); }
+  .vil-card-header { padding:.65rem .9rem; display:flex; align-items:center; gap:.55rem; user-select:none; }
+  .vil-detail { display:none; border-top:1px solid var(--border); }
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:.5rem;">
-      <h2 style="margin:0;font-size:1.05rem;">🏘️ Dorf-Tracker</h2>
+  /* Field grid — Travian-style oval */
+  .field-grid {
+    position:relative; width:100%; padding-bottom:58%; /* aspect ratio */
+    background:radial-gradient(ellipse at center, #2d5a1e 50%, #1a3a10 100%);
+    border-radius:8px; overflow:hidden;
+  }
+  .field-cell {
+    position:absolute; transform:translate(-50%,-50%);
+    display:flex; flex-direction:column; align-items:center; gap:1px;
+    cursor:pointer;
+  }
+  .field-slot {
+    width:38px; height:38px; border-radius:8px; border:2px solid rgba(255,255,255,.2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:.65rem; font-weight:700; color:#fff;
+    transition:border-color .12s, box-shadow .12s;
+  }
+  .field-slot:hover { border-color:#fbbf24; box-shadow:0 0 8px rgba(251,191,36,.4); }
+  .field-slot.level-0  { background:rgba(30,41,59,.8); }
+  .field-slot.level-low  { background:rgba(34,197,94,.35); }
+  .field-slot.level-mid  { background:rgba(34,197,94,.6); }
+  .field-slot.level-high { background:rgba(34,197,94,.85); box-shadow:0 0 6px rgba(34,197,94,.5); }
+  .field-slot.level-max  { background:#16a34a; box-shadow:0 0 8px rgba(22,163,74,.7); }
+  .field-label { font-size:.58rem; color:rgba(255,255,255,.7); text-align:center; }
+
+  /* Building grid */
+  .building-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:.35rem; padding:.65rem; }
+  .building-cell {
+    display:flex; align-items:center; gap:.4rem; padding:.35rem .5rem;
+    background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:7px;
+    transition:border-color .12s;
+  }
+  .building-cell:hover { border-color:rgba(99,102,241,.4); }
+  .building-cell .b-level {
+    width:36px; flex-shrink:0; padding:.2rem; border:1px solid var(--border);
+    border-radius:5px; background:var(--bg-main); color:var(--text);
+    font-size:.8rem; font-weight:700; text-align:center;
+  }
+  .building-cell .b-name { font-size:.72rem; color:var(--text-muted); line-height:1.2; }
+
+  /* Mini position map */
+  #village-map-svg { background:#0f172a; border-radius:10px; border:1px solid var(--border); }
+  </style>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;flex-wrap:wrap;gap:.5rem;">
+      <div>
+        <h2 style="margin:0 0 .1rem;font-size:1.05rem;">🏘️ Village Overview</h2>
+        {% if village_history.snapshots %}
+        <span style="font-size:.74rem;color:var(--text-muted);">
+          {{ village_history.snapshots|length }} snapshot(s) · Last import: {{ village_history.snapshots[0].snapshot_at[:16].replace('T',' ') }} UTC
+        </span>
+        {% endif %}
+      </div>
       <button onclick="document.getElementById('village-import-modal').style.display='flex'"
-              style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;
-                     background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);color:#818cf8;">
-        📋 Profil importieren
+              style="padding:.35rem .9rem;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;
+                     background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);color:#818cf8;">
+        📋 Import profile
       </button>
     </div>
 
-    {% if village_history.snapshots %}
-    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">
-      {{ village_history.snapshots|length }} Snapshot(s) ·
-      Letzter Import: {{ village_history.snapshots[0].snapshot_at[:16].replace('T',' ') }} UTC
-    </p>
-    {% endif %}
-
-    {# ── Aktuelle Dorfliste ── #}
     {% if village_history.villages %}
-    <div class="card" style="margin-bottom:1.25rem;padding:.75rem 1rem;">
-      <h3 style="margin:0 0 .75rem;font-size:.9rem;">📍 Aktuelle Dörfer ({{ village_history.villages|length }})</h3>
-      <div style="display:grid;gap:.4rem;">
-        {% for v in village_history.villages %}
-        <div style="display:flex;align-items:center;gap:.6rem;padding:.4rem .6rem;
-                    background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;flex-wrap:wrap;
-                    {% if v.is_capital %}border-left:3px solid rgba(251,191,36,.6);{% endif %}">
-          <div style="flex:1;min-width:120px;">
-            <span style="font-weight:600;font-size:.88rem;">{{ v.village_name }}</span>
-            {% if v.is_capital %}<span style="font-size:.68rem;color:#fbbf24;margin-left:.35rem;">👑 Hauptstadt</span>{% endif %}
-            {% if v.label and not v.is_capital %}<span style="font-size:.7rem;color:#a78bfa;margin-left:.35rem;">{{ v.label }}</span>{% endif %}
-          </div>
-          <span style="font-family:monospace;font-size:.82rem;color:#93c5fd;">
-            {% if v.coords_x is not none %}({{ v.coords_x }}|{{ v.coords_y }}){% endif %}
-          </span>
-          {% if v.population %}<span style="font-size:.75rem;color:var(--text-muted);">👥 {{ v.population }}</span>{% endif %}
-        </div>
-        {% endfor %}
+
+    {# ── Mini Position Map ── #}
+    <div class="card" style="margin-bottom:1.1rem;padding:.85rem;">
+      <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.55rem;">
+        📍 Village Positions on Map
+      </div>
+      <svg id="village-map-svg" width="100%" viewBox="0 0 480 200" style="max-width:100%;">
+        <!-- rendered by JS -->
+      </svg>
+      <div style="display:flex;gap:.75rem;margin-top:.4rem;flex-wrap:wrap;">
+        <span style="font-size:.68rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;"><span style="width:9px;height:9px;border-radius:50%;background:#fbbf24;display:inline-block;"></span> Capital</span>
+        <span style="font-size:.68rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;"><span style="width:9px;height:9px;border-radius:50%;background:#f87171;display:inline-block;"></span> Off villa</span>
+        <span style="font-size:.68rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;"><span style="width:9px;height:9px;border-radius:50%;background:#4ade80;display:inline-block;"></span> Def villa</span>
+        <span style="font-size:.68rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;"><span style="width:9px;height:9px;border-radius:50%;background:#a78bfa;display:inline-block;"></span> Other</span>
       </div>
     </div>
-    {% else %}
-    <div class="card" style="margin-bottom:1.25rem;text-align:center;padding:2rem 1rem;">
-      <div style="font-size:2.5rem;margin-bottom:.5rem;">🏘️</div>
-      <p style="color:var(--text-muted);font-size:.88rem;margin:0 0 .75rem;">
-        Noch keine Dörfer importiert. Öffne auf Travian das Profil von <strong>{{ enemy.player_name }}</strong>,
-        markiere alles, kopiere und importiere es hier.
-      </p>
-      <button onclick="document.getElementById('village-import-modal').style.display='flex'"
-              style="padding:.4rem 1rem;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer;
-                     background:#6366f1;border:none;color:#fff;">
-        📋 Jetzt importieren
-      </button>
+
+    {# ── Village Cards ── #}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.6rem;margin-bottom:1.25rem;">
+      {% for v in village_history.villages %}
+      {% set ck = (v.coords_x | string) + '|' + (v.coords_y | string) %}
+      {% set vdet = village_details.get(ck, {}) %}
+      {% if v.is_capital %}
+        {% set vborder = '#fbbf24' %}{% set vtag = '👑 Capital' %}{% set vtagcol = '#fbbf24' %}
+      {% elif v.label and 'off' in v.label | lower %}
+        {% set vborder = '#f87171' %}{% set vtag = '⚔️ ' + v.label %}{% set vtagcol = '#f87171' %}
+      {% elif v.label and 'def' in v.label | lower %}
+        {% set vborder = '#4ade80' %}{% set vtag = '🛡️ ' + v.label %}{% set vtagcol = '#4ade80' %}
+      {% elif v.label %}
+        {% set vborder = '#a78bfa' %}{% set vtag = v.label %}{% set vtagcol = '#a78bfa' %}
+      {% else %}
+        {% set vborder = '#475569' %}{% set vtag = '' %}{% set vtagcol = '#94a3b8' %}
+      {% endif %}
+
+      <div class="vil-card" style="border-left:3px solid {{ vborder }};"
+           id="vc-{{ loop.index }}">
+        <div class="vil-card-header" onclick="toggleVillage({{ loop.index }}, '{{ ck }}')">
+          <div style="width:10px;height:10px;border-radius:50%;background:{{ vborder }};flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              {{ v.village_name }}
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-top:.1rem;">
+              {% if v.coords_x is not none %}
+              <span style="font-family:monospace;font-size:.75rem;color:#93c5fd;">{{ v.coords_x }}|{{ v.coords_y }}</span>
+              {% endif %}
+              {% if v.population %}
+              <span style="font-size:.72rem;color:var(--text-muted);">👥 {{ v.population }}</span>
+              {% endif %}
+              {% if vtag %}
+              <span style="font-size:.65rem;font-weight:700;color:{{ vtagcol }};background:{{ vborder }}18;border:1px solid {{ vborder }}40;border-radius:4px;padding:1px 5px;">{{ vtag }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;">
+            {% if vdet %}
+            <span style="font-size:.65rem;color:#4ade80;">✓ detailed</span>
+            {% endif %}
+            <span style="font-size:.72rem;color:var(--text-muted);transition:transform .2s;" id="vc-chevron-{{ loop.index }}">▼</span>
+          </div>
+        </div>
+
+        <div class="vil-detail" id="vd-{{ loop.index }}">
+          {# Sub-tabs #}
+          <div style="display:flex;border-bottom:1px solid var(--border);">
+            <button onclick="vTab({{ loop.index }},'fields',this)"
+                    id="vt-{{ loop.index }}-fields"
+                    style="flex:1;padding:.4rem;font-size:.75rem;font-weight:600;border:none;cursor:pointer;
+                           background:rgba(99,102,241,.1);color:#818cf8;border-bottom:2px solid #6366f1;">
+              🌾 Resource Fields
+            </button>
+            <button onclick="vTab({{ loop.index }},'buildings',this)"
+                    id="vt-{{ loop.index }}-buildings"
+                    style="flex:1;padding:.4rem;font-size:.75rem;font-weight:600;border:none;cursor:pointer;
+                           background:transparent;color:var(--text-muted);border-bottom:2px solid transparent;">
+              🏗️ Buildings
+            </button>
+            <button onclick="vTab({{ loop.index }},'notes',this)"
+                    id="vt-{{ loop.index }}-notes"
+                    style="flex:1;padding:.4rem;font-size:.75rem;font-weight:600;border:none;cursor:pointer;
+                           background:transparent;color:var(--text-muted);border-bottom:2px solid transparent;">
+              📝 Notes
+            </button>
+          </div>
+
+          {# Fields tab #}
+          <div id="vtab-{{ loop.index }}-fields" style="padding:.75rem;">
+            <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem;">
+              Click a field to set its level (0–20). Colors: grey=0, light green=1–5, medium=6–10, dark=11–18, gold=19–20.
+            </div>
+            <div class="field-grid" id="fg-{{ loop.index }}" data-vindex="{{ loop.index }}" data-ck="{{ ck }}">
+              {# JS renders the 18 fields inside here #}
+            </div>
+            <div style="margin-top:.55rem;font-size:.72rem;color:var(--text-muted);">
+              Village type:
+              <select id="vtype-{{ loop.index }}" onchange="renderFields({{ loop.index }}, this.value)"
+                      style="padding:.2rem .4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.72rem;margin-left:.3rem;">
+                <option value="normal">Normal (4W 4C 4I 6Wh)</option>
+                <option value="9crop">9-Crop (0W 0C 0I 9Wh)</option>
+                <option value="15crop">15-Crop (0W 0C 0I 15Wh)</option>
+                <option value="3w">3W (3W 4C 4I 7Wh)</option>
+                <option value="3c">3C (4W 3C 4I 7Wh)</option>
+                <option value="3i">3I (4W 4C 3I 7Wh)</option>
+              </select>
+            </div>
+          </div>
+
+          {# Buildings tab #}
+          <div id="vtab-{{ loop.index }}-buildings" style="display:none;">
+            <div class="building-grid" id="bg-{{ loop.index }}" data-vindex="{{ loop.index }}" data-ck="{{ ck }}">
+              {# JS renders building inputs #}
+            </div>
+          </div>
+
+          {# Notes tab #}
+          <div id="vtab-{{ loop.index }}-notes" style="display:none;padding:.65rem;">
+            <textarea id="vnotes-{{ loop.index }}" placeholder="Notes about this village…" rows="4"
+                      style="width:100%;padding:.4rem .6rem;background:var(--bg-main);border:1px solid var(--border);
+                             border-radius:6px;color:var(--text);font-size:.82rem;resize:vertical;"></textarea>
+          </div>
+
+          <div style="padding:.5rem .75rem;border-top:1px solid var(--border);display:flex;gap:.4rem;align-items:center;">
+            <button onclick="saveVillageDetail({{ loop.index }}, '{{ ck }}')"
+                    style="padding:.3rem .85rem;border-radius:6px;background:rgba(99,102,241,.2);
+                           border:1px solid rgba(99,102,241,.4);color:#818cf8;font-size:.78rem;font-weight:700;cursor:pointer;">
+              💾 Save
+            </button>
+            <span id="vsave-status-{{ loop.index }}" style="font-size:.72rem;color:var(--text-muted);"></span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
     </div>
-    {% endif %}
 
     {# ── Event-Timeline ── #}
     {% if village_history.events %}
-    <h3 style="margin:0 0 .75rem;font-size:.9rem;">⚡ Erkannte Ereignisse</h3>
+    <h3 style="margin:0 0 .75rem;font-size:.9rem;">⚡ Detected Events</h3>
     <div style="position:relative;">
       <div style="position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(99,102,241,.2);border-radius:1px;"></div>
       <div style="display:flex;flex-direction:column;gap:.5rem;padding-left:38px;">
         {% for ev in village_history.events %}
         {% set ecol = '#4ade80' if ev.event_type in ['village_settled','capital_settled'] else '#f87171' if ev.event_type == 'village_lost' else '#fbbf24' %}
         {% set eicon = '🏗️' if 'settled' in ev.event_type else '⚔️' if 'conquered' in ev.event_type else '💥' if 'lost' in ev.event_type else '📌' %}
-        {% set elabel = 'Neu gesiedelt' if ev.event_type == 'village_settled' else 'Hauptstadt gesiedelt' if ev.event_type == 'capital_settled' else 'Geadelt/Erobert' if ev.event_type == 'village_conquered' else 'Dorf verloren' if ev.event_type == 'village_lost' else ev.event_type %}
+        {% set elabel = 'Settled' if ev.event_type == 'village_settled' else 'Capital settled' if ev.event_type == 'capital_settled' else 'Conquered/Chiefed' if ev.event_type == 'village_conquered' else 'Village lost' if ev.event_type == 'village_lost' else ev.event_type %}
         <div style="position:relative;">
           <div style="position:absolute;left:-28px;top:50%;transform:translateY(-50%);
                       width:11px;height:11px;border-radius:50%;background:{{ ecol }};
                       border:2px solid var(--bg-main);"></div>
-          <div class="card" style="padding:.45rem .75rem;border-left:2px solid {{ ecol }}20;">
+          <div class="card" style="padding:.45rem .75rem;border-left:2px solid {{ ecol }}30;">
             <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
               <span style="font-size:.75rem;font-weight:700;color:{{ ecol }};">{{ eicon }} {{ elabel }}</span>
               <span style="font-weight:600;font-size:.85rem;">{{ ev.village_name }}</span>
@@ -240,7 +391,22 @@
       </div>
     </div>
     {% elif village_history.snapshots|length > 1 %}
-    <div class="card"><p style="color:var(--text-muted);font-size:.85rem;margin:0;">✅ Keine Änderungen zwischen den Snapshots erkannt.</p></div>
+    <div class="card"><p style="color:var(--text-muted);font-size:.85rem;margin:0;">✅ No changes detected between snapshots.</p></div>
+    {% endif %}
+
+    {% else %}
+    <div class="card" style="margin-bottom:1.25rem;text-align:center;padding:2.5rem 1rem;">
+      <div style="font-size:3rem;margin-bottom:.6rem;">🏘️</div>
+      <p style="color:var(--text-muted);font-size:.88rem;margin:0 0 .85rem;">
+        No villages imported yet. Open <strong>{{ enemy.player_name }}</strong>'s profile on Travian,
+        select all, copy and import it here.
+      </p>
+      <button onclick="document.getElementById('village-import-modal').style.display='flex'"
+              style="padding:.45rem 1.1rem;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer;
+                     background:#6366f1;border:none;color:#fff;">
+        📋 Import now
+      </button>
+    </div>
     {% endif %}
 
   </div>{# end ed-doerfer #}
@@ -641,6 +807,284 @@ function edTab(name, btn) {
     if (btn) edTab('doerfer', btn);
   }
 })();
+
+// ════════════════════════════════════════════════════════════════════════
+// VILLAGE LAYOUT
+// ════════════════════════════════════════════════════════════════════════
+
+// Preloaded detail data from server
+const VILLAGE_DETAILS = {{ village_details | tojson | safe if village_details is defined else '{}' }};
+// Per-village runtime state: {vindex: {fields:{slot:level}, buildings:{id:level}, notes:''}}
+const vState = {};
+
+// Village coordinates for mini-map
+const VILLAGES = [
+  {% for v in village_history.villages %}
+  {
+    name: {{ v.village_name | tojson }},
+    x: {{ v.coords_x or 0 }}, y: {{ v.coords_y or 0 }},
+    isCapital: {{ 'true' if v.is_capital else 'false' }},
+    label: {{ (v.label or '') | tojson }},
+    idx: {{ loop.index }},
+    ck: "{{ (v.coords_x | string) + '|' + (v.coords_y | string) }}",
+  },
+  {% endfor %}
+];
+
+// ── Mini SVG coordinate map ───────────────────────────────────────────────────
+(function() {
+  const svg = document.getElementById('village-map-svg');
+  if (!svg || !VILLAGES.length) return;
+  const W = 480, H = 200, pad = 24;
+  const xs = VILLAGES.map(v => v.x), ys = VILLAGES.map(v => v.y);
+  let minX = Math.min(...xs), maxX = Math.max(...xs);
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+  // Ensure non-zero range
+  if (minX === maxX) { minX -= 50; maxX += 50; }
+  if (minY === maxY) { minY -= 50; maxY += 50; }
+  const scaleX = (W - pad*2) / (maxX - minX);
+  const scaleY = (H - pad*2) / (maxY - minY);
+  const toSVG = (x, y) => [
+    pad + (x - minX) * scaleX,
+    H - pad - (y - minY) * scaleY,  // flip Y (Travian: higher Y = more north)
+  ];
+
+  let html = '';
+  // Grid lines
+  html += `<line x1="${pad}" y1="${H/2}" x2="${W-pad}" y2="${H/2}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+  html += `<line x1="${W/2}" y1="${pad}" x2="${W/2}" y2="${H-pad}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+
+  VILLAGES.forEach(v => {
+    const [cx, cy] = toSVG(v.x, v.y);
+    const col = v.isCapital ? '#fbbf24' :
+                (v.label && v.label.toLowerCase().includes('off')) ? '#f87171' :
+                (v.label && v.label.toLowerCase().includes('def')) ? '#4ade80' : '#a78bfa';
+    html += `<g class="vil-map-dot" onclick="scrollToVillage(${v.idx})" style="cursor:pointer;" id="vmap-${v.idx}">
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="7" fill="${col}" fill-opacity=".8" stroke="${col}" stroke-width="1.5"/>
+      <text x="${cx.toFixed(1)}" y="${(cy+18).toFixed(1)}" text-anchor="middle"
+            font-size="9" fill="rgba(255,255,255,.7)" font-family="monospace">${v.x}|${v.y}</text>
+    </g>`;
+  });
+  svg.innerHTML = html;
+})();
+
+function scrollToVillage(idx) {
+  const card = document.getElementById('vc-' + idx);
+  if (card) card.scrollIntoView({behavior:'smooth', block:'center'});
+  // Flash highlight
+  card.style.boxShadow = '0 0 0 3px rgba(99,102,241,.6)';
+  setTimeout(() => { card.style.boxShadow = ''; }, 1200);
+}
+
+// ── Village card toggle ───────────────────────────────────────────────────────
+function toggleVillage(idx, ck) {
+  const detail = document.getElementById('vd-' + idx);
+  const chevron = document.getElementById('vc-chevron-' + idx);
+  const open = detail.style.display !== 'none';
+  if (!open) {
+    detail.style.display = 'block';
+    chevron.style.transform = 'rotate(180deg)';
+    ensureVState(idx, ck);
+    renderFields(idx, document.getElementById('vtype-' + idx)?.value || 'normal');
+    renderBuildings(idx);
+    loadNotes(idx, ck);
+  } else {
+    detail.style.display = 'none';
+    chevron.style.transform = '';
+  }
+}
+
+function vTab(idx, tab, btn) {
+  ['fields','buildings','notes'].forEach(t => {
+    const el = document.getElementById(`vtab-${idx}-${t}`);
+    const bt = document.getElementById(`vt-${idx}-${t}`);
+    if (!el || !bt) return;
+    const active = t === tab;
+    el.style.display = active ? 'block' : 'none';
+    bt.style.background    = active ? 'rgba(99,102,241,.1)' : 'transparent';
+    bt.style.color         = active ? '#818cf8' : 'var(--text-muted)';
+    bt.style.borderBottom  = active ? '2px solid #6366f1' : '2px solid transparent';
+  });
+}
+
+// ── State helpers ─────────────────────────────────────────────────────────────
+function ensureVState(idx, ck) {
+  if (!vState[idx]) {
+    const saved = VILLAGE_DETAILS[ck] || {};
+    vState[idx] = {
+      fields:    saved.fields    || {},
+      buildings: saved.buildings || {},
+      notes:     saved.notes     || '',
+      type:      saved.type      || 'normal',
+    };
+  }
+}
+
+function loadNotes(idx, ck) {
+  ensureVState(idx, ck);
+  const ta = document.getElementById('vnotes-' + idx);
+  if (ta) ta.value = vState[idx].notes || '';
+}
+
+// ── Resource fields ───────────────────────────────────────────────────────────
+// 18 field positions in a Travian-style oval, as [left%, top%]
+const FIELD_POSITIONS = [
+  // top arc
+  [31,6],[50,4],[69,6],
+  // upper left/right
+  [14,18],[37,16],[63,16],[86,18],
+  // middle left/right + inner
+  [5,36],[26,33],[50,30],[74,33],[95,36],
+  // lower left/right
+  [10,56],[30,62],[50,65],[70,62],[90,56],
+  // bottom
+  [50,80],
+];
+
+const FIELD_TYPES = {
+  normal: ['w','w','w','w','c','c','c','c','i','i','i','i','wh','wh','wh','wh','wh','wh'],
+  '9crop':['wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh'],
+  '15crop':['wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh','wh'],
+  '3w': ['w','w','w','c','c','c','c','i','i','i','i','wh','wh','wh','wh','wh','wh','wh'],
+  '3c': ['w','w','w','w','c','c','c','i','i','i','i','wh','wh','wh','wh','wh','wh','wh'],
+  '3i': ['w','w','w','w','c','c','c','c','i','i','i','wh','wh','wh','wh','wh','wh','wh'],
+};
+const FIELD_EMOJI = { w:'🌲', c:'🧱', i:'⛰️', wh:'🌾' };
+const FIELD_LABEL = { w:'Wood', c:'Clay', i:'Iron', wh:'Wheat' };
+
+function levelClass(lv) {
+  if (!lv || lv == 0) return 'level-0';
+  if (lv <= 5)  return 'level-low';
+  if (lv <= 10) return 'level-mid';
+  if (lv <= 18) return 'level-high';
+  return 'level-max';
+}
+
+function renderFields(idx, type) {
+  const grid = document.getElementById('fg-' + idx);
+  if (!grid) return;
+  const ck = grid.dataset.ck;
+  ensureVState(idx, ck);
+  vState[idx].type = type;
+  const types = FIELD_TYPES[type] || FIELD_TYPES.normal;
+
+  grid.innerHTML = '';
+  FIELD_POSITIONS.forEach(([left, top], i) => {
+    const ft   = types[i] || 'wh';
+    const slotKey = `f${i}`;
+    const lv   = parseInt(vState[idx].fields[slotKey] || 0);
+    const cell = document.createElement('div');
+    cell.className = 'field-cell';
+    cell.style.left = left + '%';
+    cell.style.top  = top  + '%';
+    cell.innerHTML = `
+      <div class="field-slot ${levelClass(lv)}" title="${FIELD_LABEL[ft]} — level ${lv}"
+           onclick="cycleField(${idx}, '${slotKey}', '${ft}', this)">
+        <span>${FIELD_EMOJI[ft]}</span>
+      </div>
+      <div class="field-label" id="fl-${idx}-${i}">${lv||0}</div>`;
+    grid.appendChild(cell);
+  });
+}
+
+function cycleField(idx, key, ft, el) {
+  const cur = parseInt(vState[idx].fields[key] || 0);
+  const next = cur >= 20 ? 0 : cur + 1;
+  vState[idx].fields[key] = next;
+  el.className = `field-slot ${levelClass(next)}`;
+  el.title = `${FIELD_LABEL[ft]} — level ${next}`;
+  const labelEl = el.closest('.field-cell').querySelector('.field-label');
+  if (labelEl) labelEl.textContent = next;
+}
+
+// ── Buildings ─────────────────────────────────────────────────────────────────
+const BUILDINGS = [
+  {id:'main',      name:'Main Building', emoji:'🏛️'},
+  {id:'rally',     name:'Rally Point',   emoji:'⚑'},
+  {id:'barracks',  name:'Barracks',      emoji:'⚔️'},
+  {id:'stable',    name:'Stables',       emoji:'🐴'},
+  {id:'workshop',  name:'Workshop',      emoji:'🔧'},
+  {id:'academy',   name:'Academy',       emoji:'📚'},
+  {id:'smithy',    name:'Smithy',        emoji:'⚒️'},
+  {id:'townhall',  name:'Town Hall',     emoji:'🏛️'},
+  {id:'senate',    name:'Senate',        emoji:'📜'},
+  {id:'market',    name:'Marketplace',   emoji:'🏪'},
+  {id:'embassy',   name:'Embassy',       emoji:'🤝'},
+  {id:'hero_mansion',name:'Hero Mansion',emoji:'🦸'},
+  {id:'granary',   name:'Granary',       emoji:'🌾'},
+  {id:'warehouse', name:'Warehouse',     emoji:'📦'},
+  {id:'residence', name:'Residence',     emoji:'🏰'},
+  {id:'palace',    name:'Palace',        emoji:'👑'},
+  {id:'treasury',  name:'Treasury',      emoji:'💰'},
+  {id:'cranny',    name:'Cranny',        emoji:'🕳️'},
+  {id:'stonemason',name:'Stonemason',    emoji:'🪨'},
+  {id:'wall',      name:'Wall/Trench',   emoji:'🧱'},
+];
+
+function renderBuildings(idx) {
+  const grid = document.getElementById('bg-' + idx);
+  if (!grid) return;
+  const ck = grid.dataset.ck;
+  ensureVState(idx, ck);
+  grid.innerHTML = '';
+  BUILDINGS.forEach(b => {
+    const lv = vState[idx].buildings[b.id] || 0;
+    const cell = document.createElement('div');
+    cell.className = 'building-cell';
+    cell.innerHTML = `
+      <span style="font-size:.95rem;">${b.emoji}</span>
+      <div style="flex:1;min-width:0;">
+        <div class="b-name">${b.name}</div>
+      </div>
+      <input type="number" class="b-level" min="0" max="20" value="${lv}"
+             data-bid="${b.id}" data-vidx="${idx}" oninput="onBuildingInput(this)"
+             title="${b.name} level">`;
+    grid.appendChild(cell);
+  });
+}
+
+function onBuildingInput(inp) {
+  const idx = parseInt(inp.dataset.vidx);
+  const bid = inp.dataset.bid;
+  vState[idx].buildings[bid] = parseInt(inp.value) || 0;
+}
+
+// ── Save ─────────────────────────────────────────────────────────────────────
+async function saveVillageDetail(idx, ck) {
+  ensureVState(idx, ck);
+  const ta = document.getElementById('vnotes-' + idx);
+  if (ta) vState[idx].notes = ta.value;
+
+  const statusEl = document.getElementById('vsave-status-' + idx);
+  if (statusEl) { statusEl.textContent = '⏳ Saving…'; statusEl.style.color = 'var(--text-muted)'; }
+
+  try {
+    const resp = await fetch(`/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/village-detail`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ coords_key: ck, detail: vState[idx] }),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      if (statusEl) { statusEl.textContent = '✅ Saved'; statusEl.style.color = '#4ade80'; }
+      // Mark card as detailed
+      const chevron = document.getElementById('vc-chevron-' + idx);
+      const card = document.getElementById('vc-' + idx);
+      if (card && !card.querySelector('.detail-badge')) {
+        const badge = document.createElement('span');
+        badge.className = 'detail-badge';
+        badge.style.cssText = 'font-size:.65rem;color:#4ade80;';
+        badge.textContent = '✓ detailed';
+        document.getElementById('vc-' + idx)?.querySelector('.vil-card-header > div:last-child')?.prepend(badge);
+      }
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2500);
+    } else {
+      throw new Error(data.error || 'unknown error');
+    }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = '#f87171'; }
+  }
+}
 
 // ════════════════════════════════════════════════════════════════════════
 // TROOP PICKER
