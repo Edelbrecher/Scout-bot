@@ -12,19 +12,94 @@
         Wird automatisch befüllt wenn Scout-Berichte im Discord eingehen
       </p>
     </div>
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-      <form method="post" action="/guild/{{ guild.guild_id }}/enemies/add"
-            style="display:flex;gap:.4rem;margin:0;">
-        <input type="text" name="player_name" placeholder="Spielername…" required maxlength="100"
-               style="padding:.4rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);
-                      color:var(--text);font-size:.85rem;width:180px;">
-        <button type="submit"
-                style="padding:.4rem .9rem;border-radius:6px;background:rgba(99,102,241,.15);
-                       border:1px solid rgba(99,102,241,.35);color:#818cf8;font-size:.85rem;font-weight:600;cursor:pointer;">
-          ➕ Gegner hinzufügen
-        </button>
-      </form>
+    <div>
+      <button onclick="document.getElementById('add-enemy-panel').style.display='block';this.style.display='none';document.getElementById('aps-input').focus();"
+              id="add-enemy-btn"
+              style="padding:.4rem .9rem;border-radius:6px;background:rgba(99,102,241,.15);
+                     border:1px solid rgba(99,102,241,.35);color:#818cf8;font-size:.85rem;font-weight:600;cursor:pointer;">
+        ➕ Add enemy
+      </button>
     </div>
+  </div>
+
+  {# ── Smart add-enemy panel ── #}
+  <div id="add-enemy-panel" style="display:none;margin-bottom:1.25rem;">
+  <div class="card" style="padding:1rem 1.25rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+      <h3 style="margin:0;font-size:.95rem;">🎯 Add Enemy Player</h3>
+      <button onclick="closeAddPanel()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
+    </div>
+
+    <style>
+    #aps-wrap { position:relative; }
+    #aps-input { width:100%; padding:.45rem .75rem; border-radius:7px; background:var(--bg-main); border:1px solid var(--border); color:var(--text); font-size:.9rem; }
+    #aps-input:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,.2); }
+    #aps-dropdown {
+      display:none; position:absolute; left:0; right:0; top:calc(100% + 4px);
+      background:#1e293b; border:1px solid rgba(99,102,241,.35); border-radius:8px;
+      z-index:200; max-height:320px; overflow-y:auto;
+      box-shadow:0 8px 32px rgba(0,0,0,.5);
+    }
+    .aps-player {
+      padding:.55rem .85rem; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05);
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .aps-player:hover { background:rgba(99,102,241,.12); }
+    .aps-player:last-child { border-bottom:none; }
+    #aps-villages { display:none; margin-top:.75rem; }
+    .aps-village-chip {
+      display:inline-flex; align-items:center; gap:.35rem;
+      padding:.28rem .7rem; border-radius:20px; font-size:.78rem; font-weight:600;
+      border:1px solid rgba(99,102,241,.4); color:#a5b4fc; background:rgba(99,102,241,.1);
+      cursor:pointer; transition:all .12s; margin:.2rem;
+    }
+    .aps-village-chip:hover { background:rgba(99,102,241,.25); border-color:#818cf8; }
+    .aps-village-chip.selected { background:rgba(99,102,241,.4); border-color:#818cf8; color:#fff; }
+    </style>
+
+    <div id="aps-wrap">
+      <input id="aps-input" type="text" placeholder="Search player name…" autocomplete="off">
+      <div id="aps-dropdown"></div>
+    </div>
+
+    {# selected player info #}
+    <div id="aps-selected" style="display:none;margin-top:.65rem;padding:.55rem .85rem;
+         background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.25);border-radius:8px;">
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <span style="font-weight:700;font-size:.92rem;color:#f87171;" id="aps-sel-name"></span>
+        <span style="font-size:.75rem;color:var(--text-muted);" id="aps-sel-alliance"></span>
+        <button onclick="clearSelection()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.8rem;margin-left:auto;">✕ Change</button>
+      </div>
+    </div>
+
+    <div id="aps-villages">
+      <div style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin:.6rem 0 .3rem;">
+        Select a village (optional):
+      </div>
+      <div id="aps-village-chips"></div>
+    </div>
+
+    <form method="post" action="/guild/{{ guild.guild_id }}/enemies/add" id="aps-form"
+          style="margin-top:.75rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+      <input type="hidden" name="player_name"   id="aps-f-name">
+      <input type="hidden" name="coordinates"   id="aps-f-coords">
+      <input type="hidden" name="village"       id="aps-f-village">
+      <input type="hidden" name="alliance_name" id="aps-f-alliance">
+      <button type="submit" id="aps-submit" disabled
+              style="padding:.42rem 1.1rem;border-radius:6px;background:rgba(99,102,241,.2);
+                     border:1px solid rgba(99,102,241,.4);color:#818cf8;font-size:.88rem;
+                     font-weight:700;cursor:pointer;opacity:.5;"
+              title="Select a player first">
+        ➕ Add to records
+      </button>
+      <button type="button" onclick="closeAddPanel()"
+              style="padding:.42rem .85rem;border-radius:6px;background:none;border:1px solid var(--border);
+                     color:var(--text-muted);font-size:.85rem;cursor:pointer;">
+        Cancel
+      </button>
+      <span id="aps-status" style="font-size:.78rem;color:var(--text-muted);"></span>
+    </form>
+  </div>
   </div>
 
   {% if saved == 'deleted' %}
@@ -142,10 +217,23 @@
         {% for e in enemies %}
         <tr data-name="{{ e.player_name | lower }}">
           <td>
-            <a href="/guild/{{ guild.guild_id }}/enemies/{{ e.player_name | urlencode }}"
-               style="font-weight:600;color:#f87171;text-decoration:none;">
-              🎯 {{ e.player_name }}
-            </a>
+            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+              <a href="/guild/{{ guild.guild_id }}/enemies/{{ e.player_name | urlencode }}"
+                 style="font-weight:600;color:#f87171;text-decoration:none;">
+                🎯 {{ e.player_name }}
+              </a>
+              {% if e.danger_level == 'critical' %}<span style="font-size:.65rem;font-weight:700;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);color:#f87171;border-radius:4px;padding:1px 5px;">💀 CRITICAL</span>
+              {% elif e.danger_level == 'high' %}<span style="font-size:.65rem;font-weight:700;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.4);color:#fb923c;border-radius:4px;padding:1px 5px;">🔴 HIGH</span>
+              {% elif e.danger_level == 'medium' %}<span style="font-size:.65rem;font-weight:700;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.35);color:#fbbf24;border-radius:4px;padding:1px 5px;">🟡 MEDIUM</span>
+              {% elif e.danger_level == 'low' %}<span style="font-size:.65rem;font-weight:700;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:4px;padding:1px 5px;">🟢 LOW</span>
+              {% endif %}
+            </div>
+            {% if e.alliance_name %}<div style="font-size:.7rem;color:var(--text-muted);">[{{ e.alliance_name }}]</div>{% endif %}
+            {% if e.tags %}
+            <div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.15rem;">
+              {% for tag in e.tags.split(',') %}{% if tag.strip() %}<span style="font-size:.65rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 6px;">{{ tag.strip() }}</span>{% endif %}{% endfor %}
+            </div>
+            {% endif %}
           </td>
           <td style="font-family:monospace;font-size:0.85rem;color:#93c5fd;">
             {{ e.coordinates or '—' }}
@@ -191,6 +279,9 @@
 </div>
 
 <script>
+const GUILD_ID = {{ guild.guild_id | tojson }};
+
+// ── Table filter ──────────────────────────────────────────────────────────────
 function filterEnemies() {
   const q = document.getElementById('enemySearch').value.trim().toLowerCase();
   const rows = document.querySelectorAll('#enemyBody tr');
@@ -204,5 +295,122 @@ function filterEnemies() {
     shown < rows.length ? `${shown} von ${rows.length}` : `${rows.length} Gegner`;
 }
 filterEnemies();
+
+// ── Smart add-enemy panel ─────────────────────────────────────────────────────
+function closeAddPanel() {
+  document.getElementById('add-enemy-panel').style.display = 'none';
+  document.getElementById('add-enemy-btn').style.display  = '';
+  clearSelection();
+  document.getElementById('aps-input').value = '';
+  document.getElementById('aps-dropdown').style.display = 'none';
+}
+
+let selectedPlayer = null;
+let selectedVillage = null;
+
+function clearSelection() {
+  selectedPlayer = null;
+  selectedVillage = null;
+  document.getElementById('aps-selected').style.display  = 'none';
+  document.getElementById('aps-villages').style.display  = 'none';
+  document.getElementById('aps-input').style.display     = '';
+  document.getElementById('aps-submit').disabled         = true;
+  document.getElementById('aps-submit').style.opacity    = '.5';
+  document.getElementById('aps-f-name').value            = '';
+  document.getElementById('aps-f-coords').value          = '';
+  document.getElementById('aps-f-village').value         = '';
+  document.getElementById('aps-f-alliance').value        = '';
+}
+
+function selectPlayer(p) {
+  selectedPlayer = p;
+  document.getElementById('aps-dropdown').style.display  = 'none';
+  document.getElementById('aps-input').style.display     = 'none';
+  document.getElementById('aps-selected').style.display  = '';
+  document.getElementById('aps-sel-name').textContent    = p.name;
+  document.getElementById('aps-sel-alliance').textContent= p.alliance ? `[${p.alliance}]` : '';
+  document.getElementById('aps-f-name').value            = p.name;
+  document.getElementById('aps-f-alliance').value        = p.alliance || '';
+
+  // Village chips
+  const chips = document.getElementById('aps-village-chips');
+  chips.innerHTML = '';
+  if (p.villages && p.villages.length) {
+    document.getElementById('aps-villages').style.display = '';
+    p.villages.forEach(v => {
+      const chip = document.createElement('span');
+      chip.className = 'aps-village-chip';
+      chip.innerHTML = `<span style="font-family:monospace;font-size:.72rem;color:#93c5fd;">${v.x}|${v.y}</span> ${v.name} <span style="color:var(--text-muted);font-size:.7rem;">pop ${v.pop}</span>`;
+      chip.addEventListener('click', () => selectVillage(v, chip));
+      chips.appendChild(chip);
+    });
+    // "No village" chip
+    const none = document.createElement('span');
+    none.className = 'aps-village-chip';
+    none.style.borderStyle = 'dashed';
+    none.style.color = 'var(--text-muted)';
+    none.innerHTML = 'No specific village';
+    none.addEventListener('click', () => selectVillage(null, none));
+    chips.appendChild(none);
+  }
+
+  document.getElementById('aps-submit').disabled      = false;
+  document.getElementById('aps-submit').style.opacity = '1';
+}
+
+function selectVillage(v, chipEl) {
+  document.querySelectorAll('.aps-village-chip').forEach(c => c.classList.remove('selected'));
+  chipEl.classList.add('selected');
+  selectedVillage = v;
+  if (v) {
+    document.getElementById('aps-f-coords').value  = `${v.x}|${v.y}`;
+    document.getElementById('aps-f-village').value = v.name;
+    document.getElementById('aps-status').textContent = `${v.name} (${v.x}|${v.y}) selected`;
+  } else {
+    document.getElementById('aps-f-coords').value  = '';
+    document.getElementById('aps-f-village').value = '';
+    document.getElementById('aps-status').textContent = '';
+  }
+}
+
+// Debounced search
+let searchTimer = null;
+document.getElementById('aps-input').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('aps-dropdown').style.display = 'none'; return; }
+  document.getElementById('aps-status').textContent = '⏳';
+  searchTimer = setTimeout(() => doPlayerSearch(q), 280);
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#aps-wrap')) document.getElementById('aps-dropdown').style.display = 'none';
+});
+
+async function doPlayerSearch(q) {
+  const dd = document.getElementById('aps-dropdown');
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/map/player-search?q=${encodeURIComponent(q)}`);
+    const data = await r.json();
+    document.getElementById('aps-status').textContent = '';
+    const players = data.players || [];
+    if (!players.length) {
+      dd.innerHTML = '<div style="padding:.65rem .85rem;font-size:.8rem;color:var(--text-muted);">No players found in map data.</div>';
+      dd.style.display = 'block';
+      return;
+    }
+    dd.innerHTML = players.map(p => `
+      <div class="aps-player" onclick='selectPlayer(${JSON.stringify(p).replace(/'/g,"&#39;")})'>
+        <span style="font-weight:700;color:#f87171;">${p.name}</span>
+        ${p.alliance ? `<span style="font-size:.75rem;color:var(--text-muted);">[${p.alliance}]</span>` : ''}
+        <span style="margin-left:auto;font-size:.72rem;color:var(--text-muted);">${p.villages.length} village${p.villages.length!==1?'s':''}</span>
+      </div>
+    `).join('');
+    dd.style.display = 'block';
+  } catch(e) {
+    document.getElementById('aps-status').textContent = '❌ Search failed';
+    dd.style.display = 'none';
+  }
+}
 </script>
 {% endblock %}

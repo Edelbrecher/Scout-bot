@@ -2924,6 +2924,95 @@ async def guild_map_data(request: Request, guild_id: str):
         return JSONResponse({"error": str(e)}, status_code=502)
 
 
+_map_player_cache: dict = {}  # guild_id → {ts, players: [{name, alliance, villages:[{name,x,y,pop}]}]}
+_MAP_PLAYER_CACHE_TTL = 600   # 10 minutes
+
+@app.get("/guild/{guild_id}/map/player-search")
+async def map_player_search(request: Request, guild_id: str, q: str = ""):
+    """Return players + villages matching query, parsed from map.sql (cached 10 min)."""
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+
+    import time as _time
+    q = q.strip().lower()
+    if not q or len(q) < 2:
+        return _JSONResponse({"players": []})
+
+    cache = _map_player_cache.get(guild_id)
+    if not cache or (_time.time() - cache["ts"]) > _MAP_PLAYER_CACHE_TTL:
+        # Fetch + parse map.sql
+        guild = await database.get_guild(guild_id)
+        server_url = (guild or {}).get("tw_world", "")
+        if not server_url:
+            return _JSONResponse({"error": "no server configured"}, status_code=400)
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.get(f"{server_url}/map.sql")
+                if r.status_code != 200:
+                    return _JSONResponse({"error": "map unavailable"}, status_code=502)
+                raw = r.text
+        except Exception as e:
+            return _JSONResponse({"error": str(e)}, status_code=502)
+
+        # Parse map.sql — build player → {alliance, villages} index
+        import re as _re2
+        player_index: dict = {}
+        def _is_num(s): return bool(_re2.match(r'^-?\d+(\.\d+)?$', (s or '').strip()))
+        for line in raw.split('\n'):
+            m = _re2.search(r'VALUES\s*\((.+)\);?\s*$', line, _re2.I)
+            if not m: continue
+            # Minimal CSV split (handles quoted strings)
+            parts = []
+            buf, in_q = '', False
+            for ch in m.group(1):
+                if ch == "'" and not in_q: in_q = True; continue
+                if ch == "'" and in_q:     in_q = False; continue
+                if ch == ',' and not in_q: parts.append(buf); buf = ''; continue
+                buf += ch
+            parts.append(buf)
+            if len(parts) < 10: continue
+            try:
+                f0 = float(parts[0])
+            except Exception:
+                continue
+            v7num = _is_num(parts[7])
+            # Layout A: vid, x, y, tribe, row_uid, vname, player_id, pname, aid, aname, pop
+            if not v7num and f0 >= 0 and len(parts) > 10:
+                x,y,vname = int(float(parts[1])),int(float(parts[2])),parts[5]
+                pname,aname,pop = parts[7],parts[9],int(float(parts[10] or 0))
+            elif not v7num and abs(f0) <= 800:
+                x,y,vname = int(f0),int(float(parts[1])),parts[5]
+                pname,aname,pop = parts[7],parts[9],int(float(parts[6] or 0))
+            elif v7num and f0 >= 0:
+                x,y,vname = int(float(parts[1])),int(float(parts[2])),parts[6]
+                pname,aname,pop = parts[8],parts[10],int(float(parts[7] or 0))
+            else:
+                continue
+            if not pname or pname in ('NULL','','Natars'): continue
+            if pname not in player_index:
+                player_index[pname] = {"alliance": aname or "", "villages": []}
+            player_index[pname]["villages"].append({"name": vname, "x": x, "y": y, "pop": pop})
+
+        players_list = [
+            {"name": k, "alliance": v["alliance"],
+             "villages": sorted(v["villages"], key=lambda vv: -vv["pop"])}
+            for k, v in player_index.items()
+        ]
+        _map_player_cache[guild_id] = {"ts": _time.time(), "players": players_list}
+        cache = _map_player_cache[guild_id]
+
+    # Filter by query (name or alliance)
+    results = [
+        p for p in cache["players"]
+        if q in p["name"].lower() or q in p["alliance"].lower()
+    ]
+    # Sort: exact prefix match first
+    results.sort(key=lambda p: (0 if p["name"].lower().startswith(q) else 1, p["name"].lower()))
+    return _JSONResponse({"players": results[:15]})
+
+
 @app.get("/guild/{guild_id}/map/heatmap-data")
 async def guild_map_heatmap_data(request: Request, guild_id: str):
     """Return farmlist resource data for heatmap overlay."""
@@ -5009,10 +5098,15 @@ async def enemy_add(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     form = await request.form()
-    player_name = (form.get("player_name") or "").strip()
+    player_name   = (form.get("player_name") or "").strip()
+    coordinates   = (form.get("coordinates") or "").strip()
+    village       = (form.get("village") or "").strip()
+    alliance_name = (form.get("alliance_name") or "").strip()
     if not player_name:
         return RedirectResponse(f"/guild/{guild_id}/enemies", status_code=303)
-    await database.upsert_enemy(guild_id, player_name)
+    await database.upsert_enemy(guild_id, player_name, coordinates=coordinates, village=village)
+    if alliance_name:
+        await database.update_enemy_meta(guild_id, player_name, alliance_name=alliance_name)
     return RedirectResponse(
         f"/guild/{guild_id}/enemies/{player_name}", status_code=303
     )
@@ -8093,6 +8187,23 @@ async def enemy_update_notes(
     await database.update_enemy_notes(guild_id, player_name, notes)
     return RedirectResponse(
         f"/guild/{guild_id}/enemies/{player_name}?saved=1", status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/enemies/{player_name}/meta")
+async def enemy_update_meta(request: Request, guild_id: str, player_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    form = await request.form()
+    danger_level = (form.get("danger_level") or "").strip()
+    tags_raw     = (form.get("tags") or "").strip()
+    # Normalise tags: split on comma/space, dedupe, rejoin
+    tags = ",".join(t.strip() for t in re.split(r"[,\s]+", tags_raw) if t.strip())
+    await database.update_enemy_meta(guild_id, player_name, danger_level, tags)
+    return RedirectResponse(
+        f"/guild/{guild_id}/enemies/{player_name}?flash=meta_saved", status_code=303
     )
 
 

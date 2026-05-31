@@ -1038,6 +1038,25 @@ async def update_enemy_notes(guild_id: str, player_name: str, notes: str):
         await db.commit()
 
 
+async def update_enemy_meta(
+    guild_id: str, player_name: str,
+    danger_level: str = "", tags: str = "", alliance_name: str | None = None
+):
+    """Update danger level, tags (comma-sep), optional alliance_name."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        if alliance_name is not None:
+            await db.execute(
+                "UPDATE enemies SET danger_level=?, tags=?, alliance_name=? WHERE guild_id=? AND player_name=?",
+                (danger_level or "", tags or "", alliance_name, guild_id, player_name),
+            )
+        else:
+            await db.execute(
+                "UPDATE enemies SET danger_level=?, tags=? WHERE guild_id=? AND player_name=?",
+                (danger_level or "", tags or "", guild_id, player_name),
+            )
+        await db.commit()
+
+
 async def delete_enemy(guild_id: str, player_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
@@ -3792,6 +3811,15 @@ async def _init_alliance_members_table():
             )
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_enemies_guild ON enemies(guild_id)")
+
+        # Migrations: danger_level + tags + alliance_name on enemies
+        for col in ["danger_level TEXT DEFAULT ''",
+                    "tags TEXT DEFAULT ''",
+                    "alliance_name TEXT DEFAULT ''"]:
+            try:
+                await db.execute(f"ALTER TABLE enemies ADD COLUMN {col}")
+            except Exception:
+                pass
 
         # Migrations: add discord_message_id + image_url to scout_reports
         for col in ["discord_message_id TEXT", "image_urls TEXT"]:
