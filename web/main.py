@@ -4682,6 +4682,27 @@ async def my_ally_regen_token(request: Request, guild_id: str, which: str = Form
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=token_renewed", status_code=303)
 
 
+@app.post("/guild/{guild_id}/my-ally/roles/reorder")
+async def my_ally_roles_reorder(request: Request, guild_id: str):
+    """AJAX endpoint: reorder roles via drag & drop."""
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return _JSONResponse({"error": "not owner"}, status_code=403)
+    import json as _json
+    try:
+        body = await request.json()
+        ordered_ids = [int(x) for x in body.get("ids", [])]
+    except Exception:
+        return _JSONResponse({"error": "invalid"}, status_code=400)
+    await database.reorder_ally_roles(ally_group["id"], ordered_ids)
+    return _JSONResponse({"ok": True})
+
+
 @app.post("/guild/{guild_id}/my-ally/roles/create")
 async def my_ally_role_create(request: Request, guild_id: str,
                                role_name: str = Form(...), color: str = Form("#94a3b8")):

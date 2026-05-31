@@ -506,9 +506,13 @@
       border:1px solid rgba(99,102,241,.4); color:#818cf8; font-size:.6rem;
       font-weight:700; flex-shrink:0; cursor:default;
     }
-    .role-card { background:var(--bg-main); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    .role-card { background:var(--bg-main); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:box-shadow .15s; }
+    .role-card.drag-over { box-shadow:0 0 0 2px #6366f1; }
+    .role-card.dragging  { opacity:.4; }
     .role-card-header { display:flex; align-items:center; gap:.6rem; padding:.55rem .75rem; cursor:pointer; user-select:none; }
     .role-card-header:hover { background:rgba(255,255,255,.02); }
+    .drag-handle { color:var(--text-muted); font-size:.85rem; cursor:grab; padding:0 2px; flex-shrink:0; }
+    .drag-handle:active { cursor:grabbing; }
     .perm-group {
       background:rgba(255,255,255,.025); border:1px solid var(--border);
       border-radius:8px; padding:.55rem .65rem;
@@ -530,12 +534,13 @@
         </div>
         <p style="font-size:.76rem;color:var(--text-muted);margin:0 0 .85rem;">Click a role to expand its permission settings.</p>
 
-        <div style="display:flex;flex-direction:column;gap:.45rem;margin-bottom:.85rem;">
+        <div id="roles-sortable" style="display:flex;flex-direction:column;gap:.45rem;margin-bottom:.85rem;">
           {% for r in roles %}
           {% set rp = r.permissions or '' %}
           {% set pcount = (rp.split(',') | select | list) | length %}
-          <div class="role-card" style="border-left:3px solid {{ r.color }};">
+          <div class="role-card" data-role-id="{{ r.id }}" style="border-left:3px solid {{ r.color }};">
             <div class="role-card-header" onclick="toggleRole({{ r.id }})">
+              <span class="drag-handle" title="Drag to reorder" onclick="event.stopPropagation()">⠿</span>
               <span style="width:11px;height:11px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
               <span style="font-size:.9rem;font-weight:700;flex:1;color:{{ r.color }};">{{ r.role_name }}</span>
               <span style="font-size:.7rem;color:var(--text-muted);background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:20px;padding:1px 8px;">
@@ -634,43 +639,24 @@
         </form>
       </div>
 
-      {# ── Right: who has which role ── #}
-      <div style="display:flex;flex-direction:column;gap:.75rem;">
+      {# ── Right: dynamic role detail + legend ── #}
+      <div style="display:flex;flex-direction:column;gap:.75rem;position:sticky;top:1rem;">
 
-        {# Role overview card #}
-        {% if roles and (members | rejectattr("status","equalto","pending") | list) %}
-        <div class="card">
-          <h3 style="margin:0 0 .85rem;font-size:.92rem;">👥 Role assignments</h3>
-          {% for r in roles %}
-          {% set role_members = members | selectattr("role_id","equalto",r.id) | rejectattr("status","equalto","pending") | list %}
-          {% if role_members %}
-          <div style="margin-bottom:.7rem;">
-            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;">
-              <span style="width:8px;height:8px;border-radius:50%;background:{{ r.color }};flex-shrink:0;"></span>
-              <span style="font-size:.82rem;font-weight:600;color:{{ r.color }};">{{ r.role_name }}</span>
-              <span style="font-size:.7rem;color:var(--text-muted);">({{ role_members|length }})</span>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:.3rem;padding-left:1.1rem;">
-              {% for m in role_members %}
-              <span style="font-size:.75rem;background:{{ r.color }}15;border:1px solid {{ r.color }};color:{{ r.color }};border-radius:10px;padding:1px 8px;">{{ m.travian_name or m.discord_username }}</span>
-              {% endfor %}
-            </div>
+        {# Dynamic role detail — updated by JS when a role is expanded #}
+        <div class="card" id="role-detail-panel">
+          <div id="role-detail-placeholder" style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:.5rem 0;">
+            👆 Click a role to see its members
           </div>
-          {% endif %}
-          {% endfor %}
-          {% set no_role = members | selectattr("role_id","none") | rejectattr("status","equalto","pending") | list %}
-          {% if no_role %}
-          <div style="border-top:1px solid var(--border);padding-top:.6rem;margin-top:.2rem;">
-            <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.3rem;">⚫ No role assigned</div>
-            <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
-              {% for m in no_role %}
-              <span style="font-size:.75rem;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 8px;">{{ m.travian_name or m.discord_username }}</span>
-              {% endfor %}
+          <div id="role-detail-content" style="display:none;">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem;">
+              <span id="rdc-dot" style="width:11px;height:11px;border-radius:50%;flex-shrink:0;"></span>
+              <span id="rdc-name" style="font-size:.92rem;font-weight:700;"></span>
+              <span id="rdc-count" style="font-size:.72rem;color:var(--text-muted);"></span>
             </div>
+            <div id="rdc-members" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.6rem;"></div>
+            <div id="rdc-norole" style="display:none;font-size:.78rem;color:var(--text-muted);">No members with this role.</div>
           </div>
-          {% endif %}
         </div>
-        {% endif %}
 
         {# Permission legend card #}
         <div class="card" style="font-size:.78rem;">
@@ -1025,14 +1011,104 @@ function filterMapping(q) {
   });
   document.getElementById('mappingEmpty').style.display = shown === 0 ? '' : 'none';
 }
+// ── Member data for dynamic right panel ──────────────────────────────────────
+const ROLE_MEMBERS = {
+  {% for r in roles %}
+  {{ r.id }}: {
+    name:  {{ r.role_name | tojson }},
+    color: {{ r.color | tojson }},
+    members: [
+      {% for m in members | selectattr("role_id","equalto",r.id) | rejectattr("status","equalto","pending") | list %}
+      {{ (m.travian_name or m.discord_username) | tojson }},
+      {% endfor %}
+    ],
+  },
+  {% endfor %}
+};
+
+function showRoleDetail(id) {
+  const data = ROLE_MEMBERS[id];
+  if (!data) return;
+  document.getElementById('role-detail-placeholder').style.display = 'none';
+  document.getElementById('role-detail-content').style.display    = 'block';
+  document.getElementById('rdc-dot').style.background = data.color;
+  document.getElementById('rdc-name').textContent = data.name;
+  document.getElementById('rdc-name').style.color = data.color;
+  document.getElementById('rdc-count').textContent = `${data.members.length} member${data.members.length !== 1 ? 's' : ''}`;
+  const membersEl = document.getElementById('rdc-members');
+  const noroleEl  = document.getElementById('rdc-norole');
+  if (data.members.length) {
+    membersEl.style.display = '';
+    noroleEl.style.display  = 'none';
+    membersEl.innerHTML = data.members.map(n =>
+      `<span style="font-size:.78rem;background:${data.color}18;border:1px solid ${data.color};color:${data.color};border-radius:10px;padding:2px 10px;font-weight:600;">${n}</span>`
+    ).join('');
+  } else {
+    membersEl.style.display = 'none';
+    noroleEl.style.display  = '';
+  }
+}
+
 function toggleRole(id) {
   const panel = document.getElementById('role-panel-' + id);
-  const ch = document.getElementById('role-chevron-' + id);
-  const open = panel.style.display !== 'none';
+  const ch    = document.getElementById('role-chevron-' + id);
+  const open  = panel.style.display !== 'none';
   document.querySelectorAll('[id^="role-panel-"]').forEach(p => p.style.display = 'none');
   document.querySelectorAll('[id^="role-chevron-"]').forEach(c => c.style.transform = '');
-  if (!open) { panel.style.display = 'block'; ch.style.transform = 'rotate(180deg)'; }
+  if (!open) {
+    panel.style.display = 'block';
+    ch.style.transform  = 'rotate(180deg)';
+    showRoleDetail(id);
+  }
 }
+
+// ── Role drag & drop reorder ──────────────────────────────────────────────────
+(function() {
+  const list = document.getElementById('roles-sortable');
+  if (!list) return;
+  let dragSrc = null;
+
+  list.querySelectorAll('.role-card').forEach(card => {
+    const handle = card.querySelector('.drag-handle');
+    if (!handle) return;
+
+    handle.addEventListener('mousedown', () => { card.draggable = true; });
+    handle.addEventListener('mouseup',   () => { card.draggable = false; });
+
+    card.addEventListener('dragstart', e => {
+      dragSrc = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.draggable = false;
+      card.classList.remove('dragging');
+      list.querySelectorAll('.role-card').forEach(c => c.classList.remove('drag-over'));
+      // Persist order
+      const ids = [...list.querySelectorAll('.role-card')].map(c => +c.dataset.roleId);
+      fetch(`/guild/{{ guild.guild_id }}/my-ally/roles/reorder`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids}),
+      });
+    });
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (card === dragSrc) return;
+      list.querySelectorAll('.role-card').forEach(c => c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
+      // Reorder in DOM
+      const allCards = [...list.querySelectorAll('.role-card')];
+      const srcIdx   = allCards.indexOf(dragSrc);
+      const tgtIdx   = allCards.indexOf(card);
+      if (srcIdx < tgtIdx) list.insertBefore(dragSrc, card.nextSibling);
+      else                  list.insertBefore(dragSrc, card);
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => { e.preventDefault(); card.classList.remove('drag-over'); });
+  });
+})();
 // Restore active tab from hash
 const hash = location.hash.replace('#','');
 if (hash) {

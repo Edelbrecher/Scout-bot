@@ -3229,19 +3229,41 @@ async def update_ally_group(ally_group_id: int, owner_id: str, **kwargs):
 async def get_ally_roles(ally_group_id: int) -> list[dict]:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
+        # migrate: add sort_order if missing
+        try:
+            await db.execute("ALTER TABLE ally_roles ADD COLUMN sort_order INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT * FROM ally_roles WHERE ally_group_id=? ORDER BY id ASC", (ally_group_id,)
+            "SELECT * FROM ally_roles WHERE ally_group_id=? ORDER BY sort_order ASC, id ASC", (ally_group_id,)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def reorder_ally_roles(ally_group_id: int, ordered_ids: list[int]):
+    """Set sort_order for each role id in the given order."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        for i, rid in enumerate(ordered_ids):
+            await db.execute(
+                "UPDATE ally_roles SET sort_order=? WHERE id=? AND ally_group_id=?",
+                (i, rid, ally_group_id),
+            )
+        await db.commit()
 
 
 async def create_ally_role(ally_group_id: int, role_name: str, color: str, permissions: str = "") -> int:
     await _init_ally_tables()
     async with aiosqlite.connect(DB_PATH) as db:
+        # new role goes to the end
+        async with db.execute(
+            "SELECT COALESCE(MAX(sort_order),0)+1 FROM ally_roles WHERE ally_group_id=?", (ally_group_id,)
+        ) as cur:
+            next_order = (await cur.fetchone())[0]
         cur = await db.execute(
-            "INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, color, permissions) VALUES (?,?,?,?)",
-            (ally_group_id, role_name[:40], color or "#94a3b8", permissions or ""),
+            "INSERT OR IGNORE INTO ally_roles (ally_group_id, role_name, color, permissions, sort_order) VALUES (?,?,?,?,?)",
+            (ally_group_id, role_name[:40], color or "#94a3b8", permissions or "", next_order),
         )
         await db.commit()
         return cur.lastrowid
