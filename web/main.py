@@ -2028,20 +2028,34 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
     total_active = sum(1 for r in all_requests if r.get("status") in ACTIVE_STATUSES)
     total_done   = sum(1 for r in all_requests if r.get("status") in DONE_STATUSES)
 
-    # Pre-compute parsed totals per request for progress bars
-    def _parse_res(s: str) -> int:
-        import re as _re
-        s = (s or "").strip().replace(" ", "").replace("_", "")
-        if not s: return 0
-        m = 1
-        if s.lower().endswith("k"): m = 1_000; s = s[:-1]
-        elif s.lower().endswith("m"): m = 1_000_000; s = s[:-1]
-        try: return int(float(s.replace(",", ".")) * m)
-        except: return 0
+    # Pre-compute parsed totals and goals per request for progress bars
+    import re as _re
 
-    contribution_totals = {}
+    def _parse_res(s: str) -> int:
+        """Parse '500k', '1m', '1 mil ress', '50000' → int. Flexible."""
+        s = (s or "").strip()
+        # Find first number (int or float) optionally followed by k/m/mil/million
+        m = _re.search(r'([\d]+(?:[.,]\d+)?)\s*(mil(?:lion)?|m\b|k\b)?', s, _re.I)
+        if not m: return 0
+        try:
+            num = float(m.group(1).replace(",", "."))
+        except Exception:
+            return 0
+        suffix = (m.group(2) or "").lower()
+        if suffix.startswith("mil") or suffix == "m":
+            return int(num * 1_000_000)
+        if suffix == "k":
+            return int(num * 1_000)
+        return int(num)
+
+    contribution_totals: dict[str, int] = {}
     for rid, contribs in contributions.items():
         contribution_totals[rid] = sum(_parse_res(c.get("amount", "")) for c in contribs)
+
+    # Parse push_height goals server-side (handles "1 mil ress", "500k", "50000")
+    goal_totals: dict[str, int] = {}
+    for r in all_requests:
+        goal_totals[str(r["id"])] = _parse_res(r.get("push_height", ""))
 
     return templates.TemplateResponse("res_push_board.html", {
         "request": request,
@@ -2049,6 +2063,7 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
         "requests": requests,
         "contributions": contributions,
         "contribution_totals": contribution_totals,
+        "goal_totals": goal_totals,
         "show": show,
         "total_active": total_active,
         "total_done": total_done,

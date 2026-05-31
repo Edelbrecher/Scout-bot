@@ -175,44 +175,30 @@
         {% endif %}
       </div>
 
-      <!-- Progress bar -->
+      <!-- Progress bar (goal parsed server-side) -->
       {% set sent_total = contribution_totals.get(req.id | string, 0) %}
-      {% if req.push_height %}
-      {% set goal = namespace(val=0) %}
-      {# Parse push_height: supports 1m, 500k, 50000 #}
-      {% set ph = req.push_height | lower | replace(' ','') %}
-      {% if ph.endswith('m') %}
-        {% set goal.val = (ph[:-1] | float(default=0) * 1000000) | int %}
-      {% elif ph.endswith('k') %}
-        {% set goal.val = (ph[:-1] | float(default=0) * 1000) | int %}
-      {% else %}
-        {% set goal.val = ph | int(default=0) %}
-      {% endif %}
-      {% if goal.val > 0 %}
-      {% set pct = [((sent_total / goal.val) * 100) | int, 100] | min %}
+      {% set goal_val   = goal_totals.get(req.id | string, 0) %}
+      {% if goal_val > 0 %}
+      {% set pct = [((sent_total / goal_val) * 100) | int, 100] | min %}
       <div style="margin-top:.65rem;border-top:1px solid var(--border);padding-top:.55rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;flex-wrap:wrap;gap:.3rem;">
-          <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">
-            📦 Progress
-          </span>
-          <span style="font-size:.78rem;font-weight:700;color:{% if pct >= 100 %}#4ade80{% elif pct >= 50 %}#f59e0b{% else %}#f87171{% endif %};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;flex-wrap:wrap;gap:.25rem;">
+          <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">📦 Progress</span>
+          <span style="font-size:.8rem;font-weight:700;color:{% if pct >= 100 %}#4ade80{% elif pct >= 50 %}#f59e0b{% else %}#f87171{% endif %};">
             {% if sent_total >= 1000000 %}{{ "%.2f"|format(sent_total/1000000) }}M
             {% elif sent_total >= 1000 %}{{ "%.1f"|format(sent_total/1000) }}k
             {% else %}{{ sent_total }}{% endif %}
             /
-            {% if goal.val >= 1000000 %}{{ "%.2f"|format(goal.val/1000000) }}M
-            {% elif goal.val >= 1000 %}{{ "%.1f"|format(goal.val/1000) }}k
-            {% else %}{{ goal.val }}{% endif %}
+            {% if goal_val >= 1000000 %}{{ "%.2f"|format(goal_val/1000000) }}M
+            {% elif goal_val >= 1000 %}{{ "%.1f"|format(goal_val/1000) }}k
+            {% else %}{{ goal_val }}{% endif %}
             &nbsp;·&nbsp; {{ pct }}%
           </span>
         </div>
         <div style="height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;">
           <div style="height:7px;border-radius:4px;width:{{ pct }}%;
-                      background:{% if pct >= 100 %}linear-gradient(90deg,#22c55e,#4ade80){% elif pct >= 50 %}linear-gradient(90deg,#f59e0b,#fbbf24){% else %}linear-gradient(90deg,#ef4444,#f87171){% endif %};
-                      transition:width .3s;"></div>
+                      background:{% if pct >= 100 %}linear-gradient(90deg,#22c55e,#4ade80){% elif pct >= 50 %}linear-gradient(90deg,#f59e0b,#fbbf24){% else %}linear-gradient(90deg,#ef4444,#f87171){% endif %};"></div>
         </div>
       </div>
-      {% endif %}
       {% endif %}
 
       <!-- Contributions -->
