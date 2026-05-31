@@ -2552,6 +2552,62 @@ async def guild_map(request: Request, guild_id: str):
     })
 
 
+@app.post("/guild/{guild_id}/map/share")
+async def map_create_share(request: Request, guild_id: str):
+    """Save map state (camera + filters + drawing) and return a short share ID."""
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    import json as _json
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    state_json = _json.dumps(body)
+    short_id = await database.create_map_share(
+        guild_id, state_json, created_by=session.get("username", "")
+    )
+    base = str(request.base_url).rstrip("/")
+    return _JSONResponse({"short_id": short_id, "url": f"{base}/guild/{guild_id}/map/s/{short_id}"})
+
+
+@app.get("/guild/{guild_id}/map/s/{short_id}", response_class=HTMLResponse)
+async def map_share_view(request: Request, guild_id: str, short_id: str):
+    """Load a shared map state and render the map with it embedded."""
+    share = await database.get_map_share(short_id)
+    if not share or share["guild_id"] != guild_id:
+        return HTMLResponse("<h2>Link ungültig oder abgelaufen.</h2>", status_code=404)
+
+    # Auth: require login, but allow non-members (like normal share links)
+    session = _get_session(request)
+    if not session:
+        return RedirectResponse(f"/auth/discord?next=/guild/{guild_id}/map/s/{short_id}", status_code=303)
+
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+
+    is_member = can_access_guild(session, guild_id) or await can_access_guild_async(session, guild_id)
+    is_admin  = session.get("type") == "admin"
+    scouted   = await database.get_scouted_coordinates(guild_id)
+    ally_group     = await database.get_ally_group_for_guild(guild_id) if is_member else None
+    meta_alliances = await database.get_meta_alliances(guild_id) if is_member else []
+    meta_groups    = await database.get_meta_groups(guild_id) if is_member else []
+
+    return templates.TemplateResponse("map.html", {
+        "request": request,
+        "guild": guild,
+        "scouted": scouted,
+        "is_admin": is_admin,
+        "ally_group": ally_group,
+        "meta_alliances": meta_alliances,
+        "meta_groups": meta_groups,
+        "is_share_viewer": not is_member,
+        "share_state_json": share["state_json"],  # embedded in template
+    })
+
+
 @app.get("/guild/{guild_id}/map/world-settings", response_class=HTMLResponse)
 async def guild_world_settings_page(request: Request, guild_id: str):
     session, err = _require_session(request)

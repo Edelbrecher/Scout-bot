@@ -7563,3 +7563,52 @@ async def get_enemy_village_all_snapshots(guild_id: str, player_name: str) -> li
             ORDER BY s.snapshot_at ASC
         """, (guild_id, player_name))
         return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Map Share Links
+# ---------------------------------------------------------------------------
+
+async def _init_map_share_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS map_share_links (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id   TEXT NOT NULL,
+                short_id   TEXT UNIQUE NOT NULL,
+                state_json TEXT NOT NULL,
+                created_by TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def create_map_share(guild_id: str, state_json: str, created_by: str = "") -> str:
+    import secrets
+    await _init_map_share_table()
+    short_id = secrets.token_urlsafe(6)   # 8 chars, URL-safe
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Ensure uniqueness
+        for _ in range(5):
+            try:
+                await db.execute("""
+                    INSERT INTO map_share_links (guild_id, short_id, state_json, created_by)
+                    VALUES (?,?,?,?)
+                """, (guild_id, short_id, state_json, created_by))
+                await db.commit()
+                return short_id
+            except Exception:
+                short_id = secrets.token_urlsafe(6)
+    return short_id
+
+
+async def get_map_share(short_id: str) -> dict | None:
+    await _init_map_share_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM map_share_links WHERE short_id=?", (short_id,)
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None

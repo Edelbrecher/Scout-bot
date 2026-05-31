@@ -254,8 +254,9 @@
 
 {% if guild.tw_world %}
 <script>
-const GUILD_ID    = {{ guild.guild_id | tojson }};
-const SCOUTED_RAW = {{ scouted | tojson }};
+const GUILD_ID      = {{ guild.guild_id | tojson }};
+const SCOUTED_RAW   = {{ scouted | tojson }};
+const SHARE_STATE   = {{ share_state_json | default('null') | safe }};
 
 const TRIBE_COLOR = { 1:'#c0392b', 2:'#85929e', 3:'#58d68d', 4:'#d4ac0d', 5:'#9b59b6', 6:'#1abc9c' };
 const NATAR_COLOR  = '#e67e22';
@@ -934,22 +935,49 @@ function buildShareUrl() {
   return location.origin + location.pathname + '?' + p.toString();
 }
 
-function shareMapView(btn) {
-  const url = buildShareUrl();
-  navigator.clipboard.writeText(url).then(() => {
-    const orig = btn.textContent;
+async function shareMapView(btn) {
+  const orig = btn.textContent;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+
+  // Build state object
+  const state = {
+    v:  viewMode,
+    cx: Math.round(camX),
+    cy: Math.round(camY),
+    z:  parseFloat(scale.toFixed(3)),
+  };
+  if (playerFilters.length)   state.pf = playerFilters.map(f => f.name + ':' + f.color).join(',');
+  if (allianceFilters.length) state.af = allianceFilters.map(f => f.name + ':' + f.color).join(',');
+  const drawData = drawSerialize();
+  if (drawData) state.draw = drawData;
+
+  try {
+    const resp = await fetch(`/guild/${GUILD_ID}/map/share`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(state),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.url) throw new Error(data.error || 'Fehler');
+    await navigator.clipboard.writeText(data.url).catch(() => prompt('Link kopieren:', data.url));
     btn.textContent = '✅ Kopiert!';
     btn.style.color = '#4ade80';
-    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2200);
-  }).catch(() => {
-    // Fallback: select from prompt
-    prompt('Link kopieren:', url);
-  });
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 2200);
+  } catch(e) {
+    btn.textContent = '❌ Fehler';
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+  }
 }
 
 function restoreFromUrl() {
-  const p = new URLSearchParams(location.search);
-  if (!p.has('v') && !p.has('pf') && !p.has('af')) return;
+  // Prefer server-side share state (short link) over URL params
+  const src = SHARE_STATE || null;
+  const p   = src ? {
+    has: k => k in src,
+    get: k => src[k] != null ? String(src[k]) : null,
+  } : new URLSearchParams(location.search);
+  if (!src && !p.has('v') && !p.has('pf') && !p.has('af') && !p.has('cx')) return;
 
   if (p.has('v'))  { viewMode = p.get('v'); const sel = document.getElementById('viewMode'); if (sel) sel.value = viewMode; }
   if (p.has('cx')) camX = parseFloat(p.get('cx')) || 0;
@@ -999,7 +1027,7 @@ async function loadMap() {
     statusEl.textContent=`${(villages.length-natars).toLocaleString()} Dörfer · ${natars.toLocaleString()} Natars · ${scoutMap.size} Scout`;
 
     // Default scale/cam only if not restored from URL
-    const hasUrlState = new URLSearchParams(location.search).has('cx');
+    const hasUrlState = new URLSearchParams(location.search).has('cx') || SHARE_STATE;
     if (!hasUrlState) {
       scale=Math.min(canvas.width,canvas.height)/(mapRadius*2+4);
       camX=0;camY=0;
@@ -1218,13 +1246,14 @@ buildShareUrl = function() {
 syncDrawCanvas();
 
 // ── Restore drawings from URL ─────────────────────────────────
-// restoreFromUrl() was already called before this code ran,
-// so we check the URL parameter directly here after map loads.
+// Restore drawing data from SHARE_STATE (server-side short link) or URL param
 (function restoreDrawings() {
-  const p = new URLSearchParams(location.search);
-  if (!p.has('draw')) return;
-  const encoded = p.get('draw');
-  // Wait for loadMap() to finish and canvas to be sized
+  // Source: server-side share state or URL ?draw= param
+  const encoded = (SHARE_STATE && SHARE_STATE.draw)
+    ? SHARE_STATE.draw
+    : new URLSearchParams(location.search).get('draw');
+  if (!encoded) return;
+
   const tryRestore = (attempts) => {
     if (canvas.width > 0) {
       syncDrawCanvas();
@@ -1233,7 +1262,7 @@ syncDrawCanvas();
       setTimeout(() => tryRestore(attempts - 1), 150);
     }
   };
-  setTimeout(() => tryRestore(10), 300);
+  setTimeout(() => tryRestore(15), 300);
 })();
 </script>
 {% endif %}
