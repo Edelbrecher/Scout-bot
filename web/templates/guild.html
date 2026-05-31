@@ -362,6 +362,8 @@
       {{ LOCK_ARROW if is_personal else OK_ARROW }}
     </a>
 
+    {% endif %}
+
     <!-- Statistiken-Verlauf -->
     <a href="/guild/{{ guild.guild_id }}/travian-stats" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📊</div>
@@ -371,7 +373,6 @@
       </div>
       {{ OK_ARROW }}
     </a>
-    {% endif %}
 
   </div>
 
