@@ -779,13 +779,15 @@ async def _sync_private_channel_permissions(guild_id: str, private_channel_role_
                 pass
 
 
-async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str):
-    """Set archive channel: @everyone hidden, allowed roles can view."""
+async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str, archive_role_ids: str = ""):
+    """Set archive channel: @everyone hidden, archive_role_ids (or fallback scout roles) can view."""
     token = os.environ.get("DISCORD_TOKEN", "")
+    # Use dedicated archive roles if set, otherwise fall back to scout roles
+    effective_roles = archive_role_ids.strip() if archive_role_ids and archive_role_ids.strip() else allowed_role_ids
     overwrites = [
         {"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL},  # @everyone
     ]
-    for role_id in [r.strip() for r in allowed_role_ids.split(",") if r.strip()]:
+    for role_id in [r.strip() for r in effective_roles.split(",") if r.strip()]:
         overwrites.append({"id": role_id, "type": 0, "allow": VIEW_CHANNEL, "deny": "0"})
     async with httpx.AsyncClient() as client:
         await client.patch(
@@ -1794,7 +1796,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids"}:
+    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
@@ -1803,14 +1805,17 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     allowed_ids = (guild_row or {}).get("allowed_role_ids") or ""
     defend_ids  = (guild_row or {}).get("defend_role_ids") or ""
     priv_ids    = (guild_row or {}).get("private_channel_role_ids") or ""
+    archive_ids = (guild_row or {}).get("archive_role_ids") or ""
 
     if field == "allowed_role_ids":
         if guild_row and guild_row.get("archive_channel_id"):
-            await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids)
-        # Sync scout channels immediately
+            await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
         asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
-        # Defend channels use defend_role_ids with fallback to allowed_role_ids
         asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
+
+    if field == "archive_role_ids":
+        if guild_row and guild_row.get("archive_channel_id"):
+            asyncio.create_task(_sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids))
 
     if field == "defend_role_ids":
         asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
