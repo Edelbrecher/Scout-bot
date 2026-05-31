@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}{{ (member.travian_name or member.discord_username or 'Mitglied') }} · My Ally · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <a href="/guild/{{ guild.guild_id }}/my-ally" class="back-link">← My Ally</a>
+
+  <!-- Header -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin:1rem 0 1.5rem;">
+    <div>
+      <h1 style="margin:0 0 .2rem;">
+        {% if troops and troops.tribe %}
+          {% set tribe_icons = {'romans':'🏛️','gauls':'🌿','teutons':'⚔️','egyptians':'🏺','huns':'🏹','spartans':'🛡️'} %}
+          {{ tribe_icons.get(troops.tribe, '👤') }}
+        {% else %}👤{% endif %}
+        {{ member.travian_name if member else '—' }}
+      </h1>
+      <div style="font-size:.85rem;color:var(--text-muted);">
+        @{{ member.discord_username if member else discord_id }}
+        {% if member and member.role_name %}
+        · <span style="border:1px solid {{ member.role_color or '#94a3b8' }};color:{{ member.role_color or '#94a3b8' }};border-radius:10px;padding:1px 8px;font-size:.78rem;font-weight:600;">{{ member.role_name }}</span>
+        {% endif %}
+      </div>
+      {% if member and member.note %}
+      <div style="margin-top:.4rem;font-size:.83rem;color:var(--text-muted);">📝 {{ member.note }}</div>
+      {% endif %}
+    </div>
+    {% if troops %}
+    <div style="font-size:.75rem;color:var(--text-muted);text-align:right;">
+      Daten importiert: {{ (troops.updated_at or '')[:10] }}<br>
+      <span class="days-ago" data-date="{{ (troops.updated_at or '')[:10] }}"></span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not troops %}
+  <!-- No data -->
+  <div class="card" style="text-align:center;padding:3rem 1rem;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">📭</div>
+    <div style="font-weight:600;margin-bottom:.35rem;">Noch keine Truppendaten importiert</div>
+    <div style="font-size:.85rem;color:var(--text-muted);">
+      Der Spieler muss seine Dörfer über das Bot-Kommando oder die eigene Profilseite importieren.
+    </div>
+  </div>
+
+  {% else %}
+
+  <!-- KPI cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.25rem;">
+    {% set kpis = [
+      ('⚔️ Off-Score',   troops.total_off   or 0, '#f87171', 'off'),
+      ('🛡️ Def-Score',   troops.total_def   or 0, '#60a5fa', 'def'),
+      ('🌾 Getreide',    troops.total_crop  or 0, '#fbbf24', None),
+      ('🪖 Truppen',     troops.total_units or 0, '#a78bfa', None),
+      ('🔭 Scouts',      troops.total_scouts or 0,'#34d399', 'scout'),
+    ] %}
+    {% for label, val, color, _ in kpis %}
+    <div class="card" style="text-align:center;padding:1rem;">
+      <div style="font-size:1.6rem;font-weight:700;color:{{ color }};">
+        {% if val >= 1000000 %}{{ "%.1f"|format(val/1000000) }}M
+        {% elif val >= 1000 %}{{ "%.1f"|format(val/1000) }}k
+        {% else %}{{ val }}{% endif %}
+      </div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Village breakdown table -->
+  {% set villages = troops.get('villages', []) %}
+  {% if villages %}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.1rem;border-bottom:1px solid var(--border);">
+      <h2 style="margin:0;font-size:1rem;">🏘️ Dörfer ({{ villages|length }})</h2>
+      <!-- Filter -->
+      <div style="display:flex;gap:.35rem;">
+        <button class="vf-btn active" onclick="filterVillages('all',this)"
+                style="padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;
+                       background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#818cf8;">Alle</button>
+        <button class="vf-btn" onclick="filterVillages('off',this)"
+                style="padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;
+                       background:transparent;border:1px solid var(--border);color:var(--text-muted);">⚔️ Off</button>
+        <button class="vf-btn" onclick="filterVillages('def',this)"
+                style="padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;
+                       background:transparent;border:1px solid var(--border);color:var(--text-muted);">🛡️ Def</button>
+        <button class="vf-btn" onclick="filterVillages('mixed',this)"
+                style="padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;
+                       background:transparent;border:1px solid var(--border);color:var(--text-muted);">⚖️ Mixed</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table" id="villageTable" style="font-size:.83rem;">
+        <thead>
+          <tr>
+            <th>Dorf</th>
+            <th>Typ</th>
+            <th style="text-align:right;">⚔️ Off</th>
+            <th style="text-align:right;">🛡️ Def</th>
+            <th style="text-align:right;">🔭 Scouts</th>
+            <th style="text-align:right;">🌾 Crop</th>
+            <th style="text-align:right;">👥 Pop</th>
+            <th>Truppen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in villages %}
+          {% set vtype = v.get('village_type','mixed') or 'mixed' %}
+          {% set off_s = v.get('off_score',0) or 0 %}
+          {% set def_s = v.get('def_score',0) or 0 %}
+          <tr class="village-row" data-type="{{ vtype }}">
+            <td>
+              <div style="font-weight:600;">{{ v.get('village_name','—') }}</div>
+              {% set x = v.get('x') %}{% set y = v.get('y') %}
+              {% if x is not none and y is not none %}
+              <div style="font-size:.72rem;color:var(--text-muted);font-family:monospace;">({{ x }}|{{ y }})</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if vtype == 'off' %}<span style="font-size:.72rem;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:#f87171;border-radius:10px;padding:1px 7px;">⚔️ Off</span>
+              {% elif vtype == 'def' %}<span style="font-size:.72rem;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);color:#60a5fa;border-radius:10px;padding:1px 7px;">🛡️ Def</span>
+              {% else %}<span style="font-size:.72rem;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 7px;">⚖️ Mixed</span>{% endif %}
+            </td>
+            <td style="text-align:right;color:#f87171;font-weight:600;">
+              {% if off_s >= 1000 %}{{ "%.0f"|format(off_s/1000) }}k{% elif off_s %}{{ off_s }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:right;color:#60a5fa;font-weight:600;">
+              {% if def_s >= 1000 %}{{ "%.0f"|format(def_s/1000) }}k{% elif def_s %}{{ def_s }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:right;color:#34d399;">
+              {# Extract scouts from troops_json #}
+              {% set tjson = v.get('troops_json','[]') %}
+              {% set scouts = namespace(n=0) %}
+              {% if tjson and tjson != '[]' %}
+                {# Scouts shown in troop chips below #}
+              {% endif %}
+              —
+            </td>
+            <td style="text-align:right;color:#fbbf24;">
+              {% set crop = v.get('crop_consumption',0) or 0 %}
+              {% if crop >= 1000 %}{{ "%.0f"|format(crop/1000) }}k{% elif crop %}{{ crop }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:right;color:var(--text-muted);">{{ v.get('population',0) or '—' }}</td>
+            <td style="max-width:220px;">
+              {# Troop chips from troops_json #}
+              {% if v.get('troops_json') and v.get('troops_json') != '[]' %}
+              <div class="troop-chips" data-raw="{{ v.get('troops_json','[]')|e }}"></div>
+              {% else %}
+              <span style="color:var(--text-muted);font-size:.75rem;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Growth chart -->
+  {% if growth_data and growth_data|length >= 2 %}
+  <div class="card">
+    <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Verlauf (letzte 14 Snapshots)</h2>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;">
+      {% for metric, label, color in [
+        ('total_off','⚔️ Off','#f87171'),
+        ('total_def','🛡️ Def','#60a5fa'),
+        ('village_count','🏘️ Dörfer','#34d399'),
+        ('total_crop','🌾 Crop','#fbbf24'),
+      ] %}
+      <button class="gm-btn{% if loop.first %} gm-active{% endif %}"
+              data-metric="{{ metric }}" data-color="{{ color }}"
+              onclick="switchGrowthMetric('{{ metric }}','{{ color }}',this)"
+              style="font-size:.75rem;padding:.22rem .7rem;border-radius:12px;cursor:pointer;border:1px solid var(--border);
+                     {% if loop.first %}background:rgba(248,113,113,.12);color:{{ color }};{% else %}background:transparent;color:var(--text-muted);{% endif %}">
+        {{ label }}
+      </button>
+      {% endfor %}
+    </div>
+    <canvas id="growthCanvas" height="80" style="width:100%;"></canvas>
+    <div id="growthDates" style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--text-muted);margin-top:.3rem;padding:0 2px;">
+      <span id="growthDateFirst"></span><span id="growthDateLast"></span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}{# end if troops #}
+
+</div>
+
+<script>
+// ── Days ago ─────────────────────────────────────────────────────────────────
+(function(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  document.querySelectorAll('.days-ago[data-date]').forEach(el => {
+    const d = new Date(el.dataset.date);
+    if (isNaN(d)) return;
+    const diff = Math.round((today - d) / 86400000);
+    if (diff > 3) el.textContent = `(vor ${diff} Tagen)`;
+    else if (diff > 0) el.textContent = `(vor ${diff} Tag${diff>1?'en':''})`;
+    else el.textContent = 'heute';
+    el.style.color = diff > 14 ? '#f87171' : diff > 7 ? '#f59e0b' : '#4ade80';
+  });
+})();
+
+// ── Troop chips ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.troop-chips[data-raw]').forEach(el => {
+  try {
+    const troops = JSON.parse(el.dataset.raw);
+    if (!Array.isArray(troops)) return;
+    const html = troops
+      .filter(t => t.count > 0)
+      .map(t => {
+        const isScout = (t.name||'').toLowerCase().includes('kundsch') || (t.name||'').toLowerCase().includes('pfad') || (t.name||'').toLowerCase().includes('late') || (t.name||'').toLowerCase().includes('scout');
+        const col = isScout ? '#34d399' : (t.type==='off'?'#f87171':'#60a5fa');
+        return `<span style="display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;padding:1px 6px;border-radius:8px;border:1px solid ${col}30;color:${col};background:${col}12;margin:.1rem;">${t.name} <strong>${t.count >= 1000 ? (t.count/1000).toFixed(1)+'k' : t.count}</strong></span>`;
+      }).join('');
+    el.innerHTML = html || '<span style="color:var(--text-muted);font-size:.75rem;">leer</span>';
+  } catch(e) { el.innerHTML = '<span style="color:var(--text-muted);">?</span>'; }
+});
+
+// ── Village type filter ───────────────────────────────────────────────────────
+function filterVillages(type, btn) {
+  document.querySelectorAll('.vf-btn').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = 'var(--text-muted)';
+  });
+  btn.style.background = 'rgba(99,102,241,.2)';
+  btn.style.borderColor = 'rgba(99,102,241,.4)';
+  btn.style.color = '#818cf8';
+  document.querySelectorAll('.village-row').forEach(tr => {
+    tr.style.display = (type === 'all' || tr.dataset.type === type) ? '' : 'none';
+  });
+}
+
+// ── Growth chart ──────────────────────────────────────────────────────────────
+const GROWTH = {{ growth_data | tojson }};
+let currentMetric = 'total_off', currentColor = '#f87171';
+let growthChart = null;
+
+function switchGrowthMetric(metric, color, btn) {
+  document.querySelectorAll('.gm-btn').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text-muted)';
+  });
+  btn.style.background = color + '20'; btn.style.color = color;
+  currentMetric = metric; currentColor = color;
+  drawGrowth();
+}
+
+function drawGrowth() {
+  if (!GROWTH || GROWTH.length < 2) return;
+  const canvas = document.getElementById('growthCanvas');
+  if (!canvas) return;
+  const W = canvas.offsetWidth || 800, H = 80;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const vals = GROWTH.map(p => p[currentMetric] || 0);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const pts = vals.map((v,i) => ({ x:(i/(vals.length-1))*(W-4)+2, y:H-2-((v-min)/range)*(H-8) }));
+  ctx.beginPath(); ctx.moveTo(pts[0].x, H);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts.at(-1).x, H); ctx.closePath();
+  ctx.fillStyle = currentColor+'22'; ctx.fill();
+  ctx.beginPath(); pts.forEach((p,i) => i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle = currentColor; ctx.lineWidth = 2; ctx.stroke();
+  const last = pts.at(-1);
+  ctx.beginPath(); ctx.arc(last.x,last.y,4,0,Math.PI*2); ctx.fillStyle=currentColor; ctx.fill();
+  // Dates
+  document.getElementById('growthDateFirst').textContent = GROWTH[0]?.uploaded_at?.slice(0,10) || '';
+  document.getElementById('growthDateLast').textContent  = GROWTH.at(-1)?.uploaded_at?.slice(0,10) || '';
+}
+if (GROWTH && GROWTH.length >= 2) drawGrowth();
+window.addEventListener('resize', drawGrowth);
+</script>
+{% endblock %}

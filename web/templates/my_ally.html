@@ -94,58 +94,72 @@
     <div class="card" style="padding:0;overflow:hidden;">
 
       {# Toolbar #}
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
           <span style="font-weight:700;font-size:.95rem;">👥 Mitglieder ({{ approved_members|length }})</span>
           {% if not is_editor %}
           <span style="font-size:.72rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#818cf8;border-radius:20px;padding:1px 8px;">🔀 Zufällige Reihenfolge</span>
           {% endif %}
+          {# Troop type filter pills #}
+          <div style="display:flex;gap:.25rem;margin-left:.25rem;">
+            <button class="mt-filter active" data-filter="all" onclick="filterMemberTroops('all',this)"
+                    style="padding:.2rem .65rem;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.15);color:#818cf8;">Alle</button>
+            <button class="mt-filter" data-filter="off" onclick="filterMemberTroops('off',this)"
+                    style="padding:.2rem .65rem;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);">⚔️ Off</button>
+            <button class="mt-filter" data-filter="def" onclick="filterMemberTroops('def',this)"
+                    style="padding:.2rem .65rem;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);">🛡️ Def</button>
+            <button class="mt-filter" data-filter="scout" onclick="filterMemberTroops('scout',this)"
+                    style="padding:.2rem .65rem;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);">🔭 Scouts</button>
+          </div>
           {# Wing filter #}
           {% set wings_defined = ally_group.wing1_name or ally_group.wing2_name %}
           {% if wings_defined %}
-          <div style="display:flex;gap:.3rem;">
-            <span class="wing-filter-btn active" onclick="filterWing('all',this)" style="font-size:.75rem;cursor:pointer;padding:.2rem .7rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">Alle</span>
-            <span class="wing-filter-btn" onclick="filterWing('0',this)" style="font-size:.75rem;cursor:pointer;padding:.2rem .7rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">Haupt</span>
-            {% if ally_group.wing1_name %}<span class="wing-filter-btn" onclick="filterWing('1',this)" style="font-size:.75rem;cursor:pointer;padding:.2rem .7rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">{{ ally_group.wing1_name }}</span>{% endif %}
-            {% if ally_group.wing2_name %}<span class="wing-filter-btn" onclick="filterWing('2',this)" style="font-size:.75rem;cursor:pointer;padding:.2rem .7rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">{{ ally_group.wing2_name }}</span>{% endif %}
+          <div style="display:flex;gap:.25rem;margin-left:.25rem;">
+            <span class="wing-filter-btn active" onclick="filterWing('all',this)" style="font-size:.72rem;cursor:pointer;padding:.2rem .65rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">Alle</span>
+            <span class="wing-filter-btn" onclick="filterWing('0',this)" style="font-size:.72rem;cursor:pointer;padding:.2rem .65rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">Haupt</span>
+            {% if ally_group.wing1_name %}<span class="wing-filter-btn" onclick="filterWing('1',this)" style="font-size:.72rem;cursor:pointer;padding:.2rem .65rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">{{ ally_group.wing1_name }}</span>{% endif %}
+            {% if ally_group.wing2_name %}<span class="wing-filter-btn" onclick="filterWing('2',this)" style="font-size:.72rem;cursor:pointer;padding:.2rem .65rem;border-radius:20px;border:1px solid var(--border);color:var(--text-muted);">{{ ally_group.wing2_name }}</span>{% endif %}
           </div>
           {% endif %}
         </div>
         <input type="text" id="memberSearch" placeholder="🔍 Suchen…"
                oninput="filterMemberTable(this.value)"
-               style="padding:.32rem .7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:160px;">
+               style="padding:.32rem .7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:150px;">
       </div>
 
       {# Table #}
       {% if approved_members %}
       <div style="overflow-x:auto;">
-        <table class="table" id="memberTable" style="font-size:.83rem;min-width:800px;">
+        <table class="table" id="memberTable" style="font-size:.83rem;min-width:820px;">
           <thead>
             <tr>
               {% if is_editor %}<th style="width:2rem;">#</th>{% endif %}
               <th>Travian Account</th>
-              <th>Stärke</th>
+              <th>⚔️ Off</th>
+              <th>🛡️ Def</th>
+              <th>🔭 Scouts</th>
               <th style="text-align:right;">Einwohner</th>
-              <th style="text-align:right;">Dörfer</th>
               <th>Aktualisiert</th>
               <th>Anmerkungen</th>
-              {% if is_editor %}<th style="width:60px;"></th>{% endif %}
+              <th style="width:50px;"></th>
             </tr>
           </thead>
           <tbody id="memberTableBody">
             {% for m in approved_members %}
-            {% set lb = lb_by_travian.get(m.travian_name or '', {}) %}
-            {% set total_off = lb.get('total_off', 0) or 0 %}
-            {% set total_def = lb.get('total_def', 0) or 0 %}
-            {% set total_crop = lb.get('total_crop', 0) or 0 %}
-            {% set population = lb.get('population', 0) or 0 %}
-            {% set village_count = lb.get('village_count', 0) or 0 %}
-            {% set uploaded_at = lb.get('uploaded_at', '') or '' %}
-            {# Days since last update #}
-            {% set days_ago = '' %}
-            <tr class="member-row" data-wing="{{ m.wing }}"
+            {# discord_id primary, travian_name fallback #}
+            {% set lb = lb_by_discord.get(m.discord_id, lb_by_travian.get(m.travian_name or '', {})) %}
+            {% set total_off    = (lb.get('total_off',    0) or 0) %}
+            {% set total_def    = (lb.get('total_def',    0) or 0) %}
+            {% set total_scouts = (lb.get('total_scouts', 0) or 0) %}
+            {% set updated_at   = (lb.get('updated_at',  '') or '') %}
+            {% set has_data = total_off > 0 or total_def > 0 or total_scouts > 0 %}
+            <tr class="member-row"
+                data-wing="{{ m.wing }}"
+                data-off="{{ total_off }}"
+                data-def="{{ total_def }}"
+                data-scout="{{ total_scouts }}"
                 data-search="{{ (m.travian_name or '')|lower }} {{ (m.discord_username or '')|lower }}">
-              {% if is_editor %}<td style="color:var(--text-muted);font-weight:600;">{{ loop.index }}</td>{% endif %}
+              {% if is_editor %}<td style="color:var(--text-muted);font-weight:600;font-size:.8rem;">{{ loop.index }}</td>{% endif %}
               <td>
                 <div style="font-weight:700;font-size:.88rem;color:#a5b4fc;">{{ m.travian_name or '—' }}</div>
                 <div style="font-size:.72rem;color:var(--text-muted);">@{{ m.discord_username or m.discord_id }}</div>
@@ -154,43 +168,46 @@
                   {% if m.discord_id in ep_members %}<span style="font-size:.65rem;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.4);color:#fb923c;border-radius:10px;padding:0 6px;">⚔️ EP</span>{% endif %}
                 </div>
               </td>
-              <td>
-                {% if total_off or total_def or total_crop %}
-                <div style="font-size:.78rem;line-height:1.6;">
-                  <span style="color:#f87171;">⚔️ {{ '{:,.0f}'.format(total_off).replace(',','.') if total_off >= 1000 else total_off }}</span><br>
-                  <span style="color:#60a5fa;">🛡️ {{ '{:,.0f}'.format(total_def).replace(',','.') if total_def >= 1000 else total_def }}</span><br>
-                  <span style="color:#fbbf24;">🌾 {{ '{:,.0f}'.format(total_crop).replace(',','.') if total_crop >= 1000 else total_crop }}</span>
-                </div>
-                {% else %}
-                <span style="color:var(--text-muted);font-size:.78rem;">—</span>
-                {% endif %}
+              <td style="color:#f87171;font-weight:600;">
+                {% if total_off >= 1000000 %}{{ "%.1f"|format(total_off/1000000) }}M
+                {% elif total_off >= 1000 %}{{ "%.0f"|format(total_off/1000) }}k
+                {% elif total_off %}{{ total_off }}
+                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
               </td>
-              <td style="text-align:right;font-weight:600;">
-                {% if population > 0 %}
-                <span style="color:#c4b5fd;">{{ (population / 1000)|round(1) }}k</span>
-                {% else %}—{% endif %}
+              <td style="color:#60a5fa;font-weight:600;">
+                {% if total_def >= 1000000 %}{{ "%.1f"|format(total_def/1000000) }}M
+                {% elif total_def >= 1000 %}{{ "%.0f"|format(total_def/1000) }}k
+                {% elif total_def %}{{ total_def }}
+                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
               </td>
-              <td style="text-align:right;color:var(--text-muted);">
-                {% if village_count > 0 %}🏘️ {{ village_count }}{% else %}—{% endif %}
+              <td style="color:#34d399;font-weight:600;">
+                {% if total_scouts >= 1000 %}{{ "%.0f"|format(total_scouts/1000) }}k
+                {% elif total_scouts %}{{ total_scouts }}
+                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+              </td>
+              <td style="text-align:right;color:#c4b5fd;font-weight:600;">
+                {% set pop = lb.get('population', 0) or 0 %}
+                {% if pop >= 1000 %}{{ "%.1f"|format(pop/1000) }}k{% elif pop %}{{ pop }}{% else %}—{% endif %}
               </td>
               <td style="font-size:.78rem;">
-                {% if uploaded_at %}
-                <span>{{ uploaded_at[:10] }}</span>
-                <span class="days-ago" data-date="{{ uploaded_at[:10] }}" style="color:#f87171;margin-left:.3rem;"></span>
-                {% else %}
-                <span style="color:var(--text-muted);">—</span>
+                {% if updated_at %}
+                <span>{{ updated_at[:10] }}</span>
+                <span class="days-ago" data-date="{{ updated_at[:10] }}" style="margin-left:.3rem;"></span>
+                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+              </td>
+              <td style="font-size:.78rem;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                  title="{{ m.note or '' }}">{{ m.note or '—' }}</td>
+              <td style="white-space:nowrap;">
+                <a href="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/detail"
+                   style="padding:.2rem .45rem;border-radius:5px;font-size:.72rem;text-decoration:none;
+                          background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399;"
+                   title="Detailansicht">🔍</a>
+                {% if is_editor %}
+                <button onclick="openEditMember('{{ m.discord_id }}','{{ (m.travian_name or '')|e }}','{{ (m.note or '')|e }}','{{ m.role_id or '' }}','{{ m.wing }}')"
+                        style="padding:.2rem .45rem;border-radius:5px;font-size:.72rem;cursor:pointer;
+                               background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);color:#818cf8;margin-left:.2rem;">✏️</button>
                 {% endif %}
               </td>
-              <td style="font-size:.78rem;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                {{ m.note or '—' }}
-              </td>
-              {% if is_editor %}
-              <td>
-                <button onclick="openEditMember('{{ m.discord_id }}','{{ (m.travian_name or '')|e }}','{{ (m.note or '')|e }}','{{ m.role_id or '' }}','{{ m.wing }}')"
-                        style="padding:.2rem .5rem;border-radius:5px;font-size:.72rem;cursor:pointer;
-                               background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);color:#818cf8;">✏️</button>
-              </td>
-              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
@@ -203,7 +220,7 @@
       </div>
       {% endif %}
 
-      {# Footer hint #}
+      {# Footer #}
       <div style="padding:.5rem 1.1rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border);">
         {{ approved_members|length }} Mitglieder · {{ approved_members|selectattr('travian_name')|list|length }} mit Travian-Zuordnung
         {% if not is_editor %} · Reihenfolge zufällig{% endif %}
@@ -991,6 +1008,7 @@ function copyLink(id) {
   });
 }
 function filterWing(wing, btn) {
+  _activeWing = wing;
   document.querySelectorAll('.wing-filter-btn').forEach(b => {
     b.classList.remove('active');
     b.style.background = 'transparent';
@@ -1001,14 +1019,32 @@ function filterWing(wing, btn) {
   btn.style.background = 'rgba(99,102,241,.15)';
   btn.style.color = '#818cf8';
   btn.style.borderColor = 'rgba(99,102,241,.35)';
-  document.querySelectorAll('.member-row').forEach(row => {
-    row.style.display = (wing === 'all' || row.dataset.wing === wing) ? '' : 'none';
-  });
+  _applyMemberFilters();
 }
 function filterMemberTable(q) {
   q = q.toLowerCase();
   document.querySelectorAll('.member-row').forEach(tr => {
     tr.style.display = (!q || tr.dataset.search.includes(q)) ? '' : 'none';
+  });
+}
+
+let _activeWing = 'all', _activeTroopFilter = 'all';
+function filterMemberTroops(type, btn) {
+  _activeTroopFilter = type;
+  document.querySelectorAll('.mt-filter').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text-muted)'; b.style.borderColor = 'var(--border)';
+  });
+  btn.style.background = 'rgba(99,102,241,.15)'; btn.style.color = '#818cf8'; btn.style.borderColor = 'rgba(99,102,241,.4)';
+  _applyMemberFilters();
+}
+function _applyMemberFilters() {
+  document.querySelectorAll('.member-row').forEach(tr => {
+    const wingOk = _activeWing === 'all' || tr.dataset.wing === _activeWing;
+    let troopOk = true;
+    if (_activeTroopFilter === 'off')    troopOk = parseInt(tr.dataset.off||0) > 0;
+    if (_activeTroopFilter === 'def')    troopOk = parseInt(tr.dataset.def||0) > 0;
+    if (_activeTroopFilter === 'scout')  troopOk = parseInt(tr.dataset.scout||0) > 0;
+    tr.style.display = (wingOk && troopOk) ? '' : 'none';
   });
 }
 

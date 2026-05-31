@@ -4661,10 +4661,10 @@ async def my_ally_page(request: Request, guild_id: str):
     is_lead = bool(ally_group)
     is_editor = is_lead or await has_perm(request, guild_id, "ally_manage")
 
-    # For members: load leaderboard data (troop stats) to enrich member view
-    # Build a dict: travian_name -> leaderboard row for quick lookup
-    all_leaderboard = await database.get_member_leaderboard(guild_id) if (ally_group or membership) else []
-    lb_by_travian: dict = {r["travian_name"]: r for r in all_leaderboard if r.get("travian_name")}
+    # Load member troop data keyed by discord_id (primary) + travian_name (fallback)
+    all_troops = await database.get_member_troops(guild_id) if (ally_group or membership) else []
+    lb_by_discord: dict = {r["discord_id"]: r for r in all_troops}
+    lb_by_travian: dict = {r["travian_name"]: r for r in all_troops if r.get("travian_name")}
 
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
@@ -4681,6 +4681,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "bonuses": bonuses,
         "is_editor": is_editor,
         "is_lead": is_lead,
+        "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
     })
 
@@ -5015,6 +5016,54 @@ async def my_ally_set_member_role(request: Request, guild_id: str, discord_id: s
     rid = int(role_id_raw) if role_id_raw and role_id_raw.isdigit() else None
     await database.update_ally_member(ally_group["id"], discord_id, None, None, rid, None)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_set#rechte", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# My Ally — Member Detail Page
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/my-ally/member/{discord_id}/detail", response_class=HTMLResponse)
+async def my_ally_member_detail(request: Request, guild_id: str, discord_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+
+    # Require membership or ownership
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    membership = await database.get_ally_membership(guild_id, uid) if not ally_group else None
+    guild_group = await database.get_ally_group_for_guild(guild_id)
+    if not ally_group and not membership:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally")
+
+    group = ally_group or guild_group
+    if not group:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally")
+
+    # Get the specific member's ally_members record
+    members = await database.get_ally_members(group["id"])
+    member = next((m for m in members if m["discord_id"] == discord_id), None)
+
+    # Troop data
+    troops = await database.get_member_troops_single(guild_id, discord_id)
+
+    # Editor check
+    is_editor = bool(ally_group) or await has_perm(request, guild_id, "ally_manage")
+
+    # Growth history
+    growth = await database.get_member_growth(guild_id, [discord_id])
+    growth_data = growth.get(discord_id, [])
+
+    return templates.TemplateResponse("my_ally_member_detail.html", {
+        "request": request, "guild": guild,
+        "member": member, "troops": troops,
+        "is_editor": is_editor,
+        "growth_data": growth_data,
+    })
 
 
 # ---------------------------------------------------------------------------
