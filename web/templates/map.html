@@ -1205,6 +1205,7 @@ function drawDeserialize(str) {
 }
 
 // ── Hook into share URL ───────────────────────────────────────
+// Override buildShareUrl to include drawing data
 const _origBuildShareUrl = buildShareUrl;
 buildShareUrl = function() {
   const url = _origBuildShareUrl();
@@ -1213,18 +1214,27 @@ buildShareUrl = function() {
   return url + '&draw=' + encodeURIComponent(serialized);
 };
 
-const _origRestoreFromUrl = restoreFromUrl;
-restoreFromUrl = function() {
-  _origRestoreFromUrl();
-  const p = new URLSearchParams(location.search);
-  if (p.has('draw')) {
-    // Restore after map loads so canvas size is set
-    setTimeout(() => drawDeserialize(decodeURIComponent(p.get('draw'))), 200);
-  }
-};
-
-// Init canvas size
+// ── Init canvas size ──────────────────────────────────────────
 syncDrawCanvas();
+
+// ── Restore drawings from URL ─────────────────────────────────
+// restoreFromUrl() was already called before this code ran,
+// so we check the URL parameter directly here after map loads.
+(function restoreDrawings() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has('draw')) return;
+  const encoded = p.get('draw');
+  // Wait for loadMap() to finish and canvas to be sized
+  const tryRestore = (attempts) => {
+    if (canvas.width > 0) {
+      syncDrawCanvas();
+      drawDeserialize(decodeURIComponent(encoded));
+    } else if (attempts > 0) {
+      setTimeout(() => tryRestore(attempts - 1), 150);
+    }
+  };
+  setTimeout(() => tryRestore(10), 300);
+})();
 </script>
 {% endif %}
 {% endblock %}
