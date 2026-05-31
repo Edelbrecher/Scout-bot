@@ -925,13 +925,20 @@ buildFieldInputs();
       <input type="number" id="tr-trade-center" min="0" max="20" value="0" oninput="calcTradeRoutes()">
     </div>
 
-    <div class="cc-field" title="Allianz-Bonus auf Händlerkapazität — z. B. 5 für +5 %">
+    <div class="cc-field" title="Allianz-Bonus auf Händlerkapazität — Stufe 1=+30%, 2=+60%, 3=+90%, 4=+120%, 5=+150%">
       <label style="display:flex;align-items:center;gap:.35rem;">
         Allianz-Bonus
         <span style="font-size:.68rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);
-                     color:#4ade80;border-radius:10px;padding:1px 6px;">% auf Kapazität</span>
+                     color:#4ade80;border-radius:10px;padding:1px 6px;">Stufe</span>
       </label>
-      <input type="number" id="tr-ally-bonus" min="0" max="100" value="0" step="1" oninput="calcTradeRoutes()">
+      <select id="tr-ally-bonus" onchange="calcTradeRoutes()">
+        <option value="0">Kein Bonus (0%)</option>
+        <option value="30">Stufe 1 (+30%)</option>
+        <option value="60">Stufe 2 (+60%)</option>
+        <option value="90">Stufe 3 (+90%)</option>
+        <option value="120">Stufe 4 (+120%)</option>
+        <option value="150">Stufe 5 (+150%)</option>
+      </select>
     </div>
 
     <div class="cc-field">
