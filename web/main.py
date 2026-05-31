@@ -7767,8 +7767,15 @@ async def verteidigung_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
-    err = await _require_alliance(guild, guild_id)
-    if err: return err
+    uid = session.get("uid", "")
+    # Allow access if: alliance plan OR user is member of the guild's ally group
+    alliance_err = await _require_alliance(guild, guild_id)
+    if alliance_err:
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        membership  = await database.get_ally_membership(guild_id, uid) if ally_group else None
+        is_ally_member = bool(membership and membership.get("status") == "approved")
+        if not is_ally_member:
+            return alliance_err
     show = request.query_params.get("show", "open")  # open | all | closed
     all_channels = await database.get_defend_channels(guild_id)
     if show == "open":
@@ -7777,7 +7784,6 @@ async def verteidigung_page(request: Request, guild_id: str):
         channels = [c for c in all_channels if c.get("status") == "closed"]
     else:
         channels = all_channels
-    uid = session.get("uid", "")
     can_close = (
         session.get("type") == "admin"
         or guild.get("owner_discord_id") == uid
