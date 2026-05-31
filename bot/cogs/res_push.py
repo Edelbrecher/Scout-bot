@@ -14,57 +14,46 @@ import database
 # ---------------------------------------------------------------------------
 
 def _parse_amount(s: str) -> int | None:
-    """Parse a human-friendly number string into an integer.
-
-    Supported formats:
-      90k / 90K         → 90 000
-      1.5k / 1,5k       → 1 500
-      1m / 1.5m / 1,5m  → 1 000 000 / 1 500 000
-      50.000 / 50,000   → 50 000  (thousand-separator dot/comma)
-      50000             → 50 000
-    Returns None if the string cannot be parsed.
+    """Parse a resource amount string into an integer.
+    Resources are always whole numbers.
+    Rules:
+      - Commas → always removed (thousands separator): 19,500 → 19500
+      - Spaces between digits → removed: 49 140 → 49140
+      - Dots followed by exactly 3 digits → thousands sep (removed): 19.500 → 19500
+      - Dots with other digit counts → decimal (for use with k/m): 1.5m → 1500000
+      - Suffix k/K → ×1000, m/M → ×1000000, mil/million → ×1000000
+    Returns None if not parseable.
     """
-    s = s.strip().replace(" ", "").replace("_", "")
+    import re as _re
+    s = s.strip()
     if not s:
         return None
 
+    # Detect suffix
     multiplier = 1
-    lower = s.lower()
-    if lower.endswith("k"):
-        multiplier = 1_000
-        s = s[:-1]
-    elif lower.endswith("m"):
-        multiplier = 1_000_000
-        s = s[:-1]
+    sm = _re.search(r"(\d)\s*(mil(?:lion)?|m(?!\w)|k(?!\w))", s, _re.I)
+    if sm:
+        suffix = sm.group(2).lower()
+        s = s[:sm.start(1) + 1]
+        if suffix.startswith("mil") or suffix == "m":
+            multiplier = 1_000_000
+        elif suffix == "k":
+            multiplier = 1_000
 
-    # Normalise decimal separator: if both . and , appear, the one with
-    # exactly 3 digits after it is the thousands separator.
-    # Simple heuristic: if there's exactly one separator and ≤ 3 digits follow
-    # it → decimal; if 3 digits follow it → thousands separator.
-    # Replace European thousands sep (dot with 3 trailing digits) with nothing,
-    # then replace comma decimal sep with dot.
-    # E.g.  "50.000" → "50000"   "1.5" → "1.5"   "1,5" → "1.5"
-    if "." in s and "," in s:
-        # Both present — the one before the other is thousands sep
-        if s.index(".") < s.index(","):
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            s = s.replace(",", "")
-    elif "." in s:
-        # Dot: thousands sep if exactly 3 digits follow each dot
-        parts = s.split(".")
-        if all(len(p) == 3 for p in parts[1:]):
-            s = s.replace(".", "")   # thousands sep → remove
-        # else leave as decimal point
-    elif "," in s:
-        parts = s.split(",")
-        if all(len(p) == 3 for p in parts[1:]):
-            s = s.replace(",", "")   # thousands sep → remove
-        else:
-            s = s.replace(",", ".")  # decimal comma → dot
+    # Remove spaces between digits
+    s = _re.sub(r"(\d)\s+(\d)", r"\1\2", s.strip())
+    # Remove all commas (always thousands separators)
+    s = s.replace(",", "")
+    # Dots: remove if all groups are exactly 3 digits (thousands), else keep as decimal
+    dot_groups = _re.findall(r"\.(\d+)", s)
+    if dot_groups and all(len(g) == 3 for g in dot_groups):
+        s = s.replace(".", "")
 
+    m = _re.search(r"\d+(?:\.\d+)?", s)
+    if not m:
+        return None
     try:
-        return int(float(s) * multiplier)
+        return int(float(m.group()) * multiplier)
     except (ValueError, OverflowError):
         return None
 

@@ -2032,31 +2032,31 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
     import re as _re
 
     def _parse_res(s: str) -> int:
-        """Parse resource amounts flexibly.
-        Handles: 500k, 1m, 1.5m, 19.500, 52.200, 49 140, 1 mil ress, 1.500.000 etc.
-        European dot-thousands (19.500 → 19500) and space-thousands (49 140 → 49140).
+        """Parse resource amounts. Resources are always whole numbers.
+        Rules:
+          - Commas are ALWAYS thousands separators → removed (19,500 → 19500)
+          - Spaces between digits → removed (49 140 → 49140)
+          - Dots: thousands sep when followed by 3 digits; decimal only with k/m suffix
+          - Supports: 500k, 1m, 1.5m, 19.500, 19,500, 49 140, 1 mil ress, 1.500.000
         """
         s = (s or "").strip()
-        # 1. Detect multiplier suffix attached to a digit (500k, 1m, 1 mil ress)
+        # Detect suffix (k, m, mil, million) attached to a digit
         suffix = ""
         mult   = 1
         sm = _re.search(r"(\d)\s*(mil(?:lion)?|m(?!\w)|k(?!\w))", s, _re.I)
         if sm:
             suffix = sm.group(2).lower()
-            s = s[:sm.start(1) + 1]  # keep only the digit part before suffix
+            s = s[:sm.start(1) + 1]
 
-        # 2. Remove space-based thousands separators (49 140 → 49140)
+        # Remove spaces between digits (49 140 → 49140)
         s = _re.sub(r"(\d)\s+(\d)", r"\1\2", s.strip())
-
-        # 3. Dot / comma: if ALL groups after the separator have exactly 3 digits → thousands sep
+        # Remove all commas — always thousands separators (19,500 → 19500)
+        s = s.replace(",", "")
+        # Dots: thousands sep if followed by exactly 3 digits
         dot_groups = _re.findall(r"\.(\d+)", s)
-        com_groups = _re.findall(r",(\d+)",  s)
         if dot_groups and all(len(g) == 3 for g in dot_groups):
             s = s.replace(".", "")
-        elif com_groups and all(len(g) == 3 for g in com_groups):
-            s = s.replace(",", "")
-        else:
-            s = s.replace(",", ".")  # treat as decimal comma
+        # else leave dot as decimal (e.g. 1.5m)
 
         m = _re.search(r"\d+(?:\.\d+)?", s)
         if not m: return 0
