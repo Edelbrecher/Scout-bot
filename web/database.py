@@ -5244,16 +5244,46 @@ async def get_defend_stats(guild_id: str) -> dict:
         """, (guild_id,)) as cur:
             targeted = [dict(r) for r in await cur.fetchall()]
 
-        # Troop senders — who sends the most deff
+        # Troop senders — who sends the most deff, with avg response time
         async with db.execute("""
-            SELECT user_name, SUM(amount_parsed) as total_troops,
-                   COUNT(DISTINCT channel_id) as participations,
-                   SUM(amount_parsed * grain_per_unit) as total_grain
-            FROM defend_sent
-            WHERE guild_id=?
-            GROUP BY user_name ORDER BY total_troops DESC LIMIT 20
+            SELECT
+                ds.user_name,
+                ds.user_id,
+                SUM(ds.amount_parsed) as total_troops,
+                COUNT(DISTINCT ds.channel_id) as participations,
+                SUM(ds.amount_parsed * ds.grain_per_unit) as total_grain,
+                AVG(
+                    (julianday(ds.sent_at) - julianday(dc.created_at)) * 24 * 60
+                ) as avg_response_minutes,
+                MIN(
+                    (julianday(ds.sent_at) - julianday(dc.created_at)) * 24 * 60
+                ) as best_response_minutes
+            FROM defend_sent ds
+            JOIN defend_channels dc ON dc.channel_id = ds.channel_id
+            WHERE ds.guild_id=?
+            GROUP BY ds.user_name
+            ORDER BY total_troops DESC
+            LIMIT 50
         """, (guild_id,)) as cur:
             senders = [dict(r) for r in await cur.fetchall()]
+
+        # Per-player breakdown: troop types sent
+        async with db.execute("""
+            SELECT user_name, troop_type,
+                   SUM(amount_parsed) as troops,
+                   SUM(amount_parsed * grain_per_unit) as grain
+            FROM defend_sent
+            WHERE guild_id=? AND troop_type != ''
+            GROUP BY user_name, troop_type
+            ORDER BY user_name, troops DESC
+        """, (guild_id,)) as cur:
+            troop_breakdown_rows = [dict(r) for r in await cur.fetchall()]
+
+        # Build per-player troop breakdown dict
+        from collections import defaultdict
+        troop_breakdown: dict = defaultdict(list)
+        for r in troop_breakdown_rows:
+            troop_breakdown[r["user_name"]].append(r)
 
         # Most defended targets (channel = one defend request)
         async with db.execute("""
@@ -5289,6 +5319,7 @@ async def get_defend_stats(guild_id: str) -> dict:
         "attackers": attackers,
         "targeted": targeted,
         "senders": senders,
+        "troop_breakdown": dict(troop_breakdown),
         "top_defends": top_defends,
         "totals": {**totals, **sent_totals},
     }
