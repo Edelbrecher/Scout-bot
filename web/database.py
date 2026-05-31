@@ -7216,33 +7216,44 @@ async def _init_enemy_troops_table():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS enemy_troop_entries (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id     TEXT NOT NULL,
-                player_name  TEXT NOT NULL,
-                off_troops   INTEGER DEFAULT 0,
-                def_troops   INTEGER DEFAULT 0,
-                total_troops INTEGER DEFAULT 0,
-                notes        TEXT DEFAULT '',
-                reported_by  TEXT DEFAULT '',
-                entry_time   TEXT DEFAULT '',
-                created_at   TEXT DEFAULT (datetime('now'))
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id       TEXT NOT NULL,
+                player_name    TEXT NOT NULL,
+                off_troops     INTEGER DEFAULT 0,
+                def_troops     INTEGER DEFAULT 0,
+                total_troops   INTEGER DEFAULT 0,
+                notes          TEXT DEFAULT '',
+                reported_by    TEXT DEFAULT '',
+                entry_time     TEXT DEFAULT '',
+                troop_details  TEXT DEFAULT '',
+                village_name   TEXT DEFAULT '',
+                created_at     TEXT DEFAULT (datetime('now'))
             )
         """)
+        # migrations
+        for col in ["troop_details TEXT DEFAULT ''", "village_name TEXT DEFAULT ''"]:
+            try:
+                await db.execute(f"ALTER TABLE enemy_troop_entries ADD COLUMN {col}")
+            except Exception:
+                pass
         await db.commit()
 
 
-async def add_enemy_troop_entry(guild_id: str, player_name: str,
-                                 off_troops: int, def_troops: int, total_troops: int,
-                                 notes: str, reported_by: str, entry_time: str) -> int:
+async def add_enemy_troop_entry(
+    guild_id: str, player_name: str,
+    off_troops: int, def_troops: int, total_troops: int,
+    notes: str, reported_by: str, entry_time: str,
+    troop_details: str = "", village_name: str = "",
+) -> int:
     await _init_enemy_troops_table()
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("""
             INSERT INTO enemy_troop_entries
                 (guild_id, player_name, off_troops, def_troops, total_troops,
-                 notes, reported_by, entry_time)
-            VALUES (?,?,?,?,?,?,?,?)
+                 notes, reported_by, entry_time, troop_details, village_name)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
         """, (guild_id, player_name, off_troops, def_troops, total_troops,
-              notes, reported_by, entry_time))
+              notes, reported_by, entry_time, troop_details or "", village_name or ""))
         await db.commit()
         return cur.lastrowid
 

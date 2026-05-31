@@ -5016,15 +5016,17 @@ async def enemy_troops_add(request: Request, guild_id: str, player_name: str):
     err = _require_guild(session, guild_id)
     if err: return err
     form = await request.form()
-    off_troops   = int(form.get("off_troops")   or 0)
-    def_troops   = int(form.get("def_troops")   or 0)
-    total_troops = int(form.get("total_troops") or 0)
-    notes        = (form.get("notes") or "").strip()
-    entry_time   = (form.get("entry_time") or "").strip()
-    reported_by  = session.get("username", "")
+    off_troops    = int(form.get("off_troops")   or 0)
+    def_troops    = int(form.get("def_troops")   or 0)
+    total_troops  = int(form.get("total_troops") or 0)
+    notes         = (form.get("notes")         or "").strip()
+    entry_time    = (form.get("entry_time")    or "").strip()
+    troop_details = (form.get("troop_details") or "").strip()
+    village_name  = (form.get("village_name")  or "").strip()
+    reported_by   = session.get("username", "")
     await database.add_enemy_troop_entry(
         guild_id, player_name, off_troops, def_troops, total_troops,
-        notes, reported_by, entry_time
+        notes, reported_by, entry_time, troop_details, village_name,
     )
     return RedirectResponse(
         f"/guild/{guild_id}/enemies/{player_name}?flash=troops_added", status_code=303

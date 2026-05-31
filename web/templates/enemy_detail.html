@@ -441,45 +441,66 @@
     </div>
     {% endif %}
 
-    <!-- Eingabe-Formular -->
+    <!-- Troop Entry Form -->
     <div id="troop-form" style="display:none;margin-bottom:1rem;">
-      <div class="card" style="border-left:3px solid rgba(99,102,241,0.5);">
-        <h3 style="margin:0 0 0.75rem;font-size:0.9rem;">Neue Truppen-Meldung</h3>
-        <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/troops/add">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;margin-bottom:0.6rem;">
-            <label style="font-size:0.8rem;color:var(--text-muted);">⚔️ Off-Truppen
-              <input type="number" name="off_troops" value="0" min="0"
-                     style="width:100%;margin-top:0.2rem;padding:0.35rem 0.5rem;background:var(--bg-main);
-                            color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.85rem;">
-            </label>
-            <label style="font-size:0.8rem;color:var(--text-muted);">🛡️ Def-Truppen
-              <input type="number" name="def_troops" value="0" min="0"
-                     style="width:100%;margin-top:0.2rem;padding:0.35rem 0.5rem;background:var(--bg-main);
-                            color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.85rem;">
-            </label>
-            <label style="font-size:0.8rem;color:var(--text-muted);">🏹 Gesamt
-              <input type="number" name="total_troops" value="0" min="0"
-                     style="width:100%;margin-top:0.2rem;padding:0.35rem 0.5rem;background:var(--bg-main);
-                            color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.85rem;">
-            </label>
-            <label style="font-size:0.8rem;color:var(--text-muted);">📅 Zeitpunkt (UTC)
-              <input type="text" name="entry_time" placeholder="z.B. 30.05. 22:15 UTC"
-                     style="width:100%;margin-top:0.2rem;padding:0.35rem 0.5rem;background:var(--bg-main);
-                            color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
-            </label>
-          </div>
-          <label style="font-size:0.8rem;color:var(--text-muted);">📝 Notiz
-            <input type="text" name="notes" placeholder="z.B. aus Scout-Bericht, nach Verteidigung …" maxlength="200"
-                   style="width:100%;margin-top:0.2rem;padding:0.35rem 0.6rem;background:var(--bg-main);
-                          color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+    <div class="card" style="border-left:3px solid rgba(99,102,241,0.5);padding:1rem 1.15rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.92rem;">⚔️ New Troop Report</h3>
+      <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/troops/add"
+            id="troop-add-form">
+
+        {# Meta row #}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem;margin-bottom:.75rem;">
+          <label style="font-size:.78rem;color:var(--text-muted);">🏘️ Village (optional)
+            <input type="text" name="village_name" id="tf-village" placeholder="Village name…" maxlength="80"
+                   style="width:100%;margin-top:.2rem;padding:.32rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
           </label>
-          <div style="margin-top:0.65rem;display:flex;gap:0.5rem;">
-            <button type="submit" class="btn btn-primary" style="font-size:0.82rem;">💾 Speichern</button>
-            <button type="button" onclick="document.getElementById('troop-form').style.display='none'"
-                    class="btn btn-secondary" style="font-size:0.82rem;">✕</button>
-          </div>
-        </form>
-      </div>
+          <label style="font-size:.78rem;color:var(--text-muted);">📅 Observed at (UTC)
+            <input type="text" name="entry_time" id="tf-time" placeholder="e.g. 30.05. 22:15"
+                   style="width:100%;margin-top:.2rem;padding:.32rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          </label>
+          <label style="font-size:.78rem;color:var(--text-muted);">📝 Note
+            <input type="text" name="notes" placeholder="Source, context…" maxlength="200"
+                   style="width:100%;margin-top:.2rem;padding:.32rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          </label>
+        </div>
+
+        {# Tribe selector #}
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.65rem;align-items:center;">
+          <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Tribe:</span>
+          {% for tid, tlabel in [('romans','🏛️ Romans'),('teutons','🪓 Teutons'),('gauls','🌿 Gauls'),('egyptians','🏺 Egyptians'),('huns','🏹 Huns'),('spartans','⚡ Spartans'),('natars','👾 Natars')] %}
+          <button type="button" onclick="setTribe('{{ tid }}')" id="tribe-btn-{{ tid }}"
+                  style="padding:.25rem .7rem;border-radius:20px;font-size:.76rem;font-weight:600;cursor:pointer;
+                         border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);transition:all .12s;">
+            {{ tlabel }}
+          </button>
+          {% endfor %}
+        </div>
+
+        {# Troop grid (rendered by JS) #}
+        <div id="troop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.4rem;margin-bottom:.75rem;min-height:40px;">
+          <span style="font-size:.8rem;color:var(--text-muted);grid-column:1/-1;">← Select a tribe to see troop types</span>
+        </div>
+
+        {# Auto-computed totals + hidden fields #}
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:.55rem .75rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;margin-bottom:.7rem;">
+          <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Computed totals:</span>
+          <span style="font-size:.85rem;font-weight:700;color:#f87171;">⚔️ Off: <span id="tf-off-display">0</span></span>
+          <span style="font-size:.85rem;font-weight:700;color:#4ade80;">🛡️ Def: <span id="tf-def-display">0</span></span>
+          <span style="font-size:.85rem;font-weight:700;color:#93c5fd;">🔢 Total: <span id="tf-total-display">0</span></span>
+          <span style="font-size:.72rem;color:var(--text-muted);margin-left:auto;">Scouts & siege counted in Off total</span>
+        </div>
+        <input type="hidden" name="off_troops"   id="tf-off">
+        <input type="hidden" name="def_troops"   id="tf-def">
+        <input type="hidden" name="total_troops" id="tf-total">
+        <input type="hidden" name="troop_details" id="tf-details">
+
+        <div style="display:flex;gap:.5rem;">
+          <button type="submit" class="btn btn-primary" style="font-size:.82rem;">💾 Save entry</button>
+          <button type="button" onclick="document.getElementById('troop-form').style.display='none'"
+                  class="btn btn-secondary" style="font-size:.82rem;">✕ Cancel</button>
+        </div>
+      </form>
+    </div>
     </div>
 
     <!-- Timeline -->
@@ -500,16 +521,20 @@
           <div class="card" style="padding:0.6rem 0.85rem;border-left:2px solid
             {% if e.off_troops > e.def_troops %}rgba(239,68,68,0.4){% elif e.def_troops > e.off_troops %}rgba(34,197,94,0.4){% else %}rgba(99,102,241,0.3){% endif %};">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem;">
-              <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-                {% if e.off_troops %}
-                <span style="font-size:0.82rem;color:#f87171;font-weight:700;">⚔️ {{ '{:,}'.format(e.off_troops) }} Off</span>
+              <div style="display:flex;flex-direction:column;gap:.3rem;flex:1;">
+                {# Individual troops if available #}
+                {% if e.troop_details %}
+                <div style="display:flex;flex-wrap:wrap;gap:.3rem;" id="td-{{ e.id }}">
+                  {# Rendered by JS from JSON #}
+                  <span class="troop-detail-raw" data-json="{{ e.troop_details | e }}" style="display:none;"></span>
+                </div>
                 {% endif %}
-                {% if e.def_troops %}
-                <span style="font-size:0.82rem;color:#4ade80;font-weight:700;">🛡️ {{ '{:,}'.format(e.def_troops) }} Def</span>
-                {% endif %}
-                {% if e.total_troops %}
-                <span style="font-size:0.82rem;color:#93c5fd;font-weight:700;">🏹 {{ '{:,}'.format(e.total_troops) }} Ges.</span>
-                {% endif %}
+                <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+                  {% if e.village_name %}<span style="font-size:.72rem;color:var(--text-muted);">🏘️ {{ e.village_name }}</span>{% endif %}
+                  {% if e.off_troops %}<span style="font-size:.82rem;color:#f87171;font-weight:700;">⚔️ {{ '{:,}'.format(e.off_troops) }} Off</span>{% endif %}
+                  {% if e.def_troops %}<span style="font-size:.82rem;color:#4ade80;font-weight:700;">🛡️ {{ '{:,}'.format(e.def_troops) }} Def</span>{% endif %}
+                  {% if e.total_troops %}<span style="font-size:.82rem;color:#93c5fd;font-weight:700;">🔢 {{ '{:,}'.format(e.total_troops) }} total</span>{% endif %}
+                </div>
               </div>
               <div style="display:flex;align-items:center;gap:0.6rem;">
                 <span style="font-size:0.72rem;color:var(--text-muted);">
@@ -603,14 +628,12 @@ function edTab(name, btn) {
   document.getElementById('ed-' + name).style.display = 'block';
   btn.classList.add('active');
 }
-// Set datetime default
 (function() {
   const el = document.getElementById('vilSnapshotTime');
   if (!el) return;
   const now = new Date();
   el.value = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
 })();
-// Open doerfer tab if flash=villages_imported
 (function() {
   const params = new URLSearchParams(location.search);
   if (params.get('flash') === 'villages_imported') {
@@ -618,5 +641,227 @@ function edTab(name, btn) {
     if (btn) edTab('doerfer', btn);
   }
 })();
+
+// ════════════════════════════════════════════════════════════════════════
+// TROOP PICKER
+// ════════════════════════════════════════════════════════════════════════
+// role: 'off' | 'def' | 'scout' | 'siege' | 'special'
+// Off total  = off + scout + siege
+// Def total  = def
+// Grand total = all with count > 0
+const TRIBES = {
+  romans: {
+    label: '🏛️ Romans',
+    troops: [
+      {id:'legionnaire',      name:'Legionnaire',          role:'def'},
+      {id:'praetorian',       name:'Praetorian',           role:'def'},
+      {id:'imperian',         name:'Imperian',             role:'off'},
+      {id:'eq_legati',        name:'Equites Legati',       role:'scout', note:'scouts'},
+      {id:'eq_imp',           name:'Eq. Imperatoris',      role:'off'},
+      {id:'eq_caes',          name:'Eq. Caesaris',         role:'off'},
+      {id:'bat_ram',          name:'Battering Ram',        role:'siege'},
+      {id:'fire_cat',         name:'Fire Catapult',        role:'siege'},
+      {id:'senator',          name:'Senator',              role:'special'},
+      {id:'settler_r',        name:'Settler',              role:'special'},
+    ]
+  },
+  teutons: {
+    label: '🪓 Teutons',
+    troops: [
+      {id:'clubswinger',      name:'Clubswinger',          role:'off'},
+      {id:'spearman',         name:'Spearman',             role:'def'},
+      {id:'axeman',           name:'Axeman',               role:'off'},
+      {id:'scout_t',          name:'Scout',                role:'scout', note:'scouts'},
+      {id:'paladin',          name:'Paladin',              role:'def'},
+      {id:'tk',               name:'Teutonic Knight',      role:'off'},
+      {id:'ram_t',            name:'Ram',                  role:'siege'},
+      {id:'cat_t',            name:'Catapult',             role:'siege'},
+      {id:'chief',            name:'Chief',                role:'special'},
+      {id:'settler_t',        name:'Settler',              role:'special'},
+    ]
+  },
+  gauls: {
+    label: '🌿 Gauls',
+    troops: [
+      {id:'phalanx',          name:'Phalanx',              role:'def'},
+      {id:'swordsman',        name:'Swordsman',            role:'off'},
+      {id:'pathfinder',       name:'Pathfinder',           role:'scout', note:'scouts'},
+      {id:'tt',               name:'Theutates Thunder',    role:'off'},
+      {id:'druidrider',       name:'Druidrider',           role:'def'},
+      {id:'haeduan',          name:'Haeduan',              role:'off'},
+      {id:'ram_g',            name:'Ram',                  role:'siege'},
+      {id:'trebuchet',        name:'Trebuchet',            role:'siege'},
+      {id:'chieftain',        name:'Chieftain',            role:'special'},
+      {id:'settler_g',        name:'Settler',              role:'special'},
+    ]
+  },
+  egyptians: {
+    label: '🏺 Egyptians',
+    troops: [
+      {id:'slave_militia',    name:'Slave Militia',        role:'def'},
+      {id:'ash_warden',       name:'Ash Warden',           role:'def'},
+      {id:'khopesh',          name:'Khopesh Warrior',      role:'off'},
+      {id:'sopdu',            name:'Sopdu Explorer',       role:'scout', note:'scouts'},
+      {id:'anhur',            name:'Anhur Guard',          role:'def'},
+      {id:'reshef',           name:'Reshef Chariot',       role:'off'},
+      {id:'ram_e',            name:'Ram',                  role:'siege'},
+      {id:'stone_cat',        name:'Stone Catapult',       role:'siege'},
+      {id:'nomarch',          name:'Nomarch',              role:'special'},
+      {id:'settler_e',        name:'Settler',              role:'special'},
+    ]
+  },
+  huns: {
+    label: '🏹 Huns',
+    troops: [
+      {id:'mercenary',        name:'Mercenary',            role:'off'},
+      {id:'bowman',           name:'Bowman',               role:'def'},
+      {id:'spotter',          name:'Spotter',              role:'scout', note:'scouts'},
+      {id:'steppe',           name:'Steppe Rider',         role:'off'},
+      {id:'marksman',         name:'Marksman',             role:'off'},
+      {id:'marauder',         name:'Marauder',             role:'off'},
+      {id:'ram_h',            name:'Ram',                  role:'siege'},
+      {id:'cat_h',            name:'Catapult',             role:'siege'},
+      {id:'logades',          name:'Logades',              role:'special'},
+      {id:'settler_h',        name:'Settler',              role:'special'},
+    ]
+  },
+  spartans: {
+    label: '⚡ Spartans',
+    troops: [
+      {id:'hoplite',          name:'Hoplite',              role:'def'},
+      {id:'sentinel',         name:'Sentinel',             role:'def'},
+      {id:'slave',            name:'Slave',                role:'off'},
+      {id:'haetairos',        name:'Haetairos',            role:'scout', note:'scouts'},
+      {id:'thraex',           name:'Thraex',               role:'off'},
+      {id:'thorakites',       name:'Thorakites',           role:'def'},
+      {id:'ram_s',            name:'Ram',                  role:'siege'},
+      {id:'cat_s',            name:'Catapult',             role:'siege'},
+      {id:'elder',            name:'Elder',                role:'special'},
+      {id:'settler_s',        name:'Settler',              role:'special'},
+    ]
+  },
+  natars: {
+    label: '👾 Natars',
+    troops: [
+      {id:'rat',              name:'Rat',                  role:'off'},
+      {id:'spider',           name:'Spider',               role:'off'},
+      {id:'snake',            name:'Snake',                role:'off'},
+      {id:'bat',              name:'Bat',                  role:'scout', note:'scouts'},
+      {id:'wild_boar',        name:'Wild Boar',            role:'off'},
+      {id:'wolf',             name:'Wolf',                 role:'off'},
+      {id:'bear',             name:'Bear',                 role:'def'},
+      {id:'crocodile',        name:'Crocodile',            role:'def'},
+      {id:'tiger',            name:'Tiger',                role:'off'},
+      {id:'elephant',         name:'Elephant',             role:'siege'},
+    ]
+  },
+};
+
+const ROLE_COLOR = {
+  off:     {bg:'rgba(239,68,68,.12)',   border:'rgba(239,68,68,.35)',   text:'#f87171',  label:'⚔️ Off'},
+  def:     {bg:'rgba(34,197,94,.1)',    border:'rgba(34,197,94,.3)',    text:'#4ade80',  label:'🛡️ Def'},
+  scout:   {bg:'rgba(234,179,8,.1)',    border:'rgba(234,179,8,.3)',    text:'#fbbf24',  label:'🔍 Scout'},
+  siege:   {bg:'rgba(168,85,247,.1)',   border:'rgba(168,85,247,.3)',   text:'#c084fc',  label:'🏹 Siege'},
+  special: {bg:'rgba(100,116,139,.08)', border:'rgba(100,116,139,.25)','text':'#94a3b8', label:'⭐ Special'},
+};
+
+let currentTribe = null;
+const troopCounts = {};  // troop id → count
+
+function setTribe(tribeId) {
+  currentTribe = tribeId;
+  // Update buttons
+  Object.keys(TRIBES).forEach(t => {
+    const btn = document.getElementById('tribe-btn-' + t);
+    if (!btn) return;
+    if (t === tribeId) {
+      btn.style.background = 'rgba(99,102,241,.2)';
+      btn.style.borderColor = 'rgba(99,102,241,.5)';
+      btn.style.color = '#a5b4fc';
+    } else {
+      btn.style.background = 'var(--bg-main)';
+      btn.style.borderColor = 'var(--border)';
+      btn.style.color = 'var(--text-muted)';
+    }
+  });
+  renderGrid(tribeId);
+}
+
+function renderGrid(tribeId) {
+  const tribe = TRIBES[tribeId];
+  const grid  = document.getElementById('troop-grid');
+  grid.innerHTML = '';
+  tribe.troops.forEach(t => {
+    const rc = ROLE_COLOR[t.role] || ROLE_COLOR.special;
+    const cnt = troopCounts[t.id] || 0;
+    const cell = document.createElement('label');
+    cell.style.cssText = `display:flex;align-items:center;gap:.4rem;padding:.35rem .55rem;
+      border-radius:7px;border:1px solid ${rc.border};background:${rc.bg};cursor:pointer;`;
+    cell.innerHTML = `
+      <span style="font-size:.75rem;font-weight:600;color:${rc.text};flex:1;line-height:1.2;">${t.name}
+        ${t.note ? `<span style="font-size:.65rem;color:var(--text-muted);display:block;">${t.note}</span>` : ''}
+      </span>
+      <input type="number" min="0" value="${cnt}"
+             style="width:68px;padding:.22rem .35rem;background:var(--bg-main);border:1px solid var(--border);
+                    border-radius:5px;color:var(--text);font-size:.82rem;font-weight:700;text-align:right;"
+             data-troop="${t.id}" data-role="${t.role}"
+             oninput="onTroopInput(this)">`;
+    grid.appendChild(cell);
+  });
+}
+
+function onTroopInput(inp) {
+  const id  = inp.dataset.troop;
+  const val = parseInt(inp.value) || 0;
+  if (val > 0) troopCounts[id] = val;
+  else         delete troopCounts[id];
+  recompute();
+}
+
+function recompute() {
+  let off = 0, def = 0, total = 0;
+  // Collect all tribe troops for role lookup
+  const roleMap = {};
+  Object.values(TRIBES).forEach(tr => tr.troops.forEach(t => roleMap[t.id] = t.role));
+
+  for (const [id, cnt] of Object.entries(troopCounts)) {
+    if (!cnt) continue;
+    total += cnt;
+    const role = roleMap[id] || 'off';
+    if (role === 'def')           def += cnt;
+    else if (role !== 'special')  off += cnt;  // off, scout, siege
+  }
+
+  document.getElementById('tf-off').value   = off;
+  document.getElementById('tf-def').value   = def;
+  document.getElementById('tf-total').value = total;
+  document.getElementById('tf-off-display').textContent   = off.toLocaleString();
+  document.getElementById('tf-def-display').textContent   = def.toLocaleString();
+  document.getElementById('tf-total-display').textContent = total.toLocaleString();
+
+  // Serialize details
+  document.getElementById('tf-details').value = JSON.stringify(troopCounts);
+}
+
+// Render saved troop details from existing entries
+document.querySelectorAll('.troop-detail-raw').forEach(el => {
+  try {
+    const data = JSON.parse(el.dataset.json);
+    const parent = el.parentElement;
+    // Build role → name lookup
+    const nameMap = {}, roleMap = {};
+    Object.values(TRIBES).forEach(tr => tr.troops.forEach(t => { nameMap[t.id] = t.name; roleMap[t.id] = t.role; }));
+    Object.entries(data).forEach(([id, cnt]) => {
+      if (!cnt) return;
+      const rc = ROLE_COLOR[roleMap[id]] || ROLE_COLOR.special;
+      const chip = document.createElement('span');
+      chip.style.cssText = `display:inline-flex;align-items:center;gap:.25rem;padding:2px 8px;
+        border-radius:10px;font-size:.75rem;font-weight:700;
+        border:1px solid ${rc.border};background:${rc.bg};color:${rc.text};`;
+      chip.textContent = `${parseInt(cnt).toLocaleString()} ${nameMap[id] || id}`;
+      parent.appendChild(chip);
+    });
+  } catch(e) {}
+});
 </script>
 {% endblock %}
