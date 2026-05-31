@@ -960,11 +960,12 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
                 view_channel=True, send_messages=True, manage_channels=True
             ),
         }
-        # Copy existing view_channel permissions (so the right people can still read)
+        # Copy existing permissions but disable writing
         for target, ow in channel.overwrites.items():
             if target == guild.default_role or target == guild.me:
                 continue
-            new_ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+            allow, deny = ow.pair()
+            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
             new_ow.update(send_messages=False, add_reactions=False)
             overwrites[target] = new_ow
 
@@ -973,10 +974,7 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
             overwrites=overwrites,
             reason="Defend-Channel archiviert",
         )
-        await channel.send(
-            "📦 **Dieser Defend-Channel wurde archiviert** und ins Archiv verschoben. "
-            "Weitere Nachrichten sind nicht mehr möglich."
-        )
+        await channel.send("📦 **Dieser Channel wurde archiviert** und ins Archiv verschoben.")
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
@@ -1015,7 +1013,8 @@ async def handle_unarchive_defend_channel(request: aiohttp_web.Request) -> aioht
         # Re-enable send_messages for all existing overwrites
         overwrites = {}
         for target, ow in channel.overwrites.items():
-            new_ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+            allow, deny = ow.pair()
+            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
             new_ow.update(send_messages=None, add_reactions=None)
             overwrites[target] = new_ow
 

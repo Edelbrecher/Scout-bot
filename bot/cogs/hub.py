@@ -993,7 +993,8 @@ class DefendCloseView(discord.ui.View):
             for target, ow in channel.overwrites.items():
                 if target in (guild.default_role, guild.me):
                     continue
-                new_ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+                allow, deny = ow.pair()
+                new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
                 new_ow.update(send_messages=False, add_reactions=False)
                 overwrites[target] = new_ow
 
