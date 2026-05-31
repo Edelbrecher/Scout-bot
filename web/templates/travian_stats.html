@@ -263,49 +263,49 @@ canvas.spark { display:block; }
 const PLAYER_DATA   = {{ player_trends   | tojson }};
 
 // ── Import-Cooldown Timer ────────────────────────────────────────────────────
-const COOLDOWN_MIN = {{ cooldown_minutes }};
-const LAST_IMPORT = {
-  player:   {{ ('"' + player_last_at + '"') if player_last_at else 'null' }},
-  alliance: {{ ('"' + alliance_last_at + '"') if alliance_last_at else 'null' }},
+const COOLDOWN_MIN = {{ cooldown_minutes | default(60) }};
+const LAST_IMPORT  = {
+  player:   {{ player_last_at   | tojson }},
+  alliance: {{ alliance_last_at | tojson }},
 };
 
 function updateTimers() {
-  ['player','alliance'].forEach(view => {
-    const last = LAST_IMPORT[view];
-    const textEl = document.getElementById('timer-'+view+'-text');
-    const dotEl  = document.getElementById('dot-'+view);
-    if (!textEl) return;
+  try {
+    ['player','alliance'].forEach(view => {
+      const last   = LAST_IMPORT[view];
+      const textEl = document.getElementById('timer-'+view+'-text');
+      const dotEl  = document.getElementById('dot-'+view);
+      if (!textEl || !dotEl) return;
 
-    if (!last) {
-      textEl.textContent = 'Noch kein Import';
-      textEl.style.color = 'var(--text-muted)';
-      dotEl.style.color  = 'var(--text-muted)';
-      return;
-    }
+      if (!last) {
+        textEl.textContent = 'Noch kein Import';
+        textEl.style.color = 'var(--text-muted)';
+        dotEl.style.color  = 'var(--text-muted)';
+        return;
+      }
 
-    const lastMs  = new Date(last.replace(' ','T') + (last.includes('+') || last.endsWith('Z') ? '' : 'Z'));
-    const agoMin  = (Date.now() - lastMs.getTime()) / 60000;
-    const readyIn = COOLDOWN_MIN - agoMin;
+      const normalized = last.replace(' ', 'T').replace(/(\d{2}:\d{2})$/, '$1:00');
+      const lastMs  = new Date(normalized + (normalized.endsWith('Z') || normalized.includes('+') ? '' : 'Z'));
+      if (isNaN(lastMs.getTime())) return;
 
-    if (readyIn <= 0) {
-      // Ready
-      const ago = Math.floor(agoMin);
-      textEl.textContent = `vor ${ago < 60 ? ago+' Min' : Math.floor(ago/60)+'h '+Math.floor(ago%60)+'m'} — ✅ Import möglich`;
-      textEl.style.color = '#4ade80';
-      dotEl.style.color  = '#4ade80';
-    } else {
-      // Blocked
-      const mins = Math.floor(readyIn);
-      const secs = Math.floor((readyIn - mins) * 60);
-      textEl.textContent = `Noch ${mins}:${String(secs).padStart(2,'0')} Min warten`;
-      textEl.style.color = '#f87171';
-      dotEl.style.color  = '#f87171';
-    }
-  });
+      const agoMin  = (Date.now() - lastMs.getTime()) / 60000;
+      const readyIn = COOLDOWN_MIN - agoMin;
+
+      if (readyIn <= 0) {
+        const ago = Math.floor(agoMin);
+        textEl.textContent = `vor ${ago < 60 ? ago+' Min' : Math.floor(ago/60)+'h '+Math.floor(ago%60)+'m'} — ✅ Import möglich`;
+        textEl.style.color = '#4ade80';
+        dotEl.style.color  = '#4ade80';
+      } else {
+        const mins = Math.floor(readyIn);
+        const secs = Math.floor((readyIn % 1) * 60);
+        textEl.textContent = `Noch ${mins}:${String(secs).padStart(2,'0')} Min warten`;
+        textEl.style.color = '#f87171';
+        dotEl.style.color  = '#f87171';
+      }
+    });
+  } catch(e) { /* silent */ }
 }
-
-updateTimers();
-setInterval(updateTimers, 10000); // update every 10s
 
 const ALLIANCE_DATA = {{ alliance_trends | tojson }};
 const GUILD_ID = '{{ guild.guild_id }}';
@@ -692,6 +692,8 @@ function renderView(view) {
 document.addEventListener('DOMContentLoaded', () => {
   const active = '{{ active_tab }}';
   renderView(active);
+  updateTimers();
+  setInterval(updateTimers, 10000);
 });
 </script>
 {% endblock %}
