@@ -16,16 +16,37 @@
   .vle-wrapper { grid-template-columns: 1fr; }
 }
 
+/* ── View tabs ──────────────────────────────────────── */
+.view-tabs {
+  display: flex; gap: 0; margin-bottom: 0;
+  border-radius: 10px 10px 0 0; overflow: hidden;
+  border: 1px solid var(--border); border-bottom: none;
+}
+.view-tab {
+  flex: 1; padding: .55rem 1rem; font-size: .85rem; font-weight: 700;
+  cursor: pointer; border: none; text-align: center;
+  background: var(--bg-main); color: var(--text-muted);
+  transition: background .15s, color .15s;
+}
+.view-tab.active-fields   { background: #0e1f0a; color: #4ade80; }
+.view-tab.active-buildings { background: #12111e; color: #818cf8; }
+.view-tab:not([class*=active]):hover { background: rgba(255,255,255,.04); color: var(--text); }
+
 /* ── Village map ────────────────────────────────────── */
 .village-map-container {
   position: relative;
   width: 100%;
   padding-bottom: 90%;
-  border-radius: 16px;
+  border-radius: 0 0 16px 16px;
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0,0,0,0.7);
   background:
     radial-gradient(ellipse 70% 60% at 50% 55%, #2a4a20 0%, #1a3212 40%, #0e1f0a 70%, #080f06 100%);
+  transition: background .3s;
+}
+.village-map-container.mode-buildings {
+  background:
+    radial-gradient(ellipse 55% 50% at 50% 52%, #2a2230 0%, #181424 45%, #0e0c18 80%, #070610 100%);
 }
 .village-map-inner {
   position: absolute; inset: 0;
@@ -39,7 +60,7 @@
     radial-gradient(ellipse 85% 78% at 50% 52%, rgba(22,101,52,0.12) 0%, transparent 100%);
   pointer-events: none;
 }
-/* Village border ring */
+/* Village border ring — fields view */
 .village-map-inner::after {
   content: '';
   position: absolute;
@@ -47,6 +68,19 @@
   border-radius: 50%;
   border: 1px dashed rgba(255,255,255,0.07);
   pointer-events: none;
+  transition: border-color .3s, box-shadow .3s;
+}
+/* Buildings view: inner walls ring */
+.mode-buildings .village-map-inner::after {
+  top: 8%; left: 8%; right: 8%; bottom: 8%;
+  border-radius: 50%;
+  border: 2px solid rgba(139,92,246,0.25);
+  box-shadow: inset 0 0 60px rgba(99,102,241,0.08);
+}
+.mode-buildings .village-map-inner::before {
+  background-image:
+    radial-gradient(ellipse 50% 44% at 50% 50%, rgba(99,102,241,0.08) 0%, transparent 100%),
+    radial-gradient(ellipse 80% 72% at 50% 50%, rgba(67,56,202,0.06) 0%, transparent 100%);
 }
 
 /* ── Slot circles ───────────────────────────────────── */
@@ -166,22 +200,32 @@
   </div>
 
   <div class="vle-wrapper">
-    <!-- Village Map -->
+    <!-- Village Map + Tabs -->
     <div>
+      <!-- Tabs -->
+      <div class="view-tabs">
+        <button class="view-tab active-fields" id="tab-fields"
+                onclick="switchView('fields')">🌾 Felder</button>
+        <button class="view-tab" id="tab-buildings"
+                onclick="switchView('buildings')">🏛️ Dorf Inneres</button>
+      </div>
+
       <div class="village-map-container" id="village-map">
         <div class="village-map-inner" id="village-map-inner">
           <!-- slots injected by JS -->
         </div>
       </div>
 
-      <!-- Legend -->
+      <!-- Legend — changes per tab -->
       <div style="margin-top:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:0.9rem;">
         <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:0.5rem;">Legende</div>
-        <div class="legend-grid">
+        <div class="legend-grid" id="legend-fields">
           <div class="legend-dot"><div class="legend-swatch" style="background:#22c55e;"></div> 🌲 Holz</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#f97316;"></div> 🏺 Lehm</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#94a3b8;"></div> ⚙️ Eisen</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#eab308;"></div> 🌾 Getreide</div>
+        </div>
+        <div class="legend-grid" id="legend-buildings" style="display:none;">
           <div class="legend-dot"><div class="legend-swatch" style="background:#ef4444;"></div> ⚔️ Militär</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#f59e0b;"></div> 💰 Wirtschaft</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#6366f1;"></div> 🏛️ Verwaltung</div>
@@ -194,25 +238,27 @@
     <!-- Right panel -->
     <div class="slot-panel" id="slot-panel">
 
-      <!-- Add new slot -->
+      <!-- Add new slot — tab-aware -->
       <div style="margin-bottom:1rem;">
         <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">Add to map</div>
-        <div style="display:flex;flex-direction:column;gap:.35rem;">
-          <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
-            <button onclick="addSlot('resource','wood')"   style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#15532e;border:1px solid #22c55e;color:#86efac;font-size:.75rem;cursor:pointer;">🌲 Wood</button>
-            <button onclick="addSlot('resource','clay')"   style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#7c2d12;border:1px solid #f97316;color:#fed7aa;font-size:.75rem;cursor:pointer;">🏺 Clay</button>
-            <button onclick="addSlot('resource','iron')"   style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#1e293b;border:1px solid #94a3b8;color:#e2e8f0;font-size:.75rem;cursor:pointer;">⚙️ Iron</button>
-            <button onclick="addSlot('resource','wheat')"  style="flex:1;padding:.3rem .4rem;border-radius:6px;background:#713f12;border:1px solid #eab308;color:#fef08a;font-size:.75rem;cursor:pointer;">🌾 Wheat</button>
-          </div>
-          <div style="display:flex;gap:.3rem;align-items:center;">
-            <select id="new-bld-type" class="form-input" style="flex:1;font-size:.78rem;padding:.3rem .5rem;">
-              <option value="">— Building type —</option>
-            </select>
-            <button onclick="addSlot('building', document.getElementById('new-bld-type').value)"
-                    style="padding:.3rem .65rem;border-radius:6px;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#818cf8;font-size:.75rem;cursor:pointer;">
-              ➕
-            </button>
-          </div>
+
+        <!-- Fields add buttons -->
+        <div id="add-fields" style="display:flex;gap:.3rem;flex-wrap:wrap;">
+          <button onclick="addSlot('resource','wood')"  style="flex:1;padding:.32rem .35rem;border-radius:6px;background:#15532e;border:1px solid #22c55e;color:#86efac;font-size:.74rem;cursor:pointer;">🌲 Wood</button>
+          <button onclick="addSlot('resource','clay')"  style="flex:1;padding:.32rem .35rem;border-radius:6px;background:#7c2d12;border:1px solid #f97316;color:#fed7aa;font-size:.74rem;cursor:pointer;">🏺 Clay</button>
+          <button onclick="addSlot('resource','iron')"  style="flex:1;padding:.32rem .35rem;border-radius:6px;background:#1e293b;border:1px solid #94a3b8;color:#e2e8f0;font-size:.74rem;cursor:pointer;">⚙️ Iron</button>
+          <button onclick="addSlot('resource','wheat')" style="flex:1;padding:.32rem .35rem;border-radius:6px;background:#713f12;border:1px solid #eab308;color:#fef08a;font-size:.74rem;cursor:pointer;">🌾 Wheat</button>
+        </div>
+
+        <!-- Buildings add dropdown -->
+        <div id="add-buildings" style="display:none;display:flex;gap:.3rem;align-items:center;">
+          <select id="new-bld-type" class="form-input" style="flex:1;font-size:.78rem;padding:.3rem .5rem;">
+            <option value="">— Building type —</option>
+          </select>
+          <button onclick="addSlot('building', document.getElementById('new-bld-type').value)"
+                  style="padding:.3rem .7rem;border-radius:6px;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#818cf8;font-size:.8rem;cursor:pointer;font-weight:700;">
+            ➕
+          </button>
         </div>
       </div>
 
@@ -466,6 +512,9 @@ function makeDraggable(el, slotNum) {
 // ── Add new slot ──────────────────────────────────────────────────
 function addSlot(zone, building_type) {
   if (!building_type) { alert('Please select a building type first.'); return; }
+  // Ensure we're on the right tab
+  if (zone === 'resource' && currentView !== 'fields')    switchView('fields');
+  if (zone === 'building' && currentView !== 'buildings') switchView('buildings');
   const num = nextSlotNum++;
   // Place near center with slight random offset
   const px = 45 + Math.random() * 10;
@@ -599,7 +648,59 @@ async function deleteSelectedSlot() {
   document.getElementById('panel-content').style.display = 'none';
 }
 
+// ── View switching ─────────────────────────────────────────────────
+let currentView = 'fields';
+
+function switchView(view) {
+  currentView = view;
+  const map  = document.getElementById('village-map');
+  const tabF = document.getElementById('tab-fields');
+  const tabB = document.getElementById('tab-buildings');
+  const addF = document.getElementById('add-fields');
+  const addB = document.getElementById('add-buildings');
+  const legF = document.getElementById('legend-fields');
+  const legB = document.getElementById('legend-buildings');
+
+  if (view === 'fields') {
+    map.classList.remove('mode-buildings');
+    tabF.className = 'view-tab active-fields';
+    tabB.className = 'view-tab';
+    addF.style.display = 'flex';
+    addB.style.display = 'none';
+    legF.style.display = '';
+    legB.style.display = 'none';
+  } else {
+    map.classList.add('mode-buildings');
+    tabF.className = 'view-tab';
+    tabB.className = 'view-tab active-buildings';
+    addF.style.display = 'none';
+    addB.style.display = 'flex';
+    legF.style.display = 'none';
+    legB.style.display = '';
+  }
+
+  // Show only slots belonging to this view
+  slots.forEach(s => {
+    const el = slotEl(s.slot_num);
+    if (!el) return;
+    const belongs = view === 'fields' ? s.zone === 'resource' : s.zone === 'building';
+    el.style.display = belongs ? '' : 'none';
+  });
+
+  // Deselect if selected slot is from wrong zone
+  if (selectedSlotNum !== null) {
+    const s = slots.get(selectedSlotNum);
+    if (s && (view === 'fields') !== (s.zone === 'resource')) {
+      slotEl(selectedSlotNum)?.classList.remove('selected');
+      selectedSlotNum = null;
+      document.getElementById('panel-placeholder').style.display = '';
+      document.getElementById('panel-content').style.display = 'none';
+    }
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────
 slots.forEach(s => createSlotElement(s));
+switchView('fields');
 </script>
 {% endblock %}
