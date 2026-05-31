@@ -1729,7 +1729,7 @@ async def get_inactive_farms(
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
-            SELECT village_id, x, y, village_name, player_name, population, tribe,
+            SELECT village_id, x, y, village_name, player_name, tribe,
                    MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
                    COUNT(DISTINCT fetched_at) as snapshot_count,
                    MIN(population) as min_pop_val, MAX(population) as max_pop_val
@@ -1737,15 +1737,16 @@ async def get_inactive_farms(
             WHERE guild_id = ?
             GROUP BY village_id
             HAVING snapshot_count >= 2
-               AND CAST(max_pop_val AS REAL) - CAST(min_pop_val AS REAL) <= 2
+               AND CAST(max_pop_val AS REAL) - CAST(min_pop_val AS REAL) <= 5
                AND julianday(last_seen) - julianday(first_seen) >= ?
-               AND population >= ? AND population <= ?
-            ORDER BY population DESC
+               AND max_pop_val >= ? AND min_pop_val <= ?
+            ORDER BY max_pop_val DESC
         """, (guild_id, min_days, min_pop, max_pop)) as cur:
             rows = await cur.fetchall()
         result = []
         for r in rows:
             d = dict(r)
+            d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
             try:
                 from datetime import datetime as _dt
                 fs = _dt.fromisoformat(d["first_seen"])
