@@ -183,7 +183,7 @@ def _build_push_embed(data: dict, contributions: list[dict], status: str = "acti
 
 def _disabled_push_view(label: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
-    view.add_item(discord.ui.Button(label="I sent", emoji="📦", style=discord.ButtonStyle.primary, disabled=True))
+    view.add_item(discord.ui.Button(label="I send", emoji="📦", style=discord.ButtonStyle.primary, disabled=True))
     view.add_item(discord.ui.Button(label=label, style=discord.ButtonStyle.secondary, disabled=True))
     view.add_item(discord.ui.Button(label="Remove Channel", style=discord.ButtonStyle.danger, disabled=True))
     return view
@@ -196,7 +196,7 @@ def _disabled_push_view(label: str) -> discord.ui.View:
 class ResModal(discord.ui.Modal, title="Res-Push Request"):
     player_name = discord.ui.TextInput(label="Player Name", placeholder="Who needs the push?", max_length=100)
     coordinates = discord.ui.TextInput(label="Coordinates", placeholder="e.g. 500|500", max_length=50)
-    push_height = discord.ui.TextInput(label="Push Height", placeholder="e.g. 50000 (troops/resources)", max_length=50)
+    push_height = discord.ui.TextInput(label="Push Height (numbers + k/m only)", placeholder="e.g. 500k or 1m or 50000", max_length=20)
     reason = discord.ui.TextInput(
         label="Reason", placeholder="Why is this push needed?",
         required=False, style=discord.TextStyle.paragraph, max_length=500,
@@ -205,6 +205,16 @@ class ResModal(discord.ui.Modal, title="Res-Push Request"):
     async def on_submit(self, interaction: discord.Interaction):
         guild = interaction.guild
         config = await database.get_guild_config(str(guild.id))
+
+        # Validate push_height: only digits + k/m
+        import re as _re
+        ph = self.push_height.value.strip().lower()
+        if not _re.fullmatch(r'[\d]+[km]?', ph):
+            await interaction.response.send_message(
+                "⚠️ **Push Height** may only contain numbers and optionally 'k' or 'm' at the end.\n"
+                "Examples: `500k`, `1m`, `50000`", ephemeral=True
+            )
+            return
 
         if not config or not config.get("res_answer_channel_id"):
             await interaction.response.send_message(
@@ -380,6 +390,16 @@ class ResAnswerView(discord.ui.View):
                 overwrites[role] = discord.PermissionOverwrite(
                     view_channel=True, send_messages=True, manage_messages=True,
                 )
+        # Give all allowed_role_ids (Members) read + send access
+        for role_id_str in (config.get("allowed_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = interaction.guild.get_role(int(role_id_str))
+            if role and role not in overwrites:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True,
+                )
 
         safe_player = re.sub(r"[^a-z0-9]", "-", req["player_name"].lower())
         channel_name = f"push-{safe_player}"[:100]
@@ -454,7 +474,7 @@ class ResPushChannelView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="I sent", style=discord.ButtonStyle.primary,
+        label="I send", style=discord.ButtonStyle.primary,
         emoji="📦", custom_id="persistent:res_push_sent",
     )
     async def i_sent(self, interaction: discord.Interaction, button: discord.ui.Button):
