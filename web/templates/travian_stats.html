@@ -116,10 +116,10 @@
                style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
         <div style="display:flex;gap:.25rem;" id="catFilterA">
           <button class="cat-btn active" data-cat="all"  onclick="setCat('alliance','all',this)">Alle</button>
-          <button class="cat-btn"        data-cat="raid" onclick="setCat('alliance','raid',this)">⛏️ Räuber</button>
-          <button class="cat-btn"        data-cat="off"  onclick="setCat('alliance','off',this)">⚔️ PvP</button>
-          <button class="cat-btn"        data-cat="pve"  onclick="setCat('alliance','pve',this)">🐾 PvE</button>
-          <button class="cat-btn"        data-cat="def"  onclick="setCat('alliance','def',this)">🛡️ Def</button>
+          <button class="cat-btn"        data-cat="raid"    onclick="setCat('alliance','raid',this)">⛏️ Räuber</button>
+          <button class="cat-btn"        data-cat="off"     onclick="setCat('alliance','off',this)">⚔️ Angreifer</button>
+          <button class="cat-btn"        data-cat="climber" onclick="setCat('alliance','climber',this)">📈 Aufsteiger</button>
+          <button class="cat-btn"        data-cat="def"     onclick="setCat('alliance','def',this)">🛡️ Def</button>
         </div>
         <select id="sortKeyA" onchange="renderView('alliance')"
                 style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
@@ -248,7 +248,11 @@ const GUILD_ID = '{{ guild.guild_id }}';
 const sortState = { player: { key:'name', dir:1 }, alliance: { key:'name', dir:1 } };
 const catState  = { player: 'all', alliance: 'all' };
 
-const CAT_KEY = { raid:'raid_points', off:'off_points', pve:'pve_points', def:'def_points' };
+// Player: pve='pve_points'  |  Alliance: climber='population'
+const CAT_KEY = {
+  player:   { raid:'raid_points', off:'off_points', pve:'pve_points',  def:'def_points' },
+  alliance: { raid:'raid_points', off:'off_points', climber:'population', def:'def_points' },
+};
 
 function setCat(view, cat, btn) {
   catState[view] = cat;
@@ -484,7 +488,12 @@ function renderView(view) {
   const filter     = (document.getElementById(filterId)?.value || '').toLowerCase();
   const anomOnly   = document.getElementById(anomCheckId)?.checked || false;
 
-  const CATS = [
+  const CATS = view === 'alliance' ? [
+    { key:'raid_points', delta:'raid_delta',  label:'⛏️ Räuber',    color:'#f59e0b' },
+    { key:'off_points',  delta:'off_delta',   label:'⚔️ Angreifer', color:'#f87171' },
+    { key:'population',  delta:null,          label:'📈 Aufsteiger', color:'#818cf8' },
+    { key:'def_points',  delta:'def_delta',   label:'🛡️ Def',       color:'#4ade80' },
+  ] : [
     { key:'raid_points', delta:'raid_delta', label:'⛏️ Räuber', color:'#f59e0b' },
     { key:'off_points',  delta:'off_delta',  label:'⚔️ PvP',    color:'#f87171' },
     { key:'pve_points',  delta:'pve_delta',  label:'🐾 PvE',    color:'#a78bfa' },
@@ -514,8 +523,8 @@ function renderView(view) {
     .filter(([, tl]) => {
       const cat = catState[view];
       if (cat === 'all') return true;
-      const key = CAT_KEY[cat];
-      // Show only players who have non-zero data in this category
+      const key = (CAT_KEY[view] || CAT_KEY.player)[cat];
+      if (!key) return true;
       return tl.some(p => (p[key] || 0) > 0);
     })
     .sort(([a, tA], [b, tB]) => {
