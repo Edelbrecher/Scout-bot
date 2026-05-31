@@ -954,14 +954,31 @@ class DefendCloseView(discord.ui.View):
             msg = "⛔ Nur Leader/HC können den Channel schließen." if lang == "de" else "⛔ Only Leader/HC can close the channel."
             await interaction.response.send_message(msg, ephemeral=True)
             return
+        await database.close_defend_channel(str(interaction.channel.id))
         await interaction.response.send_message(
-            t(lang, "defend.closing", user=interaction.user.mention)
+            f"🔒 Channel wird archiviert von {interaction.user.mention}…"
         )
-        await asyncio.sleep(5)
         try:
-            await interaction.channel.delete(reason=t(lang, "defend.channel_closed_reason"))
-        except Exception:
-            pass
+            channel = interaction.channel
+            guild   = interaction.guild
+            # Make read-only for all
+            overwrites = dict(channel.overwrites)
+            for target, ow in overwrites.items():
+                ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+                ow.update(send_messages=False, add_reactions=False)
+                overwrites[target] = ow
+            ow_e = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+            ow_e.update(send_messages=False, add_reactions=False)
+            overwrites[guild.default_role] = ow_e
+
+            new_name = channel.name
+            if not new_name.startswith("🔒-"):
+                new_name = "🔒-" + new_name[:90]
+
+            await channel.edit(name=new_name, overwrites=overwrites,
+                               reason="Defend-Channel archiviert")
+        except Exception as e:
+            print(f"[hub] archive defend channel error: {e}")
 
 
 # ---------------------------------------------------------------------------

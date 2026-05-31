@@ -901,6 +901,94 @@ async def handle_announce_ep_cancelled(request: aiohttp_web.Request) -> aiohttp_
     return aiohttp_web.json_response({"ok": True, "dms": dm_sent})
 
 
+async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Archive a defend channel: make it read-only and rename with 🔒 prefix."""
+    try:
+        data = await request.json()
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild_id   = str(data.get("guild_id", ""))
+    channel_id = str(data.get("channel_id", ""))
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    try:
+        channel = guild.get_channel(int(channel_id))
+        if not channel:
+            channel = await guild.fetch_channel(int(channel_id))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+
+    try:
+        # Make channel read-only for everyone (keep viewing rights, remove send)
+        overwrites = dict(channel.overwrites)
+        for target, ow in overwrites.items():
+            ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+            ow.update(send_messages=False, add_reactions=False)
+            overwrites[target] = ow
+        # Also lock @everyone
+        ow_everyone = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+        ow_everyone.update(send_messages=False, add_reactions=False)
+        overwrites[guild.default_role] = ow_everyone
+
+        new_name = channel.name
+        if not new_name.startswith("🔒-"):
+            new_name = "🔒-" + new_name[:90]
+
+        await channel.edit(name=new_name, overwrites=overwrites,
+                           reason="Defend-Channel archiviert (via Web)")
+        await channel.send("🔒 **Dieser Channel wurde archiviert.** Keine weiteren Beiträge möglich.")
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    return aiohttp_web.json_response({"ok": True})
+
+
+async def handle_unarchive_defend_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Reopen an archived defend channel: restore send permissions."""
+    try:
+        data = await request.json()
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild_id   = str(data.get("guild_id", ""))
+    channel_id = str(data.get("channel_id", ""))
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    try:
+        channel = guild.get_channel(int(channel_id))
+        if not channel:
+            channel = await guild.fetch_channel(int(channel_id))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+
+    try:
+        # Re-enable send_messages (reset to None = inherit)
+        overwrites = dict(channel.overwrites)
+        for target, ow in overwrites.items():
+            ow = discord.PermissionOverwrite.from_pair(ow.allow, ow.deny)
+            ow.update(send_messages=None, add_reactions=None)
+            overwrites[target] = ow
+
+        new_name = channel.name
+        if new_name.startswith("🔒-"):
+            new_name = new_name[len("🔒-"):]
+
+        await channel.edit(name=new_name, overwrites=overwrites,
+                           reason="Defend-Channel wieder geöffnet (via Web)")
+        await channel.send("🔓 **Channel wieder geöffnet!** Weitere Beiträge sind jetzt möglich.")
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    return aiohttp_web.json_response({"ok": True})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -917,6 +1005,8 @@ async def start_api_server():
     app.router.add_post("/api/op-notify", handle_op_notify)
     app.router.add_post("/api/announce-ep", handle_announce_ep)
     app.router.add_post("/api/announce-ep-cancelled", handle_announce_ep_cancelled)
+    app.router.add_post("/api/archive-defend-channel", handle_archive_defend_channel)
+    app.router.add_post("/api/unarchive-defend-channel", handle_unarchive_defend_channel)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

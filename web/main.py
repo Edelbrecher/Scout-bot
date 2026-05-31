@@ -7820,6 +7820,13 @@ async def defend_close(request: Request, guild_id: str, channel_id: str):
     if not (is_admin or is_owner or has_rights):
         return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=no_permission", status_code=303)
     await database.close_defend_channel(channel_id)
+    # Tell bot to archive the Discord channel (read-only, not deleted)
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            await client.post("http://bot:7777/api/archive-defend-channel",
+                              json={"guild_id": guild_id, "channel_id": channel_id})
+    except Exception:
+        pass  # Bot might be offline; DB is updated regardless
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=closed", status_code=303)
 
 
@@ -7829,9 +7836,24 @@ async def defend_reopen(request: Request, guild_id: str, channel_id: str):
     if err: return err
     err = await _require_guild_async(session, guild_id)
     if err: return err
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    is_admin   = session.get("type") == "admin"
+    is_owner   = guild and guild.get("owner_discord_id") == uid
+    perms      = await database.get_member_permissions(guild_id, uid)
+    has_rights = "defend_manage" in perms or "ally_manage" in perms
+    if not (is_admin or is_owner or has_rights):
+        return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=no_permission", status_code=303)
     async with __import__("aiosqlite").connect(database.DB_PATH) as db:
         await db.execute("UPDATE defend_channels SET status='open' WHERE channel_id=?", (channel_id,))
         await db.commit()
+    # Tell bot to unarchive the Discord channel
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            await client.post("http://bot:7777/api/unarchive-defend-channel",
+                              json={"guild_id": guild_id, "channel_id": channel_id})
+    except Exception:
+        pass
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?show=closed&flash=reopened", status_code=303)
 
 
