@@ -4661,10 +4661,14 @@ async def my_ally_page(request: Request, guild_id: str):
     is_lead = bool(ally_group)
     is_editor = is_lead or await has_perm(request, guild_id, "ally_manage")
 
-    # Load member troop data keyed by discord_id (primary) + travian_name (fallback)
-    all_troops = await database.get_member_troops(guild_id) if (ally_group or membership) else []
-    lb_by_discord: dict = {r["discord_id"]: r for r in all_troops}
-    lb_by_travian: dict = {r["travian_name"]: r for r in all_troops if r.get("travian_name")}
+    # Load member troop data — cross-guild lookup by discord_id so members
+    # who uploaded in a different guild context still show up
+    all_member_discord_ids = (
+        [m["discord_id"] for m in members if m.get("discord_id")]
+        or [m["discord_id"] for m in member_view_members if m.get("discord_id")]
+    )
+    lb_by_discord: dict = await database.get_member_troops_for_discord_ids(all_member_discord_ids)
+    lb_by_travian: dict = {r["travian_name"]: r for r in lb_by_discord.values() if r.get("travian_name")}
 
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
@@ -5048,7 +5052,7 @@ async def my_ally_member_detail(request: Request, guild_id: str, discord_id: str
     members = await database.get_ally_members(group["id"])
     member = next((m for m in members if m["discord_id"] == discord_id), None)
 
-    # Troop data
+    # Troop data — cross-guild fallback so data from other guild contexts is found
     troops = await database.get_member_troops_single(guild_id, discord_id)
 
     # Editor check

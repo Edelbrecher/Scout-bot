@@ -6006,18 +6006,57 @@ async def get_member_troops(guild_id: str) -> list[dict]:
 
 
 async def get_member_troops_single(guild_id: str, discord_id: str) -> dict | None:
+    """Return member troop data — prefers current guild, falls back to any guild (latest entry)."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        # Try current guild first
         async with db.execute(
             "SELECT * FROM member_troops WHERE guild_id=? AND discord_id=?",
             (guild_id, discord_id)
         ) as cur:
             row = await cur.fetchone()
+        if not row:
+            # Fallback: most recent entry across any guild
+            async with db.execute(
+                "SELECT * FROM member_troops WHERE discord_id=? ORDER BY updated_at DESC LIMIT 1",
+                (discord_id,)
+            ) as cur:
+                row = await cur.fetchone()
     if not row:
         return None
     r = dict(row)
     r["villages"] = _json_op.loads(r["villages_json"]) if r["villages_json"] else []
     return r
+
+
+async def get_member_troops_for_discord_ids(discord_ids: list[str]) -> dict[str, dict]:
+    """Return most recent troop entry per discord_id, across all guilds.
+    Returns dict: discord_id -> row dict (with 'villages' list parsed)."""
+    if not discord_ids:
+        return {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        placeholders = ",".join("?" * len(discord_ids))
+        # Pick the row with the latest updated_at per discord_id
+        rows = await db.execute_fetchall(f"""
+            SELECT mt.*
+            FROM member_troops mt
+            INNER JOIN (
+                SELECT discord_id, MAX(updated_at) AS max_updated
+                FROM member_troops
+                WHERE discord_id IN ({placeholders})
+                GROUP BY discord_id
+            ) latest ON mt.discord_id = latest.discord_id
+                     AND mt.updated_at = latest.max_updated
+        """, discord_ids)
+    result = {}
+    for r in rows:
+        d = dict(r)
+        d["villages"] = _json_op.loads(d["villages_json"]) if d.get("villages_json") else []
+        # Only keep first match per discord_id (in case of tie)
+        if d["discord_id"] not in result:
+            result[d["discord_id"]] = d
+    return result
 
 
 async def get_member_leaderboard(guild_id: str) -> list[dict]:
