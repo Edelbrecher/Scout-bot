@@ -2176,22 +2176,21 @@ async def res_push_stats(request: Request, guild_id: str):
 async def res_request_inactive(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
-    # Verify the request belongs to this guild
     req = await database.get_res_request_by_id_web(request_id)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "inactive")
-    # Refresh the Discord embed via bot internal API
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            await client.post(
-                "http://localhost:7777/api/refresh-res-push",
-                json={"request_id": request_id},
-            )
-    except Exception:
-        pass
+    # Move Discord channel to archive
+    channel_id = req.get("push_channel_id") or ""
+    if channel_id:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                await client.post("http://bot:7777/api/archive-res-push-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id})
+        except Exception:
+            pass
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 
@@ -2199,21 +2198,21 @@ async def res_request_inactive(request: Request, guild_id: str, request_id: int)
 async def res_request_activate(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     req = await database.get_res_request_by_id_web(request_id)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "accepted")
-    # Refresh the Discord embed via bot internal API
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            await client.post(
-                "http://localhost:7777/api/refresh-res-push",
-                json={"request_id": request_id},
-            )
-    except Exception:
-        pass
+    # Move Discord channel back from archive
+    channel_id = req.get("push_channel_id") or ""
+    if channel_id:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                await client.post("http://bot:7777/api/unarchive-res-push-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id})
+        except Exception:
+            pass
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
 
 

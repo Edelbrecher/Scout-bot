@@ -1033,6 +1033,114 @@ async def handle_unarchive_defend_channel(request: aiohttp_web.Request) -> aioht
     return aiohttp_web.json_response({"ok": True})
 
 
+ARCHIVE_RES_NAME = "📦 Archive-Pushes"
+
+
+async def _get_or_create_res_archive_category(guild: discord.Guild) -> discord.CategoryChannel:
+    for cat in guild.categories:
+        if cat.name == ARCHIVE_RES_NAME:
+            return cat
+    return await guild.create_category(
+        ARCHIVE_RES_NAME,
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, manage_channels=True
+            ),
+        },
+        reason="Res-Push archive category auto-created",
+    )
+
+
+async def handle_archive_res_push_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Move a res-push channel to 📦 Archive-Pushes and make it read-only."""
+    try:
+        data = await request.json()
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild_id   = str(data.get("guild_id", ""))
+    channel_id = str(data.get("channel_id", ""))
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    try:
+        channel = guild.get_channel(int(channel_id))
+        if not channel:
+            channel = await guild.fetch_channel(int(channel_id))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+
+    try:
+        archive_cat = await _get_or_create_res_archive_category(guild)
+
+        # Build read-only overwrites — copy existing, strip send rights
+        overwrites = {}
+        for target, ow in channel.overwrites.items():
+            allow, deny = ow.pair()
+            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
+            new_ow.update(send_messages=False, add_reactions=False)
+            overwrites[target] = new_ow
+        # Fully hide from regular members, keep bot access
+        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False, send_messages=False)
+        overwrites[guild.me] = discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
+
+        await channel.edit(category=archive_cat, overwrites=overwrites, reason="Res-Push archived")
+        await channel.send("📦 **This push channel has been archived.** No further contributions possible.")
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    return aiohttp_web.json_response({"ok": True})
+
+
+async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Move a res-push channel back from archive and restore send permissions."""
+    try:
+        data = await request.json()
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    guild_id   = str(data.get("guild_id", ""))
+    channel_id = str(data.get("channel_id", ""))
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    try:
+        channel = guild.get_channel(int(channel_id))
+        if not channel:
+            channel = await guild.fetch_channel(int(channel_id))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+
+    try:
+        config = await database.get_guild_config(guild_id)
+        cat_id = (config or {}).get("res_push_category_id")
+        target_cat = guild.get_channel(int(cat_id)) if cat_id else None
+
+        # Restore send_messages permissions
+        overwrites = {}
+        for target, ow in channel.overwrites.items():
+            allow, deny = ow.pair()
+            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
+            new_ow.update(send_messages=None, add_reactions=None)
+            overwrites[target] = new_ow
+
+        edit_kwargs = {"overwrites": overwrites, "reason": "Res-Push channel reactivated"}
+        if target_cat:
+            edit_kwargs["category"] = target_cat
+
+        await channel.edit(**edit_kwargs)
+        await channel.send("🔓 **This push channel has been reactivated!** Contributions are open again.")
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    return aiohttp_web.json_response({"ok": True})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1051,6 +1159,8 @@ async def start_api_server():
     app.router.add_post("/api/announce-ep-cancelled", handle_announce_ep_cancelled)
     app.router.add_post("/api/archive-defend-channel", handle_archive_defend_channel)
     app.router.add_post("/api/unarchive-defend-channel", handle_unarchive_defend_channel)
+    app.router.add_post("/api/archive-res-push-channel", handle_archive_res_push_channel)
+    app.router.add_post("/api/unarchive-res-push-channel", handle_unarchive_res_push_channel)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)
