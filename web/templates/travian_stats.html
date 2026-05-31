@@ -284,7 +284,9 @@ function updateTimers() {
         return;
       }
 
-      const normalized = last.replace(' ', 'T').replace(/(\d{2}:\d{2})$/, '$1:00');
+      // Replace space separator with T; add :00 seconds only if not already present
+      const withT = last.replace(' ', 'T');
+      const normalized = /\d{2}:\d{2}:\d{2}/.test(withT) ? withT : withT + ':00';
       const lastMs  = new Date(normalized + (normalized.endsWith('Z') || normalized.includes('+') ? '' : 'Z'));
       if (isNaN(lastMs.getTime())) return;
 
