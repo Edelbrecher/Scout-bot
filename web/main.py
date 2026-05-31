@@ -779,22 +779,27 @@ async def _sync_private_channel_permissions(guild_id: str, private_channel_role_
                 pass
 
 
-async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str, archive_role_ids: str = ""):
-    """Set archive channel: @everyone hidden, archive_role_ids (or fallback scout roles) can view."""
+async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allowed_role_ids: str, archive_role_ids: str = "") -> tuple[int, str]:
+    """Set archive channel: @everyone hidden, archive_role_ids (or fallback scout roles) can view.
+    Returns (status_code, response_text)."""
     token = os.environ.get("DISCORD_TOKEN", "")
+    if not token:
+        return 0, "no token"
     # Use dedicated archive roles if set, otherwise fall back to scout roles
     effective_roles = archive_role_ids.strip() if archive_role_ids and archive_role_ids.strip() else allowed_role_ids
     overwrites = [
-        {"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL},  # @everyone
+        {"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL},  # @everyone deny view
     ]
     for role_id in [r.strip() for r in effective_roles.split(",") if r.strip()]:
         overwrites.append({"id": role_id, "type": 0, "allow": VIEW_CHANNEL, "deny": "0"})
     async with httpx.AsyncClient() as client:
-        await client.patch(
+        r = await client.patch(
             f"https://discord.com/api/v10/channels/{archive_channel_id}",
             headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
             json={"permission_overwrites": overwrites},
+            timeout=10,
         )
+    return r.status_code, r.text
 
 
 async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str):
@@ -1807,15 +1812,18 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     priv_ids    = (guild_row or {}).get("private_channel_role_ids") or ""
     archive_ids = (guild_row or {}).get("archive_role_ids") or ""
 
+    archive_sync_status = None
     if field == "allowed_role_ids":
         if guild_row and guild_row.get("archive_channel_id"):
-            await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
+            sc, _ = await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
+            archive_sync_status = sc
         asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
         asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
 
     if field == "archive_role_ids":
         if guild_row and guild_row.get("archive_channel_id"):
-            asyncio.create_task(_sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids))
+            sc, body = await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
+            archive_sync_status = sc
 
     if field == "defend_role_ids":
         asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
@@ -1823,7 +1831,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if field in ("allowed_role_ids", "private_channel_role_ids"):
         asyncio.create_task(_sync_private_channel_permissions(guild_id, priv_ids, allowed_ids))
 
-    return JSONResponse({"added": added})
+    return JSONResponse({"added": added, "archive_sync": archive_sync_status})
 
 
 @app.post("/guild/{guild_id}/reset-scout")
@@ -1906,7 +1914,7 @@ async def auto_setup(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/fix-archive-perms")
 async def fix_archive_perms(request: Request, guild_id: str):
-    """Fix bot permissions on the archive channel."""
+    """Fix bot permissions on the archive channel and re-sync role visibility."""
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -1921,6 +1929,7 @@ async def fix_archive_perms(request: Request, guild_id: str):
     archive_channel_id = guild["archive_channel_id"]
 
     async with httpx.AsyncClient() as client:
+        # 1) Fix bot's own permissions
         bot_user_r = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
         if bot_user_r.status_code != 200:
             return RedirectResponse(f"/guild/{guild_id}?error=bot_id_failed", status_code=303)
@@ -1931,7 +1940,14 @@ async def fix_archive_perms(request: Request, guild_id: str):
             json={"allow": ALLOW_BOT, "deny": "0", "type": 1},
         )
         if r.status_code not in (200, 201, 204):
-            return RedirectResponse(f"/guild/{guild_id}/settings?flash=⚠️+Fehler:+perms_{r.status_code}", status_code=303)
+            return RedirectResponse(f"/guild/{guild_id}/settings?flash=⚠️+Fehler:+bot_perms_{r.status_code}", status_code=303)
+
+    # 2) Re-sync role visibility (@everyone deny + allowed roles allow)
+    allowed_ids = guild.get("allowed_role_ids") or ""
+    archive_ids = guild.get("archive_role_ids") or ""
+    sc, body = await _sync_archive_permissions(guild_id, archive_channel_id, allowed_ids, archive_ids)
+    if sc not in (200, 201, 204):
+        return RedirectResponse(f"/guild/{guild_id}/settings?flash=⚠️+Bot-Perms+ok,+Rollen-Sync+Fehler+{sc}", status_code=303)
 
     return RedirectResponse(f"/guild/{guild_id}/settings?flash=✅+Berechtigungen+erfolgreich+repariert", status_code=303)
 
