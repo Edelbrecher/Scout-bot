@@ -5758,11 +5758,28 @@ async def farming_page(
     request: Request,
     guild_id: str,
     saved: str = "",
+    tab: str = "inactive",
+    q: str = "",
+    # Basic inactive filters
     min_days: int = 1,
     min_pop: int = 0,
     max_pop: int = 9999,
-    tab: str = "inactive",
-    q: str = "",
+    # Advanced filters (merged from inactive-search)
+    ref_x: Optional[int] = None,
+    ref_y: Optional[int] = None,
+    min_dist: Optional[float] = None,
+    max_dist: Optional[float] = None,
+    min_player_pop: Optional[int] = None,
+    max_player_pop: Optional[int] = None,
+    max_pop_increase: Optional[int] = None,
+    player_filter: str = "",
+    alliance_filter: str = "",
+    exclude_players: str = "",
+    exclude_alliances: str = "",
+    include_natars: bool = False,
+    tribes: Optional[List[int]] = Query(default=None),
+    in_farmlist: str = "",   # "" | "no" | "yes"
+    advanced: bool = False,  # show advanced filter panel
 ):
     session, err = _require_session(request)
     if err: return err
@@ -5772,11 +5789,11 @@ async def farming_page(
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
+    uid = session.get("discord_id", "")
     is_admin = session.get("guilds") is None
-
-    # Auto-fetch first snapshot if none exists and world is configured
-    # Skip auto-fetch right after a manual clear so the user sees an empty state
     tw_world = (guild.get("tw_world") or "").strip()
+
+    # Auto-fetch first snapshot if none exists
     auto_fetched = False
     auto_fetch_error = ""
     if tw_world and saved != "snapshots_cleared":
@@ -5788,32 +5805,91 @@ async def farming_page(
             except Exception as e:
                 auto_fetch_error = str(e)
 
-    farm_stats = await database.get_farm_stats(guild_id)
+    farm_stats   = await database.get_farm_stats(guild_id)
     snap_pop_range = await database.get_snapshot_pop_range(guild_id)
-    inactive_farms = await database.get_inactive_farms(guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
-    farm_list = await database.get_farm_list(guild_id)
-    cross_reference = await database.get_farming_cross_reference(guild_id, min_days=min_days)
+    farm_list    = await database.get_farm_list(guild_id)
+    cross_reference  = await database.get_farming_cross_reference(guild_id, min_days=min_days)
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
-    # All coords the user has on their farmlist (active or inactive)
     farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
+
+    # Farmlist cross-reference (from imported farmlist analysis)
+    farmlist_xy = await database.get_farmlist_xy_lookup(guild_id, uid)
+    has_farmlist = bool(farmlist_xy)
+
+    # Detect if any advanced filter is active
+    _advanced_active = any([
+        ref_x is not None, ref_y is not None,
+        min_dist is not None, max_dist is not None,
+        min_player_pop is not None, max_player_pop is not None,
+        max_pop_increase is not None,
+        player_filter.strip(), alliance_filter.strip(),
+        exclude_players.strip(), exclude_alliances.strip(),
+        include_natars, tribes, in_farmlist,
+    ])
+
+    # Choose query: advanced (search_inactive_advanced) or basic (get_inactive_farms)
+    if _advanced_active and farm_stats.get("snapshot_count", 0) >= 2:
+        adv_result = await database.search_inactive_advanced(
+            guild_id=guild_id,
+            ref_x=ref_x or 0,
+            ref_y=ref_y or 0,
+            max_pop_increase=max_pop_increase if max_pop_increase is not None else 999,
+            min_pop=min_pop,
+            max_pop=max_pop if max_pop < 9999 else (snap_pop_range.get("max_pop", 9999) if snap_pop_range else 9999),
+            min_player_pop=min_player_pop or 0,
+            max_player_pop=max_player_pop if max_player_pop is not None else 999999,
+            min_distance=min_dist or 0.0,
+            max_distance=max_dist if max_dist is not None else 9999.0,
+            player_filter=player_filter,
+            alliance_filter=alliance_filter,
+            exclude_players=exclude_players,
+            exclude_alliances=exclude_alliances,
+            include_natars=include_natars,
+            tribes=tribes or [],
+            limit=500,
+        )
+        inactive_farms_raw = adv_result.get("villages", [])
+        # Annotate with farmlist info
+        for v in inactive_farms_raw:
+            v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
+            v.setdefault("days_tracked", 0)
+            v.setdefault("population", v.get("population", 0))
+        # Apply in_farmlist filter
+        if in_farmlist == "no":
+            inactive_farms = [v for v in inactive_farms_raw if not v["farmlist_groups"]]
+        elif in_farmlist == "yes":
+            inactive_farms = [v for v in inactive_farms_raw if v["farmlist_groups"]]
+        else:
+            inactive_farms = inactive_farms_raw
+    else:
+        inactive_farms_raw = await database.get_inactive_farms(
+            guild_id, min_days=min_days, min_pop=min_pop, max_pop=max_pop)
+        for v in inactive_farms_raw:
+            v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
+        if in_farmlist == "no":
+            inactive_farms = [v for v in inactive_farms_raw if not v["farmlist_groups"]]
+        elif in_farmlist == "yes":
+            inactive_farms = [v for v in inactive_farms_raw if v["farmlist_groups"]]
+        else:
+            inactive_farms = inactive_farms_raw
+
+    # Alliance names for autocomplete
+    alliance_names = await database.get_alliance_names_from_snapshot(guild_id)
 
     # Growth analysis
     growth_data = await database.get_player_growth(guild_id, limit=100)
 
-    # Search — auto-fetch snapshot on-demand if none exists yet
+    # Map search
     search_results = []
     search_error = ""
     snap_count_for_search = await database.get_snapshot_count(guild_id)
     if q.strip():
-        if snap_count_for_search == 0:
-            if tw_world:
-                try:
-                    await _fetch_and_save_snapshot(guild_id, tw_world)
-                    snap_count_for_search = 1
-                except Exception as e:
-                    search_error = f"Snapshot konnte nicht geladen werden: {e}"
-            else:
-                search_error = "Keine Travian-Welt konfiguriert. Bitte erst eine Welt-URL unter Map-Einstellungen eintragen."
+        if snap_count_for_search == 0 and tw_world:
+            try:
+                await _fetch_and_save_snapshot(guild_id, tw_world)
+                snap_count_for_search = 1
+            except Exception as e:
+                search_error = f"Snapshot konnte nicht geladen werden: {e}"
         if not search_error:
             search_results = await database.search_map_snapshot(guild_id, q.strip())
 
@@ -5840,7 +5916,77 @@ async def farming_page(
         "auto_fetch_error": auto_fetch_error,
         "snap_count_for_search": snap_count_for_search,
         "snap_pop_range": snap_pop_range,
+        # Advanced filter values
+        "ref_x": ref_x or 0, "ref_y": ref_y or 0,
+        "min_dist": min_dist or 0, "max_dist": max_dist or "",
+        "min_player_pop": min_player_pop or 0,
+        "max_player_pop": max_player_pop or "",
+        "max_pop_increase": max_pop_increase if max_pop_increase is not None else "",
+        "player_filter": player_filter,
+        "alliance_filter": alliance_filter,
+        "exclude_players": exclude_players,
+        "exclude_alliances": exclude_alliances,
+        "include_natars": include_natars,
+        "tribes": tribes or [],
+        "in_farmlist": in_farmlist,
+        "advanced": advanced or _advanced_active,
+        "has_farmlist": has_farmlist,
+        "alliance_names": [a["alliance_name"] for a in alliance_names],
     })
+
+
+@app.post("/guild/{guild_id}/farming/import-farmlist")
+async def farming_import_farmlist(
+    request: Request, guild_id: str,
+    farmlist_text: str = Form(""),
+):
+    """Import a farmlist paste directly from the farming intelligence page."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    farms = parse_farmlist(farmlist_text)
+    if not farms:
+        return RedirectResponse(f"/guild/{guild_id}/farming?tab=inactive&saved=farmlist_empty", status_code=303)
+    # Compute stats and save as farmlist analysis
+    from collections import defaultdict as _dd
+    _grp: dict = _dd(list)
+    for f in farms:
+        _grp[f["group"]].append(f)
+    group_stats = []
+    for gn, gf in _grp.items():
+        non_nat = [f for f in gf if not f["is_natar"] and not f["is_oasis"]]
+        group_stats.append({
+            "name": gn, "total": len(gf),
+            "gut": sum(1 for f in gf if f["rating"] == "gut"),
+            "ok":  sum(1 for f in gf if f["rating"] == "ok"),
+            "leer": sum(1 for f in gf if f["rating"] == "leer"),
+            "natars": sum(1 for f in gf if f["is_natar"]),
+            "res_last": sum(f["res_last"] for f in gf),
+            "res_total": sum(f["res_total"] for f in gf),
+            "avg_dist": round(sum(f["distance"] for f in non_nat) / len(non_nat), 1) if non_nat else 0,
+            "lists": sorted({f["list_name"] for f in gf}),
+        })
+    stats = {
+        "total": len(farms),
+        "gut": sum(1 for f in farms if f["rating"] == "gut"),
+        "ok":  sum(1 for f in farms if f["rating"] == "ok"),
+        "leer": sum(1 for f in farms if f["rating"] == "leer"),
+        "avg_res": round(sum(f["res_last"] for f in farms) / len(farms), 1) if farms else 0,
+        "avg_dist": round(sum(f["distance"] for f in farms) / len(farms), 1) if farms else 0,
+        "total_res_last": sum(f["res_last"] for f in farms),
+        "total_res_total": sum(f["res_total"] for f in farms),
+    }
+    await database.save_farmlist_analysis(
+        guild_id, session.get("discord_id", ""),
+        session.get("username", ""), stats, group_stats, farms,
+    )
+    return RedirectResponse(
+        f"/guild/{guild_id}/farming?tab=inactive&saved=farmlist_imported&advanced=1",
+        status_code=303
+    )
 
 
 @app.post("/guild/{guild_id}/farming/snapshot")
