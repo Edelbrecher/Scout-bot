@@ -311,8 +311,32 @@ async def can_access_guild_async(session: dict, guild_id: str) -> bool:
     return False
 
 
+_DISCORD_BOT_UA = re.compile(r'Discordbot|Twitterbot|facebookexternalhit|LinkedInBot|Slackbot', re.I)
+
+def _og_preview_response(request: Request) -> Response:
+    """Return a minimal HTML page with OG tags for link-preview bots."""
+    url = str(request.url)
+    html = f"""<!DOCTYPE html><html><head>
+<meta charset="UTF-8"/>
+<meta property="og:site_name" content="TravOps"/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="TravOps — Travian Allianz-Management"/>
+<meta property="og:description" content="Scout-Tracking, Einsatzplanung, Defend-Koordination und mehr für Travian Legends."/>
+<meta property="og:image" content="https://travops.online/static/logo.png"/>
+<meta property="og:image:width" content="512"/>
+<meta property="og:image:height" content="512"/>
+<meta property="og:url" content="{url}"/>
+<meta name="theme-color" content="#5865f2"/>
+</head><body></body></html>"""
+    return HTMLResponse(html)
+
+
 def _require_session(request: Request):
     """Returns (session, error_response). error_response is set if auth fails."""
+    # Let link-preview bots (Discord, Slack, …) see OG tags instead of OAuth redirect
+    ua = request.headers.get("user-agent", "")
+    if _DISCORD_BOT_UA.search(ua):
+        return None, _og_preview_response(request)
     session = get_session(request)
     if not session:
         return None, RedirectResponse("/login", status_code=303)
