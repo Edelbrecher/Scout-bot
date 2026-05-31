@@ -2172,6 +2172,34 @@ async def res_push_stats(request: Request, guild_id: str):
     return templates.TemplateResponse("res_push_stats.html", {"request": request, "guild": guild, "stats": stats})
 
 
+async def _call_res_archive(guild_id: str, channel_id: str) -> str:
+    """Call bot to archive a res-push channel. Returns 'archived'|'no_channel'|'err:...'"""
+    if not channel_id:
+        return "no_channel"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.post("http://bot:7777/api/archive-res-push-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id})
+            d = r.json()
+            return "archived" if d.get("ok") else f"err:{d.get('error','?')[:60]}"
+    except Exception as e:
+        return f"err:{str(e)[:60]}"
+
+
+async def _call_res_unarchive(guild_id: str, channel_id: str, requester_id: str = "") -> str:
+    if not channel_id:
+        return "no_channel"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.post("http://bot:7777/api/unarchive-res-push-channel",
+                                  json={"guild_id": guild_id, "channel_id": channel_id,
+                                        "requester_id": requester_id})
+            d = r.json()
+            return "unarchived" if d.get("ok") else f"err:{d.get('error','?')[:60]}"
+    except Exception as e:
+        return f"err:{str(e)[:60]}"
+
+
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/inactive")
 async def res_request_inactive(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
@@ -2182,16 +2210,25 @@ async def res_request_inactive(request: Request, guild_id: str, request_id: int)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "inactive")
-    # Move Discord channel to archive
-    channel_id = req.get("push_channel_id") or ""
-    if channel_id:
-        try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                await client.post("http://bot:7777/api/archive-res-push-channel",
-                                  json={"guild_id": guild_id, "channel_id": channel_id})
-        except Exception:
-            pass
-    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
+    bot = await _call_res_archive(guild_id, req.get("push_channel_id") or "")
+    from urllib.parse import quote
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed&bot={quote(bot)}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/requests/{request_id}/archive")
+async def res_request_archive(request: Request, guild_id: str, request_id: int):
+    """Explicit archive: move to Archive-Pushes without changing status."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    req = await database.get_res_request_by_id_web(request_id)
+    if not req or req.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
+    await database.set_res_request_status_by_id(request_id, "inactive")
+    bot = await _call_res_archive(guild_id, req.get("push_channel_id") or "")
+    from urllib.parse import quote
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed&bot={quote(bot)}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/activate")
@@ -2204,17 +2241,9 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "accepted")
-    # Move Discord channel back from archive, pass requester_id to restore their access
-    channel_id = req.get("push_channel_id") or ""
-    if channel_id:
-        try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                await client.post("http://bot:7777/api/unarchive-res-push-channel",
-                                  json={"guild_id": guild_id, "channel_id": channel_id,
-                                        "requester_id": req.get("user_id", "")})
-        except Exception:
-            pass
-    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
+    bot = await _call_res_unarchive(guild_id, req.get("push_channel_id") or "", req.get("user_id",""))
+    from urllib.parse import quote
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed&bot={quote(bot)}", status_code=303)
 
 
 async def _close_scout_channel_after_delay(channel_id: str, token: str, delay: int = 120):
@@ -2830,17 +2859,23 @@ async def guild_map_heatmap_data(request: Request, guild_id: str):
 async def res_request_remove(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     req = await database.get_res_request_by_id_web(request_id)
     if not req or req.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     if req.get("push_channel_id"):
-        bot_token = os.environ.get("DISCORD_TOKEN", "")
-        async with httpx.AsyncClient() as client:
-            await client.delete(f"https://discord.com/api/v10/channels/{req['push_channel_id']}", headers={"Authorization": f"Bot {bot_token}"})
+        try:
+            bot_token = os.environ.get("DISCORD_TOKEN", "")
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.delete(
+                    f"https://discord.com/api/v10/channels/{req['push_channel_id']}",
+                    headers={"Authorization": f"Bot {bot_token}"},
+                )
+        except Exception:
+            pass
     await database.delete_res_request(request_id)
-    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=removed", status_code=303)
 
 
 # ---------------------------------------------------------------------------
