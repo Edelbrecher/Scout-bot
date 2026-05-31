@@ -70,33 +70,53 @@
             <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .6rem;">
               Click one or more areas of the map. Coordinates are set automatically.
             </p>
-            <div style="display:inline-grid;grid-template-columns:repeat(3,72px);grid-template-rows:repeat(3,52px);gap:3px;
-                        background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:4px;margin-bottom:.75rem;">
-              {# cells: (key, x1, y1, x2, y2, label)  — y1=south edge, y2=north edge #}
-              {# 3x3 non-overlapping thirds: x cols at -133/133, y rows at -133/133 #}
-              {% set cells = [
-                ('NW', -400, 133, -133, 400, 'NW'),
-                ('N',  -133, 133,  133, 400, 'N'),
-                ('NE',  133, 133,  400, 400, 'NE'),
-                ('W',  -400,-133, -133, 133, 'W'),
-                ('C',  -133,-133,  133, 133, 'Center'),
-                ('E',   133,-133,  400, 133, 'E'),
-                ('SW', -400,-400, -133,-133, 'SW'),
-                ('S',  -133,-400,  133,-133, 'S'),
-                ('SE',  133,-400,  400,-133, 'SE'),
-              ] %}
-              {% for key, cx1, cy1, cx2, cy2, label in cells %}
+            {# 5-sector grid: NW/NE/Center/SW/SE — divides at x=0, y=0 #}
+            {# Center = inner 200x200 area around (0,0) #}
+            {% set cells = [
+              ('NW', -400,   0,   0, 400, 'NW'),
+              ('NE',    0,   0, 400, 400, 'NE'),
+              ('C',  -100,-100, 100, 100, 'Center'),
+              ('SW', -400,-400,   0,   0, 'SW'),
+              ('SE',    0,-400, 400,   0, 'SE'),
+            ] %}
+            <div style="display:grid;grid-template-columns:repeat(2,80px);grid-template-rows:repeat(3,52px);gap:4px;
+                        background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:.75rem;">
+              {# Row 1: NW | NE #}
+              {% for key, cx1, cy1, cx2, cy2, label in cells %}{% if key in ['NW','NE'] %}
               <div class="qcell" id="qc-{{ key }}"
                    data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
                    onclick="toggleQuadrant('{{ key }}')"
-                   title="{{ label }} ({{ cx1 }}|{{ cy1 }}) – ({{ cx2 }}|{{ cy2 }})"
-                   style="display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;
-                          border-radius:5px;cursor:pointer;border:1px solid var(--border);
-                          background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;
-                          {% if key == 'C' %}color:#6366f1;border-color:#6366f1;{% endif %}">
+                   title="{{ label }}: ({{ cx1 }}|{{ cy1 }}) → ({{ cx2 }}|{{ cy2 }})"
+                   style="display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;
+                          border-radius:6px;cursor:pointer;border:1px solid var(--border);
+                          background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;">
                 {{ label }}
               </div>
-              {% endfor %}
+              {% endif %}{% endfor %}
+              {# Row 2: Center (spans 2 cols) #}
+              {% for key, cx1, cy1, cx2, cy2, label in cells %}{% if key == 'C' %}
+              <div class="qcell" id="qc-{{ key }}"
+                   data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
+                   onclick="toggleQuadrant('{{ key }}')"
+                   title="{{ label }}: ({{ cx1 }}|{{ cy1 }}) → ({{ cx2 }}|{{ cy2 }})"
+                   style="grid-column:1/3;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;
+                          border-radius:6px;cursor:pointer;border:1px solid #6366f1;
+                          background:rgba(99,102,241,.08);color:#6366f1;transition:all .12s;">
+                ⊙ {{ label }}
+              </div>
+              {% endif %}{% endfor %}
+              {# Row 3: SW | SE #}
+              {% for key, cx1, cy1, cx2, cy2, label in cells %}{% if key in ['SW','SE'] %}
+              <div class="qcell" id="qc-{{ key }}"
+                   data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
+                   onclick="toggleQuadrant('{{ key }}')"
+                   title="{{ label }}: ({{ cx1 }}|{{ cy1 }}) → ({{ cx2 }}|{{ cy2 }})"
+                   style="display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;
+                          border-radius:6px;cursor:pointer;border:1px solid var(--border);
+                          background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;">
+                {{ label }}
+              </div>
+              {% endif %}{% endfor %}
             </div>
             <div id="quadrantSummary" style="font-size:.78rem;color:var(--text-muted);">No area selected</div>
           </div>
