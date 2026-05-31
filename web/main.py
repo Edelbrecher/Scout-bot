@@ -2032,21 +2032,42 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
     import re as _re
 
     def _parse_res(s: str) -> int:
-        """Parse '500k', '1m', '1 mil ress', '50000' → int. Flexible."""
+        """Parse resource amounts flexibly.
+        Handles: 500k, 1m, 1.5m, 19.500, 52.200, 49 140, 1 mil ress, 1.500.000 etc.
+        European dot-thousands (19.500 → 19500) and space-thousands (49 140 → 49140).
+        """
         s = (s or "").strip()
-        # Find first number (int or float) optionally followed by k/m/mil/million
-        m = _re.search(r'([\d]+(?:[.,]\d+)?)\s*(mil(?:lion)?|m\b|k\b)?', s, _re.I)
+        # 1. Detect multiplier suffix attached to a digit (500k, 1m, 1 mil ress)
+        suffix = ""
+        mult   = 1
+        sm = _re.search(r"(\d)\s*(mil(?:lion)?|m(?!\w)|k(?!\w))", s, _re.I)
+        if sm:
+            suffix = sm.group(2).lower()
+            s = s[:sm.start(1) + 1]  # keep only the digit part before suffix
+
+        # 2. Remove space-based thousands separators (49 140 → 49140)
+        s = _re.sub(r"(\d)\s+(\d)", r"\1\2", s.strip())
+
+        # 3. Dot / comma: if ALL groups after the separator have exactly 3 digits → thousands sep
+        dot_groups = _re.findall(r"\.(\d+)", s)
+        com_groups = _re.findall(r",(\d+)",  s)
+        if dot_groups and all(len(g) == 3 for g in dot_groups):
+            s = s.replace(".", "")
+        elif com_groups and all(len(g) == 3 for g in com_groups):
+            s = s.replace(",", "")
+        else:
+            s = s.replace(",", ".")  # treat as decimal comma
+
+        m = _re.search(r"\d+(?:\.\d+)?", s)
         if not m: return 0
         try:
-            num = float(m.group(1).replace(",", "."))
+            num = float(m.group())
         except Exception:
             return 0
-        suffix = (m.group(2) or "").lower()
-        if suffix.startswith("mil") or suffix == "m":
-            return int(num * 1_000_000)
-        if suffix == "k":
-            return int(num * 1_000)
-        return int(num)
+
+        if suffix.startswith("mil") or suffix == "m": mult = 1_000_000
+        elif suffix == "k":                           mult = 1_000
+        return int(num * mult)
 
     contribution_totals: dict[str, int] = {}
     for rid, contribs in contributions.items():
