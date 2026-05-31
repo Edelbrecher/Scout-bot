@@ -59,6 +59,14 @@
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
         <input type="text" id="playerFilter" placeholder="🔍 Spieler suchen…" oninput="renderView('player')"
                style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
+        <!-- Category filter -->
+        <div style="display:flex;gap:.25rem;" id="catFilterP">
+          <button class="cat-btn active" data-cat="all"    onclick="setCat('player','all',this)">Alle</button>
+          <button class="cat-btn"        data-cat="raid"   onclick="setCat('player','raid',this)">⛏️ Räuber</button>
+          <button class="cat-btn"        data-cat="off"    onclick="setCat('player','off',this)">⚔️ PvP</button>
+          <button class="cat-btn"        data-cat="pve"    onclick="setCat('player','pve',this)">🐾 PvE</button>
+          <button class="cat-btn"        data-cat="def"    onclick="setCat('player','def',this)">🛡️ Def</button>
+        </div>
         <select id="sortKeyP" onchange="renderView('player')"
                 style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
           <option value="name">↕ Name</option>
@@ -106,6 +114,13 @@
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
         <input type="text" id="allianceFilter" placeholder="🔍 Allianz suchen…" oninput="renderView('alliance')"
                style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
+        <div style="display:flex;gap:.25rem;" id="catFilterA">
+          <button class="cat-btn active" data-cat="all"  onclick="setCat('alliance','all',this)">Alle</button>
+          <button class="cat-btn"        data-cat="raid" onclick="setCat('alliance','raid',this)">⛏️ Räuber</button>
+          <button class="cat-btn"        data-cat="off"  onclick="setCat('alliance','off',this)">⚔️ PvP</button>
+          <button class="cat-btn"        data-cat="pve"  onclick="setCat('alliance','pve',this)">🐾 PvE</button>
+          <button class="cat-btn"        data-cat="def"  onclick="setCat('alliance','def',this)">🛡️ Def</button>
+        </div>
         <select id="sortKeyA" onchange="renderView('alliance')"
                 style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
           <option value="name">↕ Name</option>
@@ -193,6 +208,9 @@
 .st-tab { font-size:.82rem;padding:.35rem .85rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s; }
 .st-tab.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
 .st-tab:hover:not(.active) { border-color:#3b82f6;color:var(--text); }
+.cat-btn { font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap; }
+.cat-btn.active { background:rgba(99,102,241,.18);border-color:rgba(99,102,241,.5);color:#a5b4fc;font-weight:700; }
+.cat-btn:hover:not(.active) { border-color:#818cf8;color:var(--text); }
 .alert-ok   { padding:.6rem 1rem;border-radius:8px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e; }
 .alert-muted{ padding:.6rem 1rem;border-radius:8px;background:rgba(148,163,184,.1);border:1px solid var(--border);color:var(--text-muted); }
 .alert-err  { padding:.6rem 1rem;border-radius:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171; }
@@ -228,6 +246,17 @@ const GUILD_ID = '{{ guild.guild_id }}';
 
 // Sort state per view
 const sortState = { player: { key:'name', dir:1 }, alliance: { key:'name', dir:1 } };
+const catState  = { player: 'all', alliance: 'all' };
+
+const CAT_KEY = { raid:'raid_points', off:'off_points', pve:'pve_points', def:'def_points' };
+
+function setCat(view, cat, btn) {
+  catState[view] = cat;
+  const container = document.getElementById('catFilter' + (view==='player'?'P':'A'));
+  container.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderView(view);
+}
 
 function toggleDir(view) {
   sortState[view].dir *= -1;
@@ -482,6 +511,13 @@ function renderView(view) {
   const entries = Object.entries(data)
     .filter(([name]) => !filter || name.toLowerCase().includes(filter))
     .filter(([, tl]) => !anomOnly || isAnomalous(tl))
+    .filter(([, tl]) => {
+      const cat = catState[view];
+      if (cat === 'all') return true;
+      const key = CAT_KEY[cat];
+      // Show only players who have non-zero data in this category
+      return tl.some(p => (p[key] || 0) > 0);
+    })
     .sort(([a, tA], [b, tB]) => {
       const va = getVal(a, tA), vb = getVal(b, tB);
       if (va < vb) return -1 * sortDir;
