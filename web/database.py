@@ -1219,6 +1219,16 @@ async def set_poll_thread(poll_id: int, channel_id: str, thread_id: str | None, 
         await db.commit()
 
 
+async def queue_thread_invites(thread_id: str, guild_id: str, user_ids: list[str]):
+    import json as _json
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO pending_thread_invites (thread_id, guild_id, user_ids) VALUES (?,?,?)",
+            (thread_id, guild_id, _json.dumps(user_ids))
+        )
+        await db.commit()
+
+
 async def get_poll_target_members(guild_id: str, target_type: str, target_ids_json: str) -> list[dict]:
     """Return ally_members rows matching the target (discord_id, travian_name, role_id, wing)."""
     import json as _json
@@ -6255,6 +6265,17 @@ async def _init_op_tables():
             await db.commit()
         except Exception:
             pass
+        # pending thread invites for bot to process
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS pending_thread_invites (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                thread_id  TEXT NOT NULL,
+                guild_id   TEXT NOT NULL,
+                user_ids   TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
         # Notifications table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS notifications (

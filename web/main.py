@@ -2667,13 +2667,10 @@ async def polls_create(
             )
             if tr.status_code in (200, 201):
                 thread_id = tr.json()["id"]
-                # Add targeted members to thread
-                for m in target_members:
-                    if m.get("discord_id"):
-                        await client.put(
-                            f"https://discord.com/api/v10/channels/{thread_id}/thread-members/{m['discord_id']}",
-                            headers=headers,
-                        )
+                # Queue thread invites for bot to process (bot has GUILD_MEMBERS intent)
+                invite_ids = [m["discord_id"] for m in target_members if m.get("discord_id")]
+                if invite_ids:
+                    await database.queue_thread_invites(thread_id, guild_id, invite_ids)
                 # Build mention string (max 10 to avoid rate limits)
                 mentions = " ".join(f"<@{m['discord_id']}>" for m in target_members[:30] if m.get("discord_id"))
                 content = ("📊 New poll! Please vote 👇\n" + mentions) if mentions else "📊 New poll!"

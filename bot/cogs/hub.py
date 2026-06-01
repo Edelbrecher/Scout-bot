@@ -1759,6 +1759,40 @@ class Hub(commands.Cog):
     async def on_ready(self):
         """Restore persistent hub views on startup."""
         print("[hub] RequestHubView + PrivateChannelView registered.", flush=True)
+        self.bot.loop.create_task(self._process_thread_invites())
+
+    async def _process_thread_invites(self):
+        """Background task: drain pending_thread_invites table every 5 seconds."""
+        import json as _json
+        import aiosqlite
+        DB_PATH = database.DB_PATH
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            try:
+                async with aiosqlite.connect(DB_PATH) as db:
+                    db.row_factory = aiosqlite.Row
+                    async with db.execute("SELECT * FROM pending_thread_invites ORDER BY id LIMIT 20") as cur:
+                        rows = [dict(r) for r in await cur.fetchall()]
+                for row in rows:
+                    thread = self.bot.get_channel(int(row["thread_id"]))
+                    if thread is None:
+                        try:
+                            thread = await self.bot.fetch_channel(int(row["thread_id"]))
+                        except Exception:
+                            thread = None
+                    if thread:
+                        user_ids = _json.loads(row["user_ids"] or "[]")
+                        for uid in user_ids:
+                            try:
+                                await thread.add_user(await self.bot.fetch_user(int(uid)))
+                            except Exception as e:
+                                print(f"[thread-invite] {uid}: {e}", flush=True)
+                    async with aiosqlite.connect(DB_PATH) as db:
+                        await db.execute("DELETE FROM pending_thread_invites WHERE id=?", (row["id"],))
+                        await db.commit()
+            except Exception as e:
+                print(f"[thread-invite-task] {e}", flush=True)
+            await asyncio.sleep(5)
 
 
 async def setup(bot: commands.Bot):
