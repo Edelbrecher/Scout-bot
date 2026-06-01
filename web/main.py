@@ -5847,6 +5847,12 @@ async def farming_page(
     snap_pop_range = await database.get_snapshot_pop_range(guild_id)
     farm_list      = await database.get_farm_list(guild_id)
     scout_village  = await database.get_scout_village(guild_id, uid)
+    # Enrich scout village with Travian village_id for newdid= links
+    if scout_village and scout_village.get("x") is not None:
+        sv_id = await database.get_village_id_by_xy(guild_id, scout_village["x"], scout_village["y"])
+        scout_village = {**scout_village, "travian_village_id": sv_id}
+    # Own villages with village_ids for farmlist dropdown
+    own_village_ids = await database.get_own_village_ids(guild_id, uid)
     cross_reference  = await database.get_farming_cross_reference(guild_id, min_days=min_days_i)
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
     farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
@@ -5953,6 +5959,7 @@ async def farming_page(
         "snap_count_for_search": snap_count_for_search,
         "snap_pop_range": snap_pop_range,
         "scout_village": scout_village,
+        "own_village_ids": own_village_ids,
         # Advanced filter values
         "ref_x": ref_x_i or 0, "ref_y": ref_y_i or 0,
         "min_dist": min_dist_f or 0, "max_dist": max_dist_f or "",

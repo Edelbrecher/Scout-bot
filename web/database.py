@@ -1758,6 +1758,48 @@ async def get_inactive_farms(
         return result
 
 
+async def get_village_id_by_xy(guild_id: str, x: int, y: int) -> str | None:
+    """Return Travian village_id for a given coordinate from the latest snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT village_id FROM map_snapshots
+            WHERE guild_id=? AND x=? AND y=?
+            ORDER BY fetched_at DESC LIMIT 1
+        """, (guild_id, x, y)) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def get_own_village_ids(guild_id: str, discord_id: str, tw_player_name: str = "") -> list[dict]:
+    """Return own villages with Travian village_ids looked up from map_snapshots."""
+    await _init_own_villages_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT village_name, x, y FROM guild_own_villages WHERE guild_id=? AND discord_id=? AND x IS NOT NULL",
+            (guild_id, discord_id)
+        ) as cur:
+            own = [dict(r) for r in await cur.fetchall()]
+        if not own:
+            return []
+        # Lookup village_ids from latest snapshot
+        latest_ts_row = await db.execute(
+            "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,))
+        row = await (await latest_ts_row).fetchone()
+        latest_ts = row[0] if row else None
+        if not latest_ts:
+            return [{**v, "village_id": None} for v in own]
+        result = []
+        for v in own:
+            async with db.execute(
+                "SELECT village_id FROM map_snapshots WHERE guild_id=? AND x=? AND y=? AND fetched_at=? LIMIT 1",
+                (guild_id, v["x"], v["y"], latest_ts)
+            ) as cur2:
+                vid_row = await cur2.fetchone()
+            result.append({**v, "village_id": vid_row[0] if vid_row else None})
+        return result
+
+
 async def get_snapshot_pop_range(guild_id: str) -> dict:
     """Return min/max population seen in snapshots for this guild."""
     async with aiosqlite.connect(DB_PATH) as db:
