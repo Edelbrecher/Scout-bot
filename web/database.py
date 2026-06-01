@@ -2368,31 +2368,33 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
             vt["pop_intervals"] = village_pop_intervals.get((vt["x"], vt["y"]), {})
 
         # Village origin: settled or conquered?
-        # For each village, find what was at those coords just before this player's first_seen
+        # Strategy: search the entire snapshot history at each coord for a DIFFERENT player.
+        # This catches chiefings even when they happened before the player's first_seen
+        # (e.g. the village was already chiefed when we took our first snapshot).
         village_origins = {}
         for vt in village_timeline:
             x, y = vt["x"], vt["y"]
             first_seen = vt["first_seen"]
-            # Look for any entry at (x, y) with a different player in the snapshot just before first_seen
+            # Find the most recent record at (x,y) owned by ANYONE ELSE — before or up to first_seen
             async with db.execute(
                 """SELECT player_name, alliance_name, population, fetched_at FROM map_snapshots
-                   WHERE guild_id = ? AND x = ? AND y = ? AND fetched_at < ?
+                   WHERE guild_id = ? AND x = ? AND y = ?
+                     AND lower(player_name) != lower(?) AND player_name != '' AND player_name IS NOT NULL
                    ORDER BY fetched_at DESC LIMIT 1""",
-                (guild_id, x, y, first_seen)
+                (guild_id, x, y, player_name)
             ) as cur:
-                prev = await cur.fetchone()
-            if prev and prev[0] and prev[0].lower() != player_name.lower():
+                other = await cur.fetchone()
+            if other:
+                # Someone else was there at some point → conquered
                 village_origins[(x, y)] = {
                     "type": "conquered",
-                    "from_player": prev[0],
-                    "from_alliance": prev[1],
-                    "prev_pop": prev[2],
+                    "from_player": other[0],
+                    "from_alliance": other[1],
+                    "prev_pop": other[2],
                     "conquered_at": first_seen,
                 }
-            elif prev and (not prev[0] or prev[0] == ""):
-                village_origins[(x, y)] = {"type": "settled", "conquered_at": first_seen}
             else:
-                # No prior record = first time we saw it, assume settled (or unknown)
+                # No other player ever seen here in our data → settled
                 village_origins[(x, y)] = {"type": "settled", "conquered_at": first_seen}
 
         for vt in village_timeline:
