@@ -2559,8 +2559,7 @@ async def polls_create(
     target_members = []
     if is_private:
         target_members = await database.get_poll_target_members(guild_id, target_type, target_ids_json)
-    # All ally members get thread access (so HC etc. can always be added)
-    all_ally_members = await database.get_poll_target_members(guild_id, "all", "[]") if is_private else []
+    all_ally_members = []  # no longer needed
 
     # Build embed
     target_label = "All"
@@ -2683,11 +2682,10 @@ async def polls_create(
             )
             if tr.status_code in (200, 201):
                 thread_id = tr.json()["id"]
-                # Invite ALL ally members to thread for access, ping only targeted ones
-                all_invite_ids = [m["discord_id"] for m in all_ally_members if m.get("discord_id")]
-                if all_invite_ids:
-                    await database.queue_thread_invites(thread_id, guild_id, all_invite_ids)
-                # Mention only the targeted role/wing members
+                # Only invite the targeted role/wing members
+                invite_ids = [m["discord_id"] for m in target_members if m.get("discord_id")]
+                if invite_ids:
+                    await database.queue_thread_invites(thread_id, guild_id, invite_ids)
                 mentions = " ".join(f"<@{m['discord_id']}>" for m in target_members[:50] if m.get("discord_id"))
                 content = ("📊 New poll! Please vote 👇\n" + mentions) if mentions else "📊 New poll!"
                 resp = await client.post(
