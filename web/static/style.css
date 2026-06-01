@@ -62,12 +62,71 @@ code {
 .nav-links a:hover { color: var(--text); text-decoration: none; }
 
 /* ── Layout ── */
-main { padding: 2rem 1rem; transition: margin-left 0.25s ease; }
+main {
+  padding: 2rem 2.5rem;
+  transition: margin-left 0.25s ease;
+  min-height: calc(100vh - 56px);
+}
 body.has-guild-sidebar main { margin-left: 220px; }
 body.has-guild-sidebar.sidebar-collapsed main { margin-left: 58px; }
 
-.container { max-width: 960px; margin: 0 auto; }
-.container-wide { max-width: 1400px; margin: 0 auto; }
+/* Containers: use available width generously */
+.container       { max-width: 1280px; width: 100%; margin: 0 auto; }
+.container-wide  { max-width: 100%;   width: 100%; margin: 0 auto; }
+
+/* Tables: horizontal scroll on overflow */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Responsive breakpoints ── */
+
+/* Large desktop (≥1600px): even more breathing room */
+@media (min-width: 1600px) {
+  main { padding: 2.5rem 4rem; }
+}
+
+/* Tablet (≤1024px): reduce main padding */
+@media (max-width: 1024px) {
+  main { padding: 1.5rem 1.5rem; }
+  body.has-guild-sidebar main { margin-left: 220px; }
+}
+
+/* Small tablet / large phone (≤768px): hide sidebar, full width */
+@media (max-width: 768px) {
+  main { padding: 1rem 1rem; }
+  body.has-guild-sidebar main { margin-left: 0 !important; }
+  body.has-guild-sidebar.sidebar-collapsed main { margin-left: 0 !important; }
+
+  /* Stack all grids to single column */
+  .grid-2, .grid-3 { grid-template-columns: 1fr !important; }
+
+  /* Navbar: tighten padding */
+  .navbar { padding: 0 1rem; }
+
+  /* Tables: force scroll */
+  .table { display: block; overflow-x: auto; white-space: nowrap; }
+
+  /* Cards: reduce padding */
+  .card { padding: 1rem; }
+
+  /* Hide less critical nav text */
+  .nav-brand { font-size: 1rem; }
+
+  /* Full-width containers */
+  .container, .container-wide { padding: 0; }
+}
+
+/* Phone (≤480px): extra compact */
+@media (max-width: 480px) {
+  main { padding: 0.75rem 0.75rem; }
+  .navbar { height: 50px; }
+  body.has-guild-sidebar main { margin-left: 0 !important; }
+
+  h1 { font-size: 1.3rem !important; }
+  .card { padding: 0.75rem; border-radius: 6px; }
+
+  /* Sidebar mobile button bigger tap target */
+  #gs-mobile-toggle { width: 48px; height: 48px; font-size: 1.3rem; }
+}
 
 /* ── Guild Sidebar ── */
 #guild-sidebar {
@@ -200,9 +259,24 @@ body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
 @media (max-width: 768px) {
   body.has-guild-sidebar main { margin-left: 0; }
   body.has-guild-sidebar.sidebar-collapsed main { margin-left: 0; }
-  #guild-sidebar { transform: translateX(-100%); transition: transform 0.25s ease, width 0.25s ease; width: 240px !important; }
+  #guild-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    width: 260px !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,.6);
+    z-index: 150;
+  }
   body.mobile-sidebar-open #guild-sidebar { transform: translateX(0); }
   #gs-mobile-toggle { display: flex !important; }
+  /* Overlay when sidebar open on mobile */
+  body.mobile-sidebar-open::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 140;
+    pointer-events: all;
+  }
 }
 
 .page-header { margin-bottom: 1.5rem; }
@@ -225,8 +299,12 @@ body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
   margin-bottom: 1rem;
 }
 
-@media (max-width: 680px) {
+@media (max-width: 900px) {
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
   .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
 }
 
 /* ── Card ── */
