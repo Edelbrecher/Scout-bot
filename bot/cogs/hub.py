@@ -13,6 +13,22 @@ from discord.ext import commands
 
 import database
 from utils import require_premium, travops_footer
+
+# URL / hyperlink pattern — catches http(s)://, www., discord.gg and markdown links
+_URL_RE = re.compile(
+    r'(https?://|www\.|discord\.gg/|\[.+?\]\(https?://)',
+    re.IGNORECASE
+)
+
+async def _check_no_urls(interaction: discord.Interaction, *values: str) -> bool:
+    """Return True (and send error) if any value contains a URL. Use as early-return guard."""
+    if any(_URL_RE.search(v or "") for v in values):
+        await interaction.response.send_message(
+            "❌ URLs und Links sind in Anfrage-Feldern nicht erlaubt.",
+            ephemeral=True,
+        )
+        return True
+    return False
 from i18n import t, get_guild_lang
 
 
@@ -114,6 +130,9 @@ class HeroScoutHubModal(discord.ui.Modal, title="🦸 Helden-Scout melden"):
     async def on_submit(self, interaction: discord.Interaction):
         if not await require_premium(interaction):
             return
+        if await _check_no_urls(interaction, self.player.value, self.coordinates.value,
+                                 self.hero_action.value, self.additional_info.value):
+            return
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
 
@@ -176,6 +195,9 @@ class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not await require_premium(interaction):
+            return
+        if await _check_no_urls(interaction, self.player.value, self.coordinates.value,
+                                 self.village.value, self.time.value, self.additional_info.value):
             return
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
@@ -445,6 +467,8 @@ class DefendStep2Modal(discord.ui.Modal, title="🛡️ Defend (2/2) — Kornzie
         self._key = key
 
     async def on_submit(self, interaction: discord.Interaction):
+        if await _check_no_urls(interaction, self.troop_goal.value, self.ratio.value):
+            return
         data = _defend_pending.pop(self._key, None)
         if not data:
             await interaction.response.send_message(
@@ -489,6 +513,9 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
                                        style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
+        if await _check_no_urls(interaction, self.defender.value, self.attacker.value,
+                                 self.coords.value, self.arrival.value, self.notes.value):
+            return
         key = (interaction.guild_id, interaction.user.id)
         _defend_pending[key] = dict(
             defender  = self.defender.value.strip(),
@@ -515,6 +542,9 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend (1/2)"):
     arrival_2 = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC", max_length=40)
 
     async def on_submit(self, interaction: discord.Interaction):
+        if await _check_no_urls(interaction, self.defender.value, self.attacker.value,
+                                 self.coords.value, self.arrival.value, self.arrival_2.value):
+            return
         key = (interaction.guild_id, interaction.user.id)
         _defend_pending[key] = dict(
             defender  = self.defender.value.strip(),
@@ -1112,6 +1142,9 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
     notes = discord.ui.TextInput(label="Weitere Infos", required=False, style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
+        if await _check_no_urls(interaction, self.village.value, self.resources.value,
+                                 self.until.value, self.notes.value):
+            return
         from cogs.res_push import _build_request_embed
         from datetime import datetime
 
@@ -1384,6 +1417,10 @@ class EnemyScoutModal(discord.ui.Modal, title="👁️ Gegner-Scout melden"):
     scout_time     = discord.ui.TextInput(label="Uhrzeit des Scouts (UTC)", placeholder="z.B. 22:45 UTC oder 2025-05-30 22:45", max_length=60)
 
     async def on_submit(self, interaction: discord.Interaction):
+        if _URL_RE.search(self.victim_player.value or "") or _URL_RE.search(self.enemy_player.value or "") \
+                or _URL_RE.search(self.victim_village.value or "") or _URL_RE.search(self.scout_time.value or ""):
+            await interaction.response.send_message("❌ URLs und Links sind in Anfrage-Feldern nicht erlaubt.", ephemeral=True)
+            return
         await interaction.response.defer(ephemeral=True)
         coords = _clean_coords(self.victim_coords.value) if self.victim_coords.value else ""
         await database.add_scout_incident(

@@ -13,6 +13,8 @@ import database
 from utils import require_premium, travops_footer
 from i18n import t, get_guild_lang
 
+_URL_RE = re.compile(r'(https?://|www\.|discord\.gg/|\[.+?\]\(https?://)', re.IGNORECASE)
+
 # ---------------------------------------------------------------------------
 # Travian Scout-Report Parser
 # ---------------------------------------------------------------------------
@@ -611,6 +613,13 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not await require_premium(interaction):
+            return
+        if any(_URL_RE.search(v or "") for v in [
+            self.coordinates.value, self.player.value,
+            self.village.value, self.time.value, self.additional_info.value
+        ]):
+            await interaction.response.send_message(
+                "❌ URLs and links are not allowed in request fields.", ephemeral=True)
             return
         guild = interaction.guild
         lang = await get_guild_lang(str(guild.id))
