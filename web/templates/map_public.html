@@ -398,14 +398,19 @@ function restoreFromShareState() {
   }
 }
 
-// Restore drawings from share state
+// Restore drawings from share state (compact format: {c,w,e,p})
 function restoreDrawings() {
   if (!SHARE_STATE || !SHARE_STATE.draw) return;
   try {
-    const paths = JSON.parse(atob(SHARE_STATE.draw));
-    if (!Array.isArray(paths)) return;
-    // Store paths and re-render after map loads
-    window._sharedPaths = paths;
+    const json = decodeURIComponent(atob(SHARE_STATE.draw));
+    const data = JSON.parse(json);
+    if (!Array.isArray(data)) return;
+    window._sharedPaths = data.map(d => ({
+      color: d.c || '#ff4444',
+      width: d.w || 4,
+      erase: !!d.e,
+      pts:   d.p || [],
+    }));
   } catch(e) { console.warn('Draw restore failed:', e); }
 }
 
@@ -414,19 +419,26 @@ function renderSharedDrawings() {
   dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   for (const path of window._sharedPaths) {
     if (!path.pts || path.pts.length < 2) continue;
-    dctx.strokeStyle = path.color || '#ff4444';
-    dctx.lineWidth   = path.size  || 4;
-    dctx.lineCap     = 'round';
-    dctx.lineJoin    = 'round';
+    if (path.erase) {
+      dctx.globalCompositeOperation = 'destination-out';
+      dctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      dctx.globalCompositeOperation = 'source-over';
+      dctx.strokeStyle = path.color;
+    }
+    dctx.lineWidth = path.width;
+    dctx.lineCap   = 'round';
+    dctx.lineJoin  = 'round';
     dctx.beginPath();
     const [sx, sy] = worldToCanvas(path.pts[0][0], path.pts[0][1]);
     dctx.moveTo(sx, sy);
     for (let i = 1; i < path.pts.length; i++) {
-      const [cx, cy] = worldToCanvas(path.pts[i][0], path.pts[i][1]);
-      dctx.lineTo(cx, cy);
+      const [px, py] = worldToCanvas(path.pts[i][0], path.pts[i][1]);
+      dctx.lineTo(px, py);
     }
     dctx.stroke();
   }
+  dctx.globalCompositeOperation = 'source-over';
 }
 
 function resize() {
