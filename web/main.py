@@ -2598,10 +2598,18 @@ async def polls_create(
                 if _cat_r.status_code == 200:
                     _hub_pos = _cat_r.json().get("position", 0)
 
-            # Create Polls category
-            _cat = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-                headers=headers, json={"name": "Polls", "type": 4, "position": _hub_pos + 1})
-            _cat_id = _cat.json().get("id") if _cat.status_code in (200,201) else None
+            # Find existing Polls category or create one
+            _cat_id = None
+            _guild_chs = await _c.get(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers)
+            if _guild_chs.status_code == 200:
+                for _ch in _guild_chs.json():
+                    if _ch.get("type") == 4 and _ch.get("name","").lower() == "polls":
+                        _cat_id = _ch["id"]
+                        break
+            if not _cat_id:
+                _cat = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                    headers=headers, json={"name": "Polls", "type": 4, "position": _hub_pos + 1})
+                _cat_id = _cat.json().get("id") if _cat.status_code in (200,201) else None
 
             if not guild.get("poll_channel_id") and _cat_id:
                 _priv_ow = [{"id": guild_id, "type": 0, "allow": "0", "deny": _DENY_VIEW}]

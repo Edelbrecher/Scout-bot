@@ -1439,11 +1439,14 @@ async def _get_or_create_poll_channels(guild: discord.Guild) -> tuple[discord.Te
         if hub_cat:
             hub_cat_pos = hub_cat.position
 
-    poll_cat = await guild.create_category("Polls")
-    try:
-        await poll_cat.edit(position=hub_cat_pos + 1)
-    except Exception:
-        pass
+    # Reuse existing Polls category if present
+    poll_cat = discord.utils.get(guild.categories, name="Polls")
+    if not poll_cat:
+        poll_cat = await guild.create_category("Polls")
+        try:
+            await poll_cat.edit(position=hub_cat_pos + 1)
+        except Exception:
+            pass
 
     everyone = guild.default_role
 
