@@ -1451,9 +1451,9 @@ async def _get_or_create_poll_channels(guild: discord.Guild) -> tuple[discord.Te
     everyone = guild.default_role
 
     if not private_ch:
-        # #polls — hidden from @everyone, bot can manage threads
+        # #polls — read-only for everyone so bot can add thread members; private threads still restrict content
         private_overwrites = {
-            everyone: discord.PermissionOverwrite(view_channel=False),
+            everyone: discord.PermissionOverwrite(view_channel=True, send_messages=False),
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
                                                    embed_links=True, manage_threads=True),
         }

@@ -2641,7 +2641,8 @@ async def polls_create(
                 await database.update_poll_channel(guild_id, guild.get("poll_channel_id") or _priv_id or "", _pub_id)
 
             if not (guild.get("poll_channel_id") or _priv_id) and _cat_id:
-                _priv_ow = [{"id": guild_id, "type": 0, "allow": "0", "deny": _DENY_VIEW}]
+                # polls: visible read-only for everyone (needed so bot can add thread members)
+                _priv_ow = [{"id": guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]
                 if _bot_id: _priv_ow.append({"id": _bot_id, "type": 1, "allow": _ALLOW_BOT, "deny": "0"})
                 _pr = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
                     headers=headers, json={"name": "polls", "type": 0, "parent_id": _cat_id,
@@ -2741,8 +2742,8 @@ async def polls_auto_setup(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{guild_id}/polls?error=category_{r.status_code}", status_code=303)
         category_id = r.json()["id"]
 
-        # #polls — hidden from @everyone, bot-only (for private threads)
-        private_overwrites = [{"id": guild_id, "type": 0, "allow": "0", "deny": DENY_ALL}]
+        # #polls — read-only for everyone (so bot can add thread members), no sending
+        private_overwrites = [{"id": guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]
         if bot_id:
             private_overwrites.append({"id": bot_id, "type": 1, "allow": ALLOW_BOT, "deny": "0"})
         r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
