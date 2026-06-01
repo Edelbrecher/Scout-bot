@@ -100,10 +100,10 @@
                 <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Village</th>
                 <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Coords</th>
                 <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Now</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Δ7d</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Δ14d</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Δ30d</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Δ all</th>
+                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth vs 7 days ago">+7d</th>
+                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth vs 14 days ago">+14d</th>
+                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth vs 30 days ago">+30d</th>
+                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth since first seen">Total</th>
                 <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Origin</th>
                 <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Since</th>
                 <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Status</th>
@@ -288,12 +288,11 @@ function selectPlayer(name) {
 (function(){
   const canvas = document.getElementById('miniMap');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
   const mapTip = document.getElementById('mapTip');
 
   const activeVillages = {{ intel.current_villages | tojson }};
   const lostVillages   = {{ intel.village_timeline | selectattr('is_active','equalto',false) | list | tojson }};
-  const origins        = {};
+  const origins = {};
   {% for vt in intel.village_timeline %}
   origins["{{ vt.x }}|{{ vt.y }}"] = {{ vt.get('origin', {}) | tojson }};
   {% endfor %}
@@ -304,97 +303,109 @@ function selectPlayer(name) {
   ];
   if (!all.length) return;
 
+  // HiDPI / retina fix
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth || 340;
+  const cssH = cssW; // square
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+
+  // Bounding box — padding so villages aren't on the edge
   const xs = all.map(v => v.x), ys = all.map(v => v.y);
   let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
-  // Ensure minimum visible area of ~60 fields so map isn't over-zoomed
-  const MIN_RANGE = 60;
-  const cx = (x0+x1)/2, cy = (y0+y1)/2;
-  const rng = Math.max(x1-x0, y1-y0, MIN_RANGE);
-  const half = rng / 2 * 1.35; // 35% padding
-  x0 = cx - half; x1 = cx + half; y0 = cy - half; y1 = cy + half;
-  const span = x1 - x0;
+  const pad = Math.max(15, (Math.max(x1-x0, y1-y0)) * 0.2 + 5);
+  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  const spanX = x1 - x0, spanY = y1 - y0;
+  // Keep square aspect
+  const span = Math.max(spanX, spanY);
+  const midX = (x0+x1)/2, midY = (y0+y1)/2;
+  x0 = midX - span/2; x1 = midX + span/2;
+  y0 = midY - span/2; y1 = midY + span/2;
 
-  const W = canvas.width, H = canvas.height;
   function toCanvas(wx, wy) {
-    return [((wx-x0)/span)*W, H-((wy-y0)/span)*H];
+    return [((wx-x0)/span)*W, H - ((wy-y0)/span)*H];
   }
 
   function draw() {
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle='#2d5a1e'; ctx.fillRect(0,0,W,H);
-    // Grid
-    const gStep = span > 200 ? 100 : span > 80 ? 50 : 20;
-    ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=1;
+    ctx.fillStyle='#1e3a14'; ctx.fillRect(0,0,W,H);
+
+    // Grid lines
+    const gStep = span > 300 ? 100 : span > 100 ? 50 : span > 40 ? 20 : 10;
+    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
     for (let g = Math.ceil(x0/gStep)*gStep; g <= x1; g+=gStep) {
       const [px]=toCanvas(g,0); ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
     }
     for (let g = Math.ceil(y0/gStep)*gStep; g <= y1; g+=gStep) {
       const [,py]=toCanvas(0,g); ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W,py); ctx.stroke();
     }
-    // Axes
+    // Axes (only if 0,0 in view)
+    ctx.lineWidth=1;
     if (x0<=0 && x1>=0) {
-      const [ax]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1;
+      const [ax]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.2)';
       ctx.beginPath(); ctx.moveTo(ax,0); ctx.lineTo(ax,H); ctx.stroke();
     }
     if (y0<=0 && y1>=0) {
-      const [,ay]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1;
+      const [,ay]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.2)';
       ctx.beginPath(); ctx.moveTo(0,ay); ctx.lineTo(W,ay); ctx.stroke();
     }
-    // Lost villages
+
+    // Lost villages (small dim squares)
     for (const v of lostVillages) {
       const [px,py]=toCanvas(v.x,v.y);
-      const org = origins[`${v.x}|${v.y}`] || {};
-      ctx.fillStyle = org.type==='conquered' ? '#7f1d1d' : '#374151';
+      const org = origins[`${v.x}|${v.y}`]||{};
+      ctx.fillStyle = org.type==='conquered' ? 'rgba(220,60,60,.4)' : 'rgba(100,116,139,.5)';
       ctx.fillRect(px-3,py-3,6,6);
     }
+
     // Active villages
     for (const v of activeVillages) {
       const [px,py]=toCanvas(v.x,v.y);
       const isCapital = v.is_capital;
-      const org = origins[`${v.x}|${v.y}`] || {};
-      const wasConquered = org.type==='conquered';
+      const org = origins[`${v.x}|${v.y}`]||{};
+      const conquered = org.type==='conquered';
       if (isCapital) {
         ctx.fillStyle='#f59e0b';
-        ctx.beginPath(); ctx.arc(px,py,7,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.stroke();
       } else {
-        ctx.fillStyle = wasConquered ? '#f87171' : '#6366f1';
-        ctx.fillRect(px-4,py-4,8,8);
+        ctx.fillStyle = conquered ? '#f87171' : '#818cf8';
+        ctx.beginPath(); ctx.arc(px,py,4,0,Math.PI*2); ctx.fill();
       }
     }
-    // Village labels when not too many
-    if (all.length <= 25) {
-      ctx.font='bold 10px sans-serif';
-      for (const v of activeVillages) {
-        const [px,py]=toCanvas(v.x,v.y);
-        const name = v.village_name || '';
-        ctx.fillStyle='rgba(0,0,0,.6)';
-        ctx.fillText(name, px+7, py+4);
-        ctx.fillStyle='rgba(255,255,255,.85)';
-        ctx.fillText(name, px+6, py+3);
-      }
-    }
+
+    // Coord labels at corners
+    ctx.font = '9px monospace'; ctx.fillStyle = 'rgba(255,255,255,.3)';
+    ctx.fillText(`${Math.round(x0)}|${Math.round(y1)}`, 3, 11);
+    ctx.fillText(`${Math.round(x1)}|${Math.round(y0)}`, W-55, H-4);
   }
 
   draw();
 
+  // Hover
   canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX-rect.left)*(W/rect.width);
-    const my = (e.clientY-rect.top)*(H/rect.height);
+    const mx = (e.clientX-rect.left);
+    const my = (e.clientY-rect.top);
     let best=null, bestD=Infinity;
     for (const v of all) {
       const [px,py]=toCanvas(v.x,v.y);
       const d=Math.hypot(px-mx,py-my);
       if(d<bestD){bestD=d;best=v;}
     }
-    if (best && bestD < 16) {
-      const org = origins[`${best.x}|${best.y}`] || {};
-      const originStr = org.type==='conquered' ? ` · ⚔️ from ${org.from_player}` : ' · 🏗️ settled';
-      mapTip.textContent = `${best.village_name||'?'} (${best.x}|${best.y}) · ${(best.population||0).toLocaleString()} pop${best.active===false?' · Lost':''}${originStr}`;
+    if (best && bestD < 14) {
+      const org = origins[`${best.x}|${best.y}`]||{};
+      const originStr = org.type==='conquered' ? ` · conquered from ${org.from_player}` : ' · settled';
+      mapTip.textContent = `${best.village_name||'?'} (${best.x}|${best.y}) · ${(best.population||0).toLocaleString()} pop${best.active===false?' · lost':''}${originStr}`;
     } else { mapTip.textContent=''; }
   });
-  canvas.addEventListener('mouseleave', () => mapTip.textContent='');
+  canvas.addEventListener('mouseleave', ()=> mapTip.textContent='');
 })();
 {% endif %}
 </script>
