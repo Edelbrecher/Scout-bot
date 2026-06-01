@@ -358,8 +358,8 @@ function rebuildHighlights() {
 function renderLegend() {
   let el = document.getElementById('shareLegend');
   const items = [
-    ...playerFilters.map(f => ({label: '👤 ' + f.name, color: f.color})),
-    ...allianceFilters.map(f => ({label: '🛡️ ' + f.name, color: f.color})),
+    ...playerFilters.map(f => ({label: f.name, color: f.color})),
+    ...allianceFilters.map(f => ({label: f.name, color: f.color})),
   ];
   if (!items.length) { if (el) el.remove(); return; }
   if (!el) {
