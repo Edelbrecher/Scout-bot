@@ -2583,6 +2583,20 @@ async def polls_create(
     if not guild:
         return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
 
+    # Verify channels still exist in Discord, clear stale IDs
+    async with httpx.AsyncClient() as _vc:
+        for _field, _col in [("poll_channel_id", "poll_channel_id"), ("poll_public_channel_id", "poll_public_channel_id")]:
+            _cid = guild.get(_field)
+            if _cid:
+                _r = await _vc.get(f"https://discord.com/api/v10/channels/{_cid}", headers=headers)
+                if _r.status_code == 404:
+                    print(f"[polls] Channel {_cid} ({_field}) gone, clearing", flush=True)
+                    if _field == "poll_channel_id":
+                        await database.update_poll_channel(guild_id, "")
+                    else:
+                        await database.update_poll_channel(guild_id, guild.get("poll_channel_id") or "", "")
+                    guild = await database.get_guild(guild_id)
+
     # Auto-create channels if missing
     if not guild.get("poll_channel_id") or not guild.get("poll_public_channel_id"):
         async with httpx.AsyncClient() as _c:
