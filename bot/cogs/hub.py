@@ -1411,37 +1411,67 @@ class PrivateChannelNameModal(discord.ui.Modal):
 # Poll Hub Modal + auto-category helper
 # ---------------------------------------------------------------------------
 
-async def _get_or_create_poll_category(guild: discord.Guild) -> discord.TextChannel | None:
-    """Return (or create) the poll channel, placing its category just below the Hub category."""
+async def _get_or_create_poll_channels(guild: discord.Guild) -> tuple[discord.TextChannel | None, discord.TextChannel | None]:
+    """Return (private_ch, public_ch). Creates both if missing, private = bot-only, public = read-only for everyone.
+    The Polls category is placed just below the Hub category."""
     config = await database.get_guild_config(str(guild.id))
-    if config and config.get("poll_channel_id"):
-        ch = guild.get_channel(int(config["poll_channel_id"]))
-        if ch:
-            return ch
-        try:
-            ch = await guild.fetch_channel(int(config["poll_channel_id"]))
-            if ch:
-                return ch
-        except Exception:
-            pass
 
-    # Need to create category + channel
+    # Try to resolve existing channels from DB
+    private_ch = public_ch = None
+    if config and config.get("poll_channel_id"):
+        try:
+            private_ch = guild.get_channel(int(config["poll_channel_id"])) or await guild.fetch_channel(int(config["poll_channel_id"]))
+        except Exception:
+            private_ch = None
+    if config and config.get("poll_public_channel_id"):
+        try:
+            public_ch = guild.get_channel(int(config["poll_public_channel_id"])) or await guild.fetch_channel(int(config["poll_public_channel_id"]))
+        except Exception:
+            public_ch = None
+
+    if private_ch and public_ch:
+        return private_ch, public_ch
+
+    # Create category directly below Hub category
     hub_cat_pos = 0
     if config and config.get("category_id"):
         hub_cat = guild.get_channel(int(config["category_id"]))
         if hub_cat:
             hub_cat_pos = hub_cat.position
 
-    poll_cat = await guild.create_category("Umfragen")
-    # Shift category right below Hub category
+    poll_cat = await guild.create_category("Polls")
     try:
         await poll_cat.edit(position=hub_cat_pos + 1)
     except Exception:
         pass
 
-    poll_ch = await guild.create_text_channel("umfragen", category=poll_cat)
-    await database.update_poll_channel(str(guild.id), str(poll_ch.id))
-    return poll_ch
+    everyone = guild.default_role
+
+    if not private_ch:
+        # #polls — hidden from @everyone, bot can manage threads
+        private_overwrites = {
+            everyone: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                   embed_links=True, manage_threads=True),
+        }
+        private_ch = await guild.create_text_channel("polls", category=poll_cat, overwrites=private_overwrites)
+
+    if not public_ch:
+        # #polls-public — @everyone can read, not send
+        public_overwrites = {
+            everyone: discord.PermissionOverwrite(view_channel=True, send_messages=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, embed_links=True),
+        }
+        public_ch = await guild.create_text_channel("polls-public", category=poll_cat, overwrites=public_overwrites)
+
+    await database.update_poll_channel(str(guild.id), str(private_ch.id), str(public_ch.id))
+    return private_ch, public_ch
+
+
+async def _get_or_create_poll_category(guild: discord.Guild) -> discord.TextChannel | None:
+    """Legacy wrapper — returns the private channel (used by hub modal for public polls via public_ch)."""
+    _, public_ch = await _get_or_create_poll_channels(guild)
+    return public_ch
 
 
 class PollHubModal(discord.ui.Modal, title="📊 Create Poll"):

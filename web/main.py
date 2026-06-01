@@ -2568,23 +2568,29 @@ async def polls_create(
         "description": description or "",
         "color": 0x6366f1 if is_private else 0x58b9e0,
         "fields": [
-            {"name": "🕐 Zeitpunkt", "value": event_datetime.replace("T", " "), "inline": True},
+            {"name": "🕐 Date & Time", "value": event_datetime.replace("T", " "), "inline": True},
             {"name": "👥 Target Group", "value": target_label, "inline": True},
         ],
-        "footer": {"text": f"Umfrage #{poll_id} · Click a button to indicate your availability"},
+        "footer": {"text": f"Poll #{poll_id} · Click a button to indicate your availability"},
     }
     components = [{"type": 1, "components": [
-        {"type": 2, "style": 3, "label": "Dabei",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
-        {"type": 2, "style": 1, "label": "Vielleicht",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
-        {"type": 2, "style": 4, "label": "Nicht dabei", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
+        {"type": 2, "style": 3, "label": "Going",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
+        {"type": 2, "style": 1, "label": "Maybe",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
+        {"type": 2, "style": 4, "label": "Not going", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
     ]}]
 
-    # Ensure poll channel exists (auto-create if needed)
-    if not guild or not guild.get("poll_channel_id"):
-        # Try to auto-setup via bot API endpoint
+    # Route: private polls → #polls (hidden), public → #polls-public
+    if not guild:
         return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
 
-    channel_id = guild["poll_channel_id"]
+    if is_private:
+        channel_id = guild.get("poll_channel_id")
+    else:
+        channel_id = guild.get("poll_public_channel_id") or guild.get("poll_channel_id")
+
+    if not channel_id:
+        return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
+
     thread_id = None
 
     async with httpx.AsyncClient() as client:
@@ -2643,16 +2649,43 @@ async def polls_auto_setup(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     token = os.environ.get("DISCORD_TOKEN", "")
     headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    # Get bot user id for overwrite
     async with httpx.AsyncClient() as client:
-        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "Umfragen", "type": 4})
+        me = await client.get("https://discord.com/api/v10/users/@me", headers=headers)
+        bot_id = me.json().get("id") if me.status_code == 200 else None
+        ALLOW_BOT = str(0x400 | 0x800 | 0x4000 | 0x8000 | 0x10000000)  # view+send+embed+attach+manage_threads
+        DENY_ALL  = str(0x400)  # deny VIEW_CHANNEL for @everyone
+
+        # Category
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers, json={"name": "Polls", "type": 4})
         if r.status_code not in (200, 201):
             return RedirectResponse(f"/guild/{guild_id}/polls?error=category_{r.status_code}", status_code=303)
         category_id = r.json()["id"]
-        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json={"name": "umfragen", "type": 0, "parent_id": category_id})
+
+        # #polls — hidden from @everyone, bot-only (for private threads)
+        private_overwrites = [{"id": guild_id, "type": 0, "allow": "0", "deny": DENY_ALL}]
+        if bot_id:
+            private_overwrites.append({"id": bot_id, "type": 1, "allow": ALLOW_BOT, "deny": "0"})
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers, json={"name": "polls", "type": 0, "parent_id": category_id,
+                                   "permission_overwrites": private_overwrites})
         if r.status_code not in (200, 201):
             return RedirectResponse(f"/guild/{guild_id}/polls?error=channel_{r.status_code}", status_code=303)
         poll_channel_id = r.json()["id"]
-    await database.update_poll_channel(guild_id, poll_channel_id)
+
+        # #polls-public — read-only for @everyone (no send), bot can send
+        public_overwrites = [{"id": guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]  # view yes, send no
+        if bot_id:
+            public_overwrites.append({"id": bot_id, "type": 1, "allow": ALLOW_BOT, "deny": "0"})
+        r = await client.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers=headers, json={"name": "polls-public", "type": 0, "parent_id": category_id,
+                                   "permission_overwrites": public_overwrites})
+        if r.status_code not in (200, 201):
+            return RedirectResponse(f"/guild/{guild_id}/polls?error=public_ch_{r.status_code}", status_code=303)
+        poll_public_channel_id = r.json()["id"]
+
+    await database.update_poll_channel(guild_id, poll_channel_id, poll_public_channel_id)
     return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
 
 
@@ -6726,9 +6759,9 @@ async def op_launch_poll(request: Request, guild_id: str, plan_id: int):
         "footer": {"text": f"EP-Umfrage #{poll_id} · Antwort ist anonym"},
     }
     components = [{"type": 1, "components": [
-        {"type": 2, "style": 3, "label": "Dabei",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
-        {"type": 2, "style": 1, "label": "Vielleicht",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
-        {"type": 2, "style": 4, "label": "Nicht dabei", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
+        {"type": 2, "style": 3, "label": "Going",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
+        {"type": 2, "style": 1, "label": "Maybe",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
+        {"type": 2, "style": 4, "label": "Not going", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
     ]}]
     async with httpx.AsyncClient() as client:
         resp = await client.post(

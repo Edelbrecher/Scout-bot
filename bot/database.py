@@ -117,6 +117,11 @@ async def init_db():
             await db.commit()
         except Exception:
             pass
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_public_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS availability_polls (
@@ -1304,11 +1309,16 @@ async def set_poll_discord_message(poll_id: int, channel_id: str, message_id: st
         await db.commit()
 
 
-async def update_poll_channel(guild_id: str, poll_channel_id: str):
-    """Persist the poll channel id in guild_configs."""
+async def update_poll_channel(guild_id: str, poll_channel_id: str, poll_public_channel_id: str | None = None):
+    """Persist poll channel ids in guild_configs."""
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "UPDATE guild_configs SET poll_channel_id = ? WHERE guild_id = ?",
             (poll_channel_id, guild_id),
         )
+        if poll_public_channel_id is not None:
+            await db.execute(
+                "UPDATE guild_configs SET poll_public_channel_id = ? WHERE guild_id = ?",
+                (poll_public_channel_id, guild_id),
+            )
         await db.commit()

@@ -1125,9 +1125,11 @@ async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
 # Poll system
 # ---------------------------------------------------------------------------
 
-async def update_poll_channel(guild_id: str, poll_channel_id: str):
+async def update_poll_channel(guild_id: str, poll_channel_id: str, poll_public_channel_id: str | None = None):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE guild_configs SET poll_channel_id = ? WHERE guild_id = ?", (poll_channel_id or None, guild_id))
+        if poll_public_channel_id is not None:
+            await db.execute("UPDATE guild_configs SET poll_public_channel_id = ? WHERE guild_id = ?", (poll_public_channel_id or None, guild_id))
         await db.commit()
 
 
@@ -6247,6 +6249,12 @@ async def _init_op_tables():
                 await db.commit()
             except Exception:
                 pass
+        # guild_configs: separate public poll channel
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_public_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
         # Notifications table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
