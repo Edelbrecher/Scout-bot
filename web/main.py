@@ -2583,10 +2583,51 @@ async def polls_create(
     if not guild:
         return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
 
+    # Auto-create channels if missing
+    if not guild.get("poll_channel_id") or not guild.get("poll_public_channel_id"):
+        async with httpx.AsyncClient() as _c:
+            _me = await _c.get("https://discord.com/api/v10/users/@me", headers=headers)
+            _bot_id = _me.json().get("id") if _me.status_code == 200 else None
+            _ALLOW_BOT = str(0x400 | 0x800 | 0x4000 | 0x8000 | 0x10000000)
+            _DENY_VIEW = str(0x400)
+
+            # Find hub category position for placement
+            _hub_pos = 0
+            if guild.get("category_id"):
+                _cat_r = await _c.get(f"https://discord.com/api/v10/channels/{guild['category_id']}", headers=headers)
+                if _cat_r.status_code == 200:
+                    _hub_pos = _cat_r.json().get("position", 0)
+
+            # Create Polls category
+            _cat = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                headers=headers, json={"name": "Polls", "type": 4, "position": _hub_pos + 1})
+            _cat_id = _cat.json().get("id") if _cat.status_code in (200,201) else None
+
+            if not guild.get("poll_channel_id") and _cat_id:
+                _priv_ow = [{"id": guild_id, "type": 0, "allow": "0", "deny": _DENY_VIEW}]
+                if _bot_id: _priv_ow.append({"id": _bot_id, "type": 1, "allow": _ALLOW_BOT, "deny": "0"})
+                _pr = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                    headers=headers, json={"name": "polls", "type": 0, "parent_id": _cat_id,
+                                          "permission_overwrites": _priv_ow})
+                if _pr.status_code in (200,201):
+                    await database.update_poll_channel(guild_id, _pr.json()["id"])
+
+            if not guild.get("poll_public_channel_id") and _cat_id:
+                _pub_ow = [{"id": guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]
+                if _bot_id: _pub_ow.append({"id": _bot_id, "type": 1, "allow": _ALLOW_BOT, "deny": "0"})
+                _pb = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                    headers=headers, json={"name": "polls-public", "type": 0, "parent_id": _cat_id,
+                                          "permission_overwrites": _pub_ow})
+                if _pb.status_code in (200,201):
+                    await database.update_poll_channel(guild_id, guild.get("poll_channel_id") or "", _pb.json()["id"])
+
+        # Reload guild config after auto-setup
+        guild = await database.get_guild(guild_id)
+
     if is_private:
-        channel_id = guild.get("poll_channel_id")
+        channel_id = guild.get("poll_channel_id") if guild else None
     else:
-        channel_id = guild.get("poll_public_channel_id") or guild.get("poll_channel_id")
+        channel_id = (guild.get("poll_public_channel_id") or guild.get("poll_channel_id")) if guild else None
 
     if not channel_id:
         return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
