@@ -17,7 +17,7 @@
   <!-- Discord accent colour -->
   <meta name="theme-color"         content="#5865f2" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260601b" />
+  <link rel="stylesheet" href="/static/style.css?v=20260601c" />
   <!-- Tour navigation shield: style tag injected in <head> before first paint -->
   <script>
     (function(){try{var s=localStorage.getItem('travops_tour');if(!s)return;var st=JSON.parse(s);if(!st||!st.name)return;var style=document.createElement('style');style.id='tt-nav-shield';style.textContent='body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;}';document.head.appendChild(style);}catch(e){}})();
@@ -250,55 +250,90 @@ document.addEventListener('click', e => {
   <script>
   (function(){
     var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
-    if (!m) return; // not a guild page
+    if (!m) return;
 
     var gid  = m[1];
     var path = location.pathname;
 
-    // Only show sidebar on feature sub-pages, not on the guild overview/dashboard
+    // Only show on feature sub-pages, not the guild overview
     var subPath = m[2] || '';
     if (!subPath || subPath === '/') return;
+
     var sidebar = document.getElementById('guild-sidebar');
     var body    = document.body;
     if (!sidebar) return;
 
-    // ── Navigation structure ──
+    // ── SVG icon set (light gray, 18×18 viewBox) ──
+    var IC = {
+      home:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L10 3l7 6.5V17a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M7 18v-7h6v7"/></svg>',
+      map:     '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="1,4 7,1 13,4 19,1 19,16 13,19 7,16 1,19"/><line x1="7" y1="1" x2="7" y2="16"/><line x1="13" y1="4" x2="13" y2="19"/></svg>',
+      sword:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="16" x2="16" y2="4"/><polyline points="14,4 16,4 16,6"/><line x1="4" y1="13" x2="7" y2="16"/><line x1="7" y1="13" x2="4" y2="16"/></svg>',
+      radar:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><circle cx="10" cy="10" r="4"/><circle cx="10" cy="10" r="1" fill="currentColor" stroke="none"/><line x1="10" y1="10" x2="17" y2="5"/></svg>',
+      wheat:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="18" x2="10" y2="6"/><path d="M10 14c-2-2-4-2-5-1"/><path d="M10 11c-2-2-4-2-5-1"/><path d="M10 14c2-2 4-2 5-1"/><path d="M10 11c2-2 4-2 5-1"/><path d="M10 8c0-2 1-4 2-5"/></svg>',
+      list:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/></svg>',
+      search:  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><line x1="13.5" y1="13.5" x2="18" y2="18"/></svg>',
+      eye:     '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z"/><circle cx="10" cy="10" r="3"/></svg>',
+      shield:  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z"/></svg>',
+      alert:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L2 17h16L10 2z"/><line x1="10" y1="9" x2="10" y2="13"/><circle cx="10" cy="15.5" r="0.5" fill="currentColor" stroke="none"/></svg>',
+      castle:  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="14" height="10"/><polyline points="3,8 3,4 6,4 6,6 8,6 8,4 12,4 12,6 14,6 14,4 17,4 17,8"/><rect x="8" y="13" width="4" height="5"/></svg>',
+      users:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="7" r="3"/><path d="M2 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="15" cy="7" r="2"/><path d="M15 13c1.7 0 3 1.3 3 3"/></svg>',
+      skull:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2a7 7 0 017 7c0 2.8-1.6 5.2-4 6.4V17a1 1 0 01-1 1H8a1 1 0 01-1-1v-1.6C4.6 14.2 3 11.8 3 9a7 7 0 017-7z"/><line x1="7" y1="17" x2="13" y2="17"/><circle cx="7.5" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="9" r="1" fill="currentColor" stroke="none"/></svg>',
+      cross:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><line x1="10" y1="6" x2="10" y2="14"/><line x1="6" y1="10" x2="14" y2="10"/></svg>',
+      gear:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg>',
+      box:     '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 10,11 18,6"/><path d="M2 6l8 5 8-5v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/><polyline points="6,3.3 10,1 14,3.3"/></svg>',
+      chart:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="17" x2="17" y2="17"/><rect x="4" y="11" width="3" height="6"/><rect x="8.5" y="7" width="3" height="10"/><rect x="13" y="4" width="3" height="13"/></svg>',
+      clock:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><polyline points="10,5 10,10 14,12"/></svg>',
+      flag:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="2" x2="4" y2="18"/><path d="M4 3h12l-2 5 2 5H4"/></svg>',
+      poll:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><line x1="6" y1="10" x2="14" y2="10"/><line x1="10" y1="6" x2="10" y2="14"/></svg>',
+      blueprint:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1"/><line x1="3" y1="7" x2="17" y2="7"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="10" y1="10" x2="14" y2="10"/><line x1="10" y1="13" x2="14" y2="13"/></svg>',
+      fist:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="10" height="8" rx="2"/><path d="M7 8V5a1 1 0 012 0v3"/><path d="M10 8V4a1 1 0 012 0v4"/><path d="M13 8V5a1 1 0 012 0v3"/><path d="M5 12h10"/></svg>',
+      crop:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="3"/><line x1="10" y1="2" x2="10" y2="7"/><line x1="10" y1="13" x2="10" y2="18"/><line x1="2" y1="10" x2="7" y2="10"/><line x1="13" y1="10" x2="18" y2="10"/></svg>',
+      person:  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="4"/><path d="M3 18c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>',
+      bell:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2a6 6 0 016 6v4l2 2H2l2-2V8a6 6 0 016-6z"/><line x1="8" y1="18" x2="12" y2="18"/></svg>',
+      card:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="16" height="11" rx="2"/><line x1="2" y1="9" x2="18" y2="9"/><line x1="5" y1="13" x2="9" y2="13"/></svg>',
+    };
+
+    function ico(key) {
+      return '<span class="gs-icon" aria-hidden="true">'+(IC[key]||IC.home)+'</span>';
+    }
+
+    // ── Navigation (English, verified links) ──
     var nav = [
       { group: null },
-      { icon:'🏠', label:'Übersicht',     url:'/guild/'+gid },
-      { group: 'Karte & Angriffe' },
-      { icon:'🗺️',  label:'Karte',         url:'/guild/'+gid+'/map' },
-      { icon:'⚔️',  label:'Angriffe',      url:'/guild/'+gid+'/attacks' },
-      { icon:'📡',  label:'Sektor-Monitor',url:'/guild/'+gid+'/sector-monitor' },
+      { icon:'home',      label:'Overview',        url:'/guild/'+gid },
+      { group: 'Map & Attacks' },
+      { icon:'map',       label:'Map',              url:'/guild/'+gid+'/map' },
+      { icon:'sword',     label:'Attacks',          url:'/guild/'+gid+'/attacks' },
+      { icon:'radar',     label:'Sector Monitor',   url:'/guild/'+gid+'/sector-monitor' },
       { group: 'Farming' },
-      { icon:'🌾',  label:'Farming Intel', url:'/guild/'+gid+'/farming' },
-      { icon:'📋',  label:'Farmlist',      url:'/guild/'+gid+'/farmlist-analyst' },
-      { group: 'Scouts' },
-      { icon:'🔎',  label:'Player Intel',  url:'/guild/'+gid+'/intel' },
-      { icon:'🕵️', label:'Scout-Tracking',url:'/guild/'+gid+'/scout' },
-      { icon:'🦸',  label:'Hero Scout',    url:'/guild/'+gid+'/defense/hero-scout' },
-      { icon:'🚨',  label:'Incidents',     url:'/guild/'+gid+'/scout-incidents' },
-      { group: 'Allianz' },
-      { icon:'🏰',  label:'Meine Allianz', url:'/guild/'+gid+'/my-ally' },
-      { icon:'👥',  label:'Mitglieder',    url:'/guild/'+gid+'/allianz/mitglieder' },
-      { icon:'🛡️', label:'Verteidigung',   url:'/guild/'+gid+'/verteidigung' },
-      { icon:'😈',  label:'Feinde',        url:'/guild/'+gid+'/enemies' },
-      { icon:'🏥',  label:'Hospital',      url:'/guild/'+gid+'/allianz/hospital' },
+      { icon:'wheat',     label:'Farming Intel',    url:'/guild/'+gid+'/farming' },
+      { icon:'list',      label:'Farmlist Analyst', url:'/guild/'+gid+'/farmlist-analyst' },
+      { group: 'Scouting' },
+      { icon:'search',    label:'Player Intel',     url:'/guild/'+gid+'/intel' },
+      { icon:'eye',       label:'Scout Tracking',   url:'/guild/'+gid+'/scout' },
+      { icon:'shield',    label:'Hero Scout',       url:'/guild/'+gid+'/defense/hero-scout' },
+      { icon:'alert',     label:'Incidents',        url:'/guild/'+gid+'/scout-incidents' },
+      { group: 'Alliance' },
+      { icon:'castle',    label:'My Alliance',      url:'/guild/'+gid+'/my-ally' },
+      { icon:'users',     label:'Members',          url:'/guild/'+gid+'/allianz/mitglieder' },
+      { icon:'shield',    label:'Defense',          url:'/guild/'+gid+'/verteidigung' },
+      { icon:'skull',     label:'Enemies',          url:'/guild/'+gid+'/enemies' },
+      { icon:'cross',     label:'Hospital',         url:'/guild/'+gid+'/allianz/hospital' },
       { group: 'Tools' },
-      { icon:'⚙️',  label:'Operationen',   url:'/guild/'+gid+'/operations' },
-      { icon:'📦',  label:'Res-Push',      url:'/guild/'+gid+'/res-push' },
-      { icon:'📊',  label:'Statistiken',   url:'/guild/'+gid+'/stats' },
-      { icon:'⏱️',  label:'Timer',         url:'/guild/'+gid+'/timer' },
-      { icon:'📜',  label:'Settle-Liste',  url:'/guild/'+gid+'/settle-list' },
-      { icon:'🗳️',  label:'Umfragen',      url:'/guild/'+gid+'/polls' },
-      { icon:'📐',  label:'Blueprints',    url:'/guild/'+gid+'/blueprints' },
-      { icon:'⚔️',  label:'Kampfkraft',    url:'/guild/'+gid+'/kampfkraft' },
-      { icon:'🌽',  label:'Getreide-Kalk.',url:'/guild/'+gid+'/tools/crop-calculator' },
-      { group: 'Einstellungen' },
-      { icon:'👤',  label:'Mein Account',  url:'/guild/'+gid+'/mein-account' },
-      { icon:'🔔',  label:'Benachrichtig.',url:'/guild/'+gid+'/notifications' },
-      { icon:'⚙️',  label:'Einstellungen', url:'/guild/'+gid+'/settings' },
-      { icon:'💳',  label:'Abonnement',    url:'/guild/'+gid+'/billing' },
+      { icon:'gear',      label:'Operations',       url:'/guild/'+gid+'/operations' },
+      { icon:'box',       label:'Res Push',         url:'/guild/'+gid+'/res-push' },
+      { icon:'chart',     label:'Statistics',       url:'/guild/'+gid+'/stats' },
+      { icon:'clock',     label:'Timer',            url:'/guild/'+gid+'/timer' },
+      { icon:'flag',      label:'Settle List',      url:'/guild/'+gid+'/settle-list' },
+      { icon:'poll',      label:'Polls',            url:'/guild/'+gid+'/polls' },
+      { icon:'blueprint', label:'Blueprints',       url:'/guild/'+gid+'/blueprints' },
+      { icon:'fist',      label:'Combat Power',     url:'/guild/'+gid+'/kampfkraft' },
+      { icon:'crop',      label:'Crop Calculator',  url:'/guild/'+gid+'/tools/crop-calculator' },
+      { group: 'Account' },
+      { icon:'person',    label:'My Account',       url:'/guild/'+gid+'/mein-account' },
+      { icon:'bell',      label:'Notifications',    url:'/guild/'+gid+'/notifications' },
+      { icon:'gear',      label:'Settings',         url:'/guild/'+gid+'/settings' },
+      { icon:'card',      label:'Billing',          url:'/guild/'+gid+'/billing' },
     ];
 
     // Build sidebar HTML
@@ -308,7 +343,6 @@ document.addEventListener('click', e => {
         if (item.group) html += '<div class="gs-group-label">'+item.group+'</div>';
         return;
       }
-      // Check active: exact match or starts-with (but not overview catching everything)
       var isActive = false;
       if (item.url === '/guild/'+gid) {
         isActive = path === item.url || path === item.url+'/';
@@ -317,7 +351,7 @@ document.addEventListener('click', e => {
       }
       html += '<a class="gs-item'+(isActive?' active':'')
         +'" href="'+item.url+'" data-label="'+item.label+'">'
-        +'<span class="gs-icon">'+item.icon+'</span>'
+        +ico(item.icon)
         +'<span class="gs-label">'+item.label+'</span>'
         +'</a>';
     });

@@ -63,8 +63,8 @@ code {
 
 /* ── Layout ── */
 main { padding: 2rem 1rem; transition: margin-left 0.25s ease; }
-body.has-guild-sidebar main { margin-left: 240px; }
-body.has-guild-sidebar.sidebar-collapsed main { margin-left: 56px; }
+body.has-guild-sidebar main { margin-left: 220px; }
+body.has-guild-sidebar.sidebar-collapsed main { margin-left: 58px; }
 
 .container { max-width: 960px; margin: 0 auto; }
 .container-wide { max-width: 1400px; margin: 0 auto; }
@@ -75,7 +75,7 @@ body.has-guild-sidebar.sidebar-collapsed main { margin-left: 56px; }
   top: 56px;
   left: 0;
   bottom: 0;
-  width: 240px;
+  width: 220px;
   background: #111214;
   border-right: 1px solid var(--border);
   z-index: 90;
@@ -84,7 +84,7 @@ body.has-guild-sidebar.sidebar-collapsed main { margin-left: 56px; }
   transition: width 0.25s ease;
   overflow: hidden;
 }
-body.sidebar-collapsed #guild-sidebar { width: 56px; }
+body.sidebar-collapsed #guild-sidebar { width: 58px; }
 
 #guild-sidebar .gs-scroll {
   flex: 1;
@@ -135,36 +135,45 @@ body.sidebar-collapsed .gs-group-label { opacity: 0; pointer-events: none; }
 .gs-item {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.75rem;
-  margin: 1px 6px;
-  border-radius: 6px;
-  color: var(--text-muted);
+  gap: 0.8rem;
+  padding: 0.6rem 0.85rem;
+  margin: 2px 8px;
+  border-radius: 7px;
+  color: #7d8590;
   text-decoration: none;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   transition: background 0.12s, color 0.12s;
   cursor: pointer;
 }
-.gs-item:hover { background: var(--bg-card); color: var(--text); text-decoration: none; }
-.gs-item.active { background: rgba(88,101,242,0.18); color: #818cf8; }
+.gs-item:hover { background: rgba(255,255,255,0.06); color: #c9d1d9; text-decoration: none; }
+.gs-item.active { background: rgba(88,101,242,0.18); color: #a5b4fc; }
 .gs-item.active:hover { background: rgba(88,101,242,0.26); }
 
 .gs-item .gs-icon {
-  font-size: 1.05rem;
-  width: 22px;
-  text-align: center;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7d8590;
+  transition: color 0.12s;
 }
+.gs-item .gs-icon svg { width: 18px; height: 18px; }
+.gs-item:hover .gs-icon { color: #c9d1d9; }
+.gs-item.active .gs-icon { color: #a5b4fc; }
+
 .gs-item .gs-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   transition: opacity 0.15s;
 }
-body.sidebar-collapsed .gs-item .gs-label { opacity: 0; pointer-events: none; }
-body.sidebar-collapsed .gs-item { justify-content: center; padding: 0.45rem; margin: 1px 6px; }
+body.sidebar-collapsed .gs-item .gs-label { opacity: 0; pointer-events: none; width: 0; }
+body.sidebar-collapsed .gs-item { justify-content: center; padding: 0.6rem; margin: 2px 6px; }
 
 /* Tooltip on collapsed */
 body.sidebar-collapsed .gs-item { position: relative; }
