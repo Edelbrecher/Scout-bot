@@ -1848,6 +1848,7 @@ async def get_inactive_farms(
     min_days: int = 3,
     min_pop: int = 0,
     max_pop: int = 9999,
+    include_ww: bool = False,
 ) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -1855,7 +1856,8 @@ async def get_inactive_farms(
             SELECT village_id, x, y, village_name, player_name, tribe,
                    MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
                    COUNT(DISTINCT fetched_at) as snapshot_count,
-                   MIN(population) as min_pop_val, MAX(population) as max_pop_val
+                   MIN(population) as min_pop_val, MAX(population) as max_pop_val,
+                   MAX(village_type) as village_type, MAX(is_capital) as is_capital
             FROM map_snapshots
             WHERE guild_id = ?
             GROUP BY village_id
@@ -1869,6 +1871,9 @@ async def get_inactive_farms(
         result = []
         for r in rows:
             d = dict(r)
+            # Filter WW villages (village_type=15) unless explicitly included
+            if not include_ww and int(d.get("village_type") or 0) == 15:
+                continue
             d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
             try:
                 from datetime import datetime as _dt
@@ -1951,6 +1956,7 @@ async def search_inactive_advanced(
     exclude_alliances: str = "",
     tribes: list | None = None,
     include_natars: bool = False,
+    include_ww: bool = False,
     max_pop_increase: int = 0,
     limit: int = 300,
 ) -> dict:
@@ -2020,6 +2026,9 @@ async def search_inactive_advanced(
         # Natars filter in SQL
         if not include_natars:
             query += " AND v.tribe != 4 AND v.tribe != '4'"
+        # WW villages filter (village_type=15)
+        if not include_ww:
+            query += " AND (v.village_type IS NULL OR v.village_type != 15)"
 
         async with db.execute(query, params) as cur:
             cur.row_factory = aiosqlite.Row

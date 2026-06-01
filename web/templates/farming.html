@@ -320,10 +320,14 @@
                 <div style="font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">⚠️ No farmlist imported</div>
                 {% endif %}
               </div>
-              <div style="display:flex;align-items:center;gap:.5rem;margin-top:1.2rem;">
+              <div style="display:flex;align-items:center;gap:1rem;margin-top:1.2rem;">
                 <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;">
                   <input type="checkbox" name="include_natars" value="1" {% if include_natars %}checked{% endif %}>
                   Include Natars
+                </label>
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;">
+                  <input type="checkbox" name="include_ww" value="1" {% if include_ww %}checked{% endif %}>
+                  Include WW villages
                 </label>
               </div>
             </div>

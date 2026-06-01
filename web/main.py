@@ -5801,6 +5801,7 @@ async def farming_page(
     exclude_players: str = "",
     exclude_alliances: str = "",
     include_natars: bool = False,
+    include_ww: bool = False,
     tribes: Optional[List[int]] = Query(default=None),
     in_farmlist: str = "",
     advanced: bool = False,
@@ -5877,7 +5878,7 @@ async def farming_page(
         max_pop_inc_i is not None,
         player_filter.strip(), alliance_filter.strip(),
         exclude_players.strip(), exclude_alliances.strip(),
-        include_natars, tribes, in_farmlist,
+        include_natars, include_ww, tribes, in_farmlist,
     ])
 
     # Choose query: advanced (search_inactive_advanced) or basic (get_inactive_farms)
@@ -5898,6 +5899,7 @@ async def farming_page(
             exclude_players=exclude_players,
             exclude_alliances=exclude_alliances,
             include_natars=include_natars,
+            include_ww=include_ww,
             tribes=tribes or [],
             limit=500,
         )
@@ -5913,7 +5915,7 @@ async def farming_page(
             inactive_farms = inactive_farms_raw
     else:
         inactive_farms_raw = await database.get_inactive_farms(
-            guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i)
+            guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i, include_ww=include_ww)
         for v in inactive_farms_raw:
             v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
         if in_farmlist == "no":
@@ -5988,6 +5990,7 @@ async def farming_page(
         "exclude_players": exclude_players,
         "exclude_alliances": exclude_alliances,
         "include_natars": include_natars,
+        "include_ww": include_ww,
         "tribes": tribes or [],
         "in_farmlist": in_farmlist,
         "advanced": advanced or _advanced_active,
