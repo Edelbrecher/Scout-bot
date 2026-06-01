@@ -2263,6 +2263,109 @@ async def search_map_snapshot(guild_id: str, query: str) -> list[dict]:
         return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
+    """Full player intelligence: current villages, pop history, village timeline (first/last seen)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Latest snapshot timestamp
+        async with db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        latest = row["latest"] if row else None
+        if not latest:
+            return None
+
+        # Current villages from latest snapshot
+        async with db.execute(
+            """SELECT x, y, village_name, population, tribe, alliance_name, alliance_id,
+                      is_capital, village_type, fetched_at
+               FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ? AND lower(player_name) = lower(?)
+               ORDER BY is_capital DESC, population DESC""",
+            (guild_id, latest, player_name)
+        ) as cur:
+            current_villages = [dict(r) for r in await cur.fetchall()]
+
+        if not current_villages:
+            return None
+
+        first = current_villages[0]
+
+        # All distinct snapshot timestamps available for this player
+        async with db.execute(
+            """SELECT DISTINCT fetched_at FROM map_snapshots
+               WHERE guild_id = ? AND lower(player_name) = lower(?)
+               ORDER BY fetched_at""",
+            (guild_id, player_name)
+        ) as cur:
+            all_ts = [r[0] for r in await cur.fetchall()]
+
+        # Per-village timeline: first_seen, last_seen, min/max pop across all snapshots
+        async with db.execute(
+            """SELECT x, y, village_name,
+                      MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
+                      MIN(population) as min_pop, MAX(population) as max_pop,
+                      COUNT(DISTINCT fetched_at) as snap_count
+               FROM map_snapshots
+               WHERE guild_id = ? AND lower(player_name) = lower(?)
+               GROUP BY x, y""",
+            (guild_id, player_name)
+        ) as cur:
+            village_timeline = [dict(r) for r in await cur.fetchall()]
+
+        # Classify each village: active (present in latest), lost (was seen but not in latest)
+        current_coords = {(v["x"], v["y"]) for v in current_villages}
+        for vt in village_timeline:
+            vt["is_active"] = (vt["x"], vt["y"]) in current_coords
+
+        # Player total population per snapshot (growth chart)
+        async with db.execute(
+            """SELECT fetched_at, SUM(population) as total_pop, COUNT(*) as village_count
+               FROM map_snapshots
+               WHERE guild_id = ? AND lower(player_name) = lower(?)
+               GROUP BY fetched_at
+               ORDER BY fetched_at""",
+            (guild_id, player_name)
+        ) as cur:
+            pop_history = [dict(r) for r in await cur.fetchall()]
+
+        # Player name autocomplete list (all distinct player names in latest snapshot)
+        return {
+            "player_name": first.get("player_name", player_name),
+            "alliance_name": first.get("alliance_name"),
+            "alliance_id": first.get("alliance_id"),
+            "tribe": first.get("tribe"),
+            "current_villages": current_villages,
+            "village_timeline": sorted(village_timeline, key=lambda v: (not v["is_active"], -v.get("max_pop", 0))),
+            "pop_history": pop_history,
+            "total_pop": sum(v.get("population", 0) or 0 for v in current_villages),
+            "village_count": len(current_villages),
+            "snapshot_count": len(all_ts),
+            "latest_snapshot": latest,
+        }
+
+
+async def search_players_in_snapshot(guild_id: str, query: str, limit: int = 20) -> list[str]:
+    """Return distinct player names matching query from the latest snapshot."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        latest = row[0] if row else None
+        if not latest:
+            return []
+        async with db.execute(
+            """SELECT DISTINCT player_name FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ? AND player_name LIKE ? AND player_name != ''
+               ORDER BY player_name LIMIT ?""",
+            (guild_id, latest, f"%{query}%", limit)
+        ) as cur:
+            return [r[0] for r in await cur.fetchall()]
+
+
 async def get_farmlist_heatmap(guild_id: str, discord_user_id: str) -> list[dict]:
     """Return all farm coords with resource totals from user's latest farmlist analysis."""
     async with aiosqlite.connect(DB_PATH) as db:

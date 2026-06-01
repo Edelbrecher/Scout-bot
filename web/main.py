@@ -10281,6 +10281,53 @@ async def download_extension():
 
 
 # ---------------------------------------------------------------------------
+# Routes — Player Intelligence (enemy player lookup)
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/intel", response_class=HTMLResponse)
+async def player_intel_page(request: Request, guild_id: str, q: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    intel = None
+    suggestions = []
+    error = ""
+
+    if q.strip():
+        intel = await database.get_player_intel(guild_id, q.strip())
+        if not intel:
+            # Try autocomplete to give helpful suggestions
+            suggestions = await database.search_players_in_snapshot(guild_id, q.strip(), limit=10)
+            if not suggestions:
+                error = f"No player found matching '{q}'. Make sure a map snapshot has been loaded."
+
+    return templates.TemplateResponse("player_intel.html", {
+        "request": request,
+        "guild": guild,
+        "q": q,
+        "intel": intel,
+        "suggestions": suggestions,
+        "error": error,
+    })
+
+
+@app.get("/guild/{guild_id}/intel/autocomplete")
+async def player_intel_autocomplete(request: Request, guild_id: str, q: str = ""):
+    session = _get_session(request)
+    if not session or not (can_access_guild(session, guild_id) or await can_access_guild_async(session, guild_id)):
+        return JSONResponse([])
+    if len(q.strip()) < 2:
+        return JSONResponse([])
+    names = await database.search_players_in_snapshot(guild_id, q.strip(), limit=15)
+    return JSONResponse(names)
+
+
+# ---------------------------------------------------------------------------
 # Routes — Scout Incidents (enemy scouted our members)
 # ---------------------------------------------------------------------------
 

@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% block title %}Player Intel{% if intel %} · {{ intel.player_name }}{% endif %} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container-wide" style="padding-bottom:3rem;">
+
+  {# ── Header ── #}
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+    <div>
+      <h1 style="margin:0;font-size:1.5rem;">🔎 Player Intelligence</h1>
+      <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Search any player from your world — villages, population history, timeline</p>
+    </div>
+  </div>
+
+  {# ── Search bar ── #}
+  <form method="get" action="" id="searchForm" style="margin-bottom:1.5rem;">
+    <div style="position:relative;max-width:480px;">
+      <input type="text" name="q" id="playerSearch" value="{{ q }}" placeholder="Player name…" autocomplete="off"
+        style="width:100%;padding:.6rem 3rem .6rem .85rem;background:var(--bg-card);border:1px solid var(--border);
+               border-radius:8px;color:var(--text);font-size:.95rem;box-sizing:border-box;">
+      <button type="submit"
+        style="position:absolute;right:0;top:0;bottom:0;padding:0 .9rem;background:var(--accent);
+               border:none;border-radius:0 8px 8px 0;color:#fff;cursor:pointer;font-size:.9rem;">🔍</button>
+      <div id="acDropdown"
+        style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-card);
+               border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:50;max-height:220px;overflow-y:auto;">
+      </div>
+    </div>
+  </form>
+
+  {# ── Error / suggestions ── #}
+  {% if error %}
+  <div style="background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:8px;padding:.75rem 1rem;color:#ef4444;margin-bottom:1rem;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  {% if suggestions %}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+    <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:.5rem;">Did you mean…</div>
+    <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
+      {% for s in suggestions %}
+      <a href="?q={{ s | urlencode }}"
+        style="padding:.3rem .75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;
+               color:var(--text);text-decoration:none;font-size:.85rem;">{{ s }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if intel %}
+  {% set tribe_names = {1:'Romans',2:'Teutons',3:'Gauls',4:'Natars',5:'Huns',6:'Egyptians',7:'Spartans'} %}
+  {% set tribe_icons = {1:'🏛️',2:'⚔️',3:'🌿',4:'👾',5:'🏹',6:'🏺',7:'🛡️'} %}
+  {% set vt_labels = {6:'6-crop',7:'7-crop',9:'9-crop',15:'15-crop'} %}
+
+  {# ── Summary cards ── #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem;">
+    {% for label, val in [
+      ('Tribe', (tribe_icons.get(intel.tribe,'?') ~ ' ' ~ tribe_names.get(intel.tribe,'Unknown'))),
+      ('Alliance', intel.alliance_name or '—'),
+      ('Villages', intel.village_count),
+      ('Total Pop', '{:,}'.format(intel.total_pop)),
+      ('Snapshots', intel.snapshot_count),
+    ] %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">{{ label }}</div>
+      <div style="font-size:1rem;font-weight:600;">{{ val }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start;">
+    <div>
+
+      {# ── Village table ── #}
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:1.5rem;overflow:hidden;">
+        <div style="padding:.75rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:.5rem;">
+          🏘️ Villages
+          <span style="font-size:.75rem;font-weight:400;color:var(--text-muted);">— {{ intel.village_count }} current · {{ intel.village_timeline|selectattr('is_active','equalto',false)|list|length }} lost</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+            <thead>
+              <tr style="background:var(--bg-main);">
+                {% for h in ['Village','Coords','Pop','Fields','First seen','Last seen','Snaps','Status'] %}
+                <th style="padding:.5rem .75rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);white-space:nowrap;">{{ h }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for vt in intel.village_timeline %}
+              <tr style="border-top:1px solid var(--border);{% if not vt.is_active %}opacity:.55;{% endif %}">
+                <td style="padding:.5rem .75rem;font-weight:{% if vt.is_active %}500{% else %}400{% endif %};">
+                  {% if vt.is_active %}
+                    {% set cv = intel.current_villages | selectattr('x','equalto',vt.x) | selectattr('y','equalto',vt.y) | first %}
+                    {% if cv and cv.get('is_capital') %}★ {% endif %}
+                  {% endif %}
+                  {{ vt.village_name or '?' }}
+                </td>
+                <td style="padding:.5rem .75rem;font-family:monospace;color:var(--text-muted);">{{ vt.x }}|{{ vt.y }}</td>
+                <td style="padding:.5rem .75rem;">
+                  {% if vt.is_active %}
+                    {% set cv = intel.current_villages | selectattr('x','equalto',vt.x) | selectattr('y','equalto',vt.y) | first %}
+                    {% if cv %}{{ '{:,}'.format(cv.population or 0) }}{% else %}—{% endif %}
+                  {% else %}
+                    <span style="color:var(--text-muted);">~{{ '{:,}'.format(vt.max_pop or 0) }}</span>
+                  {% endif %}
+                </td>
+                <td style="padding:.5rem .75rem;color:var(--text-muted);">
+                  {% if vt.is_active %}
+                    {% set cv = intel.current_villages | selectattr('x','equalto',vt.x) | selectattr('y','equalto',vt.y) | first %}
+                    {% if cv %}{{ vt_labels.get(cv.get('village_type',0)|int, '') }}{% endif %}
+                  {% endif %}
+                </td>
+                <td style="padding:.5rem .75rem;color:var(--text-muted);white-space:nowrap;font-size:.78rem;">{{ vt.first_seen[:10] if vt.first_seen else '—' }}</td>
+                <td style="padding:.5rem .75rem;color:var(--text-muted);white-space:nowrap;font-size:.78rem;">{{ vt.last_seen[:10] if vt.last_seen else '—' }}</td>
+                <td style="padding:.5rem .75rem;color:var(--text-muted);">{{ vt.snap_count }}</td>
+                <td style="padding:.5rem .75rem;">
+                  {% if vt.is_active %}
+                  <span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 7px;font-size:.72rem;">Active</span>
+                  {% else %}
+                  <span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 7px;font-size:.72rem;">Lost</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {# ── Population history chart ── #}
+      {% if intel.pop_history | length >= 2 %}
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1.5rem;">
+        <div style="font-weight:600;font-size:.9rem;margin-bottom:.75rem;">📈 Total Population History</div>
+        <canvas id="popChart" height="80" style="width:100%;display:block;"></canvas>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--text-muted);margin-top:.25rem;">
+          <span>{{ intel.pop_history[0].fetched_at[:10] }}</span>
+          <span>{{ intel.pop_history[-1].fetched_at[:10] }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>{# end left col #}
+
+    {# ── Mini map ── #}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:sticky;top:1rem;">
+      <div style="padding:.75rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.9rem;">🗺️ Village Map</div>
+      <canvas id="miniMap" width="320" height="320" style="display:block;width:100%;background:#2d5a1e;cursor:crosshair;"></canvas>
+      <div id="mapTip" style="padding:.4rem .75rem;font-size:.75rem;color:var(--text-muted);min-height:1.5rem;border-top:1px solid var(--border);"></div>
+      <div style="padding:.5rem .75rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+        <span style="font-size:.72rem;"><span style="color:#f59e0b;">●</span> Capital</span>
+        <span style="font-size:.72rem;"><span style="color:#6366f1;">●</span> Village</span>
+        <span style="font-size:.72rem;"><span style="color:#475569;">●</span> Lost</span>
+      </div>
+    </div>
+
+  </div>{# end grid #}
+  {% endif %}{# end if intel #}
+
+</div>
+
+<script>
+{# ── Autocomplete ── #}
+const searchInput = document.getElementById('playerSearch');
+const acDrop = document.getElementById('acDropdown');
+let acTimer;
+searchInput && searchInput.addEventListener('input', () => {
+  clearTimeout(acTimer);
+  const v = searchInput.value.trim();
+  if (v.length < 2) { acDrop.style.display='none'; return; }
+  acTimer = setTimeout(async () => {
+    const r = await fetch(`/guild/{{ guild.guild_id }}/intel/autocomplete?q=${encodeURIComponent(v)}`);
+    const names = await r.json();
+    if (!names.length) { acDrop.style.display='none'; return; }
+    acDrop.innerHTML = names.map(n =>
+      `<div onclick="selectPlayer(${JSON.stringify(n)})"
+        style="padding:.5rem .85rem;cursor:pointer;font-size:.88rem;"
+        onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">${n}</div>`
+    ).join('');
+    acDrop.style.display='block';
+  }, 220);
+});
+document.addEventListener('click', e => { if (!e.target.closest('#searchForm')) acDrop.style.display='none'; });
+function selectPlayer(name) {
+  searchInput.value = name;
+  acDrop.style.display='none';
+  document.getElementById('searchForm').submit();
+}
+
+{% if intel %}
+{# ── Pop chart ── #}
+{% if intel.pop_history | length >= 2 %}
+(function(){
+  const canvas = document.getElementById('popChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const data = {{ intel.pop_history | tojson }};
+  const pops = data.map(d => d.total_pop || 0);
+  const W = canvas.offsetWidth || 600;
+  const H = 80;
+  canvas.width = W; canvas.height = H;
+  const minP = Math.min(...pops), maxP = Math.max(...pops, minP+1);
+  const pad = 8;
+  ctx.clearRect(0,0,W,H);
+  // Fill
+  ctx.beginPath();
+  data.forEach((d,i) => {
+    const x = pad + (i/(data.length-1))*(W-pad*2);
+    const y = H - pad - ((d.total_pop-minP)/(maxP-minP))*(H-pad*2);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.lineTo(pad+(data.length-1)/(data.length-1)*(W-pad*2), H-pad);
+  ctx.lineTo(pad, H-pad);
+  ctx.closePath();
+  ctx.fillStyle='rgba(99,102,241,.18)';
+  ctx.fill();
+  // Line
+  ctx.beginPath();
+  data.forEach((d,i) => {
+    const x = pad + (i/(data.length-1))*(W-pad*2);
+    const y = H - pad - ((d.total_pop-minP)/(maxP-minP))*(H-pad*2);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle='#6366f1'; ctx.lineWidth=2; ctx.stroke();
+  // Dots
+  data.forEach((d,i) => {
+    const x = pad + (i/(data.length-1))*(W-pad*2);
+    const y = H - pad - ((d.total_pop-minP)/(maxP-minP))*(H-pad*2);
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2);
+    ctx.fillStyle='#818cf8'; ctx.fill();
+  });
+  // Hover tooltip
+  const tip = document.createElement('div');
+  tip.style.cssText='position:absolute;background:rgba(0,0,0,.8);color:#fff;padding:3px 8px;border-radius:4px;font-size:.75rem;pointer-events:none;display:none;z-index:50;';
+  document.body.appendChild(tip);
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const idx = Math.round((mx - pad) / (W - pad*2) * (data.length-1));
+    if (idx < 0 || idx >= data.length) { tip.style.display='none'; return; }
+    const d = data[idx];
+    tip.textContent = `${d.fetched_at.slice(0,10)}: ${(d.total_pop||0).toLocaleString()} pop · ${d.village_count} villages`;
+    tip.style.display='block';
+    tip.style.left = (e.pageX+10)+'px';
+    tip.style.top  = (e.pageY-28)+'px';
+  });
+  canvas.addEventListener('mouseleave', () => tip.style.display='none');
+})();
+{% endif %}
+
+{# ── Mini map ── #}
+(function(){
+  const canvas = document.getElementById('miniMap');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const mapTip = document.getElementById('mapTip');
+
+  const villages = {{ intel.current_villages | tojson }};
+  const lostVillages = {{ intel.village_timeline | selectattr('is_active','equalto',false) | list | tojson }};
+  const all = [
+    ...villages.map(v => ({...v, active:true})),
+    ...lostVillages.map(v => ({...v, active:false})),
+  ];
+
+  if (!all.length) return;
+
+  // Compute bounding box with padding
+  const xs = all.map(v => v.x), ys = all.map(v => v.y);
+  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const pad = Math.max(10, Math.round(Math.max(x1-x0, y1-y0) * 0.25));
+  x0-=pad; x1+=pad; y0-=pad; y1+=pad;
+  const rng = Math.max(x1-x0, y1-y0, 1);
+
+  const W = canvas.width, H = canvas.height;
+  function toCanvas(wx, wy) {
+    return [
+      ((wx - x0) / rng) * W,
+      H - ((wy - y0) / rng) * H,
+    ];
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#2d5a1e'; ctx.fillRect(0,0,W,H);
+    // Grid lines
+    ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.lineWidth=1;
+    // Axes if 0,0 in view
+    if (x0<=0 && x1>=0) {
+      const [ax]=toCanvas(0,0); ctx.beginPath(); ctx.moveTo(ax,0); ctx.lineTo(ax,H); ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.stroke();
+    }
+    if (y0<=0 && y1>=0) {
+      const [,ay]=toCanvas(0,0); ctx.beginPath(); ctx.moveTo(0,ay); ctx.lineTo(W,ay); ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.stroke();
+    }
+    // Lost villages
+    for (const v of lostVillages) {
+      const [cx,cy] = toCanvas(v.x, v.y);
+      ctx.fillStyle='#475569';
+      ctx.fillRect(cx-3,cy-3,6,6);
+    }
+    // Active villages
+    for (const v of villages) {
+      const [cx,cy] = toCanvas(v.x, v.y);
+      const isCapital = v.is_capital;
+      const r = isCapital ? 7 : 5;
+      ctx.fillStyle = isCapital ? '#f59e0b' : '#6366f1';
+      if (isCapital) {
+        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+      } else {
+        ctx.fillRect(cx-r/2,cy-r/2,r,r);
+      }
+    }
+    // Labels at high zoom
+    if (villages.length <= 30) {
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle='rgba(255,255,255,.75)';
+      for (const v of villages) {
+        const [cx,cy] = toCanvas(v.x, v.y);
+        ctx.fillText(v.village_name||'', cx+6, cy+4);
+      }
+    }
+  }
+
+  draw();
+
+  // Hover tooltip
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)*(W/rect.width);
+    const my = (e.clientY-rect.top)*(H/rect.height);
+    let best=null, bestD=Infinity;
+    for (const v of all) {
+      const [cx,cy]=toCanvas(v.x,v.y);
+      const d=Math.hypot(cx-mx,cy-my);
+      if(d<bestD){bestD=d;best=v;}
+    }
+    if(best && bestD < 20) {
+      mapTip.textContent = `${best.village_name||'?'} (${best.x}|${best.y}) · ${(best.population||best.max_pop||0).toLocaleString()} pop${best.active===false?' · Lost':''}`;
+    } else {
+      mapTip.textContent='';
+    }
+  });
+  canvas.addEventListener('mouseleave', () => mapTip.textContent='');
+})();
+{% endif %}
+</script>
+{% endblock %}
