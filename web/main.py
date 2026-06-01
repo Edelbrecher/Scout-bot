@@ -2491,6 +2491,8 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
         p["responses"]         = responses
         p["target_ids_list"]   = _json.loads(p.get("target_ids") or "[]")
     is_admin = session.get("type") == "admin"
+    can_manage = is_admin or await has_perm(request, guild_id, "poll_manage")
+    can_view   = can_manage or await has_perm(request, guild_id, "poll_view")
     # Load ally group + roles for targeting
     ally_group  = await database.get_ally_group_for_guild(guild_id)
     ally_roles  = await database.get_ally_roles(ally_group["id"]) if ally_group else []
@@ -2499,11 +2501,12 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
     wing_names = {}
     if ally_group:
         wing_names = {
-            1: ally_group.get("wing1_name") or "Flügel 1",
-            2: ally_group.get("wing2_name") or "Flügel 2",
+            1: ally_group.get("wing1_name") or "Wing 1",
+            2: ally_group.get("wing2_name") or "Wing 2",
         }
     return templates.TemplateResponse("polls.html", {
-        "request": request, "guild": guild, "polls": polls, "saved": saved, "is_admin": is_admin,
+        "request": request, "guild": guild, "polls": polls, "saved": saved,
+        "is_admin": is_admin, "can_manage": can_manage, "can_view": can_view,
         "ally_roles": ally_roles, "ally_group": ally_group,
         "wings": wings, "wing_names": wing_names,
     })
@@ -2782,6 +2785,8 @@ async def polls_close(request: Request, guild_id: str, poll_id: int):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    if not (session.get("type") == "admin" or await has_perm(request, guild_id, "poll_manage")):
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
     poll = await database.get_poll(poll_id)
     if not poll or poll.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
@@ -2858,6 +2863,8 @@ async def polls_delete(request: Request, guild_id: str, poll_id: int):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    if not (session.get("type") == "admin" or await has_perm(request, guild_id, "poll_manage")):
+        return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
     poll = await database.get_poll(poll_id)
     if not poll or poll.get("guild_id") != guild_id:
         return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)

@@ -620,6 +620,10 @@
                   ("🏥 Hospital", [
                     ("hospital_view","View Hospital","Can view the hospital / troop recovery tracker."),
                   ]),
+                  ("📅 Polls", [
+                    ("poll_view","View Polls","Can view availability polls and see who voted."),
+                    ("poll_manage","Manage Polls","Can create, close and delete polls; change responses."),
+                  ]),
                 ] %}
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.45rem;margin-bottom:.85rem;">
@@ -702,6 +706,7 @@
               ("📦 Res-Push","res_push_view / res_push_manage","View resource requests; accept, archive and manage push channels."),
               ("📡 Sector","sector_view","View sector monitoring."),
               ("🏥 Hospital","hospital_view","View troop recovery tracker."),
+              ("📅 Polls","poll_view / poll_manage","View polls & responses; create, close and delete polls."),
             ] %}
             {% for icon_label, flags, desc in legend %}
             <div style="display:flex;gap:.5rem;">
