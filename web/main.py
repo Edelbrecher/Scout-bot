@@ -7662,6 +7662,49 @@ async def admin_contact_save(
 
 
 # ---------------------------------------------------------------------------
+# Admin — Impressum editor
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/impressum", response_class=HTMLResponse)
+async def admin_impressum(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse("/dashboard", status_code=303)
+    impressum = await _get_impressum()
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("admin_impressum.html", {
+        "request": request, "impressum": impressum, "saved": saved,
+    })
+
+@app.post("/admin/impressum/save")
+async def admin_impressum_save(
+    request: Request,
+    name:        str = Form(""),
+    street:      str = Form(""),
+    city:        str = Form(""),
+    country:     str = Form(""),
+    email:       str = Form(""),
+    phone:       str = Form(""),
+    website:     str = Form(""),
+    ust_id:      str = Form(""),
+    responsible: str = Form(""),
+    updated:     str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse("/dashboard", status_code=303)
+    config = {
+        "name": name, "street": street, "city": city, "country": country,
+        "email": email, "phone": phone, "website": website,
+        "ust_id": ust_id, "responsible": responsible, "updated": updated,
+    }
+    await database.set_setting("impressum_config", _json_mod.dumps(config))
+    return RedirectResponse("/admin/impressum?saved=1", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Admin — preview mode (simulate different subscription tiers)
 # ---------------------------------------------------------------------------
 
@@ -7724,7 +7767,7 @@ async def kontakt(request: Request):
 
 import datetime as _dt
 
-_IMPRESSUM = {
+_IMPRESSUM_DEFAULTS = {
     "name":        os.environ.get("IMPRESSUM_NAME", "Maximilian Frischholz"),
     "street":      os.environ.get("IMPRESSUM_STREET", "Eberhard-Wildermuth-Straße 58"),
     "city":        os.environ.get("IMPRESSUM_CITY", "34121 Kassel"),
@@ -7737,34 +7780,43 @@ _IMPRESSUM = {
     "updated":     os.environ.get("IMPRESSUM_UPDATED", "Mai 2026"),
 }
 
-templates.env.globals["impressum"] = _IMPRESSUM
+async def _get_impressum() -> dict:
+    raw = await database.get_setting("impressum_config")
+    if raw:
+        try:
+            data = _json_mod.loads(raw)
+            return {**_IMPRESSUM_DEFAULTS, **data}
+        except Exception:
+            pass
+    return dict(_IMPRESSUM_DEFAULTS)
 
-def _legal_ctx(request: Request) -> dict:
+async def _legal_ctx(request: Request) -> dict:
+    impressum = await _get_impressum()
     return {
         "request": request,
-        "impressum": _IMPRESSUM,
+        "impressum": impressum,
         "current_year": _dt.datetime.utcnow().year,
     }
 
 
 @app.get("/impressum", response_class=HTMLResponse)
 async def page_impressum(request: Request):
-    return templates.TemplateResponse("impressum.html", _legal_ctx(request))
+    return templates.TemplateResponse("impressum.html", await _legal_ctx(request))
 
 
 @app.get("/datenschutz", response_class=HTMLResponse)
 async def page_datenschutz(request: Request):
-    return templates.TemplateResponse("datenschutz.html", _legal_ctx(request))
+    return templates.TemplateResponse("datenschutz.html", await _legal_ctx(request))
 
 
 @app.get("/agb", response_class=HTMLResponse)
 async def page_agb(request: Request):
-    return templates.TemplateResponse("agb.html", _legal_ctx(request))
+    return templates.TemplateResponse("agb.html", await _legal_ctx(request))
 
 
 @app.get("/cookies", response_class=HTMLResponse)
 async def page_cookies(request: Request):
-    return templates.TemplateResponse("cookies.html", _legal_ctx(request))
+    return templates.TemplateResponse("cookies.html", await _legal_ctx(request))
 
 
 # ---------------------------------------------------------------------------
