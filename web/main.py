@@ -2973,8 +2973,8 @@ async def guild_map_data(request: Request, guild_id: str, public_token: str = ""
             # Valid public token — continue without session
         else:
             return JSONResponse({"error": "unauthorized"}, status_code=403)
-    # Allow access if guild member OR if user is logged in (share viewer)
-    if not can_access_guild(session, guild_id):
+    # Allow access if guild member OR share viewer (session may be None for public token)
+    if session and not can_access_guild(session, guild_id):
         if not await can_access_guild_async(session, guild_id):
             pass  # share viewer — still allow map data, just no ally context
     guild = await database.get_guild(guild_id)
