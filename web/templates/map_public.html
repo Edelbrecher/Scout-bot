@@ -465,11 +465,11 @@ async function loadMap() {
     const json = await r.json();
     if (!r.ok) { statusEl.textContent=`Error: ${json.error}`; return; }
     const {rows, maxCoord} = parseSql(json.data);
-    villages  = rows;
+    const natars = rows.filter(v=>v.isNatar).length;
+    villages  = rows.filter(v=>!v.isNatar);
     mapRadius = maxCoord;
     maxPop    = Math.max(1, ...villages.map(v => v.pop||0));
-    const natars = villages.filter(v=>v.isNatar).length;
-    statusEl.textContent = `${(villages.length-natars).toLocaleString()} villages · ${natars} Natars`;
+    statusEl.textContent = `${villages.length.toLocaleString()} villages`;
     if (!SHARE_STATE) {
       scale = Math.min(canvas.width, canvas.height) / (mapRadius*2+4);
       camX=0; camY=0;
