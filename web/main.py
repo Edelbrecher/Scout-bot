@@ -2555,14 +2555,17 @@ async def polls_create(
     headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
     is_private = target_type != "all"
+    # Members to @mention (role/wing filtered)
     target_members = []
     if is_private:
         target_members = await database.get_poll_target_members(guild_id, target_type, target_ids_json)
+    # All ally members get thread access (so HC etc. can always be added)
+    all_ally_members = await database.get_poll_target_members(guild_id, "all", "[]") if is_private else []
 
     # Build embed
-    target_label = "Alle"
+    target_label = "All"
     if is_private and target_members:
-        target_label = f"{len(target_members)} members"
+        target_label = f"{len(target_members)} members pinged"
     embed = {
         "title": f"📅 {title}",
         "description": description or "",
@@ -2679,12 +2682,12 @@ async def polls_create(
             )
             if tr.status_code in (200, 201):
                 thread_id = tr.json()["id"]
-                # Queue thread invites for bot to process (bot has GUILD_MEMBERS intent)
-                invite_ids = [m["discord_id"] for m in target_members if m.get("discord_id")]
-                if invite_ids:
-                    await database.queue_thread_invites(thread_id, guild_id, invite_ids)
-                # Build mention string (max 10 to avoid rate limits)
-                mentions = " ".join(f"<@{m['discord_id']}>" for m in target_members[:30] if m.get("discord_id"))
+                # Invite ALL ally members to thread for access, ping only targeted ones
+                all_invite_ids = [m["discord_id"] for m in all_ally_members if m.get("discord_id")]
+                if all_invite_ids:
+                    await database.queue_thread_invites(thread_id, guild_id, all_invite_ids)
+                # Mention only the targeted role/wing members
+                mentions = " ".join(f"<@{m['discord_id']}>" for m in target_members[:50] if m.get("discord_id"))
                 content = ("📊 New poll! Please vote 👇\n" + mentions) if mentions else "📊 New poll!"
                 resp = await client.post(
                     f"https://discord.com/api/v10/channels/{thread_id}/messages",
