@@ -428,6 +428,10 @@
               <th>Tribe</th>
               <th onclick="sortInactive('population')" style="cursor:pointer;">Pop. ↕</th>
               <th onclick="sortInactive('days_tracked')" style="cursor:pointer;">Inactive ↕</th>
+              <th title="Capital village">★</th>
+              <th title="Crop field layout">Fields</th>
+              <th title="Account pop growth last 7 days">Acc. Δ7d</th>
+              <th title="Village pop last 7 days">Pop history</th>
               {% if has_farmlist %}<th>📋 Lists</th>{% endif %}
               <th style="white-space:nowrap;">🔭 📋</th>
             </tr>
@@ -481,6 +485,46 @@
                 <span style="background:rgba(245,158,11,0.12);color:#f59e0b;border-radius:5px;padding:2px 7px;font-size:0.8rem;font-weight:600;">
                   {{ farm.days_tracked }}d
                 </span>
+              </td>
+              {# Capital #}
+              <td style="text-align:center;">
+                {% if farm.get('is_capital') %}
+                <span title="Capital village" style="color:#f59e0b;">★</span>
+                {% else %}—{% endif %}
+              </td>
+              {# Field type #}
+              <td style="font-size:.75rem;text-align:center;">
+                {% set vt = farm.get('village_type', 0)|int %}
+                {% if vt == 15 %}🌾15
+                {% elif vt == 9 %}🌾9
+                {% elif vt == 7 %}🌾7
+                {% elif vt == 6 %}🌾6
+                {% else %}—{% endif %}
+              </td>
+              {# Account growth #}
+              <td style="font-size:.78rem;text-align:right;">
+                {% set pg = player_growth.get(farm.player_name, {}) %}
+                {% set delta = pg.get('delta', 0) %}
+                {% if delta > 0 %}<span style="color:#f87171;">+{{ delta }}</span>
+                {% elif delta < 0 %}<span style="color:#22c55e;">{{ delta }}</span>
+                {% elif pg %}<span style="color:var(--text-muted);">±0</span>
+                {% else %}—{% endif %}
+              </td>
+              {# Pop history sparkline #}
+              <td style="font-size:.68rem;color:var(--text-muted);">
+                {% set hist = pop_history.get((farm.x, farm.y), []) %}
+                {% if hist|length >= 2 %}
+                <div style="display:flex;gap:2px;align-items:flex-end;height:20px;">
+                  {% set max_p = hist|map(attribute='pop')|max %}
+                  {% for h in hist[:7]|reverse %}
+                  {% set bar_h = ((h.pop / max_p) * 18)|round|int if max_p > 0 else 4 %}
+                  <div style="width:5px;height:{{ bar_h }}px;background:#6366f1;border-radius:1px;opacity:.7;"
+                       title="{{ h.date }}: {{ h.pop }}"></div>
+                  {% endfor %}
+                </div>
+                {% elif hist %}
+                {{ hist[0].pop }}
+                {% else %}—{% endif %}
               </td>
               {% if has_farmlist %}
               <td style="font-size:.72rem;">

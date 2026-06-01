@@ -1571,7 +1571,9 @@ async def _init_farming_tables():
                 alliance_id   TEXT,
                 alliance_name TEXT,
                 population    INTEGER NOT NULL,
-                tribe         INTEGER
+                tribe         INTEGER,
+                is_capital    INTEGER DEFAULT 0,
+                village_type  INTEGER DEFAULT 0
             )
         """)
         await db.execute("""
@@ -1590,6 +1592,17 @@ async def _init_farming_tables():
             )
         """)
         await db.commit()
+        # Migrations for new columns
+        try:
+            await db.execute("ALTER TABLE map_snapshots ADD COLUMN is_capital INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE map_snapshots ADD COLUMN village_type INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
         # Index for performance
         try:
             await db.execute("CREATE INDEX IF NOT EXISTS idx_map_snap_guild ON map_snapshots(guild_id, fetched_at)")
@@ -1605,8 +1618,8 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
         await db.executemany("""
             INSERT INTO map_snapshots
                 (guild_id, fetched_at, village_id, x, y, village_name, player_id, player_name,
-                 alliance_id, alliance_name, population, tribe)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 alliance_id, alliance_name, population, tribe, is_capital, village_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (
                 guild_id, fetched_at,
@@ -1615,6 +1628,7 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
                 v.get("village_name"), v.get("player_id"), v.get("player_name"),
                 v.get("alliance_id"), v.get("alliance_name"),
                 int(v.get("population", 0)), v.get("tribe"),
+                int(v.get("is_capital", 0)), int(v.get("village_type", 0)),
             )
             for v in villages
         ])
@@ -1634,6 +1648,115 @@ async def clear_all_snapshots(guild_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM map_snapshots WHERE guild_id = ?", (guild_id,))
         await db.commit()
+
+
+async def get_village_pop_history(guild_id: str, x: int, y: int, days: int = 7) -> list[dict]:
+    """Return daily population snapshots for a village, newest first, up to `days` distinct dates."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT DATE(fetched_at) as snap_date, MAX(population) as population
+            FROM map_snapshots
+            WHERE guild_id=? AND x=? AND y=?
+              AND fetched_at >= datetime('now', '-' || ? || ' days')
+            GROUP BY DATE(fetched_at)
+            ORDER BY snap_date DESC
+            LIMIT ?
+        """, (guild_id, x, y, days, days)) as cur:
+            rows = await cur.fetchall()
+        return [{"date": r[0], "population": r[1]} for r in rows]
+
+
+async def get_player_pop_growth(guild_id: str, player_name: str, days: int = 7) -> dict:
+    """Return player's total pop at latest snapshot vs N days ago."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT SUM(population) FROM map_snapshots
+            WHERE guild_id=? AND player_name=?
+              AND fetched_at=(SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?)
+        """, (guild_id, player_name, guild_id)) as cur:
+            latest = (await cur.fetchone() or [None])[0] or 0
+        async with db.execute("""
+            SELECT SUM(population) FROM map_snapshots
+            WHERE guild_id=? AND player_name=?
+              AND fetched_at=(
+                SELECT fetched_at FROM map_snapshots WHERE guild_id=?
+                  AND fetched_at <= datetime('now', '-' || ? || ' days')
+                ORDER BY fetched_at DESC LIMIT 1
+              )
+        """, (guild_id, player_name, guild_id, days)) as cur:
+            old = (await cur.fetchone() or [None])[0] or 0
+        return {"latest": latest, "old": old, "delta": latest - old}
+
+
+async def get_bulk_village_pop_history(guild_id: str, coords: list, days: int = 7) -> dict:
+    """Return {(x,y): [{"date":..., "pop":...}, ...]} for multiple villages."""
+    if not coords:
+        return {}
+    result: dict = {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        or_clauses = " OR ".join("(x=? AND y=?)" for _ in coords)
+        flat = [val for (x, y) in coords for val in (x, y)]
+        async with db.execute(f"""
+            SELECT x, y, DATE(fetched_at) as snap_date, MAX(population) as pop
+            FROM map_snapshots
+            WHERE guild_id=? AND fetched_at >= datetime('now', '-' || ? || ' days')
+              AND ({or_clauses})
+            GROUP BY x, y, DATE(fetched_at)
+            ORDER BY x, y, snap_date DESC
+        """, (guild_id, days, *flat)) as cur:
+            for r in await cur.fetchall():
+                key = (r[0], r[1])
+                result.setdefault(key, []).append({"date": r[2], "pop": r[3]})
+    return result
+
+
+async def get_bulk_player_pop_growth(guild_id: str, player_names: list, days: int = 7) -> dict:
+    """Return {player_name: {"delta": N, "latest": M}} for multiple players."""
+    if not player_names:
+        return {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Latest snapshot time
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            latest_ts = (await cur.fetchone() or [None])[0]
+        if not latest_ts:
+            return {}
+
+        # Old snapshot time (closest to N days ago)
+        async with db.execute("""
+            SELECT fetched_at FROM map_snapshots WHERE guild_id=?
+              AND fetched_at <= datetime('now', '-' || ? || ' days')
+            ORDER BY fetched_at DESC LIMIT 1
+        """, (guild_id, days)) as cur:
+            old_ts_row = await cur.fetchone()
+        old_ts = old_ts_row[0] if old_ts_row else None
+
+        ph = ",".join("?" for _ in player_names)
+
+        # Latest totals
+        async with db.execute(f"""
+            SELECT player_name, SUM(population) FROM map_snapshots
+            WHERE guild_id=? AND fetched_at=? AND player_name IN ({ph})
+            GROUP BY player_name
+        """, (guild_id, latest_ts, *player_names)) as cur:
+            latest_map = {r[0]: r[1] for r in await cur.fetchall()}
+
+        old_map: dict = {}
+        if old_ts:
+            async with db.execute(f"""
+                SELECT player_name, SUM(population) FROM map_snapshots
+                WHERE guild_id=? AND fetched_at=? AND player_name IN ({ph})
+                GROUP BY player_name
+            """, (guild_id, old_ts, *player_names)) as cur:
+                old_map = {r[0]: r[1] for r in await cur.fetchall()}
+
+        result = {}
+        for pname in player_names:
+            lat = latest_map.get(pname) or 0
+            old = old_map.get(pname) or 0
+            result[pname] = {"latest": lat, "old": old, "delta": lat - old}
+        return result
 
 
 async def get_servers_overview() -> list[dict]:
@@ -1872,7 +1995,9 @@ async def search_inactive_advanced(
             WITH stats AS (
                 SELECT guild_id, x, y,
                        MAX(population) - MIN(population) AS pop_range,
-                       COUNT(DISTINCT fetched_at)         AS snap_count
+                       COUNT(DISTINCT fetched_at)         AS snap_count,
+                       MIN(fetched_at)                    AS first_seen,
+                       MAX(fetched_at)                    AS last_seen
                 FROM map_snapshots
                 WHERE guild_id = ?
                   AND fetched_at IN ({snap_placeholders})
@@ -1880,7 +2005,8 @@ async def search_inactive_advanced(
             )
             SELECT v.x, v.y, v.village_name, v.player_name,
                    v.alliance_name, v.population, v.tribe,
-                   s.pop_range, s.snap_count
+                   v.is_capital, v.village_type,
+                   s.pop_range, s.snap_count, s.first_seen, s.last_seen
             FROM map_snapshots v
             JOIN stats s ON s.guild_id = v.guild_id AND s.x = v.x AND s.y = v.y
             WHERE v.guild_id = ?
@@ -1938,7 +2064,14 @@ async def search_inactive_advanced(
             if dist < min_distance or dist > max_distance:
                 continue
 
-            filtered.append({**v, "distance": dist, "player_total_pop": pp})
+            from datetime import datetime as _dt
+            try:
+                fs = _dt.fromisoformat(v["first_seen"])
+                ls = _dt.fromisoformat(v["last_seen"])
+                days_tracked = max(0, (ls - fs).days)
+            except Exception:
+                days_tracked = 0
+            filtered.append({**v, "distance": dist, "player_total_pop": pp, "days_tracked": days_tracked})
 
         total = len(filtered)
         filtered.sort(key=lambda v: v["distance"])
