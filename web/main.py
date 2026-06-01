@@ -7762,6 +7762,25 @@ async def api_sidebar_config(request: Request):
     return JSONResponse(nav)
 
 
+@app.get("/admin/features", response_class=HTMLResponse)
+async def admin_features(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse("/dashboard", status_code=303)
+    plan_rows = [
+        {"name": "Free",      "css": "free",         "monthly": "€0",    "annual": "€0",    "servers": "1",  "notes": "Discord server required; no player features"},
+        {"name": "Player Pro","css": "player-pro",   "monthly": "€2.99", "annual": "€23.99","servers": "1",  "notes": "Solo / personal workspace; all player features; no alliance Discord features"},
+        {"name": "Starter",   "css": "alliance-pro", "monthly": "€9.99", "annual": "€79.99","servers": "1",  "notes": "Small alliances; all Player Pro + alliance features"},
+        {"name": "Clan",      "css": "alliance-pro", "monthly": "€14.99","annual": "€119.99","servers": "3", "notes": "Multiple servers"},
+        {"name": "Alliance",  "css": "alliance-pro", "monthly": "€24.99","annual": "€199.99","servers": "5", "notes": "Larger alliances"},
+        {"name": "Imperium",  "css": "alliance-pro", "monthly": "€49.99","annual": "€399.99","servers": "∞", "notes": "Unlimited servers"},
+    ]
+    return templates.TemplateResponse("admin_features.html", {
+        "request": request, "plan_rows": plan_rows,
+    })
+
+
 @app.get("/admin/sidebar", response_class=HTMLResponse)
 async def admin_sidebar(request: Request):
     session, err = _require_session(request)

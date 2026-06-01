@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}Feature Matrix · Admin · TravOps{% endblock %}
+
+{% block content %}
+<div class="container-wide">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Admin nav -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin"           style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/servers"   style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🖥 Server</a>
+        <a href="/admin/promos"    style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup"     style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents"  style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats"     style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
+        <a href="/admin/features"  style="display:block;padding:.65rem 1rem;color:#f59e0b;text-decoration:none;font-size:.9rem;background:rgba(245,158,11,.08);">🗂 Feature Matrix</a>
+        <a href="/admin/contact"   style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+        <a href="/admin/impressum" style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📄 Impressum</a>
+        <a href="/admin/sidebar"   style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🧭 Sidebar-Nav</a>
+        <a href="/admin/auths"     style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🔐 Auths</a>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div style="flex:1; min-width:0;">
+      <div style="margin-bottom:2rem;">
+        <h1 style="margin:0 0 .35rem;font-size:1.5rem;">🗂 Feature Matrix</h1>
+        <p style="color:var(--text-muted);font-size:.88rem;margin:0;">Which features are available on each plan — overview, flow diagram, and full comparison table.</p>
+      </div>
+
+      <!-- ── Plan legend ── -->
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:2rem;">
+        <div class="plan-badge free">Free</div>
+        <div style="color:var(--text-muted);font-size:1.2rem;align-self:center;">→</div>
+        <div class="plan-badge player-pro">Player Pro</div>
+        <div style="color:var(--text-muted);font-size:1.2rem;align-self:center;">→</div>
+        <div class="plan-badge alliance-pro">Alliance Pro <span style="font-size:.72rem;opacity:.7;">(Starter / Clan / Alliance / Imperium)</span></div>
+      </div>
+
+      <!-- ── Flow diagram ── -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:2rem;overflow-x:auto;">
+        <h2 style="margin:0 0 1.5rem;font-size:1rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Plan Flow</h2>
+        <div class="flow-wrap">
+
+          <!-- FREE column -->
+          <div class="flow-col">
+            <div class="flow-header free">🆓 Free</div>
+            <div class="flow-body">
+              <div class="flow-section-title">Map & World</div>
+              <div class="flow-item">🗺️ Map</div>
+              <div class="flow-item">⚔️ Attacks</div>
+              <div class="flow-item">⏱️ Timer</div>
+              <div class="flow-item">📜 Settle List</div>
+              <div class="flow-section-title">Alliance</div>
+              <div class="flow-item">🏰 My Alliance</div>
+              <div class="flow-item">👥 Members</div>
+              <div class="flow-item">🪑 Sitter List</div>
+              <div class="flow-section-title">Scouting</div>
+              <div class="flow-item">🦸 Hero Scout</div>
+              <div class="flow-item">🛡️ Defense</div>
+              <div class="flow-item">🚨 Scout Incidents</div>
+              <div class="flow-item">🔎 Player Intel</div>
+              <div class="flow-section-title">Tools</div>
+              <div class="flow-item">📦 Res Push</div>
+              <div class="flow-item">📊 Stats</div>
+              <div class="flow-item">🌍 Travian Stats</div>
+              <div class="flow-item">🗳️ Polls</div>
+              <div class="flow-item">📐 Blueprints</div>
+              <div class="flow-item">🌽 Crop Calculator</div>
+              <div class="flow-item">⚙️ Hero Tasks</div>
+              <div class="flow-item">🔔 Notifications</div>
+              <div class="flow-item">🧩 Browser Extension</div>
+            </div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="flow-arrow">
+            <div class="flow-arrow-line"></div>
+            <div class="flow-arrow-head player-pro-arrow">▶</div>
+            <div class="flow-arrow-label">Player Pro</div>
+          </div>
+
+          <!-- PLAYER PRO column -->
+          <div class="flow-col">
+            <div class="flow-header player-pro">⭐ Player Pro</div>
+            <div class="flow-body">
+              <div class="flow-section-title">Includes all Free +</div>
+              <div class="flow-item new">🌾 Farming Intel</div>
+              <div class="flow-item new">📋 Farmlist Analyst</div>
+              <div class="flow-item new">🗡️ Attack Planner</div>
+              <div class="flow-item new">📡 Sector Monitor</div>
+            </div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="flow-arrow">
+            <div class="flow-arrow-line"></div>
+            <div class="flow-arrow-head alliance-pro-arrow">▶</div>
+            <div class="flow-arrow-label">Starter / Clan<br>Alliance / Imperium</div>
+          </div>
+
+          <!-- ALLIANCE PRO column -->
+          <div class="flow-col">
+            <div class="flow-header alliance-pro">👑 Alliance Pro</div>
+            <div class="flow-body">
+              <div class="flow-section-title">Includes all Player Pro +</div>
+              <div class="flow-item new">⚙️ Operations</div>
+              <div class="flow-item new">🏥 Hospital</div>
+              <div class="flow-item new">😈 Enemies</div>
+              <div class="flow-item new">🕵️ Scout Tracking</div>
+            </div>
+          </div>
+
+        </div><!-- /flow-wrap -->
+      </div><!-- /flow diagram -->
+
+      <!-- ── Full comparison table ── -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:2rem;">
+        <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);">
+          <h2 style="margin:0;font-size:1rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Full Feature Comparison</h2>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.03);">
+                <th style="text-align:left;padding:.75rem 1.25rem;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;width:35%;">Feature</th>
+                <th style="text-align:center;padding:.75rem 1rem;color:#6ee7b7;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Free</th>
+                <th style="text-align:center;padding:.75rem 1rem;color:#fbbf24;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Player Pro</th>
+                <th style="text-align:center;padding:.75rem 1rem;color:#a78bfa;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Alliance Pro</th>
+              </tr>
+            </thead>
+            <tbody id="featureTableBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Plan limits ── -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);">
+          <h2 style="margin:0;font-size:1rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Plan Limits & Pricing</h2>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.03);">
+                <th style="text-align:left;padding:.75rem 1.25rem;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Plan</th>
+                <th style="text-align:center;padding:.75rem 1rem;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Monthly</th>
+                <th style="text-align:center;padding:.75rem 1rem;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Annual</th>
+                <th style="text-align:center;padding:.75rem 1rem;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Servers</th>
+                <th style="text-align:left;padding:.75rem 1rem;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in plan_rows %}
+              <tr style="border-top:1px solid var(--border);" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
+                <td style="padding:.7rem 1.25rem;font-weight:600;">
+                  <span class="plan-badge {{ row.css }}">{{ row.name }}</span>
+                </td>
+                <td style="text-align:center;padding:.7rem 1rem;font-family:monospace;">{{ row.monthly }}</td>
+                <td style="text-align:center;padding:.7rem 1rem;font-family:monospace;">{{ row.annual }}</td>
+                <td style="text-align:center;padding:.7rem 1rem;">{{ row.servers }}</td>
+                <td style="padding:.7rem 1rem;color:var(--text-muted);font-size:.82rem;">{{ row.notes }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div>
+</div>
+
+<style>
+.plan-badge {
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.35rem .85rem;border-radius:20px;font-size:.82rem;font-weight:700;
+}
+.plan-badge.free         { background:rgba(110,231,183,.1); color:#6ee7b7; border:1px solid rgba(110,231,183,.25); }
+.plan-badge.player-pro   { background:rgba(251,191,36,.1);  color:#fbbf24; border:1px solid rgba(251,191,36,.25); }
+.plan-badge.alliance-pro { background:rgba(167,139,250,.1); color:#a78bfa; border:1px solid rgba(167,139,250,.25); }
+
+/* Flow diagram */
+.flow-wrap {
+  display:flex;align-items:flex-start;gap:0;
+  min-width:700px;
+}
+.flow-col {
+  flex:1;min-width:0;
+  border-radius:10px;overflow:hidden;
+  border:1px solid var(--border);
+}
+.flow-header {
+  text-align:center;padding:.75rem 1rem;font-weight:700;font-size:.95rem;
+}
+.flow-header.free         { background:rgba(110,231,183,.12); color:#6ee7b7; }
+.flow-header.player-pro   { background:rgba(251,191,36,.12);  color:#fbbf24; }
+.flow-header.alliance-pro { background:rgba(167,139,250,.12); color:#a78bfa; }
+
+.flow-body { padding:.75rem .85rem; background:var(--bg-main); }
+.flow-section-title {
+  font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-muted);margin:.9rem 0 .35rem;
+}
+.flow-section-title:first-child { margin-top:.1rem; }
+.flow-item {
+  padding:.3rem .5rem;font-size:.86rem;color:var(--text-muted);border-radius:5px;
+  margin-bottom:2px;
+}
+.flow-item.new {
+  color:#c9d1d9;background:rgba(255,255,255,.04);border-left:2px solid #5865f2;
+  padding-left:.6rem;
+}
+
+.flow-arrow {
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding-top:4rem;gap:.3rem;width:60px;flex-shrink:0;
+}
+.flow-arrow-line {
+  width:24px;height:2px;background:var(--border);
+}
+.flow-arrow-head { font-size:.9rem; }
+.flow-arrow-head.player-pro-arrow   { color:#fbbf24; }
+.flow-arrow-head.alliance-pro-arrow { color:#a78bfa; }
+.flow-arrow-label {
+  font-size:.68rem;color:var(--text-muted);text-align:center;line-height:1.3;
+}
+
+/* Feature table */
+.ft-yes-free     { color:#6ee7b7;font-size:1.1rem; }
+.ft-yes-player   { color:#fbbf24;font-size:1.1rem; }
+.ft-yes-alliance { color:#a78bfa;font-size:1.1rem; }
+.ft-no           { color:rgba(255,255,255,.15);font-size:1rem; }
+.ft-group-row td {
+  background:rgba(255,255,255,.025);
+  font-size:.72rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-muted);padding:.5rem 1.25rem !important;
+}
+
+@media(max-width:700px){
+  .flow-wrap { min-width:500px; }
+  .flow-arrow { width:36px; }
+  .flow-arrow-line { width:14px; }
+}
+</style>
+
+<script>
+const FEATURES = [
+  // [name, free, player_pro, alliance_pro, note]
+  // free=true means free, player_pro=true means player_pro only (not in free), etc.
+  { group: 'Map & World' },
+  { name: '🗺️ Map',               free:true,  pp:true,  ap:true  },
+  { name: '⚔️ Attacks',           free:true,  pp:true,  ap:true, note:'Requires Discord server (not Personal)' },
+  { name: '📡 Sector Monitor',    free:false, pp:true,  ap:true  },
+  { name: '⏱️ Timer',             free:true,  pp:true,  ap:true  },
+  { name: '📜 Settle List',       free:true,  pp:true,  ap:true  },
+  { group: 'Farming' },
+  { name: '🌾 Farming Intel',     free:false, pp:true,  ap:true  },
+  { name: '📋 Farmlist Analyst',  free:false, pp:true,  ap:true  },
+  { group: 'Scouting' },
+  { name: '🔎 Player Intel',      free:true,  pp:true,  ap:true  },
+  { name: '🦸 Hero Scout',        free:true,  pp:true,  ap:true  },
+  { name: '🕵️ Scout Tracking',   free:false, pp:false, ap:true  },
+  { name: '🚨 Scout Incidents',   free:true,  pp:true,  ap:true  },
+  { name: '🛡️ Defense',          free:true,  pp:true,  ap:true  },
+  { group: 'Operations' },
+  { name: '⚙️ Operations',        free:false, pp:false, ap:true  },
+  { name: '🗡️ Attack Planner',   free:false, pp:true,  ap:true  },
+  { group: 'Alliance' },
+  { name: '🏰 My Alliance',       free:true,  pp:true,  ap:true  },
+  { name: '👥 Members',           free:true,  pp:true,  ap:true  },
+  { name: '🪑 Sitter List',       free:true,  pp:true,  ap:true  },
+  { name: '🏥 Hospital',          free:false, pp:false, ap:true  },
+  { name: '😈 Enemies',           free:false, pp:false, ap:true  },
+  { group: 'Tools' },
+  { name: '📦 Res Push',          free:true,  pp:true,  ap:true  },
+  { name: '🗳️ Polls',            free:true,  pp:true,  ap:true  },
+  { name: '📐 Blueprints',        free:true,  pp:true,  ap:true  },
+  { name: '🌽 Crop Calculator',   free:true,  pp:true,  ap:true  },
+  { name: '⚙️ Hero Tasks',        free:true,  pp:true,  ap:true  },
+  { group: 'Analytics & Stats' },
+  { name: '📊 Statistics',        free:true,  pp:true,  ap:true  },
+  { name: '🌍 Travian Stats',     free:true,  pp:true,  ap:true  },
+  { group: 'Account & Settings' },
+  { name: '👤 My Account',        free:true,  pp:true,  ap:true  },
+  { name: '🔔 Notifications',     free:true,  pp:true,  ap:true  },
+  { name: '⚙️ Settings',          free:true,  pp:true,  ap:true  },
+  { name: '🧩 Browser Extension', free:true,  pp:true,  ap:true  },
+];
+
+const CHECK = { free:'✓', pp:'✓', ap:'✓' };
+const tbody = document.getElementById('featureTableBody');
+
+FEATURES.forEach(f => {
+  if (f.group) {
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr class="ft-group-row"><td colspan="4">${f.group}</td></tr>`);
+    return;
+  }
+  const freeCell   = f.free ? `<span class="ft-yes-free">✓</span>`     : `<span class="ft-no">—</span>`;
+  const ppCell     = f.pp   ? `<span class="ft-yes-player">✓</span>`   : `<span class="ft-no">—</span>`;
+  const apCell     = f.ap   ? `<span class="ft-yes-alliance">✓</span>` : `<span class="ft-no">—</span>`;
+  const noteHtml   = f.note ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">${f.note}</div>` : '';
+  tbody.insertAdjacentHTML('beforeend', `
+    <tr style="border-top:1px solid rgba(63,65,71,.5);" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
+      <td style="padding:.6rem 1.25rem;">${f.name}${noteHtml}</td>
+      <td style="text-align:center;padding:.6rem 1rem;">${freeCell}</td>
+      <td style="text-align:center;padding:.6rem 1rem;">${ppCell}</td>
+      <td style="text-align:center;padding:.6rem 1rem;">${apCell}</td>
+    </tr>`);
+});
+</script>
+{% endblock %}
