@@ -2482,16 +2482,30 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard")
     polls = await database.get_polls(guild_id)
-    # Attach response counts to each poll
+    import json as _json
     for p in polls:
         responses = await database.get_poll_responses(p["id"])
         p["count_available"]   = sum(1 for r in responses if r["response"] == "available")
         p["count_maybe"]       = sum(1 for r in responses if r["response"] == "maybe")
         p["count_unavailable"] = sum(1 for r in responses if r["response"] == "unavailable")
         p["responses"]         = responses
+        p["target_ids_list"]   = _json.loads(p.get("target_ids") or "[]")
     is_admin = session.get("type") == "admin"
+    # Load ally group + roles for targeting
+    ally_group  = await database.get_ally_group_for_guild(guild_id)
+    ally_roles  = await database.get_ally_roles(ally_group["id"]) if ally_group else []
+    ally_members = await database.get_ally_members(ally_group["id"]) if ally_group else []
+    wings = sorted({m["wing"] for m in ally_members if m.get("wing") is not None})
+    wing_names = {}
+    if ally_group:
+        wing_names = {
+            1: ally_group.get("wing1_name") or "Flügel 1",
+            2: ally_group.get("wing2_name") or "Flügel 2",
+        }
     return templates.TemplateResponse("polls.html", {
         "request": request, "guild": guild, "polls": polls, "saved": saved, "is_admin": is_admin,
+        "ally_roles": ally_roles, "ally_group": ally_group,
+        "wings": wings, "wing_names": wing_names,
     })
 
 
@@ -2512,27 +2526,51 @@ async def polls_create(
     title: str = Form(...),
     description: str = Form(""),
     event_datetime: str = Form(...),
+    target_type: str = Form("all"),
+    target_ids: str = Form("[]"),
 ):
+    import json as _json
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
-    if not guild or not guild.get("poll_channel_id"):
-        return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
 
     title       = title.strip()[:100]
     description = description.strip()[:500]
+    try:
+        target_ids_list = _json.loads(target_ids)
+        if not isinstance(target_ids_list, list):
+            target_ids_list = []
+    except Exception:
+        target_ids_list = []
+    target_ids_json = _json.dumps(target_ids_list)
 
-    poll_id = await database.create_poll(guild_id, title, description, event_datetime)
+    poll_id = await database.create_poll_targeted(
+        guild_id, title, description, event_datetime,
+        target_type=target_type, target_ids=target_ids_json,
+    )
 
-    token      = os.environ.get("DISCORD_TOKEN", "")
-    channel_id = guild["poll_channel_id"]
+    token = os.environ.get("DISCORD_TOKEN", "")
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+
+    is_private = target_type != "all"
+    target_members = []
+    if is_private:
+        target_members = await database.get_poll_target_members(guild_id, target_type, target_ids_json)
+
+    # Build embed
+    target_label = "Alle"
+    if is_private and target_members:
+        target_label = f"{len(target_members)} Mitglieder"
     embed = {
         "title": f"📅 {title}",
         "description": description or "",
-        "color": 5793266,
-        "fields": [{"name": "🕐 Zeitpunkt (UTC)", "value": event_datetime.replace("T", " "), "inline": False}],
+        "color": 0x6366f1 if is_private else 0x58b9e0,
+        "fields": [
+            {"name": "🕐 Zeitpunkt", "value": event_datetime.replace("T", " "), "inline": True},
+            {"name": "👥 Zielgruppe", "value": target_label, "inline": True},
+        ],
         "footer": {"text": f"Umfrage #{poll_id} · Klicke einen Button um deine Verfügbarkeit anzugeben"},
     }
     components = [{"type": 1, "components": [
@@ -2541,14 +2579,56 @@ async def polls_create(
         {"type": 2, "style": 4, "label": "Nicht dabei", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
     ]}]
 
+    # Ensure poll channel exists (auto-create if needed)
+    if not guild or not guild.get("poll_channel_id"):
+        # Try to auto-setup via bot API endpoint
+        return RedirectResponse(f"/guild/{guild_id}/polls?error=no_channel", status_code=303)
+
+    channel_id = guild["poll_channel_id"]
+    thread_id = None
+
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"https://discord.com/api/v10/channels/{channel_id}/messages",
-            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
-            json={"embeds": [embed], "components": components},
-        )
+        if is_private and target_members:
+            # Create a private thread in the poll channel
+            thread_name = title[:100]
+            tr = await client.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/threads",
+                headers=headers,
+                json={"name": thread_name, "type": 12, "invitable": False},  # 12 = GUILD_PRIVATE_THREAD
+            )
+            if tr.status_code in (200, 201):
+                thread_id = tr.json()["id"]
+                # Add targeted members to thread
+                for m in target_members:
+                    if m.get("discord_id"):
+                        await client.put(
+                            f"https://discord.com/api/v10/channels/{thread_id}/thread-members/{m['discord_id']}",
+                            headers=headers,
+                        )
+                # Build mention string (max 10 to avoid rate limits)
+                mentions = " ".join(f"<@{m['discord_id']}>" for m in target_members[:30] if m.get("discord_id"))
+                content = ("📊 Neue Umfrage! Bitte abstimmen 👇\n" + mentions) if mentions else "📊 Neue Umfrage!"
+                resp = await client.post(
+                    f"https://discord.com/api/v10/channels/{thread_id}/messages",
+                    headers=headers,
+                    json={"content": content, "embeds": [embed], "components": components},
+                )
+            else:
+                # Fallback: post to channel normally
+                resp = await client.post(
+                    f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                    headers=headers,
+                    json={"embeds": [embed], "components": components},
+                )
+        else:
+            resp = await client.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers=headers,
+                json={"embeds": [embed], "components": components},
+            )
+
     if resp.status_code in (200, 201):
-        await database.set_poll_message_id(poll_id, resp.json()["id"])
+        await database.set_poll_thread(poll_id, channel_id, thread_id, resp.json()["id"])
     return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
 
 

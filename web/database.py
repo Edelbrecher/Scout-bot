@@ -1187,6 +1187,77 @@ async def delete_poll(poll_id: int):
         await db.commit()
 
 
+async def create_poll_targeted(
+    guild_id: str, title: str, description: str, event_datetime: str,
+    target_type: str = "all", target_ids: str = "[]",
+    plan_id: int | None = None,
+) -> int:
+    """Create a poll with optional targeting. Returns poll id."""
+    import json as _json
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO availability_polls
+                (guild_id, title, description, event_datetime, target_type, target_ids, plan_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (guild_id, title, description, event_datetime,
+               target_type, target_ids, plan_id, _dt.utcnow().isoformat()))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def set_poll_thread(poll_id: int, channel_id: str, thread_id: str | None, message_id: str):
+    """Save discord IDs for a posted poll."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """UPDATE availability_polls
+               SET poll_channel_id=?, thread_id=?, discord_message_id=? WHERE id=?""",
+            (channel_id, thread_id, message_id, poll_id),
+        )
+        await db.commit()
+
+
+async def get_poll_target_members(guild_id: str, target_type: str, target_ids_json: str) -> list[dict]:
+    """Return ally_members rows matching the target (discord_id, travian_name, role_id, wing)."""
+    import json as _json
+    try:
+        ids = _json.loads(target_ids_json or "[]")
+    except Exception:
+        ids = []
+    group = await get_ally_group_for_guild(guild_id)
+    if not group:
+        return []
+    gid = group["id"]
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if target_type == "all" or not ids:
+            sql = """SELECT am.discord_id, am.discord_username, am.travian_name, am.role_id, am.wing,
+                              ar.role_name, ar.color
+                       FROM ally_members am LEFT JOIN ally_roles ar ON ar.id=am.role_id
+                       WHERE am.ally_group_id=? AND (am.status IS NULL OR am.status='approved')"""
+            async with db.execute(sql, (gid,)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        elif target_type == "role":
+            ph = ",".join("?" * len(ids))
+            sql = f"""SELECT am.discord_id, am.discord_username, am.travian_name, am.role_id, am.wing,
+                               ar.role_name, ar.color
+                        FROM ally_members am LEFT JOIN ally_roles ar ON ar.id=am.role_id
+                        WHERE am.ally_group_id=? AND am.role_id IN ({ph})
+                          AND (am.status IS NULL OR am.status='approved')"""
+            async with db.execute(sql, [gid] + [int(i) for i in ids]) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        elif target_type == "wing":
+            ph = ",".join("?" * len(ids))
+            sql = f"""SELECT am.discord_id, am.discord_username, am.travian_name, am.role_id, am.wing,
+                               ar.role_name, ar.color
+                        FROM ally_members am LEFT JOIN ally_roles ar ON ar.id=am.role_id
+                        WHERE am.ally_group_id=? AND am.wing IN ({ph})
+                          AND (am.status IS NULL OR am.status='approved')"""
+            async with db.execute(sql, [gid] + [int(i) for i in ids]) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+    return []
+
+
 async def get_guild_by_stripe_customer(stripe_customer_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -6164,6 +6235,18 @@ async def _init_op_tables():
             await db.commit()
         except Exception:
             pass
+        # availability_polls: targeting + private thread support
+        for col, defn in [
+            ("target_type", "TEXT DEFAULT 'all'"),
+            ("target_ids",  "TEXT DEFAULT '[]'"),
+            ("thread_id",   "TEXT"),
+            ("poll_channel_id", "TEXT"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE availability_polls ADD COLUMN {col} {defn}")
+                await db.commit()
+            except Exception:
+                pass
         # Notifications table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
