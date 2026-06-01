@@ -108,6 +108,7 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkM
 const GUILD_ID    = {{ guild.guild_id | tojson }};
 const SCOUTED_RAW = {{ scouted | tojson }};
 const SHARE_STATE = {{ share_state_json | default('null') | safe }};
+const PUBLIC_TOKEN = {{ public_token | tojson }};
 
 const TRIBE_COLOR = { 1:'#c0392b', 2:'#85929e', 3:'#58d68d', 4:'#d4ac0d', 5:'#9b59b6', 6:'#1abc9c' };
 const NATAR_COLOR  = '#e67e22';
@@ -456,7 +457,7 @@ window.addEventListener('resize', resize);
 async function loadMap() {
   statusEl.textContent = 'Loading map data…';
   try {
-    const r = await fetch(`/guild/${GUILD_ID}/map/data`);
+    const r = await fetch(`/guild/${GUILD_ID}/map/data?public_token=${encodeURIComponent(PUBLIC_TOKEN)}`);
     const json = await r.json();
     if (!r.ok) { statusEl.textContent=`Error: ${json.error}`; return; }
     const {rows, maxCoord} = parseSql(json.data);

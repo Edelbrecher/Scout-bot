@@ -2811,10 +2811,11 @@ async def map_public_view(request: Request, short_id: str):
 
     scouted = await database.get_scouted_coordinates(share["guild_id"])
     return templates.TemplateResponse("map_public.html", {
-        "request":        request,
-        "guild":          guild,
-        "scouted":        scouted,
+        "request":          request,
+        "guild":            guild,
+        "scouted":          scouted,
         "share_state_json": share["state_json"],
+        "public_token":     short_id,
     })
 
 
@@ -2960,11 +2961,18 @@ async def sector_monitor_dismiss_all(request: Request, guild_id: str):
 
 
 @app.get("/guild/{guild_id}/map/data")
-async def guild_map_data(request: Request, guild_id: str):
-    """Proxy Travian map.sql to avoid CORS issues. Allow logged-in share viewers."""
+async def guild_map_data(request: Request, guild_id: str, public_token: str = ""):
+    """Proxy Travian map.sql to avoid CORS issues. Allow logged-in share viewers and public token holders."""
     session = _get_session(request)
+    # Allow unauthenticated access via valid public share token
     if not session:
-        return JSONResponse({"error": "unauthorized"}, status_code=403)
+        if public_token:
+            share = await database.get_map_share(public_token)
+            if not share or not share.get("is_public") or share["guild_id"] != guild_id:
+                return JSONResponse({"error": "unauthorized"}, status_code=403)
+            # Valid public token — continue without session
+        else:
+            return JSONResponse({"error": "unauthorized"}, status_code=403)
     # Allow access if guild member OR if user is logged in (share viewer)
     if not can_access_guild(session, guild_id):
         if not await can_access_guild_async(session, guild_id):
