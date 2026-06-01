@@ -2264,7 +2264,8 @@ async def search_map_snapshot(guild_id: str, query: str) -> list[dict]:
 
 
 async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
-    """Full player intelligence: current villages, pop history, village timeline (first/last seen)."""
+    """Full player intelligence: villages, pop history, alliance history, village origin, growth."""
+    import datetime as _dt_mod
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
 
@@ -2292,8 +2293,9 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
             return None
 
         first = current_villages[0]
+        real_name = first.get("player_name", player_name)
 
-        # All distinct snapshot timestamps available for this player
+        # All distinct snapshot timestamps
         async with db.execute(
             """SELECT DISTINCT fetched_at FROM map_snapshots
                WHERE guild_id = ? AND lower(player_name) = lower(?)
@@ -2302,7 +2304,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         ) as cur:
             all_ts = [r[0] for r in await cur.fetchall()]
 
-        # Per-village timeline: first_seen, last_seen, min/max pop across all snapshots
+        # Per-village timeline
         async with db.execute(
             """SELECT x, y, village_name,
                       MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
@@ -2315,12 +2317,107 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         ) as cur:
             village_timeline = [dict(r) for r in await cur.fetchall()]
 
-        # Classify each village: active (present in latest), lost (was seen but not in latest)
         current_coords = {(v["x"], v["y"]) for v in current_villages}
         for vt in village_timeline:
             vt["is_active"] = (vt["x"], vt["y"]) in current_coords
 
-        # Player total population per snapshot (growth chart)
+        # Village population at key intervals (7 / 14 / 30 days ago)
+        now_ts = latest
+        try:
+            now_dt = _dt_mod.datetime.fromisoformat(now_ts)
+        except Exception:
+            now_dt = _dt_mod.datetime.utcnow()
+
+        def _offset_ts(days):
+            return (now_dt - _dt_mod.timedelta(days=days)).isoformat(sep=' ', timespec='seconds')
+
+        # For each interval, find the closest snapshot before that date
+        interval_snaps = {}
+        for label, days in [("d7", 7), ("d14", 14), ("d30", 30)]:
+            target = _offset_ts(days)
+            async with db.execute(
+                """SELECT fetched_at FROM map_snapshots
+                   WHERE guild_id = ? AND fetched_at <= ? AND lower(player_name) = lower(?)
+                   ORDER BY fetched_at DESC LIMIT 1""",
+                (guild_id, target, player_name)
+            ) as cur:
+                r = await cur.fetchone()
+            interval_snaps[label] = r[0] if r else None
+
+        # Per-village population at each interval
+        village_pop_intervals = {}  # (x,y) -> {d7, d14, d30, first}
+        all_timeline_coords = [(vt["x"], vt["y"]) for vt in village_timeline]
+        for vt in village_timeline:
+            x, y = vt["x"], vt["y"]
+            intervals = {"first": vt["min_pop"]}
+            for label, ts in interval_snaps.items():
+                if ts:
+                    async with db.execute(
+                        """SELECT population FROM map_snapshots
+                           WHERE guild_id = ? AND fetched_at = ? AND x = ? AND y = ?
+                             AND lower(player_name) = lower(?)""",
+                        (guild_id, ts, x, y, player_name)
+                    ) as cur:
+                        r = await cur.fetchone()
+                    intervals[label] = r[0] if r else None
+                else:
+                    intervals[label] = None
+            village_pop_intervals[(x, y)] = intervals
+
+        for vt in village_timeline:
+            vt["pop_intervals"] = village_pop_intervals.get((vt["x"], vt["y"]), {})
+
+        # Village origin: settled or conquered?
+        # For each village, find what was at those coords just before this player's first_seen
+        village_origins = {}
+        for vt in village_timeline:
+            x, y = vt["x"], vt["y"]
+            first_seen = vt["first_seen"]
+            # Look for any entry at (x, y) with a different player in the snapshot just before first_seen
+            async with db.execute(
+                """SELECT player_name, alliance_name, population, fetched_at FROM map_snapshots
+                   WHERE guild_id = ? AND x = ? AND y = ? AND fetched_at < ?
+                   ORDER BY fetched_at DESC LIMIT 1""",
+                (guild_id, x, y, first_seen)
+            ) as cur:
+                prev = await cur.fetchone()
+            if prev and prev[0] and prev[0].lower() != player_name.lower():
+                village_origins[(x, y)] = {
+                    "type": "conquered",
+                    "from_player": prev[0],
+                    "from_alliance": prev[1],
+                    "prev_pop": prev[2],
+                    "conquered_at": first_seen,
+                }
+            elif prev and (not prev[0] or prev[0] == ""):
+                village_origins[(x, y)] = {"type": "settled", "conquered_at": first_seen}
+            else:
+                # No prior record = first time we saw it, assume settled (or unknown)
+                village_origins[(x, y)] = {"type": "settled", "conquered_at": first_seen}
+
+        for vt in village_timeline:
+            vt["origin"] = village_origins.get((vt["x"], vt["y"]), {"type": "unknown"})
+
+        # Alliance history: track changes across snapshots
+        async with db.execute(
+            """SELECT fetched_at, MAX(alliance_name) as alliance_name
+               FROM map_snapshots
+               WHERE guild_id = ? AND lower(player_name) = lower(?)
+               GROUP BY fetched_at
+               ORDER BY fetched_at""",
+            (guild_id, player_name)
+        ) as cur:
+            raw_ally = [dict(r) for r in await cur.fetchall()]
+
+        alliance_history = []
+        prev_ally = None
+        for row in raw_ally:
+            a = row["alliance_name"] or ""
+            if a != prev_ally:
+                alliance_history.append({"date": row["fetched_at"][:10], "alliance": a or "—"})
+                prev_ally = a
+
+        # Total population per snapshot (growth chart)
         async with db.execute(
             """SELECT fetched_at, SUM(population) as total_pop, COUNT(*) as village_count
                FROM map_snapshots
@@ -2331,19 +2428,20 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         ) as cur:
             pop_history = [dict(r) for r in await cur.fetchall()]
 
-        # Player name autocomplete list (all distinct player names in latest snapshot)
         return {
-            "player_name": first.get("player_name", player_name),
+            "player_name": real_name,
             "alliance_name": first.get("alliance_name"),
             "alliance_id": first.get("alliance_id"),
             "tribe": first.get("tribe"),
             "current_villages": current_villages,
             "village_timeline": sorted(village_timeline, key=lambda v: (not v["is_active"], -v.get("max_pop", 0))),
             "pop_history": pop_history,
+            "alliance_history": alliance_history,
             "total_pop": sum(v.get("population", 0) or 0 for v in current_villages),
             "village_count": len(current_villages),
             "snapshot_count": len(all_ts),
             "latest_snapshot": latest,
+            "interval_snaps": interval_snaps,
         }
 
 
