@@ -1444,20 +1444,20 @@ async def _get_or_create_poll_category(guild: discord.Guild) -> discord.TextChan
     return poll_ch
 
 
-class PollHubModal(discord.ui.Modal, title="📊 Neue Umfrage erstellen"):
+class PollHubModal(discord.ui.Modal, title="📊 Create Poll"):
     poll_title = discord.ui.TextInput(
-        label="Titel", placeholder="z.B. Samstag Raid", max_length=120
+        label="Title", placeholder="e.g. Saturday Raid", max_length=120
     )
     description = discord.ui.TextInput(
-        label="Beschreibung (optional)",
+        label="Description (optional)",
         style=discord.TextStyle.paragraph,
-        placeholder="Details zum Event...",
+        placeholder="Event details...",
         max_length=500,
         required=False,
     )
     event_datetime = discord.ui.TextInput(
-        label="Datum & Uhrzeit",
-        placeholder="z.B. 07.06.2026 20:00",
+        label="Date & Time",
+        placeholder="e.g. 07.06.2026 20:00",
         max_length=40,
     )
 
@@ -1468,7 +1468,7 @@ class PollHubModal(discord.ui.Modal, title="📊 Neue Umfrage erstellen"):
 
         poll_ch = await _get_or_create_poll_category(guild)
         if not poll_ch:
-            await interaction.followup.send("❌ Poll-Channel konnte nicht erstellt werden.", ephemeral=True)
+            await interaction.followup.send("❌ Could not create poll channel.", ephemeral=True)
             return
 
         title = self.poll_title.value.strip()
@@ -1482,19 +1482,19 @@ class PollHubModal(discord.ui.Modal, title="📊 Neue Umfrage erstellen"):
             description=desc or discord.utils.MISSING,
             color=0x6366f1,
         )
-        embed.add_field(name="📅 Zeitpunkt", value=event_dt, inline=False)
-        embed.set_footer(text=f"Umfrage #{poll_id} · Erstellt von {interaction.user.display_name}")
+        embed.add_field(name="📅 Date & Time", value=event_dt, inline=False)
+        embed.set_footer(text=f"Poll #{poll_id} · Created by {interaction.user.display_name}")
 
         view = discord.ui.View(timeout=None)
-        view.add_item(discord.ui.Button(label="Dabei", emoji="✅", style=discord.ButtonStyle.success, custom_id=f"poll_available_{poll_id}"))
-        view.add_item(discord.ui.Button(label="Vielleicht", emoji="⏰", style=discord.ButtonStyle.secondary, custom_id=f"poll_maybe_{poll_id}"))
-        view.add_item(discord.ui.Button(label="Nicht dabei", emoji="❌", style=discord.ButtonStyle.danger, custom_id=f"poll_unavailable_{poll_id}"))
+        view.add_item(discord.ui.Button(label="Going", emoji="✅", style=discord.ButtonStyle.success, custom_id=f"poll_available_{poll_id}"))
+        view.add_item(discord.ui.Button(label="Maybe", emoji="⏰", style=discord.ButtonStyle.secondary, custom_id=f"poll_maybe_{poll_id}"))
+        view.add_item(discord.ui.Button(label="Not going", emoji="❌", style=discord.ButtonStyle.danger, custom_id=f"poll_unavailable_{poll_id}"))
 
         msg = await poll_ch.send(embed=embed, view=view)
         await database.set_poll_discord_message(poll_id, str(poll_ch.id), str(msg.id))
 
         await interaction.followup.send(
-            f"✅ Umfrage erstellt! → {poll_ch.mention}",
+            f"✅ Poll created! → {poll_ch.mention}",
             ephemeral=True,
         )
 
@@ -1614,7 +1614,7 @@ class RequestHubView(discord.ui.View):
         await interaction.response.send_modal(EnemyScoutModal())
 
     @discord.ui.button(
-        label="Umfrage", emoji="📊", style=discord.ButtonStyle.primary,
+        label="Poll", emoji="📊", style=discord.ButtonStyle.primary,
         custom_id="persistent:hub_poll", row=3,
     )
     async def hub_poll(self, interaction: discord.Interaction, button: discord.ui.Button):

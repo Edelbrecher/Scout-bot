@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Umfragen · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Polls · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -167,14 +167,14 @@
 <div class="container-wide">
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:.25rem 0 .1rem;">📅 Umfragen</h1>
-    <p style="color:var(--text-muted);margin:0;font-size:.875rem;">Verfügbarkeits-Umfragen für {{ guild.guild_name }}</p>
+    <h1 style="margin:.25rem 0 .1rem;">📅 Polls</h1>
+    <p style="color:var(--text-muted);margin:0;font-size:.875rem;">Availability polls for {{ guild.guild_name }}</p>
   </div>
 
-  {% if saved %}<div class="alert alert-success" style="margin-bottom:1rem;">✅ Umfrage erstellt und in Discord gepostet.</div>{% endif %}
+  {% if saved %}<div class="alert alert-success" style="margin-bottom:1rem;">✅ Poll created and posted to Discord.</div>{% endif %}
   {% if request.query_params.get('error') == 'no_channel' %}
   <div class="alert alert-error" style="margin-bottom:1rem;">
-    ❌ Kein Umfrage-Channel konfiguriert. Klicke im Hub auf <strong>📊 Umfrage</strong> — der Channel wird automatisch erstellt.
+    ❌ No poll channel configured. Click <strong>📊 Poll</strong> in the Hub — the channel will be created automatically.
   </div>
   {% endif %}
 
@@ -188,13 +188,13 @@
       {% if not polls %}
       <div class="polls-empty">
         <div style="font-size:2.5rem;margin-bottom:.75rem;">📊</div>
-        <div style="font-size:1rem;font-weight:600;margin-bottom:.4rem;color:var(--text);">Noch keine Umfragen</div>
-        <div style="font-size:.85rem;">Erstelle deine erste Umfrage mit dem Formular rechts.</div>
+        <div style="font-size:1rem;font-weight:600;margin-bottom:.4rem;color:var(--text);">No polls yet</div>
+        <div style="font-size:.85rem;">Create your first poll using the form on the right.</div>
       </div>
       {% endif %}
 
       {% if active_polls %}
-      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">Aktiv ({{ active_polls|length }})</div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">Active ({{ active_polls|length }})</div>
       {% for poll in active_polls %}{% set is_priv = poll.get('target_type','all') != 'all' %}{% set is_closed = poll.status != 'active' %}{% set total = poll.count_available + poll.count_maybe + poll.count_unavailable %}
       <div class="poll-card{% if is_priv %} private{% endif %}{% if is_closed %} closed{% endif %}">
         <div class="poll-header">
@@ -202,12 +202,12 @@
             <div class="poll-title">
               {{ poll.title }}
               <span class="pill pill-active">Live</span>
-              {% if is_priv %}<span class="target-badge tb-private">🔒 Privat</span>{% else %}<span class="target-badge tb-all">🌐 Öffentlich</span>{% endif %}
+              {% if is_priv %}<span class="target-badge tb-private">🔒 Private</span>{% else %}<span class="target-badge tb-all">🌐 Public</span>{% endif %}
             </div>
             <div class="poll-meta">
               <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}</span>
               <span>{{ total }} Antworten</span>
-              <span>Erstellt {{ poll.created_at[:10] }}</span>
+              <span>Created {{ poll.created_at[:10] }}</span>
             </div>
           </div>
           <div style="display:flex;gap:.4rem;flex-shrink:0;">
@@ -220,7 +220,7 @@
           </div>
         </div>
         <div class="poll-bars">
-          {% for label, cls, count in [('✅ Dabei','bar-available',poll.count_available),('⏰ Vielleicht','bar-maybe',poll.count_maybe),('❌ Nicht dabei','bar-unavailable',poll.count_unavailable)] %}
+          {% for label, cls, count in [('✅ Going','bar-available',poll.count_available),('⏰ Maybe','bar-maybe',poll.count_maybe),('❌ Not going','bar-unavailable',poll.count_unavailable)] %}
           <div class="bar-row">
             <span class="bar-label">{{ label }}</span>
             <div class="bar-track"><div class="bar-fill {{ cls }}" style="width:{% if total > 0 %}{{ (count/total*100)|round|int }}{% else %}0{% endif %}%;"></div></div>
@@ -231,14 +231,14 @@
         {% if poll.responses %}
         <div class="resp-section">
           <button class="resp-toggle" onclick="var d=this.parentElement.querySelector('.resp-detail');d.style.display=d.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=d.style.display==='block'?'▾':'▸';">
-            <span class="arr">▸</span> Antworten ({{ poll.responses|length }})
+            <span class="arr">▸</span> Responses ({{ poll.responses|length }})
           </button>
           <div class="resp-detail">
             <div class="resp-grid">
               {% set avail = poll.responses | selectattr('response','equalto','available') | list %}
               {% set maybe = poll.responses | selectattr('response','equalto','maybe') | list %}
               {% set unavail = poll.responses | selectattr('response','equalto','unavailable') | list %}
-              {% for grp, color, lbl in [(avail,'#22c55e','✅ Dabei'),(maybe,'#f59e0b','⏰ Vielleicht'),(unavail,'#ef4444','❌ Nicht dabei')] %}
+              {% for grp, color, lbl in [(avail,'#22c55e','✅ Going'),(maybe,'#f59e0b','⏰ Maybe'),(unavail,'#ef4444','❌ Not going')] %}
               {% if grp %}
               <div>
                 <div class="resp-col-header" style="color:{{ color }};">{{ lbl }}</div>
@@ -266,7 +266,7 @@
       {% endif %}
 
       {% if closed_polls %}
-      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:.75rem 0 .6rem;">Geschlossen ({{ closed_polls|length }})</div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:.75rem 0 .6rem;">Closed ({{ closed_polls|length }})</div>
       {% for poll in closed_polls %}{% set is_priv = poll.get('target_type','all') != 'all' %}{% set total = poll.count_available + poll.count_maybe + poll.count_unavailable %}
       <div class="poll-card{% if is_priv %} private{% endif %} closed">
         <div class="poll-header">
@@ -274,7 +274,7 @@
             <div class="poll-title">
               {{ poll.title }}
               <span class="pill pill-closed">Closed</span>
-              {% if is_priv %}<span class="target-badge tb-private">🔒 Privat</span>{% else %}<span class="target-badge tb-all">🌐 Öffentlich</span>{% endif %}
+              {% if is_priv %}<span class="target-badge tb-private">🔒 Private</span>{% else %}<span class="target-badge tb-all">🌐 Public</span>{% endif %}
             </div>
             <div class="poll-meta">
               <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}</span>
@@ -287,7 +287,7 @@
           </form>
         </div>
         <div class="poll-bars">
-          {% for label, cls, count in [('✅ Dabei','bar-available',poll.count_available),('⏰ Vielleicht','bar-maybe',poll.count_maybe),('❌ Nicht dabei','bar-unavailable',poll.count_unavailable)] %}
+          {% for label, cls, count in [('✅ Going','bar-available',poll.count_available),('⏰ Maybe','bar-maybe',poll.count_maybe),('❌ Not going','bar-unavailable',poll.count_unavailable)] %}
           <div class="bar-row">
             <span class="bar-label">{{ label }}</span>
             <div class="bar-track"><div class="bar-fill {{ cls }}" style="width:{% if total > 0 %}{{ (count/total*100)|round|int }}{% else %}0{% endif %}%;"></div></div>
@@ -298,14 +298,14 @@
         {% if poll.responses %}
         <div class="resp-section">
           <button class="resp-toggle" onclick="var d=this.parentElement.querySelector('.resp-detail');d.style.display=d.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=d.style.display==='block'?'▾':'▸';">
-            <span class="arr">▸</span> Antworten ({{ poll.responses|length }})
+            <span class="arr">▸</span> Responses ({{ poll.responses|length }})
           </button>
           <div class="resp-detail">
             <div class="resp-grid">
               {% set avail = poll.responses | selectattr('response','equalto','available') | list %}
               {% set maybe = poll.responses | selectattr('response','equalto','maybe') | list %}
               {% set unavail = poll.responses | selectattr('response','equalto','unavailable') | list %}
-              {% for grp, color, lbl in [(avail,'#22c55e','✅ Dabei'),(maybe,'#f59e0b','⏰ Vielleicht'),(unavail,'#ef4444','❌ Nicht dabei')] %}
+              {% for grp, color, lbl in [(avail,'#22c55e','✅ Going'),(maybe,'#f59e0b','⏰ Maybe'),(unavail,'#ef4444','❌ Not going')] %}
               {% if grp %}
               <div>
                 <div class="resp-col-header" style="color:{{ color }};">{{ lbl }}</div>
@@ -330,22 +330,22 @@
     <!-- RIGHT: Create form -->
     <div>
       <div class="create-card">
-        <h2>✨ Neue Umfrage</h2>
+        <h2>✨ New Poll</h2>
         <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" id="pollForm">
           <input type="hidden" id="event_datetime" name="event_datetime" />
           <input type="hidden" id="target_type_val" name="target_type" value="all" />
           <input type="hidden" id="target_ids_val" name="target_ids" value="[]" />
 
           <div class="form-group">
-            <label for="ptitle">Titel</label>
-            <input type="text" id="ptitle" name="title" required maxlength="100" placeholder="z.B. Samstag Raid" />
+            <label for="ptitle">Title</label>
+            <input type="text" id="ptitle" name="title" required maxlength="100" placeholder="e.g. Saturday Raid" />
           </div>
           <div class="form-group">
-            <label for="pdesc">Beschreibung <span style="color:var(--text-muted);font-size:.8rem;">(optional)</span></label>
-            <input type="text" id="pdesc" name="description" maxlength="300" placeholder="Details, Koordinaten, etc." />
+            <label for="pdesc">Description <span style="color:var(--text-muted);font-size:.8rem;">(optional)</span></label>
+            <input type="text" id="pdesc" name="description" maxlength="300" placeholder="Details, coordinates, etc." />
           </div>
           <div class="form-group">
-            <label>Datum &amp; Uhrzeit</label>
+            <label>Date &amp; Time</label>
             <div style="display:flex;gap:.4rem;">
               <input type="date" id="pick_date" required
                 style="flex:2;min-width:0;padding:.45rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;" />
@@ -363,19 +363,19 @@
 
           <!-- Target selector -->
           <div class="form-group">
-            <label>Zielgruppe</label>
+            <label>Target Group</label>
             <div class="target-selector">
               <div class="target-tabs">
-                <button type="button" class="target-tab active" data-panel="tab-all">Alle</button>
-                {% if ally_roles %}<button type="button" class="target-tab" data-panel="tab-roles">Rollen</button>{% endif %}
-                {% if wings %}<button type="button" class="target-tab" data-panel="tab-wings">Flügel</button>{% endif %}
+                <button type="button" class="target-tab active" data-panel="tab-all">All</button>
+                {% if ally_roles %}<button type="button" class="target-tab" data-panel="tab-roles">Roles</button>{% endif %}
+                {% if wings %}<button type="button" class="target-tab" data-panel="tab-wings">Wings</button>{% endif %}
               </div>
               <div id="tab-all" class="target-panel active">
-                <p style="margin:0;font-size:.8rem;color:var(--text-muted);">Alle Mitglieder können abstimmen. Poll erscheint öffentlich in <strong>#umfragen</strong>.</p>
+                <p style="margin:0;font-size:.8rem;color:var(--text-muted);">All members can vote. Poll is posted publicly in <strong>#polls</strong>.</p>
               </div>
               {% if ally_roles %}
               <div id="tab-roles" class="target-panel">
-                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Nur Mitglieder mit diesen Rollen sehen den privaten Thread in Discord.</p>
+                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only members with these roles will see the private Discord thread.</p>
                 <div class="role-chips">
                   {% for role in ally_roles %}
                   <label class="role-chip" data-id="{{ role.id }}">
@@ -388,10 +388,10 @@
               {% endif %}
               {% if wings %}
               <div id="tab-wings" class="target-panel">
-                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Nur Mitglieder des gewählten Flügels erhalten Zugriff.</p>
+                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only members of the selected wing will have access.</p>
                 <div class="wing-chips">
                   {% for w in wings %}
-                  <label class="wing-chip" data-id="{{ w }}">{{ wing_names.get(w, 'Flügel ' ~ w) }}</label>
+                  <label class="wing-chip" data-id="{{ w }}">{{ wing_names.get(w, 'Wing ' ~ w) }}</label>
                   {% endfor %}
                 </div>
               </div>
@@ -399,7 +399,7 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" style="width:100%;">📤 Umfrage erstellen</button>
+          <button type="submit" class="btn btn-primary" style="width:100%;">📤 Create Poll</button>
         </form>
       </div>
     </div>

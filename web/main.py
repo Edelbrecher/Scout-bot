@@ -2562,16 +2562,16 @@ async def polls_create(
     # Build embed
     target_label = "Alle"
     if is_private and target_members:
-        target_label = f"{len(target_members)} Mitglieder"
+        target_label = f"{len(target_members)} members"
     embed = {
         "title": f"📅 {title}",
         "description": description or "",
         "color": 0x6366f1 if is_private else 0x58b9e0,
         "fields": [
             {"name": "🕐 Zeitpunkt", "value": event_datetime.replace("T", " "), "inline": True},
-            {"name": "👥 Zielgruppe", "value": target_label, "inline": True},
+            {"name": "👥 Target Group", "value": target_label, "inline": True},
         ],
-        "footer": {"text": f"Umfrage #{poll_id} · Klicke einen Button um deine Verfügbarkeit anzugeben"},
+        "footer": {"text": f"Umfrage #{poll_id} · Click a button to indicate your availability"},
     }
     components = [{"type": 1, "components": [
         {"type": 2, "style": 3, "label": "Dabei",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
@@ -2607,7 +2607,7 @@ async def polls_create(
                         )
                 # Build mention string (max 10 to avoid rate limits)
                 mentions = " ".join(f"<@{m['discord_id']}>" for m in target_members[:30] if m.get("discord_id"))
-                content = ("📊 Neue Umfrage! Bitte abstimmen 👇\n" + mentions) if mentions else "📊 Neue Umfrage!"
+                content = ("📊 New poll! Please vote 👇\n" + mentions) if mentions else "📊 New poll!"
                 resp = await client.post(
                     f"https://discord.com/api/v10/channels/{thread_id}/messages",
                     headers=headers,
