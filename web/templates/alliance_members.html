@@ -2,8 +2,9 @@
 {% block title %}Meta-Builder · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1100px;">
+<div class="container-wide">
 
+  <!-- ── Page header ── -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
@@ -44,277 +45,300 @@
   <div class="alert alert-success">🔄 {{ synced }} Mitglieder aus Snapshot synchronisiert.</div>
   {% endif %}
 
-  <!-- Auto-Sync Einstellung -->
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;">🔄 Auto-Sync aus Karten-Snapshot</h3>
-    <p class="hint" style="margin-bottom:0.75rem;">
-      Allianz auswählen → Mitglieder werden automatisch bei jedem Snapshot-Update (alle 6h) aktualisiert.
-      Bevölkerung und Dörfer kommen direkt aus der Karte.
-    </p>
+  <!-- ── Two-column layout ── -->
+  <div class="meta-layout">
 
-    {% if snapshot_alliances %}
+    <!-- ══ LEFT: Builder ══ -->
+    <div class="meta-left">
 
-    {# Auto-detected alliance from snapshot (based on current user's own villages) #}
-    {% if detected_alliance and detected_alliance != alliance_name %}
-    <div style="margin-bottom:0.75rem;padding:0.65rem 0.9rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-      <span>🔍 <strong>Auto-Erkannt:</strong> Deine Dörfer gehören im Snapshot zur Allianz <strong>{{ detected_alliance }}</strong>{% if alliance_name %}, gespeichert ist aber <strong style="color:#f87171;">{{ alliance_name }}</strong>{% endif %}.</span>
-      <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance" style="margin:0;">
-        <input type="hidden" name="alliance_name" value="{{ detected_alliance }}">
-        <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.9rem;font-size:0.82rem;">
-          ✅ „{{ detected_alliance }}" übernehmen
-        </button>
-      </form>
-    </div>
-    {% elif detected_alliance and detected_alliance == alliance_name %}
-    <p style="margin:0 0 0.5rem;font-size:0.82rem;color:#2ed573;">
-      🔍 Erkannt &amp; gespeichert: <strong>{{ detected_alliance }}</strong> — passt ✓
-    </p>
-    {% endif %}
+      <!-- Auto-Sync -->
+      <div class="card" style="margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.5rem;font-size:0.95rem;">🔄 Auto-Sync aus Karten-Snapshot</h3>
+        <p class="hint" style="margin-bottom:0.75rem;">
+          Allianz auswählen → Mitglieder werden automatisch bei jedem Snapshot-Update (alle 6h) aktualisiert.
+          Bevölkerung und Dörfer kommen direkt aus der Karte.
+        </p>
 
-    <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance"
-          style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
-      <div class="form-group" style="margin:0;flex:1;min-width:220px;">
-        <label>Allianz aus Snapshot wählen</label>
-        <select name="alliance_name" style="width:100%;padding:0.45rem 0.65rem;
-                border-radius:6px;border:1px solid var(--border);
-                background:var(--bg-main);color:var(--text);font-size:0.875rem;">
-          <option value="">— Keine (Auto-Sync deaktivieren) —</option>
-          {% for a in snapshot_alliances %}
-          <option value="{{ a.alliance_name }}"
-            {% if a.alliance_name == alliance_name %}selected{% endif %}>
-            {{ a.alliance_name }}
-            ({{ a.member_count }} Spieler · {{ a.village_count }} Dörfer)
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary">Speichern &amp; Sync</button>
-    </form>
-    {% if alliance_name %}
-      {% set name_in_snap = snapshot_alliances | selectattr('alliance_name', 'equalto', alliance_name) | list %}
-      {% if name_in_snap %}
-      <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#2ed573;">
-        ✅ Auto-Sync aktiv für <strong>{{ alliance_name }}</strong>
-      </p>
-      {% else %}
-      <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#ef4444;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:0.5rem 0.75rem;">
-        ⚠️ <strong>Allianz „{{ alliance_name }}" nicht im Snapshot!</strong>
-        Umbenannt? Bitte oben neu auswählen — sonst keine eigenen Spieler-Dörfer in der Einsatzplanung.
-      </p>
-      {% endif %}
-    {% endif %}
-
-    {% else %}
-    <div style="padding:0.75rem 1rem;background:rgba(241,196,15,0.08);border:1px solid rgba(241,196,15,0.3);
-                border-radius:8px;font-size:0.875rem;">
-      ⚠️ Noch kein Snapshot geladen — erst einen Snapshot holen damit Allianzen zur Auswahl stehen.
-      <a href="/guild/{{ guild.guild_id }}/farming" style="margin-left:0.5rem;">→ Farming / Snapshots</a>
-    </div>
-    {% if alliance_name %}
-    <p style="margin:0.6rem 0 0;font-size:0.82rem;color:#f59e0b;">
-      ⚙️ Gespeichert: <strong>{{ alliance_name }}</strong> — wird nach dem nächsten Snapshot aktiv.
-    </p>
-    {% endif %}
-    {% endif %}
-  </div>
-
-  <!-- ── Meta-Allianzen ── -->
-  <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
-      <h3 style="margin:0;font-size:1rem;">🤝 Meta-Allianzen <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">(max. 10 Metas, je 3 Allianzen)</span></h3>
-      {% if meta_groups | length < 10 %}
-      <button type="button" class="btn btn-secondary" style="font-size:0.82rem;"
-              onclick="document.getElementById('newMetaForm').style.display=document.getElementById('newMetaForm').style.display==='none'?'flex':'none'">
-        ＋ Neue Meta
-      </button>
-      {% endif %}
-    </div>
-
-    {% if request.query_params.get('meta_error') == 'limit' %}
-    <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.75rem;color:#f87171;font-size:0.85rem;">
-      ⚠️ Maximal 10 Meta-Gruppen pro Server erlaubt.
-    </div>
-    {% endif %}
-
-    <!-- New meta form -->
-    <form id="newMetaForm" method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/create"
-          style="display:none;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
-      <input type="text" name="meta_name" placeholder="Meta-Name (z.B. Freunde, Feinde …)" maxlength="64"
-             required style="flex:1;min-width:200px;padding:0.4rem 0.65rem;border-radius:6px;
-             border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:0.875rem;">
-      <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">Erstellen</button>
-    </form>
-
-    {% if not meta_groups %}
-    <p style="color:var(--text-muted);font-size:0.85rem;">Noch keine Meta-Gruppen erstellt.</p>
-    {% endif %}
-
-    <!-- Meta group cards -->
-    {% for g in meta_groups %}
-    <div style="border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.65rem;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;">
-        <strong style="font-size:0.95rem;">{{ g.meta_name }}</strong>
-        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
-          <button type="button" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;"
-                  data-group-id="{{ g.id }}" data-meta-name="{{ g.meta_name | e }}"
-                  onclick="openMetaStats(this.dataset.groupId, this.dataset.metaName)">
-            📊 Statistiken
-          </button>
-          <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
-                style="margin:0;" onsubmit="return confirm('Meta-Gruppe »{{ g.meta_name }}« wirklich löschen?')">
-            <button type="submit" style="font-size:0.78rem;padding:0.25rem 0.6rem;
-                    background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);
-                    border-radius:6px;color:#f87171;cursor:pointer;">🗑️ Löschen</button>
+        {% if snapshot_alliances %}
+        {% if detected_alliance and detected_alliance != alliance_name %}
+        <div style="margin-bottom:0.75rem;padding:0.65rem 0.9rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+          <span>🔍 <strong>Auto-Erkannt:</strong> Deine Dörfer gehören im Snapshot zur Allianz <strong>{{ detected_alliance }}</strong>{% if alliance_name %}, gespeichert ist aber <strong style="color:#f87171;">{{ alliance_name }}</strong>{% endif %}.</span>
+          <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance" style="margin:0;">
+            <input type="hidden" name="alliance_name" value="{{ detected_alliance }}">
+            <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.9rem;font-size:0.82rem;">
+              ✅ „{{ detected_alliance }}" übernehmen
+            </button>
           </form>
         </div>
-      </div>
-      <!-- Alliance chips -->
-      <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.55rem;">
-        {% for a in g.alliances %}
-        <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/remove-alliance" style="margin:0;">
-          <input type="hidden" name="alliance_name" value="{{ a }}">
-          <button type="submit" style="display:flex;align-items:center;gap:0.35rem;padding:0.3rem 0.6rem;
-                  background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:20px;
-                  color:var(--text);font-size:0.82rem;cursor:pointer;">
-            {{ a }} <span style="color:#f87171;font-weight:bold;">✕</span>
-          </button>
+        {% elif detected_alliance and detected_alliance == alliance_name %}
+        <p style="margin:0 0 0.5rem;font-size:0.82rem;color:#2ed573;">
+          🔍 Erkannt &amp; gespeichert: <strong>{{ detected_alliance }}</strong> — passt ✓
+        </p>
+        {% endif %}
+
+        <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance"
+              style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+            <label>Allianz aus Snapshot wählen</label>
+            <select name="alliance_name" style="width:100%;padding:0.45rem 0.65rem;
+                    border-radius:6px;border:1px solid var(--border);
+                    background:var(--bg-main);color:var(--text);font-size:0.875rem;">
+              <option value="">— Keine (Auto-Sync deaktivieren) —</option>
+              {% for a in snapshot_alliances %}
+              <option value="{{ a.alliance_name }}"
+                {% if a.alliance_name == alliance_name %}selected{% endif %}>
+                {{ a.alliance_name }}
+                ({{ a.member_count }} Spieler · {{ a.village_count }} Dörfer)
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Speichern &amp; Sync</button>
         </form>
-        {% endfor %}
-        {% if g.alliances | length == 0 %}
-        <span style="color:var(--text-muted);font-size:0.82rem;">Noch keine Allianzen hinzugefügt.</span>
+
+        {% if alliance_name %}
+          {% set name_in_snap = snapshot_alliances | selectattr('alliance_name', 'equalto', alliance_name) | list %}
+          {% if name_in_snap %}
+          <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#2ed573;">
+            ✅ Auto-Sync aktiv für <strong>{{ alliance_name }}</strong>
+          </p>
+          {% else %}
+          <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#ef4444;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:0.5rem 0.75rem;">
+            ⚠️ <strong>Allianz „{{ alliance_name }}" nicht im Snapshot!</strong>
+            Umbenannt? Bitte oben neu auswählen.
+          </p>
+          {% endif %}
+        {% endif %}
+
+        {% else %}
+        <div style="padding:0.75rem 1rem;background:rgba(241,196,15,0.08);border:1px solid rgba(241,196,15,0.3);
+                    border-radius:8px;font-size:0.875rem;">
+          ⚠️ Noch kein Snapshot geladen.
+          <a href="/guild/{{ guild.guild_id }}/farming" style="margin-left:0.5rem;">→ Farming / Snapshots</a>
+        </div>
+        {% if alliance_name %}
+        <p style="margin:0.6rem 0 0;font-size:0.82rem;color:#f59e0b;">
+          ⚙️ Gespeichert: <strong>{{ alliance_name }}</strong> — wird nach dem nächsten Snapshot aktiv.
+        </p>
+        {% endif %}
         {% endif %}
       </div>
-      <!-- Add alliance -->
-      {% if g.alliances | length < 3 and snapshot_alliances %}
-      <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/add-alliance"
-            style="display:flex;gap:0.4rem;align-items:center;margin-top:0.55rem;flex-wrap:wrap;">
-        <select name="alliance_name" style="flex:1;min-width:180px;padding:0.35rem 0.6rem;
-                border-radius:6px;border:1px solid var(--border);background:var(--bg-main);
-                color:var(--text);font-size:0.82rem;">
-          <option value="">— Allianz wählen —</option>
-          {% for a in snapshot_alliances %}
-          {% if a.alliance_name not in g.alliances %}
-          <option value="{{ a.alliance_name }}">{{ a.alliance_name }} ({{ a.member_count }} Spieler)</option>
+
+      <!-- Meta-Allianzen -->
+      <div class="card" style="padding:1rem 1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+          <h3 style="margin:0;font-size:1rem;">🤝 Meta-Allianzen <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(max. 10 · je 3 Allianzen)</span></h3>
+          {% if meta_groups | length < 10 %}
+          <button type="button" class="btn btn-secondary" style="font-size:0.82rem;"
+                  onclick="document.getElementById('newMetaForm').style.display=document.getElementById('newMetaForm').style.display==='none'?'flex':'none'">
+            ＋ Neue Meta
+          </button>
           {% endif %}
-          {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-primary" style="font-size:0.82rem;padding:0.35rem 0.7rem;">+</button>
-      </form>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
+        </div>
 
-  {% if members %}
+        {% if request.query_params.get('meta_error') == 'limit' %}
+        <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.75rem;color:#f87171;font-size:0.85rem;">
+          ⚠️ Maximal 10 Meta-Gruppen pro Server erlaubt.
+        </div>
+        {% endif %}
 
-  <!-- KPI strip -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;">{{ members|length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">👥 Mitglieder</div>
-    </div>
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
-        {{ members | sum(attribute='villages') | int }}
-      </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🏘️ Dörfer gesamt</div>
-    </div>
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">
-        {{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}
-      </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🌍 Bevölkerung</div>
-    </div>
-    <div class="card" style="padding:0.85rem 1rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
-        {{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}
-      </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🏆 Punkte gesamt</div>
-    </div>
-  </div>
+        <form id="newMetaForm" method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/create"
+              style="display:none;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
+          <input type="text" name="meta_name" placeholder="Meta-Name (z.B. Freunde, Feinde …)" maxlength="64"
+                 required style="flex:1;min-width:160px;padding:0.4rem 0.65rem;border-radius:6px;
+                 border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:0.875rem;">
+          <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">Erstellen</button>
+        </form>
 
-  {% if meta %}
-  <p class="hint" style="margin-bottom:0.75rem;">
-    📅 Zuletzt importiert: <strong>{{ meta.last_import[:16].replace('T',' ') }} UTC</strong>
-    von <strong>{{ meta.imported_by }}</strong>
-  </p>
-  {% endif %}
+        {% if not meta_groups %}
+        <p style="color:var(--text-muted);font-size:0.85rem;">Noch keine Meta-Gruppen erstellt.</p>
+        {% endif %}
 
-  <!-- Search + sort controls -->
-  <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center;">
-    <input type="text" id="memberSearch" placeholder="🔍 Spieler suchen…"
-           oninput="filterMembers()"
-           style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
-                  background:var(--bg-card);color:var(--text);font-size:0.875rem;width:220px;">
-    <span id="memberCount" style="font-size:0.82rem;color:var(--text-muted);margin-left:0.25rem;"></span>
-  </div>
-
-  <div style="overflow-x:auto;">
-    <table class="table" id="memberTable">
-      <thead>
-        <tr>
-          <th onclick="sortTable(0)" style="cursor:pointer;" data-i18n="meta.col.rank">Rang ▲</th>
-          <th onclick="sortTable(1)" style="cursor:pointer;" data-i18n="meta.col.player">Spieler</th>
-          <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.points">Punkte</th>
-          <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.villages">Dörfer</th>
-          <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.pop">Bevölkerung</th>
-          <th style="min-width:160px;" data-i18n="meta.col.notes">Notizen</th>
-        </tr>
-      </thead>
-      <tbody id="memberBody">
-        {% for m in members %}
-        <tr data-name="{{ m.player_name | lower }}"
-            onclick="openPlayerPopup('{{ m.player_name | replace("'", "\\'") }}')"
-            style="cursor:pointer;"
-            onmouseover="this.style.background='rgba(147,197,253,0.06)'"
-            onmouseout="this.style.background=''">
-          <td style="color:var(--text-muted);font-size:0.85rem;">{{ m.rank or loop.index }}</td>
-          <td>
-            <strong style="color:#93c5fd;">{{ m.player_name }}</strong>
-            {% if m.player_name in strike_info %}
-            {% set s = strike_info[m.player_name] %}
-            <span title="Totalverlust vor {{ s.days_ago }} Tag(en)"
-                  style="margin-left:0.4rem;background:rgba(239,68,68,0.15);color:#ef4444;
-                         border:1px solid rgba(239,68,68,0.35);border-radius:4px;
-                         padding:0.05rem 0.4rem;font-size:0.7rem;font-weight:700;vertical-align:middle;">
-              ⚡ Strike
-              <span style="font-weight:400;opacity:0.8;">
-                {{ 'heute' if s.days_ago == 0 else ('gestern' if s.days_ago == 1 else 'vor ' ~ s.days_ago ~ 'd') }}
-              </span>
-            </span>
+        {% for g in meta_groups %}
+        <div style="border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.65rem;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;">
+            <strong style="font-size:0.95rem;">{{ g.meta_name }}</strong>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.6rem;"
+                      data-group-id="{{ g.id }}" data-meta-name="{{ g.meta_name | e }}"
+                      onclick="openMetaStats(this.dataset.groupId, this.dataset.metaName)">
+                📊 Statistiken
+              </button>
+              <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
+                    style="margin:0;" onsubmit="return confirm('Meta-Gruppe »{{ g.meta_name }}« wirklich löschen?')">
+                <button type="submit" style="font-size:0.78rem;padding:0.25rem 0.6rem;
+                        background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);
+                        border-radius:6px;color:#f87171;cursor:pointer;">🗑️ Löschen</button>
+              </form>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.55rem;">
+            {% for a in g.alliances %}
+            <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/remove-alliance" style="margin:0;">
+              <input type="hidden" name="alliance_name" value="{{ a }}">
+              <button type="submit" style="display:flex;align-items:center;gap:0.35rem;padding:0.3rem 0.6rem;
+                      background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:20px;
+                      color:var(--text);font-size:0.82rem;cursor:pointer;">
+                {{ a }} <span style="color:#f87171;font-weight:bold;">✕</span>
+              </button>
+            </form>
+            {% endfor %}
+            {% if g.alliances | length == 0 %}
+            <span style="color:var(--text-muted);font-size:0.82rem;">Noch keine Allianzen hinzugefügt.</span>
             {% endif %}
-          </td>
-          <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}</td>
-          <td style="text-align:right;">{{ m.villages if m.villages else '—' }}</td>
-          <td style="text-align:right;color:var(--text-muted);">{{ "{:,}".format(m.population).replace(",",".") if m.population else '—' }}</td>
-          <td>
-            <textarea
-              class="member-note"
-              data-player="{{ m.player_name | e }}"
-              rows="2"
-              maxlength="500"
-              placeholder="Notiz…"
-              style="width:100%;min-width:140px;resize:vertical;background:var(--bg-main);color:var(--text);
-                     border:1px solid var(--border);border-radius:5px;padding:0.3rem 0.5rem;
-                     font-size:0.8rem;box-sizing:border-box;">{{ m.notes or '' }}</textarea>
-          </td>
-        </tr>
+          </div>
+          {% if g.alliances | length < 3 and snapshot_alliances %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/add-alliance"
+                style="display:flex;gap:0.4rem;align-items:center;margin-top:0.55rem;flex-wrap:wrap;">
+            <select name="alliance_name" style="flex:1;min-width:160px;padding:0.35rem 0.6rem;
+                    border-radius:6px;border:1px solid var(--border);background:var(--bg-main);
+                    color:var(--text);font-size:0.82rem;">
+              <option value="">— Allianz wählen —</option>
+              {% for a in snapshot_alliances %}
+              {% if a.alliance_name not in g.alliances %}
+              <option value="{{ a.alliance_name }}">{{ a.alliance_name }} ({{ a.member_count }} Spieler)</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary" style="font-size:0.82rem;padding:0.35rem 0.7rem;">+</button>
+          </form>
+          {% endif %}
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
+      </div>
 
+    </div><!-- /meta-left -->
 
-  {% else %}
-  <div class="card">
-    <p style="color:var(--text-muted);font-size:0.88rem;margin:0;" data-i18n-html="meta.empty.hint">
-      Noch keine Mitglieder importiert. Öffne in Travian die <strong>Allianz → Mitglieder</strong>-Seite,
-      markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und importiere hier.
-    </p>
-  </div>
-  {% endif %}
+    <!-- ══ RIGHT: Member list ══ -->
+    <div class="meta-right">
+
+      {% if members %}
+
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.65rem;margin-bottom:1rem;">
+        <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
+          <div style="font-size:1.5rem;font-weight:800;">{{ members|length }}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">👥 Mitglieder</div>
+        </div>
+        <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
+          <div style="font-size:1.5rem;font-weight:800;color:#f59e0b;">{{ members | sum(attribute='villages') | int }}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">🏘️ Dörfer</div>
+        </div>
+        <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
+          <div style="font-size:1.5rem;font-weight:800;color:#22c55e;">{{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">🌍 Bevölkerung</div>
+        </div>
+        <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
+          <div style="font-size:1.5rem;font-weight:800;color:#93c5fd;">{{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">🏆 Punkte</div>
+        </div>
+      </div>
+
+      {% if meta %}
+      <p class="hint" style="margin-bottom:0.65rem;font-size:0.8rem;">
+        📅 Zuletzt importiert: <strong>{{ meta.last_import[:16].replace('T',' ') }} UTC</strong>
+        von <strong>{{ meta.imported_by }}</strong>
+      </p>
+      {% endif %}
+
+      <!-- Search -->
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.65rem;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="memberSearch" placeholder="🔍 Spieler suchen…"
+               oninput="filterMembers()"
+               style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
+                      background:var(--bg-card);color:var(--text);font-size:0.875rem;flex:1;min-width:160px;">
+        <span id="memberCount" style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;"></span>
+      </div>
+
+      <!-- Table -->
+      <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">
+        <table class="table" id="memberTable" style="margin:0;">
+          <thead>
+            <tr style="background:rgba(255,255,255,.03);">
+              <th onclick="sortTable(0)" style="cursor:pointer;" data-i18n="meta.col.rank">Rang ▲</th>
+              <th onclick="sortTable(1)" style="cursor:pointer;" data-i18n="meta.col.player">Spieler</th>
+              <th onclick="sortTable(2)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.points">Punkte</th>
+              <th onclick="sortTable(3)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.villages">Dörfer</th>
+              <th onclick="sortTable(4)" style="cursor:pointer;text-align:right;" data-i18n="meta.col.pop">Bevölkerung</th>
+              <th style="min-width:150px;" data-i18n="meta.col.notes">Notizen</th>
+            </tr>
+          </thead>
+          <tbody id="memberBody">
+            {% for m in members %}
+            <tr data-name="{{ m.player_name | lower }}"
+                onclick="openPlayerPopup('{{ m.player_name | replace("'", "\\'") }}')"
+                style="cursor:pointer;"
+                onmouseover="this.style.background='rgba(147,197,253,0.06)'"
+                onmouseout="this.style.background=''">
+              <td style="color:var(--text-muted);font-size:0.85rem;">{{ m.rank or loop.index }}</td>
+              <td>
+                <strong style="color:#93c5fd;">{{ m.player_name }}</strong>
+                {% if m.player_name in strike_info %}
+                {% set s = strike_info[m.player_name] %}
+                <span title="Totalverlust vor {{ s.days_ago }} Tag(en)"
+                      style="margin-left:0.4rem;background:rgba(239,68,68,0.15);color:#ef4444;
+                             border:1px solid rgba(239,68,68,0.35);border-radius:4px;
+                             padding:0.05rem 0.4rem;font-size:0.7rem;font-weight:700;vertical-align:middle;">
+                  ⚡ Strike
+                  <span style="font-weight:400;opacity:0.8;">
+                    {{ 'heute' if s.days_ago == 0 else ('gestern' if s.days_ago == 1 else 'vor ' ~ s.days_ago ~ 'd') }}
+                  </span>
+                </span>
+                {% endif %}
+              </td>
+              <td style="text-align:right;font-weight:600;">{{ "{:,}".format(m.points).replace(",",".") if m.points else '—' }}</td>
+              <td style="text-align:right;">{{ m.villages if m.villages else '—' }}</td>
+              <td style="text-align:right;color:var(--text-muted);">{{ "{:,}".format(m.population).replace(",",".") if m.population else '—' }}</td>
+              <td>
+                <textarea class="member-note" data-player="{{ m.player_name | e }}" rows="2" maxlength="500"
+                  placeholder="Notiz…"
+                  style="width:100%;min-width:130px;resize:vertical;background:var(--bg-main);color:var(--text);
+                         border:1px solid var(--border);border-radius:5px;padding:0.3rem 0.5rem;
+                         font-size:0.8rem;box-sizing:border-box;">{{ m.notes or '' }}</textarea>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% else %}
+      <div class="card" style="height:100%;display:flex;align-items:center;justify-content:center;min-height:220px;">
+        <div style="text-align:center;">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem;opacity:.4;">👥</div>
+          <p style="color:var(--text-muted);font-size:0.88rem;margin:0;" data-i18n-html="meta.empty.hint">
+            Noch keine Mitglieder importiert.<br>
+            Öffne in Travian <strong>Allianz → Mitglieder</strong>,<br>
+            markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und importiere hier.
+          </p>
+          <button type="button" class="btn btn-primary" style="margin-top:1rem;"
+                  onclick="document.getElementById('importModal').style.display='flex'">
+            ⬆️ Jetzt importieren
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+    </div><!-- /meta-right -->
+
+  </div><!-- /meta-layout -->
 
 </div>
+
+<style>
+.meta-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+.meta-left  { min-width: 0; }
+.meta-right { min-width: 0; }
+
+@media (max-width: 1000px) {
+  .meta-layout { grid-template-columns: 1fr; }
+}
+</style>
 
 <!-- Chart Modal -->
 <div id="chartModal"
