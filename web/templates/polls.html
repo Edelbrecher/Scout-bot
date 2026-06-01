@@ -37,7 +37,10 @@
       <hr style="margin:1.5rem 0;">
       {% if not guild.poll_channel_id %}
       <h3>1-Click Auto Setup</h3>
-      <p class="hint">Bot erstellt automatisch eine Kategorie <strong>Umfragen</strong> und den Channel <strong>#umfragen</strong>.</p>
+      <p class="hint">Bot erstellt automatisch eine Kategorie <strong>Umfragen</strong> direkt unterhalb der Hub-Kategorie und den Channel <strong>#umfragen</strong>.</p>
+      <div class="alert" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:.875rem;">
+        💡 <strong>Tipp:</strong> Wenn du im Hub-Channel auf <strong>📊 Umfrage</strong> klickst, wird die Kategorie automatisch erstellt — kein manuelles Setup nötig.
+      </div>
       <form method="post" action="/guild/{{ guild.guild_id }}/polls/auto-setup">
         <button type="submit" class="btn btn-primary">⚡ Auto Setup</button>
       </form>

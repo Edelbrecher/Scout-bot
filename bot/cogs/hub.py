@@ -1408,6 +1408,98 @@ class PrivateChannelNameModal(discord.ui.Modal):
 # ---------------------------------------------------------------------------
 # Request Hub View (7 buttons, persistent)
 # ---------------------------------------------------------------------------
+# Poll Hub Modal + auto-category helper
+# ---------------------------------------------------------------------------
+
+async def _get_or_create_poll_category(guild: discord.Guild) -> discord.TextChannel | None:
+    """Return (or create) the poll channel, placing its category just below the Hub category."""
+    config = await database.get_guild_config(str(guild.id))
+    if config and config.get("poll_channel_id"):
+        ch = guild.get_channel(int(config["poll_channel_id"]))
+        if ch:
+            return ch
+        try:
+            ch = await guild.fetch_channel(int(config["poll_channel_id"]))
+            if ch:
+                return ch
+        except Exception:
+            pass
+
+    # Need to create category + channel
+    hub_cat_pos = 0
+    if config and config.get("category_id"):
+        hub_cat = guild.get_channel(int(config["category_id"]))
+        if hub_cat:
+            hub_cat_pos = hub_cat.position
+
+    poll_cat = await guild.create_category("Umfragen")
+    # Shift category right below Hub category
+    try:
+        await poll_cat.edit(position=hub_cat_pos + 1)
+    except Exception:
+        pass
+
+    poll_ch = await guild.create_text_channel("umfragen", category=poll_cat)
+    await database.update_poll_channel(str(guild.id), str(poll_ch.id))
+    return poll_ch
+
+
+class PollHubModal(discord.ui.Modal, title="📊 Neue Umfrage erstellen"):
+    poll_title = discord.ui.TextInput(
+        label="Titel", placeholder="z.B. Samstag Raid", max_length=120
+    )
+    description = discord.ui.TextInput(
+        label="Beschreibung (optional)",
+        style=discord.TextStyle.paragraph,
+        placeholder="Details zum Event...",
+        max_length=500,
+        required=False,
+    )
+    event_datetime = discord.ui.TextInput(
+        label="Datum & Uhrzeit",
+        placeholder="z.B. 07.06.2026 20:00",
+        max_length=40,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        # Defer so we can do async work
+        await interaction.response.defer(ephemeral=True)
+
+        poll_ch = await _get_or_create_poll_category(guild)
+        if not poll_ch:
+            await interaction.followup.send("❌ Poll-Channel konnte nicht erstellt werden.", ephemeral=True)
+            return
+
+        title = self.poll_title.value.strip()
+        desc = self.description.value.strip()
+        event_dt = self.event_datetime.value.strip()
+
+        poll_id = await database.create_poll(str(guild.id), title, desc, event_dt)
+
+        embed = discord.Embed(
+            title=f"📊 {title}",
+            description=desc or discord.utils.MISSING,
+            color=0x6366f1,
+        )
+        embed.add_field(name="📅 Zeitpunkt", value=event_dt, inline=False)
+        embed.set_footer(text=f"Umfrage #{poll_id} · Erstellt von {interaction.user.display_name}")
+
+        view = discord.ui.View(timeout=None)
+        view.add_item(discord.ui.Button(label="Dabei", emoji="✅", style=discord.ButtonStyle.success, custom_id=f"poll_available_{poll_id}"))
+        view.add_item(discord.ui.Button(label="Vielleicht", emoji="⏰", style=discord.ButtonStyle.secondary, custom_id=f"poll_maybe_{poll_id}"))
+        view.add_item(discord.ui.Button(label="Nicht dabei", emoji="❌", style=discord.ButtonStyle.danger, custom_id=f"poll_unavailable_{poll_id}"))
+
+        msg = await poll_ch.send(embed=embed, view=view)
+        await database.set_poll_discord_message(poll_id, str(poll_ch.id), str(msg.id))
+
+        await interaction.followup.send(
+            f"✅ Umfrage erstellt! → {poll_ch.mention}",
+            ephemeral=True,
+        )
+
+
+# ---------------------------------------------------------------------------
 
 class EnemyScoutModal(discord.ui.Modal, title="👁️ Gegner-Scout melden"):
     victim_player  = discord.ui.TextInput(label="Dein Spielername (Gespähter)", placeholder="z.B. Currax", max_length=100)
@@ -1520,6 +1612,15 @@ class RequestHubView(discord.ui.View):
         if not await require_premium(interaction):
             return
         await interaction.response.send_modal(EnemyScoutModal())
+
+    @discord.ui.button(
+        label="Umfrage", emoji="📊", style=discord.ButtonStyle.primary,
+        custom_id="persistent:hub_poll", row=3,
+    )
+    async def hub_poll(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await require_premium(interaction):
+            return
+        await interaction.response.send_modal(PollHubModal())
 
     async def _create_private_channel(self, interaction: discord.Interaction, channel_label: str):
         await _do_create_private_channel(interaction, channel_label)

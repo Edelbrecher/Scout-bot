@@ -112,6 +112,11 @@ async def init_db():
             await db.commit()
         except Exception:
             pass
+        try:
+            await db.execute("ALTER TABLE availability_polls ADD COLUMN poll_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS availability_polls (
@@ -1271,3 +1276,39 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
             if "ally_manage" in flags:
                 return ALL_PERMS
             return flags
+
+
+# ---------------------------------------------------------------------------
+# Poll helpers (bot-side)
+# ---------------------------------------------------------------------------
+
+async def create_poll(guild_id: str, title: str, description: str, event_datetime: str) -> int:
+    """Insert a new availability_poll and return its id."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """INSERT INTO availability_polls (guild_id, title, description, event_datetime, status, created_at)
+               VALUES (?, ?, ?, ?, 'active', ?)""",
+            (guild_id, title, description, event_datetime, datetime.utcnow().isoformat()),
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def set_poll_discord_message(poll_id: int, channel_id: str, message_id: str):
+    """Save the Discord channel + message IDs for a poll."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE availability_polls SET discord_message_id = ?, poll_channel_id = ? WHERE id = ?",
+            (message_id, channel_id, poll_id),
+        )
+        await db.commit()
+
+
+async def update_poll_channel(guild_id: str, poll_channel_id: str):
+    """Persist the poll channel id in guild_configs."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET poll_channel_id = ? WHERE guild_id = ?",
+            (poll_channel_id, guild_id),
+        )
+        await db.commit()
