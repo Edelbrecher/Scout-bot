@@ -515,9 +515,10 @@
                 {% set hist = pop_history.get((farm.x, farm.y), []) %}
                 {% if hist|length >= 2 %}
                 <div style="display:flex;gap:2px;align-items:flex-end;height:20px;">
-                  {% set max_p = hist|map(attribute='pop')|max %}
+                  {% set pops = hist[:7]|map(attribute='pop')|list %}
+                  {% set max_p = [pops|max, 1]|max %}
                   {% for h in hist[:7]|reverse %}
-                  {% set bar_h = ((h.pop / max_p) * 18)|round|int if max_p > 0 else 4 %}
+                  {% set bar_h = [((h.pop * 18) // max_p), 2]|max %}
                   <div style="width:5px;height:{{ bar_h }}px;background:#6366f1;border-radius:1px;opacity:.7;"
                        title="{{ h.date }}: {{ h.pop }}"></div>
                   {% endfor %}
