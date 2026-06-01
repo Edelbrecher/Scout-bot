@@ -2620,6 +2620,7 @@ async def polls_create(
                     json={"content": content, "embeds": [embed], "components": components},
                 )
             else:
+                print(f"[polls] Private thread creation failed {tr.status_code}: {tr.text}", flush=True)
                 # Fallback: post to channel normally
                 resp = await client.post(
                     f"https://discord.com/api/v10/channels/{channel_id}/messages",
@@ -2635,7 +2636,9 @@ async def polls_create(
 
     if resp.status_code in (200, 201):
         await database.set_poll_thread(poll_id, channel_id, thread_id, resp.json()["id"])
-    return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
+    print(f"[polls] Discord error {resp.status_code}: {resp.text}", flush=True)
+    return RedirectResponse(f"/guild/{guild_id}/polls?error=discord_{resp.status_code}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/polls/auto-setup")
