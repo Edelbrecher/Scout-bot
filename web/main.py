@@ -2612,20 +2612,32 @@ async def polls_create(
                 if _cat_r.status_code == 200:
                     _hub_pos = _cat_r.json().get("position", 0)
 
-            # Find existing Polls category or create one
-            _cat_id = None
+            # Find existing Polls category + channels or create them
+            _cat_id = _priv_id = _pub_id = None
             _guild_chs = await _c.get(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers)
             if _guild_chs.status_code == 200:
-                for _ch in _guild_chs.json():
+                _all_chs = _guild_chs.json()
+                for _ch in _all_chs:
                     if _ch.get("type") == 4 and _ch.get("name","").lower() == "polls":
                         _cat_id = _ch["id"]
-                        break
+                if _cat_id:
+                    for _ch in _all_chs:
+                        if _ch.get("parent_id") == _cat_id and _ch.get("type") == 0:
+                            if _ch.get("name","").lower() == "polls":
+                                _priv_id = _ch["id"]
+                            elif _ch.get("name","").lower() == "polls-public":
+                                _pub_id = _ch["id"]
             if not _cat_id:
                 _cat = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
                     headers=headers, json={"name": "Polls", "type": 4, "position": _hub_pos + 1})
                 _cat_id = _cat.json().get("id") if _cat.status_code in (200,201) else None
+            # Save found channel IDs to DB immediately
+            if _priv_id and not guild.get("poll_channel_id"):
+                await database.update_poll_channel(guild_id, _priv_id)
+            if _pub_id and not guild.get("poll_public_channel_id"):
+                await database.update_poll_channel(guild_id, guild.get("poll_channel_id") or _priv_id or "", _pub_id)
 
-            if not guild.get("poll_channel_id") and _cat_id:
+            if not (guild.get("poll_channel_id") or _priv_id) and _cat_id:
                 _priv_ow = [{"id": guild_id, "type": 0, "allow": "0", "deny": _DENY_VIEW}]
                 if _bot_id: _priv_ow.append({"id": _bot_id, "type": 1, "allow": _ALLOW_BOT, "deny": "0"})
                 _pr = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
@@ -2634,7 +2646,7 @@ async def polls_create(
                 if _pr.status_code in (200,201):
                     await database.update_poll_channel(guild_id, _pr.json()["id"])
 
-            if not guild.get("poll_public_channel_id") and _cat_id:
+            if not (guild.get("poll_public_channel_id") or _pub_id) and _cat_id:
                 _pub_ow = [{"id": guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]
                 if _bot_id: _pub_ow.append({"id": _bot_id, "type": 1, "allow": _ALLOW_BOT, "deny": "0"})
                 _pb = await _c.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels",
