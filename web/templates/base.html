@@ -180,6 +180,23 @@ document.addEventListener('click', e => {
 });
 </script>
 
+  <!-- Guild Sidebar (injected via JS if on a /guild/... page) -->
+  <div id="guild-sidebar" style="display:none;" aria-label="Guild navigation">
+    <div class="gs-toggle">
+      <button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Sidebar einklappen">◀</button>
+    </div>
+    <div class="gs-scroll" id="gs-nav-items">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+  <!-- Mobile sidebar toggle -->
+  <button id="gs-mobile-toggle" onclick="gsMobileToggle()"
+    style="display:none;position:fixed;bottom:1.2rem;left:1.2rem;z-index:95;
+           width:44px;height:44px;border-radius:50%;background:#5865f2;border:none;
+           color:#fff;font-size:1.2rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);
+           align-items:center;justify-content:center;">☰</button>
+
   <main>
     {% block content %}{% endblock %}
   </main>
@@ -227,6 +244,119 @@ document.addEventListener('click', e => {
     setTimeout(() => { el.style.display = 'none'; }, 400);
     if (window._bebPopupKey) localStorage.setItem(window._bebPopupKey, '1');
   }
+  </script>
+
+  <!-- Guild Sidebar Logic -->
+  <script>
+  (function(){
+    var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
+    if (!m) return; // not a guild page
+
+    var gid  = m[1];
+    var path = location.pathname;
+    var sidebar = document.getElementById('guild-sidebar');
+    var body    = document.body;
+    if (!sidebar) return;
+
+    // ── Navigation structure ──
+    var nav = [
+      { group: null },
+      { icon:'🏠', label:'Übersicht',     url:'/guild/'+gid },
+      { group: 'Karte & Angriffe' },
+      { icon:'🗺️',  label:'Karte',         url:'/guild/'+gid+'/map' },
+      { icon:'⚔️',  label:'Angriffe',      url:'/guild/'+gid+'/attacks' },
+      { icon:'📡',  label:'Sektor-Monitor',url:'/guild/'+gid+'/sector-monitor' },
+      { group: 'Farming' },
+      { icon:'🌾',  label:'Farming Intel', url:'/guild/'+gid+'/farming' },
+      { icon:'📋',  label:'Farmlist',      url:'/guild/'+gid+'/farmlist-analyst' },
+      { group: 'Scouts' },
+      { icon:'🔎',  label:'Player Intel',  url:'/guild/'+gid+'/intel' },
+      { icon:'🕵️', label:'Scout-Tracking',url:'/guild/'+gid+'/scout' },
+      { icon:'🦸',  label:'Hero Scout',    url:'/guild/'+gid+'/defense/hero-scout' },
+      { icon:'🚨',  label:'Incidents',     url:'/guild/'+gid+'/scout-incidents' },
+      { group: 'Allianz' },
+      { icon:'🏰',  label:'Meine Allianz', url:'/guild/'+gid+'/my-ally' },
+      { icon:'👥',  label:'Mitglieder',    url:'/guild/'+gid+'/allianz/mitglieder' },
+      { icon:'🛡️', label:'Verteidigung',   url:'/guild/'+gid+'/verteidigung' },
+      { icon:'😈',  label:'Feinde',        url:'/guild/'+gid+'/enemies' },
+      { icon:'🏥',  label:'Hospital',      url:'/guild/'+gid+'/allianz/hospital' },
+      { group: 'Tools' },
+      { icon:'⚙️',  label:'Operationen',   url:'/guild/'+gid+'/operations' },
+      { icon:'📦',  label:'Res-Push',      url:'/guild/'+gid+'/res-push' },
+      { icon:'📊',  label:'Statistiken',   url:'/guild/'+gid+'/stats' },
+      { icon:'⏱️',  label:'Timer',         url:'/guild/'+gid+'/timer' },
+      { icon:'📜',  label:'Settle-Liste',  url:'/guild/'+gid+'/settle-list' },
+      { icon:'🗳️',  label:'Umfragen',      url:'/guild/'+gid+'/polls' },
+      { icon:'📐',  label:'Blueprints',    url:'/guild/'+gid+'/blueprints' },
+      { icon:'⚔️',  label:'Kampfkraft',    url:'/guild/'+gid+'/kampfkraft' },
+      { icon:'🌽',  label:'Getreide-Kalk.',url:'/guild/'+gid+'/tools/crop-calculator' },
+      { group: 'Einstellungen' },
+      { icon:'👤',  label:'Mein Account',  url:'/guild/'+gid+'/mein-account' },
+      { icon:'🔔',  label:'Benachrichtig.',url:'/guild/'+gid+'/notifications' },
+      { icon:'⚙️',  label:'Einstellungen', url:'/guild/'+gid+'/settings' },
+      { icon:'💳',  label:'Abonnement',    url:'/guild/'+gid+'/billing' },
+    ];
+
+    // Build sidebar HTML
+    var html = '';
+    nav.forEach(function(item){
+      if ('group' in item) {
+        if (item.group) html += '<div class="gs-group-label">'+item.group+'</div>';
+        return;
+      }
+      // Check active: exact match or starts-with (but not overview catching everything)
+      var isActive = false;
+      if (item.url === '/guild/'+gid) {
+        isActive = path === item.url || path === item.url+'/';
+      } else {
+        isActive = path.startsWith(item.url);
+      }
+      html += '<a class="gs-item'+(isActive?' active':'')
+        +'" href="'+item.url+'" data-label="'+item.label+'">'
+        +'<span class="gs-icon">'+item.icon+'</span>'
+        +'<span class="gs-label">'+item.label+'</span>'
+        +'</a>';
+    });
+    document.getElementById('gs-nav-items').innerHTML = html;
+
+    // Show sidebar
+    sidebar.style.display = 'flex';
+    body.classList.add('has-guild-sidebar');
+
+    // Restore collapsed state
+    var collapsed = localStorage.getItem('gs_collapsed') === '1';
+    if (collapsed) {
+      body.classList.add('sidebar-collapsed');
+      document.getElementById('gs-collapse-btn').textContent = '▶';
+    }
+
+    // Mobile toggle button
+    var mobileBtn = document.getElementById('gs-mobile-toggle');
+    if (window.innerWidth <= 768 && mobileBtn) mobileBtn.style.display = 'flex';
+  })();
+
+  function gsSidebarToggle() {
+    var body = document.body;
+    var btn  = document.getElementById('gs-collapse-btn');
+    body.classList.toggle('sidebar-collapsed');
+    var collapsed = body.classList.contains('sidebar-collapsed');
+    localStorage.setItem('gs_collapsed', collapsed ? '1' : '0');
+    btn.textContent = collapsed ? '▶' : '◀';
+  }
+
+  function gsMobileToggle() {
+    document.body.classList.toggle('mobile-sidebar-open');
+  }
+
+  // Close mobile sidebar on outside click
+  document.addEventListener('click', function(e){
+    if (!document.body.classList.contains('mobile-sidebar-open')) return;
+    var sb = document.getElementById('guild-sidebar');
+    var btn = document.getElementById('gs-mobile-toggle');
+    if (sb && !sb.contains(e.target) && btn && !btn.contains(e.target)) {
+      document.body.classList.remove('mobile-sidebar-open');
+    }
+  });
   </script>
 
   <!-- Onboarding tour -->

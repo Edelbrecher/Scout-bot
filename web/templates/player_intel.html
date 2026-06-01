@@ -4,6 +4,9 @@
 {% block content %}
 <div class="container-wide" style="padding-bottom:3rem;">
 
+  {# ── Back link ── #}
+  <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+
   {# ── Header ── #}
   <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
     <div>
