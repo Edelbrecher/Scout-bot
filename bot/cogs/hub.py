@@ -1782,11 +1782,23 @@ class Hub(commands.Cog):
                             thread = None
                     if thread:
                         user_ids = _json.loads(row["user_ids"] or "[]")
-                        for uid in user_ids:
-                            try:
-                                await thread.add_user(await self.bot.fetch_user(int(uid)))
-                            except Exception as e:
-                                print(f"[thread-invite] {uid}: {e}", flush=True)
+                        # Use HTTP API directly with bot token — bypasses cache issues
+                        import os as _os
+                        _token = _os.environ.get("DISCORD_TOKEN", "")
+                        _headers = {"Authorization": f"Bot {_token}"}
+                        import aiohttp as _aiohttp
+                        async with _aiohttp.ClientSession() as _sess:
+                            for uid in user_ids:
+                                try:
+                                    async with _sess.put(
+                                        f"https://discord.com/api/v10/channels/{thread.id}/thread-members/{uid}",
+                                        headers=_headers,
+                                    ) as _r:
+                                        if _r.status not in (200, 201, 204):
+                                            _txt = await _r.text()
+                                            print(f"[thread-invite] {uid}: {_r.status} {_txt}", flush=True)
+                                except Exception as e:
+                                    print(f"[thread-invite] {uid}: {e}", flush=True)
                     async with aiosqlite.connect(DB_PATH) as db:
                         await db.execute("DELETE FROM pending_thread_invites WHERE id=?", (row["id"],))
                         await db.commit()
