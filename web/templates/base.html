@@ -17,7 +17,7 @@
   <!-- Discord accent colour -->
   <meta name="theme-color"         content="#5865f2" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260601c" />
+  <link rel="stylesheet" href="/static/style.css?v=20260601d" />
   <!-- Tour navigation shield: style tag injected in <head> before first paint -->
   <script>
     (function(){try{var s=localStorage.getItem('travops_tour');if(!s)return;var st=JSON.parse(s);if(!st||!st.name)return;var style=document.createElement('style');style.id='tt-nav-shield';style.textContent='body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;}';document.head.appendChild(style);}catch(e){}})();
@@ -263,6 +263,15 @@ document.addEventListener('click', e => {
     var body    = document.body;
     if (!sidebar) return;
 
+    // ── Load nav config from API, then build ──
+    fetch('/api/sidebar-config').then(function(r){ return r.json(); }).then(function(navData){
+      buildSidebar(gid, path, navData, sidebar, body);
+    }).catch(function(){
+      buildSidebar(gid, path, [], sidebar, body);
+    });
+  })();
+
+  function buildSidebar(gid, path, navData, sidebar, body) {
     // ── SVG icon set (light gray, 18×18 viewBox) ──
     var IC = {
       home:    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L10 3l7 6.5V17a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M7 18v-7h6v7"/></svg>',
@@ -297,61 +306,23 @@ document.addEventListener('click', e => {
       return '<span class="gs-icon" aria-hidden="true">'+(IC[key]||IC.home)+'</span>';
     }
 
-    // ── Navigation (English, verified links) ──
-    var nav = [
-      { group: null },
-      { icon:'home',      label:'Overview',        url:'/guild/'+gid },
-      { group: 'Map & Attacks' },
-      { icon:'map',       label:'Map',              url:'/guild/'+gid+'/map' },
-      { icon:'sword',     label:'Attacks',          url:'/guild/'+gid+'/attacks' },
-      { icon:'radar',     label:'Sector Monitor',   url:'/guild/'+gid+'/sector-monitor' },
-      { group: 'Farming' },
-      { icon:'wheat',     label:'Farming Intel',    url:'/guild/'+gid+'/farming' },
-      { icon:'list',      label:'Farmlist Analyst', url:'/guild/'+gid+'/farmlist-analyst' },
-      { group: 'Scouting' },
-      { icon:'search',    label:'Player Intel',     url:'/guild/'+gid+'/intel' },
-      { icon:'eye',       label:'Scout Tracking',   url:'/guild/'+gid+'/scout' },
-      { icon:'shield',    label:'Hero Scout',       url:'/guild/'+gid+'/defense/hero-scout' },
-      { icon:'alert',     label:'Incidents',        url:'/guild/'+gid+'/scout-incidents' },
-      { group: 'Alliance' },
-      { icon:'castle',    label:'My Alliance',      url:'/guild/'+gid+'/my-ally' },
-      { icon:'users',     label:'Members',          url:'/guild/'+gid+'/allianz/mitglieder' },
-      { icon:'shield',    label:'Defense',          url:'/guild/'+gid+'/verteidigung' },
-      { icon:'skull',     label:'Enemies',          url:'/guild/'+gid+'/enemies' },
-      { icon:'cross',     label:'Hospital',         url:'/guild/'+gid+'/allianz/hospital' },
-      { group: 'Tools' },
-      { icon:'gear',      label:'Operations',       url:'/guild/'+gid+'/operations' },
-      { icon:'box',       label:'Res Push',         url:'/guild/'+gid+'/res-push' },
-      { icon:'chart',     label:'Statistics',       url:'/guild/'+gid+'/stats' },
-      { icon:'clock',     label:'Timer',            url:'/guild/'+gid+'/timer' },
-      { icon:'flag',      label:'Settle List',      url:'/guild/'+gid+'/settle-list' },
-      { icon:'poll',      label:'Polls',            url:'/guild/'+gid+'/polls' },
-      { icon:'blueprint', label:'Blueprints',       url:'/guild/'+gid+'/blueprints' },
-      { icon:'fist',      label:'Combat Power',     url:'/guild/'+gid+'/kampfkraft' },
-      { icon:'crop',      label:'Crop Calculator',  url:'/guild/'+gid+'/tools/crop-calculator' },
-      { group: 'Account' },
-      { icon:'person',    label:'My Account',       url:'/guild/'+gid+'/mein-account' },
-      { icon:'bell',      label:'Notifications',    url:'/guild/'+gid+'/notifications' },
-      { icon:'gear',      label:'Settings',         url:'/guild/'+gid+'/settings' },
-      { icon:'card',      label:'Billing',          url:'/guild/'+gid+'/billing' },
-    ];
-
-    // Build sidebar HTML
+    // Build sidebar HTML from API navData
     var html = '';
-    nav.forEach(function(item){
-      if ('group' in item) {
-        if (item.group) html += '<div class="gs-group-label">'+item.group+'</div>';
+    navData.forEach(function(item){
+      if (item.type === 'group') {
+        html += '<div class="gs-group-label">'+item.label+'</div>';
         return;
       }
+      var url = '/guild/'+gid+(item.url_suffix||'');
       var isActive = false;
-      if (item.url === '/guild/'+gid) {
-        isActive = path === item.url || path === item.url+'/';
+      if (!item.url_suffix) {
+        isActive = path === '/guild/'+gid || path === '/guild/'+gid+'/';
       } else {
-        isActive = path.startsWith(item.url);
+        isActive = path.startsWith(url);
       }
       html += '<a class="gs-item'+(isActive?' active':'')
-        +'" href="'+item.url+'" data-label="'+item.label+'">'
-        +ico(item.icon)
+        +'" href="'+url+'" data-label="'+item.label+'">'
+        +ico(item.icon||'home')
         +'<span class="gs-label">'+item.label+'</span>'
         +'</a>';
     });
@@ -371,7 +342,7 @@ document.addEventListener('click', e => {
     // Mobile toggle button
     var mobileBtn = document.getElementById('gs-mobile-toggle');
     if (window.innerWidth <= 768 && mobileBtn) mobileBtn.style.display = 'flex';
-  })();
+  }
 
   function gsSidebarToggle() {
     var body = document.body;

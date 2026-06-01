@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Sidebar Navigation · Admin · TravOps{% endblock %}
+
+{% block content %}
+<div class="container-wide">
+  <div style="display:flex; gap:1.5rem;">
+
+    <!-- Admin nav -->
+    <div style="width:180px; flex-shrink:0;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+        <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+        <a href="/admin"           style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin/customers" style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
+        <a href="/admin/servers"   style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🖥 Server</a>
+        <a href="/admin/promos"    style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/popup"     style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
+        <a href="/admin/consents"  style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
+        <a href="/admin/stats"     style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
+        <a href="/admin/contact"   style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">✉️ Kontakt-Seite</a>
+        <a href="/admin/impressum" style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📄 Impressum</a>
+        <a href="/admin/sidebar"   style="display:block;padding:.65rem 1rem;color:#f59e0b;text-decoration:none;font-size:.9rem;background:rgba(245,158,11,.08);">🧭 Sidebar-Nav</a>
+        <a href="/admin/auths"     style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🔐 Auths</a>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div style="flex:1; min-width:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+        <div>
+          <h1 style="margin:0;font-size:1.5rem;">🧭 Sidebar Navigation</h1>
+          <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Drag to reorder · click to rename · add or remove items</p>
+        </div>
+        <div style="display:flex;gap:.6rem;">
+          <button onclick="addGroup()" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.4);border-radius:7px;padding:.45rem .9rem;color:#a5b4fc;cursor:pointer;font-size:.85rem;">+ Add Group</button>
+          <button onclick="addItem()"  style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:7px;padding:.45rem .9rem;color:#4ade80;cursor:pointer;font-size:.85rem;">+ Add Item</button>
+          <button onclick="saveNav()"  style="background:#5865f2;border:none;border-radius:7px;padding:.45rem 1.1rem;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;">💾 Save</button>
+          <button onclick="resetNav()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:.45rem .9rem;color:#f87171;cursor:pointer;font-size:.85rem;">↺ Reset</button>
+        </div>
+      </div>
+
+      <div id="saveMsg" style="display:none;background:rgba(34,197,94,.1);border:1px solid #22c55e;border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;color:#22c55e;font-size:.9rem;">✓ Saved successfully.</div>
+      <div id="errMsg"  style="display:none;background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;color:#ef4444;font-size:.9rem;"></div>
+
+      <!-- Icon legend -->
+      <details style="margin-bottom:1rem;">
+        <summary style="cursor:pointer;color:var(--text-muted);font-size:.83rem;padding:.4rem 0;">Available icon keys ▾</summary>
+        <div id="iconLegend" style="display:flex;flex-wrap:wrap;gap:.4rem .6rem;margin-top:.5rem;font-size:.78rem;color:var(--text-muted);font-family:monospace;padding:.75rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;"></div>
+      </details>
+
+      <!-- Drag list -->
+      <div id="navList" style="display:flex;flex-direction:column;gap:4px;"></div>
+
+      <p style="margin-top:1rem;font-size:.8rem;color:var(--text-muted);">
+        Drag rows to reorder. <strong>url_suffix</strong> is appended to <code>/guild/&lt;id&gt;</code> — use empty string for Overview.
+      </p>
+    </div>
+  </div>
+</div>
+
+<style>
+.sn-row {
+  display:flex; align-items:center; gap:.6rem;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+  padding:.55rem .75rem; cursor:grab; user-select:none;
+  transition:background .12s, border-color .12s;
+}
+.sn-row:active { cursor:grabbing; }
+.sn-row.dragging { opacity:.4; }
+.sn-row.drag-over { border-color:#5865f2; background:rgba(88,101,242,.08); }
+.sn-row.is-group {
+  background:rgba(99,102,241,.06); border-color:rgba(99,102,241,.25);
+  font-weight:700; font-size:.82rem; letter-spacing:.06em; text-transform:uppercase; color:#818cf8;
+}
+.sn-handle { color:var(--text-muted); font-size:.95rem; flex-shrink:0; cursor:grab; }
+.sn-type-badge { font-size:.7rem; padding:1px 7px; border-radius:10px; flex-shrink:0; }
+.sn-type-badge.group { background:rgba(99,102,241,.15); color:#a5b4fc; }
+.sn-type-badge.item  { background:rgba(34,197,94,.1);   color:#4ade80; }
+.sn-input {
+  background:var(--bg-main); border:1px solid var(--border); border-radius:5px;
+  color:var(--text); font-size:.88rem; padding:.25rem .5rem;
+}
+.sn-input:focus { outline:none; border-color:#5865f2; }
+.sn-del { background:none; border:none; color:#ef4444; cursor:pointer; font-size:1rem; padding:0 4px; opacity:.6; }
+.sn-del:hover { opacity:1; }
+</style>
+
+<script>
+const ICONS = ['home','map','sword','radar','wheat','list','search','eye','shield','alert','castle','users','skull','cross','gear','box','chart','clock','flag','poll','blueprint','fist','crop','person','bell','card'];
+
+// Render icon legend
+document.getElementById('iconLegend').innerHTML = ICONS.map(k=>`<code>${k}</code>`).join('');
+
+// Initial data from server
+let navData = {{ nav | tojson }};
+
+function render() {
+  const list = document.getElementById('navList');
+  list.innerHTML = '';
+  navData.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'sn-row' + (item.type === 'group' ? ' is-group' : '');
+    row.draggable = true;
+    row.dataset.idx = i;
+
+    if (item.type === 'group') {
+      row.innerHTML = `
+        <span class="sn-handle">⠿</span>
+        <span class="sn-type-badge group">Group</span>
+        <input class="sn-input" style="flex:1;" value="${esc(item.label)}" placeholder="Group label"
+          oninput="navData[${i}].label=this.value">
+        <button class="sn-del" onclick="removeRow(${i})" title="Delete">✕</button>`;
+    } else {
+      row.innerHTML = `
+        <span class="sn-handle">⠿</span>
+        <span class="sn-type-badge item">Item</span>
+        <input class="sn-input" style="width:90px;" value="${esc(item.icon||'')}" placeholder="icon"
+          oninput="navData[${i}].icon=this.value" title="Icon key">
+        <input class="sn-input" style="flex:1;" value="${esc(item.label)}" placeholder="Label"
+          oninput="navData[${i}].label=this.value">
+        <input class="sn-input" style="width:220px;font-family:monospace;font-size:.82rem;" value="${esc(item.url_suffix||'')}" placeholder="/url-suffix"
+          oninput="navData[${i}].url_suffix=this.value" title="URL suffix after /guild/{id}">
+        <button class="sn-del" onclick="removeRow(${i})" title="Delete">✕</button>`;
+    }
+
+    // Drag events
+    row.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', i);
+      setTimeout(()=>row.classList.add('dragging'), 0);
+    });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('drag-over'); });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const to   = parseInt(row.dataset.idx);
+      if (from === to) return;
+      const moved = navData.splice(from, 1)[0];
+      navData.splice(to, 0, moved);
+      render();
+    });
+
+    list.appendChild(row);
+  });
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function removeRow(i) {
+  navData.splice(i, 1);
+  render();
+}
+
+function addGroup() {
+  navData.push({type:'group', label:'New Group'});
+  render();
+  setTimeout(()=>{ const inputs=document.querySelectorAll('.sn-row.is-group input'); if(inputs.length) inputs[inputs.length-1].select(); }, 50);
+}
+
+function addItem() {
+  navData.push({type:'item', icon:'home', label:'New Item', url_suffix:''});
+  render();
+}
+
+async function saveNav() {
+  // Sync current input values before saving
+  document.querySelectorAll('.sn-row').forEach(row => {
+    const i = parseInt(row.dataset.idx);
+    if (isNaN(i)) return;
+    const inputs = row.querySelectorAll('input');
+    if (navData[i].type === 'group') {
+      navData[i].label = inputs[0]?.value || '';
+    } else {
+      navData[i].icon       = inputs[0]?.value || 'home';
+      navData[i].label      = inputs[1]?.value || '';
+      navData[i].url_suffix = inputs[2]?.value || '';
+    }
+  });
+
+  try {
+    const r = await fetch('/admin/sidebar/save', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({nav: navData})
+    });
+    if (r.ok) {
+      const msg = document.getElementById('saveMsg');
+      msg.style.display = 'block';
+      setTimeout(()=>msg.style.display='none', 3000);
+    } else {
+      throw new Error('Server error');
+    }
+  } catch(e) {
+    const err = document.getElementById('errMsg');
+    err.textContent = '✕ Error saving: ' + e.message;
+    err.style.display = 'block';
+    setTimeout(()=>err.style.display='none', 4000);
+  }
+}
+
+async function resetNav() {
+  if (!confirm('Reset to default navigation? All custom changes will be lost.')) return;
+  const r = await fetch('/admin/sidebar/reset', {method:'POST'});
+  if (r.ok) {
+    const cfg = await fetch('/api/sidebar-config');
+    navData = await cfg.json();
+    render();
+    const msg = document.getElementById('saveMsg');
+    msg.textContent = '↺ Reset to defaults.';
+    msg.style.display = 'block';
+    setTimeout(()=>{ msg.style.display='none'; msg.textContent='✓ Saved successfully.'; }, 3000);
+  }
+}
+
+render();
+</script>
+{% endblock %}

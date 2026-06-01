@@ -7705,6 +7705,112 @@ async def admin_impressum_save(
 
 
 # ---------------------------------------------------------------------------
+# Admin — Sidebar Navigation Editor
+# ---------------------------------------------------------------------------
+
+_DEFAULT_SIDEBAR_NAV = [
+    {"type": "item",  "icon": "home",      "label": "Overview",        "url_suffix": ""},
+    {"type": "group", "label": "Map & Attacks"},
+    {"type": "item",  "icon": "map",       "label": "Map",             "url_suffix": "/map"},
+    {"type": "item",  "icon": "sword",     "label": "Attacks",         "url_suffix": "/attacks"},
+    {"type": "item",  "icon": "radar",     "label": "Sector Monitor",  "url_suffix": "/map/sector-monitor"},
+    {"type": "group", "label": "Farming"},
+    {"type": "item",  "icon": "wheat",     "label": "Farming Intel",   "url_suffix": "/farming"},
+    {"type": "item",  "icon": "list",      "label": "Farmlist Analyst","url_suffix": "/farmlist-analyst"},
+    {"type": "group", "label": "Scouting"},
+    {"type": "item",  "icon": "search",    "label": "Player Intel",    "url_suffix": "/intel"},
+    {"type": "item",  "icon": "eye",       "label": "Scout Tracking",  "url_suffix": "/scout"},
+    {"type": "item",  "icon": "shield",    "label": "Hero Scout",      "url_suffix": "/defense/hero-scout"},
+    {"type": "item",  "icon": "alert",     "label": "Scout Incidents", "url_suffix": "/scout-incidents"},
+    {"type": "group", "label": "Alliance"},
+    {"type": "item",  "icon": "castle",    "label": "My Alliance",     "url_suffix": "/my-ally"},
+    {"type": "item",  "icon": "users",     "label": "Members",         "url_suffix": "/allianz/mitglieder"},
+    {"type": "item",  "icon": "shield",    "label": "Defense",         "url_suffix": "/verteidigung"},
+    {"type": "item",  "icon": "skull",     "label": "Enemies",         "url_suffix": "/enemies"},
+    {"type": "item",  "icon": "cross",     "label": "Hospital",        "url_suffix": "/allianz/hospital"},
+    {"type": "group", "label": "Tools"},
+    {"type": "item",  "icon": "gear",      "label": "Operations",      "url_suffix": "/operations"},
+    {"type": "item",  "icon": "box",       "label": "Res Push",        "url_suffix": "/res-push"},
+    {"type": "item",  "icon": "chart",     "label": "Statistics",      "url_suffix": "/stats"},
+    {"type": "item",  "icon": "clock",     "label": "Timer",           "url_suffix": "/timer"},
+    {"type": "item",  "icon": "flag",      "label": "Settle List",     "url_suffix": "/settle-list"},
+    {"type": "item",  "icon": "poll",      "label": "Polls",           "url_suffix": "/polls"},
+    {"type": "item",  "icon": "blueprint", "label": "Blueprints",      "url_suffix": "/blueprints"},
+    {"type": "item",  "icon": "fist",      "label": "Combat Power",    "url_suffix": "/mein-account/kampfkraft"},
+    {"type": "item",  "icon": "crop",      "label": "Crop Calculator", "url_suffix": "/tools/crop-calculator"},
+    {"type": "group", "label": "Account"},
+    {"type": "item",  "icon": "person",    "label": "My Account",      "url_suffix": "/mein-account"},
+    {"type": "item",  "icon": "bell",      "label": "Notifications",   "url_suffix": "/notifications"},
+    {"type": "item",  "icon": "gear",      "label": "Settings",        "url_suffix": "/settings"},
+    {"type": "item",  "icon": "card",      "label": "Billing",         "url_suffix": "/billing"},
+]
+
+
+async def _get_sidebar_nav() -> list:
+    raw = await database.get_setting("sidebar_nav_config")
+    if raw:
+        try:
+            return _json_mod.loads(raw)
+        except Exception:
+            pass
+    return _DEFAULT_SIDEBAR_NAV
+
+
+@app.get("/api/sidebar-config")
+async def api_sidebar_config(request: Request):
+    nav = await _get_sidebar_nav()
+    return JSONResponse(nav)
+
+
+@app.get("/admin/sidebar", response_class=HTMLResponse)
+async def admin_sidebar(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse("/dashboard", status_code=303)
+    nav = await _get_sidebar_nav()
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("admin_sidebar.html", {
+        "request": request, "nav": nav, "saved": saved,
+    })
+
+
+@app.post("/admin/sidebar/save")
+async def admin_sidebar_save(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return RedirectResponse("/dashboard", status_code=303)
+    body = await request.json()
+    nav = body.get("nav", [])
+    # Sanitise: only allow known fields
+    clean = []
+    for item in nav:
+        t = item.get("type")
+        if t == "group":
+            clean.append({"type": "group", "label": str(item.get("label", ""))[:60]})
+        elif t == "item":
+            clean.append({
+                "type":       "item",
+                "icon":       str(item.get("icon", "home"))[:30],
+                "label":      str(item.get("label", ""))[:60],
+                "url_suffix": str(item.get("url_suffix", ""))[:120],
+            })
+    await database.set_setting("sidebar_nav_config", _json_mod.dumps(clean))
+    return JSONResponse({"ok": True})
+
+
+@app.post("/admin/sidebar/reset")
+async def admin_sidebar_reset(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    await database.set_setting("sidebar_nav_config", _json_mod.dumps(_DEFAULT_SIDEBAR_NAV))
+    return JSONResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
 # Admin — preview mode (simulate different subscription tiers)
 # ---------------------------------------------------------------------------
 
