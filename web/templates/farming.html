@@ -10,13 +10,13 @@
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
       <h1 style="margin:0.2rem 0 0.15rem;" data-i18n="farming.title">⚜️ Farming Intelligence</h1>
       <p class="subtitle" style="margin:0;" data-i18n="farming.subtitle">
-        Inaktive Farmen erkennen · Wachstum verfolgen · Farmlisten auswerten
+        Detect inactive farms · Track growth · Analyze farm lists
       </p>
     </div>
     {% if guild.tw_world %}
     <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshot" style="margin:0;align-self:flex-end;">
       <button type="submit" class="btn btn-primary" style="display:flex;align-items:center;gap:0.4rem;">
-        <span data-i18n="farming.snapshot.btn">🔄 Snapshot holen</span>
+        <span data-i18n="farming.snapshot.btn">🔄 Fetch Snapshot</span>
         {% if farm_stats.latest_snapshot %}
         <span id="snapAge" style="font-size:0.72rem;opacity:0.75;font-weight:400;"></span>
         {% endif %}
@@ -24,37 +24,37 @@
     </form>
     {% else %}
     <a href="/guild/{{ guild.guild_id }}/map" class="btn" style="align-self:flex-end;">
-      ⚙️ Welt konfigurieren
+      ⚙️ Configure World
     </a>
     {% endif %}
   </div>
 
   <!-- ══ FLASH MESSAGES ══════════════════════════════════════════════════════ -->
   {% if saved == 'snapshots_cleared' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Alle Snapshots gelöscht. Klicke auf <em>🔄 Snapshot holen</em> um neu zu starten.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ All snapshots deleted. Click <em>🔄 Fetch Snapshot</em> to restart.</div>
   {% elif saved == 'snapshot' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Snapshot erfolgreich gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Snapshot saved successfully.</div>
   {% elif saved == 'added' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Farm zur Liste hinzugefügt.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Farm added to list.</div>
   {% elif saved == 'deleted' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Eintrag entfernt.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Entry removed.</div>
   {% elif saved == 'farmlist_imported' %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Farmliste importiert! In der Tabelle siehst du jetzt welche Dörfer bereits in deiner Liste sind.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Farmlist imported! The table now shows which villages are already in your list.</div>
   {% elif saved == 'farmlist_empty' %}
-  <div class="alert" style="margin-bottom:1rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:.75rem 1rem;">⚠️ Farmliste konnte nicht gelesen werden — bitte Inhalt prüfen.</div>
+  <div class="alert" style="margin-bottom:1rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:.75rem 1rem;">⚠️ Farmlist could not be read — please check the content.</div>
   {% elif saved %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Saved.</div>
   {% endif %}
   {% if auto_fetched %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Erster Snapshot automatisch geladen! Nächster Auto-Snapshot in 6 Stunden — oder klick <em>🔄 Snapshot holen</em>.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ First snapshot loaded automatically! Next auto-snapshot in 6 hours — or click <em>🔄 Fetch Snapshot</em>.</div>
   {% elif auto_fetch_error %}
-  <div class="alert alert-warn" style="margin-bottom:1rem;">⚠️ Snapshot konnte nicht automatisch geladen werden: <code>{{ auto_fetch_error }}</code><br>Prüfe die Travian-Welt-URL unter <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map-Einstellungen</a>.</div>
+  <div class="alert alert-warn" style="margin-bottom:1rem;">⚠️ Snapshot could not be loaded automatically: <code>{{ auto_fetch_error }}</code><br>Check the Travian world URL under <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map Settings</a>.</div>
   {% endif %}
 
   {% if not guild.tw_world %}
   <div style="padding:1.25rem;background:rgba(241,196,15,0.08);border:1px solid rgba(241,196,15,0.3);border-radius:10px;margin-bottom:1.25rem;">
-    <strong>⚠️ Keine Travian-Welt konfiguriert.</strong>
-    Bitte erst unter <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map-Einstellungen</a> eine Welt-URL eintragen.
+    <strong>⚠️ No Travian world configured.</strong>
+    Please first enter a world URL under <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map Settings</a>.
   </div>
   {% endif %}
 
@@ -68,10 +68,10 @@
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">📸 Snapshots</div>
       {% if farm_stats.snapshot_count < 2 %}
       <div style="font-size:0.7rem;color:#eab308;margin-top:0.3rem;">
-        {% if farm_stats.snapshot_count == 0 %}Noch keiner vorhanden{% else %}Zweiter Snapshot fehlt{% endif %}
+        {% if farm_stats.snapshot_count == 0 %}None yet{% else %}Second snapshot missing{% endif %}
       </div>
       {% else %}
-      <div style="font-size:0.7rem;color:#22c55e;margin-top:0.3rem;">Bereit ✓</div>
+      <div style="font-size:0.7rem;color:#22c55e;margin-top:0.3rem;">Ready ✓</div>
       {% endif %}
     </div>
 
@@ -79,8 +79,8 @@
     <div class="card" style="padding:1rem;text-align:center;position:relative;overflow:hidden;cursor:pointer;" onclick="switchTab('inactive')">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{% if farm_stats.inactive_count > 0 %}#f59e0b{% else %}var(--border){% endif %};"></div>
       <div style="font-size:2rem;font-weight:800;line-height:1.1;margin-top:0.25rem;color:{% if farm_stats.inactive_count > 0 %}#f59e0b{% else %}var(--text){% endif %};">{{ farm_stats.inactive_count }}</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">🏚️ Inaktive Farmen</div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">klick → Liste</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">🏚️ Inactive Farms</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">click → List</div>
     </div>
 
     <!-- Meine Farmen inaktiv -->
@@ -88,8 +88,8 @@
     <div class="card" style="padding:1rem;text-align:center;position:relative;overflow:hidden;cursor:pointer;{% if my_inactive_count > 0 %}border-color:rgba(34,197,94,0.5);{% endif %}" onclick="switchTab('myfarms')">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{% if my_inactive_count > 0 %}#22c55e{% else %}var(--border){% endif %};"></div>
       <div style="font-size:2rem;font-weight:800;line-height:1.1;margin-top:0.25rem;color:{% if my_inactive_count > 0 %}#22c55e{% else %}var(--text){% endif %};">{{ my_inactive_count }}</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">🎯 Meine Farmen inaktiv</div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">von {{ farm_stats.farm_list_count }} gespeichert</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">🎯 My inactive farms</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">of {{ farm_stats.farm_list_count }} saved</div>
     </div>
 
     <!-- Letzter Scan -->
@@ -97,12 +97,12 @@
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);"></div>
       {% if farm_stats.latest_snapshot %}
       <div style="font-size:1.1rem;font-weight:700;line-height:1.2;margin-top:0.25rem;" id="nextFetchKPI">—</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">⏱️ Nächster Auto-Scan</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">⏱️ Next Auto-Scan</div>
       <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">{{ farm_stats.latest_snapshot[:16].replace('T',' ') }} UTC</div>
       {% else %}
       <div style="font-size:1.4rem;font-weight:800;line-height:1.1;margin-top:0.25rem;color:var(--text-muted);">—</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">⏱️ Kein Scan</div>
-      <div style="font-size:0.7rem;color:#eab308;margin-top:0.3rem;">Snapshot holen →</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">⏱️ No scan yet</div>
+      <div style="font-size:0.7rem;color:#eab308;margin-top:0.3rem;">Fetch Snapshot →</div>
       {% endif %}
     </div>
 
@@ -111,11 +111,11 @@
   <!-- ══ ONBOARDING (nur wenn noch kein Snapshot) ════════════════════════════ -->
   {% if farm_stats.snapshot_count == 0 and guild.tw_world %}
   <div style="padding:1.25rem 1.5rem;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:10px;margin-bottom:1.5rem;">
-    <strong style="display:block;margin-bottom:0.5rem;">🚀 So funktioniert Farming Intelligence</strong>
+    <strong style="display:block;margin-bottom:0.5rem;">🚀 How Farming Intelligence works</strong>
     <ol style="margin:0;padding-left:1.25rem;color:var(--text-muted);font-size:0.875rem;line-height:1.9;">
-      <li>Klicke oben rechts auf <strong style="color:var(--text);">🔄 Snapshot holen</strong> — lädt die aktuelle Karte deiner Travian-Welt</li>
-      <li>Warte mindestens <strong style="color:var(--text);">6 Stunden</strong> (oder hole manuell einen zweiten Snapshot)</li>
-      <li>TravOps vergleicht beide Snapshots und erkennt automatisch <strong style="color:var(--text);">welche Dörfer sich nicht verändert haben</strong></li>
+      <li>Click <strong style="color:var(--text);">🔄 Fetch Snapshot</strong> in the top right — loads the current map of your Travian world</li>
+      <li>Wait at least <strong style="color:var(--text);">6 hours</strong> (or manually fetch a second snapshot)</li>
+      <li>TravOps compares both snapshots and automatically detects <strong style="color:var(--text);">which villages have not changed</strong></li>
     </ol>
   </div>
   {% endif %}
@@ -123,10 +123,10 @@
   <!-- ══ TAB NAVIGATION ══════════════════════════════════════════════════════ -->
   <div style="display:flex;gap:0.35rem;margin-bottom:1.25rem;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:0.6rem;">
     {% set tabs_def = [
-      ('inactive', '🏚️ Inaktive Farmen'),
-      ('myfarms',  '🎯 Meine Farmen'),
-      ('growth',   '📈 Wachstum'),
-      ('search',   '🔍 Suche'),
+      ('inactive', '🏚️ Inactive Farms'),
+      ('myfarms',  '🎯 My Farms'),
+      ('growth',   '📈 Growth'),
+      ('search',   '🔍 Search'),
     ] %}
     {% for t_id, t_label in tabs_def %}
     <button onclick="switchTab('{{ t_id }}')" id="tab-btn-{{ t_id }}"
@@ -144,7 +144,7 @@
        style="padding:0.4rem 0.9rem;border-radius:7px;font-size:0.875rem;font-weight:500;
               background:var(--bg-main);border:1px solid var(--border);color:var(--text-muted);
               text-decoration:none;display:flex;align-items:center;gap:0.3rem;margin-left:0.25rem;">
-      📋 Farmlist-Analyse <span style="font-size:0.7rem;opacity:0.6;">↗</span>
+      📋 Farmlist Analysis <span style="font-size:0.7rem;opacity:0.6;">↗</span>
     </a>
   </div>
 
@@ -161,7 +161,7 @@
                        display:flex;align-items:center;gap:.5rem;">
           <span>⚙️ Filter</span>
           {% if _filter_active %}
-          <span style="background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;font-size:.7rem;">aktiv</span>
+          <span style="background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;font-size:.7rem;">active</span>
           {% endif %}
           <span id="filterArrow">{% if _filter_active %}▴{% else %}▾{% endif %}</span>
         </button>
@@ -169,32 +169,32 @@
                 style="background:var(--bg-card);border:1px solid {% if has_farmlist %}#22c55e{% else %}var(--border){% endif %};
                        border-radius:7px;padding:.4rem .9rem;font-size:.82rem;cursor:pointer;color:var(--text);
                        display:flex;align-items:center;gap:.5rem;">
-          📋 Farmliste importieren
-          {% if has_farmlist %}<span style="font-size:.7rem;color:#22c55e;">✓ aktiv</span>{% endif %}
+          📋 Import farmlist
+          {% if has_farmlist %}<span style="font-size:.7rem;color:#22c55e;">✓ active</span>{% endif %}
         </button>
         {% if _filter_active %}
-        <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.78rem;padding:.3rem .7rem;">✕ Filter zurücksetzen</a>
+        <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.78rem;padding:.3rem .7rem;">✕ Reset filters</a>
         {% endif %}
       </div>
 
       {# ── Farmlist Import Panel ── #}
       <div id="flImportPanel" style="display:none;margin-bottom:.75rem;">
         <div class="card" style="padding:1rem;border-color:rgba(34,197,94,.3);">
-          <div style="font-size:.85rem;font-weight:600;margin-bottom:.5rem;">📋 Farmliste importieren</div>
+          <div style="font-size:.85rem;font-weight:600;margin-bottom:.5rem;">📋 Import farmlist</div>
           <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">
-            Öffne in Travian deine Farmliste, markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.<br>
-            Das System erkennt dann welche inaktiven Dörfer bereits in deiner Farmliste sind.
+            Open your farmlist in Travian, select all (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.<br>
+            The system will then detect which inactive villages are already in your farmlist.
           </p>
           <form method="post" action="/guild/{{ guild.guild_id }}/farming/import-farmlist">
             <textarea name="farmlist_text" rows="5"
                       style="width:100%;background:var(--bg-main);border:1px solid var(--border);
                              border-radius:6px;padding:.5rem;color:var(--text);font-size:.78rem;
                              font-family:monospace;resize:vertical;box-sizing:border-box;"
-                      placeholder="Farmliste hier einfügen…"></textarea>
+                      placeholder="Paste farmlist here…"></textarea>
             <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center;">
-              <button type="submit" class="btn btn-primary" style="font-size:.82rem;">📥 Importieren &amp; aktivieren</button>
+              <button type="submit" class="btn btn-primary" style="font-size:.82rem;">📥 Import &amp; activate</button>
               {% if has_farmlist %}
-              <span style="font-size:.75rem;color:#22c55e;">✅ Farmliste aktiv — Vergleich läuft automatisch</span>
+              <span style="font-size:.75rem;color:#22c55e;">✅ Farmlist active — comparison runs automatically</span>
               {% endif %}
             </div>
           </form>
@@ -211,25 +211,25 @@
             {# Row 1: Basic #}
             <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.85rem;">
               <div class="form-group" style="margin:0;min-width:130px;">
-                <label style="font-size:.78rem;">Inaktiv seit (Tage)</label>
+                <label style="font-size:.78rem;">Days inactive</label>
                 <input type="number" name="min_days" value="{{ min_days }}" min="0" max="365" class="form-control"/>
               </div>
               <div class="form-group" style="margin:0;min-width:110px;">
-                <label style="font-size:.78rem;">Min. Bev.
+                <label style="font-size:.78rem;">Min. Pop.
                   {% if snap_pop_range %}<span style="font-size:.68rem;color:var(--text-muted);">(max {{ snap_pop_range.max_pop }})</span>{% endif %}
                 </label>
                 <input type="number" name="min_pop" value="{{ min_pop }}" min="0" class="form-control"
                        {% if snap_pop_range %}max="{{ snap_pop_range.max_pop }}"{% endif %}/>
               </div>
               <div class="form-group" style="margin:0;min-width:110px;">
-                <label style="font-size:.78rem;">Max. Bev.</label>
+                <label style="font-size:.78rem;">Max. Pop.</label>
                 <input type="number" name="max_pop" value="{{ max_pop if max_pop < 9999 else '' }}" min="0"
                        placeholder="{{ snap_pop_range.max_pop if snap_pop_range else '9999' }}" class="form-control"
                        {% if snap_pop_range %}max="{{ snap_pop_range.max_pop }}"{% endif %}/>
               </div>
               <div class="form-group" style="margin:0;min-width:110px;">
-                <label style="font-size:.78rem;">Max. Pop-Zunahme</label>
-                <input type="number" name="max_pop_increase" value="{{ max_pop_increase }}" min="0" class="form-control" placeholder="unbegrenzt"/>
+                <label style="font-size:.78rem;">Max. pop increase</label>
+                <input type="number" name="max_pop_increase" value="{{ max_pop_increase }}" min="0" class="form-control" placeholder="unlimited"/>
               </div>
             </div>
 
@@ -245,44 +245,44 @@
                 <input type="number" name="ref_y" value="{{ ref_y or '' }}" class="form-control" placeholder="0"/>
               </div>
               <div class="form-group" style="margin:0;min-width:90px;">
-                <label style="font-size:.78rem;">Min. Distanz</label>
+                <label style="font-size:.78rem;">Min. Distance</label>
                 <input type="number" name="min_dist" value="{{ min_dist or '' }}" class="form-control" placeholder="0" step="0.1"/>
               </div>
               <div class="form-group" style="margin:0;min-width:90px;">
-                <label style="font-size:.78rem;">Max. Distanz</label>
+                <label style="font-size:.78rem;">Max. Distance</label>
                 <input type="number" name="max_dist" value="{{ max_dist or '' }}" class="form-control" placeholder="∞" step="0.1"/>
               </div>
               <div class="form-group" style="margin:0;min-width:100px;">
-                <label style="font-size:.78rem;">Min. Spieler-Bev.</label>
+                <label style="font-size:.78rem;">Min. player pop.</label>
                 <input type="number" name="min_player_pop" value="{{ min_player_pop or '' }}" class="form-control" placeholder="0"/>
               </div>
               <div class="form-group" style="margin:0;min-width:100px;">
-                <label style="font-size:.78rem;">Max. Spieler-Bev.</label>
+                <label style="font-size:.78rem;">Max. player pop.</label>
                 <input type="number" name="max_player_pop" value="{{ max_player_pop or '' }}" class="form-control" placeholder="∞"/>
               </div>
             </div>
 
             {# Row 3: Text filters #}
             <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.85rem;">
-              <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);width:100%;margin-bottom:-.5rem;">🔍 Spieler / Allianz</div>
+              <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);width:100%;margin-bottom:-.5rem;">🔍 Player / Alliance</div>
               <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Spieler (enthält)</label>
-                <input type="text" name="player_filter" value="{{ player_filter }}" class="form-control" placeholder="Spielername…"/>
+                <label style="font-size:.78rem;">Player (contains)</label>
+                <input type="text" name="player_filter" value="{{ player_filter }}" class="form-control" placeholder="Player name…"/>
               </div>
               <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Allianz (enthält)</label>
+                <label style="font-size:.78rem;">Alliance (contains)</label>
                 <input type="text" name="alliance_filter" value="{{ alliance_filter }}" class="form-control"
-                       list="allianceListFarming" placeholder="Allianzname…"/>
+                       list="allianceListFarming" placeholder="Alliance name…"/>
                 <datalist id="allianceListFarming">
                   {% for an in alliance_names %}<option value="{{ an }}">{% endfor %}
                 </datalist>
               </div>
               <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Spieler ausschließen</label>
-                <input type="text" name="exclude_players" value="{{ exclude_players }}" class="form-control" placeholder="Spieler1, Spieler2…"/>
+                <label style="font-size:.78rem;">Exclude players</label>
+                <input type="text" name="exclude_players" value="{{ exclude_players }}" class="form-control" placeholder="Player1, Player2…"/>
               </div>
               <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Allianzen ausschließen</label>
+                <label style="font-size:.78rem;">Exclude alliances</label>
                 <input type="text" name="exclude_alliances" value="{{ exclude_alliances }}" class="form-control" placeholder="Ally1, Ally2…"/>
               </div>
             </div>
@@ -290,9 +290,9 @@
             {# Row 4: Tribes + Farmlist + Natars #}
             <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;margin-bottom:.85rem;">
               <div>
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">⚔️ Stamm</div>
+                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">⚔️ Tribe</div>
                 <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
-                  {% set tribe_opts = [(1,'🏛️ Römer'),(2,'⚔️ Teutonen'),(3,'🌿 Gallier'),(5,'🏹 Hunnen'),(6,'🏺 Ägypter'),(7,'🛡️ Spartaner')] %}
+                  {% set tribe_opts = [(1,'🏛️ Romans'),(2,'⚔️ Teutons'),(3,'🌿 Gauls'),(5,'🏹 Huns'),(6,'🏺 Egyptians'),(7,'🛡️ Spartans')] %}
                   {% for tid, tlabel in tribe_opts %}
                   <label style="cursor:pointer;">
                     <input type="checkbox" name="tribes" value="{{ tid }}" style="display:none;"
@@ -310,27 +310,27 @@
                 </div>
               </div>
               <div>
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">📋 Farmliste</div>
+                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">📋 Farmlist</div>
                 <select name="in_farmlist" class="form-control" style="min-width:160px;">
-                  <option value="" {% if not in_farmlist %}selected{% endif %}>Alle Dörfer</option>
-                  <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>❌ Nicht in Farmliste</option>
-                  <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>✅ In Farmliste</option>
+                  <option value="" {% if not in_farmlist %}selected{% endif %}>All villages</option>
+                  <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>❌ Not in farmlist</option>
+                  <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>✅ In farmlist</option>
                 </select>
                 {% if not has_farmlist %}
-                <div style="font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">⚠️ Keine Farmliste importiert</div>
+                <div style="font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">⚠️ No farmlist imported</div>
                 {% endif %}
               </div>
               <div style="display:flex;align-items:center;gap:.5rem;margin-top:1.2rem;">
                 <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;">
                   <input type="checkbox" name="include_natars" value="1" {% if include_natars %}checked{% endif %}>
-                  Nataren einschließen
+                  Include Natars
                 </label>
               </div>
             </div>
 
             <div style="display:flex;gap:.5rem;">
-              <button type="submit" class="btn btn-primary" style="font-size:.85rem;">🔍 Suchen</button>
-              <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.85rem;">Zurücksetzen</a>
+              <button type="submit" class="btn btn-primary" style="font-size:.85rem;">🔍 Search</button>
+              <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.85rem;">Reset</a>
             </div>
           </form>
         </div>
@@ -340,17 +340,17 @@
     {% if scout_village and guild.tw_world %}
     <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:8px;
                 padding:.6rem 1rem;margin-bottom:.75rem;font-size:.82rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-      <span>🔭 Scout-Dorf: <strong>{{ scout_village.village_name }}</strong>
+      <span>🔭 Scout village: <strong>{{ scout_village.village_name }}</strong>
         <span style="color:var(--text-muted);">({{ scout_village.x }}|{{ scout_village.y }})</span></span>
-      <span style="color:var(--text-muted);font-size:.75rem;">Scout-Links in der Tabelle öffnen das Truppen-Senden-Formular mit Zielkoordinaten vorausgefüllt.</span>
-      <a href="/guild/{{ guild.guild_id }}/mein-account" style="font-size:.75rem;color:#818cf8;">Ändern →</a>
+      <span style="color:var(--text-muted);font-size:.75rem;">Scout links in the table open the troop-send form with the target coordinates pre-filled.</span>
+      <a href="/guild/{{ guild.guild_id }}/mein-account" style="font-size:.75rem;color:#818cf8;">Change →</a>
     </div>
     {% elif not scout_village %}
     <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;
                 padding:.5rem 1rem;margin-bottom:.75rem;font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:.5rem;">
-      🔭 Kein Scout-Dorf markiert —
-      <a href="/guild/{{ guild.guild_id }}/mein-account" style="color:#818cf8;">in My Account festlegen</a>
-      um Scout-Links in der Tabelle zu aktivieren.
+      🔭 No scout village set —
+      <a href="/guild/{{ guild.guild_id }}/mein-account" style="color:#818cf8;">configure in My Account</a>
+      to enable scout links in the table.
     </div>
     {% endif %}
 
@@ -359,13 +359,13 @@
       <!-- Table Header Row -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
         <div style="font-weight:600;font-size:0.95rem;">
-          🏚️ Inaktive Farmen
+          🏚️ Inactive Farms
           {% if inactive_farms %}
           {% set missing_count = inactive_farms | selectattr('x') | list | selectattr('y') | list | length %}
           {% set on_list_count  = inactive_farms | selectattr('x') | list | length %}
           {# count missing via JS — badge updated dynamically #}
           <span style="font-size:0.8rem;font-weight:400;color:var(--text-muted);margin-left:0.4rem;">
-            {{ inactive_farms | length }} Ergebnisse · mind. {{ min_days }} Tage · Bev. {{ min_pop }}–{{ max_pop }}
+            {{ inactive_farms | length }} results · min. {{ min_days }} days · Pop. {{ min_pop }}–{{ max_pop }}
           </span>
           {% if farm_list %}
           <span id="missingBadge" style="font-size:0.75rem;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.35);border-radius:5px;padding:1px 7px;margin-left:0.4rem;"></span>
@@ -376,7 +376,7 @@
           {% if inactive_farms and farm_list %}
           <button id="btnOnlyMissing" onclick="toggleOnlyMissing()"
                   class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;background:rgba(251,146,60,0.1);border-color:rgba(251,146,60,0.4);color:#fb923c;">
-            ➕ Nur fehlende
+            ➕ Only missing
           </button>
           {% endif %}
           {% if inactive_farms %}
@@ -384,12 +384,12 @@
             📥 CSV Export
           </button>
           <button onclick="copyAllCoords()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">
-            📋 Alle Koordinaten
+            📋 Copy all coords
           </button>
           {% endif %}
           {% if farm_stats.snapshot_count > 0 %}
           <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshots/clear"
-                onsubmit="return confirm('Alle Snapshots löschen und neu starten?')" style="margin:0;">
+                onsubmit="return confirm('Delete all snapshots and restart?')" style="margin:0;">
             <button type="submit" class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.65rem;" title="Snapshots zurücksetzen">
               🗑 Reset
             </button>
@@ -402,16 +402,16 @@
       <div style="padding:2rem;text-align:center;">
         <div style="font-size:2.5rem;margin-bottom:0.75rem;">{% if farm_stats.snapshot_count == 0 %}📸{% else %}⏳{% endif %}</div>
         {% if farm_stats.snapshot_count == 0 %}
-        <strong>Noch kein Snapshot vorhanden</strong>
+        <strong>No snapshot yet</strong>
         <p style="color:var(--text-muted);margin:0.4rem 0 0;font-size:0.875rem;">
-          Klicke oben auf <em>🔄 Snapshot holen</em> um die Kartendaten zu laden.<br>
-          Für die Inaktivitätserkennung werden <strong>zwei Snapshots</strong> mit zeitlichem Abstand benötigt.
+          Click <em>🔄 Fetch Snapshot</em> above to load the map data.<br>
+          Inactivity detection requires <strong>two snapshots</strong> taken at different times.
         </p>
         {% else %}
-        <strong>Erster Snapshot vorhanden — warte auf den zweiten</strong>
+        <strong>First snapshot available — waiting for the second</strong>
         <p style="color:var(--text-muted);margin:0.4rem 0 0;font-size:0.875rem;">
-          Das System holt automatisch alle <strong>6 Stunden</strong> einen neuen Snapshot.<br>
-          Oder klicke jetzt auf <em>🔄 Snapshot holen</em> für den zweiten Snapshot.
+          The system automatically fetches a new snapshot every <strong>6 hours</strong>.<br>
+          Or click <em>🔄 Fetch Snapshot</em> now to get the second snapshot.
         </p>
         {% endif %}
       </div>
@@ -422,13 +422,13 @@
           <thead>
             <tr>
               <th style="width:32px;">#</th>
-              <th>Koordinaten</th>
-              <th>Dorf</th>
-              <th>Spieler</th>
-              <th>Stamm</th>
-              <th onclick="sortInactive('population')" style="cursor:pointer;">Bev. ↕</th>
-              <th onclick="sortInactive('days_tracked')" style="cursor:pointer;">Inaktiv ↕</th>
-              {% if has_farmlist %}<th>📋 Listen</th>{% endif %}
+              <th>Coordinates</th>
+              <th>Village</th>
+              <th>Player</th>
+              <th>Tribe</th>
+              <th onclick="sortInactive('population')" style="cursor:pointer;">Pop. ↕</th>
+              <th onclick="sortInactive('days_tracked')" style="cursor:pointer;">Inactive ↕</th>
+              {% if has_farmlist %}<th>📋 Lists</th>{% endif %}
               <th style="white-space:nowrap;">🔭 📋</th>
             </tr>
           </thead>
@@ -452,9 +452,9 @@
                   {% endif %}
                   <button onclick="copyCoord('{{ farm.x }}|{{ farm.y }}', this)"
                           style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:var(--text-muted);padding:0 2px;"
-                          title="Koordinaten kopieren">📋</button>
+                          title="Copy coordinates">📋</button>
                   {% if is_cross %}
-                  <span style="font-size:0.7rem;background:rgba(34,197,94,0.15);color:#22c55e;border-radius:4px;padding:1px 5px;">🎯 Meine Farm</span>
+                  <span style="font-size:0.7rem;background:rgba(34,197,94,0.15);color:#22c55e;border-radius:4px;padding:1px 5px;">🎯 My Farm</span>
                   {% endif %}
                   {% if farm_list %}
                   {% if is_on_list %}
@@ -466,14 +466,14 @@
                 </div>
               </td>
               <td>{{ farm.village_name or '—' }}</td>
-              <td>{{ farm.player_name or '<span style="color:var(--text-muted);">Barbarendorf</span>' | safe }}</td>
+              <td>{{ farm.player_name or '<span style="color:var(--text-muted);">Barbarian village</span>' | safe }}</td>
               <td style="font-size:0.85rem;">
-                {% if farm.tribe == 1 %}🏛️ Römer
-                {% elif farm.tribe == 2 %}⚔️ Teutonen
-                {% elif farm.tribe == 3 %}🌿 Gallier
-                {% elif farm.tribe == 4 %}👾 Nataren
-                {% elif farm.tribe == 5 %}🏹 Hunnen
-                {% elif farm.tribe == 6 %}🏺 Ägypter
+                {% if farm.tribe == 1 %}🏛️ Romans
+                {% elif farm.tribe == 2 %}⚔️ Teutons
+                {% elif farm.tribe == 3 %}🌿 Gauls
+                {% elif farm.tribe == 4 %}👾 Natars
+                {% elif farm.tribe == 5 %}🏹 Huns
+                {% elif farm.tribe == 6 %}🏺 Egyptians
                 {% else %}—{% endif %}
               </td>
               <td><strong>{{ farm.population }}</strong></td>
@@ -500,7 +500,7 @@
                 {# + internal TravOps farmlist #}
                 <button onclick="addToMyFarms({{ farm.x }}, {{ farm.y }}, '{{ farm.village_name | e }}', '{{ farm.player_name | e }}', {{ farm.population or 0 }})"
                         style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:0.75rem;padding:2px 6px;color:var(--text-muted);"
-                        title="Zu TravOps-Farmliste hinzufügen">＋</button>
+                        title="Add to TravOps farmlist">＋</button>
                 {% if guild.tw_world %}
                 {# 🔭 Scout: switch to scout village via newdid= then open rally point #}
                 {% set sv_id = scout_village.travian_village_id if scout_village and scout_village.travian_village_id else '' %}
@@ -510,7 +510,7 @@
                 <a href="{{ guild.tw_world.rstrip('/') }}/build.php?gid=16&tt=2&x={{ farm.x }}&y={{ farm.y }}&t4=1"
                 {% endif %}
                    target="_blank" rel="noopener"
-                   title="{% if scout_village %}Scout von {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}) senden{% else %}Scout senden — kein Scout-Dorf gesetzt{% endif %}"
+                   title="{% if scout_village %}Send scout from {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}Send scout — no scout village set{% endif %}"
                    style="display:inline-flex;align-items:center;
                           background:{% if scout_village %}rgba(99,102,241,.15){% else %}rgba(255,255,255,.05){% endif %};
                           border:1px solid {% if scout_village %}rgba(99,102,241,.5){% else %}var(--border){% endif %};
@@ -522,14 +522,14 @@
                   <button onclick="toggleFlDropdown(this)"
                           style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:5px;
                                  font-size:0.75rem;padding:2px 6px;color:#22c55e;cursor:pointer;"
-                          title="Zur Travian-Farmliste hinzufügen">📋</button>
+                          title="Add to Travian farmlist">📋</button>
                   <div class="fl-dropdown" style="display:none;position:absolute;right:0;top:110%;z-index:200;
                                                   background:var(--bg-card);border:1px solid var(--border);
                                                   border-radius:8px;padding:.4rem;min-width:220px;
                                                   box-shadow:0 4px 20px rgba(0,0,0,.4);">
                     <div style="font-size:.72rem;color:var(--text-muted);padding:.2rem .4rem .4rem;border-bottom:1px solid var(--border);margin-bottom:.3rem;">
-                      📍 Ziel: <strong>{{ farm.village_name or farm.x~'|'~farm.y }}</strong><br>
-                      <span style="font-size:.68rem;">Von welchem Dorf zur Farmliste hinzufügen?</span>
+                      📍 Target: <strong>{{ farm.village_name or farm.x~'|'~farm.y }}</strong><br>
+                      <span style="font-size:.68rem;">Add to farmlist from which village?</span>
                     </div>
                     {% if own_village_ids %}
                     {% for ov in own_village_ids %}
@@ -559,10 +559,10 @@
                     <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ farm.x }}&y={{ farm.y }}"
                        target="_blank" rel="noopener"
                        style="display:block;padding:.3rem .5rem;font-size:.78rem;color:#22c55e;text-decoration:none;">
-                      🗺️ Auf Karte öffnen
+                      🗺️ Open on map
                     </a>
                     <div style="font-size:.68rem;color:var(--text-muted);padding:.2rem .5rem;">
-                      Dörfer in My Account importieren für direkten Farmlist-Link
+                      Import villages in My Account for direct farmlist link
                     </div>
                     {% endif %}
                   </div>
@@ -578,14 +578,14 @@
 
       <!-- Population Histogram -->
       <div style="padding:1rem 1rem 0.5rem;border-top:1px solid var(--border);">
-        <div style="font-size:0.8rem;color:var(--text-muted);font-weight:600;margin-bottom:0.5rem;">Bevölkerungs-Verteilung</div>
+        <div style="font-size:0.8rem;color:var(--text-muted);font-weight:600;margin-bottom:0.5rem;">Population distribution</div>
         <canvas id="chartPop" height="60"></canvas>
       </div>
 
       {% else %}
       <div style="padding:2.5rem;text-align:center;color:var(--text-muted);">
-        Keine inaktiven Farmen mit diesen Filtern gefunden
-        <div style="font-size:0.82rem;margin-top:0.4rem;">(mind. {{ min_days }} Tage · Bev. {{ min_pop }}–{{ max_pop }})</div>
+        No inactive farms found with these filters
+        <div style="font-size:0.82rem;margin-top:0.4rem;">(min. {{ min_days }} days · Pop. {{ min_pop }}–{{ max_pop }})</div>
       </div>
       {% endif %}
     </div>
@@ -600,21 +600,21 @@
     <div class="card" style="margin-bottom:1rem;border-color:rgba(34,197,94,0.4);padding:0;">
       <div style="padding:0.85rem 1rem;border-bottom:1px solid rgba(34,197,94,0.2);display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <span style="font-weight:700;color:#22c55e;">🎯 {{ cross_reference | length }} deiner Farmen sind aktuell inaktiv!</span>
-          <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">ideale Farmziele</span>
+          <span style="font-weight:700;color:#22c55e;">🎯 {{ cross_reference | length }} of your farms are currently inactive!</span>
+          <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">ideal farm targets</span>
         </div>
-        <button onclick="copyMyInactiveCoords()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">📋 Koordinaten kopieren</button>
+        <button onclick="copyMyInactiveCoords()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">📋 Copy coordinates</button>
       </div>
       <div style="overflow-x:auto;">
         <table class="table" style="margin:0;">
           <thead>
             <tr>
-              <th>Koordinaten</th>
-              <th>Dorf</th>
-              <th>Spieler</th>
-              <th>Bevölkerung</th>
-              <th>Inaktiv seit</th>
-              <th>Meine Notizen</th>
+              <th>Coordinates</th>
+              <th>Village</th>
+              <th>Player</th>
+              <th>Population</th>
+              <th>Inactive since</th>
+              <th>My notes</th>
             </tr>
           </thead>
           <tbody>
@@ -630,7 +630,7 @@
                   <span style="font-family:monospace;font-weight:600;color:#22c55e;">{{ ref.x }}|{{ ref.y }}</span>
                   {% endif %}
                   <button onclick="copyCoord('{{ ref.x }}|{{ ref.y }}', this)"
-                          style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:var(--text-muted);padding:0;" title="Kopieren">📋</button>
+                          style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:var(--text-muted);padding:0;" title="Copy">📋</button>
                 </div>
               </td>
               <td>{{ ref.village_name or '—' }}</td>
@@ -650,11 +650,11 @@
     <div class="card" style="padding:0;">
       <div style="padding:0.85rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <span style="font-weight:600;">📋 Meine Farmliste</span>
-          <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">{{ farm_stats.farm_list_count }} Einträge</span>
+          <span style="font-weight:600;">📋 My Farmlist</span>
+          <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">{{ farm_stats.farm_list_count }} entries</span>
         </div>
         <button onclick="document.getElementById('addFarmModal').style.display='flex'" class="btn btn-primary" style="font-size:0.82rem;padding:0.35rem 0.9rem;">
-          ＋ Farm hinzufügen
+          ＋ Add farm
         </button>
       </div>
 
@@ -663,13 +663,13 @@
         <table class="table" style="margin:0;">
           <thead>
             <tr>
-              <th>Koordinaten</th>
-              <th>Dorf</th>
-              <th>Spieler</th>
-              <th>Bev.</th>
+              <th>Coordinates</th>
+              <th>Village</th>
+              <th>Player</th>
+              <th>Pop.</th>
               <th>Status</th>
-              <th>Notizen</th>
-              <th>Hinzugefügt</th>
+              <th>Notes</th>
+              <th>Added</th>
               <th></th>
             </tr>
           </thead>
@@ -697,9 +697,9 @@
               <td>{{ entry.population if entry.population is not none else '—' }}</td>
               <td>
                 {% if is_inactive %}
-                <span style="background:rgba(34,197,94,0.15);color:#22c55e;border-radius:5px;padding:2px 8px;font-size:0.78rem;font-weight:600;">🎯 Inaktiv</span>
+                <span style="background:rgba(34,197,94,0.15);color:#22c55e;border-radius:5px;padding:2px 8px;font-size:0.78rem;font-weight:600;">🎯 Inactive</span>
                 {% else %}
-                <span style="background:rgba(147,197,253,0.12);color:#93c5fd;border-radius:5px;padding:2px 8px;font-size:0.78rem;">⚡ Aktiv</span>
+                <span style="background:rgba(147,197,253,0.12);color:#93c5fd;border-radius:5px;padding:2px 8px;font-size:0.78rem;">⚡ Active</span>
                 {% endif %}
               </td>
               <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:0.85rem;">
@@ -708,7 +708,7 @@
               <td style="font-size:0.78rem;color:var(--text-muted);">{{ entry.added_at[:10] }}</td>
               <td>
                 <form method="post" action="/guild/{{ guild.guild_id }}/farming/farmlist/delete/{{ entry.id }}"
-                      onsubmit="return confirm('Eintrag löschen?')" style="margin:0;">
+                      onsubmit="return confirm('Delete entry?')" style="margin:0;">
                   <button type="submit" class="btn btn-danger"
                           style="padding:0.2rem 0.5rem;font-size:0.75rem;">🗑</button>
                 </form>
@@ -721,9 +721,9 @@
       {% else %}
       <div style="padding:2.5rem;text-align:center;color:var(--text-muted);">
         <div style="font-size:2rem;margin-bottom:0.5rem;">📋</div>
-        <strong>Noch keine Farmen gespeichert</strong>
+        <strong>No farms saved yet</strong>
         <p style="font-size:0.875rem;margin:0.4rem 0 0;">
-          Klicke auf <em>＋ Farm hinzufügen</em> oder nutze das <strong>＋</strong>-Symbol in der Inaktiven-Liste.
+          Click <em>＋ Add farm</em> or use the <strong>＋</strong> icon in the inactive farms list.
         </p>
       </div>
       {% endif %}
@@ -735,7 +735,7 @@
   <div id="tab-growth" class="fi-panel" {% if tab != 'growth' %}style="display:none;"{% endif %}>
     <div class="card" style="padding:0;">
       <div style="padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
-        <span style="font-weight:600;">📈 Spieler-Wachstum</span>
+        <span style="font-weight:600;">📈 Player Growth</span>
         {% if growth_data %}
         <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">
           {{ growth_data[0].first_snap }} → {{ growth_data[0].last_snap }} UTC
@@ -746,25 +746,25 @@
       {% if farm_stats.snapshot_count < 2 %}
       <div style="padding:2.5rem;text-align:center;color:var(--text-muted);">
         <div style="font-size:2rem;margin-bottom:0.5rem;">📸</div>
-        Mindestens <strong>2 Snapshots</strong> nötig — klicke auf <em>🔄 Snapshot holen</em> und warte ein paar Stunden.
+        At least <strong>2 snapshots</strong> required — click <em>🔄 Fetch Snapshot</em> and wait a few hours.
       </div>
       {% elif not growth_data %}
-      <div style="padding:2.5rem;text-align:center;color:var(--text-muted);">Keine Wachstumsdaten verfügbar.</div>
+      <div style="padding:2.5rem;text-align:center;color:var(--text-muted);">No growth data available.</div>
       {% else %}
 
       <!-- Summary Cards -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--border);">
         <div style="padding:1rem;text-align:center;border-right:1px solid var(--border);">
           <div style="font-size:1.5rem;font-weight:800;color:#22c55e;">+{{ growth_data | selectattr('delta','gt',0) | sum(attribute='delta') | int | abs }}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">Bevölkerung gewachsen</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">Population grown</div>
         </div>
         <div style="padding:1rem;text-align:center;border-right:1px solid var(--border);">
           <div style="font-size:1.5rem;font-weight:800;color:#ef4444;">{{ growth_data | selectattr('delta','lt',0) | sum(attribute='delta') | int }}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">Bevölkerung geschrumpft</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">Population shrunk</div>
         </div>
         <div style="padding:1rem;text-align:center;">
           <div style="font-size:1.5rem;font-weight:800;">{{ growth_data | length }}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">Spieler beobachtet</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">Players tracked</div>
         </div>
       </div>
 
@@ -778,10 +778,10 @@
         <table class="table" style="margin:0;">
           <thead>
             <tr>
-              <th>Spieler</th>
-              <th style="text-align:right;">Dörfer</th>
-              <th style="text-align:right;">Pop. vorher</th>
-              <th style="text-align:right;">Pop. jetzt</th>
+              <th>Player</th>
+              <th style="text-align:right;">Villages</th>
+              <th style="text-align:right;">Pop. before</th>
+              <th style="text-align:right;">Pop. now</th>
               <th style="text-align:right;">Δ</th>
             </tr>
           </thead>
@@ -811,7 +811,7 @@
   <div id="tab-search" class="fi-panel" {% if tab != 'search' %}style="display:none;"{% endif %}>
     <div class="card" style="padding:0;">
       <div style="padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
-        <span style="font-weight:600;">🔍 Spieler &amp; Dörfer suchen</span>
+        <span style="font-weight:600;">🔍 Search players &amp; villages</span>
         {% if snap_count_for_search > 0 %}
         <span style="font-size:0.78rem;color:var(--text-muted);margin-left:0.5rem;">{{ snap_count_for_search }} Snapshot(s)</span>
         {% endif %}
@@ -819,18 +819,18 @@
       <div style="padding:1rem;">
         {% if snap_count_for_search == 0 %}
         <div style="padding:0.75rem;background:rgba(241,196,15,0.08);border:1px solid rgba(241,196,15,0.3);border-radius:8px;margin-bottom:0.75rem;font-size:0.875rem;">
-          ⚠️ Noch kein Snapshot vorhanden. Die erste Suche lädt automatisch die Kartendaten — das kann <strong>10–30 Sekunden</strong> dauern.
+          ⚠️ No snapshot yet. The first search automatically loads the map data — this may take <strong>10–30 seconds</strong>.
         </div>
         {% endif %}
         <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="searchForm" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;">
           <input type="hidden" name="tab" value="search" />
           <input type="hidden" name="min_days" value="{{ min_days }}" />
           <div class="form-group" style="margin:0;flex:1;min-width:220px;">
-            <label for="q" style="font-size:0.8rem;">Spieler-, Dorf- oder Allianzname</label>
-            <input type="text" id="q" name="q" value="{{ q | e }}" placeholder="z.B. Caesar, Roma, -RO-" style="width:100%;" />
+            <label for="q" style="font-size:0.8rem;">Player, village or alliance name</label>
+            <input type="text" id="q" name="q" value="{{ q | e }}" placeholder="e.g. Caesar, Roma, -RO-" style="width:100%;" />
           </div>
-          <button type="submit" class="btn btn-primary">Suchen</button>
-          {% if q %}<a href="/guild/{{ guild.guild_id }}/farming?tab=search" class="btn">✕ Löschen</a>{% endif %}
+          <button type="submit" class="btn btn-primary">Search</button>
+          {% if q %}<a href="/guild/{{ guild.guild_id }}/farming?tab=search" class="btn">✕ Clear</a>{% endif %}
         </form>
 
         {% if search_error %}
@@ -840,18 +840,18 @@
         {% if q %}
           {% if search_results %}
           <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.5rem;">
-            <strong style="color:var(--text);">{{ search_results | length }}</strong> Treffer für „{{ q | e }}"
+            <strong style="color:var(--text);">{{ search_results | length }}</strong> results for "{{ q | e }}"
           </p>
           <div style="overflow-x:auto;">
             <table class="table" style="margin:0;">
               <thead>
                 <tr>
-                  <th>Koordinaten</th>
-                  <th>Dorf</th>
-                  <th>Spieler</th>
-                  <th>Allianz</th>
-                  <th>Stamm</th>
-                  <th style="text-align:right;">Bevölkerung</th>
+                  <th>Coordinates</th>
+                  <th>Village</th>
+                  <th>Player</th>
+                  <th>Alliance</th>
+                  <th>Tribe</th>
+                  <th style="text-align:right;">Population</th>
                   <th></th>
                 </tr>
               </thead>
@@ -872,19 +872,19 @@
                     </div>
                   </td>
                   <td>{{ r.village_name or '—' }}</td>
-                  <td>{{ r.player_name or '(Barbarendorf)' }}</td>
+                  <td>{{ r.player_name or '(Barbarian village)' }}</td>
                   <td>{{ r.alliance_name or '—' }}</td>
                   <td style="font-size:0.85rem;">
-                    {% if r.tribe == 1 %}🏛️ Römer{% elif r.tribe == 2 %}⚔️ Teutonen
-                    {% elif r.tribe == 3 %}🌿 Gallier{% elif r.tribe == 4 %}👾 Nataren
-                    {% elif r.tribe == 5 %}🏹 Hunnen{% elif r.tribe == 6 %}🏺 Ägypter
+                    {% if r.tribe == 1 %}🏛️ Romans{% elif r.tribe == 2 %}⚔️ Teutons
+                    {% elif r.tribe == 3 %}🌿 Gauls{% elif r.tribe == 4 %}👾 Natars
+                    {% elif r.tribe == 5 %}🏹 Huns{% elif r.tribe == 6 %}🏺 Egyptians
                     {% else %}—{% endif %}
                   </td>
                   <td style="text-align:right;"><strong>{{ r.population }}</strong></td>
                   <td>
                     <button onclick="addToMyFarms({{ r.x }}, {{ r.y }}, '{{ r.village_name | e }}', '{{ r.player_name | e }}', {{ r.population or 0 }})"
                             style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:0.75rem;padding:2px 6px;color:var(--text-muted);"
-                            title="Zu meinen Farmen hinzufügen">＋</button>
+                            title="Add to my farms">＋</button>
                   </td>
                 </tr>
                 {% endfor %}
@@ -892,14 +892,14 @@
             </table>
           </div>
           {% else %}
-          <p style="color:var(--text-muted);text-align:center;padding:1.5rem 0;">Keine Treffer für „{{ q | e }}".</p>
+          <p style="color:var(--text-muted);text-align:center;padding:1.5rem 0;">No results for "{{ q | e }}".</p>
           {% endif %}
         {% endif %}
 
         <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
           <a href="/guild/{{ guild.guild_id }}/farming/inactive-search"
              style="font-size:0.82rem;color:#93c5fd;text-decoration:none;">
-            🔬 Erweiterte Inaktiv-Suche (Radius, Allianz-Filter, Distanz …) →
+            🔬 Advanced inactive search (radius, alliance filter, distance …) →
           </a>
         </div>
       </div>
@@ -917,7 +917,7 @@
     <button onclick="document.getElementById('addFarmModal').style.display='none'"
             style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;
                    font-size:1.2rem;cursor:pointer;color:var(--text-muted);">✕</button>
-    <h2 style="margin:0 0 1rem;font-size:1rem;">＋ Farm zur Liste hinzufügen</h2>
+    <h2 style="margin:0 0 1rem;font-size:1rem;">＋ Add farm to list</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/farming/farmlist/add" id="addFarmForm">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
         <div class="form-group" style="margin:0;">
@@ -930,26 +930,26 @@
         </div>
       </div>
       <div class="form-group" style="margin-bottom:0.75rem;">
-        <label style="font-size:0.82rem;">Dorfname</label>
+        <label style="font-size:0.82rem;">Village name</label>
         <input type="text" name="village_name" id="addVillage" placeholder="Optional" />
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
         <div class="form-group" style="margin:0;">
-          <label style="font-size:0.82rem;">Spieler</label>
+          <label style="font-size:0.82rem;">Player</label>
           <input type="text" name="player_name" id="addPlayer" placeholder="Optional" />
         </div>
         <div class="form-group" style="margin:0;">
-          <label style="font-size:0.82rem;">Bevölkerung</label>
+          <label style="font-size:0.82rem;">Population</label>
           <input type="number" name="population" id="addPop" placeholder="Optional" min="0" />
         </div>
       </div>
       <div class="form-group" style="margin-bottom:1rem;">
-        <label style="font-size:0.82rem;">Notizen</label>
-        <input type="text" name="notes" placeholder="z.B. Nahe am Spawn, Römer" />
+        <label style="font-size:0.82rem;">Notes</label>
+        <input type="text" name="notes" placeholder="e.g. Near spawn, Romans" />
       </div>
       <div style="display:flex;gap:0.5rem;">
-        <button type="submit" class="btn btn-primary" style="flex:1;">Hinzufügen</button>
-        <button type="button" onclick="document.getElementById('addFarmModal').style.display='none'" class="btn">Abbrechen</button>
+        <button type="submit" class="btn btn-primary" style="flex:1;">Add</button>
+        <button type="button" onclick="document.getElementById('addFarmModal').style.display='none'" class="btn">Cancel</button>
       </div>
     </form>
   </div>
@@ -995,7 +995,7 @@
 </style>
 
 <!-- ══ Copy feedback toast ══ -->
-<div id="copyFeedback">✅ Kopiert!</div>
+<div id="copyFeedback">✅ Copied!</div>
 
 <!-- ══ SCRIPTS ════════════════════════════════════════════════════════════ -->
 <script>
@@ -1065,7 +1065,7 @@ function copyCoord(coord, btn) {
     const orig = btn.textContent;
     btn.textContent = '✓';
     btn.style.color = '#22c55e';
-    showToast('Koordinaten kopiert: ' + coord);
+    showToast('Coordinates copied: ' + coord);
     setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
   });
 }
@@ -1088,7 +1088,7 @@ function copyMyInactiveCoords() {
 // CSV Export
 function exportCSV() {
   const rows = document.querySelectorAll('#inactiveBody tr');
-  const lines = ['Koordinaten,Dorf,Spieler,Stamm,Bevölkerung,Inaktiv (Tage)'];
+  const lines = ['Coordinates,Village,Player,Tribe,Population,Inactive (days)'];
   rows.forEach(row => {
     const cells = row.querySelectorAll('td');
     if (!cells.length) return;
@@ -1162,7 +1162,7 @@ function toggleOnlyMissing() {
   if (btn) {
     btn.style.background = _onlyMissing ? 'rgba(251,146,60,0.3)' : 'rgba(251,146,60,0.1)';
     btn.style.fontWeight  = _onlyMissing ? '700' : '';
-    btn.textContent = _onlyMissing ? '✕ Alle zeigen' : '➕ Nur fehlende';
+    btn.textContent = _onlyMissing ? '✕ Show all' : '➕ Only missing';
   }
 }
 
@@ -1174,9 +1174,9 @@ function toggleOnlyMissing() {
   let missing = 0;
   rows.forEach(r => { if (r.dataset.onList === 'false') missing++; });
   if (missing > 0) {
-    badge.textContent = missing + ' fehlen auf Farmliste';
+    badge.textContent = missing + ' missing from farmlist';
   } else if (rows.length > 0) {
-    badge.textContent = 'Alle auf Farmliste ✓';
+    badge.textContent = 'All on farmlist ✓';
     badge.style.color = '#22c55e';
     badge.style.background = 'rgba(34,197,94,0.12)';
     badge.style.borderColor = 'rgba(34,197,94,0.3)';
@@ -1194,7 +1194,7 @@ function toggleOnlyMissing() {
     const ageBadge = document.getElementById('snapAge');
     if (kpi) {
       if (rem <= 0) {
-        kpi.textContent = 'Läuft gleich…';
+        kpi.textContent = 'Running soon…';
         kpi.style.color = '#22c55e';
       } else {
         const h = Math.floor(rem / 3600000);
@@ -1207,7 +1207,7 @@ function toggleOnlyMissing() {
       const ageMs = Date.now() - lastSnap;
       const ah = Math.floor(ageMs / 3600000);
       const am = Math.floor((ageMs % 3600000) / 60000);
-      ageBadge.textContent = ah > 0 ? `· vor ${ah}h` : `· vor ${am}m`;
+      ageBadge.textContent = ah > 0 ? `· ${ah}h ago` : `· ${am}m ago`;
     }
   }
   update();
@@ -1232,7 +1232,7 @@ function toggleOnlyMissing() {
   if (!ctx) return;
   new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ label:'Dörfer', data:counts,
+    data: { labels, datasets: [{ label:'Villages', data:counts,
       backgroundColor:'rgba(245,158,11,0.5)', borderColor:'rgba(245,158,11,1)', borderWidth:1, borderRadius:3 }] },
     options: { responsive:true, plugins:{legend:{display:false}},
       scales:{ x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#888',font:{size:10}}},
