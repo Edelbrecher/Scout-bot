@@ -331,6 +331,7 @@
 
     <!-- RIGHT: Create form (poll_manage only) -->
     <div>
+      {% if can_manage %}
       <div class="create-card">
         <h2>✨ New Poll</h2>
         <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" id="pollForm">
