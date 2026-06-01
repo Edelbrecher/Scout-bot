@@ -254,6 +254,10 @@ document.addEventListener('click', e => {
 
     var gid  = m[1];
     var path = location.pathname;
+
+    // Only show sidebar on feature sub-pages, not on the guild overview/dashboard
+    var subPath = m[2] || '';
+    if (!subPath || subPath === '/') return;
     var sidebar = document.getElementById('guild-sidebar');
     var body    = document.body;
     if (!sidebar) return;
