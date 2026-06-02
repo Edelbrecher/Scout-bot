@@ -878,17 +878,20 @@ function _waveGroupKey(w) {
 function renderWavesTable(t) {
   if (!t.waves?.length) return `<div style="color:var(--text-muted);font-size:.82rem;padding:.25rem 0;">No waves — click "+ Wave" to add one.</div>`;
 
-  // Group consecutive identical waves
-  const groups = [];
+  // Group all identical waves (by key) regardless of position
+  const groupMap = new Map();
+  const groupOrder = [];
   for (const w of t.waves) {
     const key = _waveGroupKey(w);
-    const last = groups[groups.length - 1];
-    if (last && last.key === key && !w.confirm_status && !last.waves[0].confirm_status) {
-      last.waves.push(w);
+    if (!w.confirm_status && groupMap.has(key) && !groupMap.get(key).waves[0].confirm_status) {
+      groupMap.get(key).waves.push(w);
     } else {
-      groups.push({ key, waves: [w] });
+      const g = { key, waves: [w] };
+      groupMap.set(w.confirm_status ? Symbol() : key, g); // confirmed waves never merge
+      groupOrder.push(g);
     }
   }
+  const groups = groupOrder;
 
   const rows = groups.map(g => {
     const w = g.waves[0]; // representative wave
