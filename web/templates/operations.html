@@ -2429,7 +2429,8 @@ function openOpMap() {
   if (!activePlan) { alert('Please select an operation plan first.'); return; }
   const overlay = document.getElementById('opMapOverlay');
   overlay.style.display = 'flex';
-  renderOpMap();
+  // small delay so the modal has layout before we measure canvas dimensions
+  setTimeout(() => renderOpMap(), 30);
 }
 function closeOpMap() {
   document.getElementById('opMapOverlay').style.display = 'none';
@@ -2536,14 +2537,14 @@ function _drawArrow(ctx, x1,y1, x2,y2, color, alpha, lw) {
 }
 
 function _drawOpMapContent(canvas, ctx) {
-  const targets = (activePlan.targets || []);
+  // Always draw background first so canvas is never empty
+  ctx.fillStyle='#1a2e12'; ctx.fillRect(0,0,canvas.width,canvas.height);
   const s = canvas._omState;
+  if (!s) return; // not yet initialised
+  const targets = (activePlan && activePlan.targets) ? activePlan.targets : [];
   const rangeX=(s.maxX-s.minX)||1, rangeY=(s.maxY-s.minY)||1;
   const baseScale=Math.min(canvas.width/rangeX, canvas.height/rangeY);
   const sc=baseScale*s.scale;
-
-  // ── Background: terrain colour ────────────────────────────────────────────
-  ctx.fillStyle='#1a2e12'; ctx.fillRect(0,0,canvas.width,canvas.height);
 
   // ── Background villages from map_snapshots ────────────────────────────────
   const bgV = s.bgVillages || [];
