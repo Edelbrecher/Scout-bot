@@ -6811,10 +6811,41 @@ async def get_all_op_waves(plan_id: int) -> list[dict]:
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def backfill_op_wave_discord_ids():
+    """One-time backfill: set attacker_discord_id on waves where it's missing but name matches member_troops."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Get all member_troops travian_name → discord_id mappings
+        async with db.execute(
+            "SELECT guild_id, travian_name, discord_id FROM member_troops WHERE travian_name != '' AND discord_id != ''"
+        ) as cur:
+            rows = await cur.fetchall()
+        updated = 0
+        for guild_id, travian_name, discord_id in rows:
+            cur2 = await db.execute(
+                """UPDATE op_waves SET attacker_discord_id=?
+                   WHERE guild_id=? AND attacker_name=?
+                     AND (attacker_discord_id IS NULL OR attacker_discord_id='')""",
+                (discord_id, guild_id, travian_name)
+            )
+            updated += cur2.rowcount
+        if updated:
+            await db.commit()
+            print(f"[backfill] set attacker_discord_id on {updated} op_waves", flush=True)
+
+
 async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
     """Return all waves assigned to a user across all active/draft plans, with plan + target info."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        # Resolve travian name for fallback match
+        travian_name = ""
+        async with db.execute(
+            "SELECT travian_name FROM member_troops WHERE guild_id=? AND discord_id=?",
+            (guild_id, discord_id)
+        ) as cur2:
+            row2 = await cur2.fetchone()
+            if row2 and row2[0]:
+                travian_name = row2[0]
         async with db.execute("""
             SELECT w.id, w.plan_id, w.target_id, w.attacker_name, w.origin_village,
                    w.origin_x, w.origin_y, w.wave_type, w.tribe, w.troop_json,
@@ -6827,10 +6858,10 @@ async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
             JOIN op_plans p  ON p.id = w.plan_id
             JOIN op_targets t ON t.id = w.target_id
             WHERE w.guild_id = ?
-              AND w.attacker_discord_id = ?
+              AND (w.attacker_discord_id = ? OR (? != '' AND w.attacker_name = ?))
               AND p.status IN ('draft','active')
             ORDER BY p.landing_time ASC, w.send_time ASC
-        """, (guild_id, discord_id)) as cur:
+        """, (guild_id, discord_id, travian_name, travian_name)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
     for r in rows:
         try:

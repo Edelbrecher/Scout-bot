@@ -647,6 +647,8 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
+    # Backfill missing attacker_discord_id in op_waves using member_troops lookup
+    await database.backfill_op_wave_discord_ids()
 
     async def _snapshot_loop():
         import datetime as _datetime
@@ -6914,18 +6916,30 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
 
         # Only notify members who have waves assigned in this plan
         waves = await database.get_all_op_waves(plan_id)
+        # Build travian_name → discord_id lookup for fallback
+        name_to_discord: dict[str, str] = {}
+        async with __import__('aiosqlite').connect(database.DB_PATH) as _db:
+            async with _db.execute(
+                "SELECT travian_name, discord_id FROM member_troops WHERE guild_id=? AND travian_name != ''",
+                (guild_id,)
+            ) as _cur:
+                for _row in await _cur.fetchall():
+                    if _row[0] and _row[1]:
+                        name_to_discord[_row[0]] = _row[1]
         member_wave_times: dict[str, str] = {}
         for w in (waves or []):
             disc_id = str(w.get("attacker_discord_id") or "").strip()
+            # Fallback: resolve by travian name if discord_id missing
+            if not disc_id:
+                aname = str(w.get("attacker_name") or "").strip()
+                disc_id = name_to_discord.get(aname, "")
             if not disc_id:
                 continue
             st = str(w.get("send_time") or "").strip()
-            # Track earliest send_time; keep member even if send_time is empty
             if disc_id not in member_wave_times:
                 member_wave_times[disc_id] = st
             elif st and (not member_wave_times[disc_id] or st < member_wave_times[disc_id]):
                 member_wave_times[disc_id] = st
-        # member_ids = only attackers with at least one wave
         member_ids = list(member_wave_times.keys())
 
         ally_group = await database.get_ally_group_for_guild(guild_id)
