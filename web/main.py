@@ -7116,6 +7116,22 @@ async def op_save_default_ts(request: Request, guild_id: str):
     return _JSONResponse({"ok": True, "ts": ts})
 
 
+@app.get("/guild/{guild_id}/operations/{plan_id}/map-popup", response_class=HTMLResponse)
+async def op_map_popup(request: Request, guild_id: str, plan_id: int):
+    """Standalone map window — no nav, just the canvas + auto-refresh."""
+    session, err = _require_session(request)
+    if err: return err
+    guild, err = await _require_guild(request, guild_id)
+    if err: return err
+    plan = await database.get_op_plan_with_targets(plan_id, guild_id)
+    if not plan:
+        return HTMLResponse("Plan not found", status_code=404)
+    return templates.TemplateResponse("op_map_popup.html", {
+        "request": request, "guild": guild,
+        "guild_id": guild_id, "plan_id": plan_id, "plan": plan,
+    })
+
+
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/recalc-times")
 async def op_recalc_times(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)

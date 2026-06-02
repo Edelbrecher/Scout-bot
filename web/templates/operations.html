@@ -2847,6 +2847,7 @@ function _drawOpMapContent(canvas, ctx) {
     <div id="opMapTitleBar" style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;cursor:move;user-select:none;">
       <span style="font-weight:700;font-size:.95rem;">🗺️ Operation Map</span>
       <div style="display:flex;gap:.5rem;align-items:center;">
+        <button onclick="opMapPopout()" title="Open in separate window" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:.75rem;cursor:pointer;padding:2px 7px;border-radius:4px;">⧉ Pop out</button>
         <button onclick="opMapMaximize()" title="Maximize" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:.75rem;cursor:pointer;padding:2px 7px;border-radius:4px;">⛶</button>
         <button onclick="closeOpMap()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;line-height:1;">✕</button>
       </div>
@@ -2925,6 +2926,12 @@ function _drawOpMapContent(canvas, ctx) {
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeOpMap(); });
 })();
 
+function opMapPopout(){
+  if(!activePlan) return;
+  const url=`/guild/${GUILD_ID}/operations/${activePlan.id}/map-popup`;
+  window.open(url,'op-map-popup','width=1200,height=800,resizable=yes,scrollbars=no');
+  closeOpMap();
+}
 function opMapMaximize(){
   const m=document.getElementById('opMapModal');
   m.style.left='1vw'; m.style.top='1vh';
