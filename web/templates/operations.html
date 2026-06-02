@@ -68,6 +68,8 @@
 
 /* ── Wave table ─────────────────────────────────────────────── */
 .wave-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.wave-subrow td { background: rgba(99,102,241,.04); }
+.wave-subrow:hover td { background: rgba(99,102,241,.08) !important; }
 .wave-table th { color:var(--text-muted); font-weight:600; padding:.3rem .6rem; text-align:left;
   border-bottom:1px solid var(--border); white-space:nowrap; }
 .wave-table td { padding:.35rem .6rem; border-bottom:1px solid rgba(255,255,255,.04);
@@ -895,32 +897,46 @@ function renderWavesTable(t) {
   const groups = groupOrder;
 
   const rows = groups.map(g => {
-    const w = g.waves[0]; // representative wave
+    const w = g.waves[0];
     const count = g.waves.length;
     const ids = g.waves.map(x=>x.id);
+    const groupId = `wg-${t.id}-${w.id}`;
+
+    function waveActionBtns(wv, isSubrow=false) {
+      const tsInfo = wv.tournament_square > 0 ? ` 🏆${wv.tournament_square}` : '';
+      return `
+        <button class="wave-action-btn" title="Quick +1" onclick="duplicateWave(${wv.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
+        ${count > 1 || isSubrow ? `<button class="wave-action-btn" title="−1 diese Welle löschen" onclick="deleteWave(${wv.id},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
+        <button class="wave-action-btn" title="Bearbeiten" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
+        <button class="wave-action-btn danger" title="Welle löschen" onclick="deleteWave(${wv.id},${t.id})">🗑</button>
+        <button class="wave-action-btn" title="Rallypoint" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>`;
+    }
+
     const troops = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
       .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('');
-    const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;" title="Turnierplatz Level ${w.tournament_square}">🏆${w.tournament_square}</span>` : '';
-    // Confirm status (only shown when count=1, grouped waves have none by design)
-    const csMap = {on_time:['✅','#4ade80','Sent on time'], late:['⏱','#fbbf24',`Late (${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s)`], not_sent:['❌','#f87171','Not sent'], cant_send:['🚫','#f87171','Cannot send']};
+    const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;">🏆${w.tournament_square}</span>` : '';
+    const csMap = {on_time:['✅','#4ade80','On time'], late:['⏱','#fbbf24',`Late`], not_sent:['❌','#f87171','Not sent'], cant_send:['🚫','#f87171','Cannot send']};
     const cs = csMap[w.confirm_status];
     const confirmIndicator = cs ? `<span title="${cs[2]}" style="font-size:.85rem;margin-left:.2rem;">${cs[0]}</span>` : '';
     const rowBg = cs ? (w.confirm_status==='on_time'?'rgba(74,222,128,.04)':w.confirm_status==='late'?'rgba(251,191,36,.06)':'rgba(248,113,113,.06)') : '';
-    // Count badge
-    const countBadge = count > 1
-      ? `<span title="${count} identische Waves" style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;min-width:18px;height:18px;padding:0 4px;margin-left:.3rem;">×${count}</span>`
-      : '';
-    // Low-troop fake warning (< 20 troops total)
     const totalTroops = Object.values(w.troop_json||{}).reduce((s,v)=>s+(parseInt(v)||0), 0);
     const lowTroopBadge = (w.wave_type==='fake' && totalTroops > 0 && totalTroops < 20)
-      ? `<span title="Only ${totalTroops} troops — fake might be too few (< 20)" style="color:#f87171;font-size:.85rem;margin-left:.2rem;" >🔻</span>`
+      ? `<span title="Nur ${totalTroops} Truppen" style="color:#f87171;font-size:.85rem;margin-left:.2rem;">🔻</span>` : '';
+
+    // Expand toggle (only for grouped waves)
+    const expandBtn = count > 1
+      ? `<button class="wave-action-btn" title="Wellen einzeln aufklappen" onclick="toggleWaveGroup('${groupId}')"
+           id="btn-${groupId}" style="font-weight:700;color:#a78bfa;border-color:rgba(167,139,250,.4);min-width:28px;">▸</button>`
       : '';
-    // Action buttons — for grouped waves: dup+edit on representative, delete deletes all in group
-    const deleteHandler = count > 1
-      ? `if(confirm('Delete ${count} identical waves?')) { ${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')} }`
-      : `deleteWave(${w.id},${t.id})`;
-    return `
-    <tr style="background:${rowBg}">
+
+    // Count badge
+    const countBadge = count > 1
+      ? `<span style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;min-width:18px;height:18px;padding:0 4px;margin-left:.3rem;cursor:pointer;" onclick="toggleWaveGroup('${groupId}')">×${count}</span>`
+      : '';
+
+    // Summary row
+    let html = `
+    <tr style="background:${rowBg}" id="summary-${groupId}">
       <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeeLabel(w.wave_type)}</span>${countBadge}${lowTroopBadge}</td>
       <td>
         <strong>${escHtml(w.attacker_name)}</strong>${confirmIndicator}
@@ -934,14 +950,47 @@ function renderWavesTable(t) {
       </td>
       <td style="font-size:.75rem;color:var(--text-muted);max-width:110px;word-break:break-word;">${w.notes ? escHtml(w.notes) : ''}</td>
       <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
-        <button class="wave-action-btn" title="Quick +1: identische Welle hinzufügen" onclick="duplicateWave(${w.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
-        ${count > 1 ? `<button class="wave-action-btn" title="−1 Welle entfernen" onclick="deleteWave(${ids[ids.length-1]},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
-        <button class="wave-action-btn" title="Duplizieren &amp; bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
-        <button class="wave-action-btn" title="Welle bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
-        <button class="wave-action-btn danger" title="${count>1?count+' waves delete':'Delete wave'}" onclick="${deleteHandler}">🗑${count>1?` ×${count}`:''}</button>
-        <button class="wave-action-btn" title="Direkt zum Rallypoint — Ziel: ${t.x}|${t.y}${TW_WORLD?'':' (Travian-Server nicht konfiguriert)'}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);font-size:.85rem;">🏹</button>
+        ${expandBtn}
+        <button class="wave-action-btn" title="+1" onclick="duplicateWave(${w.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
+        ${count > 1 ? `<button class="wave-action-btn" title="−1" onclick="deleteWave(${ids[ids.length-1]},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
+        <button class="wave-action-btn" title="Bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
+        <button class="wave-action-btn danger" title="${count>1?`Alle ${count} löschen`:'Löschen'}" onclick="${count>1?`if(confirm('${count} Wellen löschen?')){${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')}}`:`deleteWave(${w.id},${t.id})`}">🗑${count>1?` ×${count}`:''}</button>
+        <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
       </td>
     </tr>`;
+
+    // Sub-rows (individual waves, collapsed by default)
+    if (count > 1) {
+      html += g.waves.map((wv, idx) => {
+        const wvTroops = Object.entries(wv.troop_json||{}).filter(([,v])=>v>0)
+          .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,wv.tribe)} ×${cnt}</span>`).join('');
+        const wvCs = csMap[wv.confirm_status];
+        const wvCsInd = wvCs ? `<span style="font-size:.85rem;margin-left:.2rem;">${wvCs[0]}</span>` : '';
+        const wvBg = wv.confirm_status==='on_time'?'rgba(74,222,128,.04)':wv.confirm_status==='late'?'rgba(251,191,36,.06)':wv.confirm_status?'rgba(248,113,113,.06)':'';
+        return `<tr class="wave-subrow" data-group="${groupId}" style="display:none;background:${wvBg};border-left:3px solid #6366f1;">
+          <td style="padding-left:1.2rem;">
+            <span style="font-size:.7rem;color:#a78bfa;font-weight:700;">Welle ${idx+1}</span>
+          </td>
+          <td>
+            <strong>${escHtml(wv.attacker_name)}</strong>${wvCsInd}
+            <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(wv.origin_village||'')} ${wv.origin_x!=null?'('+wv.origin_x+'|'+wv.origin_y+')':''}</span>
+          </td>
+          <td><span class="tribe-pill">${tribeName(wv.tribe)}</span></td>
+          <td>${wvTroops || '<span style="color:var(--text-muted)">—</span>'}</td>
+          <td>
+            <div class="send-time">${wv.send_time ? fmtDatetime(wv.send_time) : '—'}</div>
+            <div class="travel-time">${wv.travel_seconds ? '🕐 '+fmtTravel(wv.travel_seconds) : ''}</div>
+          </td>
+          <td style="font-size:.75rem;color:var(--text-muted);max-width:110px;word-break:break-word;">${wv.notes ? escHtml(wv.notes) : ''}</td>
+          <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
+            <button class="wave-action-btn" title="Bearbeiten" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
+            <button class="wave-action-btn danger" title="Löschen" onclick="deleteWave(${wv.id},${t.id},true)">🗑</button>
+            <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+    return html;
   }).join('');
   return `
   <table class="wave-table">
@@ -1887,6 +1936,16 @@ function findWaveById(waveId) {
     if (w) return { ...w, target_id: t.id };
   }
   return null;
+}
+
+function toggleWaveGroup(groupId) {
+  const subrows = document.querySelectorAll(`tr[data-group="${groupId}"]`);
+  const btn = document.getElementById(`btn-${groupId}`);
+  const summary = document.getElementById(`summary-${groupId}`);
+  const expanded = subrows[0]?.style.display !== 'none';
+  subrows.forEach(r => r.style.display = expanded ? 'none' : '');
+  if (btn) btn.textContent = expanded ? '▸' : '▾';
+  if (summary) summary.style.opacity = expanded ? '1' : '.5';
 }
 
 async function duplicateWave(waveId) {
