@@ -245,7 +245,12 @@ function toggleTimeline(){
 }
 
 // ── Fit / export ──────────────────────────────────────────────────────────
-function fitMap(){if(omState){omState.camOX=0;omState.camOY=0;omState.scale=1;draw();}}
+function fitMap(){
+  if(!omState)return;
+  resizeCanvas(); // ensure canvas dimensions are correct
+  omState.camOX=0;omState.camOY=0;omState.scale=1;
+  draw();
+}
 function exportPng(){
   const c=document.getElementById('mapCanvas');
   const a=document.createElement('a');a.download=`op-map-${PLAN_ID}.png`;a.href=c.toDataURL();a.click();
