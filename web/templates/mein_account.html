@@ -2,7 +2,7 @@
 {% block title %}Mein Account · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1100px;">
+<div class="container" style="max-width:100%;padding:0 1.5rem 3rem;">
 
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
@@ -81,7 +81,7 @@
   </div>
   {% endif %}
 
-  <div style="display:grid;grid-template-columns:minmax(300px,1fr) minmax(280px,380px);gap:1rem;margin-bottom:1.25rem;">
+  <div class="ma-import-grid" style="display:grid;grid-template-columns:minmax(300px,2fr) minmax(280px,1fr);gap:1rem;margin-bottom:1.25rem;">
 
     <!-- Upload -->
     <div class="card">
@@ -245,7 +245,7 @@
   </div>
 
   <!-- Dual accounts + My operations side by side -->
-  <div id="dualMissionsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
+  <div id="dualMissionsGrid" style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(400px,2fr);gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
   <div class="card" style="margin-bottom:0;height:100%;box-sizing:border-box;">
     <h2 style="margin:0 0 0.75rem;" data-i18n="account.dual.title">🔗 Dual Accounts</h2>
 
@@ -826,8 +826,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeArmyModal();});
 .wt-fake{background:rgba(107,114,128,.2);color:#9ca3af;}
 .wt-def{background:rgba(59,130,246,.2);color:#93c5fd;}
 .wt-scout{background:rgba(168,85,247,.2);color:#c084fc;}
-@media(max-width:680px){
+@media(max-width:800px){
   #dualMissionsGrid{grid-template-columns:1fr!important;}
+}
+@media(max-width:700px){
+  .ma-import-grid{grid-template-columns:1fr!important;}
 }
 </style>
 
