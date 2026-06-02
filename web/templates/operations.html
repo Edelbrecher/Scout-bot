@@ -1805,18 +1805,29 @@ function onAttackerSelect(resetCoords = true) {
   }
   const roleIcon = {off:'⚔', def:'🛡', scout:'🔍'};
   const roleLabel = {off:'OFF', def:'DEF', scout:'Scout'};
+  let bestIdx = -1, bestScore = -1;
   (a.villages || []).forEach((v, i) => {
     const role = classifyVillage(v, a.tribe);
+    const hasTroops = v.troops && Object.values(v.troops).some(c => c > 0);
     const vName = v.name || v.village_name || 'Village '+(i+1);
-    const label = `${roleIcon[role]} [${roleLabel[role]}] ${vName} (${v.x}|${v.y})`;
+    const troopHint = hasTroops ? ' ✓' : '';
+    const label = `${roleIcon[role]} [${roleLabel[role]}] ${vName} (${v.x}|${v.y})${troopHint}`;
     const opt = new Option(label, i);
     opt.dataset.x = v.x;
     opt.dataset.y = v.y;
     vs.add(opt);
+    // Auto-select best village: prefer OFF with troops
+    const score = (hasTroops?10:0) + (role==='off'?4:role==='def'?2:1);
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
   });
   if (resetCoords) {
     document.getElementById('wmOX').value = '';
     document.getElementById('wmOY').value = '';
+    // Auto-select best village and fill troops
+    if (bestIdx >= 0 && a.villages?.length) {
+      vs.value = bestIdx;
+      onVillageSelect();
+    }
   }
 }
 
@@ -1831,14 +1842,21 @@ function onVillageSelect() {
   document.getElementById('wmOY').value = v.y ?? '';
   const tribe = a.tribe || document.getElementById('wmTribe').value;
   updateTroopGrid();
-  // troops may be nested in v.troops or directly on v
-  const troopSrc = v.troops || v;
+  // Fill troops from village data (troops keyed by name or id)
+  const troopSrc = v.troops && typeof v.troops === 'object' ? v.troops : {};
+  const allTroops = Object.values(TROOPS_DEF).flat();
   Object.entries(troopSrc).forEach(([tname, cnt]) => {
-    if (typeof cnt !== 'number' || cnt <= 0) return;
-    const troop = TROOPS_DEF[tribe]?.find(t => t.id === tname || t.name === tname);
+    const n = parseInt(cnt);
+    if (!n || n <= 0) return;
+    // Match by id, name, or partial name (case-insensitive)
+    const troop = allTroops.find(t =>
+      t.id === tname || t.name === tname ||
+      t.name.toLowerCase() === tname.toLowerCase() ||
+      t.id.toLowerCase() === tname.toLowerCase()
+    );
     if (troop) {
       const el = document.getElementById('troop-' + troop.id);
-      if (el) el.value = cnt;
+      if (el) { el.value = n; el.style.background = 'rgba(74,222,128,.08)'; }
     }
   });
   recalcWaveTime();

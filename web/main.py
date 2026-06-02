@@ -7469,7 +7469,7 @@ async def op_attacker_list(request: Request, guild_id: str):
             """SELECT ov.discord_id,
                       COALESCE(mt.travian_name, '') AS travian_name,
                       COALESCE(mt.discord_name, '') AS discord_name,
-                      ov.village_name, ov.x, ov.y, ov.population
+                      ov.village_name, ov.x, ov.y, ov.population, ov.troops_json
                FROM guild_own_villages ov
                LEFT JOIN member_troops mt
                       ON mt.guild_id = ov.guild_id AND mt.discord_id = ov.discord_id
@@ -7479,14 +7479,20 @@ async def op_attacker_list(request: Request, guild_id: str):
         ) as cur:
             own_rows = await cur.fetchall()
         # Build dict: travian_name (or discord_id) → list of village dicts
+        import json as _jov
         own_villages_by_player: dict = {}
         for r in own_rows:
             key = r["travian_name"] or r["discord_id"]
             if key and key not in own_villages_by_player:
                 own_villages_by_player[key] = []
             if key:
+                try:
+                    troops = _jov.loads(r["troops_json"] or "{}")
+                except Exception:
+                    troops = {}
                 own_villages_by_player[key].append({
-                    "name": r["village_name"] or "", "x": r["x"], "y": r["y"], "pop": r["population"] or 0
+                    "name": r["village_name"] or "", "x": r["x"], "y": r["y"],
+                    "pop": r["population"] or 0, "troops": troops
                 })
 
         # Also include approved ally_members with a travian_name as additional name source
