@@ -73,6 +73,21 @@
 .mop-btn:hover { filter: brightness(1.2); }
 .mop-cs-done   { font-size: .82rem; }
 
+/* ── Icon buttons (sidebar-style) ───────────────────────────── */
+.mop-icon-btn { display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);cursor:pointer;transition:background .15s,border-color .15s; }
+.mop-icon-btn:hover { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.2); }
+.mop-icon-btn-ok   { color:#4ade80; border-color:rgba(74,222,128,.35); background:rgba(74,222,128,.08); }
+.mop-icon-btn-ok:hover { background:rgba(74,222,128,.18); }
+.mop-icon-btn-late { color:#fbbf24; border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.08); }
+.mop-icon-btn-late:hover { background:rgba(251,191,36,.18); }
+.mop-icon-btn-no   { color:#f87171; border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.08); }
+.mop-icon-btn-no:hover { background:rgba(248,113,113,.18); }
+.mop-icon-btn-cant { color:#f87171; border-color:rgba(248,113,113,.25); background:rgba(248,113,113,.05); }
+.mop-icon-btn-cant:hover { background:rgba(248,113,113,.15); }
+.mop-icon-btn-send { color:#60a5fa; border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.08); }
+.mop-icon-btn-send:hover { background:rgba(96,165,250,.18); }
+.mop-icon-btn-expand { color:#a78bfa; border-color:rgba(167,139,250,.35); background:rgba(167,139,250,.06); }
+
 /* ── Notes ───────────────────────────────────────────────────── */
 .mop-note { font-size: .78rem; color: #fbbf24; font-style: italic; max-width: 180px; }
 
@@ -288,7 +303,7 @@ function updateNextWaveBanner() {
         ${next.target_player ? ` · ${escHtml(next.target_player)}` : ''}</div>
       <div style="font-size:.78rem;color:#fbbf24;font-family:monospace;margin-top:.15rem;">📤 ${fmtSendTime(next.send_time)}</div>
     </div>
-    ${TW_WORLD ? `<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally" style="font-size:.85rem;padding:.4rem .9rem;">⚔️ Send troops</a>` : ''}
+    ${TW_WORLD ? `<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Send troops" style="width:34px;height:34px;">${ICO.rally}</a>` : ''}
   `;
 }
 
@@ -339,24 +354,44 @@ function cardClass(w, secsLeft) {
   return '';
 }
 
+// ── SVG icons (matching sidebar style) ───────────────────────────
+const ICO = {
+  check: `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,10 8,14 16,6"/></svg>`,
+  clock: `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><polyline points="10,5 10,10 14,12"/></svg>`,
+  x:     `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>`,
+  ban:   `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><line x1="4.5" y1="4.5" x2="15.5" y2="15.5"/></svg>`,
+  send:  `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>`,
+  chev:  `<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 10,13 14,9"/></svg>`,
+  chevUp:`<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,13 10,9 14,13"/></svg>`,
+  rally: `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2l12 8-12 8V2z"/></svg>`,
+};
+
+function iconBtn(ico, cls, title, onclick, extraStyle='') {
+  return `<button class="mop-icon-btn ${cls}" title="${title}" onclick="${onclick}" style="${extraStyle}">${ico}</button>`;
+}
+
 function confirmBtns(w) {
   const id = w.id;
   const wd = JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y});
   if (w.confirm_status) {
     const delta = w.confirm_status === 'late' && w.confirm_delta_seconds
-      ? ` (${w.confirm_delta_seconds > 0 ? '+' : ''}${w.confirm_delta_seconds}s)` : '';
-    return `<span class="mop-cs-done" style="color:${CS_COLOR[w.confirm_status]||'#aaa'};">${CS_ICON[w.confirm_status]||'?'} ${CS_LABEL[w.confirm_status]||w.confirm_status}${delta}</span>`;
+      ? ` (+${Math.abs(w.confirm_delta_seconds)}s)` : '';
+    const color = CS_COLOR[w.confirm_status]||'#aaa';
+    const ico = {on_time:ICO.check, late:ICO.clock, not_sent:ICO.x, cant_send:ICO.ban}[w.confirm_status]||'';
+    return `<span title="${CS_LABEL[w.confirm_status]||w.confirm_status}${delta}" style="display:inline-flex;align-items:center;gap:3px;color:${color};font-size:.75rem;font-weight:700;">
+      <span style="color:${color};">${ico}</span>${CS_LABEL[w.confirm_status]||''}${delta}
+    </span>`;
   }
   const cd = cdStr(w.send_time);
   const isPast = cd.secsLeft !== null && cd.secsLeft < 0;
   if (isPast) {
-    return `<div style="display:flex;gap:.3rem;flex-wrap:wrap;">
-      <button class="mop-btn mop-btn-ok"   onclick="doConfirm(${id},'on_time',0,${wd})">✅ On time</button>
-      <button class="mop-btn mop-btn-late" onclick="openDelta(${id},${wd})">⏱ Late</button>
-      <button class="mop-btn mop-btn-no"   onclick="doConfirm(${id},'not_sent',0,${wd})">❌ Not sent</button>
+    return `<div style="display:flex;gap:.25rem;align-items:center;">
+      ${iconBtn(ICO.check, 'mop-icon-btn-ok',   'Sent on time',  `doConfirm(${id},'on_time',0,${wd})`)}
+      ${iconBtn(ICO.clock, 'mop-icon-btn-late', 'Sent late',     `openDelta(${id},${wd})`)}
+      ${iconBtn(ICO.x,     'mop-icon-btn-no',   'Not sent',      `doConfirm(${id},'not_sent',0,${wd})`)}
     </div>`;
   }
-  return `<button class="mop-btn mop-btn-cant" onclick="doConfirm(${id},'cant_send',0,${wd})">🚫 Can't send</button>`;
+  return iconBtn(ICO.ban, 'mop-icon-btn-cant', "Can't send", `doConfirm(${id},'cant_send',0,${wd})`);
 }
 
 // ── Troop chips ───────────────────────────────────────────────────
@@ -450,9 +485,14 @@ function render() {
           <td style="color:var(--text-muted);font-size:.8rem;">${fmtTravel(w.travel_seconds)}</td>
           <td>${w.notes ? `<span class="mop-note" title="${escHtml(w.notes)}">${escHtml(w.notes)}</span>` : ''}</td>
           <td style="min-width:150px;">${confirmBtns(w)}</td>
-          <td style="white-space:nowrap;">
-            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>`:''}
-            ${cnt>1?`<button onclick="this.closest('table').querySelectorAll('[data-subgroup=\\'mop-${w.id}\\']').forEach(r=>{r.style.display=r.style.display==='none'?'':'none';this.textContent=r.style.display===''?'▾':'▸';})" style="background:none;border:1px solid rgba(167,139,250,.4);color:#a78bfa;border-radius:5px;padding:1px 6px;cursor:pointer;font-size:.75rem;margin-left:.3rem;">▸</button>`:''}
+          <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;">
+            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Open rally point">${ICO.rally}</a>`:''}
+            ${cnt>1?`<button id="expand-${w.id}" class="mop-icon-btn mop-icon-btn-expand" title="Expand individual waves" onclick="
+              const rows=this.closest('table').querySelectorAll('[data-subgroup=\\'mop-${w.id}\\']');
+              const open=rows[0]?.style.display!=='none';
+              rows.forEach(r=>r.style.display=open?'none':'');
+              this.innerHTML=open?ICO.chev:ICO.chevUp;
+            ">${ICO.chev}</button>`:''}
           </td>
         </tr>
         ${cnt>1?grp.map((wv,idx)=>`<tr data-subgroup="mop-${w.id}" style="display:none;border-left:3px solid #6366f1;">
@@ -466,7 +506,7 @@ function render() {
           <td style="color:var(--text-muted);font-size:.75rem;">${fmtTravel(wv.travel_seconds)}</td>
           <td style="font-size:.75rem;color:#fbbf24;">${wv.notes?escHtml(wv.notes):''}</td>
           <td>${confirmBtns(wv)}</td>
-          <td>${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally" style="font-size:.72rem;">⚔</a>`:''}</td>
+          <td>${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Rally point">${ICO.rally}</a>`:''}</td>
         </tr>`).join(''):''}`;
       }).join('');
 
@@ -514,7 +554,7 @@ function render() {
           ${w.notes?`<div style="font-size:.78rem;color:#fbbf24;font-style:italic;margin-bottom:.4rem;">📝 ${escHtml(w.notes)}</div>`:''}
           <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
             ${confirmBtns(w)}
-            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>`:''}
+            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Rally point">${ICO.rally}</a>`:''}
           </div>
         </div>`;
       }).join('');
