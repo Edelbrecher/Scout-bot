@@ -7522,18 +7522,21 @@ async def op_map_villages(
     rows = []
     async with _aio.connect(database.DB_PATH) as db:
         db.row_factory = _aio.Row
+        # Use the single latest import batch (max fetched_at for this guild)
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            latest = row[0] if row else None
+        if not latest:
+            return _JSONResponse({"villages": []})
         async with db.execute("""
             SELECT x, y, village_name, player_name, alliance_name, tribe,
                    population, is_capital
             FROM map_snapshots
-            WHERE guild_id=? AND x>=? AND x<=? AND y>=? AND y<=?
-              AND fetched_at = (
-                SELECT MAX(m2.fetched_at) FROM map_snapshots m2
-                WHERE m2.guild_id=map_snapshots.guild_id
-                  AND m2.x=map_snapshots.x AND m2.y=map_snapshots.y
-              )
+            WHERE guild_id=? AND fetched_at=? AND x>=? AND x<=? AND y>=? AND y<=?
             LIMIT 4000
-        """, (guild_id, x1, x2, y1, y2)) as cur:
+        """, (guild_id, latest, x1, x2, y1, y2)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
     return _JSONResponse({"villages": rows})
 
