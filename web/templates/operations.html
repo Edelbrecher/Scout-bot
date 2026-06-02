@@ -2525,38 +2525,63 @@ function _drawArrow(ctx, x1,y1, x2,y2, color, alpha, lw, label) {
   const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
   if(len<4) return;
   const ux=dx/len, uy=dy/len;
+  const angle=Math.atan2(dy,dx);
   const endX=x2-ux*8, endY=y2-uy*8;
   const startX=x1+ux*8, startY=y1+uy*8;
+
   ctx.save();
   ctx.globalAlpha=alpha;
   ctx.strokeStyle=color; ctx.lineWidth=lw;
   ctx.setLineDash([6,4]);
   ctx.beginPath(); ctx.moveTo(startX,startY); ctx.lineTo(endX,endY); ctx.stroke();
   ctx.setLineDash([]);
-  // arrowhead
+
+  // ── Terminal arrowhead ─────────────────────────────────────────────────
   const headLen=Math.max(8,lw*3);
-  const angle=Math.atan2(dy,dx);
   ctx.fillStyle=color;
   ctx.beginPath();
   ctx.moveTo(endX,endY);
   ctx.lineTo(endX-headLen*Math.cos(angle-0.4), endY-headLen*Math.sin(angle-0.4));
   ctx.lineTo(endX-headLen*Math.cos(angle+0.4), endY-headLen*Math.sin(angle+0.4));
   ctx.closePath(); ctx.fill();
-  // travel time label at midpoint
-  if (label && len > 40) {
+
+  // ── Mini tick-arrows along the line (every ~60px) ─────────────────────
+  const tickSpacing=60, tickSize=5;
+  const numTicks=Math.floor((len-40)/tickSpacing);
+  for(let i=1;i<=numTicks;i++){
+    const frac=(i*tickSpacing+20)/len;
+    const tx=startX+dx*frac, ty=startY+dy*frac;
+    ctx.beginPath();
+    ctx.moveTo(tx,ty);
+    ctx.lineTo(tx-tickSize*Math.cos(angle-0.5), ty-tickSize*Math.sin(angle-0.5));
+    ctx.lineTo(tx-tickSize*Math.cos(angle+0.5), ty-tickSize*Math.sin(angle+0.5));
+    ctx.closePath();
+    ctx.fillStyle=color; ctx.fill();
+  }
+
+  // ── Travel time label — rotated along the line ────────────────────────
+  if (label && len > 50) {
     const mx=(startX+endX)/2, my=(startY+endY)/2;
     ctx.globalAlpha=1;
     ctx.font='bold 10px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    // small pill background
+
+    // Keep text readable: flip if going right-to-left
+    let rot=angle;
+    if(rot > Math.PI/2 || rot < -Math.PI/2) rot+=Math.PI;
+
+    ctx.translate(mx, my);
+    ctx.rotate(rot);
+
     const tw=ctx.measureText(label).width+8;
-    ctx.fillStyle='rgba(0,0,0,0.65)';
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(mx-tw/2, my-7, tw, 14, 4) : ctx.rect(mx-tw/2, my-7, tw, 14);
+    ctx.fillStyle='rgba(0,0,0,0.72)';
+    if(ctx.roundRect) ctx.roundRect(-tw/2,-7,tw,14,3);
+    else ctx.rect(-tw/2,-7,tw,14);
     ctx.fill();
     ctx.fillStyle=color;
-    ctx.fillText(label, mx, my);
+    ctx.fillText(label,0,0);
   }
+
   ctx.restore();
 }
 
