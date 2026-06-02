@@ -25,6 +25,17 @@
 .mop-table tr.mop-row-past   { opacity: .55; }
 .mop-table tr.mop-row-confirmed { background: rgba(74,222,128,.04); }
 
+/* ── Next-wave banner ────────────────────────────────────────── */
+.mop-next-banner { border-radius: 12px; padding: .85rem 1.2rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.mop-next-banner.urgent { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.4); }
+.mop-next-banner.soon   { background: rgba(251,191,36,.10); border: 1px solid rgba(251,191,36,.35); }
+.mop-next-banner.ok     { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.25); }
+.mop-next-banner.none   { background: rgba(255,255,255,.03); border: 1px solid var(--border); }
+.mop-next-cd { font-family: monospace; font-size: 2rem; font-weight: 900; line-height: 1; }
+.mop-next-cd.urgent { color: #f87171; }
+.mop-next-cd.soon   { color: #fbbf24; }
+.mop-next-cd.ok     { color: #4ade80; }
+
 /* ── Wave type badges ────────────────────────────────────────── */
 .wt { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
 .wt-real   { background: rgba(239,68,68,.18);   color: #f87171; border: 1px solid rgba(239,68,68,.3); }
@@ -123,6 +134,9 @@
     </label>
   </div>
 
+  <!-- Next wave banner -->
+  <div id="nextWaveBanner" style="display:none;"></div>
+
   {% if not waves %}
   <div class="mop-empty">
     <div class="mop-empty-icon">📭</div>
@@ -187,7 +201,7 @@ function cdStr(sendTime) {
   if (!sendTime) return {text:'—', cls:'mop-cd-past', secsLeft: null};
   const dt = new Date(sendTime.replace(' ','T'));
   const diff = Math.floor((dt - Date.now()) / 1000);
-  if (diff < 0) return {text:'Elapsed', cls:'mop-cd-past', secsLeft: diff};
+  if (diff < 0) return {text:'⏱ Elapsed', cls:'mop-cd-past', secsLeft: diff};
   const h = Math.floor(diff / 3600);
   const m = Math.floor((diff % 3600) / 60);
   const s = diff % 60;
@@ -196,6 +210,53 @@ function cdStr(sendTime) {
                      : `${s}s`;
   const cls = diff < 60 ? 'mop-cd-urgent' : diff < 300 ? 'mop-cd-soon' : 'mop-cd-ok';
   return {text, cls, secsLeft: diff};
+}
+
+// ── Next-wave banner ──────────────────────────────────────────────
+function updateNextWaveBanner() {
+  const banner = document.getElementById('nextWaveBanner');
+  if (!banner) return;
+
+  // Find the next unconfirmed wave with a future send_time
+  let next = null;
+  for (const w of WAVES_DATA) {
+    if (w.confirm_status || !w.send_time) continue;
+    const cd = cdStr(w.send_time);
+    if (cd.secsLeft === null || cd.secsLeft < 0) continue;
+    if (!next || cd.secsLeft < cdStr(next.send_time).secsLeft) next = w;
+  }
+
+  if (!next) {
+    // No upcoming — check if all elapsed
+    const anyFuture = WAVES_DATA.some(w => !w.confirm_status && w.send_time && cdStr(w.send_time).secsLeft > 0);
+    if (!anyFuture) {
+      banner.style.display = 'none';
+      return;
+    }
+  }
+
+  if (!next) { banner.style.display = 'none'; return; }
+
+  const cd = cdStr(next.send_time);
+  const urgencyClass = cd.secsLeft < 60 ? 'urgent' : cd.secsLeft < 300 ? 'soon' : 'ok';
+  const typeIcon = {real:'⚔️', fake:'👻', def:'🛡️', scout:'🔍', chief:'👑'}[next.wave_type] || '⚔️';
+  const target = `${next.target_x}|${next.target_y}`;
+
+  banner.style.display = 'flex';
+  banner.className = `mop-next-banner ${urgencyClass}`;
+  banner.innerHTML = `
+    <div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.2rem;">⏰ Next wave — send in</div>
+      <div class="mop-next-cd ${urgencyClass}" id="nextCdDisplay" data-send="${next.send_time}">${cd.text}</div>
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:.82rem;font-weight:700;">${typeIcon} ${TYPE_LABELS[next.wave_type]||next.wave_type}</div>
+      <div style="font-size:.78rem;color:var(--text-muted);">Target: <span style="color:#f0abfc;font-family:monospace;">${target}</span>
+        ${next.target_player ? ` · ${escHtml(next.target_player)}` : ''}</div>
+      <div style="font-size:.78rem;color:#fbbf24;font-family:monospace;margin-top:.15rem;">📤 ${fmtSendTime(next.send_time)}</div>
+    </div>
+    ${TW_WORLD ? `<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally" style="font-size:.85rem;padding:.4rem .9rem;">⚔️ Send troops</a>` : ''}
+  `;
 }
 
 function fmtSendTime(st) {
@@ -295,7 +356,17 @@ function render() {
           <div style="font-size:.72rem;color:var(--text-muted);">${w.target_player||''}</div>
         </td>
         <td class="mop-sendtime" style="color:#fbbf24;">${fmtSendTime(w.send_time)}</td>
-        <td><span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}">${cd.text}</span></td>
+        <td>
+          <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
+                style="font-size:${cd.secsLeft!==null&&cd.secsLeft>=0&&cd.secsLeft<3600?'1.05rem':''}">
+            ${cd.text}
+          </span>
+          ${cd.secsLeft!==null&&cd.secsLeft>=0 ? `
+          <div style="margin-top:3px;height:3px;border-radius:2px;background:rgba(255,255,255,.08);width:80px;overflow:hidden;">
+            <div style="height:100%;border-radius:2px;background:${cd.secsLeft<60?'#f87171':cd.secsLeft<300?'#fbbf24':'#4ade80'};
+              width:${Math.min(100,Math.max(2,(1-cd.secsLeft/86400)*100))}%;transition:width 1s linear;"></div>
+          </div>` : ''}
+        </td>
         <td style="color:var(--text-muted);font-size:.8rem;">${fmtTravel(w.travel_seconds)}</td>
         <td>${w.notes ? `<span class="mop-note" title="${w.notes}">${w.notes}</span>` : ''}</td>
         <td style="min-width:160px;">${confirmBtns(w)}</td>
@@ -310,7 +381,10 @@ function render() {
       return `<div class="mop-card ${cc}" data-wave-id="${w.id}">
         <div class="mop-card-row">
           <span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>
-          <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}" style="font-size:.85rem;">${cd.text}</span>
+          <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
+                style="font-size:${cd.secsLeft!==null&&cd.secsLeft>=0&&cd.secsLeft<3600?'1.1rem;font-weight:900':'.85rem'};">
+            ${cd.secsLeft!==null&&cd.secsLeft>=0 ? '⏰ ' : ''}${cd.text}
+          </span>
         </div>
         <div class="mop-card-row" style="margin-bottom:.5rem;">
           <div>
@@ -380,7 +454,27 @@ function tick() {
     const {text, cls} = cdStr(st);
     el.textContent = text;
     el.className = el.className.replace(/mop-cd-\w+/g, '') + ' ' + cls;
+    // Also update row highlight
+    const row = el.closest('tr, .mop-card');
+    if (row && !row.classList.contains('mop-row-confirmed')) {
+      row.classList.remove('mop-row-urgent','mop-row-soon','mop-row-past');
+      const {secsLeft} = cdStr(st);
+      if (secsLeft !== null) {
+        if (secsLeft < 0) row.classList.add('mop-row-past');
+        else if (secsLeft < 60) row.classList.add('mop-row-urgent');
+        else if (secsLeft < 300) row.classList.add('mop-row-soon');
+      }
+    }
   });
+  // Update next-wave banner countdown in-place (fast path)
+  const nextCd = document.getElementById('nextCdDisplay');
+  if (nextCd && nextCd.dataset.send) {
+    const {text, cls} = cdStr(nextCd.dataset.send);
+    nextCd.textContent = text;
+    nextCd.className = `mop-next-cd ${cls}`;
+  } else {
+    updateNextWaveBanner();
+  }
   checkAlarms();
 }
 
@@ -531,6 +625,7 @@ function autoRefresh() {
 
 // ── Init ─────────────────────────────────────────────────────────
 render();
+updateNextWaveBanner();
 setInterval(tick, 1000);
 setInterval(autoRefresh, 60000);
 </script>
