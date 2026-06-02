@@ -2,166 +2,110 @@
 {% block title %}Polls · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
+
+{# ── Poll type config (mirrors main.py POLL_TYPES) ───────────────────────── #}
+{% set POLL_TYPES = {
+  "availability": {"label":"📅 Availability","color":"#58b9e0","opts":[("available","✅ Going","#22c55e"),("maybe","⏰ Maybe","#f59e0b"),("unavailable","❌ Not going","#ef4444")]},
+  "offensive":    {"label":"⚔️ Offensive","color":"#ef4444","opts":[("available","⚔️ Ready to attack","#ef4444"),("maybe","🛡️ Support only","#f59e0b"),("unavailable","❌ Not available","#6b7280")]},
+  "farming":      {"label":"🌾 Farming","color":"#84cc16","opts":[("available","🌾 I'll farm","#84cc16"),("maybe","⏳ Maybe","#f59e0b"),("unavailable","⛔ Skipping","#6b7280")]},
+  "interest":     {"label":"👍 Interest","color":"#a78bfa","opts":[("available","👍 Interested","#22c55e"),("maybe","🤔 Unsure","#f59e0b"),("unavailable","👎 Not interested","#ef4444")]},
+  "donation":     {"label":"💰 Donation","color":"#fbbf24","opts":[("available","💰 Can donate","#22c55e"),("maybe","📦 Partial","#f59e0b"),("unavailable","❌ Can't donate","#ef4444")]},
+  "yesno":        {"label":"✅ Yes / No","color":"#22c55e","opts":[("available","✅ Yes","#22c55e"),("maybe","🤷 Abstain","#6b7280"),("unavailable","❌ No","#ef4444")]},
+} %}
+
 <style>
 /* ── Layout ──────────────────────────────────────────────── */
-.polls-shell {
-  display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 1.5rem;
-  align-items: start;
-}
-@media (max-width: 1000px) { .polls-shell { grid-template-columns: 1fr; } }
+.polls-shell { display:grid; grid-template-columns:1fr 340px; gap:1.5rem; align-items:start; }
+@media(max-width:1000px){ .polls-shell{ grid-template-columns:1fr; } }
 
 /* ── Poll card ───────────────────────────────────────────── */
-.poll-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  transition: border-color .2s;
-}
-.poll-card.private { border-left: 3px solid #6366f1; }
-.poll-card.closed  { opacity: .7; }
+.poll-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:1rem; }
+.poll-card.private { border-left:3px solid #6366f1; }
+.poll-card.closed  { opacity:.72; }
+.poll-header { padding:.85rem 1.1rem .7rem; display:flex; justify-content:space-between; align-items:flex-start; gap:.75rem; }
+.poll-title  { font-size:.95rem; font-weight:700; margin:0 0 .2rem; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+.poll-meta   { font-size:.73rem; color:var(--text-muted); display:flex; gap:.65rem; flex-wrap:wrap; }
 
-.poll-header {
-  padding: .9rem 1.1rem .75rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: .75rem;
-}
-.poll-title {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0 0 .2rem;
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  flex-wrap: wrap;
-}
-.poll-meta { font-size: .75rem; color: var(--text-muted); display: flex; gap: .75rem; flex-wrap: wrap; }
+/* ── Bars ────────────────────────────────────────────────── */
+.poll-bars { padding:0 1.1rem .8rem; }
+.bar-row { display:grid; grid-template-columns:110px 1fr 32px; align-items:center; gap:.5rem; margin-bottom:.4rem; font-size:.78rem; }
+.bar-label { color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-track { background:rgba(255,255,255,.06); border-radius:20px; height:7px; overflow:hidden; }
+.bar-fill  { height:100%; border-radius:20px; transition:width .4s ease; }
+.bar-count { text-align:right; font-weight:700; font-size:.8rem; }
 
-/* ── Progress bars ───────────────────────────────────────── */
-.poll-bars { padding: 0 1.1rem .75rem; }
-.bar-row {
-  display: grid;
-  grid-template-columns: 90px 1fr 36px;
-  align-items: center;
-  gap: .5rem;
-  margin-bottom: .45rem;
-  font-size: .8rem;
-}
-.bar-label { color: var(--text-muted); }
-.bar-track { background: rgba(255,255,255,.06); border-radius: 20px; height: 8px; overflow: hidden; }
-.bar-fill  { height: 100%; border-radius: 20px; transition: width .4s ease; }
-.bar-available   { background: #22c55e; }
-.bar-maybe       { background: #f59e0b; }
-.bar-unavailable { background: #ef4444; }
-.bar-count { text-align: right; font-weight: 700; font-size: .82rem; }
+/* ── Badges ──────────────────────────────────────────────── */
+.pill { display:inline-block; font-size:.62rem; padding:1px 7px; border-radius:20px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+.pill-active { background:rgba(34,197,94,.2); color:#4ade80; }
+.pill-closed { background:rgba(107,114,128,.2); color:#9ca3af; }
+.type-badge  { display:inline-flex; align-items:center; gap:.25rem; font-size:.68rem; padding:2px 7px; border-radius:20px; font-weight:600; background:rgba(255,255,255,.07); color:var(--text-muted); }
+.tb-private  { background:rgba(99,102,241,.15); color:#818cf8; }
+.tb-all      { background:rgba(88,185,224,.12); color:#58b9e4; }
 
-/* ── Target badge ────────────────────────────────────────── */
-.target-badge {
-  display: inline-flex; align-items: center; gap: .3rem;
-  font-size: .7rem; padding: 2px 8px; border-radius: 20px;
-  font-weight: 600;
-}
-.tb-all     { background: rgba(88,185,224,.12); color: #58b9e4; }
-.tb-private { background: rgba(99,102,241,.15); color: #818cf8; }
+/* ── Response detail (Design B) ──────────────────────────── */
+.resp-section { border-top:1px solid var(--border); padding:.6rem 1.1rem; }
+.resp-toggle  { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.78rem; padding:0; display:flex; align-items:center; gap:.3rem; }
+.resp-toggle:hover { color:var(--text); }
+.resp-detail  { display:none; margin-top:.6rem; }
 
-/* ── Response detail ─────────────────────────────────────── */
-.resp-section {
-  border-top: 1px solid var(--border);
-  padding: .65rem 1.1rem;
+.resp-list { display:flex; flex-direction:column; gap:.3rem; }
+.resp-item {
+  display:grid;
+  grid-template-columns:32px 1fr auto auto;
+  align-items:center;
+  gap:.55rem;
+  padding:.35rem .5rem;
+  border-radius:8px;
+  background:rgba(255,255,255,.03);
+  font-size:.82rem;
 }
-.resp-toggle {
-  background: none; border: none; color: var(--text-muted);
-  cursor: pointer; font-size: .78rem; padding: 0;
-  display: flex; align-items: center; gap: .3rem;
+.resp-item:hover { background:rgba(255,255,255,.06); }
+.resp-avatar {
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:.72rem; font-weight:700; flex-shrink:0;
+  color:#fff;
 }
-.resp-toggle:hover { color: var(--text); }
-.resp-detail { display: none; margin-top: .65rem; }
-.resp-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: .75rem;
+.resp-username { font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.resp-badge {
+  display:inline-flex; align-items:center; gap:.25rem;
+  font-size:.68rem; padding:2px 8px; border-radius:20px;
+  font-weight:600; white-space:nowrap; flex-shrink:0;
 }
-.resp-col-header { font-size: .75rem; font-weight: 700; margin-bottom: .35rem; }
-.resp-row {
-  display: flex; align-items: center; gap: .4rem;
-  font-size: .8rem; padding: .25rem 0;
-  border-bottom: 1px solid rgba(255,255,255,.04);
-}
-.resp-row:last-child { border-bottom: none; }
-.resp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.resp-time { font-size: .68rem; color: var(--text-muted); flex-shrink: 0; }
+.resp-ts { font-size:.67rem; color:var(--text-muted); flex-shrink:0; white-space:nowrap; }
+.resp-del-btn { background:none; border:none; cursor:pointer; color:rgba(239,68,68,.5); font-size:.72rem; padding:0 2px; flex-shrink:0; }
+.resp-del-btn:hover { color:#ef4444; }
 
 /* ── Create form ─────────────────────────────────────────── */
-.create-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.25rem;
-  position: sticky;
-  top: 1rem;
-}
-.create-card h2 { margin: 0 0 1rem; font-size: 1rem; }
+.create-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; position:sticky; top:1rem; }
+.create-card h2 { margin:0 0 1rem; font-size:1rem; }
 
-.target-selector {
-  background: var(--bg-main);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 1rem;
+/* ── Poll type picker ────────────────────────────────────── */
+.type-grid { display:grid; grid-template-columns:1fr 1fr; gap:.4rem; margin-bottom:1rem; }
+.type-opt  {
+  padding:.45rem .6rem; border-radius:8px; border:1px solid var(--border);
+  cursor:pointer; font-size:.78rem; font-weight:600; text-align:center;
+  transition:border-color .15s, background .15s;
+  user-select:none;
 }
-.target-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-}
-.target-tab {
-  flex: 1; padding: .45rem .5rem; text-align: center;
-  font-size: .75rem; font-weight: 600; cursor: pointer;
-  color: var(--text-muted); background: none; border: none;
-  transition: background .15s, color .15s;
-}
-.target-tab.active { background: var(--bg-card); color: var(--text); }
-.target-panel { padding: .75rem; display: none; }
-.target-panel.active { display: block; }
+.type-opt.selected { border-color:#6366f1; background:rgba(99,102,241,.15); color:#a5b4fc; }
 
-.role-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
-.role-chip {
-  display: inline-flex; align-items: center; gap: .3rem;
-  padding: 3px 10px; border-radius: 20px; font-size: .75rem;
-  border: 1px solid var(--border); cursor: pointer;
-  transition: border-color .15s, background .15s;
-  user-select: none;
-}
-.role-chip.selected { border-color: #6366f1; background: rgba(99,102,241,.15); color: #a5b4fc; }
-.role-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+/* ── Target selector ─────────────────────────────────────── */
+.target-selector { background:var(--bg-main); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:1rem; }
+.target-tabs { display:flex; border-bottom:1px solid var(--border); }
+.target-tab  { flex:1; padding:.45rem .5rem; text-align:center; font-size:.75rem; font-weight:600; cursor:pointer; color:var(--text-muted); background:none; border:none; transition:background .15s,color .15s; }
+.target-tab.active { background:var(--bg-card); color:var(--text); }
+.target-panel { padding:.75rem; display:none; }
+.target-panel.active { display:block; }
+.role-chips { display:flex; flex-wrap:wrap; gap:.4rem; }
+.role-chip  { display:inline-flex; align-items:center; gap:.3rem; padding:3px 10px; border-radius:20px; font-size:.75rem; border:1px solid var(--border); cursor:pointer; user-select:none; transition:border-color .15s,background .15s; }
+.role-chip.selected { border-color:#6366f1; background:rgba(99,102,241,.15); color:#a5b4fc; }
+.role-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.wing-chips { display:flex; flex-wrap:wrap; gap:.5rem; }
+.wing-chip  { flex:1; min-width:100px; padding:.5rem; border-radius:8px; border:1px solid var(--border); cursor:pointer; text-align:center; font-size:.82rem; user-select:none; transition:border-color .15s,background .15s; }
+.wing-chip.selected { border-color:#6366f1; background:rgba(99,102,241,.15); color:#a5b4fc; }
 
-.wing-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
-.wing-chip {
-  flex: 1; min-width: 100px; padding: .5rem; border-radius: 8px;
-  border: 1px solid var(--border); cursor: pointer; text-align: center;
-  font-size: .82rem; transition: border-color .15s, background .15s;
-  user-select: none;
-}
-.wing-chip.selected { border-color: #6366f1; background: rgba(99,102,241,.15); color: #a5b4fc; }
-
-/* ── Status pill ─────────────────────────────────────────── */
-.pill {
-  display: inline-block; font-size: .65rem; padding: 1px 8px;
-  border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-}
-.pill-active  { background: rgba(34,197,94,.2);  color: #4ade80; }
-.pill-closed  { background: rgba(107,114,128,.2); color: #9ca3af; }
-
-/* ── Empty state ─────────────────────────────────────────── */
-.polls-empty {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 3rem 1.5rem;
-  text-align: center; color: var(--text-muted);
-}
+.polls-empty { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:3rem 1.5rem; text-align:center; color:var(--text-muted); }
 </style>
 
 <div class="container-wide">
@@ -173,163 +117,118 @@
 
   {% if saved %}<div class="alert alert-success" style="margin-bottom:1rem;">✅ Poll created and posted to Discord.</div>{% endif %}
   {% if request.query_params.get('error') == 'no_channel' %}
-  <div class="alert alert-error" style="margin-bottom:1rem;">
-    ❌ No poll channel configured. Click <strong>📊 Poll</strong> in the Hub — the channel will be created automatically.
-  </div>
+  <div class="alert alert-error" style="margin-bottom:1rem;">❌ No poll channel configured. Click <strong>📊 Poll</strong> in the Hub.</div>
   {% endif %}
 
   <div class="polls-shell">
 
     <!-- LEFT: Poll list -->
     <div>
-      {% set active_polls = polls | selectattr('status', 'equalto', 'active') | list %}
-      {% set closed_polls = polls | rejectattr('status', 'equalto', 'active') | list %}
+      {% set active_polls = polls | selectattr('status','equalto','active') | list %}
+      {% set closed_polls = polls | rejectattr('status','equalto','active') | list %}
 
       {% if not polls %}
       <div class="polls-empty">
         <div style="font-size:2.5rem;margin-bottom:.75rem;">📊</div>
-        <div style="font-size:1rem;font-weight:600;margin-bottom:.4rem;color:var(--text);">No polls yet</div>
+        <div style="font-size:1rem;font-weight:600;color:var(--text);margin-bottom:.4rem;">No polls yet</div>
         <div style="font-size:.85rem;">Create your first poll using the form on the right.</div>
       </div>
       {% endif %}
 
-      {% if active_polls %}
-      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">Active ({{ active_polls|length }})</div>
-      {% for poll in active_polls %}{% set is_priv = poll.get('target_type','all') != 'all' %}{% set is_closed = poll.status != 'active' %}{% set total = poll.count_available + poll.count_maybe + poll.count_unavailable %}
-      <div class="poll-card{% if is_priv %} private{% endif %}{% if is_closed %} closed{% endif %}">
+      {% macro render_poll(poll, closeable) %}
+      {% set ptype = poll.get('poll_type','availability') %}
+      {% set pt    = POLL_TYPES.get(ptype, POLL_TYPES['availability']) %}
+      {% set is_priv = poll.get('target_type','all') != 'all' %}
+      {% set total = poll.count_available + poll.count_maybe + poll.count_unavailable %}
+      <div class="poll-card{% if is_priv %} private{% endif %}{% if not closeable %} closed{% endif %}">
+
+        <!-- Header -->
         <div class="poll-header">
           <div style="flex:1;min-width:0;">
             <div class="poll-title">
               {{ poll.title }}
-              <span class="pill pill-active">Live</span>
-              {% if is_priv %}<span class="target-badge tb-private">🔒 Private</span>{% else %}<span class="target-badge tb-all">🌐 Public</span>{% endif %}
+              {% if closeable %}<span class="pill pill-active">Live</span>{% else %}<span class="pill pill-closed">Closed</span>{% endif %}
+              <span class="type-badge" style="border:1px solid {{ pt.color }}22;color:{{ pt.color }};">{{ pt.label }}</span>
+              {% if is_priv %}<span class="tb-private type-badge">🔒 Private</span>{% else %}<span class="tb-all type-badge">🌐 Public</span>{% endif %}
             </div>
             <div class="poll-meta">
               <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}</span>
-              <span>{{ total }} Antworten</span>
+              <span>{{ total }} responses</span>
               <span>Created {{ poll.created_at[:10] }}</span>
             </div>
           </div>
+          {% if can_manage %}
           <div style="display:flex;gap:.4rem;flex-shrink:0;">
+            {% if closeable %}
             <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/close" style="margin:0;">
-              <button class="btn-action btn-action-warn" title="Schließen">🔒</button>
+              <button class="btn-action btn-action-warn" title="Close">🔒</button>
             </form>
-            <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/delete" onsubmit="return confirm('Umfrage löschen?')" style="margin:0;">
-              <button class="btn-action btn-action-err" title="Löschen">🗑</button>
+            {% endif %}
+            <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/delete" onsubmit="return confirm('Delete poll?')" style="margin:0;">
+              <button class="btn-action btn-action-err" title="Delete">🗑</button>
             </form>
           </div>
+          {% endif %}
         </div>
+
+        <!-- Progress bars -->
         <div class="poll-bars">
-          {% for label, cls, count in [('✅ Going','bar-available',poll.count_available),('⏰ Maybe','bar-maybe',poll.count_maybe),('❌ Not going','bar-unavailable',poll.count_unavailable)] %}
+          {% for key, lbl, color in pt.opts %}
+          {% set cnt = poll['count_' ~ key] %}
           <div class="bar-row">
-            <span class="bar-label">{{ label }}</span>
-            <div class="bar-track"><div class="bar-fill {{ cls }}" style="width:{% if total > 0 %}{{ (count/total*100)|round|int }}{% else %}0{% endif %}%;"></div></div>
-            <span class="bar-count">{{ count }}</span>
+            <span class="bar-label">{{ lbl }}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:{% if total > 0 %}{{ (cnt/total*100)|round|int }}{% else %}0{% endif %}%;background:{{ color }};"></div></div>
+            <span class="bar-count">{{ cnt }}</span>
           </div>
           {% endfor %}
         </div>
+
+        <!-- Response detail — Design B -->
         {% if poll.responses and can_view %}
         <div class="resp-section">
           <button class="resp-toggle" onclick="var d=this.parentElement.querySelector('.resp-detail');d.style.display=d.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=d.style.display==='block'?'▾':'▸';">
             <span class="arr">▸</span> Responses ({{ poll.responses|length }})
           </button>
           <div class="resp-detail">
-            <div class="resp-grid">
-              {% set avail = poll.responses | selectattr('response','equalto','available') | list %}
-              {% set maybe = poll.responses | selectattr('response','equalto','maybe') | list %}
-              {% set unavail = poll.responses | selectattr('response','equalto','unavailable') | list %}
-              {% for grp, color, lbl in [(avail,'#22c55e','✅ Going'),(maybe,'#f59e0b','⏰ Maybe'),(unavail,'#ef4444','❌ Not going')] %}
-              {% if grp %}
-              <div>
-                <div class="resp-col-header" style="color:{{ color }};">{{ lbl }}</div>
-                {% for r in grp %}
-                <div class="resp-row">
-                  <span class="resp-name">{{ r.user_name }}</span>
-                  <span class="resp-time">{{ r.responded_at[5:16] }}</span>
-                  {% if can_manage %}
-                  <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/responses/delete" style="margin:0;" onsubmit="return confirm('Entfernen?')">
-                    <input type="hidden" name="user_id" value="{{ r.user_id }}">
-                    <button style="background:none;border:none;color:#ef4444;cursor:pointer;padding:0;font-size:.75rem;" title="Entfernen">✕</button>
-                  </form>
-                  {% endif %}
-                </div>
-                {% endfor %}
+            <div class="resp-list">
+              {% for r in poll.responses | sort(attribute='responded_at') %}
+              {% set rkey = r.response %}
+              {% set opt  = pt.opts | selectattr(0, 'equalto', rkey) | first | default(('unavailable','❓','#6b7280')) %}
+              {% set rcolor = opt[2] %}
+              {% set rlabel = opt[1] %}
+              {% set initial = r.user_name[0].upper() if r.user_name else '?' %}
+              <div class="resp-item">
+                <div class="resp-avatar" style="background:{{ rcolor }}33;color:{{ rcolor }};border:1px solid {{ rcolor }}44;">{{ initial }}</div>
+                <span class="resp-username">{{ r.user_name }}</span>
+                <span class="resp-badge" style="background:{{ rcolor }}22;color:{{ rcolor }};border:1px solid {{ rcolor }}33;">{{ rlabel }}</span>
+                <span class="resp-ts">{{ r.responded_at[5:16] }}</span>
+                {% if can_manage %}
+                <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/responses/delete" style="margin:0;" onsubmit="return confirm('Remove?')">
+                  <input type="hidden" name="user_id" value="{{ r.user_id }}">
+                  <button class="resp-del-btn" title="Remove">✕</button>
+                </form>
+                {% endif %}
               </div>
-              {% endif %}
               {% endfor %}
             </div>
           </div>
         </div>
         {% endif %}
       </div>
-      {% endfor %}
+      {% endmacro %}
+
+      {% if active_polls %}
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">Active ({{ active_polls|length }})</div>
+      {% for poll in active_polls %}{{ render_poll(poll, true) }}{% endfor %}
       {% endif %}
 
       {% if closed_polls %}
       <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:.75rem 0 .6rem;">Closed ({{ closed_polls|length }})</div>
-      {% for poll in closed_polls %}{% set is_priv = poll.get('target_type','all') != 'all' %}{% set total = poll.count_available + poll.count_maybe + poll.count_unavailable %}
-      <div class="poll-card{% if is_priv %} private{% endif %} closed">
-        <div class="poll-header">
-          <div style="flex:1;min-width:0;">
-            <div class="poll-title">
-              {{ poll.title }}
-              <span class="pill pill-closed">Closed</span>
-              {% if is_priv %}<span class="target-badge tb-private">🔒 Private</span>{% else %}<span class="target-badge tb-all">🌐 Public</span>{% endif %}
-            </div>
-            <div class="poll-meta">
-              <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}</span>
-              <span>{{ total }} Antworten</span>
-              <span>{{ poll.created_at[:10] }}</span>
-            </div>
-          </div>
-          {% if can_manage %}
-          <form method="post" action="/guild/{{ guild.guild_id }}/polls/{{ poll.id }}/delete" onsubmit="return confirm('Delete poll?')" style="margin:0;">
-            <button class="btn-action btn-action-err" title="Delete">🗑</button>
-          </form>
-          {% endif %}
-        </div>
-        <div class="poll-bars">
-          {% for label, cls, count in [('✅ Going','bar-available',poll.count_available),('⏰ Maybe','bar-maybe',poll.count_maybe),('❌ Not going','bar-unavailable',poll.count_unavailable)] %}
-          <div class="bar-row">
-            <span class="bar-label">{{ label }}</span>
-            <div class="bar-track"><div class="bar-fill {{ cls }}" style="width:{% if total > 0 %}{{ (count/total*100)|round|int }}{% else %}0{% endif %}%;"></div></div>
-            <span class="bar-count">{{ count }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% if poll.responses and can_view %}
-        <div class="resp-section">
-          <button class="resp-toggle" onclick="var d=this.parentElement.querySelector('.resp-detail');d.style.display=d.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=d.style.display==='block'?'▾':'▸';">
-            <span class="arr">▸</span> Responses ({{ poll.responses|length }})
-          </button>
-          <div class="resp-detail">
-            <div class="resp-grid">
-              {% set avail = poll.responses | selectattr('response','equalto','available') | list %}
-              {% set maybe = poll.responses | selectattr('response','equalto','maybe') | list %}
-              {% set unavail = poll.responses | selectattr('response','equalto','unavailable') | list %}
-              {% for grp, color, lbl in [(avail,'#22c55e','✅ Going'),(maybe,'#f59e0b','⏰ Maybe'),(unavail,'#ef4444','❌ Not going')] %}
-              {% if grp %}
-              <div>
-                <div class="resp-col-header" style="color:{{ color }};">{{ lbl }}</div>
-                {% for r in grp %}
-                <div class="resp-row">
-                  <span class="resp-name">{{ r.user_name }}</span>
-                  <span class="resp-time">{{ r.responded_at[5:16] }}</span>
-                </div>
-                {% endfor %}
-              </div>
-              {% endif %}
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
+      {% for poll in closed_polls %}{{ render_poll(poll, false) }}{% endfor %}
       {% endif %}
     </div>
 
-    <!-- RIGHT: Create form (poll_manage only) -->
+    <!-- RIGHT: Create form -->
     <div>
       {% if can_manage %}
       <div class="create-card">
@@ -337,7 +236,21 @@
         <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" id="pollForm">
           <input type="hidden" id="event_datetime" name="event_datetime" />
           <input type="hidden" id="target_type_val" name="target_type" value="all" />
-          <input type="hidden" id="target_ids_val" name="target_ids" value="[]" />
+          <input type="hidden" id="target_ids_val"  name="target_ids"  value="[]" />
+          <input type="hidden" id="poll_type_val"   name="poll_type"   value="availability" />
+
+          <!-- Poll type -->
+          <div class="form-group">
+            <label>Poll Type</label>
+            <div class="type-grid">
+              {% for key, pt in POLL_TYPES.items() %}
+              <div class="type-opt{% if loop.first %} selected{% endif %}" data-type="{{ key }}"
+                   style="{% if loop.first %}border-color:#6366f1;background:rgba(99,102,241,.15);color:#a5b4fc;{% endif %}">
+                {{ pt.label }}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
 
           <div class="form-group">
             <label for="ptitle">Title</label>
@@ -352,14 +265,11 @@
             <div style="display:flex;gap:.4rem;">
               <input type="date" id="pick_date" required
                 style="flex:2;min-width:0;padding:.45rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;" />
-              <select id="pick_hour"
-                style="flex:1;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
+              <select id="pick_hour" style="flex:1;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
                 {% for h in range(24) %}<option value="{{ '%02d'|format(h) }}">{{ '%02d'|format(h) }}h</option>{% endfor %}
               </select>
-              <select id="pick_min"
-                style="flex:.8;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
-                <option value="00">:00</option><option value="15">:15</option>
-                <option value="30">:30</option><option value="45">:45</option>
+              <select id="pick_min" style="flex:.8;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
+                <option value="00">:00</option><option value="15">:15</option><option value="30">:30</option><option value="45">:45</option>
               </select>
             </div>
           </div>
@@ -374,16 +284,15 @@
                 {% if wings %}<button type="button" class="target-tab" data-panel="tab-wings">Wings</button>{% endif %}
               </div>
               <div id="tab-all" class="target-panel active">
-                <p style="margin:0;font-size:.8rem;color:var(--text-muted);">All members can vote. Poll is posted publicly in <strong>#polls</strong>.</p>
+                <p style="margin:0;font-size:.8rem;color:var(--text-muted);">All members can vote. Posted publicly in <strong>#polls-public</strong>.</p>
               </div>
               {% if ally_roles %}
               <div id="tab-roles" class="target-panel">
-                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only members with these roles will see the private Discord thread.</p>
+                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only selected roles see the private Discord thread.</p>
                 <div class="role-chips">
                   {% for role in ally_roles %}
                   <label class="role-chip" data-id="{{ role.id }}">
-                    <span class="role-dot" style="background:{{ role.color or '#94a3b8' }};"></span>
-                    {{ role.role_name }}
+                    <span class="role-dot" style="background:{{ role.color or '#94a3b8' }};"></span>{{ role.role_name }}
                   </label>
                   {% endfor %}
                 </div>
@@ -391,10 +300,10 @@
               {% endif %}
               {% if wings %}
               <div id="tab-wings" class="target-panel">
-                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only members of the selected wing will have access.</p>
+                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only members of the selected wing get access.</p>
                 <div class="wing-chips">
                   {% for w in wings %}
-                  <label class="wing-chip" data-id="{{ w }}">{{ wing_names.get(w, 'Wing ' ~ w) }}</label>
+                  <label class="wing-chip" data-id="{{ w }}">{{ wing_names.get(w,'Wing '~w) }}</label>
                   {% endfor %}
                 </div>
               </div>
@@ -405,7 +314,8 @@
           <button type="submit" class="btn btn-primary" style="width:100%;">📤 Create Poll</button>
         </form>
       </div>
-    {% endif %}
+      {% endif %}
+    </div>
 
   </div>
 </div>
@@ -417,48 +327,47 @@
   document.getElementById('pick_date').value =
     `${today.getUTCFullYear()}-${pad(today.getUTCMonth()+1)}-${pad(today.getUTCDate())}`;
 
-  // Tab switching
+  // Poll type selection
+  document.querySelectorAll('.type-opt').forEach(el => {
+    el.addEventListener('click', function(){
+      document.querySelectorAll('.type-opt').forEach(o => {
+        o.classList.remove('selected');
+        o.style.borderColor = ''; o.style.background = ''; o.style.color = '';
+      });
+      this.classList.add('selected');
+      this.style.borderColor = '#6366f1'; this.style.background = 'rgba(99,102,241,.15)'; this.style.color = '#a5b4fc';
+      document.getElementById('poll_type_val').value = this.dataset.type;
+    });
+  });
+
+  // Target tabs
   document.querySelectorAll('.target-tab').forEach(btn => {
     btn.addEventListener('click', function(){
       document.querySelectorAll('.target-tab').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.target-panel').forEach(p => p.classList.remove('active'));
       this.classList.add('active');
       document.getElementById(this.dataset.panel).classList.add('active');
-      sync();
+      syncTarget();
     });
   });
 
-  // Role chip toggle
+  // Role chips
   document.querySelectorAll('.role-chip').forEach(chip => {
-    chip.addEventListener('click', function(e){
-      e.preventDefault();
-      this.classList.toggle('selected');
-      sync();
-    });
+    chip.addEventListener('click', function(e){ e.preventDefault(); this.classList.toggle('selected'); syncTarget(); });
   });
-
-  // Wing chip toggle
+  // Wing chips
   document.querySelectorAll('.wing-chip').forEach(chip => {
-    chip.addEventListener('click', function(e){
-      e.preventDefault();
-      this.classList.toggle('selected');
-      sync();
-    });
+    chip.addEventListener('click', function(e){ e.preventDefault(); this.classList.toggle('selected'); syncTarget(); });
   });
 
-  function sync(){
+  function syncTarget(){
     const active = document.querySelector('.target-tab.active');
-    const panel = active ? active.dataset.panel : 'tab-all';
+    const panel  = active ? active.dataset.panel : 'tab-all';
     let type = 'all', ids = [];
-    if(panel === 'tab-roles'){
-      type = 'role';
-      ids = [...document.querySelectorAll('.role-chip.selected')].map(c => parseInt(c.dataset.id));
-    } else if(panel === 'tab-wings'){
-      type = 'wing';
-      ids = [...document.querySelectorAll('.wing-chip.selected')].map(c => parseInt(c.dataset.id));
-    }
+    if(panel === 'tab-roles'){ type='role'; ids=[...document.querySelectorAll('.role-chip.selected')].map(c=>parseInt(c.dataset.id)); }
+    else if(panel === 'tab-wings'){ type='wing'; ids=[...document.querySelectorAll('.wing-chip.selected')].map(c=>parseInt(c.dataset.id)); }
     document.getElementById('target_type_val').value = type;
-    document.getElementById('target_ids_val').value = JSON.stringify(ids);
+    document.getElementById('target_ids_val').value  = JSON.stringify(ids);
   }
 
   document.getElementById('pollForm').addEventListener('submit', function(e){

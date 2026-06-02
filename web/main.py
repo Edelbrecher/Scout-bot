@@ -2531,8 +2531,19 @@ async def polls_create(
     event_datetime: str = Form(...),
     target_type: str = Form("all"),
     target_ids: str = Form("[]"),
+    poll_type: str = Form("availability"),
 ):
     import json as _json
+    # Poll type definitions
+    POLL_TYPES = {
+        "availability": [("available","✅ Going",3),("maybe","⏰ Maybe",1),("unavailable","❌ Not going",4)],
+        "offensive":    [("available","⚔️ Ready to attack",4),("maybe","🛡️ Support only",1),("unavailable","❌ Not available",2)],
+        "farming":      [("available","🌾 I'll farm",3),("maybe","⏳ Maybe",1),("unavailable","⛔ Skipping",2)],
+        "interest":     [("available","👍 Interested",3),("maybe","🤔 Unsure",1),("unavailable","👎 Not interested",4)],
+        "donation":     [("available","💰 Can donate",3),("maybe","📦 Partial",1),("unavailable","❌ Can't donate",4)],
+        "yesno":        [("available","✅ Yes",3),("maybe","🤷 Abstain",2),("unavailable","❌ No",4)],
+    }
+    type_opts = POLL_TYPES.get(poll_type, POLL_TYPES["availability"])
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -2551,7 +2562,7 @@ async def polls_create(
 
     poll_id = await database.create_poll_targeted(
         guild_id, title, description, event_datetime,
-        target_type=target_type, target_ids=target_ids_json,
+        target_type=target_type, target_ids=target_ids_json, poll_type=poll_type,
     )
 
     token = os.environ.get("DISCORD_TOKEN", "")
@@ -2579,9 +2590,7 @@ async def polls_create(
         "footer": {"text": f"Poll #{poll_id} · Click a button to indicate your availability"},
     }
     components = [{"type": 1, "components": [
-        {"type": 2, "style": 3, "label": "Going",       "emoji": {"name": "✅"}, "custom_id": f"poll_available_{poll_id}"},
-        {"type": 2, "style": 1, "label": "Maybe",  "emoji": {"name": "⏰"}, "custom_id": f"poll_maybe_{poll_id}"},
-        {"type": 2, "style": 4, "label": "Not going", "emoji": {"name": "❌"}, "custom_id": f"poll_unavailable_{poll_id}"},
+        *[{"type": 2, "style": s, "label": lbl, "custom_id": f"poll_{key}_{poll_id}"} for key, lbl, s in type_opts],
     ]}]
 
     # Route: private polls → #polls (hidden), public → #polls-public

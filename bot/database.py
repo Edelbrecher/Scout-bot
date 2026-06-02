@@ -118,6 +118,11 @@ async def init_db():
         except Exception:
             pass
         try:
+            await db.execute("ALTER TABLE availability_polls ADD COLUMN poll_type TEXT DEFAULT 'availability'")
+            await db.commit()
+        except Exception:
+            pass
+        try:
             await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_public_channel_id TEXT")
             await db.commit()
         except Exception:

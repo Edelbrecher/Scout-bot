@@ -1192,7 +1192,7 @@ async def delete_poll(poll_id: int):
 async def create_poll_targeted(
     guild_id: str, title: str, description: str, event_datetime: str,
     target_type: str = "all", target_ids: str = "[]",
-    plan_id: int | None = None,
+    plan_id: int | None = None, poll_type: str = "availability",
 ) -> int:
     """Create a poll with optional targeting. Returns poll id."""
     import json as _json
@@ -1200,10 +1200,10 @@ async def create_poll_targeted(
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("""
             INSERT INTO availability_polls
-                (guild_id, title, description, event_datetime, target_type, target_ids, plan_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (guild_id, title, description, event_datetime, target_type, target_ids, plan_id, poll_type, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (guild_id, title, description, event_datetime,
-               target_type, target_ids, plan_id, _dt.utcnow().isoformat()))
+               target_type, target_ids, plan_id, poll_type, _dt.utcnow().isoformat()))
         await db.commit()
         return cur.lastrowid
 
@@ -6259,6 +6259,12 @@ async def _init_op_tables():
                 await db.commit()
             except Exception:
                 pass
+        # availability_polls: poll type
+        try:
+            await db.execute("ALTER TABLE availability_polls ADD COLUMN poll_type TEXT DEFAULT 'availability'")
+            await db.commit()
+        except Exception:
+            pass
         # guild_configs: separate public poll channel
         try:
             await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_public_channel_id TEXT")
