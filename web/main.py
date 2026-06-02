@@ -7642,6 +7642,80 @@ async def admin_dashboard(request: Request):
     })
 
 
+@app.get("/admin/server", response_class=HTMLResponse)
+async def admin_server(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    return templates.TemplateResponse("admin_server.html", {"request": request, "session": session})
+
+
+@app.get("/api/admin/server-stats")
+async def api_server_stats(request: Request):
+    session, err = _require_admin(request)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    import os, time
+    stats: dict = {}
+    # ── CPU ──────────────────────────────────────────────────────────────────
+    try:
+        with open("/proc/stat") as f:
+            cpu_line = f.readline()
+        vals = list(map(int, cpu_line.split()[1:]))
+        idle = vals[3] + (vals[4] if len(vals) > 4 else 0)
+        total = sum(vals)
+        stats["cpu_idle"] = idle
+        stats["cpu_total"] = total
+    except Exception:
+        stats["cpu_idle"] = stats["cpu_total"] = 0
+    # ── Memory ───────────────────────────────────────────────────────────────
+    try:
+        mem = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":", 1)
+                mem[k.strip()] = int(v.strip().split()[0])
+        stats["mem_total_kb"] = mem.get("MemTotal", 0)
+        stats["mem_free_kb"]  = mem.get("MemAvailable", mem.get("MemFree", 0))
+        stats["mem_used_kb"]  = stats["mem_total_kb"] - stats["mem_free_kb"]
+    except Exception:
+        stats["mem_total_kb"] = stats["mem_free_kb"] = stats["mem_used_kb"] = 0
+    # ── Load average ─────────────────────────────────────────────────────────
+    try:
+        with open("/proc/loadavg") as f:
+            parts = f.read().split()
+        stats["load_1"]  = float(parts[0])
+        stats["load_5"]  = float(parts[1])
+        stats["load_15"] = float(parts[2])
+        procs = parts[3].split("/")
+        stats["procs_running"] = int(procs[0])
+        stats["procs_total"]   = int(procs[1]) if len(procs) > 1 else 0
+    except Exception:
+        stats["load_1"] = stats["load_5"] = stats["load_15"] = 0.0
+        stats["procs_running"] = stats["procs_total"] = 0
+    # ── Uptime ───────────────────────────────────────────────────────────────
+    try:
+        with open("/proc/uptime") as f:
+            uptime_sec = float(f.read().split()[0])
+        stats["uptime_sec"] = int(uptime_sec)
+    except Exception:
+        stats["uptime_sec"] = 0
+    # ── Disk ─────────────────────────────────────────────────────────────────
+    try:
+        st = os.statvfs("/")
+        stats["disk_total_kb"] = st.f_frsize * st.f_blocks // 1024
+        stats["disk_free_kb"]  = st.f_frsize * st.f_bavail // 1024
+        stats["disk_used_kb"]  = stats["disk_total_kb"] - stats["disk_free_kb"]
+    except Exception:
+        stats["disk_total_kb"] = stats["disk_free_kb"] = stats["disk_used_kb"] = 0
+    # ── DB size ──────────────────────────────────────────────────────────────
+    try:
+        db_path = database.DB_PATH
+        stats["db_size_kb"] = os.path.getsize(db_path) // 1024
+    except Exception:
+        stats["db_size_kb"] = 0
+    stats["ts"] = int(time.time())
+    return _JSONResponse(stats)
+
+
 @app.get("/admin/customers", response_class=HTMLResponse)
 async def admin_customers(request: Request):
     session, err = _require_admin(request)

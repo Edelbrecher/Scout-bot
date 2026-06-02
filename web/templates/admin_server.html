@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Server Monitor · Admin · TravOps{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:0 1.25rem 2rem;">
+  <div style="margin-bottom:1.25rem;">
+    <a href="/admin" class="back-link">← Admin</a>
+    <h1 style="margin:.25rem 0 0;">🖥️ Server Monitor</h1>
+    <p style="color:var(--text-muted);font-size:.83rem;margin:.2rem 0 0;">Aktualisiert alle 5 Sekunden</p>
+  </div>
+
+  <!-- KPI tiles -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.85rem;margin-bottom:1.25rem;" id="kpi-grid">
+    <div class="card" id="kpi-cpu">
+      <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem;">⚡ CPU</div>
+      <div style="font-size:2rem;font-weight:900;line-height:1;" id="cpu-val">—</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">Auslastung</div>
+      <div style="margin-top:.5rem;height:6px;border-radius:3px;background:var(--bg-main);overflow:hidden;">
+        <div id="cpu-bar" style="height:100%;width:0%;border-radius:3px;background:#f87171;transition:width .5s;"></div>
+      </div>
+    </div>
+    <div class="card" id="kpi-mem">
+      <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem;">🧠 RAM</div>
+      <div style="font-size:2rem;font-weight:900;line-height:1;" id="mem-val">—</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;" id="mem-detail">—</div>
+      <div style="margin-top:.5rem;height:6px;border-radius:3px;background:var(--bg-main);overflow:hidden;">
+        <div id="mem-bar" style="height:100%;width:0%;border-radius:3px;background:#60a5fa;transition:width .5s;"></div>
+      </div>
+    </div>
+    <div class="card" id="kpi-disk">
+      <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem;">💾 Disk</div>
+      <div style="font-size:2rem;font-weight:900;line-height:1;" id="disk-val">—</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;" id="disk-detail">—</div>
+      <div style="margin-top:.5rem;height:6px;border-radius:3px;background:var(--bg-main);overflow:hidden;">
+        <div id="disk-bar" style="height:100%;width:0%;border-radius:3px;background:#a78bfa;transition:width .5s;"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem;">📊 Load (1/5/15 min)</div>
+      <div style="font-size:1.5rem;font-weight:900;line-height:1;" id="load-val">—</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;" id="load-procs">—</div>
+    </div>
+    <div class="card">
+      <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem;">⏱️ Uptime</div>
+      <div style="font-size:1.4rem;font-weight:900;line-height:1;" id="uptime-val">—</div>
+    </div>
+    <div class="card">
+      <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem;">🗄️ Datenbank</div>
+      <div style="font-size:2rem;font-weight:900;line-height:1;" id="db-val">—</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">DB Größe</div>
+    </div>
+  </div>
+
+  <!-- CPU chart -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div style="font-size:.82rem;font-weight:700;margin-bottom:.6rem;">📈 CPU-Verlauf (letzte 2 Minuten)</div>
+    <canvas id="cpuChart" height="80"></canvas>
+  </div>
+
+  <p style="font-size:.75rem;color:var(--text-muted);text-align:right;" id="last-update">—</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+let prevIdle = null, prevTotal = null;
+const cpuHistory = [];
+const MAX_PTS = 24;
+
+const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+const cpuChart = new Chart(cpuCtx, {
+  type: 'line',
+  data: {
+    labels: Array(MAX_PTS).fill(''),
+    datasets: [{
+      data: Array(MAX_PTS).fill(null),
+      borderColor: '#f87171',
+      backgroundColor: 'rgba(248,113,113,.1)',
+      fill: true,
+      tension: .4,
+      pointRadius: 0,
+      borderWidth: 2,
+    }]
+  },
+  options: {
+    animation: false,
+    scales: {
+      y: { min: 0, max: 100, ticks: { callback: v => v+'%', color: '#6b7280', font:{size:10} }, grid: { color: 'rgba(255,255,255,.05)' } },
+      x: { ticks: { display: false }, grid: { display: false } }
+    },
+    plugins: { legend: { display: false } },
+    responsive: true, maintainAspectRatio: true,
+  }
+});
+
+function fmt(kb) {
+  if (kb > 1024*1024) return (kb/1024/1024).toFixed(1)+' GB';
+  if (kb > 1024) return (kb/1024).toFixed(0)+' MB';
+  return kb+' KB';
+}
+function fmtUptime(s) {
+  const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+function barColor(pct) {
+  if (pct > 85) return '#f87171';
+  if (pct > 60) return '#fb923c';
+  return '#22c55e';
+}
+
+async function poll() {
+  try {
+    const r = await fetch('/api/admin/server-stats');
+    const d = await r.json();
+
+    // CPU %
+    let cpuPct = null;
+    if (prevIdle !== null) {
+      const dIdle = d.cpu_idle - prevIdle;
+      const dTotal = d.cpu_total - prevTotal;
+      cpuPct = dTotal > 0 ? Math.round((1 - dIdle/dTotal)*100) : 0;
+      cpuPct = Math.max(0, Math.min(100, cpuPct));
+      document.getElementById('cpu-val').textContent = cpuPct+'%';
+      document.getElementById('cpu-val').style.color = barColor(cpuPct);
+      document.getElementById('cpu-bar').style.width = cpuPct+'%';
+      document.getElementById('cpu-bar').style.background = barColor(cpuPct);
+    }
+    prevIdle = d.cpu_idle; prevTotal = d.cpu_total;
+
+    // CPU chart
+    cpuHistory.push(cpuPct ?? 0);
+    if (cpuHistory.length > MAX_PTS) cpuHistory.shift();
+    cpuChart.data.datasets[0].data = [...cpuHistory, ...Array(MAX_PTS-cpuHistory.length).fill(null)].slice(-MAX_PTS);
+    cpuChart.update('none');
+
+    // RAM
+    const memPct = d.mem_total_kb > 0 ? Math.round(d.mem_used_kb/d.mem_total_kb*100) : 0;
+    document.getElementById('mem-val').textContent = memPct+'%';
+    document.getElementById('mem-val').style.color = barColor(memPct);
+    document.getElementById('mem-detail').textContent = fmt(d.mem_used_kb)+' / '+fmt(d.mem_total_kb);
+    document.getElementById('mem-bar').style.width = memPct+'%';
+    document.getElementById('mem-bar').style.background = barColor(memPct);
+
+    // Disk
+    const diskPct = d.disk_total_kb > 0 ? Math.round(d.disk_used_kb/d.disk_total_kb*100) : 0;
+    document.getElementById('disk-val').textContent = diskPct+'%';
+    document.getElementById('disk-val').style.color = barColor(diskPct);
+    document.getElementById('disk-detail').textContent = fmt(d.disk_used_kb)+' / '+fmt(d.disk_total_kb);
+    document.getElementById('disk-bar').style.width = diskPct+'%';
+    document.getElementById('disk-bar').style.background = barColor(diskPct);
+
+    // Load
+    document.getElementById('load-val').textContent = `${d.load_1.toFixed(2)} / ${d.load_5.toFixed(2)} / ${d.load_15.toFixed(2)}`;
+    document.getElementById('load-procs').textContent = `${d.procs_running} aktive Prozesse von ${d.procs_total}`;
+
+    // Uptime
+    document.getElementById('uptime-val').textContent = fmtUptime(d.uptime_sec);
+
+    // DB size
+    document.getElementById('db-val').textContent = fmt(d.db_size_kb);
+
+    document.getElementById('last-update').textContent = 'Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE');
+  } catch(e) {
+    document.getElementById('last-update').textContent = 'Fehler beim Laden der Daten';
+  }
+}
+
+poll();
+setInterval(poll, 5000);
+</script>
+{% endblock %}
