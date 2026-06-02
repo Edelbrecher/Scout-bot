@@ -356,6 +356,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favorites</div>
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Troops</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)">🔍 Check</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('hero',this);loadHeroActions()">🦸 Hero</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('stats',this);loadStats()">📊 Evaluation</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
               </div>
@@ -385,10 +386,41 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div id="checkResults"></div>
               </div>
 
+              <!-- Hero Actions -->
+              <div class="op-panel-body" id="panel-hero" style="display:none;">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Assign hero gear switches or no-hero waves to confuse the enemy.</div>
+
+                <!-- Add form -->
+                <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem;">
+                  <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">+ Assign Hero Task</div>
+                  <select id="heroActionType" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;" onchange="onHeroTypeChange()">
+                    <option value="gear_switch">🔄 Gear Switch</option>
+                    <option value="no_hero">🚫 Real Attack — No Hero</option>
+                  </select>
+                  <select id="heroPlayer" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;">
+                    <option value="">— Select player —</option>
+                  </select>
+                  <div id="heroGearFields">
+                    <select id="heroItemSlot" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;">
+                      <option value="weapon">⚔️ Weapon</option>
+                      <option value="helmet">🪖 Helmet</option>
+                      <option value="body">🛡️ Body Armour</option>
+                      <option value="shoes">👟 Boots</option>
+                      <option value="horse">🐴 Mount</option>
+                    </select>
+                    <input id="heroItemName" type="text" placeholder="Item name (e.g. Sword of the Soldier)" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;box-sizing:border-box;">
+                  </div>
+                  <input id="heroNotes" type="text" placeholder="Notes (optional)" style="width:100%;margin-bottom:.5rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;box-sizing:border-box;">
+                  <button class="btn btn-primary" style="width:100%;font-size:.82rem;" onclick="addHeroAction()">+ Assign & Notify</button>
+                </div>
+
+                <div id="heroActionsContent"><div style="color:var(--text-muted);font-size:.82rem;">No hero tasks assigned.</div></div>
+              </div>
+
               <!-- Statistics / Evaluation -->
               <div class="op-panel-body" id="panel-stats" style="display:none;">
                 <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Confirmation status of all attackers after landing.</div>
-                <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Aktualisieren</button>
+                <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Refresh</button>
                 <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">No data yet.</div></div>
               </div>
 
@@ -2133,92 +2165,243 @@ async function runCheck() {
   } catch(e) { el.innerHTML=`<div style="color:#f87171;">Fehler: ${e.message}</div>`; }
 }
 
-function loadStats() {
-  if (!activePlan) return;
+async function loadStats() {
+  if (!activePlan || !activePlanId) return;
   const el = document.getElementById('statsContent');
-  el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">Lade…</div>';
+  el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;padding:.5rem;">Loading…</div>';
 
-  // Collect all waves from current plan targets
-  const allWaves = (activePlan.targets||[]).flatMap(t =>
-    (t.waves||[]).map(w => ({...w, target_player: t.player_name, target_x: t.x, target_y: t.y}))
-  );
-
-  if (!allWaves.length) {
-    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">No waves in this plan.</div>';
+  let evalData;
+  try {
+    evalData = await apiFetch(`/plans/${activePlanId}/evaluation`);
+  } catch(e) {
+    el.innerHTML = '<div style="color:#f87171;font-size:.82rem;">Error loading evaluation.</div>';
     return;
   }
 
-  // Group by attacker
-  const byAttacker = {};
-  allWaves.forEach(w => {
-    if (!byAttacker[w.attacker_name]) byAttacker[w.attacker_name] = [];
-    byAttacker[w.attacker_name].push(w);
-  });
+  const { targets=[], waves=[], stats={} } = evalData;
+  const { total=0, confirmed=0, late=0, not_sent=0, unconfirmed=0 } = stats;
+  const pct = total ? Math.round((confirmed+late)/total*100) : 0;
 
-  const csIcons  = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫', '':'⬜'};
-  const csColors = {on_time:'#4ade80', late:'#fbbf24', not_sent:'#f87171', cant_send:'#f87171', '':'var(--text-muted)'};
-  const csLabels = {on_time:'On time', late:'Late', not_sent:'Not sent', cant_send:'Dropped out', '':'Pending'};
+  const csIcon  = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫', '':'⬜'};
+  const csColor = {on_time:'#4ade80', late:'#fbbf24', not_sent:'#f87171', cant_send:'#f87171', '':'#6b7280'};
+  const csLabel = {on_time:'On time', late:'Late', not_sent:'Not sent', cant_send:'Dropped out', '':'Pending'};
+  const wtIcon  = {real:'⚔',fake:'👻',def:'🛡',scout:'🔍',cleaner1:'🧹',cleaner2:'🧹'};
 
-  // Summary counts
-  const totalWaves  = allWaves.length;
-  const confirmedCnt = allWaves.filter(w=>w.confirm_status).length;
-  const onTimeCnt   = allWaves.filter(w=>w.confirm_status==='on_time').length;
-  const lateCnt     = allWaves.filter(w=>w.confirm_status==='late').length;
-  const notSentCnt  = allWaves.filter(w=>w.confirm_status==='not_sent').length;
-  const cantSendCnt = allWaves.filter(w=>w.confirm_status==='cant_send').length;
-  const pendingCnt  = totalWaves - confirmedCnt;
-  const pct = totalWaves ? Math.round(confirmedCnt/totalWaves*100) : 0;
-
-  const summaryHtml = `
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:.85rem;">
-    <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
-      <div style="font-size:1.1rem;font-weight:800;color:#4ade80;">${onTimeCnt}</div>
-      <div style="font-size:.65rem;color:var(--text-muted);">✅ On time</div>
+  // ── Summary KPIs ──────────────────────────────────────────────
+  const kpis = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem;margin-bottom:.85rem;">
+    <div style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:.4rem .3rem;text-align:center;">
+      <div style="font-size:1.2rem;font-weight:900;color:#4ade80;">${confirmed}</div>
+      <div style="font-size:.6rem;color:#4ade80;">✅ On time</div>
     </div>
-    <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
-      <div style="font-size:1.1rem;font-weight:800;color:#fbbf24;">${lateCnt}</div>
-      <div style="font-size:.65rem;color:var(--text-muted);">⏱ Late</div>
+    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:7px;padding:.4rem .3rem;text-align:center;">
+      <div style="font-size:1.2rem;font-weight:900;color:#fbbf24;">${late}</div>
+      <div style="font-size:.6rem;color:#fbbf24;">⏱ Late</div>
     </div>
-    <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
-      <div style="font-size:1.1rem;font-weight:800;color:#f87171;">${notSentCnt+cantSendCnt}</div>
-      <div style="font-size:.65rem;color:var(--text-muted);">❌ Ausgefallen</div>
+    <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:7px;padding:.4rem .3rem;text-align:center;">
+      <div style="font-size:1.2rem;font-weight:900;color:#f87171;">${not_sent}</div>
+      <div style="font-size:.6rem;color:#f87171;">❌ Not sent</div>
+    </div>
+    <div style="background:rgba(107,114,128,.08);border:1px solid rgba(107,114,128,.2);border-radius:7px;padding:.4rem .3rem;text-align:center;">
+      <div style="font-size:1.2rem;font-weight:900;color:#9ca3af;">${unconfirmed}</div>
+      <div style="font-size:.6rem;color:#9ca3af;">⬜ Pending</div>
     </div>
   </div>
-  <div style="margin-bottom:.6rem;">
+  <div style="margin-bottom:.85rem;">
     <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">
-      <span>Confirmed: ${confirmedCnt} / ${totalWaves}</span>
-      <span>${pct}%</span>
+      <span>Sent: ${confirmed+late} / ${total} waves</span><span>${pct}%</span>
     </div>
-    <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;">
-      <div style="height:100%;width:${pct}%;background:${pct>=80?'#4ade80':pct>=50?'#fbbf24':'#f87171'};transition:width .3s;border-radius:3px;"></div>
+    <div style="height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;display:flex;">
+      <div style="height:100%;width:${total?Math.round(confirmed/total*100):0}%;background:#4ade80;"></div>
+      <div style="height:100%;width:${total?Math.round(late/total*100):0}%;background:#fbbf24;"></div>
+      <div style="height:100%;width:${total?Math.round(not_sent/total*100):0}%;background:#f87171;"></div>
     </div>
-    ${pendingCnt ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">⬜ ${pendingCnt} wave${pendingCnt!==1?'s':''} without confirmation yet</div>` : ''}
   </div>`;
 
-  // Per-attacker rows
-  const attackerRows = Object.entries(byAttacker).map(([name, waves]) => {
-    const total = waves.length;
-    const ok = waves.filter(w=>w.confirm_status==='on_time').length;
-    const bad = waves.filter(w=>['not_sent','cant_send'].includes(w.confirm_status)).length;
-    const late = waves.filter(w=>w.confirm_status==='late').length;
-    const pending = waves.filter(w=>!w.confirm_status).length;
-    const rowColor = bad ? 'rgba(248,113,113,.06)' : late ? 'rgba(251,191,36,.05)' : ok===total ? 'rgba(74,222,128,.05)' : '';
-    const chips = waves.map(w => {
-      const ic = csIcons[w.confirm_status||''];
-      const clr = csColors[w.confirm_status||''];
-      const wtIcon = {real:'⚔',fake:'👻',scout:'🔍',def:'🛡'}[w.wave_type]||'';
-      const deltaStr = w.confirm_status==='late' ? ' ('+(w.confirm_delta_seconds>0?'+':'')+w.confirm_delta_seconds+'s)' : '';
-      const ttip = wtIcon+' '+w.target_x+'|'+w.target_y+deltaStr;
-      return `<span title="${escHtml(ttip)}" style="font-size:.8rem;color:${clr};">${ic}</span>`;
+  // ── Per-target impact times ───────────────────────────────────
+  const targetRows = targets.map(t => {
+    const tw = t.waves || [];
+    if (!tw.length) return '';
+    // Impact times = arrival_time of real/cleaner waves, sorted
+    const impactWaves = [...tw].sort((a,b) => (a.arrival_time||'').localeCompare(b.arrival_time||''));
+    const firstImpact = impactWaves[0]?.arrival_time;
+    const lastImpact  = impactWaves[impactWaves.length-1]?.arrival_time;
+    const waveChips = impactWaves.map(w => {
+      const ic = csIcon[w.confirm_status||''];
+      const clr = csColor[w.confirm_status||''];
+      const wic = wtIcon[w.wave_type]||'⚔';
+      const delta = w.confirm_status==='late' && w.confirm_delta_seconds
+        ? `<span style="font-size:.6rem;">${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s</span>` : '';
+      const sendStr = w.send_time ? w.send_time.slice(11,19) : '—';
+      return `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:.3rem .5rem;font-size:.72rem;min-width:120px;">
+        <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.15rem;">
+          <span>${wic}</span>
+          <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;">${escHtml(w.attacker_name||'?')}</span>
+          <span style="margin-left:auto;color:${clr};">${ic}${delta}</span>
+        </div>
+        <div style="color:var(--text-muted);">📤 ${sendStr}</div>
+        ${w.arrival_time ? `<div style="color:#fbbf24;">🎯 ${w.arrival_time.slice(11,19)}</div>` : ''}
+        ${w.confirm_status==='late'&&w.confirm_delta_seconds ? `<div style="color:#fbbf24;font-size:.68rem;">Delta: ${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s</div>` : ''}
+      </div>`;
     }).join('');
-    return `<div style="display:flex;align-items:center;gap:.4rem;padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.04);background:${rowColor}">
-      <span style="flex:1;font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span>
-      <span style="font-size:.75rem;color:var(--text-muted);">${total}W</span>
-      <span style="display:flex;gap:.1rem;">${chips}</span>
+
+    const allSent = tw.every(w=>w.confirm_status && w.confirm_status!=='cant_send');
+    const anyFailed = tw.some(w=>['not_sent','cant_send'].includes(w.confirm_status));
+    const bg = anyFailed?'rgba(248,113,113,.05)':allSent?'rgba(74,222,128,.04)':'';
+    return `<div style="background:${bg};border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;margin-bottom:.5rem;">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;">
+        <span style="font-family:monospace;color:#f0abfc;font-weight:700;">${t.x}|${t.y}</span>
+        <span style="color:var(--text-muted);font-size:.78rem;">${escHtml(t.player_name||'')}</span>
+        ${firstImpact ? `<span style="font-size:.72rem;color:#fbbf24;font-family:monospace;margin-left:auto;">🕐 ${firstImpact.slice(0,16).replace('T',' ')}${lastImpact!==firstImpact?' – '+lastImpact.slice(11,16):''}</span>` : ''}
+        <span style="font-size:.72rem;color:var(--text-muted);">${tw.length} wave${tw.length!==1?'s':''}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.3rem;">${waveChips}</div>
     </div>`;
   }).join('');
 
-  el.innerHTML = summaryHtml + `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:.3rem;">Attacker</div>` + attackerRows;
+  // ── Per-attacker summary ──────────────────────────────────────
+  const byAttacker = {};
+  waves.forEach(w => {
+    if (!byAttacker[w.attacker_name]) byAttacker[w.attacker_name] = [];
+    byAttacker[w.attacker_name].push(w);
+  });
+  const attackerRows = Object.entries(byAttacker).map(([name, ws]) => {
+    const ok = ws.filter(w=>w.confirm_status==='on_time').length;
+    const lt = ws.filter(w=>w.confirm_status==='late').length;
+    const bad = ws.filter(w=>['not_sent','cant_send'].includes(w.confirm_status)).length;
+    const pend = ws.filter(w=>!w.confirm_status).length;
+    const rowBg = bad?'rgba(248,113,113,.06)':lt?'rgba(251,191,36,.04)':ok===ws.length&&!pend?'rgba(74,222,128,.04)':'';
+    const chips = ws.map(w => {
+      const ic = csIcon[w.confirm_status||''];
+      const clr = csColor[w.confirm_status||''];
+      const delta = w.confirm_status==='late' ? `(${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s)` : '';
+      return `<span title="${wtIcon[w.wave_type]||'⚔'} → ${w.target_x}|${w.target_y} ${delta}" style="color:${clr};font-size:.85rem;">${ic}</span>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:.4rem;padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.04);background:${rowBg}">
+      <span style="flex:1;font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span>
+      <span style="font-size:.72rem;color:var(--text-muted);">${ws.length}W</span>
+      <span style="display:flex;gap:2px;">${chips}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = kpis
+    + `<div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">🎯 Targets & Impact Times</div>`
+    + (targetRows || '<div style="color:var(--text-muted);font-size:.82rem;">No targets.</div>')
+    + `<div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin:1rem 0 .4rem;">👤 By Attacker</div>`
+    + (attackerRows || '<div style="color:var(--text-muted);font-size:.82rem;">No waves.</div>');
+}
+
+// ── Hero Actions ──────────────────────────────────────────────────────────────
+
+function onHeroTypeChange() {
+  const t = document.getElementById('heroActionType').value;
+  document.getElementById('heroGearFields').style.display = t === 'no_hero' ? 'none' : '';
+}
+
+function loadHeroActions() {
+  if (!activePlan) return;
+  // Populate player dropdown
+  const sel = document.getElementById('heroPlayer');
+  sel.innerHTML = '<option value="">— Select player —</option>';
+  const seen = new Set();
+  (activePlan.targets||[]).forEach(t => {
+    (t.waves||[]).forEach(w => {
+      if (w.attacker_name && !seen.has(w.attacker_name)) {
+        seen.add(w.attacker_name);
+        const opt = new Option(w.attacker_name, w.attacker_discord_id || '');
+        opt.dataset.name = w.attacker_name;
+        opt.dataset.discord = w.attacker_discord_id || '';
+        sel.add(opt);
+      }
+    });
+  });
+  // Also populate from members list
+  (members||[]).forEach(m => {
+    const name = m.travian_name || m.discord_name;
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      const opt = new Option(name, m.discord_id || '');
+      opt.dataset.name = name;
+      opt.dataset.discord = m.discord_id || '';
+      sel.add(opt);
+    }
+  });
+  renderHeroActions();
+}
+
+function renderHeroActions() {
+  const el = document.getElementById('heroActionsContent');
+  const actions = activePlan?.hero_actions || [];
+  if (!actions.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">No hero tasks assigned yet.</div>';
+    return;
+  }
+  const slotLabel = {weapon:'⚔️ Weapon', helmet:'🪖 Helmet', body:'🛡️ Body', shoes:'👟 Boots', horse:'🐴 Mount'};
+  el.innerHTML = actions.map(a => {
+    const isSwitch = a.action_type === 'gear_switch';
+    const desc = isSwitch
+      ? `🔄 Switch ${slotLabel[a.item_slot]||a.item_slot||'gear'} → <strong>${escHtml(a.item_name||'?')}</strong>`
+      : `🚫 Real attack <strong>without hero</strong>`;
+    return `<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:.5rem .7rem;margin-bottom:.4rem;">
+      <div style="display:flex;align-items:flex-start;gap:.4rem;">
+        <div style="flex:1;">
+          <div style="font-size:.82rem;font-weight:700;margin-bottom:.15rem;">${escHtml(a.player_name||'Unknown')}</div>
+          <div style="font-size:.78rem;">${desc}</div>
+          ${a.notes ? `<div style="font-size:.72rem;color:#fbbf24;margin-top:.2rem;">📝 ${escHtml(a.notes)}</div>` : ''}
+        </div>
+        <button onclick="deleteHeroAction(${a.id})" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:.85rem;" title="Remove">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addHeroAction() {
+  if (!activePlanId) return;
+  const typeEl   = document.getElementById('heroActionType');
+  const playerEl = document.getElementById('heroPlayer');
+  const slotEl   = document.getElementById('heroItemSlot');
+  const nameEl   = document.getElementById('heroItemName');
+  const notesEl  = document.getElementById('heroNotes');
+
+  const selectedOpt = playerEl.options[playerEl.selectedIndex];
+  const playerName  = selectedOpt?.dataset?.name || playerEl.value;
+  const discordId   = selectedOpt?.dataset?.discord || '';
+
+  if (!playerName) { showToast('⚠️ Please select a player.'); return; }
+
+  const payload = {
+    action_type: typeEl.value,
+    player_discord_id: discordId,
+    player_name: playerName,
+    item_slot: slotEl?.value || '',
+    item_name: nameEl?.value?.trim() || '',
+    notes: notesEl?.value?.trim() || '',
+  };
+
+  try {
+    await apiFetch(`/plans/${activePlanId}/hero-actions`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    // Clear form
+    playerEl.value = ''; if(nameEl) nameEl.value=''; if(notesEl) notesEl.value='';
+    // Reload plan to get updated hero_actions
+    await reloadActivePlan();
+    renderHeroActions();
+    showToast('✅ Hero task assigned & Discord DM sent.');
+  } catch(e) {
+    showToast('⚠️ Error: ' + e.message);
+  }
+}
+
+async function deleteHeroAction(actionId) {
+  if (!confirm('Remove this hero task?')) return;
+  try {
+    await apiFetch(`/hero-actions/${actionId}/delete`, {method:'POST'});
+    await reloadActivePlan();
+    renderHeroActions();
+  } catch(e) { showToast('Error: '+e.message); }
 }
 
 function openInlineLandingEditor() {
@@ -2489,7 +2672,7 @@ async function refreshPlanList() {
 
 function switchPanel(name, el) {
   document.querySelectorAll('.op-panel-tab').forEach(t=>t.classList.remove('active'));
-  ['info','favs','members','check','stats','msglog'].forEach(n => {
+  ['info','favs','members','check','hero','stats','msglog'].forEach(n => {
     document.getElementById('panel-'+n).style.display = n===name ? 'block' : 'none';
   });
   if (el) el.classList.add('active');

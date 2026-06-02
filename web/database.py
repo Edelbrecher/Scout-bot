@@ -6588,6 +6588,27 @@ async def _init_op_tables():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_notify_log_plan ON op_notify_log(guild_id, plan_id)")
         await db.commit()
 
+        # Hero actions — gear switch / no-hero assignments per plan
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_hero_actions (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                plan_id          INTEGER NOT NULL,
+                guild_id         TEXT NOT NULL,
+                action_type      TEXT NOT NULL DEFAULT 'gear_switch',
+                player_discord_id TEXT DEFAULT '',
+                player_name      TEXT DEFAULT '',
+                item_slot        TEXT DEFAULT '',
+                item_name        TEXT DEFAULT '',
+                notes            TEXT DEFAULT '',
+                target_id        INTEGER,
+                no_hero_wave_id  INTEGER,
+                created_at       TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (plan_id) REFERENCES op_plans(id) ON DELETE CASCADE
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_op_hero_plan ON op_hero_actions(plan_id)")
+        await db.commit()
+
         # Favourites per user per guild (saved targets)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS op_favorites (
@@ -6897,6 +6918,8 @@ async def get_op_plan_full(plan_id: int, guild_id: str) -> dict | None:
         t["waves"] = waves_by_target.get(t["id"], [])
 
     plan["targets"] = targets
+    # Include hero actions
+    plan["hero_actions"] = await get_op_hero_actions(plan_id, guild_id)
     return plan
 
 
@@ -7375,6 +7398,103 @@ async def save_op_notify_log(guild_id: str, plan_id: int, triggered_by: str,
             VALUES (?, ?, ?, ?, ?)
         """, (guild_id, plan_id, triggered_by, trigger_type, _json_op.dumps(entries, ensure_ascii=False)))
         await db.commit()
+
+
+async def get_hero_actions_for_player(guild_id: str, discord_id: str) -> list[dict]:
+    """Return hero actions assigned to a specific player across active/draft plans."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT ha.*, p.name AS plan_name, p.landing_time, p.status AS plan_status
+            FROM op_hero_actions ha
+            JOIN op_plans p ON p.id = ha.plan_id
+            WHERE ha.guild_id = ? AND ha.player_discord_id = ?
+              AND p.status IN ('draft','active')
+            ORDER BY p.landing_time ASC
+        """, (guild_id, discord_id)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_op_hero_actions(plan_id: int, guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM op_hero_actions WHERE plan_id=? AND guild_id=? ORDER BY id",
+            (plan_id, guild_id)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_op_hero_action(plan_id: int, guild_id: str, action_type: str,
+                              player_discord_id: str, player_name: str,
+                              item_slot: str, item_name: str, notes: str,
+                              target_id: int | None = None) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO op_hero_actions
+                (plan_id, guild_id, action_type, player_discord_id, player_name,
+                 item_slot, item_name, notes, target_id)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (plan_id, guild_id, action_type, player_discord_id, player_name,
+              item_slot, item_name, notes, target_id))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_op_hero_action(action_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM op_hero_actions WHERE id=? AND guild_id=?",
+            (action_id, guild_id)
+        )
+        await db.commit()
+
+
+async def get_op_evaluation(plan_id: int, guild_id: str) -> dict:
+    """Return full evaluation data for a plan: per-target impact times, wave status, stats."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id)
+        ) as cur:
+            plan = dict(await cur.fetchone() or {})
+        if not plan:
+            return {}
+        async with db.execute(
+            "SELECT * FROM op_targets WHERE plan_id=? ORDER BY order_idx", (plan_id,)
+        ) as cur:
+            targets = [dict(r) for r in await cur.fetchall()]
+        async with db.execute(
+            "SELECT * FROM op_waves WHERE plan_id=? ORDER BY arrival_time ASC, send_time ASC",
+            (plan_id,)
+        ) as cur:
+            waves = [dict(r) for r in await cur.fetchall()]
+
+    # Attach waves to targets
+    waves_by_target: dict[int, list] = {}
+    for w in waves:
+        w["troop_json"] = _json_op.loads(w.get("troop_json") or "{}")
+        waves_by_target.setdefault(w["target_id"], []).append(w)
+
+    for t in targets:
+        t["waves"] = waves_by_target.get(t["id"], [])
+
+    # Stats
+    total = len(waves)
+    confirmed  = sum(1 for w in waves if w.get("confirm_status") == "on_time")
+    late       = sum(1 for w in waves if w.get("confirm_status") == "late")
+    not_sent   = sum(1 for w in waves if w.get("confirm_status") in ("not_sent", "cant_send"))
+    unconfirmed = total - confirmed - late - not_sent
+
+    return {
+        "plan": plan,
+        "targets": targets,
+        "waves": waves,
+        "stats": {
+            "total": total, "confirmed": confirmed, "late": late,
+            "not_sent": not_sent, "unconfirmed": unconfirmed,
+        }
+    }
 
 
 async def get_op_notify_logs(guild_id: str, plan_id: int) -> list[dict]:

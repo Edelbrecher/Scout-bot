@@ -154,6 +154,9 @@
     </label>
   </div>
 
+  <!-- Hero action banner -->
+  <div id="heroBanner" style="display:none;margin-bottom:.75rem;"></div>
+
   <!-- Cleaner role banner -->
   <div id="cleanerBanner" style="display:none;"></div>
 
@@ -199,6 +202,7 @@
 const GUILD_ID   = '{{ guild.guild_id }}';
 const TW_WORLD   = '{{ tw_world }}';
 const WAVES_DATA = {{ waves | tojson | safe }};
+let HERO_ACTIONS = [];
 
 const TYPE_LABELS = {real:'⚔️ Real Attack', fake:'👻 Fake', def:'🛡️ Defense', scout:'🔍 Scout', chief:'👑 Chief', siege:'💣 Siege', cleaner1:'🧹 1st-Cleaner', cleaner2:'🧹 2nd-Cleaner'};
 const TYPE_CSS    = {real:'wt-real', fake:'wt-fake', def:'wt-def', scout:'wt-scout', chief:'wt-chief', siege:'wt-siege', cleaner1:'wt-cleaner1', cleaner2:'wt-cleaner2'};
@@ -754,6 +758,32 @@ function flashTitle(msg) {
   setTimeout(() => { clearInterval(_flashInterval); document.title = orig; }, 15000);
 }
 
+// ── Hero task banner ──────────────────────────────────────────────
+function renderHeroBanner() {
+  const el = document.getElementById('heroBanner');
+  if (!el || !HERO_ACTIONS.length) { if(el) el.style.display='none'; return; }
+  const slotLabel = {weapon:'⚔️ Weapon', helmet:'🪖 Helmet', body:'🛡️ Body', shoes:'👟 Boots', horse:'🐴 Mount'};
+  el.style.display = 'block';
+  el.innerHTML = HERO_ACTIONS.map(a => {
+    const isSwitch = a.action_type === 'gear_switch';
+    const desc = isSwitch
+      ? `Switch ${slotLabel[a.item_slot]||a.item_slot||'gear'} → <strong>${escHtml(a.item_name||'as instructed')}</strong>`
+      : `Run your <strong>real attack WITHOUT your hero</strong>`;
+    return `<div style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.35);border-radius:10px;padding:.75rem 1rem;margin-bottom:.5rem;display:flex;align-items:flex-start;gap:.75rem;">
+      <span style="font-size:1.4rem;">${isSwitch?'🔄':'🚫'}</span>
+      <div>
+        <div style="font-weight:700;font-size:.92rem;margin-bottom:.2rem;">
+          ${isSwitch ? '🦸 Hero Gear Switch required' : '🦸 No-Hero Attack'}
+          <span style="font-size:.72rem;color:#fbbf24;font-family:monospace;margin-left:.5rem;">📋 ${escHtml(a.plan_name||'')}</span>
+        </div>
+        <div style="font-size:.82rem;">${desc}</div>
+        ${a.notes ? `<div style="font-size:.75rem;color:#fbbf24;margin-top:.2rem;">📝 ${escHtml(a.notes)}</div>` : ''}
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:.25rem;">Landing: ${(a.landing_time||'').slice(0,16).replace('T',' ')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // ── Auto-refresh every 60s to pick up new plan changes ──────────
 function autoRefresh() {
   fetch(`/guild/${GUILD_ID}/operations/api/my-waves`)
@@ -766,12 +796,15 @@ function autoRefresh() {
         if (lw) { if (!lw.confirm_status && fw.confirm_status) lw.confirm_status = fw.confirm_status; }
         else WAVES_DATA.push(fw);
       });
+      HERO_ACTIONS = d.hero_actions || [];
+      renderHeroBanner();
       render();
     }).catch(() => {});
 }
 
 // ── Init ─────────────────────────────────────────────────────────
 render();
+renderHeroBanner();
 updateCleanerBanner();
 updateNextWaveBanner();
 setInterval(tick, 1000);

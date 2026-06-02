@@ -7221,7 +7221,8 @@ async def op_my_waves(request: Request, guild_id: str):
     if err: return err
     uid = session.get("uid","")
     waves = await database.get_my_op_waves(guild_id, uid)
-    return _JSONResponse({"waves": waves})
+    hero_actions = await database.get_hero_actions_for_player(guild_id, uid)
+    return _JSONResponse({"waves": waves, "hero_actions": hero_actions})
 
 
 @app.get("/guild/{guild_id}/my-operations", response_class=HTMLResponse)
@@ -7716,6 +7717,68 @@ async def op_get_notify_log(request: Request, guild_id: str, plan_id: int):
     if err: return err
     logs = await database.get_op_notify_logs(guild_id, plan_id)
     return _JSONResponse({"logs": logs})
+
+
+# ── OP Evaluation ────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/evaluation")
+async def op_evaluation(request: Request, guild_id: str, plan_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    data = await database.get_op_evaluation(plan_id, guild_id)
+    return _JSONResponse(data)
+
+
+# ── Hero Actions ──────────────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/hero-actions")
+async def op_add_hero_action(request: Request, guild_id: str, plan_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    try:
+        data = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    action_id = await database.add_op_hero_action(
+        plan_id, guild_id,
+        action_type=data.get("action_type", "gear_switch"),
+        player_discord_id=data.get("player_discord_id", ""),
+        player_name=data.get("player_name", ""),
+        item_slot=data.get("item_slot", ""),
+        item_name=data.get("item_name", ""),
+        notes=data.get("notes", ""),
+        target_id=data.get("target_id"),
+    )
+    # Notify the player via Discord DM
+    discord_id = data.get("player_discord_id", "")
+    if discord_id:
+        async def _notify_hero():
+            try:
+                plan = await database.get_op_plan(plan_id, guild_id)
+                async with httpx.AsyncClient(timeout=8) as _hc:
+                    await _hc.post("http://bot:7777/api/op-hero-action", json={
+                        "guild_id": guild_id,
+                        "discord_id": discord_id,
+                        "player_name": data.get("player_name", ""),
+                        "action_type": data.get("action_type", "gear_switch"),
+                        "item_slot": data.get("item_slot", ""),
+                        "item_name": data.get("item_name", ""),
+                        "notes": data.get("notes", ""),
+                        "plan_name": (plan or {}).get("name", "Operation"),
+                        "landing_time": (plan or {}).get("landing_time", ""),
+                    })
+            except Exception:
+                pass
+        asyncio.create_task(_notify_hero())
+    return _JSONResponse({"ok": True, "id": action_id})
+
+
+@app.post("/guild/{guild_id}/operations/api/hero-actions/{action_id}/delete")
+async def op_delete_hero_action(request: Request, guild_id: str, action_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    await database.delete_op_hero_action(action_id, guild_id)
+    return _JSONResponse({"ok": True})
 
 
 # ── Personal missions (used by mein-account tab) ──────────────────────────────
