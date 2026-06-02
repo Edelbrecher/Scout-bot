@@ -7696,6 +7696,44 @@ async def dismiss_attack(attack_id: int, guild_id: str):
         await db.commit()
 
 
+async def archive_attack(attack_id: int, guild_id: str) -> bool:
+    """Archive (soft-hide) an attack. Returns True if found."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE incoming_attacks SET is_dismissed=1 WHERE id=? AND guild_id=?",
+            (attack_id, guild_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def delete_attack(attack_id: int, guild_id: str) -> bool:
+    """Hard-delete an attack. Returns True if found."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "DELETE FROM incoming_attacks WHERE id=? AND guild_id=?",
+            (attack_id, guild_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_archived_attacks(guild_id: str, limit: int = 200) -> list[dict]:
+    """Return dismissed/archived attacks."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM incoming_attacks
+               WHERE guild_id=? AND is_dismissed=1
+               ORDER BY arrival_time DESC LIMIT ?""",
+            (guild_id, limit)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
 async def get_enemy_artifacts(guild_id: str, player_name: str) -> list[dict]:
     await _init_attack_detection_tables()
     async with aiosqlite.connect(DB_PATH) as db:

@@ -19,6 +19,11 @@
       <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
         &#x1F3F0; Own Villages
       </a>
+      {% if can_label %}
+      <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:0.9rem;">
+        &#x1F4C1; Archive
+      </button>
+      {% endif %}
     </div>
   </div>
 
@@ -64,6 +69,18 @@
   </div>
 
   <!-- ===== ALLIANCE ANALYSIS PANEL ===== -->
+  {% if can_label %}
+  <div id="archivedPanel" style="display:none; margin-bottom:1.5rem;">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h2 style="margin:0;">📁 Archived Attacks</h2>
+        <button onclick="toggleArchivedView()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">Archived attacks are hidden from the main view. You can permanently delete them here.</p>
+    </div>
+  </div>
+  {% endif %}
+
   <div id="alliancePanel" style="display:none; margin-bottom:1.5rem;">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
@@ -701,8 +718,14 @@
         ${labelBadge(a.label||'')}
         ${CAN_LABEL ? labelButtons(a.id, a.label||'') : ''}
         ${importedBy}
-        <button onclick="dismissAttack(${a.id})" data-tip="Attack ausblenden"
-          style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>
+        ${CAN_LABEL
+          ? `<button onclick="archiveAttack(${a.id})" data-tip="Archive attack"
+              style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;" title="Archive">📁</button>
+             <button onclick="deleteAttack(${a.id})" data-tip="Delete attack permanently"
+              style="background:none;border:none;color:#f87171;cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;" title="Delete">🗑</button>`
+          : `<button onclick="dismissAttack(${a.id})" data-tip="Hide attack"
+              style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>`
+        }
       </span>
     </div>`;
   }
@@ -774,6 +797,76 @@
     } catch(e) {
       if (row) row.style.opacity = '1';
     }
+  };
+
+  window.archiveAttack = async function(id) {
+    if (!confirm('Archive this attack? It will be hidden but can be viewed in the archive.')) return;
+    const row = document.querySelector('[data-id="'+id+'"]');
+    if (row) row.style.opacity = '0.4';
+    try {
+      const r = await fetch('/guild/' + GUILD_ID + '/attacks/archive/' + id, {method:'POST'});
+      const d = await r.json();
+      if (d.error === 'no_permission') { alert('No permission.'); if(row) row.style.opacity='1'; return; }
+      if (row) row.remove();
+    } catch(e) { if (row) row.style.opacity = '1'; }
+  };
+
+  window.deleteAttack = async function(id) {
+    if (!confirm('Permanently delete this attack? This cannot be undone.')) return;
+    const row = document.querySelector('[data-id="'+id+'"]');
+    if (row) row.style.opacity = '0.4';
+    try {
+      const r = await fetch('/guild/' + GUILD_ID + '/attacks/delete/' + id, {method:'POST'});
+      const d = await r.json();
+      if (d.error === 'no_permission') { alert('No permission.'); if(row) row.style.opacity='1'; return; }
+      if (row) row.remove();
+    } catch(e) { if (row) row.style.opacity = '1'; }
+  };
+
+  let archivedLoaded = false;
+  let archivedVisible = false;
+  window.toggleArchivedView = async function() {
+    const panel = document.getElementById('archivedPanel');
+    archivedVisible = !archivedVisible;
+    panel.style.display = archivedVisible ? 'block' : 'none';
+    if (archivedVisible && !archivedLoaded) {
+      panel.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">Loading…</p>';
+      try {
+        const r = await fetch('/guild/' + GUILD_ID + '/attacks/api/archived');
+        const d = await r.json();
+        if (d.error) { panel.innerHTML = '<p style="color:#f87171;padding:1rem;">No permission.</p>'; return; }
+        const attacks = d.attacks || [];
+        if (!attacks.length) { panel.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">No archived attacks.</p>'; archivedLoaded=true; return; }
+        panel.innerHTML = '<div style="display:flex;flex-direction:column;gap:0.4rem;padding:0.5rem 0;">'
+          + attacks.map(a => {
+              const coordStr = (a.attacker_village_x!=null) ? ` (${a.attacker_village_x}|${a.attacker_village_y})` : '';
+              return `<div class="atk-row" style="opacity:0.7;" data-archived-id="${a.id}">
+                ${typeBadge(a.attack_type)}
+                <span>${escHtml(a.attacker_player||'?')}</span>
+                <span style="color:var(--text-muted);font-size:0.8rem;">${escHtml(a.attacker_village_name||'')}${escHtml(coordStr)}</span>
+                <span style="color:var(--text-muted);">→</span>
+                <span style="font-size:0.8rem;color:var(--text-muted);">${fmtArrival(a.arrival_time)}</span>
+                <span style="margin-left:auto;">
+                  ${labelBadge(a.label||'')}
+                  <button onclick="deleteArchivedAttack(${a.id})" title="Delete permanently"
+                    style="background:none;border:none;color:#f87171;cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">🗑</button>
+                </span>
+              </div>`;
+            }).join('')
+          + '</div>';
+        archivedLoaded = true;
+      } catch(e) { panel.innerHTML = '<p style="color:#f87171;padding:1rem;">Error loading archive.</p>'; }
+    }
+  };
+
+  window.deleteArchivedAttack = async function(id) {
+    if (!confirm('Permanently delete this attack?')) return;
+    const row = document.querySelector('[data-archived-id="'+id+'"]');
+    if (row) row.style.opacity = '0.3';
+    try {
+      await fetch('/guild/' + GUILD_ID + '/attacks/delete/' + id, {method:'POST'});
+      if (row) row.remove();
+    } catch(e) { if (row) row.style.opacity = '0.7'; }
   };
 
   // =========================================================

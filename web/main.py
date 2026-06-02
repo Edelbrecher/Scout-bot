@@ -4791,6 +4791,58 @@ async def attacks_dismiss(request: Request, guild_id: str, attack_id: int):
     return _JSONResponse({"ok": True})
 
 
+def _attacks_can_manage(session: dict, guild: dict, perms: list) -> bool:
+    uid = session.get("uid", "")
+    is_admin = session.get("type") == "admin"
+    is_owner = guild and guild.get("owner_discord_id") == uid
+    return is_admin or is_owner or "ally_manage" in perms or "defend_manage" in perms
+
+
+@app.post("/guild/{guild_id}/attacks/archive/{attack_id}")
+async def attacks_archive(request: Request, guild_id: str, attack_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    if not _attacks_can_manage(session, guild, perms):
+        return _JSONResponse({"error": "no_permission"}, status_code=403)
+    ok = await database.archive_attack(attack_id, guild_id)
+    return _JSONResponse({"ok": ok})
+
+
+@app.post("/guild/{guild_id}/attacks/delete/{attack_id}")
+async def attacks_delete(request: Request, guild_id: str, attack_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    if not _attacks_can_manage(session, guild, perms):
+        return _JSONResponse({"error": "no_permission"}, status_code=403)
+    ok = await database.delete_attack(attack_id, guild_id)
+    return _JSONResponse({"ok": ok})
+
+
+@app.get("/guild/{guild_id}/attacks/api/archived")
+async def attacks_api_archived(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    if not _attacks_can_manage(session, guild, perms):
+        return _JSONResponse({"error": "no_permission"}, status_code=403)
+    attacks = await database.get_archived_attacks(guild_id)
+    return _JSONResponse({"attacks": attacks})
+
+
 @app.post("/guild/{guild_id}/attacks/label/{attack_id}")
 async def attacks_label(request: Request, guild_id: str, attack_id: int):
     session, err = _require_session(request)
