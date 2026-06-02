@@ -7111,11 +7111,25 @@ async def op_attacker_list(request: Request, guild_id: str):
         am = ally_members.get(name, {})
         tr = troop_rows.get(name, {})
         villages = snap_villages.get(name, [])
-        # Fallback 1: villages_json from member_troops upload
+        # Fallback 1: villages_json from member_troops upload (include troops)
+        # Include villages even without coords (x=None) so player appears in list
         if not villages and tr.get("villages_json"):
             try:
                 tv = _jop.loads(tr["villages_json"])
-                villages = [{"name": v.get("village_name",""), "x": v.get("x"), "y": v.get("y"), "pop": v.get("population",0)} for v in tv if v.get("x") is not None]
+                villages = [{
+                    "name": v.get("village_name",""), "x": v.get("x"), "y": v.get("y"),
+                    "pop": v.get("population", 0), "troops": v.get("troops", {}),
+                } for v in tv]
+            except Exception:
+                pass
+        # Enrich snap villages with troops from member_troops
+        elif villages and tr.get("villages_json"):
+            try:
+                tv = _jop.loads(tr["villages_json"])
+                troop_by_coord = {(v.get("x"), v.get("y")): v.get("troops", {}) for v in tv}
+                for v in villages:
+                    if not v.get("troops"):
+                        v["troops"] = troop_by_coord.get((v.get("x"), v.get("y")), {})
             except Exception:
                 pass
         # Fallback 2: own villages imported via "Mein Account" (guild_own_villages)
