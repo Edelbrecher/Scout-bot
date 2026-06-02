@@ -8857,3 +8857,17 @@ async def save_troop_roles(guild_id: str, roles: dict[str, str]):
                 (guild_id, troop_name, role)
             )
         await db.commit()
+
+
+async def get_player_tribe_from_map(guild_id: str, player_name: str) -> str:
+    """Look up tribe from map_snapshots. Returns lowercase tribe name or empty string."""
+    _TRIBE_ID_MAP = {1: "römer", 2: "teutonen", 3: "gallier", 5: "ägypter", 6: "hunnen", 7: "spartaner"}
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT tribe FROM map_snapshots WHERE guild_id=? AND player_name=? AND tribe IS NOT NULL AND tribe != 0 LIMIT 1",
+            (guild_id, player_name)
+        ) as cur:
+            row = await cur.fetchone()
+            if row:
+                return _TRIBE_ID_MAP.get(int(row[0]), "")
+    return ""

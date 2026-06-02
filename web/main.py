@@ -4451,31 +4451,54 @@ async def mein_account_upload(
             existing = await database.get_member_troops_single(guild_id, discord_id)
             tname = (existing or {}).get("travian_name", "") or ""
 
+    # Auto-detect tribe from map data if not submitted
+    _TRIBE_ID_MAP = {1:"römer", 2:"teutonen", 3:"gallier", 5:"ägypter", 6:"hunnen", 7:"spartaner"}
+    if not tribe and tname:
+        tribe = await database.get_player_tribe_from_map(guild_id, tname)
+    elif not tribe and not tname:
+        existing = existing if 'existing' in dir() else await database.get_member_troops_single(guild_id, discord_id)
+        stored_name = (existing or {}).get("travian_name", "")
+        if stored_name:
+            tribe = await database.get_player_tribe_from_map(guild_id, stored_name)
+
     # Persist travian_name to member_troops even without a troop upload
     parsed = parse_own_villages(troop_text, tribe=tribe)
     troop_roles = await database.get_troop_roles(guild_id)
+    _CROP_MAP = {
+        "Legionär":1,"Prätorianer":1,"Imperianer":1,
+        "Equites Legati":2,"Equites Imperatoris":3,"Equites Caesaris":4,
+        "Rammbock":5,"Feuerkatapult":6,"Senator":5,
+        "Keulenschwinger":1,"Speerkämpfer":1,"Axtkämpfer":1,
+        "Späher":1,"Paladin":2,"Teut. Ritter":3,
+        "Häuptling":4,"Stammesführer":4,"Teutonen-Rammbock":5,"Kriegsmaschine":6,
+        "Phalanx":1,"Schwertkämpfer":1,"Pathfinder":2,
+        "Theutates-Blitz":2,"Druidentreiter":2,"Haeduer":3,
+        "Gallier-Rammbock":5,"Gallier-Kata":6,"Siedler":1,"Held":0,
+    }
     for v in parsed:
         vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
         v["village_type"] = vtype
         v["off_score"]    = off_s
         v["def_score"]    = def_s
         v["priority"]     = prio
+        v["total_crop"]   = sum(_CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
+        v["total_units"]  = sum(c for c in v.get("troops", {}).values())
     if parsed:
         await database.save_own_villages(guild_id, parsed, uploaded_by, discord_id)
-    total_off  = sum(v.get("off_score",0) for v in parsed)
-    total_def  = sum(v.get("def_score",0) for v in parsed)
-    total_crop = sum(v.get("total_crop",0) for v in parsed)
-    total_units= sum(sum(t for t in v.get("troops",{}).values() if isinstance(t,int)) for v in parsed)
-    # count scouts
-    scout_names = {"Equites Legati","Späher","Pathfinder","Sopdu-Erkunder"}
-    total_scouts= sum(v.get("troops",{}).get(s,0) for v in parsed for s in scout_names)
+    troop_roles_scout = {t for t, r in troop_roles.items() if r == "scout"}
+    total_off    = sum(v.get("off_score",0) for v in parsed)
+    total_def    = sum(v.get("def_score",0) for v in parsed)
+    total_crop   = sum(v.get("total_crop",0) for v in parsed)
+    total_units  = sum(v.get("total_units",0) for v in parsed)
+    total_scouts = sum(c for v in parsed for t, c in v.get("troops",{}).items() if t in troop_roles_scout)
     # Always upsert member_troops so travian_name is stored (even if no troop data yet)
     if tname or parsed:
         await database.upsert_member_troops(
             guild_id, discord_id, uploaded_by, tname or uploaded_by,
-            [{k:v for k,v in vill.items() if k in ("village_name","x","y","troops","off_score","def_score","village_type")}
+            [{k: val for k, val in vill.items()
+              if k in ("village_name","x","y","troops","off_score","def_score","village_type","total_crop","total_units")}
              for vill in parsed],
-            tribe="", total_off=total_off, total_def=total_def,
+            tribe=tribe, total_off=total_off, total_def=total_def,
             total_crop=total_crop, total_units=total_units, total_scouts=total_scouts,
         )
     return RedirectResponse(f"/guild/{guild_id}/mein-account?uploaded={len(parsed)}", status_code=303)
