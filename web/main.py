@@ -544,51 +544,67 @@ def _parse_map_sql(content: str) -> list[dict]:
             if f0 is None:
                 continue
 
+            def _int(val, default=0):
+                """Parse int from SQL value — handles NULL, FALSE, TRUE, floats."""
+                if val in ('NULL', '', None):
+                    return default
+                if val.upper() == 'FALSE':
+                    return 0
+                if val.upper() == 'TRUE':
+                    return 1
+                return int(float(val))
+
             # Detect layout
             v7_is_num = len(v) > 7 and _IS_NUM.match(v[7].strip())
 
             if not v7_is_num and f0 >= 0 and len(v) > 10:
                 # Layout A: new T4.5+ format
-                # (village_id, x, y, tribe, row_uid, village_name, player_id, player_name, alliance_id, alliance_name, population, is_capital, village_type)
-                x           = int(float(v[1]))
-                y           = int(float(v[2]))
-                tribe       = int(float(v[3])) if v[3] not in ('NULL', '') else 0
-                vname       = v[5]
-                pop         = int(float(v[10])) if v[10] not in ('NULL', '') else 0
-                pname       = v[7]
-                aname       = v[9] if v[9] not in ('NULL', '') else ""
-                pid         = v[6]   # v[6] = real player_id (constant per player across all their villages)
-                vid         = v[0]
-                is_capital  = int(float(v[11])) if len(v) > 11 and v[11] not in ('NULL', '') else 0
-                village_type = int(float(v[12])) if len(v) > 12 and v[12] not in ('NULL', '') else 0
+                # (vid, x, y, tribe, pid, vname, score?, pname, aid, aname, pop, NULL, is_capital, ...)
+                x            = _int(v[1])
+                y            = _int(v[2])
+                tribe        = _int(v[3])
+                vid          = v[0]
+                pid          = v[4]
+                vname        = v[5]
+                pname        = v[7]
+                aname        = v[9] if v[9] not in ('NULL', '') else ""
+                pop          = _int(v[10])
+                # is_capital: v[11] in old 13-col, v[12] in new 16-col (after extra NULL)
+                # Detect: if v[11] is NULL and v[12] looks like boolean → new format
+                if len(v) > 12 and v[11] in ('NULL', '') and v[12].upper() in ('TRUE','FALSE','0','1'):
+                    is_capital   = _int(v[12])
+                    village_type = _int(v[13]) if len(v) > 13 else 0
+                else:
+                    is_capital   = _int(v[11]) if len(v) > 11 else 0
+                    village_type = _int(v[12]) if len(v) > 12 else 0
 
             elif not v7_is_num and abs(f0) <= 800:
                 # Layout B: old x-first — x, y, type_id, tribe, vid, vname, pop, pname, pid, aname
-                x           = int(f0)
-                y           = int(float(v[1]))
-                tribe       = int(float(v[3])) if len(v) > 3 and v[3] not in ('NULL', '') else 0
-                vname       = v[5] if len(v) > 5 else ""
-                pop         = int(float(v[6])) if len(v) > 6 and v[6] not in ('NULL', '') else 0
-                pname       = v[7] if v[7] not in ('NULL', '') else ""
-                aname       = v[9] if len(v) > 9 and v[9] not in ('NULL', '') else ""
-                pid         = v[8] if len(v) > 8 else ""
-                vid         = v[4] if len(v) > 4 else ""
-                village_type = int(float(v[2])) if len(v) > 2 and v[2] not in ('NULL', '') else 0
-                is_capital  = int(float(v[12])) if len(v) > 12 and v[12] not in ('NULL', '') else 0
+                x            = _int(v[0])
+                y            = _int(v[1])
+                tribe        = _int(v[3]) if len(v) > 3 else 0
+                vname        = v[5] if len(v) > 5 else ""
+                pop          = _int(v[6]) if len(v) > 6 else 0
+                pname        = v[7] if len(v) > 7 and v[7] not in ('NULL', '') else ""
+                aname        = v[9] if len(v) > 9 and v[9] not in ('NULL', '') else ""
+                pid          = v[8] if len(v) > 8 else ""
+                vid          = v[4] if len(v) > 4 else ""
+                village_type = _int(v[2]) if len(v) > 2 else 0
+                is_capital   = _int(v[12]) if len(v) > 12 else 0
 
             else:
                 # Layout C: old vid-first — vid, x, y, type_id, tribe, ?, vname, pop, pname, ?, aname
-                x           = int(float(v[1]))
-                y           = int(float(v[2]))
-                tribe       = int(float(v[4])) if len(v) > 4 and v[4] not in ('NULL', '') else 0
-                vname       = v[6] if len(v) > 6 else ""
-                pop         = int(float(v[7])) if len(v) > 7 and v[7] not in ('NULL', '') else 0
-                pname       = v[8] if len(v) > 8 and v[8] not in ('NULL', '') else ""
-                aname       = v[10] if len(v) > 10 and v[10] not in ('NULL', '') else ""
-                pid         = v[8] if len(v) > 8 else ""
-                vid         = v[0]
-                village_type = int(float(v[3])) if len(v) > 3 and v[3] not in ('NULL', '') else 0
-                is_capital  = int(float(v[13])) if len(v) > 13 and v[13] not in ('NULL', '') else 0
+                x            = _int(v[1])
+                y            = _int(v[2])
+                tribe        = _int(v[4]) if len(v) > 4 else 0
+                vname        = v[6] if len(v) > 6 else ""
+                pop          = _int(v[7]) if len(v) > 7 else 0
+                pname        = v[8] if len(v) > 8 and v[8] not in ('NULL', '') else ""
+                aname        = v[10] if len(v) > 10 and v[10] not in ('NULL', '') else ""
+                pid          = v[8] if len(v) > 8 else ""
+                vid          = v[0]
+                village_type = _int(v[3]) if len(v) > 3 else 0
+                is_capital   = _int(v[13]) if len(v) > 13 else 0
 
         except (ValueError, IndexError):
             continue
