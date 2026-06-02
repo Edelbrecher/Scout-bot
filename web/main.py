@@ -6454,6 +6454,7 @@ async def operations_page(request: Request, guild_id: str):
         "favorites": favorites,
         "members":   members,
         "troops_def": database.TRAVIAN_TROOPS,
+        "default_ts": guild.get("default_tournament_square") or 0,
     })
 
 
@@ -6815,6 +6816,20 @@ async def op_my_waves(request: Request, guild_id: str):
 
 
 # ── Recalculate wave times ────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/operations/api/save-default-ts")
+async def op_save_default_ts(request: Request, guild_id: str):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    data = await request.json()
+    ts = max(0, min(20, int(data.get("ts", 0))))
+    async with __import__('aiosqlite').connect(database.DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET default_tournament_square=? WHERE guild_id=?", (ts, guild_id)
+        )
+        await db.commit()
+    return _JSONResponse({"ok": True, "ts": ts})
+
 
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/recalc-times")
 async def op_recalc_times(request: Request, guild_id: str, plan_id: int):

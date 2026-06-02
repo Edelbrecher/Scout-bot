@@ -6259,6 +6259,12 @@ async def _init_op_tables():
                 await db.commit()
             except Exception:
                 pass
+        # guild_configs: default tournament square for operations
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN default_tournament_square INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
         # availability_polls: poll type
         try:
             await db.execute("ALTER TABLE availability_polls ADD COLUMN poll_type TEXT DEFAULT 'availability'")

@@ -1229,7 +1229,12 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
 let assignTarget = null;
 let assignRows   = [];
 // Panel-wide settings (read from DOM when rendering)
-const ASSIGN_DEFAULTS = { ts: 0, heroEnabled: true, heroBonus: 5, onlyOff: false };
+const GUILD_DEFAULT_TS = {{ default_ts | default(0) }};
+const _lsTS = parseInt(localStorage.getItem('assign_ts'));
+const ASSIGN_DEFAULTS = {
+  ts: isNaN(_lsTS) ? GUILD_DEFAULT_TS : _lsTS,
+  heroEnabled: true, heroBonus: 5, onlyOff: false, onlyWithTroops: false
+};
 
 function _torusDist(x1, y1, x2, y2) {
   const dx = Math.min(Math.abs(x1-x2), 801-Math.abs(x1-x2));
@@ -1245,7 +1250,8 @@ function _assignSettings() {
     ts:          Math.max(0, Math.min(20, parseInt(document.getElementById('assignTS')?.value)||0)),
     heroEnabled: document.getElementById('assignHero')?.checked ?? true,
     heroBonus:   parseFloat(document.getElementById('assignHeroBonus')?.value)||5,
-    onlyOff:     document.getElementById('assignOnlyOff')?.checked ?? true,
+    onlyOff:        document.getElementById('assignOnlyOff')?.checked ?? false,
+    onlyWithTroops: document.getElementById('assignOnlyWithTroops')?.checked ?? false,
   };
 }
 
@@ -1286,6 +1292,8 @@ function _buildAssignRows(settings) {
       // Classify village (OFF / DEF / Scout / unknown) — only if actual troop data exists
       const role = classifyVillage(v, a.tribe);
       if (settings.onlyOff && role !== 'off') return;
+      const hasTroopData = Object.values(v.troops || {}).some(c => c > 0);
+      if (settings.onlyWithTroops && !hasTroopData) return;
       const dist = _torusDist(v.x, v.y, tx, ty);
       const travelSec = _catTravelSec(dist, settings, spd);
       assignRows.push({
@@ -1330,34 +1338,51 @@ function _renderAssignmentPanel(settings) {
     </div>
 
     <!-- Settings bar -->
-    <div style="padding:.45rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);display:flex;flex-direction:column;gap:.3rem;">
+    <div style="padding:.45rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);display:flex;flex-direction:column;gap:.35rem;">
+      <!-- Row 1: village filter toggle -->
+      <div style="display:flex;gap:.35rem;">
+        <button onclick="document.getElementById('assignOnlyWithTroops').checked=false;rebuildAssignPanel();"
+          id="btn-all-villages"
+          style="flex:1;padding:.3rem .4rem;font-size:.7rem;font-weight:600;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:${!settings.onlyWithTroops?'rgba(99,102,241,.2)':'var(--bg-main)'};color:${!settings.onlyWithTroops?'#a5b4fc':'var(--text-muted)'};">
+          🏘 All villages
+        </button>
+        <button onclick="document.getElementById('assignOnlyWithTroops').checked=true;rebuildAssignPanel();"
+          id="btn-troops-only"
+          style="flex:1;padding:.3rem .4rem;font-size:.7rem;font-weight:600;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:${settings.onlyWithTroops?'rgba(99,102,241,.2)':'var(--bg-main)'};color:${settings.onlyWithTroops?'#a5b4fc':'var(--text-muted)'};">
+          🪖 With troops only
+        </button>
+        <input type="checkbox" id="assignOnlyWithTroops" style="display:none;" ${settings.onlyWithTroops?'checked':''} onchange="rebuildAssignPanel()">
+      </div>
+      <!-- Row 2: TS + hero + only-off -->
       <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
         <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;">
-          🏆 TP:
+          🏆 TS:
           <input id="assignTS" type="number" min="0" max="20" value="${settings.ts}"
             style="width:38px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
-            oninput="rebuildAssignPanel()">
+            oninput="localStorage.setItem('assign_ts',this.value);rebuildAssignPanel()">
+          <button onclick="saveGuildDefaultTS()" title="Save as guild default"
+            style="background:none;border:none;color:#6366f1;cursor:pointer;font-size:.72rem;padding:0 2px;">💾</button>
         </label>
         <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.25rem;">
           <input id="assignHero" type="checkbox" class="atk-include" ${settings.heroEnabled?'checked':''}
             onchange="rebuildAssignPanel()">
-          Held&nbsp;+&nbsp;Bonus:
+          Hero&nbsp;+&nbsp;Bonus:
           <input id="assignHeroBonus" type="number" min="0" max="30" step="0.5" value="${settings.heroBonus}"
             style="width:38px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
             oninput="rebuildAssignPanel()">
-          Fel/h
+          t/h
         </label>
         <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.25rem;margin-left:auto;">
           <input id="assignOnlyOff" type="checkbox" class="atk-include" ${settings.onlyOff?'checked':''}
-            onchange="rebuildAssignPanel()"> Nur OFF
+            onchange="rebuildAssignPanel()"> OFF only
         </label>
       </div>
       <div style="font-size:.68rem;color:#fbbf24;">${speedInfo}</div>
     </div>
 
     <div style="overflow-y:auto;flex:1;" id="pbAtkList">
-      ${!attackers.length ? '<div style="color:#f87171;font-size:.8rem;padding:1.2rem;text-align:center;">⚠️ Keine eigenen Spieler geladen.<br><small style=\'color:var(--text-muted)\'>Truppen in Mein Account importieren.</small></div>'
-      : !assignRows.length ? '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">Keine Dörfer gefunden.<br><small>„Nur OFF" deaktivieren oder Truppen importieren.</small></div>'
+      ${!attackers.length ? '<div style="color:#f87171;font-size:.8rem;padding:1.2rem;text-align:center;">⚠️ No players loaded.<br><small style='color:var(--text-muted)'>Import troops in My Account.</small></div>'
+      : !assignRows.length ? '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">No villages found.<br><small>Disable filters or import troops in My Account.</small></div>'
       : assignRows.map((r, i) => {
         const sendStr = _sendTimeStr(r.travelSec);
         // Build troops display (only >0)
@@ -1411,6 +1436,22 @@ function rebuildAssignPanel() {
   const settings = _assignSettings();
   _buildAssignRows(settings);
   _renderAssignmentPanel(settings);
+}
+
+async function saveGuildDefaultTS() {
+  const ts = parseInt(document.getElementById('assignTS')?.value) || 0;
+  if (!activePlanId) return;
+  try {
+    const r = await fetch(`/guild/{{ guild.guild_id }}/operations/api/save-default-ts`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ts})
+    });
+    if (r.ok) {
+      const btn = event.target;
+      btn.textContent = '✅'; setTimeout(() => btn.textContent = '💾', 1500);
+    }
+  } catch(e) { console.error(e); }
 }
 
 async function addAtkWave(i, type, btn) {
