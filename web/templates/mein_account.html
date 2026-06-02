@@ -115,6 +115,18 @@
         <textarea name="troop_text" rows="7"
           placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."
           style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;"></textarea>
+        <div style="margin:.45rem 0 .3rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <label style="font-size:.8rem;color:var(--text-muted);">Volk (nur nötig bei mobilem Browser):</label>
+          <select name="tribe" style="font-size:.82rem;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);">
+            <option value="">– automatisch –</option>
+            <option value="römer">Römer</option>
+            <option value="teutonen">Teutonen</option>
+            <option value="gallier">Gallier</option>
+            <option value="ägypter">Ägypter</option>
+            <option value="hunnen">Hunnen</option>
+            <option value="spartaner">Spartaner</option>
+          </select>
+        </div>
         <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap;">
           <button type="submit" class="btn btn-primary" data-i18n="account.import.btn">⬆️ Speichern &amp; Importieren</button>
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='flex'" style="display:flex;align-items:center;gap:.4rem;">

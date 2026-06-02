@@ -4063,7 +4063,17 @@ def classify_own_village(troops: dict, troop_roles: dict | None = None) -> tuple
     return "mixed", off_score, def_score, (off_score + def_score) // 2
 
 
-def parse_own_villages(text: str) -> list:
+TRIBE_COLUMN_ORDER: dict[str, list[str]] = {
+    "römer":    ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"],
+    "teutonen": ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutonen-Rammbock","Kriegsmaschine","Häuptling","Siedler","Held"],
+    "gallier":  ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gallier-Rammbock","Gallier-Kata","Häuptling","Siedler","Held"],
+    "ägypter":  ["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Häuptling","Siedler","Held"],
+    "hunnen":   ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Häuptling","Siedler","Held"],
+    "spartaner":["Hoplite","Sentinel","Häuptling","Siedler","Held"],
+}
+
+
+def parse_own_villages(text: str, tribe: str = "") -> list:
     """
     Parse Travian village/troop overview copy-paste (Strg+A / Strg+C).
 
@@ -4206,6 +4216,9 @@ def parse_own_villages(text: str) -> list:
         if is_troop_col_header:
             header_idx = i
             col_names  = [normalize(p) for p in parts[1:]]
+            # Mobile: header row has empty column names → use tribe fallback
+            if all(c == "" for c in col_names) and tribe:
+                col_names = TRIBE_COLUMN_ORDER.get(tribe.lower(), col_names)
             is_gaul = any(n in col_names for n in (
                 "Phalanx", "Theutates-Blitz", "Gallier-Rammbock",
                 "Druidentreiter", "Haeduer", "Gallier-Kata"))
@@ -4414,6 +4427,7 @@ async def mein_account_upload(
     guild_id: str,
     travian_name: str = Form(""),
     troop_text: str = Form(""),
+    tribe: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -4438,11 +4452,7 @@ async def mein_account_upload(
             tname = (existing or {}).get("travian_name", "") or ""
 
     # Persist travian_name to member_troops even without a troop upload
-    import logging as _logging
-    _log = _logging.getLogger("upload_debug")
-    _log.warning("UPLOAD full text: %r", troop_text)
-    parsed = parse_own_villages(troop_text)
-    _log.warning("UPLOAD parsed villages: %r", parsed)
+    parsed = parse_own_villages(troop_text, tribe=tribe)
     troop_roles = await database.get_troop_roles(guild_id)
     for v in parsed:
         vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
