@@ -4060,6 +4060,7 @@ def parse_own_villages(text: str) -> list:
     """
     import re
     text = re.sub(r'[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]', '', text)
+    text = text.replace('\u2212', '-').replace('\u2013', '-')  # Unicode minus / en-dash \u2192 ASCII
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
     TROOP_ALIASES = {
