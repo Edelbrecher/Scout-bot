@@ -328,7 +328,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
             <div id="allianceFilterRow" style="display:none;position:absolute;z-index:200;top:auto;left:0;right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;box-shadow:0 8px 32px rgba(0,0,0,.45);margin-top:.2rem;">
               <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
                 <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🏰 Allianz-Filter</span>
-                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">Keine Auswahl = alle Player</span>
+                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">No selection = all players</span>
                 <button class="btn-icon" id="allyResetBtn" style="font-size:.7rem;padding:.15rem .5rem;display:none;" onclick="resetAllianceFilter()">↺ Reset</button>
                 <button class="btn-icon" style="font-size:.7rem;padding:.1rem .35rem;" onclick="toggleAlliancePanel()">✕</button>
               </div>
@@ -344,7 +344,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
             <div id="targetList"></div>
 
             <div id="noTargets" style="text-align:center;padding:2rem;color:var(--text-muted);font-size:.85rem;display:none;">
-              Noch keine Targets — suche nach einem Player oder gib Coordinates manuell ein.
+              No targets yet — search for a player or enter coordinates manually.
             </div>
           </div>
 
@@ -526,8 +526,8 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
     </div>
     <div class="op-modal-body">
 
-      <!-- Row 1: Angreifer + Village -->
-      <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Angreifer</div>
+      <!-- Row 1: Attacker + Village -->
+      <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Attacker</div>
       <div class="form-row" style="margin-bottom:.6rem;">
         <div class="form-group" style="flex:1;">
           <label>Allianz-Mitglied</label>
@@ -536,7 +536,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           </select>
         </div>
         <div class="form-group" style="flex:2;">
-          <label>Angreifer-Village</label>
+          <label>Attacker village</label>
           <select id="wmVillageSelect" onchange="onVillageSelect()" disabled>
             <option value="">— select attacker first —</option>
           </select>
@@ -635,7 +635,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div id="pbAssignPanel">
           <div class="pb-right-empty">
             <span style="font-size:1.5rem;">🎯</span>
-            <span>Village anklicken<br>um eigene Player<br>mit Laufzeiten zu sehen</span>
+            <span>Click a village<br>to see your players<br>with march times</span>
           </div>
         </div>
       </div>
@@ -700,7 +700,7 @@ function statusLabel(s) {
   return m[s]||s;
 }
 function waveTypeeLabel(t) {
-  return {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout',cleaner1:'🧹 1st-Cleaner',cleaner2:'🧹 2nd-Cleaner'}[t]||t;
+  return {real:'⚔ Real',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout',cleaner1:'🧹 1st-Cleaner',cleaner2:'🧹 2nd-Cleaner'}[t]||t;
 }
 function tribeName(t) {
   return {romans:'Romans',gauls:'Gauls',teutons:'Teutons',huns:'Huns',egyptians:'Egyptians'}[t]||t;
@@ -775,7 +775,7 @@ function renderPlanInfo() {
     <table style="width:100%;font-size:.82rem;">
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Name</td><td style="padding:.2rem .4rem;font-weight:600;">${escHtml(p.name)}</td></tr>
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Status</td><td style="padding:.2rem .4rem;"><span class="status-badge status-${p.status}">${statusLabel(p.status)}</span></td></tr>
-      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Ankunft</td><td style="padding:.2rem .4rem;font-family:monospace;color:#fbbf24;">${fmtDatetime(p.landing_time)}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Landing</td><td style="padding:.2rem .4rem;font-family:monospace;color:#fbbf24;">${fmtDatetime(p.landing_time)}</td></tr>
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Speed</td><td style="padding:.2rem .4rem;">${p.server_speed}x</td></tr>
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Enemy-Ally</td><td style="padding:.2rem .4rem;">${escHtml(p.target_ally||'—')}</td></tr>
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Targets</td><td style="padding:.2rem .4rem;">${(p.targets||[]).length}</td></tr>
@@ -851,9 +851,9 @@ function renderTargetCard(t) {
         ${cleaner1Cnt ? `<span class="wave-type-badge wt-cleaner1">🧹1 ${cleaner1Cnt}</span>` : ''}
         ${cleaner2Cnt ? `<span class="wave-type-badge wt-cleaner2">🧹2 ${cleaner2Cnt}</span>` : ''}
         ${realCnt && !fakeOk ? '<span title="Zu wenig Fakes!" style="color:#f59e0b;">⚠️</span>' : ''}
-        <button class="btn-icon" title="Add wave" style="font-size:.75rem;" onclick="event.stopPropagation();openWaveModal(${t.id},'${escHtml(t.player_name||'')} (${t.x}|${t.y})')">+ Welle</button>
+        <button class="btn-icon" title="Add wave" style="font-size:.75rem;" onclick="event.stopPropagation();openWaveModal(${t.id},'${escHtml(t.player_name||'')} (${t.x}|${t.y})')">+ Wave</button>
         <button class="btn-icon" title="Als Favorit" style="font-size:.75rem;" onclick="event.stopPropagation();favTarget(${t.id})">⭐</button>
-        <button class="btn-icon danger" title="Ziel entfernen" style="font-size:.75rem;" onclick="event.stopPropagation();deleteTarget(${t.id})">🗑</button>
+        <button class="btn-icon danger" title="Remove target" style="font-size:.75rem;" onclick="event.stopPropagation();deleteTarget(${t.id})">🗑</button>
         <span style="color:var(--text-muted);font-size:.8rem;" id="tc-chevron-${t.id}">▼</span>
       </div>
     </div>
@@ -873,9 +873,8 @@ function toggleTarget(id) {
 
 // Key for grouping identical waves (all meaningful fields except id/order/confirm)
 function _waveGroupKey(w) {
-  // Exclude send_time so waves with slight time diffs still group
-  return [w.wave_type, w.attacker_name, w.origin_village||'', w.origin_x??'', w.origin_y??'',
-          w.tribe, JSON.stringify(w.troop_json||{}), w.tournament_square||0, w.notes||''].join('|');
+  // Group by attacker + type + origin only — troops can differ per wave
+  return [w.wave_type, w.attacker_name, w.origin_village||'', w.origin_x??'', w.origin_y??'', w.tribe].join('|');
 }
 
 function renderWavesTable(t) {
@@ -906,14 +905,18 @@ function renderWavesTable(t) {
       const tsInfo = wv.tournament_square > 0 ? ` 🏆${wv.tournament_square}` : '';
       return `
         <button class="wave-action-btn" title="Quick +1" onclick="duplicateWave(${wv.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
-        ${count > 1 || isSubrow ? `<button class="wave-action-btn" title="−1 diese Welle löschen" onclick="deleteWave(${wv.id},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
-        <button class="wave-action-btn" title="Bearbeiten" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
-        <button class="wave-action-btn danger" title="Welle löschen" onclick="deleteWave(${wv.id},${t.id})">🗑</button>
+        ${count > 1 || isSubrow ? `<button class="wave-action-btn" title="−1 remove this wave" onclick="deleteWave(${wv.id},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
+        <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
+        <button class="wave-action-btn danger" title="Delete wave" onclick="deleteWave(${wv.id},${t.id})">🗑</button>
         <button class="wave-action-btn" title="Rallypoint" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>`;
     }
 
-    const troops = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
-      .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('');
+    // Show troops: if all waves identical show chips, otherwise show "mixed"
+    const allTroopsSame = g.waves.every(x => JSON.stringify(x.troop_json||{}) === JSON.stringify(w.troop_json||{}));
+    const troops = allTroopsSame
+      ? Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
+          .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('')
+      : `<span style="font-size:.75rem;color:#a78bfa;font-style:italic;">Mixed troops — expand to see</span>`;
     const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;">🏆${w.tournament_square}</span>` : '';
     const csMap = {on_time:['✅','#4ade80','On time'], late:['⏱','#fbbf24',`Late`], not_sent:['❌','#f87171','Not sent'], cant_send:['🚫','#f87171','Cannot send']};
     const cs = csMap[w.confirm_status];
@@ -921,11 +924,11 @@ function renderWavesTable(t) {
     const rowBg = cs ? (w.confirm_status==='on_time'?'rgba(74,222,128,.04)':w.confirm_status==='late'?'rgba(251,191,36,.06)':'rgba(248,113,113,.06)') : '';
     const totalTroops = Object.values(w.troop_json||{}).reduce((s,v)=>s+(parseInt(v)||0), 0);
     const lowTroopBadge = (w.wave_type==='fake' && totalTroops > 0 && totalTroops < 20)
-      ? `<span title="Nur ${totalTroops} Truppen" style="color:#f87171;font-size:.85rem;margin-left:.2rem;">🔻</span>` : '';
+      ? `<span title="Only ${totalTroops} troops" style="color:#f87171;font-size:.85rem;margin-left:.2rem;">🔻</span>` : '';
 
     // Expand toggle (only for grouped waves)
     const expandBtn = count > 1
-      ? `<button class="wave-action-btn" title="Wellen einzeln aufklappen" onclick="toggleWaveGroup('${groupId}')"
+      ? `<button class="wave-action-btn" title="Expand waves" onclick="toggleWaveGroup('${groupId}')"
            id="btn-${groupId}" style="font-weight:700;color:#a78bfa;border-color:rgba(167,139,250,.4);min-width:28px;">▸</button>`
       : '';
 
@@ -953,14 +956,20 @@ function renderWavesTable(t) {
         ${expandBtn}
         <button class="wave-action-btn" title="+1" onclick="duplicateWave(${w.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
         ${count > 1 ? `<button class="wave-action-btn" title="−1" onclick="deleteWave(${ids[ids.length-1]},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
-        <button class="wave-action-btn" title="Bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
-        <button class="wave-action-btn danger" title="${count>1?`Alle ${count} löschen`:'Löschen'}" onclick="${count>1?`if(confirm('${count} Wellen löschen?')){${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')}}`:`deleteWave(${w.id},${t.id})`}">🗑${count>1?` ×${count}`:''}</button>
+        <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
+        <button class="wave-action-btn danger" title="${count>1?`Delete all ${count}`:'Delete'}" onclick="${count>1?`if(confirm('Delete ${count} waves?')){${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')}}`:`deleteWave(${w.id},${t.id})`}">🗑${count>1?` ×${count}`:''}</button>
         <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
       </td>
     </tr>`;
 
     // Sub-rows (individual waves, collapsed by default)
     if (count > 1) {
+      html += `<tr class="wave-subrow" data-group="${groupId}" style="display:none;">
+        <td colspan="7" style="padding:.25rem 1.2rem .25rem 2.5rem;background:rgba(99,102,241,.03);">
+          <button class="wave-action-btn" onclick="duplicateWaveEdit(${w.id},${t.id})"
+            style="font-size:.72rem;color:#4ade80;border-color:rgba(74,222,128,.3);">+ Add wave to group</button>
+        </td>
+      </tr>`;
       html += g.waves.map((wv, idx) => {
         const wvTroops = Object.entries(wv.troop_json||{}).filter(([,v])=>v>0)
           .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,wv.tribe)} ×${cnt}</span>`).join('');
@@ -969,7 +978,7 @@ function renderWavesTable(t) {
         const wvBg = wv.confirm_status==='on_time'?'rgba(74,222,128,.04)':wv.confirm_status==='late'?'rgba(251,191,36,.06)':wv.confirm_status?'rgba(248,113,113,.06)':'';
         return `<tr class="wave-subrow" data-group="${groupId}" style="display:none;background:${wvBg};border-left:3px solid #6366f1;">
           <td style="padding-left:1.2rem;">
-            <span style="font-size:.7rem;color:#a78bfa;font-weight:700;">Welle ${idx+1}</span>
+            <span style="font-size:.7rem;color:#a78bfa;font-weight:700;">Wave ${idx+1}</span>
           </td>
           <td>
             <strong>${escHtml(wv.attacker_name)}</strong>${wvCsInd}
@@ -983,8 +992,8 @@ function renderWavesTable(t) {
           </td>
           <td style="font-size:.75rem;color:var(--text-muted);max-width:110px;word-break:break-word;">${wv.notes ? escHtml(wv.notes) : ''}</td>
           <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
-            <button class="wave-action-btn" title="Bearbeiten" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
-            <button class="wave-action-btn danger" title="Löschen" onclick="deleteWave(${wv.id},${t.id},true)">🗑</button>
+            <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
+            <button class="wave-action-btn danger" title="Delete" onclick="deleteWave(${wv.id},${t.id},true)">🗑</button>
             <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
           </td>
         </tr>`;
@@ -1108,7 +1117,7 @@ function renderAllianceFilter() {
 
   const hasFilter = selectedAlliances.size > 0;
   if (!hasFilter) {
-    hint.textContent = 'Keine Auswahl = alle Player';
+    hint.textContent = 'No selection = all players';
   } else {
     hint.textContent = `Active: ${[...selectedAlliances].join(' + ')}`;
   }
@@ -1230,7 +1239,7 @@ function renderPlayerBrowser() {
   const body = document.getElementById('pbBody');
   const count = document.getElementById('pbCount');
   if (!pbFiltered.length) {
-    body.innerHTML = '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Keine Player gefunden.</div>';
+    body.innerHTML = '<div style="color:var(--text-muted);padding:1rem;text-align:center;">No players found.</div>';
     count.textContent = '';
     return;
   }
@@ -1403,7 +1412,7 @@ function _renderAssignmentPanel(settings) {
   const effSpeed = (CAT_BASE_SPEED * (1 + settings.ts * 0.2) + (settings.heroEnabled ? settings.heroBonus : 0)) * spd;
   const speedInfo = `Kata ${CAT_BASE_SPEED} → ${effSpeed.toFixed(1)} Fel/h (×${spd})`;
 
-  const lbl = {real:'⚔ Echt', fake:'👻 Fake', scout:'🔍 Scout', def:'🛡 Def'};
+  const lbl = {real:'⚔ Real', fake:'👻 Fake', scout:'🔍 Scout', def:'🛡 Def'};
   const roleTag = {off:'<span style="color:#f87171;font-size:.68rem;">⚔ OFF</span>',
                    def:'<span style="color:#93c5fd;font-size:.68rem;">🛡 DEF</span>',
                    scout:'<span style="color:#c084fc;font-size:.68rem;">🔍 Scout</span>',
@@ -1471,7 +1480,7 @@ function _renderAssignmentPanel(settings) {
               const label = tDef ? tDef.name : id;
               return `<span style="font-size:.68rem;background:rgba(255,255,255,.06);border-radius:4px;padding:.1rem .35rem;white-space:nowrap;">${escHtml(label)}: <b>${cnt.toLocaleString()}</b></span>`;
             }).join('')
-          : '<span style="font-size:.68rem;color:var(--text-muted);">Keine Troopsdaten</span>';
+          : '<span style="font-size:.68rem;color:var(--text-muted);">No troop data</span>';
         const hasTroops = troopEntries.length > 0;
         return `
         <div class="atk-row" id="atk-row-${i}">
@@ -1491,7 +1500,7 @@ function _renderAssignmentPanel(settings) {
           </div>
           ${sendStr ? `<div style="font-size:.7rem;color:#4ade80;">📤 ${sendStr}</div>` : ''}
           <div class="atk-controls" id="atk-btns-${i}">
-            <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Echt</button>
+            <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Real</button>
             <button class="atk-type-btn sel-fake"  onclick="addAtkWave(${i},'fake',this)">👻 Fake</button>
             <button class="atk-type-btn sel-scout" onclick="addAtkWave(${i},'scout',this)">🔍 Scout</button>
           </div>
@@ -1557,7 +1566,7 @@ async function addAtkWave(i, type, btn) {
   }
   if (!target) {
     if (btnsEl) btnsEl.querySelectorAll('button').forEach(b => b.disabled = false);
-    showToast('⚠️ Ziel konnte nicht angelegt werden');
+    showToast('⚠️ Could not add target');
     return;
   }
 
@@ -1580,7 +1589,7 @@ async function addAtkWave(i, type, btn) {
     });
     // Visual feedback: show checkmark + re-enable
     if (btnsEl) {
-      btnsEl.innerHTML = `<span style="color:#4ade80;font-size:.78rem;font-weight:700;">✓ ${type==='real'?'Echt':type==='fake'?'Fake':'Scout'} eingetragen</span>
+      btnsEl.innerHTML = `<span style="color:#4ade80;font-size:.78rem;font-weight:700;">✓ ${type==='real'?'Real':type==='fake'?'Fake':'Scout'} eingetragen</span>
         <button class="atk-type-btn" style="margin-left:auto;font-size:.68rem;" onclick="resetAtkRow(${i})">+ nochmal</button>`;
     }
     reloadActivePlan(); // refresh EP in background
@@ -1594,7 +1603,7 @@ function resetAtkRow(i) {
   const btnsEl = document.getElementById(`atk-btns-${i}`);
   if (!btnsEl) return;
   btnsEl.innerHTML = `
-    <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Echt</button>
+    <button class="atk-type-btn sel-real"  onclick="addAtkWave(${i},'real',this)">⚔ Real</button>
     <button class="atk-type-btn sel-fake"  onclick="addAtkWave(${i},'fake',this)">👻 Fake</button>
     <button class="atk-type-btn sel-scout" onclick="addAtkWave(${i},'scout',this)">🔍 Scout</button>
   `;
@@ -1717,7 +1726,7 @@ function openWaveEditModal(waveId, targetId) {
   currentTargetId = targetId;
   editingWaveId = waveId;
   const t = activePlan?.targets?.find(t => t.id === targetId);
-  document.getElementById('waveModalTitle').innerHTML = `✏ Welle bearbeiten — <span id="waveModalTarget">${escHtml(t ? t.player_name + ' ('+t.x+'|'+t.y+')' : '')}</span>`;
+  document.getElementById('waveModalTitle').innerHTML = `✏ Edit wave — <span id="waveModalTarget">${escHtml(t ? t.player_name + ' ('+t.x+'|'+t.y+')' : '')}</span>`;
   document.getElementById('wmSaveBtn').textContent = '💾 Save changes';
   _resetWaveForm();
   _populateAttackerDropdown();
@@ -1992,9 +2001,9 @@ function openRallypoint(tx, ty, sendTime) {
     window.open(url, '_blank');
   } else {
     // Fallback: copy coords to clipboard
-    const txt = `Ziel: ${tx}|${ty}\nSend time: ${sendTime || '—'}`;
+    const txt = `Target: ${tx}|${ty}\nSend time: ${sendTime || '—'}`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(txt).then(() => showToast('📋 Ziel & Send time kopiert: ' + tx+'|'+ty));
+      navigator.clipboard.writeText(txt).then(() => showToast('📋 Target & send time copied: ' + tx+'|'+ty));
     } else {
       prompt('For the rally point — target & send time:', txt);
     }
@@ -2102,7 +2111,7 @@ async function runCheck() {
     html += section(data.suggestions, '💡', '#93c5fd', 'Suggestions');
     html += section(data.ok,          '✅', '#4ade80', 'Positiv');
 
-    el.innerHTML = html || '<div style="color:var(--text-muted);">Keine Results.</div>';
+    el.innerHTML = html || '<div style="color:var(--text-muted);">No results.</div>';
   } catch(e) { el.innerHTML=`<div style="color:#f87171;">Fehler: ${e.message}</div>`; }
 }
 
@@ -2117,7 +2126,7 @@ function loadStats() {
   );
 
   if (!allWaves.length) {
-    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">Keine Waves im Plan.</div>';
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">No waves in this plan.</div>';
     return;
   }
 
@@ -2191,7 +2200,7 @@ function loadStats() {
     </div>`;
   }).join('');
 
-  el.innerHTML = summaryHtml + `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:.3rem;">Angreifer</div>` + attackerRows;
+  el.innerHTML = summaryHtml + `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:.3rem;">Attacker</div>` + attackerRows;
 }
 
 function openInlineLandingEditor() {
@@ -2230,7 +2239,7 @@ async function setPlanStatus(newStatus) {
 
 async function recalcTimes() {
   if (!activePlanId) return;
-  if (!activePlan?.landing_time) { showToast('⚠️ Keine Landing time gesetzt.'); return; }
+  if (!activePlan?.landing_time) { showToast('⚠️ No landing time set.'); return; }
   if (!confirm('Recalculate all send times?\nThis will overwrite manually set send times.')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/recalc-times`);
@@ -2348,7 +2357,7 @@ async function loadNotifyLog() {
       sent:          '<span style="color:#4ade80;font-size:.72rem;">✅ Gesendet</span>',
       dm_blocked:    '<span style="color:#f87171;font-size:.72rem;">🔒 DM blockiert</span>',
       not_in_server: '<span style="color:#f59e0b;font-size:.72rem;">⚠️ Nicht auf Server</span>',
-      no_discord_id: '<span style="color:#9ca3af;font-size:.72rem;">❓ Keine Discord-ID</span>',
+      no_discord_id: '<span style="color:#9ca3af;font-size:.72rem;">❓ No Discord ID</span>',
       error:         '<span style="color:#f87171;font-size:.72rem;">❌ Fehler</span>',
     }[s] || `<span style="color:var(--text-muted);font-size:.72rem;">${s}</span>`);
 
@@ -2368,7 +2377,7 @@ async function loadNotifyLog() {
           <span style="flex-shrink:0;">${statusLabel(e.status)}</span>
           ${e.error ? `<span style="font-size:.67rem;color:#f87171;flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.error}">${e.error}</span>` : ''}
         </div>`).join('')
-        : '<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ Keine Waves mit Discord-ID oder kein Ally-Mitglied gefunden.</div>';
+        : '<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ No waves with Discord ID or no ally member found.</div>';
 
       return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden;">
         <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;border-bottom:1px solid var(--border);">
