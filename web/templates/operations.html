@@ -1381,7 +1381,7 @@ function _renderAssignmentPanel(settings) {
     </div>
 
     <div style="overflow-y:auto;flex:1;" id="pbAtkList">
-      ${!attackers.length ? '<div style="color:#f87171;font-size:.8rem;padding:1.2rem;text-align:center;">⚠️ No players loaded.<br><small style='color:var(--text-muted)'>Import troops in My Account.</small></div>'
+      ${!attackers.length ? '<div style="color:#f87171;font-size:.8rem;padding:1.2rem;text-align:center;">⚠️ No players loaded.<br><small style=\'color:var(--text-muted)\'>Import troops in My Account.</small></div>'
       : !assignRows.length ? '<div style="color:var(--text-muted);font-size:.8rem;padding:1.2rem;text-align:center;">No villages found.<br><small>Disable filters or import troops in My Account.</small></div>'
       : assignRows.map((r, i) => {
         const sendStr = _sendTimeStr(r.travelSec);
