@@ -128,23 +128,21 @@
               {% if def_s >= 1000 %}{{ "%.0f"|format(def_s/1000) }}k{% elif def_s %}{{ def_s }}{% else %}—{% endif %}
             </td>
             <td style="text-align:right;color:#34d399;">
-              {# Extract scouts from troops_json #}
-              {% set tjson = v.get('troops_json','[]') %}
-              {% set scouts = namespace(n=0) %}
-              {% if tjson and tjson != '[]' %}
-                {# Scouts shown in troop chips below #}
-              {% endif %}
-              —
+              {% set _scout_names = ['Equites Legati','Späher','Pathfinder','Sopdu-Erkunder','Ammende Nomadin','Sentinel'] %}
+              {% set _troops = v.get('troops') if v.get('troops') is mapping else {} %}
+              {% set _scouts = namespace(n=0) %}
+              {% for sn in _scout_names %}{% set _scouts.n = _scouts.n + (_troops.get(sn) or 0) %}{% endfor %}
+              {% if _scouts.n %}{{ _scouts.n }}{% else %}—{% endif %}
             </td>
             <td style="text-align:right;color:#fbbf24;">
-              {% set crop = v.get('crop_consumption',0) or 0 %}
+              {% set crop = v.get('total_crop',0) or 0 %}
               {% if crop >= 1000 %}{{ "%.0f"|format(crop/1000) }}k{% elif crop %}{{ crop }}{% else %}—{% endif %}
             </td>
             <td style="text-align:right;color:var(--text-muted);">{{ v.get('population',0) or '—' }}</td>
             <td style="max-width:220px;">
-              {# Troop chips from troops_json #}
-              {% if v.get('troops_json') and v.get('troops_json') != '[]' %}
-              <div class="troop-chips" data-raw="{{ v.get('troops_json','[]')|e }}"></div>
+              {% set _troops2 = v.get('troops') if v.get('troops') is mapping else {} %}
+              {% if _troops2 %}
+              <div class="troop-chips" data-raw="{{ _troops2 | tojson | e }}"></div>
               {% else %}
               <span style="color:var(--text-muted);font-size:.75rem;">—</span>
               {% endif %}
