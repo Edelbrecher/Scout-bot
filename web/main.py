@@ -7152,6 +7152,25 @@ async def op_my_waves(request: Request, guild_id: str):
     return _JSONResponse({"waves": waves})
 
 
+@app.get("/guild/{guild_id}/my-operations", response_class=HTMLResponse)
+async def my_operations_page(request: Request, guild_id: str):
+    """Player-facing op plan view — only shows waves assigned to the logged-in user."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    uid = session.get("uid", "")
+    waves = await database.get_my_op_waves(guild_id, uid)
+    tw_world = (guild or {}).get("tw_world", "")
+    return templates.TemplateResponse("my_operations.html", {
+        "request": request, "guild": guild, "guild_id": guild_id,
+        "waves": waves, "tw_world": tw_world,
+    })
+
+
 # ── Recalculate wave times ────────────────────────────────────────────────────
 
 @app.post("/guild/{guild_id}/operations/api/save-default-ts")
@@ -8440,6 +8459,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "cross",     "label": "Hospital",        "url_suffix": "/allianz/hospital"},
     {"type": "group", "label": "Tools"},
     {"type": "item",  "icon": "gear",      "label": "Operations",      "url_suffix": "/operations"},
+    {"type": "item",  "icon": "flag",      "label": "My Op Plan",      "url_suffix": "/my-operations"},
     {"type": "item",  "icon": "box",       "label": "Res Push",        "url_suffix": "/res-push"},
     {"type": "item",  "icon": "chart",     "label": "Statistics",      "url_suffix": "/stats"},
     {"type": "item",  "icon": "clock",     "label": "Timer",           "url_suffix": "/timer"},

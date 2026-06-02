@@ -1,0 +1,537 @@
+{% extends "base.html" %}
+{% block title %}My Op Plan · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+/* ── Layout ─────────────────────────────────────────────────── */
+.mop-container { max-width: 1100px; margin: 0 auto; padding: 0 1rem 3rem; }
+
+/* ── Plan card ──────────────────────────────────────────────── */
+.mop-plan { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 1.5rem; overflow: hidden; }
+.mop-plan-header { padding: .9rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.mop-plan-name { font-size: 1.05rem; font-weight: 700; }
+.mop-landing { font-size: .8rem; color: #fbbf24; font-family: monospace; background: rgba(251,191,36,.1); padding: 2px 8px; border-radius: 6px; }
+.mop-status-badge { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+.mop-status-active { background: rgba(74,222,128,.15); color: #4ade80; }
+.mop-status-draft  { background: rgba(148,163,184,.12); color: #94a3b8; }
+
+/* ── Wave rows (desktop) ─────────────────────────────────────── */
+.mop-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.mop-table th { padding: .4rem .75rem; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.mop-table td { padding: .5rem .75rem; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+.mop-table tr:last-child td { border-bottom: none; }
+.mop-table tr.mop-row-urgent { background: rgba(239,68,68,.06); }
+.mop-table tr.mop-row-soon   { background: rgba(251,191,36,.05); }
+.mop-table tr.mop-row-past   { opacity: .55; }
+.mop-table tr.mop-row-confirmed { background: rgba(74,222,128,.04); }
+
+/* ── Wave type badges ────────────────────────────────────────── */
+.wt { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.wt-real   { background: rgba(239,68,68,.18);   color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+.wt-fake   { background: rgba(148,163,184,.14); color: #94a3b8; border: 1px solid rgba(148,163,184,.25); }
+.wt-def    { background: rgba(74,222,128,.15);  color: #4ade80; border: 1px solid rgba(74,222,128,.3); }
+.wt-scout  { background: rgba(96,165,250,.15);  color: #60a5fa; border: 1px solid rgba(96,165,250,.3); }
+.wt-chief  { background: rgba(168,85,247,.15);  color: #c084fc; border: 1px solid rgba(168,85,247,.3); }
+.wt-siege  { background: rgba(251,146,60,.15);  color: #fb923c; border: 1px solid rgba(251,146,60,.3); }
+
+/* ── Countdown ────────────────────────────────────────────────── */
+.mop-cd { font-family: monospace; font-size: .9rem; font-weight: 700; white-space: nowrap; }
+.mop-cd-urgent { color: #f87171; }
+.mop-cd-soon   { color: #fbbf24; }
+.mop-cd-ok     { color: #4ade80; }
+.mop-cd-past   { color: var(--text-muted); }
+
+/* ── Send time ───────────────────────────────────────────────── */
+.mop-sendtime { font-family: monospace; font-size: .82rem; white-space: nowrap; }
+
+/* ── Rally link ──────────────────────────────────────────────── */
+.mop-rally { font-size: .78rem; color: #60a5fa; text-decoration: none; white-space: nowrap; padding: 2px 8px; border: 1px solid rgba(96,165,250,.3); border-radius: 6px; background: rgba(96,165,250,.08); }
+.mop-rally:hover { background: rgba(96,165,250,.18); }
+
+/* ── Confirm buttons ─────────────────────────────────────────── */
+.mop-btn { font-size: .72rem; padding: .2rem .55rem; border-radius: 5px; border: 1px solid; cursor: pointer; font-weight: 600; transition: background .15s; }
+.mop-btn-ok    { background: rgba(74,222,128,.1);  color: #4ade80; border-color: rgba(74,222,128,.35); }
+.mop-btn-late  { background: rgba(251,191,36,.1);  color: #fbbf24; border-color: rgba(251,191,36,.35); }
+.mop-btn-no    { background: rgba(248,113,113,.1); color: #f87171; border-color: rgba(248,113,113,.35); }
+.mop-btn-cant  { background: rgba(248,113,113,.07);color: #f87171; border-color: rgba(248,113,113,.25); }
+.mop-btn:hover { filter: brightness(1.2); }
+.mop-cs-done   { font-size: .82rem; }
+
+/* ── Notes ───────────────────────────────────────────────────── */
+.mop-note { font-size: .78rem; color: #fbbf24; font-style: italic; max-width: 180px; }
+
+/* ── Mobile cards (hidden on desktop) ───────────────────────── */
+.mop-cards { display: none; }
+.mop-card { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 10px; padding: .85rem 1rem; margin-bottom: .6rem; }
+.mop-card-urgent { border-color: rgba(239,68,68,.4); }
+.mop-card-soon   { border-color: rgba(251,191,36,.35); }
+.mop-card-confirmed { border-color: rgba(74,222,128,.3); opacity: .7; }
+.mop-card-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; }
+.mop-card-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Alarm bar ───────────────────────────────────────────────── */
+.mop-alarm { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .85rem 1.2rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.mop-alarm-label { font-size: .85rem; color: var(--text-muted); font-weight: 600; }
+.mop-alarm-btn { font-size: .8rem; padding: .3rem .8rem; border-radius: 7px; border: 1px solid rgba(74,222,128,.35); background: rgba(74,222,128,.1); color: #4ade80; cursor: pointer; font-weight: 600; }
+.mop-alarm-btn.off { border-color: var(--border); background: rgba(255,255,255,.04); color: var(--text-muted); }
+
+/* ── Responsive: mobile ──────────────────────────────────────── */
+@media (max-width: 700px) {
+  .mop-table-wrap { display: none; }
+  .mop-cards { display: block; }
+  .mop-alarm { flex-direction: column; align-items: flex-start; gap: .6rem; }
+}
+
+/* ── Delta modal ─────────────────────────────────────────────── */
+#mopDeltaModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:2000; align-items:center; justify-content:center; }
+#mopDeltaModal.open { display:flex; }
+.mop-modal-box { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; max-width:380px; width:90%; }
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.mop-empty { text-align:center; padding: 3rem 1rem; color: var(--text-muted); }
+.mop-empty-icon { font-size: 3rem; margin-bottom: .75rem; }
+</style>
+
+<div class="mop-container">
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">&larr; {{ guild.guild_name }}</a>
+      <h1>⚔️ My Operation Plan</h1>
+      <p class="subtitle">Your assigned waves — send times and targets</p>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-start;margin-top:.25rem;">
+      <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.85rem;">📋 Op Planning</a>
+      <button class="btn btn-secondary" onclick="location.reload()" style="font-size:.85rem;">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Alarm bar -->
+  <div class="mop-alarm">
+    <span class="mop-alarm-label">🔔 Wave Alarm:</span>
+    <button class="mop-alarm-btn off" id="alarmBtn" onclick="toggleAlarm()">Activate</button>
+    <span id="alarmStatus" style="font-size:.8rem;color:var(--text-muted);"></span>
+    <span class="mop-alarm-label" style="margin-left:auto;">⚡ Warn me</span>
+    <select id="alarmMinutes" style="background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.2rem .5rem;font-size:.82rem;">
+      <option value="1">1 min before</option>
+      <option value="2">2 min before</option>
+      <option value="3" selected>3 min before</option>
+      <option value="5">5 min before</option>
+      <option value="10">10 min before</option>
+    </select>
+    <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.4rem;">
+      <input type="checkbox" id="chkSound" checked> Sound
+    </label>
+  </div>
+
+  {% if not waves %}
+  <div class="mop-empty">
+    <div class="mop-empty-icon">📭</div>
+    <div style="font-size:1.1rem;font-weight:600;margin-bottom:.5rem;">No waves assigned to you</div>
+    <div style="font-size:.9rem;">You will appear here once a lead adds you to an operation plan.</div>
+  </div>
+  {% else %}
+
+  <!-- Plans grouped in JS -->
+  <div id="mopContent"></div>
+
+  {% endif %}
+</div>
+
+<!-- Delta modal -->
+<div id="mopDeltaModal">
+  <div class="mop-modal-box">
+    <h3 style="margin:0 0 1rem;">⏱ How late were you?</h3>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="deltaPresets">
+      <button class="mop-btn mop-btn-late" onclick="submitDelta(-30)">30s early</button>
+      <button class="mop-btn mop-btn-late" onclick="submitDelta(30)">+30s</button>
+      <button class="mop-btn mop-btn-late" onclick="submitDelta(60)">+1min</button>
+      <button class="mop-btn mop-btn-late" onclick="submitDelta(120)">+2min</button>
+      <button class="mop-btn mop-btn-late" onclick="submitDelta(300)">+5min</button>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;">
+      <input type="number" id="deltaCustom" placeholder="Custom seconds" style="flex:1;padding:.4rem .7rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;">
+      <button class="mop-btn mop-btn-late" onclick="submitDelta(parseInt(document.getElementById('deltaCustom').value)||0)">OK</button>
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button class="mop-btn" style="border-color:var(--border);color:var(--text-muted);" onclick="closeDeltaModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GUILD_ID   = '{{ guild.guild_id }}';
+const TW_WORLD   = '{{ tw_world }}';
+const WAVES_DATA = {{ waves | tojson | safe }};
+
+const TYPE_LABELS = {real:'⚔ Real Attack', fake:'👻 Fake', def:'🛡 Defense', scout:'🔍 Scout', chief:'👑 Chief', siege:'💣 Siege'};
+const TYPE_CSS    = {real:'wt-real', fake:'wt-fake', def:'wt-def', scout:'wt-scout', chief:'wt-chief', siege:'wt-siege'};
+const CS_ICON     = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫'};
+const CS_LABEL    = {on_time:'On time', late:'Late', not_sent:'Not sent', cant_send:'Cannot send'};
+const CS_COLOR    = {on_time:'#4ade80', late:'#fbbf24', not_sent:'#f87171', cant_send:'#f87171'};
+
+// ── Group waves by plan ──────────────────────────────────────────
+function groupByPlan(waves) {
+  const plans = {};
+  for (const w of waves) {
+    if (!plans[w.plan_id]) plans[w.plan_id] = {
+      plan_id: w.plan_id, plan_name: w.plan_name,
+      landing_time: w.landing_time, plan_status: w.plan_status, waves: []
+    };
+    plans[w.plan_id].waves.push(w);
+  }
+  return Object.values(plans);
+}
+
+// ── Countdown string ─────────────────────────────────────────────
+function cdStr(sendTime) {
+  if (!sendTime) return {text:'—', cls:'mop-cd-past', secsLeft: null};
+  const dt = new Date(sendTime.replace(' ','T'));
+  const diff = Math.floor((dt - Date.now()) / 1000);
+  if (diff < 0) return {text:'Elapsed', cls:'mop-cd-past', secsLeft: diff};
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  const text = h > 0 ? `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`
+                     : m > 0 ? `${m}m ${String(s).padStart(2,'0')}s`
+                     : `${s}s`;
+  const cls = diff < 60 ? 'mop-cd-urgent' : diff < 300 ? 'mop-cd-soon' : 'mop-cd-ok';
+  return {text, cls, secsLeft: diff};
+}
+
+function fmtSendTime(st) {
+  if (!st) return '—';
+  // Format: Tue, 03.06 17:42:30
+  const d = new Date(st.replace(' ','T'));
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  const ss = String(d.getSeconds()).padStart(2,'0');
+  return `${days[d.getDay()]}, ${dd}.${mm} ${hh}:${mi}:${ss}`;
+}
+
+function fmtTravel(secs) {
+  if (!secs) return '—';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+  if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
+  return `${s}s`;
+}
+
+function rallyLink(w) {
+  if (!TW_WORLD) return '';
+  // Travian rally point: /build.php?gid=16&tt=2&t[n][x]=X&t[n][y]=Y
+  const base = TW_WORLD.replace(/\/$/, '');
+  const url = `${base}/build.php?gid=16&tt=2`;
+  return `<a href="${url}" target="_blank" class="mop-rally" title="Open Travian rally point">⚔ Send troops</a>`;
+}
+
+function rowClass(w, secsLeft) {
+  if (w.confirm_status) return 'mop-row-confirmed';
+  if (secsLeft === null) return '';
+  if (secsLeft < 0) return 'mop-row-past';
+  if (secsLeft < 60) return 'mop-row-urgent';
+  if (secsLeft < 300) return 'mop-row-soon';
+  return '';
+}
+
+function cardClass(w, secsLeft) {
+  if (w.confirm_status) return 'mop-card-confirmed';
+  if (secsLeft !== null && secsLeft < 60) return 'mop-card-urgent';
+  if (secsLeft !== null && secsLeft < 300) return 'mop-card-soon';
+  return '';
+}
+
+function confirmBtns(w) {
+  const id = w.id;
+  const wd = JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y});
+  if (w.confirm_status) {
+    const delta = w.confirm_status === 'late' && w.confirm_delta_seconds
+      ? ` (${w.confirm_delta_seconds > 0 ? '+' : ''}${w.confirm_delta_seconds}s)` : '';
+    return `<span class="mop-cs-done" style="color:${CS_COLOR[w.confirm_status]||'#aaa'};">${CS_ICON[w.confirm_status]||'?'} ${CS_LABEL[w.confirm_status]||w.confirm_status}${delta}</span>`;
+  }
+  const cd = cdStr(w.send_time);
+  const isPast = cd.secsLeft !== null && cd.secsLeft < 0;
+  if (isPast) {
+    return `<div style="display:flex;gap:.3rem;flex-wrap:wrap;">
+      <button class="mop-btn mop-btn-ok"   onclick="doConfirm(${id},'on_time',0,${wd})">✅ On time</button>
+      <button class="mop-btn mop-btn-late" onclick="openDelta(${id},${wd})">⏱ Late</button>
+      <button class="mop-btn mop-btn-no"   onclick="doConfirm(${id},'not_sent',0,${wd})">❌ Not sent</button>
+    </div>`;
+  }
+  return `<button class="mop-btn mop-btn-cant" onclick="doConfirm(${id},'cant_send',0,${wd})">🚫 Can't send</button>`;
+}
+
+// ── Render ───────────────────────────────────────────────────────
+function render() {
+  const plans = groupByPlan(WAVES_DATA);
+  if (!plans.length) return;
+  const el = document.getElementById('mopContent');
+  if (!el) return;
+
+  el.innerHTML = plans.map(p => {
+    const landStr = p.landing_time ? fmtSendTime(p.landing_time) : '—';
+    const statusBadge = p.plan_status === 'active'
+      ? `<span class="mop-status-badge mop-status-active">● Active</span>`
+      : `<span class="mop-status-badge mop-status-draft">○ Draft</span>`;
+
+    // Desktop table rows
+    const tableRows = p.waves.map(w => {
+      const cd = cdStr(w.send_time);
+      const rc = rowClass(w, cd.secsLeft);
+      const troop_info = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
+        .map(([k,v])=>`${k}: ${v.toLocaleString()}`).join(', ');
+      return `<tr class="${rc}" data-wave-id="${w.id}">
+        <td><span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span></td>
+        <td>
+          <div style="font-family:monospace;color:#93c5fd;font-size:.85rem;">${w.origin_village||w.attacker_name||'—'}</div>
+          <div style="font-size:.72rem;color:var(--text-muted);">(${w.origin_x||'?'}|${w.origin_y||'?'})</div>
+        </td>
+        <td>
+          <div style="font-family:monospace;color:#f0abfc;font-size:.85rem;">${w.target_x}|${w.target_y}</div>
+          <div style="font-size:.72rem;color:var(--text-muted);">${w.target_player||''}</div>
+        </td>
+        <td class="mop-sendtime" style="color:#fbbf24;">${fmtSendTime(w.send_time)}</td>
+        <td><span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}">${cd.text}</span></td>
+        <td style="color:var(--text-muted);font-size:.8rem;">${fmtTravel(w.travel_seconds)}</td>
+        <td>${w.notes ? `<span class="mop-note" title="${w.notes}">${w.notes}</span>` : ''}</td>
+        <td style="min-width:160px;">${confirmBtns(w)}</td>
+        <td>${rallyLink(w)}</td>
+      </tr>`;
+    }).join('');
+
+    // Mobile cards
+    const mobileCards = p.waves.map(w => {
+      const cd = cdStr(w.send_time);
+      const cc = cardClass(w, cd.secsLeft);
+      return `<div class="mop-card ${cc}" data-wave-id="${w.id}">
+        <div class="mop-card-row">
+          <span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>
+          <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}" style="font-size:.85rem;">${cd.text}</span>
+        </div>
+        <div class="mop-card-row" style="margin-bottom:.5rem;">
+          <div>
+            <div class="mop-card-label">From</div>
+            <div style="font-family:monospace;font-size:.82rem;">${w.origin_village||w.attacker_name||'—'} (${w.origin_x||'?'}|${w.origin_y||'?'})</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mop-card-label">Target</div>
+            <div style="font-family:monospace;color:#f0abfc;font-size:.82rem;">${w.target_x}|${w.target_y}</div>
+            <div style="font-size:.72rem;color:var(--text-muted);">${w.target_player||''}</div>
+          </div>
+        </div>
+        <div class="mop-card-row" style="margin-bottom:.5rem;">
+          <div>
+            <div class="mop-card-label">Send time</div>
+            <div style="font-family:monospace;color:#fbbf24;font-size:.8rem;">${fmtSendTime(w.send_time)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mop-card-label">March</div>
+            <div style="font-size:.8rem;">${fmtTravel(w.travel_seconds)}</div>
+          </div>
+        </div>
+        ${w.notes ? `<div style="font-size:.78rem;color:#fbbf24;font-style:italic;margin-bottom:.5rem;">📝 ${w.notes}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          ${confirmBtns(w)}
+          ${TW_WORLD ? `<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="mop-plan">
+      <div class="mop-plan-header">
+        <span style="font-size:1.2rem;">📋</span>
+        <span class="mop-plan-name">${p.plan_name||'Operation'}</span>
+        ${statusBadge}
+        <span class="mop-landing">🕐 Landing: ${landStr}</span>
+        <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted);">${p.waves.length} wave${p.waves.length!==1?'s':''} assigned to you</span>
+      </div>
+      <!-- Desktop -->
+      <div class="mop-table-wrap" style="overflow-x:auto;">
+        <table class="mop-table">
+          <thead><tr>
+            <th>Type</th>
+            <th>From village</th>
+            <th>Target</th>
+            <th>Send time</th>
+            <th>Countdown</th>
+            <th>March time</th>
+            <th>Notes</th>
+            <th>Status</th>
+            <th>Link</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <!-- Mobile -->
+      <div class="mop-cards" style="padding:.75rem;">${mobileCards}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Live countdown tick ──────────────────────────────────────────
+function tick() {
+  document.querySelectorAll('[data-send]').forEach(el => {
+    const st = el.dataset.send;
+    if (!st) return;
+    const {text, cls} = cdStr(st);
+    el.textContent = text;
+    el.className = el.className.replace(/mop-cd-\w+/g, '') + ' ' + cls;
+  });
+  checkAlarms();
+}
+
+// ── Confirm / Delta ──────────────────────────────────────────────
+let _deltaWaveId = null, _deltaWaveData = null;
+
+function openDelta(id, waveData) {
+  _deltaWaveId = id; _deltaWaveData = waveData;
+  document.getElementById('mopDeltaModal').classList.add('open');
+}
+function closeDeltaModal() {
+  document.getElementById('mopDeltaModal').classList.remove('open');
+}
+function submitDelta(secs) {
+  closeDeltaModal();
+  doConfirm(_deltaWaveId, 'late', secs, _deltaWaveData);
+}
+
+async function doConfirm(id, status, delta, waveData) {
+  try {
+    const fd = new FormData();
+    fd.append('status', status);
+    fd.append('delta_seconds', delta);
+    const r = await fetch(`/guild/${GUILD_ID}/operations/api/waves/${id}/confirm`, {method:'POST', body:fd});
+    const d = await r.json();
+    if (!d.ok) { alert('Error confirming wave.'); return; }
+
+    // Notify leads if cant_send / not_sent
+    if ((status==='cant_send'||status==='not_sent') && waveData) {
+      fetch(`/guild/${GUILD_ID}/operations/api/waves/${id}/notify-leads`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          status, delta_seconds: delta,
+          attacker_name: waveData.attacker_name||'',
+          plan_name: waveData.plan_name||'',
+          plan_id: waveData.plan_id||null,
+          target: (waveData.target_x||'')+'|'+(waveData.target_y||'')
+        })
+      });
+    }
+
+    // Update wave in local data and re-render
+    const w = WAVES_DATA.find(x => x.id === id);
+    if (w) { w.confirm_status = status; w.confirm_delta_seconds = delta; }
+    render();
+  } catch(e) { console.error('confirm error', e); }
+}
+
+// ── Alarm system ─────────────────────────────────────────────────
+let alarmActive = false;
+const alarmFired = new Set();
+let _audioCtx = null;
+
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+
+function playBeep(freq=880, dur=0.3, vol=0.6) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+function playAlarmSound() {
+  // Three rising beeps
+  playBeep(660, 0.2, 0.5);
+  setTimeout(() => playBeep(880, 0.2, 0.6), 250);
+  setTimeout(() => playBeep(1100, 0.35, 0.7), 500);
+}
+
+function toggleAlarm() {
+  alarmActive = !alarmActive;
+  const btn = document.getElementById('alarmBtn');
+  const status = document.getElementById('alarmStatus');
+  if (alarmActive) {
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    btn.classList.remove('off');
+    btn.textContent = '🔔 Active';
+    status.textContent = 'You will be warned before each send time.';
+    if (_audioCtx) _audioCtx.resume();
+  } else {
+    btn.classList.add('off');
+    btn.textContent = 'Activate';
+    status.textContent = '';
+  }
+}
+
+function checkAlarms() {
+  if (!alarmActive) return;
+  const warnSecs = parseInt(document.getElementById('alarmMinutes').value) * 60;
+  const withSound = document.getElementById('chkSound').checked;
+  for (const w of WAVES_DATA) {
+    if (w.confirm_status || !w.send_time) continue;
+    const cd = cdStr(w.send_time);
+    if (cd.secsLeft === null) continue;
+    const key = `${w.id}-${Math.floor(cd.secsLeft / 30)}`; // fire once per 30s window
+    if (cd.secsLeft > 0 && cd.secsLeft <= warnSecs && !alarmFired.has(key)) {
+      alarmFired.add(key);
+      const msg = `⚔ Send wave now! Target: ${w.target_x}|${w.target_y} — ${Math.ceil(cd.secsLeft/60)}min left`;
+      if (withSound) playAlarmSound();
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('TravOps — Wave Alarm', {body: msg, icon: '/static/favicon.ico'});
+      }
+      // Also flash the tab title
+      flashTitle(`⚠ SEND NOW — ${w.target_x}|${w.target_y}`);
+    }
+  }
+}
+
+let _flashInterval = null;
+function flashTitle(msg) {
+  clearInterval(_flashInterval);
+  const orig = document.title;
+  let tog = false;
+  _flashInterval = setInterval(() => {
+    document.title = tog ? orig : msg;
+    tog = !tog;
+  }, 800);
+  setTimeout(() => { clearInterval(_flashInterval); document.title = orig; }, 15000);
+}
+
+// ── Auto-refresh every 60s to pick up new plan changes ──────────
+function autoRefresh() {
+  fetch(`/guild/${GUILD_ID}/operations/api/my-waves`)
+    .then(r => r.json())
+    .then(d => {
+      const fresh = d.waves || [];
+      // Merge confirm statuses from server (don't overwrite local)
+      fresh.forEach(fw => {
+        const lw = WAVES_DATA.find(x => x.id === fw.id);
+        if (lw) { if (!lw.confirm_status && fw.confirm_status) lw.confirm_status = fw.confirm_status; }
+        else WAVES_DATA.push(fw);
+      });
+      render();
+    }).catch(() => {});
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+render();
+setInterval(tick, 1000);
+setInterval(autoRefresh, 60000);
+</script>
+{% endblock %}
