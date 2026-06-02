@@ -282,6 +282,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <input type="datetime-local" id="inlineLandingInput"
                style="display:none;font-size:.8rem;background:var(--bg-card);color:var(--text);border:1px solid #fbbf24;border-radius:6px;padding:.2rem .4rem;"
                onblur="saveInlineLanding()" onkeydown="if(event.key==='Enter')saveInlineLanding();if(event.key==='Escape')closeInlineLanding()">
+        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openOpMap()">🗺️ Karte</button>
         <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Prüfung</button>
         <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
         <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
@@ -2422,6 +2423,245 @@ renderMembers();
 // Load first active plan if any
 const firstActive = plans.find(p=>p.status==='active') || plans[0];
 if (firstActive) loadPlan(firstActive.id);
+
+// ══ Op-Karte Modal ══════════════════════════════════════════════════════════
+function openOpMap() {
+  if (!activePlan) { alert('Bitte erst einen Einsatzplan auswählen.'); return; }
+  const overlay = document.getElementById('opMapOverlay');
+  overlay.style.display = 'flex';
+  renderOpMap();
+}
+function closeOpMap() {
+  document.getElementById('opMapOverlay').style.display = 'none';
+}
+
+function renderOpMap() {
+  const canvas = document.getElementById('opMapCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Resize canvas to actual pixel size
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width || canvas.offsetWidth || 800;
+  canvas.height = rect.height || canvas.offsetHeight || 500;
+
+  const targets = (activePlan.targets || []);
+  // Collect all points
+  const points = [];
+  for (const t of targets) {
+    if (t.x != null && t.y != null) points.push({x: t.x, y: t.y});
+    for (const w of (t.waves || [])) {
+      if (w.origin_x != null && w.origin_y != null) points.push({x: w.origin_x, y: w.origin_y});
+    }
+  }
+  if (!points.length) {
+    ctx.fillStyle = '#2d5a1e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Keine Koordinaten vorhanden', canvas.width/2, canvas.height/2);
+    return;
+  }
+
+  let minX = points[0].x, maxX = points[0].x;
+  let minY = points[0].y, maxY = points[0].y;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const padX = Math.max((maxX - minX) * 0.20, 10);
+  const padY = Math.max((maxY - minY) * 0.20, 10);
+  minX -= padX; maxX += padX; minY -= padY; maxY += padY;
+
+  canvas._omState = { minX, maxX, minY, maxY, camOX: 0, camOY: 0, scale: 1 };
+  _drawOpMapContent(canvas, ctx);
+}
+
+function _worldToCanvas(canvas, wx, wy) {
+  const s = canvas._omState;
+  const rangeX = (s.maxX - s.minX) || 1;
+  const rangeY = (s.maxY - s.minY) || 1;
+  const baseScale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+  const sc = baseScale * s.scale;
+  const cx = (canvas.width/2)  + ((wx - (s.minX+s.maxX)/2) * sc) + s.camOX;
+  const cy = (canvas.height/2) - ((wy - (s.minY+s.maxY)/2) * sc) + s.camOY;
+  return [cx, cy];
+}
+
+function _canvasToWorld(canvas, cx, cy) {
+  const s = canvas._omState;
+  const rangeX = (s.maxX - s.minX) || 1;
+  const rangeY = (s.maxY - s.minY) || 1;
+  const baseScale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+  const sc = baseScale * s.scale;
+  const wx = (s.minX+s.maxX)/2 + (cx - canvas.width/2  - s.camOX) / sc;
+  const wy = (s.minY+s.maxY)/2 - (cy - canvas.height/2 - s.camOY) / sc;
+  return [wx, wy];
+}
+
+function _drawOpMapContent(canvas, ctx) {
+  const targets = (activePlan.targets || []);
+  ctx.fillStyle = '#1e3a14';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Light grid
+  const s = canvas._omState;
+  const rangeX = (s.maxX - s.minX) || 1;
+  const rangeY = (s.maxY - s.minY) || 1;
+  const baseScale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+  const sc = baseScale * s.scale;
+  const gridStep = Math.max(1, Math.round(20 / sc));
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  const xStart = Math.floor(s.minX / gridStep) * gridStep;
+  const xEnd   = Math.ceil(s.maxX / gridStep) * gridStep;
+  const yStart = Math.floor(s.minY / gridStep) * gridStep;
+  const yEnd   = Math.ceil(s.maxY / gridStep) * gridStep;
+  for (let gx = xStart; gx <= xEnd; gx += gridStep) {
+    const [px] = _worldToCanvas(canvas, gx, 0);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height); ctx.stroke();
+  }
+  for (let gy = yStart; gy <= yEnd; gy += gridStep) {
+    const [, py] = _worldToCanvas(canvas, 0, gy);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(canvas.width, py); ctx.stroke();
+  }
+
+  // Collect attacker villages
+  const attackerMap = new Map(); // "x|y" → {name, x, y}
+  for (const t of targets) {
+    for (const w of (t.waves||[])) {
+      if (w.origin_x != null && w.origin_y != null) {
+        const key = `${w.origin_x}|${w.origin_y}`;
+        if (!attackerMap.has(key)) attackerMap.set(key, {name: w.attacker_name||'?', x: w.origin_x, y: w.origin_y});
+      }
+    }
+  }
+
+  // Draw attacker villages (blue)
+  ctx.font = `bold ${Math.max(9, Math.min(13, sc*1.2))}px sans-serif`;
+  for (const [, av] of attackerMap) {
+    const [px, py] = _worldToCanvas(canvas, av.x, av.y);
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(4, sc*0.4), 0, Math.PI*2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#93c5fd';
+    ctx.textAlign = 'center';
+    ctx.fillText(av.name, px, py - Math.max(6, sc*0.5));
+  }
+
+  // Draw target villages (red)
+  for (const t of targets) {
+    if (t.x == null || t.y == null) continue;
+    const [px, py] = _worldToCanvas(canvas, t.x, t.y);
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(5, sc*0.5), 0, Math.PI*2);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#fca5a5';
+    ctx.textAlign = 'center';
+    ctx.fillText(t.player_name||t.village_name||'?', px, py - Math.max(7, sc*0.6));
+  }
+}
+
+// Pan + Zoom on opMapCanvas
+(function() {
+  let dragging = false, dragStartX, dragStartY, dragStartCamOX, dragStartCamOY;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('opMapCanvas');
+    if (!canvas) return;
+
+    canvas.addEventListener('mousedown', e => {
+      dragging = true;
+      dragStartX = e.clientX; dragStartY = e.clientY;
+      const s = canvas._omState;
+      if (s) { dragStartCamOX = s.camOX; dragStartCamOY = s.camOY; }
+    });
+    canvas.addEventListener('mousemove', e => {
+      const s = canvas._omState;
+      if (!s) return;
+      if (dragging) {
+        s.camOX = dragStartCamOX + (e.clientX - dragStartX);
+        s.camOY = dragStartCamOY + (e.clientY - dragStartY);
+        _drawOpMapContent(canvas, canvas.getContext('2d'));
+      }
+      // Tooltip
+      const r = canvas.getBoundingClientRect();
+      const [wx, wy] = _canvasToWorld(canvas, e.clientX - r.left, e.clientY - r.top);
+      const tip = document.getElementById('opMapTooltip');
+      if (!tip) return;
+      // Find nearest point
+      let best = null, bestDist = 99999;
+      const targets2 = (activePlan && activePlan.targets) ? activePlan.targets : [];
+      for (const t of targets2) {
+        if (t.x==null) continue;
+        const d = Math.hypot(t.x - wx, t.y - wy);
+        if (d < bestDist) { bestDist = d; best = {name: t.player_name||t.village_name||'?', x: t.x, y: t.y, type:'target'}; }
+      }
+      // Also check attacker origins
+      for (const t of targets2) {
+        for (const w of (t.waves||[])) {
+          if (w.origin_x==null) continue;
+          const d = Math.hypot(w.origin_x - wx, w.origin_y - wy);
+          if (d < bestDist) { bestDist = d; best = {name: w.attacker_name||'?', x: w.origin_x, y: w.origin_y, type:'attacker'}; }
+        }
+      }
+      const rangeX = s.maxX - s.minX || 1;
+      const sc2 = Math.min(canvas.width / rangeX, 1);
+      if (best && bestDist < 20) {
+        tip.style.display = 'block';
+        tip.style.left = (e.clientX - r.left + 14) + 'px';
+        tip.style.top  = (e.clientY - r.top  - 10) + 'px';
+        tip.innerHTML = `<strong>${escHtml(best.name)}</strong><br>(${best.x}|${best.y})`;
+      } else {
+        tip.style.display = 'none';
+        tip.innerHTML = `(${Math.round(wx)}|${Math.round(wy)})`;
+        tip.style.display = 'block';
+        tip.style.left = (e.clientX - r.left + 14) + 'px';
+        tip.style.top  = (e.clientY - r.top  - 10) + 'px';
+      }
+    });
+    canvas.addEventListener('mouseup', () => { dragging = false; });
+    canvas.addEventListener('mouseleave', () => {
+      dragging = false;
+      const tip = document.getElementById('opMapTooltip');
+      if (tip) tip.style.display = 'none';
+    });
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const s = canvas._omState;
+      if (!s) return;
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      s.scale = Math.max(0.1, Math.min(50, s.scale * factor));
+      _drawOpMapContent(canvas, canvas.getContext('2d'));
+    }, {passive: false});
+  });
+})();
 </script>
+
+<!-- Op-Karte Modal -->
+<div id="opMapOverlay" onclick="if(event.target===this)closeOpMap()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10100;align-items:center;justify-content:center;">
+  <div id="opMapModal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+       width:min(960px,96vw);height:80vh;background:var(--bg-card);border-radius:14px;
+       border:1px solid var(--border);z-index:10101;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <span style="font-weight:700;font-size:.95rem;">🗺️ Einsatz-Karte</span>
+      <button onclick="closeOpMap()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div style="position:relative;flex:1;overflow:hidden;">
+      <canvas id="opMapCanvas" style="display:block;width:100%;height:100%;cursor:crosshair;background:#1e3a14;"></canvas>
+      <div id="opMapTooltip" style="position:absolute;display:none;background:rgba(10,18,10,.94);border:1px solid rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:6px;font-size:.78rem;pointer-events:none;white-space:nowrap;color:#e0e0e0;z-index:10;"></div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

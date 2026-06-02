@@ -8729,3 +8729,67 @@ async def get_map_share(short_id: str) -> dict | None:
         )
         row = await cur.fetchone()
         return dict(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Map Presets
+# ---------------------------------------------------------------------------
+
+async def _init_map_preset_tables():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS map_presets (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                created_by  TEXT DEFAULT '',
+                created_at  TEXT DEFAULT (datetime('now')),
+                preset_json TEXT DEFAULT '{}'
+            )
+        """)
+        await db.commit()
+
+
+async def save_map_preset(guild_id: str, name: str, created_by: str, preset_json_str: str) -> int:
+    await _init_map_preset_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO map_presets (guild_id, name, created_by, preset_json) VALUES (?,?,?,?)",
+            (guild_id, name, created_by, preset_json_str)
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_map_presets(guild_id: str) -> list[dict]:
+    await _init_map_preset_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM map_presets WHERE guild_id=? ORDER BY created_at DESC",
+            (guild_id,)
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def delete_map_preset(guild_id: str, preset_id: int) -> bool:
+    await _init_map_preset_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "DELETE FROM map_presets WHERE id=? AND guild_id=?",
+            (preset_id, guild_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def update_map_preset_name(guild_id: str, preset_id: int, name: str) -> bool:
+    await _init_map_preset_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE map_presets SET name=? WHERE id=? AND guild_id=?",
+            (name, preset_id, guild_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0

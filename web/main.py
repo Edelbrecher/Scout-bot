@@ -2995,6 +2995,65 @@ async def map_create_share(request: Request, guild_id: str):
     return _JSONResponse({"short_id": short_id, "url": url, "is_public": is_public})
 
 
+@app.get("/guild/{guild_id}/map/presets")
+async def map_presets_list(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    presets = await database.get_map_presets(guild_id)
+    return _JSONResponse({"presets": presets})
+
+
+@app.post("/guild/{guild_id}/map/presets")
+async def map_presets_save(request: Request, guild_id: str):
+    import json as _json
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    name = str(body.get("name", "")).strip()
+    if not name:
+        return _JSONResponse({"error": "name required"}, status_code=400)
+    state = body.get("state", {})
+    preset_json_str = _json.dumps(state)
+    new_id = await database.save_map_preset(
+        guild_id, name, session.get("username", ""), preset_json_str
+    )
+    return _JSONResponse({"id": new_id, "name": name})
+
+
+@app.post("/guild/{guild_id}/map/presets/{preset_id}/delete")
+async def map_presets_delete(request: Request, guild_id: str, preset_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    ok = await database.delete_map_preset(guild_id, preset_id)
+    return _JSONResponse({"ok": ok})
+
+
+@app.post("/guild/{guild_id}/map/presets/{preset_id}/rename")
+async def map_presets_rename(request: Request, guild_id: str, preset_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    name = str(body.get("name", "")).strip()
+    if not name:
+        return _JSONResponse({"error": "name required"}, status_code=400)
+    ok = await database.update_map_preset_name(guild_id, preset_id, name)
+    return _JSONResponse({"ok": ok})
+
+
 @app.get("/guild/{guild_id}/map/s/{short_id}", response_class=HTMLResponse)
 async def map_share_view(request: Request, guild_id: str, short_id: str):
     """Load a shared map state and render the map with it embedded."""

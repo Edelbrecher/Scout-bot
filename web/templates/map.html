@@ -129,6 +129,9 @@
     <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;">✕ Reset</button>
     <button onclick="shareMapView(this,false)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Share with alliance members (requires Discord login)">🔗 Share</button>
     <button onclick="shareMapView(this,true)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;color:#a5b4fc;border-color:rgba(99,102,241,.45);" title="Create a public link — anyone with the URL can view this map (read-only, no login required)">🌐 Public Link</button>
+    {% if not is_share_viewer %}
+    <button onclick="togglePresetPanel()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Kartenansichten speichern und laden">📁 Presets</button>
+    {% endif %}
     <!-- Draw toolbar -->
     <div id="drawToolbar" style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;padding:0.25rem 0.5rem;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);">
       <button id="drawToggleBtn" onclick="toggleDraw()" title="Zeichnen an/aus"
@@ -157,6 +160,19 @@
     </div>
     <span id="searchInfo" style="align-self:flex-end; font-size:0.78rem; color:var(--text-muted);"></span>
   </div>
+
+  <!-- Map Presets Panel -->
+  {% if not is_share_viewer %}
+  <div id="presetPanel" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;margin-bottom:.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+      <span style="font-size:.82rem;font-weight:600;color:var(--text);">📁 Gespeicherte Presets</span>
+      <button onclick="saveCurrentPreset()" class="btn btn-primary" style="font-size:.78rem;padding:.25rem .7rem;">💾 Aktuellen Stand speichern</button>
+    </div>
+    <div id="presetList" style="display:flex;flex-direction:column;gap:.3rem;min-height:1.5rem;">
+      <span style="font-size:.78rem;color:var(--text-muted);">Wird geladen…</span>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Meta-Allianz Schnellfilter -->
   {% if has_meta_premium %}
@@ -1294,6 +1310,104 @@ syncDrawCanvas();
   };
   setTimeout(() => tryRestore(15), 300);
 })();
+
+// --------------- Map Presets ---------------
+let _presetPanelOpen = false;
+
+function togglePresetPanel() {
+  const panel = document.getElementById('presetPanel');
+  if (!panel) return;
+  _presetPanelOpen = !_presetPanelOpen;
+  panel.style.display = _presetPanelOpen ? 'block' : 'none';
+  if (_presetPanelOpen) loadPresets();
+}
+
+async function loadPresets() {
+  const listEl = document.getElementById('presetList');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`/guild/${GUILD_ID}/map/presets`, {credentials: 'same-origin'});
+    const data = await res.json();
+    const presets = data.presets || [];
+    if (!presets.length) {
+      listEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Noch keine Presets gespeichert.</span>';
+      return;
+    }
+    listEl.innerHTML = presets.map(p => `
+      <div style="display:flex;align-items:center;gap:.4rem;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);">
+        <span style="flex:1;font-size:.82rem;color:var(--text);">${escHtml(p.name)}</span>
+        <span style="font-size:.7rem;color:var(--text-muted);">${(p.created_by||'')?escHtml(p.created_by):''}</span>
+        <button onclick="applyPreset(${p.id})" title="Laden" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);background:rgba(99,102,241,.15);color:#a5b4fc;cursor:pointer;">🔄 Laden</button>
+        <button onclick="renamePreset(${p.id},this)" title="Umbenennen" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;">✏️</button>
+        <button onclick="deletePreset(${p.id})" title="Löschen" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;">🗑️</button>
+      </div>`).join('');
+  } catch(e) {
+    listEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler beim Laden.</span>';
+  }
+}
+
+async function saveCurrentPreset() {
+  const name = prompt('Preset-Name:');
+  if (!name || !name.trim()) return;
+  const state = {
+    playerFilters,
+    allianceFilters,
+    viewMode,
+    camX: Math.round(camX),
+    camY: Math.round(camY),
+    scale: Math.round(scale * 100) / 100
+  };
+  try {
+    const res = await fetch(`/guild/${GUILD_ID}/map/presets`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name.trim(), state})
+    });
+    if (res.ok) loadPresets();
+    else alert('Fehler beim Speichern.');
+  } catch(e) { alert('Fehler: ' + e); }
+}
+
+async function applyPreset(presetId) {
+  try {
+    const res = await fetch(`/guild/${GUILD_ID}/map/presets`, {credentials: 'same-origin'});
+    const data = await res.json();
+    const p = (data.presets||[]).find(x => x.id === presetId);
+    if (!p) return;
+    const state = JSON.parse(p.preset_json || '{}');
+    if (Array.isArray(state.playerFilters)) { playerFilters = state.playerFilters; }
+    if (Array.isArray(state.allianceFilters)) { allianceFilters = state.allianceFilters; }
+    if (state.viewMode) setViewMode(state.viewMode);
+    if (state.camX != null) camX = state.camX;
+    if (state.camY != null) camY = state.camY;
+    if (state.scale != null) scale = state.scale;
+    renderTags();
+    draw();
+  } catch(e) { alert('Fehler beim Laden: ' + e); }
+}
+
+async function deletePreset(presetId) {
+  if (!confirm('Preset löschen?')) return;
+  try {
+    await fetch(`/guild/${GUILD_ID}/map/presets/${presetId}/delete`, {
+      method: 'POST', credentials: 'same-origin'
+    });
+    loadPresets();
+  } catch(e) {}
+}
+
+async function renamePreset(presetId, btn) {
+  const name = prompt('Neuer Name:');
+  if (!name || !name.trim()) return;
+  try {
+    await fetch(`/guild/${GUILD_ID}/map/presets/${presetId}/rename`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name.trim()})
+    });
+    loadPresets();
+  } catch(e) {}
+}
 </script>
 {% endif %}
 {% endblock %}
