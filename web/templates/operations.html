@@ -410,6 +410,11 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                     </select>
                     <input id="heroItemName" type="text" placeholder="Item name (e.g. Sword of the Soldier)" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;box-sizing:border-box;">
                   </div>
+                  <select id="heroTarget" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;">
+                    <option value="">— Link to target (optional) —</option>
+                  </select>
+                  <label style="font-size:.72rem;color:var(--text-muted);">⏰ Switch time (when to do it)</label>
+                  <input id="heroSendTime" type="datetime-local" style="width:100%;margin-bottom:.4rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;box-sizing:border-box;">
                   <input id="heroNotes" type="text" placeholder="Notes (optional)" style="width:100%;margin-bottom:.5rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.3rem .5rem;font-size:.82rem;box-sizing:border-box;">
                   <button class="btn btn-primary" style="width:100%;font-size:.82rem;" onclick="addHeroAction()">+ Assign & Notify</button>
                 </div>
@@ -1033,12 +1038,67 @@ function renderWavesTable(t) {
     }
     return html;
   }).join('');
+  // Inject hero actions linked to this target, sorted by send_time
+  const heroRows = (activePlan?.hero_actions||[])
+    .filter(a => a.target_id === t.id)
+    .sort((a,b) => (a.send_time||'').localeCompare(b.send_time||''))
+    .map(a => {
+      const isSwitch = a.action_type === 'gear_switch';
+      const slotLabel = {weapon:'⚔️',helmet:'🪖',body:'🛡️',shoes:'👟',horse:'🐴'};
+      const desc = isSwitch
+        ? `${slotLabel[a.item_slot]||'🔄'} Switch gear → <b>${escHtml(a.item_name||'?')}</b>`
+        : `🚫 Real attack <b>without hero</b>`;
+      const timeStr = a.send_time ? a.send_time.slice(0,16).replace('T',' ') : '—';
+      return `<tr style="background:rgba(168,85,247,.08);border-left:3px solid #a78bfa;">
+        <td colspan="5">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            <span style="font-size:.7rem;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:.05em;">🦸 Hero Task</span>
+            <span style="font-size:.78rem;font-weight:700;">${escHtml(a.player_name)}</span>
+            <span style="font-size:.78rem;">${desc}</span>
+            ${a.send_time ? `<span style="font-size:.72rem;color:#fbbf24;font-family:monospace;margin-left:auto;">⏰ ${timeStr}</span>` : ''}
+            ${a.notes ? `<span style="font-size:.72rem;color:#fbbf24;">📝 ${escHtml(a.notes)}</span>` : ''}
+          </div>
+        </td>
+        <td colspan="2" style="white-space:nowrap;text-align:right;">
+          <button onclick="deleteHeroAction(${a.id})" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:.82rem;" title="Remove">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+  // Also add any plan-level hero actions (no target_id) as global rows before waves
+  const globalHeroRows = (activePlan?.hero_actions||[])
+    .filter(a => !a.target_id)
+    .filter(a => {
+      // Show if send_time falls within this target's wave window
+      if (!a.send_time) return false;
+      const wTimes = (t.waves||[]).map(w=>w.send_time).filter(Boolean).sort();
+      if (!wTimes.length) return false;
+      return a.send_time >= wTimes[0] && a.send_time <= wTimes[wTimes.length-1];
+    })
+    .map(a => {
+      const isSwitch = a.action_type === 'gear_switch';
+      const slotLabel = {weapon:'⚔️',helmet:'🪖',body:'🛡️',shoes:'👟',horse:'🐴'};
+      const desc = isSwitch ? `${slotLabel[a.item_slot]||'🔄'} Switch → <b>${escHtml(a.item_name||'?')}</b>` : `🚫 No hero`;
+      const timeStr = a.send_time.slice(0,16).replace('T',' ');
+      return `<tr style="background:rgba(168,85,247,.06);border-left:3px solid rgba(167,139,250,.5);">
+        <td colspan="5">
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span style="font-size:.7rem;font-weight:800;color:#a78bfa;">🦸</span>
+            <span style="font-size:.78rem;font-weight:700;">${escHtml(a.player_name)}</span>
+            <span style="font-size:.78rem;">${desc}</span>
+            <span style="font-size:.72rem;color:#fbbf24;font-family:monospace;margin-left:auto;">⏰ ${timeStr}</span>
+          </div>
+        </td>
+        <td colspan="2"></td>
+      </tr>`;
+    }).join('');
+
   return `
   <table class="wave-table">
     <thead><tr>
-      <th>Type</th><th>Attacker</th><th>Volk</th><th>Troops</th><th>Send time</th><th>Note</th><th></th>
+      <th>Type</th><th>Attacker</th><th>Tribe</th><th>Troops</th><th>Send time</th><th>Note</th><th></th>
     </tr></thead>
-    <tbody>${rows}</tbody>
+    <tbody>${globalHeroRows}${rows}${heroRows}</tbody>
   </table>`;
 }
 
@@ -2300,6 +2360,12 @@ function onHeroTypeChange() {
 
 function loadHeroActions() {
   if (!activePlan) return;
+  // Populate target dropdown
+  const tsel = document.getElementById('heroTarget');
+  tsel.innerHTML = '<option value="">— Link to target (optional) —</option>';
+  (activePlan.targets||[]).forEach(t => {
+    tsel.add(new Option(`${t.player_name||'?'} (${t.x}|${t.y})`, t.id));
+  });
   // Populate player dropdown
   const sel = document.getElementById('heroPlayer');
   sel.innerHTML = '<option value="">— Select player —</option>';
@@ -2342,12 +2408,19 @@ function renderHeroActions() {
     const desc = isSwitch
       ? `🔄 Switch ${slotLabel[a.item_slot]||a.item_slot||'gear'} → <strong>${escHtml(a.item_name||'?')}</strong>`
       : `🚫 Real attack <strong>without hero</strong>`;
-    return `<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:.5rem .7rem;margin-bottom:.4rem;">
+    // Find linked target
+    const tgt = a.target_id ? (activePlan?.targets||[]).find(t=>t.id===a.target_id) : null;
+    const timeStr = a.send_time ? a.send_time.slice(0,16).replace('T',' ') : null;
+    return `<div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:7px;padding:.5rem .7rem;margin-bottom:.4rem;border-left:3px solid #a78bfa;">
       <div style="display:flex;align-items:flex-start;gap:.4rem;">
         <div style="flex:1;">
-          <div style="font-size:.82rem;font-weight:700;margin-bottom:.15rem;">${escHtml(a.player_name||'Unknown')}</div>
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.2rem;">
+            <span style="font-size:.82rem;font-weight:700;">${isSwitch?'🔄':'🚫'} ${escHtml(a.player_name||'Unknown')}</span>
+            ${timeStr ? `<span style="font-size:.7rem;color:#fbbf24;font-family:monospace;">⏰ ${timeStr}</span>` : ''}
+            ${tgt ? `<span style="font-size:.7rem;color:#f0abfc;font-family:monospace;">→ ${tgt.x}|${tgt.y}</span>` : ''}
+          </div>
           <div style="font-size:.78rem;">${desc}</div>
-          ${a.notes ? `<div style="font-size:.72rem;color:#fbbf24;margin-top:.2rem;">📝 ${escHtml(a.notes)}</div>` : ''}
+          ${a.notes ? `<div style="font-size:.72rem;color:#fbbf24;margin-top:.15rem;">📝 ${escHtml(a.notes)}</div>` : ''}
         </div>
         <button onclick="deleteHeroAction(${a.id})" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:.85rem;" title="Remove">🗑</button>
       </div>
@@ -2369,6 +2442,11 @@ async function addHeroAction() {
 
   if (!playerName) { showToast('⚠️ Please select a player.'); return; }
 
+  const targetEl   = document.getElementById('heroTarget');
+  const sendTimeEl = document.getElementById('heroSendTime');
+  const targetId   = targetEl?.value ? parseInt(targetEl.value) : null;
+  const sendTime   = sendTimeEl?.value || '';
+
   const payload = {
     action_type: typeEl.value,
     player_discord_id: discordId,
@@ -2376,6 +2454,8 @@ async function addHeroAction() {
     item_slot: slotEl?.value || '',
     item_name: nameEl?.value?.trim() || '',
     notes: notesEl?.value?.trim() || '',
+    send_time: sendTime,
+    target_id: targetId,
   };
 
   try {
@@ -2386,6 +2466,7 @@ async function addHeroAction() {
     });
     // Clear form
     playerEl.value = ''; if(nameEl) nameEl.value=''; if(notesEl) notesEl.value='';
+    if(sendTimeEl) sendTimeEl.value=''; if(targetEl) targetEl.value='';
     // Reload plan to get updated hero_actions
     await reloadActivePlan();
     renderHeroActions();

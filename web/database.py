@@ -6600,12 +6600,18 @@ async def _init_op_tables():
                 item_slot        TEXT DEFAULT '',
                 item_name        TEXT DEFAULT '',
                 notes            TEXT DEFAULT '',
+                send_time        TEXT DEFAULT '',
                 target_id        INTEGER,
                 no_hero_wave_id  INTEGER,
                 created_at       TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (plan_id) REFERENCES op_plans(id) ON DELETE CASCADE
             )
         """)
+        try:
+            await db.execute("ALTER TABLE op_hero_actions ADD COLUMN send_time TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
         await db.execute("CREATE INDEX IF NOT EXISTS idx_op_hero_plan ON op_hero_actions(plan_id)")
         await db.commit()
 
@@ -7405,12 +7411,14 @@ async def get_hero_actions_for_player(guild_id: str, discord_id: str) -> list[di
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
-            SELECT ha.*, p.name AS plan_name, p.landing_time, p.status AS plan_status
+            SELECT ha.*, p.name AS plan_name, p.landing_time, p.status AS plan_status,
+                   t.x AS target_x, t.y AS target_y, t.player_name AS target_player
             FROM op_hero_actions ha
             JOIN op_plans p ON p.id = ha.plan_id
+            LEFT JOIN op_targets t ON t.id = ha.target_id
             WHERE ha.guild_id = ? AND ha.player_discord_id = ?
               AND p.status IN ('draft','active')
-            ORDER BY p.landing_time ASC
+            ORDER BY ha.send_time ASC, p.landing_time ASC
         """, (guild_id, discord_id)) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
@@ -7428,15 +7436,16 @@ async def get_op_hero_actions(plan_id: int, guild_id: str) -> list[dict]:
 async def add_op_hero_action(plan_id: int, guild_id: str, action_type: str,
                               player_discord_id: str, player_name: str,
                               item_slot: str, item_name: str, notes: str,
+                              send_time: str = "",
                               target_id: int | None = None) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("""
             INSERT INTO op_hero_actions
                 (plan_id, guild_id, action_type, player_discord_id, player_name,
-                 item_slot, item_name, notes, target_id)
-            VALUES (?,?,?,?,?,?,?,?,?)
+                 item_slot, item_name, notes, send_time, target_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
         """, (plan_id, guild_id, action_type, player_discord_id, player_name,
-              item_slot, item_name, notes, target_id))
+              item_slot, item_name, notes, send_time, target_id))
         await db.commit()
         return cur.lastrowid
 

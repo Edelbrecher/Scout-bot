@@ -7747,6 +7747,7 @@ async def op_add_hero_action(request: Request, guild_id: str, plan_id: int):
         item_slot=data.get("item_slot", ""),
         item_name=data.get("item_name", ""),
         notes=data.get("notes", ""),
+        send_time=data.get("send_time", ""),
         target_id=data.get("target_id"),
     )
     # Notify the player via Discord DM
