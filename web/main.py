@@ -4010,28 +4010,44 @@ async def stripe_webhook(request: Request):
 # Own-village helpers
 # ---------------------------------------------------------------------------
 
-def classify_own_village(troops: dict) -> tuple:
-    """Returns (village_type, off_score, def_score, priority)"""
-    TROOP_OFF = {
+def classify_own_village(troops: dict, troop_roles: dict | None = None) -> tuple:
+    """Returns (village_type, off_score, def_score, priority).
+    troop_roles: mapping troop_name -> 'off'|'def'|'both'|'scout'|'siege'|'ignore'
+    Falls back to built-in defaults when None.
+    """
+    roles = troop_roles if troop_roles is not None else database.TROOP_ROLE_DEFAULTS
+
+    # Build scoring dicts from role config (weight = 1 per troop, scaled by count)
+    _OFF_WEIGHT = {
         "Imperianer": 70, "Equites Imperatoris": 120, "Equites Caesaris": 180,
         "Axtkämpfer": 55, "Teut. Ritter": 150, "Keulenschwinger": 40,
         "Theutates-Blitz": 90, "Haeduer": 200, "Schwertkämpfer": 65,
+        "Ägyptischer Reiter": 100, "Khopesh-Krieger": 60, "Resheph-Streitwagen": 180,
+        "Soldat": 40, "Marauder": 80, "Hunnischer Reiter": 160,
     }
-    TROOP_DEF = {
+    _DEF_WEIGHT = {
         "Prätorianer": 65, "Legionär": 35, "Equites Legati": 20,
-        "Speerkämpfer": 60, "Paladin": 100,
-        "Phalanx": 40, "Druidentreiter": 115,
-    }
-    TROOP_SCOUT = {"Equites Legati": 1, "Späher": 1, "Pathfinder": 1}
-    SIEGE = {
-        "Rammbock": 1, "Feuerkatapult": 1, "Teutonen-Rammbock": 1,
-        "Kriegsmaschine": 1, "Gallier-Rammbock": 1, "Gallier-Kata": 1,
+        "Speerkämpfer": 60, "Paladin": 100, "Phalanx": 40, "Druidentreiter": 115,
+        "Schleuderer": 50, "Anhur-Wächter": 120,
+        "Lanzenkämpfer": 55, "Boyar": 110, "Hoplite": 80,
     }
 
-    off_score = sum(TROOP_OFF.get(t, 0) * c for t, c in troops.items())
-    def_score = sum(TROOP_DEF.get(t, 0) * c for t, c in troops.items())
-    scout_count = sum(c for t, c in troops.items() if t in TROOP_SCOUT)
-    siege_count = sum(c for t, c in troops.items() if t in SIEGE)
+    off_score = 0
+    def_score = 0
+    scout_count = 0
+    siege_count = 0
+
+    for t, c in troops.items():
+        role = roles.get(t, "ignore")
+        if role in ("off", "both"):
+            off_score += _OFF_WEIGHT.get(t, 50) * c
+        if role in ("def", "both"):
+            def_score += _DEF_WEIGHT.get(t, 50) * c
+        if role == "scout":
+            scout_count += c
+        if role == "siege":
+            siege_count += c
+
     total = sum(troops.values())
 
     if total == 0:
@@ -4423,8 +4439,9 @@ async def mein_account_upload(
 
     # Persist travian_name to member_troops even without a troop upload
     parsed = parse_own_villages(troop_text)
+    troop_roles = await database.get_troop_roles(guild_id)
     for v in parsed:
-        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}))
+        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
         v["village_type"] = vtype
         v["off_score"]    = off_s
         v["def_score"]    = def_s
@@ -5432,6 +5449,36 @@ async def my_ally_set_entry_role(request: Request, guild_id: str):
     role_id = int(role_id_str) if role_id_str.isdigit() else None
     await database.set_ally_group_entry_role(ally_group["id"], role_id)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=entry_role_saved", status_code=303)
+
+
+@app.get("/guild/{guild_id}/my-ally/troop-roles", response_class=HTMLResponse)
+async def my_ally_troop_roles_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    guild, err = await _require_guild(request, guild_id)
+    if err: return err
+    if not await has_perm(request, guild_id, "ally_manage"):
+        return HTMLResponse("Forbidden", status_code=403)
+    roles = await database.get_troop_roles(guild_id)
+    all_troops = sorted(database.TROOP_ROLE_DEFAULTS.keys())
+    flash = request.query_params.get("flash")
+    return templates.TemplateResponse("troop_roles.html", {
+        "request": request, "guild_id": guild_id, "guild": guild,
+        "roles": roles, "all_troops": all_troops, "flash": flash,
+    })
+
+
+@app.post("/guild/{guild_id}/my-ally/troop-roles")
+async def my_ally_troop_roles_save(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    if not await has_perm(request, guild_id, "ally_manage"):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    valid_roles = {"off", "def", "both", "scout", "siege", "ignore"}
+    new_roles = {k: v for k, v in form.items() if v in valid_roles}
+    await database.save_troop_roles(guild_id, new_roles)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally/troop-roles?flash=saved", status_code=303)
 
 
 # ---------------------------------------------------------------------------

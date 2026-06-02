@@ -3258,11 +3258,12 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
         "Siedler": 1, "Held": 0,
     }
-    SCOUT_UNITS = {"Equites Legati", "Späher", "Pathfinder"}
+    troop_roles = await get_troop_roles(guild_id)
+    scout_units = {t for t, r in troop_roles.items() if r == "scout"}
     total_off = sum(v.get("off_score", 0) for v in villages)
     total_def = sum(v.get("def_score", 0) for v in villages)
     total_scouts = sum(
-        sum(c for t, c in v.get("troops", {}).items() if t in SCOUT_UNITS)
+        sum(c for t, c in v.get("troops", {}).items() if t in scout_units)
         for v in villages
     )
     total_crop = sum(
@@ -8793,3 +8794,66 @@ async def update_map_preset_name(guild_id: str, preset_id: int, name: str) -> bo
         )
         await db.commit()
         return cur.rowcount > 0
+
+
+# ── Troop Roles ──────────────────────────────────────────────────────────────
+
+TROOP_ROLE_DEFAULTS: dict[str, str] = {
+    # off
+    "Imperianer": "off", "Equites Imperatoris": "off", "Equites Caesaris": "off",
+    "Axtkämpfer": "off", "Teut. Ritter": "off", "Keulenschwinger": "off",
+    "Theutates-Blitz": "off", "Haeduer": "off", "Schwertkämpfer": "off",
+    # def
+    "Prätorianer": "def", "Legionär": "def", "Speerkämpfer": "def",
+    "Paladin": "def", "Phalanx": "def", "Druidentreiter": "def",
+    # scout
+    "Equites Legati": "scout", "Späher": "scout", "Pathfinder": "scout",
+    # siege
+    "Rammbock": "siege", "Feuerkatapult": "siege", "Teutonen-Rammbock": "siege",
+    "Kriegsmaschine": "siege", "Gallier-Rammbock": "siege", "Gallier-Kata": "siege",
+    # ignore
+    "Siedler": "ignore", "Held": "ignore",
+    "Häuptling": "ignore", "Senator": "ignore", "Stammesführer": "ignore",
+    # Ägypter
+    "Schleuderer": "def", "Ägyptischer Reiter": "off", "Khopesh-Krieger": "off",
+    "Sopdu-Erkunder": "scout", "Anhur-Wächter": "def", "Resheph-Streitwagen": "off",
+    # Hunnen
+    "Soldat": "off", "Lanzenkämpfer": "def", "Marauder": "off",
+    "Ammende Nomadin": "scout", "Boyar": "def", "Hunnischer Reiter": "off",
+    # Spartaner
+    "Hoplite": "def", "Sentinel": "scout",
+}
+
+async def _init_troop_roles_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS troop_roles (
+                guild_id   TEXT NOT NULL,
+                troop_name TEXT NOT NULL,
+                role       TEXT NOT NULL DEFAULT 'ignore',
+                PRIMARY KEY (guild_id, troop_name)
+            )
+        """)
+        await db.commit()
+
+async def get_troop_roles(guild_id: str) -> dict[str, str]:
+    await _init_troop_roles_table()
+    result = dict(TROOP_ROLE_DEFAULTS)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT troop_name, role FROM troop_roles WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            async for row in cur:
+                result[row["troop_name"]] = row["role"]
+    return result
+
+async def save_troop_roles(guild_id: str, roles: dict[str, str]):
+    await _init_troop_roles_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        for troop_name, role in roles.items():
+            await db.execute(
+                "INSERT OR REPLACE INTO troop_roles (guild_id, troop_name, role) VALUES (?,?,?)",
+                (guild_id, troop_name, role)
+            )
+        await db.commit()
