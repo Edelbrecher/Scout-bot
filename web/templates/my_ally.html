@@ -51,6 +51,7 @@
     <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Invitations</button>
     <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Member Roles</button>
     <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Roles & Permissions</button>
+    {% if is_editor %}<button class="ma-tab" onclick="showTab('battlegroups',this)">⚔️ Battlegroups</button>{% endif %}
     <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Alliance Bonus</button>
     <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Settings</button>
     {% if leaderboard %}
@@ -722,6 +723,87 @@
 
       </div>
     </div>
+  </div>
+
+  {# ══════════════════════════════ TAB: BATTLEGROUPS ══════════════════════════════ #}
+  <div id="tab-battlegroups" class="ma-tab-panel" style="display:none;">
+    {% if is_editor %}
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:1rem;align-items:start;">
+
+      <!-- List of battlegroups -->
+      <div>
+        {% if battle_groups %}
+        {% for bg in battle_groups %}
+        <div class="card" style="margin-bottom:.75rem;border-left:3px solid {{ bg.color }};">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem;">
+            <span style="width:14px;height:14px;border-radius:50%;background:{{ bg.color }};flex-shrink:0;"></span>
+            <span style="font-weight:700;font-size:.95rem;flex:1;">{{ bg.name }}</span>
+            {% if bg.description %}<span style="font-size:.78rem;color:var(--text-muted);">{{ bg.description }}</span>{% endif %}
+            <span style="font-size:.75rem;color:var(--text-muted);">{{ bg.members|length }} members</span>
+          </div>
+
+          <!-- Member selection -->
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/battlegroups/{{ bg.id }}/members">
+            <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.65rem;">
+              {% for m in members %}
+              {% set in_group = bg.members | selectattr('discord_id','equalto',m.discord_id) | list | length > 0 %}
+              <label style="display:inline-flex;align-items:center;gap:.3rem;padding:3px 9px;border-radius:20px;font-size:.75rem;border:1px solid {{ 'rgba(99,102,241,.5)' if in_group else 'var(--border)' }};background:{{ 'rgba(99,102,241,.12)' if in_group else 'transparent' }};cursor:pointer;">
+                <input type="checkbox" name="discord_id" value="{{ m.discord_id }}" {% if in_group %}checked{% endif %} style="display:none;" onchange="this.closest('label').style.borderColor=this.checked?'rgba(99,102,241,.5)':'var(--border)';this.closest('label').style.background=this.checked?'rgba(99,102,241,.12)':'transparent';">
+                {{ m.travian_name or m.discord_username or m.discord_id }}
+              </label>
+              {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .8rem;">💾 Save members</button>
+          </form>
+
+          <!-- Edit + Delete -->
+          <div style="display:flex;gap:.5rem;margin-top:.5rem;border-top:1px solid var(--border);padding-top:.5rem;">
+            <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/battlegroups/{{ bg.id }}/update" style="display:flex;gap:.4rem;flex:1;">
+              <input type="text" name="name" value="{{ bg.name }}" maxlength="60"
+                style="flex:1;padding:.3rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+              <input type="color" name="color" value="{{ bg.color }}"
+                style="width:30px;height:30px;border:1px solid var(--border);border-radius:4px;padding:2px;background:var(--bg-main);cursor:pointer;">
+              <button type="submit" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .7rem;">✏️</button>
+            </form>
+            <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/battlegroups/{{ bg.id }}/delete"
+                  onsubmit="return confirm('Delete battlegroup?')">
+              <button type="submit" class="btn btn-danger" style="font-size:.78rem;padding:.3rem .7rem;">🗑</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="card" style="text-align:center;padding:2rem;color:var(--text-muted);">
+          <div style="font-size:1.5rem;margin-bottom:.5rem;">⚔️</div>
+          No battlegroups yet. Create one on the right.
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Create new battlegroup -->
+      <div class="card" style="position:sticky;top:1rem;">
+        <h3 style="margin:0 0 .9rem;font-size:.95rem;">⚔️ New Battlegroup</h3>
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/battlegroups/create">
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" name="name" required maxlength="60" placeholder="e.g. Alpha Squad" />
+          </div>
+          <div class="form-group">
+            <label>Description <span style="color:var(--text-muted);font-size:.8rem;">(optional)</span></label>
+            <input type="text" name="description" maxlength="200" placeholder="Purpose, strategy, etc." />
+          </div>
+          <div class="form-group">
+            <label>Color</label>
+            <input type="color" name="color" value="#6366f1"
+              style="width:40px;height:32px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">+ Create Battlegroup</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:2rem;color:var(--text-muted);">Only the alliance leader can manage battlegroups.</div>
+    {% endif %}
   </div>
 
   {# ══════════════════════════════ TAB: EINSTELLUNGEN ══════════════════════════════ #}

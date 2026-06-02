@@ -152,7 +152,7 @@
               {% if is_priv %}<span class="tb-private type-badge">🔒 Private</span>{% else %}<span class="tb-all type-badge">🌐 Public</span>{% endif %}
             </div>
             <div class="poll-meta">
-              <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}</span>
+              <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}{% if poll.get('event_end_datetime') %} → {{ poll.event_end_datetime.replace('T',' ')[:16] }}{% endif %}</span>
               <span>{{ total }} responses</span>
               <span>Created {{ poll.created_at[:10] }}</span>
             </div>
@@ -235,6 +235,7 @@
         <h2>✨ New Poll</h2>
         <form method="post" action="/guild/{{ guild.guild_id }}/polls/create" id="pollForm">
           <input type="hidden" id="event_datetime" name="event_datetime" />
+          <input type="hidden" id="event_end_datetime" name="event_end_datetime" />
           <input type="hidden" id="target_type_val" name="target_type" value="all" />
           <input type="hidden" id="target_ids_val"  name="target_ids"  value="[]" />
           <input type="hidden" id="poll_type_val"   name="poll_type"   value="availability" />
@@ -261,14 +262,25 @@
             <input type="text" id="pdesc" name="description" maxlength="300" placeholder="Details, coordinates, etc." />
           </div>
           <div class="form-group">
-            <label>Date &amp; Time</label>
+            <label>From — Date &amp; Time</label>
             <div style="display:flex;gap:.4rem;">
-              <input type="date" id="pick_date" required
-                style="flex:2;min-width:0;padding:.45rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;" />
+              <input type="date" id="pick_date" required style="flex:2;min-width:0;padding:.45rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;" />
               <select id="pick_hour" style="flex:1;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
                 {% for h in range(24) %}<option value="{{ '%02d'|format(h) }}">{{ '%02d'|format(h) }}h</option>{% endfor %}
               </select>
               <select id="pick_min" style="flex:.8;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
+                <option value="00">:00</option><option value="15">:15</option><option value="30">:30</option><option value="45">:45</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>To — Date &amp; Time <span style="color:var(--text-muted);font-size:.78rem;">(optional)</span></label>
+            <div style="display:flex;gap:.4rem;">
+              <input type="date" id="pick_end_date" style="flex:2;min-width:0;padding:.45rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;" />
+              <select id="pick_end_hour" style="flex:1;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
+                {% for h in range(24) %}<option value="{{ '%02d'|format(h) }}">{{ '%02d'|format(h) }}h</option>{% endfor %}
+              </select>
+              <select id="pick_end_min" style="flex:.8;min-width:0;padding:.45rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.875rem;">
                 <option value="00">:00</option><option value="15">:15</option><option value="30">:30</option><option value="45">:45</option>
               </select>
             </div>
@@ -282,6 +294,7 @@
                 <button type="button" class="target-tab active" data-panel="tab-all">All</button>
                 {% if ally_roles %}<button type="button" class="target-tab" data-panel="tab-roles">Roles</button>{% endif %}
                 {% if wings %}<button type="button" class="target-tab" data-panel="tab-wings">Wings</button>{% endif %}
+                {% if battle_groups %}<button type="button" class="target-tab" data-panel="tab-bgroups">Battlegroups</button>{% endif %}
               </div>
               <div id="tab-all" class="target-panel active">
                 <p style="margin:0;font-size:.8rem;color:var(--text-muted);">All members can vote. Posted publicly in <strong>#polls-public</strong>.</p>
@@ -304,6 +317,19 @@
                 <div class="wing-chips">
                   {% for w in wings %}
                   <label class="wing-chip" data-id="{{ w }}">{{ wing_names.get(w,'Wing '~w) }}</label>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              {% if battle_groups %}
+              <div id="tab-bgroups" class="target-panel">
+                <p style="margin:0 0 .6rem;font-size:.78rem;color:var(--text-muted);">Only members of the selected battlegroup(s) see the private thread.</p>
+                <div class="role-chips">
+                  {% for bg in battle_groups %}
+                  <label class="role-chip bg-chip" data-id="{{ bg.id }}">
+                    <span class="role-dot" style="background:{{ bg.color }};"></span>{{ bg.name }}
+                    <span style="font-size:.65rem;color:var(--text-muted);">({{ bg.members|length }})</span>
+                  </label>
                   {% endfor %}
                 </div>
               </div>
@@ -364,11 +390,17 @@
     const active = document.querySelector('.target-tab.active');
     const panel  = active ? active.dataset.panel : 'tab-all';
     let type = 'all', ids = [];
-    if(panel === 'tab-roles'){ type='role'; ids=[...document.querySelectorAll('.role-chip.selected')].map(c=>parseInt(c.dataset.id)); }
+    if(panel === 'tab-roles'){ type='role'; ids=[...document.querySelectorAll('.role-chip:not(.bg-chip).selected')].map(c=>parseInt(c.dataset.id)); }
     else if(panel === 'tab-wings'){ type='wing'; ids=[...document.querySelectorAll('.wing-chip.selected')].map(c=>parseInt(c.dataset.id)); }
+    else if(panel === 'tab-bgroups'){ type='battlegroup'; ids=[...document.querySelectorAll('.bg-chip.selected')].map(c=>parseInt(c.dataset.id)); }
     document.getElementById('target_type_val').value = type;
     document.getElementById('target_ids_val').value  = JSON.stringify(ids);
   }
+
+  // Battlegroup chips
+  document.querySelectorAll('.bg-chip').forEach(chip => {
+    chip.addEventListener('click', function(e){ e.preventDefault(); this.classList.toggle('selected'); syncTarget(); });
+  });
 
   document.getElementById('pollForm').addEventListener('submit', function(e){
     const d = document.getElementById('pick_date').value;
@@ -376,6 +408,12 @@
     const m = document.getElementById('pick_min').value;
     if(!d){ e.preventDefault(); return; }
     document.getElementById('event_datetime').value = `${d}T${h}:${m}`;
+    const ed = document.getElementById('pick_end_date').value;
+    if(ed){
+      const eh = document.getElementById('pick_end_hour').value;
+      const em = document.getElementById('pick_end_min').value;
+      document.getElementById('event_end_datetime').value = `${ed}T${eh}:${em}`;
+    }
   });
 })();
 </script>

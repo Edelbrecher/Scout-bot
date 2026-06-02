@@ -2504,11 +2504,13 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
             1: ally_group.get("wing1_name") or "Wing 1",
             2: ally_group.get("wing2_name") or "Wing 2",
         }
+    battle_groups = await database.get_battle_groups(ally_group["id"]) if ally_group else []
     return templates.TemplateResponse("polls.html", {
         "request": request, "guild": guild, "polls": polls, "saved": saved,
         "is_admin": is_admin, "can_manage": can_manage, "can_view": can_view,
         "ally_roles": ally_roles, "ally_group": ally_group,
         "wings": wings, "wing_names": wing_names,
+        "battle_groups": battle_groups,
     })
 
 
@@ -2532,6 +2534,7 @@ async def polls_create(
     target_type: str = Form("all"),
     target_ids: str = Form("[]"),
     poll_type: str = Form("availability"),
+    event_end_datetime: str = Form(""),
 ):
     import json as _json
     # Poll type definitions
@@ -2563,6 +2566,7 @@ async def polls_create(
     poll_id = await database.create_poll_targeted(
         guild_id, title, description, event_datetime,
         target_type=target_type, target_ids=target_ids_json, poll_type=poll_type,
+        event_end_datetime=event_end_datetime.strip() or None,
     )
 
     token = os.environ.get("DISCORD_TOKEN", "")
@@ -2579,12 +2583,15 @@ async def polls_create(
     target_label = "All"
     if is_private and target_members:
         target_label = f"{len(target_members)} members pinged"
+    time_value = event_datetime.replace("T", " ")
+    if event_end_datetime:
+        time_value += f" → {event_end_datetime.replace('T', ' ')}"
     embed = {
         "title": f"📅 {title}",
         "description": description or "",
         "color": 0x6366f1 if is_private else 0x58b9e0,
         "fields": [
-            {"name": "🕐 Date & Time", "value": event_datetime.replace("T", " "), "inline": True},
+            {"name": "🕐 Date & Time", "value": time_value, "inline": True},
             {"name": "👥 Target Group", "value": target_label, "inline": True},
         ],
         "footer": {"text": f"Poll #{poll_id} · Click a button to indicate your availability"},
@@ -4984,6 +4991,7 @@ async def my_ally_page(request: Request, guild_id: str):
     )
     lb_by_discord: dict = await database.get_member_troops_for_discord_ids(all_member_discord_ids)
     lb_by_travian: dict = {r["travian_name"]: r for r in lb_by_discord.values() if r.get("travian_name")}
+    battle_groups = await database.get_battle_groups(ally_group["id"]) if ally_group else []
 
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
@@ -5003,6 +5011,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
         "lock_travian_name": bool((ally_group or guild_group or {}).get("lock_travian_name")),
+        "battle_groups": battle_groups,
     })
 
 
@@ -5202,6 +5211,64 @@ async def my_ally_role_delete(request: Request, guild_id: str, role_id: int):
         return JSONResponse({"error": "not owner"}, status_code=403)
     await database.delete_ally_role(ally_group["id"], role_id)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_deleted#rollen", status_code=303)
+
+
+# ── Battlegroup routes ───────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/my-ally/battlegroups/create")
+async def bg_create(request: Request, guild_id: str,
+                    name: str = Form(...), color: str = Form("#6366f1"), description: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid","")
+    ag = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ag: return JSONResponse({"error": "not owner"}, status_code=403)
+    await database.create_battle_group(ag["id"], name.strip(), color, description.strip())
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bg_created#battlegroups", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/battlegroups/{bg_id}/update")
+async def bg_update(request: Request, guild_id: str, bg_id: int,
+                    name: str = Form(...), color: str = Form("#6366f1"), description: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid","")
+    ag = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ag: return JSONResponse({"error": "not owner"}, status_code=403)
+    await database.update_battle_group(bg_id, ag["id"], name.strip(), color, description.strip())
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bg_updated#battlegroups", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/battlegroups/{bg_id}/members")
+async def bg_set_members(request: Request, guild_id: str, bg_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid","")
+    ag = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ag: return JSONResponse({"error": "not owner"}, status_code=403)
+    form = await request.form()
+    discord_ids = form.getlist("discord_id")
+    await database.set_battle_group_members(bg_id, discord_ids)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bg_members_saved#battlegroups", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/battlegroups/{bg_id}/delete")
+async def bg_delete(request: Request, guild_id: str, bg_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid","")
+    ag = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ag: return JSONResponse({"error": "not owner"}, status_code=403)
+    await database.delete_battle_group(bg_id, ag["id"])
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bg_deleted#battlegroups", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/member/{discord_id}/update")

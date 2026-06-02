@@ -1193,6 +1193,7 @@ async def create_poll_targeted(
     guild_id: str, title: str, description: str, event_datetime: str,
     target_type: str = "all", target_ids: str = "[]",
     plan_id: int | None = None, poll_type: str = "availability",
+    event_end_datetime: str | None = None,
 ) -> int:
     """Create a poll with optional targeting. Returns poll id."""
     import json as _json
@@ -1200,9 +1201,10 @@ async def create_poll_targeted(
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("""
             INSERT INTO availability_polls
-                (guild_id, title, description, event_datetime, target_type, target_ids, plan_id, poll_type, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (guild_id, title, description, event_datetime,
+                (guild_id, title, description, event_datetime, event_end_datetime,
+                 target_type, target_ids, plan_id, poll_type, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (guild_id, title, description, event_datetime, event_end_datetime,
                target_type, target_ids, plan_id, poll_type, _dt.utcnow().isoformat()))
         await db.commit()
         return cur.lastrowid
@@ -1267,6 +1269,27 @@ async def get_poll_target_members(guild_id: str, target_type: str, target_ids_js
                           AND (am.status IS NULL OR am.status='approved')"""
             async with db.execute(sql, [gid] + [int(i) for i in ids]) as cur:
                 return [dict(r) for r in await cur.fetchall()]
+        elif target_type == "battlegroup":
+            # ids = list of battle_group ids
+            result = []
+            seen = set()
+            for bg_id in ids:
+                dids = await get_battle_group_members_discord_ids(int(bg_id))
+                if not dids:
+                    continue
+                ph = ",".join("?" * len(dids))
+                sql = f"""SELECT am.discord_id, am.discord_username, am.travian_name, am.role_id, am.wing,
+                                   ar.role_name, ar.color
+                            FROM ally_members am LEFT JOIN ally_roles ar ON ar.id=am.role_id
+                            WHERE am.ally_group_id=? AND am.discord_id IN ({ph})
+                              AND (am.status IS NULL OR am.status='approved')"""
+                async with db.execute(sql, [gid] + dids) as cur:
+                    for r in await cur.fetchall():
+                        d = dict(r)
+                        if d["discord_id"] not in seen:
+                            seen.add(d["discord_id"])
+                            result.append(d)
+            return result
     return []
 
 
@@ -3721,7 +3744,32 @@ async def _init_ally_tables():
             await db.execute("ALTER TABLE ally_groups ADD COLUMN alliance_bonuses TEXT DEFAULT '{}'")
         except Exception:
             pass
+        # Battlegroups
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_battle_groups (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                ally_group_id INTEGER NOT NULL REFERENCES ally_groups(id) ON DELETE CASCADE,
+                name          TEXT NOT NULL,
+                color         TEXT DEFAULT '#6366f1',
+                description   TEXT DEFAULT '',
+                created_at    TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_battle_group_members (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                battle_group_id  INTEGER NOT NULL REFERENCES ally_battle_groups(id) ON DELETE CASCADE,
+                discord_id       TEXT NOT NULL,
+                UNIQUE(battle_group_id, discord_id)
+            )
+        """)
         await db.commit()
+        # polls: end datetime
+        try:
+            await db.execute("ALTER TABLE availability_polls ADD COLUMN event_end_datetime TEXT")
+            await db.commit()
+        except Exception:
+            pass
 
 
 async def get_ally_group_for_guild(guild_id: str) -> dict | None:
@@ -3914,6 +3962,78 @@ async def get_ally_group_for_owner(guild_id: str, owner_id: str) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+# ── Battlegroups ─────────────────────────────────────────────────────────────
+
+async def get_battle_groups(ally_group_id: int) -> list[dict]:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_battle_groups WHERE ally_group_id=? ORDER BY name", (ally_group_id,)
+        ) as cur:
+            groups = [dict(r) for r in await cur.fetchall()]
+    for g in groups:
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT abgm.discord_id, am.discord_username, am.travian_name, ar.role_name, ar.color as role_color
+                   FROM ally_battle_group_members abgm
+                   LEFT JOIN ally_members am ON am.discord_id=abgm.discord_id AND am.ally_group_id=?
+                   LEFT JOIN ally_roles ar ON ar.id=am.role_id
+                   WHERE abgm.battle_group_id=?""",
+                (ally_group_id, g["id"])
+            ) as cur:
+                g["members"] = [dict(r) for r in await cur.fetchall()]
+    return groups
+
+
+async def create_battle_group(ally_group_id: int, name: str, color: str = "#6366f1", description: str = "") -> int:
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO ally_battle_groups (ally_group_id, name, color, description) VALUES (?,?,?,?)",
+            (ally_group_id, name[:60], color, description[:200])
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_battle_group(bg_id: int, ally_group_id: int, name: str, color: str, description: str):
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_battle_groups SET name=?, color=?, description=? WHERE id=? AND ally_group_id=?",
+            (name[:60], color, description[:200], bg_id, ally_group_id)
+        )
+        await db.commit()
+
+
+async def delete_battle_group(bg_id: int, ally_group_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ally_battle_groups WHERE id=? AND ally_group_id=?", (bg_id, ally_group_id))
+        await db.commit()
+
+
+async def set_battle_group_members(bg_id: int, discord_ids: list[str]):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ally_battle_group_members WHERE battle_group_id=?", (bg_id,))
+        for did in discord_ids:
+            await db.execute(
+                "INSERT OR IGNORE INTO ally_battle_group_members (battle_group_id, discord_id) VALUES (?,?)",
+                (bg_id, did)
+            )
+        await db.commit()
+
+
+async def get_battle_group_members_discord_ids(bg_id: int) -> list[str]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT discord_id FROM ally_battle_group_members WHERE battle_group_id=?", (bg_id,)
+        ) as cur:
+            return [r["discord_id"] for r in await cur.fetchall()]
 
 
 async def get_ally_members(ally_group_id: int) -> list[dict]:
