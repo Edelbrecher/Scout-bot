@@ -4334,14 +4334,18 @@ _CROP_MAP = {
 
 
 def _enrich_own_villages(own_villages: list) -> list:
-    """Attach parsed troops + crop total to each village row."""
+    """Attach parsed troops + crop/unit totals to each village row."""
     import json as _json
     for v in own_villages:
         try:
-            v["troops"] = _json.loads(v.get("troops_json") or "{}")
+            troops = _json.loads(v.get("troops_json") or "{}")
+            # Drop empty-key entries from failed parses
+            troops = {t: c for t, c in troops.items() if t}
+            v["troops"] = troops
         except Exception:
             v["troops"] = {}
-        v["total_crop"] = sum(_CROP_MAP.get(t, 1) * c for t, c in v["troops"].items())
+        v["total_crop"]  = v.get("total_crop") or sum(_CROP_MAP.get(t, 1) * c for t, c in v["troops"].items())
+        v["total_units"] = v.get("total_units") or sum(v["troops"].values())
     return own_villages
 
 

@@ -3202,6 +3202,14 @@ async def _init_own_villages_table():
             await db.execute("ALTER TABLE guild_own_villages ADD COLUMN is_scout_village INTEGER DEFAULT 0")
         except Exception:
             pass
+        try:
+            await db.execute("ALTER TABLE guild_own_villages ADD COLUMN total_crop INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE guild_own_villages ADD COLUMN total_units INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -3280,11 +3288,13 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         else:
             await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
         for v in villages:
+            v_crop = v.get("total_crop") or sum(CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
+            v_units = v.get("total_units") or sum(v.get("troops", {}).values())
             await db.execute("""
                 INSERT INTO guild_own_villages
                     (guild_id, discord_id, village_name, x, y, population, troops_json,
-                     village_type, def_score, off_score, priority, uploaded_by, uploaded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                     village_type, def_score, off_score, priority, total_crop, total_units, uploaded_by, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             """, (
                 guild_id,
                 discord_id,
@@ -3297,6 +3307,8 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
                 v.get("def_score", 0),
                 v.get("off_score", 0),
                 v.get("priority", 0),
+                v_crop,
+                v_units,
                 uploaded_by,
             ))
         # Record history snapshot — update today's entry for this user if it already exists
