@@ -4438,7 +4438,11 @@ async def mein_account_upload(
             tname = (existing or {}).get("travian_name", "") or ""
 
     # Persist travian_name to member_troops even without a troop upload
+    import logging as _logging
+    _log = _logging.getLogger("upload_debug")
+    _log.warning("UPLOAD full text: %r", troop_text)
     parsed = parse_own_villages(troop_text)
+    _log.warning("UPLOAD parsed villages: %r", parsed)
     troop_roles = await database.get_troop_roles(guild_id)
     for v in parsed:
         vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
