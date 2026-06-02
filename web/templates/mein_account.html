@@ -81,10 +81,16 @@
   </div>
   {% endif %}
 
-  <div class="ma-import-grid" style="display:grid;grid-template-columns:minmax(300px,2fr) minmax(280px,1fr);gap:1rem;margin-bottom:1.25rem;">
+  <!-- Flash: sitters saved -->
+  {% if saved %}
+  <div class="alert alert-success">✅ Sitter-Daten gespeichert.</div>
+  {% endif %}
+
+  <!-- Top grid: Import (left) | Sitter + Dual (right stacked) -->
+  <div class="ma-import-grid" style="display:grid;grid-template-columns:minmax(300px,2fr) minmax(280px,1fr);gap:1rem;margin-bottom:1.25rem;align-items:start;">
 
     <!-- Upload -->
-    <div class="card">
+    <div class="card" style="margin-bottom:0;">
       <h2 style="margin:0 0 0.4rem;" data-i18n="account.import.title">📋 Import data</h2>
       <p class="hint" data-i18n-html="account.import.hint" style="margin-bottom:0.75rem;">
         Open in Travian the <strong>Troop Overview</strong> (Village → Troops → Troop Overview),
@@ -148,170 +154,114 @@
       </form>
     </div>
 
-    <!-- This hub explains which features use the data -->
-    <div class="card" style="background:linear-gradient(135deg,var(--bg-card),#0f1629);">
-      <h2 style="margin:0 0 0.75rem;" data-i18n="account.hub.title">🔗 Data usage</h2>
-      <p class="hint" style="margin-bottom:0.75rem;">Your imported villages are automatically used by the following features:</p>
-      <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.5rem;">
-        <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
-          <span style="width:24px;text-align:center;">⚔️</span>
-          <div>
-            <strong>Angriff-Detection</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Detect own villages as attack targets</div>
-          </div>
-        </li>
-        <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
-          <span style="width:24px;text-align:center;">🎯</span>
-          <div>
-            <strong>Einsatzplanung</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Troop distribution for attack plans</div>
-          </div>
-        </li>
-        <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
-          <span style="width:24px;text-align:center;">🪖</span>
-          <div>
-            <strong>Res-Push</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Coordinates of own villages</div>
-          </div>
-        </li>
-        <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
-          <span style="width:24px;text-align:center;">📊</span>
-          <div>
-            <strong>Statistiken</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Troop strength timeline</div>
-          </div>
-        </li>
-      </ul>
-    </div>
-  </div>
+    <!-- Right column: Sitter + Dual stacked -->
+    <div style="display:flex;flex-direction:column;gap:1rem;">
 
-  <!-- Flash: sitters saved -->
-  {% if saved %}
-  <div class="alert alert-success">✅ Sitter-Daten gespeichert.</div>
-  {% endif %}
-
-  <!-- Sitter-Verwaltung -->
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin:0 0 0.75rem;" data-i18n="account.sitter.title">🤝 Sitter Management</h2>
-    <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/sitters">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-
-        <!-- Meine Sitter -->
-        <div>
-          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">👥 My Sitters (sitting my account)</h3>
-          <div style="display:flex;flex-direction:column;gap:0.5rem;">
-            <div style="display:flex;gap:0.5rem;">
+      <!-- Sitter-Verwaltung -->
+      <div class="card" style="margin-bottom:0;">
+        <h2 style="margin:0 0 0.65rem;" data-i18n="account.sitter.title">🤝 Sitter Management</h2>
+        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/sitters">
+          <div style="display:flex;flex-direction:column;gap:.6rem;">
+            <div style="font-size:.8rem;color:var(--text-muted);font-weight:600;">👥 My Sitters</div>
+            <div style="display:flex;gap:.4rem;">
               <input type="text" name="sitter1_name" value="{{ sitters.sitter1_name if sitters else '' }}"
-                     placeholder="Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Discord" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
               <input type="text" name="sitter1_travian" value="{{ sitters.sitter1_travian if sitters else '' }}"
-                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Travian" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
             </div>
-            <div style="display:flex;gap:0.5rem;">
+            <div style="display:flex;gap:.4rem;">
               <input type="text" name="sitter2_name" value="{{ sitters.sitter2_name if sitters else '' }}"
-                     placeholder="Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Discord" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
               <input type="text" name="sitter2_travian" value="{{ sitters.sitter2_travian if sitters else '' }}"
-                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Travian" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
             </div>
-          </div>
-        </div>
-
-        <!-- Accounts die ich sitte -->
-        <div>
-          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">🕹️ Accounts I am sitting</h3>
-          <div style="display:flex;flex-direction:column;gap:0.5rem;">
-            <div style="display:flex;gap:0.5rem;">
+            <div style="font-size:.8rem;color:var(--text-muted);font-weight:600;margin-top:.2rem;">🕹️ I am sitting</div>
+            <div style="display:flex;gap:.4rem;">
               <input type="text" name="sitting1_name" value="{{ sitters.sitting1_name if sitters else '' }}"
-                     placeholder="Spieler / Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Discord" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
               <input type="text" name="sitting1_travian" value="{{ sitters.sitting1_travian if sitters else '' }}"
-                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Travian" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
             </div>
-            <div style="display:flex;gap:0.5rem;">
+            <div style="display:flex;gap:.4rem;">
               <input type="text" name="sitting2_name" value="{{ sitters.sitting2_name if sitters else '' }}"
-                     placeholder="Spieler / Discord-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Discord" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
               <input type="text" name="sitting2_travian" value="{{ sitters.sitting2_travian if sitters else '' }}"
-                     placeholder="Travian-Name" style="flex:1;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.85rem;">
+                     placeholder="Travian" style="flex:1;min-width:0;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.82rem;">
             </div>
           </div>
-        </div>
-      </div>
-
-      <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-        <button type="submit" class="btn btn-primary">💾 Save sitter data</button>
-        <span style="font-size:.78rem;color:var(--text-muted);">🔒 Visible to all members of your alliance</span>
-        {# Hidden so existing logic keeps working #}
-        <input type="hidden" name="is_shared" value="1">
-      </div>
-    </form>
-  </div>
-
-  <!-- Dual accounts + My operations side by side -->
-  <div id="dualMissionsGrid" style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(400px,2fr);gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
-  <div class="card" style="margin-bottom:0;height:100%;box-sizing:border-box;">
-    <h2 style="margin:0 0 0.75rem;" data-i18n="account.dual.title">🔗 Dual Accounts</h2>
-
-    {% if dual_created %}
-    <div class="alert alert-success" style="margin-bottom:0.75rem;">
-      ✅ Invite link created:<br>
-      <code id="dualLink" style="font-size:0.85rem;word-break:break-all;">{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dual_created }}</code>
-      <button type="button" onclick="copyDualLink()" class="btn btn-secondary" style="padding:0.2rem 0.6rem;font-size:0.75rem;margin-left:0.5rem;">📋 Copy</button>
-    </div>
-    {% endif %}
-
-    {% if dual_links %}
-    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;">
-      {% for dl in dual_links %}
-      <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.8rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:0.85rem;font-weight:600;">
-            {% if dl.status == 'active' %}
-              🟢 {{ dl.dual_username or dl.dual_discord_id }}
-            {% elif dl.status == 'pending' %}
-              🟡 Pending
-            {% else %}
-              ⛔ Revoked
-            {% endif %}
+          <input type="hidden" name="is_shared" value="1">
+          <div style="margin-top:.65rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary" style="font-size:.82rem;padding:.3rem .75rem;">💾 Save</button>
+            <span style="font-size:.72rem;color:var(--text-muted);">🔒 Visible to alliance</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">
-            {{ dl.created_at[:10] if dl.created_at else '' }}
-            {% if dl.status == 'pending' %}
-              · <span style="color:#3b82f6;cursor:pointer;" onclick="navigator.clipboard.writeText('{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dl.invite_token }}')">Copy link</span>
-            {% endif %}
-          </div>
-        </div>
-        {% if dl.status != 'revoked' %}
-        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/revoke"
-              onsubmit="return confirm('Revoke invitation?')" style="margin:0;">
-          <input type="hidden" name="token" value="{{ dl.invite_token }}">
-          <button type="submit" class="btn btn-danger" style="padding:0.2rem 0.6rem;font-size:0.75rem;">Revoke</button>
         </form>
-        {% endif %}
       </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">No dual connections yet.</p>
-    {% endif %}
 
-    <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/create">
-      <button type="submit" class="btn btn-secondary">🔗 Create new dual invite</button>
-    </form>
-  </div>
+      <!-- Dual Accounts -->
+      <div class="card" style="margin-bottom:0;">
+        <h2 style="margin:0 0 0.65rem;" data-i18n="account.dual.title">🔗 Dual Accounts</h2>
 
-  <!-- My operations -->
-  <div class="card" id="missionsCard" style="margin-bottom:0;height:100%;box-sizing:border-box;">
+        {% if dual_created %}
+        <div class="alert alert-success" style="margin-bottom:0.75rem;font-size:.82rem;">
+          ✅ Invite link created:<br>
+          <code id="dualLink" style="font-size:0.8rem;word-break:break-all;">{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dual_created }}</code>
+          <button type="button" onclick="copyDualLink()" class="btn btn-secondary" style="padding:0.2rem 0.6rem;font-size:0.72rem;margin-left:0.5rem;">📋 Copy</button>
+        </div>
+        {% endif %}
+
+        {% if dual_links %}
+        <div style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:.75rem;">
+          {% for dl in dual_links %}
+          <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.7rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.82rem;font-weight:600;">
+                {% if dl.status == 'active' %}🟢 {{ dl.dual_username or dl.dual_discord_id }}
+                {% elif dl.status == 'pending' %}🟡 Pending
+                {% else %}⛔ Revoked{% endif %}
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">
+                {{ dl.created_at[:10] if dl.created_at else '' }}
+                {% if dl.status == 'pending' %}· <span style="color:#3b82f6;cursor:pointer;" onclick="navigator.clipboard.writeText('{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dl.invite_token }}')">Copy link</span>{% endif %}
+              </div>
+            </div>
+            {% if dl.status != 'revoked' %}
+            <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/revoke"
+                  onsubmit="return confirm('Revoke invitation?')" style="margin:0;">
+              <input type="hidden" name="token" value="{{ dl.invite_token }}">
+              <button type="submit" class="btn btn-danger" style="padding:0.2rem 0.55rem;font-size:0.72rem;">Revoke</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:.75rem;">No dual connections yet.</p>
+        {% endif %}
+
+        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/create">
+          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;padding:.3rem .75rem;">🔗 Create dual invite</button>
+        </form>
+      </div>
+
+    </div>{# end right column #}
+  </div>{# end top grid #}
+
+  <!-- My operations — full width -->
+  <div class="card" id="missionsCard" style="margin-bottom:1.25rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
       <div>
         <h2 style="margin:0 0 .2rem;" data-i18n="account.missions.title">⚔️ My Operations</h2>
         <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Waves from active operation plans assigned to you.</p>
       </div>
-      <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Operation Planning</a>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <a href="/guild/{{ guild.guild_id }}/my-operations" class="btn btn-primary" style="font-size:.8rem;">📋 Full Op Plan</a>
+        <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Op Planning</a>
+      </div>
     </div>
     <div id="missionsContent">
       <div style="color:var(--text-muted);font-size:.85rem;">Loading operations…</div>
     </div>
   </div>
-
-  </div>{# end grid row #}
 
   <!-- Timeline chart -->
   {% if history and history | length > 0 %}
