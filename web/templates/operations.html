@@ -2470,16 +2470,18 @@ async function renderOpMap() {
 
   canvas._omState = { minX, maxX, minY, maxY, camOX:0, camOY:0, scale:1, bgVillages:[] };
 
-  // Fetch background villages from map_snapshots
+  // Draw immediately (no background villages yet)
+  _drawOpMapContent(canvas, ctx);
+
+  // Fetch background villages, then redraw with terrain
   try {
     const res = await fetch(`/guild/${GUILD_ID}/operations/api/map-villages?x1=${Math.floor(minX)}&y1=${Math.floor(minY)}&x2=${Math.ceil(maxX)}&y2=${Math.ceil(maxY)}`);
     if (res.ok) {
       const d = await res.json();
       canvas._omState.bgVillages = d.villages || [];
+      _drawOpMapContent(canvas, canvas.getContext('2d'));
     }
   } catch(e) {}
-
-  _drawOpMapContent(canvas, ctx);
 }
 
 function _worldToCanvas(canvas, wx, wy) {
