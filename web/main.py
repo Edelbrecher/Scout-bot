@@ -6665,11 +6665,15 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         waves = await database.get_all_op_waves(plan_id)
         member_wave_times: dict[str, str] = {}
         for w in (waves or []):
-            disc_id = str(w.get("attacker_discord_id") or "")
-            st = str(w.get("send_time") or "")
-            if disc_id and st:
-                if disc_id not in member_wave_times or st < member_wave_times[disc_id]:
-                    member_wave_times[disc_id] = st
+            disc_id = str(w.get("attacker_discord_id") or "").strip()
+            if not disc_id:
+                continue
+            st = str(w.get("send_time") or "").strip()
+            # Track earliest send_time; keep member even if send_time is empty
+            if disc_id not in member_wave_times:
+                member_wave_times[disc_id] = st
+            elif st and (not member_wave_times[disc_id] or st < member_wave_times[disc_id]):
+                member_wave_times[disc_id] = st
         # member_ids = only attackers with at least one wave
         member_ids = list(member_wave_times.keys())
 
