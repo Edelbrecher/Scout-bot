@@ -2667,14 +2667,98 @@ function _drawOpMapContent(canvas, ctx) {
     ctx.fillText(t.player_name||t.village_name||'?',px,py-tDotR-3);
   }
 
-  // ── Legend ────────────────────────────────────────────────────────────────
-  const legend=[['real','#ef4444'],['fake','#f97316'],['chief','#3b82f6'],['def','#a78bfa'],['scout','#22c55e']];
-  ctx.font='bold 11px sans-serif'; ctx.textAlign='left';
-  let lx=10, ly=18;
-  for(const[label,col] of legend) {
-    ctx.fillStyle=col; ctx.fillRect(lx,ly-9,12,9);
-    ctx.fillStyle='#fff'; ctx.fillText(label,lx+16,ly); lx+=label.length*7+28;
-  }
+  // ── Legend panel (bottom-left) ───────────────────────────────────────────
+  const attackLegend = [
+    ['Real attack', '#ef4444'],
+    ['Fake',        '#f97316'],
+    ['Chieftain',   '#3b82f6'],
+    ['Defense',     '#a78bfa'],
+    ['Scout',       '#22c55e'],
+  ];
+  const villageLegend = [
+    ['Attacker village', '#3b82f6', 'dot'],
+    ['Target village',   '#ef4444', 'dot'],
+    ['Capital',          '#ffe066', 'sq'],
+    ['Romans',   _omTribeCol(1), 'sq'],
+    ['Teutons',  _omTribeCol(2), 'sq'],
+    ['Gauls',    _omTribeCol(3), 'sq'],
+    ['Egyptians',_omTribeCol(5), 'sq'],
+    ['Huns',     _omTribeCol(6), 'sq'],
+    ['Spartans', _omTribeCol(7), 'sq'],
+  ];
+
+  const PAD=10, ROW=18, COL_W=130, TAIL=28;
+  const totalRows = Math.max(attackLegend.length, villageLegend.length);
+  const panelW = COL_W*2 + PAD*3;
+  const panelH = totalRows*ROW + PAD*2 + 16; // 16 for section titles
+  const px0 = PAD, py0 = canvas.height - panelH - PAD;
+
+  // Panel background
+  ctx.save();
+  ctx.globalAlpha=0.82;
+  ctx.fillStyle='#0d1a0d';
+  if(ctx.roundRect) ctx.roundRect(px0,py0,panelW,panelH,6);
+  else ctx.rect(px0,py0,panelW,panelH);
+  ctx.fill();
+  ctx.globalAlpha=1;
+
+  ctx.font='bold 9px sans-serif';
+  ctx.textBaseline='middle';
+
+  // Section: Attack types (left column)
+  ctx.fillStyle='rgba(255,255,255,0.45)';
+  ctx.textAlign='left';
+  ctx.fillText('ATTACK TYPE', px0+PAD, py0+PAD+4);
+
+  attackLegend.forEach(([lbl,col], i) => {
+    const tx=px0+PAD, ty=py0+PAD+16+i*ROW+ROW/2;
+    // Mini comet tail
+    const t0x=tx, t0y=ty, t1x=tx+TAIL, t1y=ty;
+    const ux=1,uy=0, px2=0, py2=1;
+    const w0=0.5, w1=4;
+    ctx.beginPath();
+    ctx.moveTo(t0x+px2*w0, t0y+py2*w0);
+    ctx.lineTo(t1x+px2*w1, t1y+py2*w1);
+    ctx.lineTo(t1x-px2*w1, t1y-py2*w1);
+    ctx.lineTo(t0x-px2*w0, t0y-py2*w0);
+    ctx.closePath();
+    const g=ctx.createLinearGradient(t0x,t0y,t1x,t1y);
+    g.addColorStop(0,col+'44'); g.addColorStop(1,col+'ee');
+    ctx.fillStyle=g; ctx.fill();
+    // Arrowhead
+    ctx.fillStyle=col;
+    ctx.beginPath();
+    ctx.moveTo(t1x+7,t1y);
+    ctx.lineTo(t1x-1,t1y-4);
+    ctx.lineTo(t1x-1,t1y+4);
+    ctx.closePath(); ctx.fill();
+    // Label
+    ctx.fillStyle='#ddd'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(lbl, tx+TAIL+10, ty);
+  });
+
+  // Section: Villages (right column)
+  const vx0=px0+PAD+COL_W;
+  ctx.fillStyle='rgba(255,255,255,0.45)';
+  ctx.font='bold 9px sans-serif';
+  ctx.fillText('VILLAGES', vx0, py0+PAD+4);
+
+  villageLegend.forEach(([lbl,col,type], i) => {
+    const tx=vx0, ty=py0+PAD+16+i*ROW+ROW/2;
+    if(type==='dot'){
+      ctx.beginPath(); ctx.arc(tx+6,ty,5,0,Math.PI*2);
+      ctx.fillStyle=col; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+    } else {
+      ctx.fillStyle=col; ctx.globalAlpha=0.7;
+      ctx.fillRect(tx+2,ty-4,10,8);
+      ctx.globalAlpha=1;
+    }
+    ctx.fillStyle='#ddd'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(lbl, tx+16, ty);
+  });
+
+  ctx.restore();
 }
 
 // Pan + Zoom on opMapCanvas
