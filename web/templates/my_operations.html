@@ -402,10 +402,9 @@ function render() {
     const targetSections = targets.map(tgt => {
       const tgtLabel = `<span style="color:#f0abfc;font-family:monospace;font-weight:700;">${tgt.target_x}|${tgt.target_y}</span>${tgt.target_player ? ` <span style="color:var(--text-muted);font-size:.8rem;">· ${escHtml(tgt.target_player)}</span>` : ''}`;
 
-      // Group identical waves — exclude send_time from key so slight time diffs still group
+      // Group by attacker + type + origin only (same logic as planning tool)
       function waveKey(w) {
-        return [w.wave_type, w.origin_village||'', w.origin_x??'', w.origin_y??'',
-                w.tribe, JSON.stringify(w.troop_json||{}), w.notes||''].join('|');
+        return [w.wave_type, w.origin_village||'', w.origin_x??'', w.origin_y??'', w.tribe].join('|');
       }
       const wGroupMap = new Map(), wGroupOrder = [];
       for (const w of tgt.waves) {
@@ -419,18 +418,23 @@ function render() {
         const cd = cdStr(w.send_time);
         const rc = rowClass(w, cd.secsLeft);
         const countBadge = cnt > 1
-          ? `<span style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.7rem;font-weight:800;border-radius:9px;min-width:20px;height:20px;padding:0 5px;margin-left:.35rem;vertical-align:middle;" title="${cnt} identical waves">×${cnt}</span>`
+          ? `<span style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.7rem;font-weight:800;border-radius:9px;min-width:20px;height:20px;padding:0 5px;margin-left:.35rem;vertical-align:middle;" title="${cnt} waves">×${cnt}</span>`
           : '';
+        // Troop display: if mixed show label, else show chips
+        const allSame = grp.every(x => JSON.stringify(x.troop_json||{}) === JSON.stringify(w.troop_json||{}));
+        const troopDisplay = cnt > 1 && !allSame
+          ? `<span style="font-size:.75rem;color:#a78bfa;font-style:italic;">Mixed — see individual waves</span>`
+          : troopChips(w.troop_json);
         return `<tr class="${rc}" data-wave-id="${w.id}">
           <td style="white-space:nowrap;">
             <span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>${countBadge}
-            ${cnt > 1 ? `<div style="font-size:.68rem;color:#6366f1;font-weight:700;margin-top:2px;">${cnt} Wellen</div>` : ''}
+            ${cnt > 1 ? `<div style="font-size:.68rem;color:#6366f1;font-weight:700;margin-top:2px;">${cnt} waves</div>` : ''}
           </td>
           <td>
             <div style="font-family:monospace;color:#93c5fd;font-size:.85rem;font-weight:600;">${escHtml(w.origin_village||w.attacker_name||'—')}</div>
             ${w.origin_x!=null?`<div style="font-size:.7rem;color:var(--text-muted);">(${w.origin_x}|${w.origin_y})</div>`:''}
           </td>
-          <td style="font-size:.78rem;">${troopChips(w.troop_json)}</td>
+          <td style="font-size:.78rem;">${troopDisplay}</td>
           <td class="mop-sendtime" style="color:#fbbf24;">${fmtSendTime(w.send_time)}</td>
           <td>
             <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
@@ -446,8 +450,24 @@ function render() {
           <td style="color:var(--text-muted);font-size:.8rem;">${fmtTravel(w.travel_seconds)}</td>
           <td>${w.notes ? `<span class="mop-note" title="${escHtml(w.notes)}">${escHtml(w.notes)}</span>` : ''}</td>
           <td style="min-width:150px;">${confirmBtns(w)}</td>
-          <td>${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>`:''}</td>
-        </tr>`;
+          <td style="white-space:nowrap;">
+            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>`:''}
+            ${cnt>1?`<button onclick="this.closest('table').querySelectorAll('[data-subgroup=\\'mop-${w.id}\\']').forEach(r=>{r.style.display=r.style.display==='none'?'':'none';this.textContent=r.style.display===''?'▾':'▸';})" style="background:none;border:1px solid rgba(167,139,250,.4);color:#a78bfa;border-radius:5px;padding:1px 6px;cursor:pointer;font-size:.75rem;margin-left:.3rem;">▸</button>`:''}
+          </td>
+        </tr>
+        ${cnt>1?grp.map((wv,idx)=>`<tr data-subgroup="mop-${w.id}" style="display:none;border-left:3px solid #6366f1;">
+          <td style="padding-left:1rem;white-space:nowrap;">
+            <span style="font-size:.68rem;color:#a78bfa;font-weight:700;">Wave ${idx+1}</span>
+          </td>
+          <td style="font-size:.8rem;color:#93c5fd;">${escHtml(wv.origin_village||'—')}</td>
+          <td style="font-size:.75rem;">${troopChips(wv.troop_json)}</td>
+          <td style="font-family:monospace;font-size:.78rem;color:#fbbf24;">${fmtSendTime(wv.send_time)}</td>
+          <td><span class="mop-cd ${cdStr(wv.send_time).cls}" data-send="${wv.send_time||''}" style="font-size:.82rem;">${cdStr(wv.send_time).text}</span></td>
+          <td style="color:var(--text-muted);font-size:.75rem;">${fmtTravel(wv.travel_seconds)}</td>
+          <td style="font-size:.75rem;color:#fbbf24;">${wv.notes?escHtml(wv.notes):''}</td>
+          <td>${confirmBtns(wv)}</td>
+          <td>${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally" style="font-size:.72rem;">⚔</a>`:''}</td>
+        </tr>`).join(''):''}`;
       }).join('');
 
       // Mobile cards per target (also grouped)
@@ -455,7 +475,9 @@ function render() {
         const w = grp[0]; const cnt = grp.length;
         const cd = cdStr(w.send_time);
         const cc = cardClass(w, cd.secsLeft);
-        const countBadgeMob = cnt > 1 ? `<span style="background:#6366f1;color:#fff;font-size:.68rem;font-weight:800;border-radius:9px;padding:1px 6px;margin-left:.3rem;">×${cnt} Wellen</span>` : '';
+        const countBadgeMob = cnt > 1 ? `<span style="background:#6366f1;color:#fff;font-size:.68rem;font-weight:800;border-radius:9px;padding:1px 6px;margin-left:.3rem;">×${cnt} waves</span>` : '';
+        const allSameMob = grp.every(x => JSON.stringify(x.troop_json||{}) === JSON.stringify(w.troop_json||{}));
+        const troopDisplayMob = cnt>1&&!allSameMob ? `<span style="font-size:.75rem;color:#a78bfa;font-style:italic;">Mixed troops</span>` : troopChips(w.troop_json);
         return `<div class="mop-card ${cc}" data-wave-id="${w.id}">
           <div class="mop-card-row">
             <span><span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>${countBadgeMob}</span>
@@ -468,7 +490,17 @@ function render() {
             <div class="mop-card-label">From</div>
             <div style="font-family:monospace;font-size:.82rem;color:#93c5fd;">${escHtml(w.origin_village||w.attacker_name||'—')}${w.origin_x!=null?` (${w.origin_x}|${w.origin_y})`:''}</div>
           </div>
-          <div style="margin-bottom:.4rem;">${troopChips(w.troop_json)}</div>
+          <div style="margin-bottom:.4rem;">${troopDisplayMob}</div>
+          ${cnt>1?`<div style="margin-bottom:.4rem;" id="mob-waves-${w.id}" style="display:none;">
+            ${grp.map((wv,idx)=>`<div style="border-left:2px solid #6366f1;padding-left:.5rem;margin-bottom:.3rem;">
+              <div style="font-size:.68rem;color:#a78bfa;font-weight:700;">Wave ${idx+1}</div>
+              <div style="font-size:.72rem;">${troopChips(wv.troop_json)}</div>
+              <div style="font-family:monospace;font-size:.72rem;color:#fbbf24;">${fmtSendTime(wv.send_time)}</div>
+            </div>`).join('')}
+          </div>
+          <button onclick="const el=document.getElementById('mob-waves-${w.id}');el.style.display=el.style.display?'':'none';this.textContent=el.style.display?'▸ Waves':'▾ Waves';"
+            style="font-size:.72rem;background:none;border:1px solid rgba(167,139,250,.4);color:#a78bfa;border-radius:5px;padding:2px 8px;cursor:pointer;margin-bottom:.4rem;">▸ Waves</button>`:''}
+          <div style="margin-bottom:.4rem;">
           <div class="mop-card-row" style="margin-bottom:.4rem;">
             <div>
               <div class="mop-card-label">Send time</div>
