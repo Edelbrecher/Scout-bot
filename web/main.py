@@ -7082,6 +7082,25 @@ async def op_add_wave(
         wave_type, tribe, troops, landing_time, server_speed, notes.strip(),
         tournament_square=max(0, min(tournament_square, 20))
     )
+    # Auto-notify the assigned player via Discord DM
+    if attacker_discord_id:
+        async def _auto_notify_wave():
+            try:
+                plan = await database.get_op_plan_full(plan_id, guild_id)
+                if plan:
+                    async with httpx.AsyncClient(timeout=8) as _hc:
+                        await _hc.post("http://bot:7777/api/op-wave-assigned", json={
+                            "guild_id": guild_id, "plan": plan,
+                            "discord_id": attacker_discord_id,
+                            "attacker_name": attacker_name.strip(),
+                            "wave_type": wave_type,
+                            "target_x": result.get("target_x"),
+                            "target_y": result.get("target_y"),
+                            "send_time": result.get("send_time"),
+                        })
+            except Exception:
+                pass
+        asyncio.create_task(_auto_notify_wave())
     return _JSONResponse({"ok": True, **result})
 
 
@@ -7551,6 +7570,7 @@ async def op_attacker_list(request: Request, guild_id: str):
             villages = own_villages_by_player[name]
         result.append({
             "player_name": name,
+            "discord_id": tr.get("discord_id", ""),
             "discord_name": tr.get("discord_name", ""),
             "tribe": tr.get("tribe") or snap_tribe.get(name) or am.get("tribe", ""),
             "rank": am.get("rank", 9999),

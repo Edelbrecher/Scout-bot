@@ -989,7 +989,8 @@ function _findAttacker(nameVal) {
   return attackers.find(a => a.player_name === nameVal || a.discord_name === nameVal)
       || (members.find(m => m.discord_name === nameVal) && (() => {
            const m = members.find(m => m.discord_name === nameVal);
-           return { player_name: m.travian_name||m.discord_name, discord_name:m.discord_name, tribe:m.tribe,
+           return { player_name: m.travian_name||m.discord_name, discord_id: m.discord_id||'',
+                    discord_name:m.discord_name, tribe:m.tribe,
                     villages:(m.villages||[]).map(v=>({name:v.village_name||'',x:v.x,y:v.y,pop:v.population||0,troops:v})) };
          })());
 }
@@ -1827,8 +1828,11 @@ async function saveWave() {
   const ox = document.getElementById('wmOX').value;
   const oy = document.getElementById('wmOY').value;
   const attacker = document.getElementById('wmAttackerSelect').value;
+  const attackerObj = _findAttacker(attacker);
+  const attackerDiscordId = attackerObj?.discord_id || '';
   const payload = {
     attacker_name: attacker,
+    attacker_discord_id: attackerDiscordId,
     origin_village: '',
     origin_x: ox||'',
     origin_y: oy||'',

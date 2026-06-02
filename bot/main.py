@@ -786,6 +786,50 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
     return aiohttp_web.json_response({"ok": True, "sent": sent, "results": results})
 
 
+async def handle_op_wave_assigned(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Send a Discord DM to one player when a wave is newly assigned to them."""
+    try:
+        data = await request.json()
+        guild_id     = str(data.get("guild_id", ""))
+        discord_id   = str(data.get("discord_id", ""))
+        attacker_name= data.get("attacker_name", "")
+        wave_type    = data.get("wave_type", "real")
+        target_x     = data.get("target_x")
+        target_y     = data.get("target_y")
+        send_time    = (data.get("send_time") or "—")[:16].replace("T", " ")
+        plan         = data.get("plan", {})
+        plan_name    = plan.get("name", "Operation")
+        landing      = (plan.get("landing_time") or "")[:16].replace("T", " ")
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not discord_id or not discord_id.isdigit():
+        return aiohttp_web.json_response({"ok": False, "status": "no_discord_id"})
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    member = guild.get_member(int(discord_id))
+    if not member:
+        return aiohttp_web.json_response({"ok": False, "status": "not_in_server"})
+
+    type_icon = {"real": "⚔️", "fake": "👻", "def": "🛡️", "scout": "🔍", "chief": "👑"}.get(wave_type, "⚔️")
+    target_str = f"({target_x}|{target_y})" if target_x is not None else "?"
+    try:
+        msg = (
+            f"⚔️ **You've been assigned a wave — {plan_name}**\n"
+            f"🕐 Landing: **{landing}**\n\n"
+            f"{type_icon} **{wave_type.upper()}** → {target_str}\n"
+            f"📤 Send time: **{send_time}**\n\n"
+            f"➡️ See your full plan: TravOps → My Op Plan"
+        )
+        await member.send(msg)
+        return aiohttp_web.json_response({"ok": True, "status": "sent"})
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": True, "status": "dm_blocked", "error": str(e)[:120]})
+
+
 async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Response:
     """Announce a newly activated EP plan to the poll channel + DM all approved ally members."""
     try:
@@ -1222,6 +1266,7 @@ async def start_api_server():
     app.router.add_post("/api/refresh-res-push", handle_refresh_res_push)
     app.router.add_post("/api/refresh-request-hub", handle_refresh_request_hub)
     app.router.add_post("/api/op-notify", handle_op_notify)
+    app.router.add_post("/api/op-wave-assigned", handle_op_wave_assigned)
     app.router.add_post("/api/announce-ep", handle_announce_ep)
     app.router.add_post("/api/announce-ep-cancelled", handle_announce_ep_cancelled)
     app.router.add_post("/api/archive-defend-channel", handle_archive_defend_channel)

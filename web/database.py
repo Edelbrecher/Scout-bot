@@ -6769,7 +6769,9 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
         await db.commit()
 
     return {"id": wave_id, "send_time": send_time, "travel_seconds": travel_sec,
-            "slowest_unit": slowest_id, "slowest_speed": slowest_speed}
+            "slowest_unit": slowest_id, "slowest_speed": slowest_speed,
+            "target_x": trow["x"] if trow else None,
+            "target_y": trow["y"] if trow else None}
 
 
 async def update_op_wave(wave_id: int, guild_id: str, **kwargs):
