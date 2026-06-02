@@ -459,7 +459,41 @@ function render() {
         return false;
       });
 
-      const tableRows = wGroupOrder.map(grp => {
+      // Build interleaved list: wave groups + hero actions sorted by send_time
+      const slotLabelInline = {weapon:'⚔️ Weapon',helmet:'🪖 Helmet',body:'🛡️ Body',shoes:'👟 Boots',horse:'🐴 Mount'};
+      const timelineItems = [];
+      for (const grp of wGroupOrder) {
+        timelineItems.push({type:'wave', grp, sortKey: grp[0].send_time||'9999'});
+      }
+      for (const a of tgtHeroActions) {
+        timelineItems.push({type:'hero', action: a, sortKey: a.send_time||'9999'});
+      }
+      timelineItems.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
+
+      const tableRows = timelineItems.map(item => {
+        if (item.type === 'hero') {
+          const a = item.action;
+          const isSwitch = a.action_type === 'gear_switch';
+          const cd = a.send_time ? cdStr(a.send_time) : {text:'—', cls:'mop-cd-past', secsLeft:null};
+          const desc = isSwitch
+            ? `🔄 Switch ${slotLabelInline[a.item_slot]||a.item_slot||'gear'} → <strong style="color:#f0abfc;">${escHtml(a.item_name||'?')}</strong>`
+            : `🚫 Send <strong>WITHOUT hero</strong>`;
+          return `<tr style="background:rgba(168,85,247,.1);border-left:3px solid #a78bfa;">
+            <td colspan="2" style="padding:.45rem .75rem;white-space:nowrap;">
+              <span style="font-size:.7rem;font-weight:800;color:#c084fc;text-transform:uppercase;letter-spacing:.05em;">🦸 Hero Task</span>
+              <span style="font-size:.82rem;margin-left:.5rem;">${desc}</span>
+              ${a.notes ? `<span style="font-size:.72rem;color:#fbbf24;margin-left:.5rem;">📝 ${escHtml(a.notes)}</span>` : ''}
+            </td>
+            <td></td>
+            <td class="mop-sendtime" style="color:#c084fc;">${a.send_time ? fmtSendTime(a.send_time) : '—'}</td>
+            <td>
+              ${a.send_time ? `<span class="mop-cd ${cd.cls}" data-send="${a.send_time}" style="font-size:.82rem;">${cd.text}</span>` : ''}
+            </td>
+            <td colspan="4"></td>
+          </tr>`;
+        }
+
+        const grp = item.grp;
         const w = grp[0]; const cnt = grp.length;
         const cd = cdStr(w.send_time);
         const rc = rowClass(w, cd.secsLeft);
@@ -576,21 +610,6 @@ function render() {
           <span style="margin-left:.5rem;">${tgtLabel}</span>
           <span style="margin-left:.5rem;font-size:.72rem;color:var(--text-muted);">${tgt.waves.length} wave${tgt.waves.length!==1?'s':''}</span>
         </div>
-        ${tgtHeroActions.map(a => {
-          const slotLabel = {weapon:'⚔️ Weapon',helmet:'🪖 Helmet',body:'🛡️ Body',shoes:'👟 Boots',horse:'🐴 Mount'};
-          const isSwitch = a.action_type === 'gear_switch';
-          const timeStr = a.send_time ? a.send_time.slice(0,16).replace('T',' ') : null;
-          const cd = a.send_time ? cdStr(a.send_time) : {text:'—', cls:'mop-cd-past', secsLeft:null};
-          return `<div style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.35);border-radius:8px;padding:.6rem .9rem;margin:.25rem 0 0 0;">
-            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
-              <span style="font-size:.7rem;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:.05em;">🦸 Hero Task</span>
-              <span style="font-size:.82rem;font-weight:700;">${isSwitch ? `🔄 Switch ${slotLabel[a.item_slot]||a.item_slot} → <strong>${escHtml(a.item_name||'?')}</strong>` : '🚫 Send <strong>without hero</strong>'}</span>
-              ${timeStr ? `<span class="mop-cd ${cd.cls}" data-send="${a.send_time}" style="font-family:monospace;font-size:.82rem;margin-left:auto;">${cd.text}</span>` : ''}
-            </div>
-            ${a.notes ? `<div style="font-size:.75rem;color:#fbbf24;margin-top:.2rem;">📝 ${escHtml(a.notes)}</div>` : ''}
-            ${timeStr ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">⏰ Do at: ${timeStr}</div>` : ''}
-          </div>`;
-        }).join('')}
         <div class="mop-table-wrap" style="overflow-x:auto;">
           <table class="mop-table">
             <thead><tr>
