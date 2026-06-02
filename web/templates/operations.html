@@ -1341,7 +1341,7 @@ function _renderAssignmentPanel(settings) {
     <div style="padding:.45rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);display:flex;flex-direction:column;gap:.35rem;">
       <!-- Row 1: village filter toggle -->
       <div style="display:flex;gap:.35rem;">
-        <button onclick="document.getElementById('assignOnlyWithTroops').checked=false;rebuildAssignPanel();"
+        <button onclick="document.getElementById('assignOnlyWithTroops').checked=false;document.getElementById('assignOnlyOff').checked=false;rebuildAssignPanel();"
           id="btn-all-villages"
           style="flex:1;padding:.3rem .4rem;font-size:.7rem;font-weight:600;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:${!settings.onlyWithTroops?'rgba(99,102,241,.2)':'var(--bg-main)'};color:${!settings.onlyWithTroops?'#a5b4fc':'var(--text-muted)'};">
           🏘 All villages

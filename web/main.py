@@ -7122,14 +7122,14 @@ async def op_attacker_list(request: Request, guild_id: str):
                 } for v in tv]
             except Exception:
                 pass
-        # Enrich snap villages with troops from member_troops
+        # Enrich snap villages with troops from member_troops (match by village name)
         elif villages and tr.get("villages_json"):
             try:
                 tv = _jop.loads(tr["villages_json"])
-                troop_by_coord = {(v.get("x"), v.get("y")): v.get("troops", {}) for v in tv}
+                troop_by_name = {v.get("village_name", ""): v.get("troops", {}) for v in tv if v.get("troops")}
                 for v in villages:
                     if not v.get("troops"):
-                        v["troops"] = troop_by_coord.get((v.get("x"), v.get("y")), {})
+                        v["troops"] = troop_by_name.get(v.get("name", ""), {})
             except Exception:
                 pass
         # Fallback 2: own villages imported via "Mein Account" (guild_own_villages)
