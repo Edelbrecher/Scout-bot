@@ -197,6 +197,10 @@ function groupByPlan(waves) {
 }
 
 // ── Countdown string ─────────────────────────────────────────────
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function cdStr(sendTime) {
   if (!sendTime) return {text:'—', cls:'mop-cd-past', secsLeft: null};
   const dt = new Date(sendTime.replace(' ','T'));
@@ -448,6 +452,7 @@ function render() {
 
 // ── Live countdown tick ──────────────────────────────────────────
 function tick() {
+  try {
   document.querySelectorAll('[data-send]').forEach(el => {
     const st = el.dataset.send;
     if (!st) return;
@@ -476,6 +481,7 @@ function tick() {
     updateNextWaveBanner();
   }
   checkAlarms();
+  } catch(e) { console.error('tick error:', e); }
 }
 
 // ── Confirm / Delta ──────────────────────────────────────────────
