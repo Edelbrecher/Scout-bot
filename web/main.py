@@ -7121,8 +7121,11 @@ async def op_map_popup(request: Request, guild_id: str, plan_id: int):
     """Standalone map window — no nav, just the canvas + auto-refresh."""
     session, err = _require_session(request)
     if err: return err
-    guild, err = await _require_guild(request, guild_id)
+    err = _require_guild(session, guild_id)
     if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
     plan = await database.get_op_plan_with_targets(plan_id, guild_id)
     if not plan:
         return HTMLResponse("Plan not found", status_code=404)
