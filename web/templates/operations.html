@@ -930,8 +930,8 @@ function renderWavesTable(t) {
       </td>
       <td style="font-size:.75rem;color:var(--text-muted);max-width:110px;word-break:break-word;">${w.notes ? escHtml(w.notes) : ''}</td>
       <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
-        <button class="wave-action-btn" title="Welle duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
-        <button class="wave-action-btn" title="Duplizieren &amp; sofort bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
+        <button class="wave-action-btn" title="Quick +1: identische Welle hinzufügen" onclick="duplicateWave(${w.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
+        <button class="wave-action-btn" title="Duplizieren &amp; bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
         <button class="wave-action-btn" title="Welle bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
         <button class="wave-action-btn danger" title="${count>1?count+' waves delete':'Delete wave'}" onclick="${deleteHandler}">🗑${count>1?` ×${count}`:''}</button>
         <button class="wave-action-btn" title="Direkt zum Rallypoint — Ziel: ${t.x}|${t.y}${TW_WORLD?'':' (Travian-Server nicht konfiguriert)'}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);font-size:.85rem;">🏹</button>
@@ -1861,7 +1861,12 @@ async function saveWave() {
   }
   try {
     if (editingWaveId) {
-      await apiPost(`/waves/${editingWaveId}/update`, payload);
+      // Update uses JSON (FormData would break troop_json parsing)
+      await apiFetch(`/waves/${editingWaveId}/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({...payload, troop_json: troops}), // send troops as object, not string
+      });
     } else {
       payload.plan_id = activePlanId;
       await apiPost(`/targets/${currentTargetId}/waves`, payload);

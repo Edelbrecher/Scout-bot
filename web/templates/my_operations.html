@@ -359,6 +359,30 @@ function confirmBtns(w) {
   return `<button class="mop-btn mop-btn-cant" onclick="doConfirm(${id},'cant_send',0,${wd})">🚫 Can't send</button>`;
 }
 
+// ── Troop chips ───────────────────────────────────────────────────
+function troopChips(troop_json) {
+  const entries = Object.entries(troop_json||{}).filter(([,v])=>v>0);
+  if (!entries.length) return '<span style="color:var(--text-muted);font-size:.75rem;">—</span>';
+  return entries.map(([k,v]) =>
+    `<span style="display:inline-block;font-size:.7rem;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:1px 6px;margin:1px;">${escHtml(k)} <b>${v.toLocaleString()}</b></span>`
+  ).join('');
+}
+
+// ── Group waves by target within a plan ──────────────────────────
+function groupByTarget(waves) {
+  const targets = {};
+  for (const w of waves) {
+    const key = `${w.target_x}|${w.target_y}`;
+    if (!targets[key]) targets[key] = {
+      target_x: w.target_x, target_y: w.target_y,
+      target_player: w.target_player, target_village: w.target_village,
+      waves: []
+    };
+    targets[key].waves.push(w);
+  }
+  return Object.values(targets);
+}
+
 // ── Render ───────────────────────────────────────────────────────
 function render() {
   const plans = groupByPlan(WAVES_DATA);
@@ -372,109 +396,104 @@ function render() {
       ? `<span class="mop-status-badge mop-status-active">● Active</span>`
       : `<span class="mop-status-badge mop-status-draft">○ Draft</span>`;
 
-    // Desktop table rows
-    const tableRows = p.waves.map(w => {
-      const cd = cdStr(w.send_time);
-      const rc = rowClass(w, cd.secsLeft);
-      const troop_info = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
-        .map(([k,v])=>`${k}: ${v.toLocaleString()}`).join(', ');
-      return `<tr class="${rc}" data-wave-id="${w.id}">
-        <td><span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span></td>
-        <td>
-          <div style="font-family:monospace;color:#93c5fd;font-size:.85rem;">${w.origin_village||w.attacker_name||'—'}</div>
-          <div style="font-size:.72rem;color:var(--text-muted);">(${w.origin_x||'?'}|${w.origin_y||'?'})</div>
-        </td>
-        <td>
-          <div style="font-family:monospace;color:#f0abfc;font-size:.85rem;">${w.target_x}|${w.target_y}</div>
-          <div style="font-size:.72rem;color:var(--text-muted);">${w.target_player||''}</div>
-        </td>
-        <td class="mop-sendtime" style="color:#fbbf24;">${fmtSendTime(w.send_time)}</td>
-        <td>
-          <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
-                style="font-size:${cd.secsLeft!==null&&cd.secsLeft>=0&&cd.secsLeft<3600?'1.05rem':''}">
-            ${cd.text}
-          </span>
-          ${cd.secsLeft!==null&&cd.secsLeft>=0 ? `
-          <div style="margin-top:3px;height:3px;border-radius:2px;background:rgba(255,255,255,.08);width:80px;overflow:hidden;">
-            <div style="height:100%;border-radius:2px;background:${cd.secsLeft<60?'#f87171':cd.secsLeft<300?'#fbbf24':'#4ade80'};
-              width:${Math.min(100,Math.max(2,(1-cd.secsLeft/86400)*100))}%;transition:width 1s linear;"></div>
-          </div>` : ''}
-        </td>
-        <td style="color:var(--text-muted);font-size:.8rem;">${fmtTravel(w.travel_seconds)}</td>
-        <td>${w.notes ? `<span class="mop-note" title="${w.notes}">${w.notes}</span>` : ''}</td>
-        <td style="min-width:160px;">${confirmBtns(w)}</td>
-        <td>${rallyLink(w)}</td>
-      </tr>`;
-    }).join('');
+    const targets = groupByTarget(p.waves);
 
-    // Mobile cards
-    const mobileCards = p.waves.map(w => {
-      const cd = cdStr(w.send_time);
-      const cc = cardClass(w, cd.secsLeft);
-      return `<div class="mop-card ${cc}" data-wave-id="${w.id}">
-        <div class="mop-card-row">
-          <span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>
-          <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
-                style="font-size:${cd.secsLeft!==null&&cd.secsLeft>=0&&cd.secsLeft<3600?'1.1rem;font-weight:900':'.85rem'};">
-            ${cd.secsLeft!==null&&cd.secsLeft>=0 ? '⏰ ' : ''}${cd.text}
-          </span>
-        </div>
-        <div class="mop-card-row" style="margin-bottom:.5rem;">
-          <div>
+    // Desktop: one section per target
+    const targetSections = targets.map(tgt => {
+      const tgtLabel = `<span style="color:#f0abfc;font-family:monospace;font-weight:700;">${tgt.target_x}|${tgt.target_y}</span>${tgt.target_player ? ` <span style="color:var(--text-muted);font-size:.8rem;">· ${escHtml(tgt.target_player)}</span>` : ''}`;
+
+      const tableRows = tgt.waves.map(w => {
+        const cd = cdStr(w.send_time);
+        const rc = rowClass(w, cd.secsLeft);
+        return `<tr class="${rc}" data-wave-id="${w.id}">
+          <td><span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span></td>
+          <td>
+            <div style="font-family:monospace;color:#93c5fd;font-size:.85rem;font-weight:600;">${escHtml(w.origin_village||w.attacker_name||'—')}</div>
+            ${w.origin_x!=null?`<div style="font-size:.7rem;color:var(--text-muted);">(${w.origin_x}|${w.origin_y})</div>`:''}
+          </td>
+          <td style="font-size:.78rem;">${troopChips(w.troop_json)}</td>
+          <td class="mop-sendtime" style="color:#fbbf24;">${fmtSendTime(w.send_time)}</td>
+          <td>
+            <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
+                  style="font-size:${cd.secsLeft!==null&&cd.secsLeft>=0&&cd.secsLeft<3600?'1rem;font-weight:800':''}">
+              ${cd.text}
+            </span>
+            ${cd.secsLeft!==null&&cd.secsLeft>=0 ? `
+            <div style="margin-top:3px;height:3px;border-radius:2px;background:rgba(255,255,255,.08);width:70px;overflow:hidden;">
+              <div style="height:100%;border-radius:2px;background:${cd.secsLeft<60?'#f87171':cd.secsLeft<300?'#fbbf24':'#4ade80'};
+                width:${Math.min(100,Math.max(2,(1-cd.secsLeft/86400)*100))}%;"></div>
+            </div>` : ''}
+          </td>
+          <td style="color:var(--text-muted);font-size:.8rem;">${fmtTravel(w.travel_seconds)}</td>
+          <td>${w.notes ? `<span class="mop-note" title="${escHtml(w.notes)}">${escHtml(w.notes)}</span>` : ''}</td>
+          <td style="min-width:150px;">${confirmBtns(w)}</td>
+          <td>${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>`:''}</td>
+        </tr>`;
+      }).join('');
+
+      // Mobile cards per target
+      const mobileCards = tgt.waves.map(w => {
+        const cd = cdStr(w.send_time);
+        const cc = cardClass(w, cd.secsLeft);
+        return `<div class="mop-card ${cc}" data-wave-id="${w.id}">
+          <div class="mop-card-row">
+            <span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>
+            <span class="mop-cd ${cd.cls}" data-send="${w.send_time||''}"
+                  style="font-size:${cd.secsLeft!==null&&cd.secsLeft>=0&&cd.secsLeft<3600?'1rem;font-weight:900':'.85rem'};">
+              ${cd.secsLeft!==null&&cd.secsLeft>=0?'⏰ ':''}${cd.text}
+            </span>
+          </div>
+          <div style="margin-bottom:.4rem;">
             <div class="mop-card-label">From</div>
-            <div style="font-family:monospace;font-size:.82rem;">${w.origin_village||w.attacker_name||'—'} (${w.origin_x||'?'}|${w.origin_y||'?'})</div>
+            <div style="font-family:monospace;font-size:.82rem;color:#93c5fd;">${escHtml(w.origin_village||w.attacker_name||'—')}${w.origin_x!=null?` (${w.origin_x}|${w.origin_y})`:''}</div>
           </div>
-          <div style="text-align:right;">
-            <div class="mop-card-label">Target</div>
-            <div style="font-family:monospace;color:#f0abfc;font-size:.82rem;">${w.target_x}|${w.target_y}</div>
-            <div style="font-size:.72rem;color:var(--text-muted);">${w.target_player||''}</div>
+          <div style="margin-bottom:.4rem;">${troopChips(w.troop_json)}</div>
+          <div class="mop-card-row" style="margin-bottom:.4rem;">
+            <div>
+              <div class="mop-card-label">Send time</div>
+              <div style="font-family:monospace;color:#fbbf24;font-size:.8rem;">${fmtSendTime(w.send_time)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mop-card-label">March</div>
+              <div style="font-size:.8rem;">${fmtTravel(w.travel_seconds)}</div>
+            </div>
           </div>
+          ${w.notes?`<div style="font-size:.78rem;color:#fbbf24;font-style:italic;margin-bottom:.4rem;">📝 ${escHtml(w.notes)}</div>`:''}
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            ${confirmBtns(w)}
+            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>`:''}
+          </div>
+        </div>`;
+      }).join('');
+
+      return `
+        <div style="padding:.5rem 1.2rem .3rem;background:rgba(240,171,252,.05);border-bottom:1px solid rgba(240,171,252,.12);">
+          <span style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">🎯 Target</span>
+          <span style="margin-left:.5rem;">${tgtLabel}</span>
+          <span style="margin-left:.5rem;font-size:.72rem;color:var(--text-muted);">${tgt.waves.length} wave${tgt.waves.length!==1?'s':''}</span>
         </div>
-        <div class="mop-card-row" style="margin-bottom:.5rem;">
-          <div>
-            <div class="mop-card-label">Send time</div>
-            <div style="font-family:monospace;color:#fbbf24;font-size:.8rem;">${fmtSendTime(w.send_time)}</div>
-          </div>
-          <div style="text-align:right;">
-            <div class="mop-card-label">March</div>
-            <div style="font-size:.8rem;">${fmtTravel(w.travel_seconds)}</div>
-          </div>
+        <div class="mop-table-wrap" style="overflow-x:auto;">
+          <table class="mop-table">
+            <thead><tr>
+              <th>Type</th><th>From village</th><th>Troops</th>
+              <th>Send time</th><th>Countdown</th><th>March</th>
+              <th>Notes</th><th>Status</th><th>Link</th>
+            </tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
         </div>
-        ${w.notes ? `<div style="font-size:.78rem;color:#fbbf24;font-style:italic;margin-bottom:.5rem;">📝 ${w.notes}</div>` : ''}
-        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-          ${confirmBtns(w)}
-          ${TW_WORLD ? `<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-rally">⚔ Send</a>` : ''}
-        </div>
-      </div>`;
+        <div class="mop-cards" style="padding:.5rem .75rem;">${mobileCards}</div>`;
     }).join('');
 
     return `<div class="mop-plan">
       <div class="mop-plan-header">
         <span style="font-size:1.2rem;">📋</span>
-        <span class="mop-plan-name">${p.plan_name||'Operation'}</span>
+        <span class="mop-plan-name">${escHtml(p.plan_name||'Operation')}</span>
         ${statusBadge}
         <span class="mop-landing">🕐 Landing: ${landStr}</span>
-        <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted);">${p.waves.length} wave${p.waves.length!==1?'s':''} assigned to you</span>
+        <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted);">${p.waves.length} wave${p.waves.length!==1?'s':''} · ${targets.length} target${targets.length!==1?'s':''}</span>
       </div>
-      <!-- Desktop -->
-      <div class="mop-table-wrap" style="overflow-x:auto;">
-        <table class="mop-table">
-          <thead><tr>
-            <th>Type</th>
-            <th>From village</th>
-            <th>Target</th>
-            <th>Send time</th>
-            <th>Countdown</th>
-            <th>March time</th>
-            <th>Notes</th>
-            <th>Status</th>
-            <th>Link</th>
-          </tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-      <!-- Mobile -->
-      <div class="mop-cards" style="padding:.75rem;">${mobileCards}</div>
+      ${targetSections}
     </div>`;
   }).join('');
 }
