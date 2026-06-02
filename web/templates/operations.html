@@ -143,11 +143,11 @@
 
 /* ── Right panel ─────────────────────────────────────────────── */
 .op-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-.op-panel-tabs { display:flex; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
-.op-panel-tabs::-webkit-scrollbar { display:none; }
-.op-panel-tab { flex:0 0 auto; padding:.4rem .5rem; text-align:center; font-size:.72rem; cursor:pointer;
-  color:var(--text-muted); border-bottom:2px solid transparent; transition:all .15s; white-space:nowrap; }
-.op-panel-tab.active { color:#f59e0b; border-bottom-color:#f59e0b; }
+.op-panel-tabs { border-bottom:1px solid var(--border); }
+.op-panel-tab { padding:.45rem .3rem; text-align:center; font-size:.72rem; cursor:pointer;
+  color:var(--text-muted); border-right:1px solid var(--border); transition:all .15s; white-space:nowrap; }
+.op-panel-tab:last-child, .op-panel-tab:nth-child(3) { border-right:none; }
+.op-panel-tab.active { color:#f59e0b; background:rgba(245,158,11,.07); }
 .op-panel-body { padding:.9rem; }
 
 /* ── Plausibility ────────────────────────────────────────────── */
@@ -346,13 +346,13 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <!-- RIGHT: Panel (Plan info, Favourites, Members, Check) -->
           <div>
             <div class="op-panel">
-              <div class="op-panel-tabs">
+              <div class="op-panel-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);overflow:visible;">
                 <div class="op-panel-tab active" onclick="switchPanel('info',this)">📋 Plan</div>
                 <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favoriten</div>
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Truppen</div>
-                <div class="op-panel-tab" onclick="switchPanel('check',this)">🔍 Check</div>
-                <div class="op-panel-tab" onclick="switchPanel('stats',this);loadStats()">📊 Auswertung</div>
-                <div class="op-panel-tab" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)">🔍 Check</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('stats',this);loadStats()">📊 Auswertung</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
               </div>
 
               <!-- Plan info -->
@@ -2238,15 +2238,16 @@ async function sendNotify() {
   if (!confirm('Plan als Discord-Nachricht an alle betroffenen Mitglieder senden?')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/notify`);
-    if (r.ok) {
-      showToast('✅ Discord-Benachrichtigung gesendet — Log wurde aktualisiert.');
-      // Auto-switch to log tab
-      const logTab = document.getElementById('tab-msglog');
-      if (logTab) { switchPanel('msglog', logTab); loadNotifyLog(); }
-    } else {
-      alert('⚠️ Benachrichtigung fehlgeschlagen (Bot prüfen).');
-    }
-  } catch(e) { alert('Fehler: '+e.message); }
+    // Always switch to log tab — success or failure
+    const logTab = document.getElementById('tab-msglog');
+    if (logTab) { switchPanel('msglog', logTab); }
+    await loadNotifyLog();
+    showToast(r.ok ? '✅ Benachrichtigung gesendet — Log aktualisiert.' : '⚠️ Benachrichtigung fehlgeschlagen — siehe Log.');
+  } catch(e) {
+    showToast('❌ Fehler: ' + e.message);
+    const logTab = document.getElementById('tab-msglog');
+    if (logTab) { switchPanel('msglog', logTab); loadNotifyLog(); }
+  }
 }
 
 // ══ Notify Log ════════════════════════════════════════════════════════════
@@ -2278,13 +2279,14 @@ async function loadNotifyLog() {
         : '<span style="background:rgba(245,158,11,.12);color:#fbbf24;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">📢 Manuell</span>';
 
       const rows = entries.length ? entries.map(e => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.25rem .5rem;border-bottom:1px solid rgba(255,255,255,.04);gap:.5rem;">
-          <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.discord_id||''}">
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.28rem .55rem;border-bottom:1px solid rgba(255,255,255,.04);">
+          <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;" title="${e.discord_id||''}">
             ${e.name || e.discord_id || '—'}
           </span>
-          <span>${statusLabel(e.status)}</span>
-          ${e.error ? `<span style="font-size:.67rem;color:#f87171;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.error}">${e.error}</span>` : ''}
-        </div>`).join('') : '<div style="font-size:.78rem;color:var(--text-muted);padding:.3rem .5rem;">Keine Einzel-Daten</div>';
+          <span style="flex-shrink:0;">${statusLabel(e.status)}</span>
+          ${e.error ? `<span style="font-size:.67rem;color:#f87171;flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.error}">${e.error}</span>` : ''}
+        </div>`).join('')
+        : '<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ Keine Wellen mit Discord-ID oder kein Ally-Mitglied gefunden.</div>';
 
       return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden;">
         <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;border-bottom:1px solid var(--border);">

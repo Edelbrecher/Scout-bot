@@ -6647,10 +6647,14 @@ async def op_update_plan(
 
 async def _announce_plan_via_bot(guild_id: str, plan_id: int):
     """Send Discord DMs + internal notifications when a plan goes active."""
+    dm_results: list = []
+    member_ids: list = []
     try:
         plan = await database.get_op_plan(plan_id, guild_id)
         if not plan:
             print(f"[announce-ep] plan not found: guild={guild_id} plan={plan_id}")
+            await database.save_op_notify_log(guild_id, plan_id, "", "auto",
+                [{"discord_id": "", "name": "System", "status": "error", "error": "Plan not found"}])
             return
         landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
         plan_name = plan.get("name", "Einsatzplan")
@@ -6659,7 +6663,6 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
 
         # Get all approved ally members
         ally_group = await database.get_ally_group_for_guild(guild_id)
-        member_ids = []
         if ally_group:
             members = await database.get_ally_members(ally_group["id"])
             member_ids = [str(m["discord_id"]) for m in members
@@ -6706,6 +6709,9 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         print(f"[announce-ep] internal notifications created for {len(member_ids)} members")
     except Exception as e:
         print(f"[announce-ep] error: {e}")
+        dm_results = [{"discord_id": "", "name": "Bot", "status": "error", "error": str(e)[:120]}]
+    finally:
+        await database.save_op_notify_log(guild_id, plan_id, "", "auto", dm_results)
 
 
 async def _announce_plan_cancelled_via_bot(guild_id: str, plan_id: int):
