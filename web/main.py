@@ -6661,14 +6661,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         server_host = os.environ.get("SERVER_HOST", "https://travops.online")
         plan_url = f"{server_host}/guild/{guild_id}/operations"
 
-        # Get all approved ally members
-        ally_group = await database.get_ally_group_for_guild(guild_id)
-        if ally_group:
-            members = await database.get_ally_members(ally_group["id"])
-            member_ids = [str(m["discord_id"]) for m in members
-                          if m.get("discord_id") and m.get("status", "approved") == "approved"]
-
-        # Build per-member earliest wave send_time for personal countdown
+        # Only notify members who have waves assigned in this plan
         waves = await database.get_all_op_waves(plan_id)
         member_wave_times: dict[str, str] = {}
         for w in (waves or []):
@@ -6677,6 +6670,10 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
             if disc_id and st:
                 if disc_id not in member_wave_times or st < member_wave_times[disc_id]:
                     member_wave_times[disc_id] = st
+        # member_ids = only attackers with at least one wave
+        member_ids = list(member_wave_times.keys())
+
+        ally_group = await database.get_ally_group_for_guild(guild_id)
 
         # 1. Discord DMs via bot (no channel needed)
         payload = {
@@ -6684,7 +6681,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
             "plan_name": plan_name,
             "landing_time": landing,
             "plan_url": plan_url,
-            "poll_channel_id": "",   # no channel post
+            "poll_channel_id": "",
             "member_discord_ids": member_ids,
             "member_wave_times": member_wave_times,
         }
