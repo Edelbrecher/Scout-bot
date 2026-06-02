@@ -871,8 +871,9 @@ function toggleTarget(id) {
 
 // Key for grouping identical waves (all meaningful fields except id/order/confirm)
 function _waveGroupKey(w) {
+  // Exclude send_time so waves with slight time diffs still group
   return [w.wave_type, w.attacker_name, w.origin_village||'', w.origin_x??'', w.origin_y??'',
-          w.tribe, JSON.stringify(w.troop_json||{}), w.send_time||'', w.tournament_square||0, w.notes||''].join('|');
+          w.tribe, JSON.stringify(w.troop_json||{}), w.tournament_square||0, w.notes||''].join('|');
 }
 
 function renderWavesTable(t) {

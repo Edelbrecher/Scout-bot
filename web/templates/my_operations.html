@@ -402,10 +402,10 @@ function render() {
     const targetSections = targets.map(tgt => {
       const tgtLabel = `<span style="color:#f0abfc;font-family:monospace;font-weight:700;">${tgt.target_x}|${tgt.target_y}</span>${tgt.target_player ? ` <span style="color:var(--text-muted);font-size:.8rem;">· ${escHtml(tgt.target_player)}</span>` : ''}`;
 
-      // Group identical waves
+      // Group identical waves — exclude send_time from key so slight time diffs still group
       function waveKey(w) {
         return [w.wave_type, w.origin_village||'', w.origin_x??'', w.origin_y??'',
-                w.tribe, JSON.stringify(w.troop_json||{}), w.send_time||'', w.notes||''].join('|');
+                w.tribe, JSON.stringify(w.troop_json||{}), w.notes||''].join('|');
       }
       const wGroupMap = new Map(), wGroupOrder = [];
       for (const w of tgt.waves) {
@@ -418,9 +418,14 @@ function render() {
         const w = grp[0]; const cnt = grp.length;
         const cd = cdStr(w.send_time);
         const rc = rowClass(w, cd.secsLeft);
-        const countBadge = cnt > 1 ? `<span style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;min-width:18px;height:18px;padding:0 4px;margin-left:.3rem;">×${cnt}</span>` : '';
+        const countBadge = cnt > 1
+          ? `<span style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.7rem;font-weight:800;border-radius:9px;min-width:20px;height:20px;padding:0 5px;margin-left:.35rem;vertical-align:middle;" title="${cnt} identical waves">×${cnt}</span>`
+          : '';
         return `<tr class="${rc}" data-wave-id="${w.id}">
-          <td><span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>${countBadge}</td>
+          <td style="white-space:nowrap;">
+            <span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>${countBadge}
+            ${cnt > 1 ? `<div style="font-size:.68rem;color:#6366f1;font-weight:700;margin-top:2px;">${cnt} Wellen</div>` : ''}
+          </td>
           <td>
             <div style="font-family:monospace;color:#93c5fd;font-size:.85rem;font-weight:600;">${escHtml(w.origin_village||w.attacker_name||'—')}</div>
             ${w.origin_x!=null?`<div style="font-size:.7rem;color:var(--text-muted);">(${w.origin_x}|${w.origin_y})</div>`:''}
@@ -450,7 +455,7 @@ function render() {
         const w = grp[0]; const cnt = grp.length;
         const cd = cdStr(w.send_time);
         const cc = cardClass(w, cd.secsLeft);
-        const countBadgeMob = cnt > 1 ? `<span style="background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;padding:1px 5px;margin-left:.3rem;">×${cnt}</span>` : '';
+        const countBadgeMob = cnt > 1 ? `<span style="background:#6366f1;color:#fff;font-size:.68rem;font-weight:800;border-radius:9px;padding:1px 6px;margin-left:.3rem;">×${cnt} Wellen</span>` : '';
         return `<div class="mop-card ${cc}" data-wave-id="${w.id}">
           <div class="mop-card-row">
             <span><span class="wt ${TYPE_CSS[w.wave_type]||''}">${TYPE_LABELS[w.wave_type]||w.wave_type}</span>${countBadgeMob}</span>
