@@ -2435,18 +2435,16 @@ function closeOpMap() {
   document.getElementById('opMapOverlay').style.display = 'none';
 }
 
-function renderOpMap() {
+async function renderOpMap() {
   const canvas = document.getElementById('opMapCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  // Resize canvas to actual pixel size
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width || canvas.offsetWidth || 800;
   canvas.height = rect.height || canvas.offsetHeight || 500;
 
   const targets = (activePlan.targets || []);
-  // Collect all points
   const points = [];
   for (const t of targets) {
     if (t.x != null && t.y != null) points.push({x: t.x, y: t.y});
@@ -2455,26 +2453,31 @@ function renderOpMap() {
     }
   }
   if (!points.length) {
-    ctx.fillStyle = '#2d5a1e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#aaa';
-    ctx.font = '16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Keine Coordinates vorhanden', canvas.width/2, canvas.height/2);
+    ctx.fillStyle = '#1a2e12'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#aaa'; ctx.font='16px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('No coordinates available', canvas.width/2, canvas.height/2);
     return;
   }
 
-  let minX = points[0].x, maxX = points[0].x;
-  let minY = points[0].y, maxY = points[0].y;
+  let minX=points[0].x, maxX=points[0].x, minY=points[0].y, maxY=points[0].y;
   for (const p of points) {
-    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+    if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
   }
-  const padX = Math.max((maxX - minX) * 0.20, 10);
-  const padY = Math.max((maxY - minY) * 0.20, 10);
-  minX -= padX; maxX += padX; minY -= padY; maxY += padY;
+  const padX=Math.max((maxX-minX)*0.25,15), padY=Math.max((maxY-minY)*0.25,15);
+  minX-=padX; maxX+=padX; minY-=padY; maxY+=padY;
 
-  canvas._omState = { minX, maxX, minY, maxY, camOX: 0, camOY: 0, scale: 1 };
+  canvas._omState = { minX, maxX, minY, maxY, camOX:0, camOY:0, scale:1, bgVillages:[] };
+
+  // Fetch background villages from map_snapshots
+  try {
+    const res = await fetch(`/guild/${GUILD_ID}/operations/api/map-villages?x1=${Math.floor(minX)}&y1=${Math.floor(minY)}&x2=${Math.ceil(maxX)}&y2=${Math.ceil(maxY)}`);
+    if (res.ok) {
+      const d = await res.json();
+      canvas._omState.bgVillages = d.villages || [];
+    }
+  } catch(e) {}
+
   _drawOpMapContent(canvas, ctx);
 }
 
@@ -2500,74 +2503,125 @@ function _canvasToWorld(canvas, cx, cy) {
   return [wx, wy];
 }
 
+// Tribe colours matching the main map page
+const _OM_TRIBE_COL = {
+  1:'#f97316', 2:'#64748b', 3:'#22c55e',
+  4:'#eab308', 5:'#f59e0b', 6:'#a78bfa', 7:'#e879f9'
+};
+function _omTribeCol(tribe) { return _OM_TRIBE_COL[tribe] || '#888'; }
+
+function _drawArrow(ctx, x1,y1, x2,y2, color, alpha, lw) {
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+  if(len<4) return;
+  const ux=dx/len, uy=dy/len;
+  // shorten so arrow ends just before the dot
+  const endX=x2-ux*8, endY=y2-uy*8;
+  const startX=x1+ux*8, startY=y1+uy*8;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  ctx.strokeStyle=color; ctx.lineWidth=lw;
+  ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(startX,startY); ctx.lineTo(endX,endY); ctx.stroke();
+  ctx.setLineDash([]);
+  // arrowhead
+  const headLen=Math.max(8,lw*3);
+  const angle=Math.atan2(dy,dx);
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(endX,endY);
+  ctx.lineTo(endX-headLen*Math.cos(angle-0.4), endY-headLen*Math.sin(angle-0.4));
+  ctx.lineTo(endX-headLen*Math.cos(angle+0.4), endY-headLen*Math.sin(angle+0.4));
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
 function _drawOpMapContent(canvas, ctx) {
   const targets = (activePlan.targets || []);
-  ctx.fillStyle = '#1e3a14';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Light grid
   const s = canvas._omState;
-  const rangeX = (s.maxX - s.minX) || 1;
-  const rangeY = (s.maxY - s.minY) || 1;
-  const baseScale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
-  const sc = baseScale * s.scale;
-  const gridStep = Math.max(1, Math.round(20 / sc));
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
-  const xStart = Math.floor(s.minX / gridStep) * gridStep;
-  const xEnd   = Math.ceil(s.maxX / gridStep) * gridStep;
-  const yStart = Math.floor(s.minY / gridStep) * gridStep;
-  const yEnd   = Math.ceil(s.maxY / gridStep) * gridStep;
-  for (let gx = xStart; gx <= xEnd; gx += gridStep) {
-    const [px] = _worldToCanvas(canvas, gx, 0);
-    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height); ctx.stroke();
-  }
-  for (let gy = yStart; gy <= yEnd; gy += gridStep) {
-    const [, py] = _worldToCanvas(canvas, 0, gy);
-    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(canvas.width, py); ctx.stroke();
-  }
+  const rangeX=(s.maxX-s.minX)||1, rangeY=(s.maxY-s.minY)||1;
+  const baseScale=Math.min(canvas.width/rangeX, canvas.height/rangeY);
+  const sc=baseScale*s.scale;
 
-  // Collect attacker villages
-  const attackerMap = new Map(); // "x|y" → {name, x, y}
-  for (const t of targets) {
-    for (const w of (t.waves||[])) {
-      if (w.origin_x != null && w.origin_y != null) {
-        const key = `${w.origin_x}|${w.origin_y}`;
-        if (!attackerMap.has(key)) attackerMap.set(key, {name: w.attacker_name||'?', x: w.origin_x, y: w.origin_y});
-      }
+  // ── Background: terrain colour ────────────────────────────────────────────
+  ctx.fillStyle='#1a2e12'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // ── Background villages from map_snapshots ────────────────────────────────
+  const bgV = s.bgVillages || [];
+  const vSize = Math.max(2, Math.min(6, sc*0.35));
+  for (const v of bgV) {
+    const [px,py] = _worldToCanvas(canvas, v.x, v.y);
+    if(px<-vSize||px>canvas.width+vSize||py<-vSize||py>canvas.height+vSize) continue;
+    ctx.fillStyle = v.is_capital ? '#ffe066' : _omTribeCol(v.tribe);
+    ctx.globalAlpha = 0.45;
+    ctx.fillRect(px-vSize/2, py-vSize/2, vSize, vSize);
+  }
+  ctx.globalAlpha=1;
+
+  // ── Grid ──────────────────────────────────────────────────────────────────
+  const gridStep=Math.max(1,Math.round(20/sc));
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  const xStart=Math.floor(s.minX/gridStep)*gridStep, xEnd=Math.ceil(s.maxX/gridStep)*gridStep;
+  const yStart=Math.floor(s.minY/gridStep)*gridStep, yEnd=Math.ceil(s.maxY/gridStep)*gridStep;
+  for(let gx=xStart;gx<=xEnd;gx+=gridStep){const[px]=_worldToCanvas(canvas,gx,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,canvas.height);ctx.stroke();}
+  for(let gy=yStart;gy<=yEnd;gy+=gridStep){const[,py]=_worldToCanvas(canvas,0,gy);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();}
+
+  // ── Collect attacker villages ─────────────────────────────────────────────
+  const attackerMap=new Map();
+  for(const t of targets) for(const w of (t.waves||[])) {
+    if(w.origin_x!=null&&w.origin_y!=null) {
+      const key=`${w.origin_x}|${w.origin_y}`;
+      if(!attackerMap.has(key)) attackerMap.set(key,{name:w.attacker_name||'?',x:w.origin_x,y:w.origin_y});
     }
   }
 
-  // Draw attacker villages (blue)
-  ctx.font = `bold ${Math.max(9, Math.min(13, sc*1.2))}px sans-serif`;
-  for (const [, av] of attackerMap) {
-    const [px, py] = _worldToCanvas(canvas, av.x, av.y);
-    ctx.beginPath();
-    ctx.arc(px, py, Math.max(4, sc*0.4), 0, Math.PI*2);
-    ctx.fillStyle = '#3b82f6';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = '#93c5fd';
-    ctx.textAlign = 'center';
-    ctx.fillText(av.name, px, py - Math.max(6, sc*0.5));
+  // ── Attack lines (drawn below dots) ──────────────────────────────────────
+  // wave_type: real→red, fake→orange, chief→blue, def→purple, scout→green
+  const waveColors = { real:'#ef4444', fake:'#f97316', chief:'#3b82f6', def:'#a78bfa', scout:'#22c55e' };
+  for(const t of targets) {
+    if(t.x==null||t.y==null) continue;
+    const [tx,ty]=_worldToCanvas(canvas,t.x,t.y);
+    for(const w of (t.waves||[])) {
+      if(w.origin_x==null||w.origin_y==null) continue;
+      const [ax,ay]=_worldToCanvas(canvas,w.origin_x,w.origin_y);
+      // Detect chief from troops json or wave_type
+      let wtype = (w.wave_type||'real').toLowerCase();
+      if(wtype==='real' && w.troop_type && (w.troop_type.toLowerCase().includes('chief')||w.troop_type.toLowerCase().includes('häuptling')||w.troop_type.toLowerCase().includes('senator'))) wtype='chief';
+      const col=waveColors[wtype]||'#ef4444';
+      _drawArrow(ctx,ax,ay,tx,ty,col,0.75,Math.max(1.5,sc*0.08));
+    }
   }
 
-  // Draw target villages (red)
-  for (const t of targets) {
-    if (t.x == null || t.y == null) continue;
-    const [px, py] = _worldToCanvas(canvas, t.x, t.y);
-    ctx.beginPath();
-    ctx.arc(px, py, Math.max(5, sc*0.5), 0, Math.PI*2);
-    ctx.fillStyle = '#ef4444';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = '#fca5a5';
-    ctx.textAlign = 'center';
-    ctx.fillText(t.player_name||t.village_name||'?', px, py - Math.max(7, sc*0.6));
+  // ── Attacker dots (blue) ──────────────────────────────────────────────────
+  const dotR=Math.max(4,sc*0.4);
+  ctx.font=`bold ${Math.max(9,Math.min(12,sc))}px sans-serif`;
+  for(const[,av] of attackerMap) {
+    const[px,py]=_worldToCanvas(canvas,av.x,av.y);
+    ctx.beginPath(); ctx.arc(px,py,dotR,0,Math.PI*2);
+    ctx.fillStyle='#3b82f6'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle='#93c5fd'; ctx.textAlign='center';
+    ctx.fillText(av.name,px,py-dotR-3);
+  }
+
+  // ── Target dots (red) ─────────────────────────────────────────────────────
+  const tDotR=Math.max(5,sc*0.5);
+  for(const t of targets) {
+    if(t.x==null||t.y==null) continue;
+    const[px,py]=_worldToCanvas(canvas,t.x,t.y);
+    ctx.beginPath(); ctx.arc(px,py,tDotR,0,Math.PI*2);
+    ctx.fillStyle='#ef4444'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle='#fca5a5'; ctx.textAlign='center';
+    ctx.fillText(t.player_name||t.village_name||'?',px,py-tDotR-3);
+  }
+
+  // ── Legend ────────────────────────────────────────────────────────────────
+  const legend=[['real','#ef4444'],['fake','#f97316'],['chief','#3b82f6'],['def','#a78bfa'],['scout','#22c55e']];
+  ctx.font='bold 11px sans-serif'; ctx.textAlign='left';
+  let lx=10, ly=18;
+  for(const[label,col] of legend) {
+    ctx.fillStyle=col; ctx.fillRect(lx,ly-9,12,9);
+    ctx.fillStyle='#fff'; ctx.fillText(label,lx+16,ly); lx+=label.length*7+28;
   }
 }
 

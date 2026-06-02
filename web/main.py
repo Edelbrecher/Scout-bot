@@ -7510,6 +7510,34 @@ async def op_send_notification(request: Request, guild_id: str, plan_id: int):
     return _JSONResponse({"ok": ok, "results": results})
 
 
+@app.get("/guild/{guild_id}/operations/api/map-villages")
+async def op_map_villages(
+    request: Request, guild_id: str,
+    x1: int = 0, y1: int = 0, x2: int = 0, y2: int = 0,
+):
+    """Return map_snapshots villages in bounding box for op map background."""
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    import aiosqlite as _aio
+    rows = []
+    async with _aio.connect(database.DB_PATH) as db:
+        db.row_factory = _aio.Row
+        async with db.execute("""
+            SELECT x, y, village_name, player_name, alliance_name, tribe,
+                   population, is_capital
+            FROM map_snapshots
+            WHERE guild_id=? AND x>=? AND x<=? AND y>=? AND y<=?
+              AND fetched_at = (
+                SELECT MAX(m2.fetched_at) FROM map_snapshots m2
+                WHERE m2.guild_id=map_snapshots.guild_id
+                  AND m2.x=map_snapshots.x AND m2.y=map_snapshots.y
+              )
+            LIMIT 4000
+        """, (guild_id, x1, x2, y1, y2)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    return _JSONResponse({"villages": rows})
+
+
 @app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/notify-log")
 async def op_get_notify_log(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
