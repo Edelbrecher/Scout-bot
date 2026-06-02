@@ -2513,11 +2513,18 @@ const _OM_TRIBE_COL = {
 };
 function _omTribeCol(tribe) { return _OM_TRIBE_COL[tribe] || '#888'; }
 
-function _drawArrow(ctx, x1,y1, x2,y2, color, alpha, lw) {
+function _fmtDuration(sec) {
+  if (!sec) return '';
+  sec = Math.round(sec);
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  if (h > 0) return `${h}h ${m.toString().padStart(2,'0')}m`;
+  return `${m}m ${s.toString().padStart(2,'0')}s`;
+}
+
+function _drawArrow(ctx, x1,y1, x2,y2, color, alpha, lw, label) {
   const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
   if(len<4) return;
   const ux=dx/len, uy=dy/len;
-  // shorten so arrow ends just before the dot
   const endX=x2-ux*8, endY=y2-uy*8;
   const startX=x1+ux*8, startY=y1+uy*8;
   ctx.save();
@@ -2535,6 +2542,21 @@ function _drawArrow(ctx, x1,y1, x2,y2, color, alpha, lw) {
   ctx.lineTo(endX-headLen*Math.cos(angle-0.4), endY-headLen*Math.sin(angle-0.4));
   ctx.lineTo(endX-headLen*Math.cos(angle+0.4), endY-headLen*Math.sin(angle+0.4));
   ctx.closePath(); ctx.fill();
+  // travel time label at midpoint
+  if (label && len > 40) {
+    const mx=(startX+endX)/2, my=(startY+endY)/2;
+    ctx.globalAlpha=1;
+    ctx.font='bold 10px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    // small pill background
+    const tw=ctx.measureText(label).width+8;
+    ctx.fillStyle='rgba(0,0,0,0.65)';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(mx-tw/2, my-7, tw, 14, 4) : ctx.rect(mx-tw/2, my-7, tw, 14);
+    ctx.fill();
+    ctx.fillStyle=color;
+    ctx.fillText(label, mx, my);
+  }
   ctx.restore();
 }
 
@@ -2590,7 +2612,8 @@ function _drawOpMapContent(canvas, ctx) {
       let wtype = (w.wave_type||'real').toLowerCase();
       if(wtype==='real' && w.troop_type && (w.troop_type.toLowerCase().includes('chief')||w.troop_type.toLowerCase().includes('häuptling')||w.troop_type.toLowerCase().includes('senator'))) wtype='chief';
       const col=waveColors[wtype]||'#ef4444';
-      _drawArrow(ctx,ax,ay,tx,ty,col,0.75,Math.max(1.5,sc*0.08));
+      const travelLabel = _fmtDuration(w.travel_seconds);
+      _drawArrow(ctx,ax,ay,tx,ty,col,0.75,Math.max(1.5,sc*0.08),travelLabel);
     }
   }
 
