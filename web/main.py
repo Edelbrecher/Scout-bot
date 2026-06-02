@@ -5204,6 +5204,25 @@ async def my_ally_page(request: Request, guild_id: str):
     lb_by_travian: dict = {r["travian_name"]: r for r in lb_by_discord.values() if r.get("travian_name")}
     battle_groups = await database.get_battle_groups(ally_group["id"]) if ally_group else []
 
+    # Alliance population history from map snapshots (for growth charts)
+    all_members_list = members or member_view_members or []
+    travian_names = [m["travian_name"] for m in all_members_list if m.get("travian_name")]
+    member_pop_history: dict = await database.get_all_members_pop_from_snapshot(guild_id, travian_names)
+
+    # Alliance-level pop history: use configured alliance name from ally_group or snapshot
+    ally_name_for_pop = (ally_group or {}).get("ally_name", "") or ""
+    ally_pop_history: list = []
+    if ally_name_for_pop:
+        ally_pop_history = await database.get_alliance_pop_history(guild_id, ally_name_for_pop)
+
+    # Members without upload: pull from latest map snapshot
+    all_travian_names_set = {m["travian_name"] for m in all_members_list if m.get("travian_name")}
+    uploaded_names_set = {r["travian_name"] for r in lb_by_discord.values() if r.get("travian_name")}
+    missing_names = list(all_travian_names_set - uploaded_names_set)
+    map_only_members: list = []
+    if missing_names and is_editor:
+        map_only_members = await database.get_players_from_snapshot(guild_id, missing_names)
+
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
         "ally_group": ally_group, "members": members, "roles": roles,
@@ -5223,6 +5242,9 @@ async def my_ally_page(request: Request, guild_id: str):
         "lb_by_travian": lb_by_travian,
         "lock_travian_name": bool((ally_group or guild_group or {}).get("lock_travian_name")),
         "battle_groups": battle_groups,
+        "member_pop_history": member_pop_history,
+        "ally_pop_history": ally_pop_history,
+        "map_only_members": map_only_members,
     })
 
 

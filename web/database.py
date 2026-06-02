@@ -4876,6 +4876,90 @@ async def sync_alliance_members_from_snapshot(guild_id: str) -> int:
     return len(members)
 
 
+async def get_alliance_pop_history(guild_id: str, alliance_name: str, days: int = 14) -> list[dict]:
+    """Return aggregated population/village count per snapshot for a given alliance (last N days)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT fetched_at,
+                   SUM(population)        AS total_pop,
+                   COUNT(DISTINCT player_id) AS player_count,
+                   COUNT(*)               AS village_count
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND alliance_name = ?
+              AND fetched_at >= datetime('now', ? || ' days')
+            GROUP BY fetched_at
+            ORDER BY fetched_at ASC
+        """, (guild_id, alliance_name, f"-{days}")) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_player_pop_from_snapshot(guild_id: str, travian_name: str) -> list[dict]:
+    """Return per-snapshot population sum for a player (last 14 days)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT fetched_at,
+                   SUM(population) AS total_pop,
+                   COUNT(*)        AS village_count
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND player_name = ?
+              AND fetched_at >= datetime('now', '-14 days')
+            GROUP BY fetched_at
+            ORDER BY fetched_at ASC
+        """, (guild_id, travian_name)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_all_members_pop_from_snapshot(guild_id: str, travian_names: list[str]) -> dict:
+    """Return {travian_name: [{'fetched_at':..,'total_pop':..}]} for all given players."""
+    if not travian_names:
+        return {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        ph = ",".join("?" * len(travian_names))
+        async with db.execute(f"""
+            SELECT player_name, fetched_at, SUM(population) AS total_pop
+            FROM map_snapshots
+            WHERE guild_id = ? AND player_name IN ({ph})
+              AND fetched_at >= datetime('now', '-14 days')
+            GROUP BY player_name, fetched_at
+            ORDER BY player_name, fetched_at ASC
+        """, [guild_id] + travian_names) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    result: dict = {}
+    for r in rows:
+        result.setdefault(r["player_name"], []).append(r)
+    return result
+
+
+async def get_players_from_snapshot(guild_id: str, player_names: list[str]) -> list[dict]:
+    """Return aggregated stats per player from the latest snapshot."""
+    if not player_names:
+        return []
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,)) as c:
+            row = await c.fetchone()
+            latest = row[0] if row else None
+        if not latest:
+            return []
+        ph = ",".join("?" * len(player_names))
+        async with db.execute(f"""
+            SELECT player_name, alliance_name,
+                   SUM(population) AS total_pop,
+                   COUNT(*) AS village_count,
+                   MAX(CASE WHEN is_capital=1 THEN population ELSE 0 END) AS capital_pop
+            FROM map_snapshots
+            WHERE guild_id=? AND fetched_at=? AND player_name IN ({ph})
+            GROUP BY player_name, alliance_name
+            ORDER BY total_pop DESC
+        """, [guild_id, latest] + player_names) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
 async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
     """Return all distinct alliances from the latest snapshot, sorted by village count."""
     async with aiosqlite.connect(DB_PATH) as db:

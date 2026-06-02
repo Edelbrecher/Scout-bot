@@ -231,9 +231,18 @@
                 {% elif total_scouts %}{{ total_scouts }}
                 {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
               </td>
-              <td style="text-align:right;color:#c4b5fd;font-weight:600;">
+              <td style="text-align:right;">
                 {% set pop = lb.get('population', 0) or 0 %}
-                {% if pop >= 1000 %}{{ "%.1f"|format(pop/1000) }}k{% elif pop %}{{ pop }}{% else %}—{% endif %}
+                {% set snap_pop_list = member_pop_history.get(m.travian_name or '', []) %}
+                {% set snap_pop = snap_pop_list[-1].total_pop if snap_pop_list else 0 %}
+                {% set display_pop = pop if pop > 0 else snap_pop %}
+                <div style="color:#c4b5fd;font-weight:600;font-size:.88rem;">
+                  {% if display_pop >= 1000 %}{{ "%.1f"|format(display_pop/1000) }}k{% elif display_pop %}{{ display_pop }}{% else %}—{% endif %}
+                </div>
+                {% if snap_pop_list | length >= 2 %}
+                <canvas class="pop-spark" data-pop='{{ snap_pop_list | tojson }}'
+                        style="display:block;width:70px;height:22px;" width="70" height="22"></canvas>
+                {% endif %}
               </td>
               <td style="font-size:.78rem;">
                 {% if updated_at %}
@@ -326,47 +335,123 @@
           </div>
         </div>
       </div>
-      <div style="font-size:.72rem;color:var(--text-muted);">
-        Basiert auf letztem Account-Upload der Members. Off = nur Attacks-Einheiten (keine Paladin/Druiden).
+      <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.75rem;">
+        Based on last account upload. Off = attack units only (no Paladin/Druid). Population from latest map snapshot.
+      </div>
+
+      {% if map_only_members %}
+      <div style="margin-top:.75rem;">
+        <div style="font-size:.8rem;font-weight:700;color:#fbbf24;margin-bottom:.5rem;">
+          📍 Members without upload — from map snapshot
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">Player</th>
+                <th style="text-align:left;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">Alliance</th>
+                <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">🏘️ Population</th>
+                <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">Villages</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in map_only_members %}
+              <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+                <td style="padding:.35rem .6rem;font-weight:600;color:#a5b4fc;">{{ p.player_name }}</td>
+                <td style="padding:.35rem .6rem;color:var(--text-muted);font-size:.75rem;">{{ p.alliance_name or '—' }}</td>
+                <td style="padding:.35rem .6rem;text-align:right;color:#c4b5fd;font-weight:600;">
+                  {% if p.total_pop >= 1000 %}{{ "%.1f"|format(p.total_pop/1000) }}k{% else %}{{ p.total_pop }}{% endif %}
+                </td>
+                <td style="padding:.35rem .6rem;text-align:right;color:var(--text-muted);">{{ p.village_count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% elif is_editor and map_only_members %}
+    {# No upload data at all but map data exists #}
+    <div class="card" style="margin-top:1rem;">
+      <h2 style="margin:0 0 .9rem;font-size:1rem;">⚔️ Alliance Members — Map Data</h2>
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem;">No account uploads yet. Showing population from latest map snapshot.</p>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="text-align:left;padding:.3rem .6rem;color:var(--text-muted);">Player</th>
+              <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);">🏘️ Population</th>
+              <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);">Villages</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in map_only_members %}
+            <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+              <td style="padding:.4rem .6rem;font-weight:600;color:#a5b4fc;">{{ p.player_name }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;color:#c4b5fd;font-weight:600;">
+                {% if p.total_pop >= 1000 %}{{ "%.1f"|format(p.total_pop/1000) }}k{% else %}{{ p.total_pop }}{% endif %}
+              </td>
+              <td style="padding:.4rem .6rem;text-align:right;color:var(--text-muted);">{{ p.village_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
     {% endif %}
 
     {# Growth Charts #}
-    {% if growth_data and is_editor %}
+    {% if (growth_data or ally_pop_history) and is_editor %}
     <div class="card" style="margin-top:1rem;">
-      <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Wachstum (letzte 2 Wochen)</h2>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;">
+      <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Alliance Growth (last 14 days)</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;">
+
+        {# Population from map snapshots #}
+        {% if ally_pop_history | length >= 2 %}
+        <div style="background:var(--bg-main);border:1px solid rgba(196,181,253,.25);border-radius:10px;padding:.75rem 1rem;">
+          <div style="font-size:.75rem;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">🏘️ Population</div>
+          {% set last_pop = ally_pop_history[-1].total_pop %}
+          {% set first_pop = ally_pop_history[0].total_pop %}
+          {% set pop_delta = last_pop - first_pop %}
+          <div style="font-size:1.3rem;font-weight:800;color:#c4b5fd;">{{ "%.0f"|format(last_pop/1000) }}k</div>
+          <div style="font-size:.72rem;color:{% if pop_delta>=0 %}#4ade80{% else %}#f87171{% endif %};margin-bottom:.4rem;">
+            {% if pop_delta>=0 %}▲{% else %}▼{% endif %} {{ "%.0f"|format(pop_delta|abs/1000) }}k over period
+          </div>
+          <canvas id="ally-pop-chart" data-history='{{ ally_pop_history | tojson }}' style="width:100%;height:55px;" height="55"></canvas>
+        </div>
+        {% endif %}
+
+        {# Aggregate member growth from uploads #}
+        {% set all_growth = [] %}
+        {% for did, glist in growth_data.items() %}{% for g in glist %}{% set _ = all_growth.append(g) %}{% endfor %}{% endfor %}
+
         {% for metric, label, color in [
           ('village_count','🏘️ Villages','#34d399'),
-          ('total_off','🗡️ Off','#f87171'),
-          ('total_def','🛡️ Def','#60a5fa'),
+          ('total_off','⚔️ Off-Score','#f87171'),
+          ('total_def','🛡️ Def-Score','#60a5fa'),
           ('total_scouts','🔍 Scouts','#a78bfa'),
-          ('total_crop','🌾 Crop','#fbbf24'),
+          ('total_crop','🌾 Crop/h','#fbbf24'),
         ] %}
-        <button class="growth-metric-btn{% if loop.first %} active{% endif %}"
-                data-metric="{{ metric }}" data-color="{{ color }}"
-                onclick="selectGrowthMetric('{{ metric }}','{{ color }}',this)"
-                style="font-size:.75rem;padding:.2rem .7rem;border-radius:12px;border:1px solid var(--border);
-                       background:{% if loop.first %}rgba(52,211,153,.15){% else %}var(--bg-main){% endif %};
-                       color:{% if loop.first %}{{ color }}{% else %}var(--text-muted){% endif %};cursor:pointer;">
-          {{ label }}
-        </button>
+        {% set dates = [] %}
+        {% set vals  = [] %}
+        {% for did, glist in growth_data.items() %}
+          {% for g in glist %}
+            {% if g.uploaded_at not in dates %}{% set _ = dates.append(g.uploaded_at) %}{% endif %}
+          {% endfor %}
         {% endfor %}
-      </div>
-      <div id="growthChartsWrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.6rem;">
-        {% for m in approved_members %}
-        {% set gdata = growth_data.get(m.discord_id, []) %}
-        {% if gdata | length >= 2 %}
-        <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.6rem .9rem;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;">
-            <div style="font-size:.82rem;font-weight:700;">{{ m.travian_name or m.discord_username }}</div>
-          </div>
-          <canvas id="gc-{{ m.discord_id }}" data-history='{{ gdata | tojson }}'
-                  style="width:100%;height:60px;" height="60"></canvas>
+        {% set dates = dates | sort | unique | list %}
+        {% if dates | length >= 2 %}
+        <div style="background:var(--bg-main);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.75rem 1rem;">
+          <div style="font-size:.75rem;font-weight:700;color:{{ color }};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">{{ label }}</div>
+          <canvas class="ally-metric-chart" data-metric="{{ metric }}" data-color="{{ color }}"
+                  data-growth='{{ growth_data | tojson }}'
+                  data-dates='{{ dates | tojson }}'
+                  style="width:100%;height:55px;" height="55"></canvas>
         </div>
         {% endif %}
         {% endfor %}
+
       </div>
     </div>
     {% endif %}
@@ -1585,37 +1670,55 @@ if (hash) {
   if (btn) showTab(hash, btn);
 }
 
-// ── Growth Charts ──────────────────────────────────────────────────────────
-let currentGrowthMetric = 'village_count';
-let currentGrowthColor  = '#34d399';
-
-function selectGrowthMetric(metric, color, btn) {
-  currentGrowthMetric = metric;
-  currentGrowthColor  = color;
-  document.querySelectorAll('.growth-metric-btn').forEach(b => {
-    b.style.background = 'var(--bg-main)';
-    b.style.color = 'var(--text-muted)';
-    b.style.borderColor = 'var(--border)';
+// ── Population sparklines in member rows ────────────────────────────────────
+function renderPopSparklines() {
+  document.querySelectorAll('canvas.pop-spark').forEach(canvas => {
+    const data = JSON.parse(canvas.dataset.pop || '[]');
+    if (data.length < 2) return;
+    const vals = data.map(d => d.total_pop || 0);
+    drawSparkline(canvas, vals, [], '#c4b5fd', true);
   });
-  btn.style.background = `${color}22`;
-  btn.style.color = color;
-  btn.style.borderColor = `${color}66`;
-  renderGrowthCharts();
 }
 
+// ── Alliance growth charts ───────────────────────────────────────────────────
+function renderAllianceGrowthCharts() {
+  // Population chart from map snapshots
+  const popCanvas = document.getElementById('ally-pop-chart');
+  if (popCanvas) {
+    const data = JSON.parse(popCanvas.dataset.history || '[]');
+    const vals = data.map(d => d.total_pop || 0);
+    drawSparkline(popCanvas, vals, [], '#c4b5fd');
+  }
+
+  // Metric charts from member uploads (aggregated by date)
+  document.querySelectorAll('canvas.ally-metric-chart').forEach(canvas => {
+    const metric  = canvas.dataset.metric;
+    const color   = canvas.dataset.color;
+    const growth  = JSON.parse(canvas.dataset.growth || '{}');
+    const dates   = JSON.parse(canvas.dataset.dates  || '[]');
+    if (!dates.length) return;
+
+    // Sum all members per date
+    const sumByDate = {};
+    dates.forEach(d => sumByDate[d] = 0);
+    Object.values(growth).forEach(snapshots => {
+      snapshots.forEach(s => {
+        if (s.uploaded_at in sumByDate) sumByDate[s.uploaded_at] += (s[metric] || 0);
+      });
+    });
+    const vals = dates.map(d => sumByDate[d]);
+    drawSparkline(canvas, vals, dates, color);
+  });
+}
+
+// ── Growth Charts (legacy per-member, kept for compat) ──────────────────────
 function renderGrowthCharts() {
-  document.querySelectorAll('[id^="gc-"]').forEach(canvas => {
-    const history = JSON.parse(canvas.dataset.history || '[]');
-    if (!history.length) return;
-    const vals   = history.map(h => h[currentGrowthMetric] || 0);
-    const labels = history.map(h => h.uploaded_at ? h.uploaded_at.slice(5) : '');
-    drawSparkline(canvas, vals, labels, currentGrowthColor);
-  });
+  renderAllianceGrowthCharts();
 }
 
-function drawSparkline(canvas, vals, labels, color) {
-  const W = canvas.offsetWidth || 300;
-  const H = canvas.offsetHeight || 60;
+function drawSparkline(canvas, vals, labels, color, mini=false) {
+  const W = canvas.offsetWidth || (mini ? 70 : 300);
+  const H = canvas.offsetHeight || (mini ? 22 : 60);
   canvas.width  = W * devicePixelRatio;
   canvas.height = H * devicePixelRatio;
   canvas.style.width  = W + 'px';
@@ -1627,7 +1730,7 @@ function drawSparkline(canvas, vals, labels, color) {
   const min = Math.min(...vals);
   const max = Math.max(...vals);
   const range = max - min || 1;
-  const pad = { l: 4, r: 4, t: 8, b: 18 };
+  const pad = mini ? { l: 1, r: 1, t: 2, b: 2 } : { l: 4, r: 4, t: 8, b: 18 };
   const gw = W - pad.l - pad.r;
   const gh = H - pad.t - pad.b;
 
@@ -1664,23 +1767,28 @@ function drawSparkline(canvas, vals, labels, color) {
     ctx.fill();
   });
 
-  // Labels: first and last date
-  ctx.fillStyle = 'rgba(148,163,184,.7)';
-  ctx.font = `${10 * devicePixelRatio / devicePixelRatio}px sans-serif`;
-  ctx.textAlign = 'left';  ctx.fillText(labels[0] || '', pad.l, H - 4);
-  ctx.textAlign = 'right'; ctx.fillText(labels[labels.length-1] || '', W - pad.r, H - 4);
+  if (!mini) {
+    // Labels: first and last date
+    ctx.fillStyle = 'rgba(148,163,184,.7)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';  ctx.fillText(labels[0] || '', pad.l, H - 4);
+    ctx.textAlign = 'right'; ctx.fillText(labels[labels.length-1] || '', W - pad.r, H - 4);
 
-  // Last value top-right
-  const lastVal = vals[vals.length-1];
-  const display = lastVal >= 1000 ? (lastVal/1000).toFixed(1)+'k' : String(lastVal);
-  ctx.fillStyle = color;
-  ctx.font = `bold ${11}px sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.fillText(display, W - pad.r, pad.t + 10);
+    // Last value top-right
+    const lastVal = vals[vals.length-1];
+    const display = lastVal >= 1000 ? (lastVal/1000).toFixed(1)+'k' : String(lastVal);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(display, W - pad.r, pad.t + 10);
+  }
 }
 
 // Initial render after paint
-requestAnimationFrame(() => requestAnimationFrame(renderGrowthCharts));
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  renderPopSparklines();
+  renderAllianceGrowthCharts();
+}));
 
 // ── Bonus Tab: Drag & Drop sort ──────────────────────────────────────────
 (function() {
