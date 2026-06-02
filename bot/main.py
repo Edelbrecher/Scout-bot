@@ -180,6 +180,25 @@ class ScouterBot(commands.Bot):
         await database.set_bot_kicked(str(guild.id))
         print(f"[on_guild_remove] Marked {guild.name} ({guild.id}) as kicked.")
 
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """Detect when a member gains an allowed_role → auto-create as ally member."""
+        guild_id = str(after.guild.id)
+        config = await database.get_guild_config(guild_id)
+        if not config:
+            return
+        allowed_ids = {r.strip() for r in (config.get("allowed_role_ids") or "").split(",") if r.strip()}
+        if not allowed_ids:
+            return
+        before_role_ids = {str(r.id) for r in before.roles}
+        after_role_ids  = {str(r.id) for r in after.roles}
+        newly_gained = after_role_ids - before_role_ids
+        if newly_gained & allowed_ids:
+            added = await database.join_ally_member(
+                guild_id, str(after.id), after.display_name or after.name
+            )
+            if added:
+                print(f"[on_member_update] Auto-joined {after} in guild {guild_id}")
+
     async def heartbeat_loop(self):
         """Update bot_last_seen for all current guilds every 8 hours."""
         await self.wait_until_ready()
@@ -730,13 +749,21 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
                 "travel": w.get("travel_seconds",0),
             })
 
-    sent = 0
+    results = []
     for key, waves in attacker_waves.items():
-        member = None
-        if key and key.isdigit():
-            member = guild.get_member(int(key))
-        if not member:
+        # Try to resolve attacker name from waves
+        aname = waves[0].get("attacker_name", "") if waves else key
+        discord_id = key if (key and key.isdigit()) else ""
+
+        if not key or not key.isdigit():
+            results.append({"discord_id": "", "name": aname or key, "status": "no_discord_id"})
             continue
+
+        member = guild.get_member(int(key))
+        if not member:
+            results.append({"discord_id": key, "name": aname, "status": "not_in_server"})
+            continue
+
         try:
             wave_lines = "\n".join([
                 f"  {'⚔' if w['type']=='real' else '👻' if w['type']=='fake' else '🛡' if w['type']=='def' else '🔍'} "
@@ -750,11 +777,13 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
                    f"**Deine Wellen:**\n{wave_lines}\n\n"
                    f"➡️ Details: TravOps → Einsatzplanung")
             await member.send(msg)
-            sent += 1
-        except Exception:
-            pass
+            results.append({"discord_id": key, "name": member.display_name or aname, "status": "sent"})
+        except Exception as e:
+            err_msg = str(e)[:120]
+            results.append({"discord_id": key, "name": member.display_name or aname, "status": "dm_blocked", "error": err_msg})
 
-    return aiohttp_web.json_response({"ok":True,"sent":sent})
+    sent = sum(1 for r in results if r["status"] == "sent")
+    return aiohttp_web.json_response({"ok": True, "sent": sent, "results": results})
 
 
 async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Response:
@@ -815,21 +844,19 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
         except Exception:
             return None
 
-    dm_sent = 0
+    dm_results = []
     for uid in member_ids:
         if not uid or not str(uid).isdigit():
-            print(f"[announce-ep] skipping invalid uid: {uid!r}")
+            dm_results.append({"discord_id": str(uid), "name": str(uid), "status": "no_discord_id"})
             continue
         member = guild.get_member(int(uid))
         if not member:
-            print(f"[announce-ep] member {uid} not found in guild cache, trying fetch...")
             try:
                 member = await guild.fetch_member(int(uid))
             except Exception as e:
-                print(f"[announce-ep] fetch_member {uid} failed: {e}")
+                dm_results.append({"discord_id": str(uid), "name": str(uid), "status": "not_in_server", "error": str(e)[:80]})
                 continue
         try:
-            # Build personal countdown for this member's earliest wave
             wave_iso = member_wave_times.get(str(uid)) or member_wave_times.get(uid)
             if wave_iso:
                 unix_ts = _iso_to_unix(wave_iso)
@@ -838,7 +865,6 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
                     if unix_ts else ""
                 )
             else:
-                # Fallback: show landing time countdown if no personal wave assigned
                 unix_ts = _iso_to_unix(landing.replace(" ", "T")) if landing else None
                 countdown_line = (
                     f"\n⏱️ **Einschlag:** <t:{unix_ts}:F> (<t:{unix_ts}:R>)"
@@ -852,12 +878,14 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
                 f"{'➡️ ' + plan_url if plan_url else 'Bitte prüfe TravOps → Einsatzplanung.'}"
             )
             await member.send(dm_text)
-            dm_sent += 1
+            dm_results.append({"discord_id": str(uid), "name": member.display_name or member.name, "status": "sent"})
             print(f"[announce-ep] DM sent to {uid} ({member.name})")
         except Exception as e:
-            print(f"[announce-ep] DM to {uid} ({member.name}) failed: {e}")
+            dm_results.append({"discord_id": str(uid), "name": member.display_name or member.name, "status": "dm_blocked", "error": str(e)[:80]})
+            print(f"[announce-ep] DM to {uid} ({getattr(member,'name',uid)}) failed: {e}")
 
-    return aiohttp_web.json_response({"ok": True, "channel": channel_sent, "dms": dm_sent})
+    dm_sent = sum(1 for r in dm_results if r["status"] == "sent")
+    return aiohttp_web.json_response({"ok": True, "channel": channel_sent, "dms": dm_sent, "results": dm_results})
 
 
 async def handle_announce_ep_cancelled(request: aiohttp_web.Request) -> aiohttp_web.Response:

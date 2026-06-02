@@ -5333,7 +5333,9 @@ async def my_ally_member_approve(request: Request, guild_id: str, discord_id: st
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
-        return JSONResponse({"error": "not owner"}, status_code=403)
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        if not ally_group or not await has_perm(request, guild_id, "ally_manage"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.set_ally_member_status(ally_group["id"], discord_id, "approved")
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=approved", status_code=303)
 
@@ -5345,9 +5347,31 @@ async def my_ally_member_reject(request: Request, guild_id: str, discord_id: str
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
-        return JSONResponse({"error": "not owner"}, status_code=403)
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        if not ally_group or not await has_perm(request, guild_id, "ally_manage"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.remove_ally_member(ally_group["id"], discord_id)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=rejected", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/set-entry-role")
+async def my_ally_set_entry_role(request: Request, guild_id: str):
+    """Set which role new Discord members automatically receive on join."""
+    session, err = _require_session(request)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        if not await has_perm(request, guild_id, "ally_manage"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+    if not ally_group:
+        return JSONResponse({"error": "no group"}, status_code=404)
+    form = await request.form()
+    role_id_str = form.get("entry_role_id", "")
+    role_id = int(role_id_str) if role_id_str.isdigit() else None
+    await database.set_ally_group_entry_role(ally_group["id"], role_id)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=entry_role_saved", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -6663,8 +6687,11 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         }
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post("http://bot:7777/api/announce-ep", json=payload)
-            dms = resp.json().get("dms", 0) if resp.status_code == 200 else 0
+            bot_data = resp.json() if resp.status_code == 200 else {}
+            dms = bot_data.get("dms", 0)
+            dm_results = bot_data.get("results", [])
             print(f"[announce-ep] DMs sent: {dms}/{len(member_ids)} for plan {plan_id}")
+        await database.save_op_notify_log(guild_id, plan_id, "", "auto", dm_results)
 
         # 2. Internal TravOps notifications for all approved members
         await database.create_notifications(
@@ -7297,17 +7324,31 @@ async def op_send_notification(request: Request, guild_id: str, plan_id: int):
     plan = await database.get_op_plan_full(plan_id, guild_id)
     if not plan:
         return _JSONResponse({"error": "not found"}, status_code=404)
-    # Build notification payload for bot
+    results = []
+    ok = False
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
                 "http://bot:7777/api/op-notify",
                 json={"guild_id": guild_id, "plan": plan}
             )
-            ok = resp.status_code == 200
-    except Exception:
-        ok = False
-    return _JSONResponse({"ok": ok})
+            if resp.status_code == 200:
+                ok = True
+                data = resp.json()
+                results = data.get("results", [])
+    except Exception as e:
+        results = [{"discord_id": "", "name": "Bot", "status": "error", "error": str(e)[:120]}]
+    triggered_by = session.get("uid", "") if session else ""
+    await database.save_op_notify_log(guild_id, plan_id, triggered_by, "manual", results)
+    return _JSONResponse({"ok": ok, "results": results})
+
+
+@app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/notify-log")
+async def op_get_notify_log(request: Request, guild_id: str, plan_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    logs = await database.get_op_notify_logs(guild_id, plan_id)
+    return _JSONResponse({"logs": logs})
 
 
 # ── Personal missions (used by mein-account tab) ──────────────────────────────
@@ -10005,7 +10046,7 @@ async def hero_scout_page(request: Request, guild_id: str):
     })
 
 
-@app.get("/guild/{guild_id}/defense/hero-scout/{player_name}", response_class=HTMLResponse)
+@app.get("/guild/{guild_id}/defense/hero-scout/{player_name}")
 async def hero_scout_detail(request: Request, guild_id: str, player_name: str):
     session, err = _require_session(request)
     if err: return err
@@ -10016,6 +10057,10 @@ async def hero_scout_detail(request: Request, guild_id: str, player_name: str):
         return RedirectResponse("/dashboard", status_code=303)
 
     history = await _get_hero_scout_history(guild_id, player_name)
+
+    if "application/json" in request.headers.get("Accept", ""):
+        return JSONResponse({"player_name": player_name, "history": history})
+
     return templates.TemplateResponse("hero_scout_detail.html", {
         "request": request,
         "guild": guild,

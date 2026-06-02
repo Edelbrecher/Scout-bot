@@ -162,11 +162,12 @@
       </form>
 
       <!-- Karte (klickbar) -->
-      <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/{{ e.player_name | urlencode }}"
-         style="text-decoration:none;color:inherit;display:block;">
+      <div onclick="openHeroDetail('{{ e.player_name | urlencode }}')"
+           style="text-decoration:none;color:inherit;display:block;cursor:pointer;">
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
-                    padding:0.65rem 0.6rem 0.55rem;cursor:pointer;
-                    {% if e.changed %}border-left:3px solid #f59e0b;{% else %}border-left:3px solid rgba(59,130,246,0.25);{% endif %}">
+                    padding:0.65rem 0.6rem 0.55rem;cursor:pointer;transition:box-shadow 0.15s;
+                    {% if e.changed %}border-left:3px solid #f59e0b;{% else %}border-left:3px solid rgba(59,130,246,0.25);{% endif %}"
+             onmouseenter="this.style.boxShadow='0 0 0 1px #6366f1'" onmouseleave="this.style.boxShadow=''">
 
           <!-- Name + Badges -->
           <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -218,7 +219,7 @@
           </div>
 
         </div>
-      </a>
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -241,7 +242,142 @@
 
 </div>
 
+<!-- ── Hero Detail Modal ── -->
+<div id="heroDetailOverlay" onclick="closeHeroDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;backdrop-filter:blur(3px);"></div>
+<div id="heroDetailPanel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.96);width:min(760px,96vw);max-height:90vh;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;z-index:10002;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.6);transition:transform 0.18s,opacity 0.18s;opacity:0;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-main);position:sticky;top:0;z-index:1;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <span style="font-size:1.2rem;">🗡️</span>
+      <h2 style="margin:0;font-size:1rem;" id="heroDetailTitle">Scout-Details</h2>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <a id="heroDetailLink" href="#" style="font-size:0.78rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:0.25rem 0.65rem;border-radius:6px;text-decoration:none;">↗ Vollansicht</a>
+      <button onclick="closeHeroDetail()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);cursor:pointer;color:var(--text-muted);font-size:1rem;width:1.9rem;height:1.9rem;border-radius:8px;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">×</button>
+    </div>
+  </div>
+  <div id="heroDetailContent" style="overflow-y:auto;max-height:calc(90vh - 60px);padding:1.1rem 1.25rem;"></div>
+</div>
+
+<style>
+#heroDetailPanel.open   { transform:translate(-50%,-50%) scale(1); opacity:1; }
+#heroDetailPanel.closing{ transform:translate(-50%,-50%) scale(0.94); opacity:0; }
+.hd-slot-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:0.4rem;margin-bottom:1rem; }
+.hd-slot { aspect-ratio:1;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:rgba(0,0,0,0.3);position:relative; }
+.hd-slot img { width:100%;height:100%;object-fit:cover; }
+.hd-slot-label { font-size:0.6rem;color:var(--text-muted);text-align:center;margin-top:0.2rem; }
+.hd-entry { background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:0.6rem; }
+.hd-entry-header { display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;font-size:0.78rem; }
+</style>
+
 <script>
+const GUILD_ID_HS = {{ guild.guild_id | tojson }};
+
+function openHeroDetail(encodedName) {
+  const overlay = document.getElementById('heroDetailOverlay');
+  const panel   = document.getElementById('heroDetailPanel');
+  overlay.style.display = 'block';
+  panel.style.display   = 'block';
+  panel.classList.remove('closing');
+  requestAnimationFrame(() => panel.classList.add('open'));
+  document.getElementById('heroDetailContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">⏳ Laden…</div>';
+  document.body.style.overflow = 'hidden';
+
+  const url = `/guild/${GUILD_ID_HS}/defense/hero-scout/${encodedName}`;
+  document.getElementById('heroDetailLink').href = url;
+
+  fetch(url, { headers: { 'Accept': 'application/json' } })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(data => {
+      try {
+        document.getElementById('heroDetailTitle').textContent = '🗡️ ' + data.player_name;
+        document.getElementById('heroDetailContent').innerHTML = renderHeroDetail(data, encodedName);
+      } catch(e) {
+        console.error(e);
+        document.getElementById('heroDetailContent').innerHTML = '<p style="color:#f87171;">Fehler beim Rendern.</p>';
+      }
+    })
+    .catch(e => {
+      console.error(e);
+      document.getElementById('heroDetailContent').innerHTML = '<p style="color:#f87171;">Fehler beim Laden.</p>';
+    });
+}
+
+function closeHeroDetail() {
+  const panel = document.getElementById('heroDetailPanel');
+  panel.classList.add('closing');
+  panel.classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('heroDetailOverlay').style.display = 'none';
+    panel.style.display = 'none';
+    panel.classList.remove('closing');
+  }, 180);
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHeroDetail(); });
+
+const SLOT_DEFS = [
+  { name:'helm',   icon:'icon-helm',   color:'#60a5fa', label:'Helm' },
+  { name:'armor',  icon:'icon-armor',  color:'#34d399', label:'Rüstung' },
+  { name:'boots',  icon:'icon-boots',  color:'#a78bfa', label:'Schuhe' },
+  { name:'weapon', icon:'icon-weapon', color:'#f87171', label:'Waffe' },
+  { name:'mount',  icon:'icon-mount',  color:'#fbbf24', label:'Pferd' },
+  { name:'misc',   icon:'icon-misc',   color:'#94a3b8', label:'Off-Hand' },
+];
+
+function renderHeroDetail(data, encodedName) {
+  const history = data.history || [];
+  if (!history.length) {
+    return '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Noch keine Einträge.</div>';
+  }
+
+  let html = '';
+  history.forEach((entry, idx) => {
+    const isLatest = idx === 0;
+    const date = (entry.created_at || '').slice(0, 16).replace('T', ' ');
+    const srcBadge = entry.source === 'manual'
+      ? '<span style="font-size:0.65rem;background:#3b1f6b;color:#c4b5fd;border-radius:4px;padding:1px 5px;font-weight:600;">✏️ Manuell</span>'
+      : '<span style="font-size:0.65rem;background:#1a3a5c;color:#93c5fd;border-radius:4px;padding:1px 5px;font-weight:600;">📷 Screenshot</span>';
+
+    html += `<div class="hd-entry" ${isLatest ? 'style="border-color:rgba(99,102,241,0.5);"' : ''}>
+      <div class="hd-entry-header">
+        ${isLatest ? '<span style="font-size:0.65rem;background:rgba(99,102,241,0.2);color:#a5b4fc;border-radius:4px;padding:1px 5px;font-weight:600;">Aktuell</span>' : ''}
+        ${srcBadge}
+        <span style="color:var(--text-muted);">${date}</span>
+        ${entry.hero_level ? `<span style="color:var(--text-muted);">· Lvl ${entry.hero_level}</span>` : ''}
+        ${entry.tribe ? `<span style="color:var(--text-muted);">· ${entry.tribe}</span>` : ''}
+        ${entry.alliance ? `<span style="color:var(--text-muted);">· ${entry.alliance}</span>` : ''}
+      </div>
+      <div class="hd-slot-grid">`;
+
+    SLOT_DEFS.forEach(s => {
+      const imgPath = entry[`img_${s.name}`];
+      const itemName = entry[`slot_${s.name}`] || '';
+      const imgSrc = imgPath ? `/guild/${GUILD_ID_HS}/defense/hero-scout/img/${entry.id}/${s.name}` : '';
+      html += `<div>
+        <div class="hd-slot" title="${itemName || s.label}">
+          ${imgSrc ? `<img src="${imgSrc}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">` : ''}
+          <div style="display:${imgSrc ? 'none' : 'flex'};position:absolute;inset:0;align-items:center;justify-content:center;color:${s.color};opacity:0.45;">
+            <svg width="55%" height="55%" viewBox="0 0 24 24"><use href="#${s.icon}"/></svg>
+          </div>
+        </div>
+        <div class="hd-slot-label">${itemName ? `<span style="color:var(--text);">${itemName.slice(0,12)}</span>` : s.label}</div>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  html += `<div style="text-align:center;margin-top:0.5rem;">
+    <a href="/guild/${GUILD_ID_HS}/defense/hero-scout/manual/${encodedName}/add"
+       style="font-size:0.8rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#86efac;padding:0.35rem 0.9rem;border-radius:6px;text-decoration:none;">
+      ✏️ Neue Version anlegen
+    </a>
+  </div>`;
+
+  return html;
+}
+
 // ── Kachel-Spalten ──────────────────────────────────────────────────
 function setCols(n) {
   document.getElementById('heroGrid').style.gridTemplateColumns = `repeat(${n},1fr)`;
@@ -253,7 +389,6 @@ function setCols(n) {
   localStorage.setItem('heroScoutCols', n);
 }
 
-// Gespeicherte Spaltenanzahl wiederherstellen
 const savedCols = parseInt(localStorage.getItem('heroScoutCols') || '5');
 setCols(savedCols);
 
@@ -273,6 +408,5 @@ function filterHeroes() {
     : `{{ entries|length }} Helden`;
   document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
 }
-
 </script>
 {% endblock %}

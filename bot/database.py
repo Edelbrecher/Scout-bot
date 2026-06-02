@@ -1288,6 +1288,31 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
             return flags
 
 
+async def join_ally_member(guild_id: str, discord_id: str, discord_username: str) -> bool:
+    """Called when a Discord member gains an alliance role.
+    Creates them with the configured entry_role_id. Ignores if already a member."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, entry_role_id FROM ally_groups WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            group = await cur.fetchone()
+        if not group:
+            return False
+        ally_group_id = group["id"]
+        entry_role_id = group["entry_role_id"]
+        try:
+            await db.execute("""
+                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, role_id, status)
+                VALUES (?, ?, ?, ?, 'approved')
+                ON CONFLICT(ally_group_id, discord_id) DO NOTHING
+            """, (ally_group_id, discord_id, discord_username, entry_role_id))
+            await db.commit()
+            return True
+        except Exception:
+            return False
+
+
 # ---------------------------------------------------------------------------
 # Poll helpers (bot-side)
 # ---------------------------------------------------------------------------

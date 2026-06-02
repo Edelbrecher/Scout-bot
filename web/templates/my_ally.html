@@ -22,6 +22,7 @@
   {% elif flash == "role_created" %}<div class="alert alert-success">✅ Role created.</div>
   {% elif flash == "role_deleted" %}<div class="alert alert-success">🗑️ Role deleted.</div>
   {% elif flash == "role_updated" %}<div class="alert alert-success">✅ Role updated.</div>
+  {% elif flash == "entry_role_saved" %}<div class="alert alert-success">✅ Eingangsrolle gespeichert.</div>
   {% elif flash == "guild_has_ally" %}<div class="alert alert-error">⚠️ Auf diesem Server existiert bereits eine Allianz.</div>
   {% elif flash == "joined" %}<div class="alert alert-success">🎉 Willkommen! Du bist der Allianz beigetreten.</div>
   {% endif %}
@@ -35,8 +36,12 @@
   <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
     <h2 style="margin:0;font-size:1.35rem;">🏰 {{ ally_group.ally_name }}</h2>
     {% set pending_members = members | selectattr("status", "equalto", "pending") | list %}
-    {% if pending_members %}
-    <span style="background:#f59e0b;color:#000;font-size:.72rem;font-weight:700;border-radius:20px;padding:2px 9px;">⏳ {{ pending_members|length }} ausstehend</span>
+    {% set new_members = [] %}
+    {% if ally_group.entry_role_id %}
+      {% set new_members = members | selectattr("role_id", "equalto", ally_group.entry_role_id) | rejectattr("status", "equalto", "pending") | list %}
+    {% endif %}
+    {% if pending_members or new_members %}
+    <span style="background:#f59e0b;color:#000;font-size:.72rem;font-weight:700;border-radius:20px;padding:2px 9px;">🆕 {{ (pending_members|length) + (new_members|length) }} neu</span>
     {% endif %}
     <div style="flex:1;"></div>
     <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/delete"
@@ -62,7 +67,7 @@
   {# ══════════════════════════════ TAB: MITGLIEDER ══════════════════════════════ #}
   <div id="tab-mitglieder" class="ma-tab-panel">
 
-    {# Pending #}
+    {# Pending (old flow) #}
     {% if pending_members %}
     <div class="card" style="border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.04);margin-bottom:1rem;">
       <h3 style="margin:0 0 .75rem;color:#fbbf24;font-size:.95rem;">⏳ Ausstehende Anfragen ({{ pending_members|length }})</h3>
@@ -82,6 +87,46 @@
             <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/reject"
                   onsubmit="return confirm('Ablehnen?')" style="margin:0;">
               <button class="btn btn-danger" style="font-size:.75rem;padding:.25rem .7rem;">❌</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Neue Mitglieder mit Eingangsrolle #}
+    {% if new_members %}
+    {% set entry_role = roles | selectattr("id", "equalto", ally_group.entry_role_id) | first %}
+    <div class="card" style="border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.04);margin-bottom:1rem;">
+      <h3 style="margin:0 0 .4rem;color:#a5b4fc;font-size:.95rem;">🆕 Neue Mitglieder — warten auf Beförderung ({{ new_members|length }})</h3>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .75rem;">
+        Diese Mitglieder haben die Eingangsrolle
+        <strong style="color:{% if entry_role %}{{ entry_role.color }}{% else %}#a5b4fc{% endif %};">{% if entry_role %}{{ entry_role.role_name }}{% else %}Neu{% endif %}</strong>
+        und sehen nur freigegebene Inhalte. Befördere sie zu einer anderen Rolle.
+      </p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.5rem;">
+        {% for m in new_members %}
+        <div style="background:var(--bg-main);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:.6rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+          <div>
+            <div style="font-weight:700;font-size:.88rem;">{{ m.discord_username or m.discord_id }}</div>
+            {% if m.travian_name %}<div style="color:#93c5fd;font-size:.78rem;">🎯 {{ m.travian_name }}</div>
+            {% else %}<div style="color:var(--text-muted);font-size:.75rem;">Kein Travian-Name</div>{% endif %}
+            <div style="color:var(--text-muted);font-size:.72rem;">Beigetreten {{ (m.joined_at or '')[:10] }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-end;">
+            <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/set-role"
+                  style="display:flex;gap:.3rem;align-items:center;margin:0;">
+              <select name="role_id" style="padding:.2rem .4rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.75rem;">
+                {% for r in roles %}{% if r.id != ally_group.entry_role_id %}
+                <option value="{{ r.id }}">{{ r.role_name }}</option>
+                {% endif %}{% endfor %}
+              </select>
+              <button type="submit" class="btn btn-primary" style="font-size:.72rem;padding:.2rem .5rem;" title="Befördern">↑</button>
+            </form>
+            <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/reject"
+                  onsubmit="return confirm('{{ m.discord_username or m.discord_id }} entfernen?')" style="margin:0;">
+              <button class="btn btn-danger" style="font-size:.72rem;padding:.2rem .5rem;">✕</button>
             </form>
           </div>
         </div>
@@ -228,15 +273,75 @@
       </div>
     </div>
 
+    {# ── Allianz-Gesamt Stats + ohne Auth ── #}
+    {% if is_editor and leaderboard %}
+    {% set total_off_sum   = leaderboard | sum(attribute='total_off')     %}
+    {% set total_def_sum   = leaderboard | sum(attribute='total_def')     %}
+    {% set total_scouts_sum= leaderboard | sum(attribute='total_scouts')  %}
+    {% set members_with_data  = lb_by_discord | length %}
+    {% set active_members = approved_members | rejectattr("status","equalto","pending") | list %}
+    {% set without_auth   = active_members | rejectattr("discord_id", "in", lb_by_discord.keys() | list) | list %}
+    <div class="card" style="margin-top:1rem;">
+      <h2 style="margin:0 0 .9rem;font-size:1rem;">⚔️ Allianz-Truppen</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin-bottom:.85rem;">
+        <div style="background:var(--bg-main);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:.7rem 1rem;">
+          <div style="font-size:.72rem;color:#f87171;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">🗡️ Off-Truppen</div>
+          <div style="font-size:1.3rem;font-weight:800;color:#f87171;">
+            {% if total_off_sum >= 1000000 %}{{ "%.1f"|format(total_off_sum/1000000) }}M
+            {% elif total_off_sum >= 1000 %}{{ "%.0f"|format(total_off_sum/1000) }}k
+            {% else %}{{ total_off_sum }}{% endif %}
+          </div>
+          <div style="font-size:.7rem;color:var(--text-muted);">Score · nur echte Off-Einheiten</div>
+        </div>
+        <div style="background:var(--bg-main);border:1px solid rgba(96,165,250,.25);border-radius:8px;padding:.7rem 1rem;">
+          <div style="font-size:.72rem;color:#60a5fa;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">🛡️ Def-Truppen</div>
+          <div style="font-size:1.3rem;font-weight:800;color:#60a5fa;">
+            {% if total_def_sum >= 1000000 %}{{ "%.1f"|format(total_def_sum/1000000) }}M
+            {% elif total_def_sum >= 1000 %}{{ "%.0f"|format(total_def_sum/1000) }}k
+            {% else %}{{ total_def_sum }}{% endif %}
+          </div>
+          <div style="font-size:.7rem;color:var(--text-muted);">Score · inkl. Paladin &amp; Druid</div>
+        </div>
+        <div style="background:var(--bg-main);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:.7rem 1rem;">
+          <div style="font-size:.72rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">🔍 Scouts</div>
+          <div style="font-size:1.3rem;font-weight:800;color:#a78bfa;">
+            {% if total_scouts_sum >= 1000000 %}{{ "%.1f"|format(total_scouts_sum/1000000) }}M
+            {% elif total_scouts_sum >= 1000 %}{{ "%.0f"|format(total_scouts_sum/1000) }}k
+            {% else %}{{ total_scouts_sum }}{% endif %}
+          </div>
+          <div style="font-size:.7rem;color:var(--text-muted);">Equites Legati / Späher / Pathfinder</div>
+        </div>
+        <div style="background:var(--bg-main);border:1px solid rgba({{ '239,68,68' if without_auth else '255,255,255' }},.2);border-radius:8px;padding:.7rem 1rem;">
+          <div style="font-size:.72rem;color:{{ '#f87171' if without_auth else 'var(--text-muted)' }};font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">
+            ⚠️ Ohne Account-Upload
+          </div>
+          <div style="font-size:1.3rem;font-weight:800;color:{{ '#f87171' if without_auth else '#4ade80' }};">
+            {{ without_auth | length }} / {{ active_members | length }}
+          </div>
+          <div style="font-size:.7rem;color:var(--text-muted);">
+            {% if without_auth %}
+            {{ without_auth | map(attribute='travian_name') | select | list | join(', ') or
+               without_auth | map(attribute='discord_username') | select | list | join(', ') }}
+            {% else %}Alle haben hochgeladen ✓{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);">
+        Basiert auf letztem Account-Upload der Mitglieder. Off = nur Angriffs-Einheiten (keine Paladin/Druiden).
+      </div>
+    </div>
+    {% endif %}
+
     {# Growth Charts #}
     {% if growth_data and is_editor %}
     <div class="card" style="margin-top:1rem;">
-      <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Account-Wachstum (letzte 2 Wochen)</h2>
+      <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Wachstum (letzte 2 Wochen)</h2>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;">
         {% for metric, label, color in [
           ('village_count','🏘️ Dörfer','#34d399'),
           ('total_off','🗡️ Off','#f87171'),
           ('total_def','🛡️ Def','#60a5fa'),
+          ('total_scouts','🔍 Scouts','#a78bfa'),
           ('total_crop','🌾 Crop','#fbbf24'),
         ] %}
         <button class="growth-metric-btn{% if loop.first %} active{% endif %}"
@@ -672,6 +777,35 @@
                  title="Pick a colour for this role">
           <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕ Create role</button>
         </form>
+
+        {# Eingangsrolle (auto-assign on Discord join) #}
+        <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.25rem;">
+          <div style="font-size:.8rem;font-weight:700;margin-bottom:.35rem;">🚪 Eingangsrolle</div>
+          <p style="font-size:.74rem;color:var(--text-muted);margin:0 0 .5rem;">
+            Neue Discord-Mitglieder erhalten diese Rolle automatisch beim Beitritt.
+            Die Rolle bestimmt welche Daten sie sehen dürfen.
+          </p>
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/set-entry-role"
+                style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+            <select name="entry_role_id" style="flex:1;min-width:140px;padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.83rem;">
+              <option value="">— Keine (kein Auto-Assign) —</option>
+              {% for r in roles %}
+              <option value="{{ r.id }}" {% if ally_group.entry_role_id == r.id %}selected{% endif %}>{{ r.role_name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">💾 Speichern</button>
+          </form>
+          {% if ally_group.entry_role_id %}
+          {% set er = roles | selectattr("id", "equalto", ally_group.entry_role_id) | first %}
+          {% if er %}
+          <div style="margin-top:.4rem;font-size:.74rem;color:var(--text-muted);">
+            Aktuell: <span style="color:{{ er.color }};font-weight:600;">{{ er.role_name }}</span>
+            {% set erp = (er.permissions or '').split(',') | select | list %}
+            — {{ erp | length }} Permission(s) konfiguriert
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
       </div>
 
       {# ── Right: dynamic role detail + legend ── #}

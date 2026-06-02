@@ -69,6 +69,8 @@ main {
 }
 body.has-guild-sidebar main { margin-left: 220px; }
 body.has-guild-sidebar.sidebar-collapsed main { margin-left: 58px; }
+/* Full-height app layouts brauchen kein main-padding */
+body.op-page main { padding: 0 !important; }
 
 /* Containers: use available width generously */
 .container       { max-width: 1280px; width: 100%; margin: 0 auto; }

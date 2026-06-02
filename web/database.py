@@ -3258,8 +3258,13 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
         "Siedler": 1, "Held": 0,
     }
+    SCOUT_UNITS = {"Equites Legati", "Späher", "Pathfinder"}
     total_off = sum(v.get("off_score", 0) for v in villages)
     total_def = sum(v.get("def_score", 0) for v in villages)
+    total_scouts = sum(
+        sum(c for t, c in v.get("troops", {}).items() if t in SCOUT_UNITS)
+        for v in villages
+    )
     total_crop = sum(
         sum(CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
         for v in villages
@@ -3303,16 +3308,16 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         if existing:
             await db.execute("""
                 UPDATE guild_own_villages_history
-                SET total_off = ?, total_def = ?, total_crop = ?,
+                SET total_off = ?, total_def = ?, total_crop = ?, total_scouts = ?,
                     village_count = ?, uploaded_by = ?, uploaded_at = date('now')
                 WHERE id = ?
-            """, (total_off, total_def, total_crop, len(villages), uploaded_by, existing[0]))
+            """, (total_off, total_def, total_crop, total_scouts, len(villages), uploaded_by, existing[0]))
         else:
             await db.execute("""
                 INSERT INTO guild_own_villages_history
-                    (guild_id, discord_id, uploaded_at, total_off, total_def, total_crop, village_count, uploaded_by)
-                VALUES (?, ?, date('now'), ?, ?, ?, ?, ?)
-            """, (guild_id, discord_id, total_off, total_def, total_crop, len(villages), uploaded_by))
+                    (guild_id, discord_id, uploaded_at, total_off, total_def, total_crop, total_scouts, village_count, uploaded_by)
+                VALUES (?, ?, date('now'), ?, ?, ?, ?, ?, ?)
+            """, (guild_id, discord_id, total_off, total_def, total_crop, total_scouts, len(villages), uploaded_by))
         await db.commit()
 
 
@@ -3365,6 +3370,10 @@ async def _init_own_villages_history_table():
         # Migration: add discord_id column if not present
         try:
             await db.execute("ALTER TABLE guild_own_villages_history ADD COLUMN discord_id TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE guild_own_villages_history ADD COLUMN total_scouts INTEGER DEFAULT 0")
         except Exception:
             pass
         await db.commit()
@@ -3739,6 +3748,11 @@ async def _init_ally_tables():
             await db.execute("ALTER TABLE ally_groups ADD COLUMN lock_travian_name INTEGER DEFAULT 0")
         except Exception:
             pass
+        # entry_role_id: role auto-assigned to new Discord members on join
+        try:
+            await db.execute("ALTER TABLE ally_groups ADD COLUMN entry_role_id INTEGER REFERENCES ally_roles(id) ON DELETE SET NULL")
+        except Exception:
+            pass
         # alliance_bonuses: JSON blob storing current bonus levels
         try:
             await db.execute("ALTER TABLE ally_groups ADD COLUMN alliance_bonuses TEXT DEFAULT '{}'")
@@ -3780,6 +3794,16 @@ async def get_ally_group_for_guild(guild_id: str) -> dict | None:
         async with db.execute("SELECT * FROM ally_groups WHERE guild_id=?", (guild_id,)) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def set_ally_group_entry_role(ally_group_id: int, role_id: int | None):
+    """Set which role is auto-assigned to new Discord members on join."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_groups SET entry_role_id=? WHERE id=?", (role_id, ally_group_id)
+        )
+        await db.commit()
 
 
 async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, ally_name: str) -> dict:
@@ -4064,6 +4088,32 @@ async def join_ally_group(ally_group_id: int, discord_id: str, discord_username:
                     wing=excluded.wing,
                     status=excluded.status
             """, (ally_group_id, discord_id, discord_username, travian_name, wing, status))
+            await db.commit()
+            return True
+        except Exception:
+            return False
+
+
+async def join_ally_member(guild_id: str, discord_id: str, discord_username: str) -> bool:
+    """Called when a Discord member joins the alliance (gets allowed_role).
+    Creates them with the configured entry_role_id. Ignores if already a member."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, entry_role_id FROM ally_groups WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            group = await cur.fetchone()
+        if not group:
+            return False
+        ally_group_id = group["id"]
+        entry_role_id = group["entry_role_id"]
+        try:
+            await db.execute("""
+                INSERT INTO ally_members (ally_group_id, discord_id, discord_username, role_id, status)
+                VALUES (?, ?, ?, ?, 'approved')
+                ON CONFLICT(ally_group_id, discord_id) DO NOTHING
+            """, (ally_group_id, discord_id, discord_username, entry_role_id))
             await db.commit()
             return True
         except Exception:
@@ -6426,6 +6476,21 @@ async def _init_op_tables():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(guild_id, recipient_id, read)")
         await db.commit()
 
+        # Op notify log — tracks who was messaged per Benachrichtigen/activate action
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_notify_log (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                plan_id       INTEGER NOT NULL,
+                triggered_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                triggered_by  TEXT DEFAULT '',
+                trigger_type  TEXT DEFAULT 'manual',
+                entries_json  TEXT DEFAULT '[]'
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notify_log_plan ON op_notify_log(guild_id, plan_id)")
+        await db.commit()
+
         # Favourites per user per guild (saved targets)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS op_favorites (
@@ -6904,7 +6969,7 @@ async def get_active_ep_members(guild_id: str) -> set:
 
 async def get_member_growth(guild_id: str, discord_ids: list) -> dict:
     """Return village history per discord_id for growth charts.
-    Returns dict: discord_id → list of {uploaded_at, village_count, total_off, total_def, total_crop}
+    Returns dict: discord_id → list of {uploaded_at, village_count, total_off, total_def, total_crop, total_scouts}
     Only last 14 entries per member."""
     if not discord_ids:
         return {}
@@ -6912,7 +6977,8 @@ async def get_member_growth(guild_id: str, discord_ids: list) -> dict:
         db.row_factory = aiosqlite.Row
         placeholders = ",".join("?" * len(discord_ids))
         rows = await db.execute_fetchall(f"""
-            SELECT discord_id, uploaded_at, village_count, total_off, total_def, total_crop
+            SELECT discord_id, uploaded_at, village_count, total_off, total_def, total_crop,
+                   COALESCE(total_scouts, 0) as total_scouts
             FROM guild_own_villages_history
             WHERE guild_id = ? AND discord_id IN ({placeholders})
             ORDER BY discord_id, uploaded_at ASC
@@ -6928,6 +6994,7 @@ async def get_member_growth(guild_id: str, discord_ids: list) -> dict:
             "total_off": r["total_off"] or 0,
             "total_def": r["total_def"] or 0,
             "total_crop": r["total_crop"] or 0,
+            "total_scouts": r["total_scouts"] or 0,
         })
     # Keep last 14 snapshots per member
     for did in result:
@@ -7167,6 +7234,40 @@ def _check_summary(ok, warnings, errors, suggestions) -> dict:
 
 
 # ── Notifications ─────────────────────────────────────────────────────────────
+
+async def save_op_notify_log(guild_id: str, plan_id: int, triggered_by: str,
+                             trigger_type: str, entries: list[dict]):
+    """Persist a notify-log entry for a plan. entries: [{discord_id, name, status, error?}]"""
+    await _init_op_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO op_notify_log (guild_id, plan_id, triggered_by, trigger_type, entries_json)
+            VALUES (?, ?, ?, ?, ?)
+        """, (guild_id, plan_id, triggered_by, trigger_type, _json_op.dumps(entries, ensure_ascii=False)))
+        await db.commit()
+
+
+async def get_op_notify_logs(guild_id: str, plan_id: int) -> list[dict]:
+    """Return all notify-log entries for a plan, newest first."""
+    await _init_op_tables()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        rows = await db.execute_fetchall("""
+            SELECT * FROM op_notify_log
+            WHERE guild_id = ? AND plan_id = ?
+            ORDER BY triggered_at DESC
+            LIMIT 20
+        """, (guild_id, plan_id))
+    result = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["entries"] = _json_op.loads(d.get("entries_json") or "[]")
+        except Exception:
+            d["entries"] = []
+        result.append(d)
+    return result
+
 
 async def create_notifications(guild_id: str, ally_group_id: int | None,
                                 recipient_ids: list[str], notif_type: str,

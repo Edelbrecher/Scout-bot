@@ -215,17 +215,22 @@ function openDetail(channelId, guildId) {
   const panel   = document.getElementById('detailPanel');
   overlay.style.display = 'block';
   panel.style.display   = 'block';
+  panel.style.opacity   = '0';
   panel.classList.remove('closing');
-  requestAnimationFrame(() => panel.classList.add('open'));
+  requestAnimationFrame(() => {
+    panel.style.opacity = '1';
+    panel.classList.add('open');
+  });
   document.getElementById('detailContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">⏳ Laden…</div>';
   document.body.style.overflow = 'hidden';
 
   fetch(`/guild/${guildId}/scout-channels/${channelId}`, {headers:{'Accept':'application/json'}})
-    .then(r => r.json())
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(data => {
-      const ch = data.ch;
-      document.getElementById('detailTitle').textContent = `${ch.player || '—'} · ${ch.coordinates || ''}`;
       try {
+        const ch = data.ch;
+        if (!ch) throw new Error('no channel data');
+        document.getElementById('detailTitle').textContent = `${ch.player || '—'} · ${ch.coordinates || ''}`;
         document.getElementById('detailContent').innerHTML = renderDetail(data, guildId);
       } catch(e) {
         console.error('renderDetail error:', e);
@@ -240,6 +245,7 @@ function openDetail(channelId, guildId) {
 
 function closeDetail() {
   const panel = document.getElementById('detailPanel');
+  panel.style.opacity = '0';
   panel.classList.add('closing');
   panel.classList.remove('open');
   setTimeout(() => {

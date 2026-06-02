@@ -2,6 +2,7 @@
 {% block title %}Einsatzplanung · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
+<script>document.body.classList.add('op-page');</script>
 <style>
 /* ── Layout ─────────────────────────────────────────────────── */
 .op-shell { display:flex; gap:0; height:calc(100vh - 56px); overflow:hidden; }
@@ -142,9 +143,10 @@
 
 /* ── Right panel ─────────────────────────────────────────────── */
 .op-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-.op-panel-tabs { display:flex; border-bottom:1px solid var(--border); }
-.op-panel-tab { flex:1; padding:.55rem; text-align:center; font-size:.8rem; cursor:pointer;
-  color:var(--text-muted); border-bottom:2px solid transparent; transition:all .15s; }
+.op-panel-tabs { display:flex; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+.op-panel-tabs::-webkit-scrollbar { display:none; }
+.op-panel-tab { flex:0 0 auto; padding:.4rem .5rem; text-align:center; font-size:.72rem; cursor:pointer;
+  color:var(--text-muted); border-bottom:2px solid transparent; transition:all .15s; white-space:nowrap; }
 .op-panel-tab.active { color:#f59e0b; border-bottom-color:#f59e0b; }
 .op-panel-body { padding:.9rem; }
 
@@ -350,6 +352,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Truppen</div>
                 <div class="op-panel-tab" onclick="switchPanel('check',this)">🔍 Check</div>
                 <div class="op-panel-tab" onclick="switchPanel('stats',this);loadStats()">📊 Auswertung</div>
+                <div class="op-panel-tab" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
               </div>
 
               <!-- Plan info -->
@@ -382,6 +385,17 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Bestätigungsstatus aller Angreifer nach dem Einschlag.</div>
                 <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Aktualisieren</button>
                 <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">Noch keine Daten.</div></div>
+              </div>
+
+              <!-- Msg Log -->
+              <div class="op-panel-body" id="panel-msglog" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
+                  <span style="font-size:.8rem;color:var(--text-muted);">Discord-Benachrichtigungslog</span>
+                  <button class="btn btn-secondary" style="font-size:.72rem;padding:.15rem .5rem;" onclick="loadNotifyLog()">🔄</button>
+                </div>
+                <div id="notifyLogContent">
+                  <div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">⏳ Laden…</div>
+                </div>
               </div>
             </div>
           </div>
@@ -2224,8 +2238,71 @@ async function sendNotify() {
   if (!confirm('Plan als Discord-Nachricht an alle betroffenen Mitglieder senden?')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/notify`);
-    alert(r.ok ? '✅ Discord-Benachrichtigung gesendet!' : '⚠️ Benachrichtigung fehlgeschlagen (Bot prüfen).');
+    if (r.ok) {
+      showToast('✅ Discord-Benachrichtigung gesendet — Log wurde aktualisiert.');
+      // Auto-switch to log tab
+      const logTab = document.getElementById('tab-msglog');
+      if (logTab) { switchPanel('msglog', logTab); loadNotifyLog(); }
+    } else {
+      alert('⚠️ Benachrichtigung fehlgeschlagen (Bot prüfen).');
+    }
   } catch(e) { alert('Fehler: '+e.message); }
+}
+
+// ══ Notify Log ════════════════════════════════════════════════════════════
+async function loadNotifyLog() {
+  if (!activePlanId) return;
+  const el = document.getElementById('notifyLogContent');
+  if (!el) return;
+  try {
+    const data = await apiGet(`/plans/${activePlanId}/notify-log`);
+    const logs = data.logs || [];
+    if (!logs.length) {
+      el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">Noch keine Benachrichtigungen für diesen Plan.</div>';
+      return;
+    }
+    const statusLabel = s => ({
+      sent:          '<span style="color:#4ade80;font-size:.72rem;">✅ Gesendet</span>',
+      dm_blocked:    '<span style="color:#f87171;font-size:.72rem;">🔒 DM blockiert</span>',
+      not_in_server: '<span style="color:#f59e0b;font-size:.72rem;">⚠️ Nicht auf Server</span>',
+      no_discord_id: '<span style="color:#9ca3af;font-size:.72rem;">❓ Keine Discord-ID</span>',
+      error:         '<span style="color:#f87171;font-size:.72rem;">❌ Fehler</span>',
+    }[s] || `<span style="color:var(--text-muted);font-size:.72rem;">${s}</span>`);
+
+    el.innerHTML = logs.map(log => {
+      const entries = log.entries || [];
+      const sent    = entries.filter(e => e.status === 'sent').length;
+      const failed  = entries.filter(e => e.status !== 'sent').length;
+      const typeTag = log.trigger_type === 'auto'
+        ? '<span style="background:rgba(99,102,241,.15);color:#a5b4fc;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🚀 Auto (Aktivierung)</span>'
+        : '<span style="background:rgba(245,158,11,.12);color:#fbbf24;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">📢 Manuell</span>';
+
+      const rows = entries.length ? entries.map(e => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.25rem .5rem;border-bottom:1px solid rgba(255,255,255,.04);gap:.5rem;">
+          <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.discord_id||''}">
+            ${e.name || e.discord_id || '—'}
+          </span>
+          <span>${statusLabel(e.status)}</span>
+          ${e.error ? `<span style="font-size:.67rem;color:#f87171;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.error}">${e.error}</span>` : ''}
+        </div>`).join('') : '<div style="font-size:.78rem;color:var(--text-muted);padding:.3rem .5rem;">Keine Einzel-Daten</div>';
+
+      return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;border-bottom:1px solid var(--border);">
+          ${typeTag}
+          <span style="font-size:.72rem;color:var(--text-muted);flex:1;">${(log.triggered_at||'').slice(0,16).replace('T',' ')} UTC</span>
+          <span style="font-size:.72rem;color:#4ade80;">✅ ${sent}</span>
+          ${failed ? `<span style="font-size:.72rem;color:#f87171;">❌ ${failed}</span>` : ''}
+        </div>
+        ${rows}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="color:#f87171;font-size:.82rem;">Fehler: ${e.message}</div>`;
+  }
+}
+
+function apiGet(path) {
+  return fetch(`/guild/${GUILD_ID}/operations/api${path}`, {headers:{'Accept':'application/json'}}).then(r=>r.json());
 }
 
 // ══ Plan modal ════════════════════════════════════════════════════════════
@@ -2301,7 +2378,7 @@ async function refreshPlanList() {
 
 function switchPanel(name, el) {
   document.querySelectorAll('.op-panel-tab').forEach(t=>t.classList.remove('active'));
-  ['info','favs','members','check','stats'].forEach(n => {
+  ['info','favs','members','check','stats','msglog'].forEach(n => {
     document.getElementById('panel-'+n).style.display = n===name ? 'block' : 'none';
   });
   if (el) el.classList.add('active');
