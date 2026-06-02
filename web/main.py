@@ -5636,6 +5636,18 @@ async def my_ally_member_detail(request: Request, guild_id: str, discord_id: str
     # Troop data — cross-guild fallback so data from other guild contexts is found
     troops = await database.get_member_troops_single(guild_id, discord_id)
 
+    # Enrich villages with population from map_snapshots by coordinate
+    if troops:
+        villages = troops.get("villages") or []
+        coords = [(v.get("x"), v.get("y")) for v in villages if v.get("x") is not None]
+        pop_map: dict = {}
+        if coords:
+            pop_map = await database.get_village_populations_by_coords(guild_id, coords)
+        for v in villages:
+            key = (v.get("x"), v.get("y"))
+            v["population"] = pop_map.get(key, 0)
+        troops["villages"] = villages
+
     # Editor check
     is_editor = bool(ally_group) or await has_perm(request, guild_id, "ally_manage")
 

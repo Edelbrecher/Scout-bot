@@ -8883,3 +8883,20 @@ async def get_player_tribe_from_map(guild_id: str, player_name: str) -> str:
             if row:
                 return _TRIBE_ID_MAP.get(int(row[0]), "")
     return ""
+
+
+async def get_village_populations_by_coords(guild_id: str, coords: list[tuple]) -> dict:
+    """Return {(x,y): population} from latest map_snapshots for given coordinates."""
+    if not coords:
+        return {}
+    result = {}
+    async with aiosqlite.connect(DB_PATH) as db:
+        for x, y in coords:
+            async with db.execute(
+                "SELECT population FROM map_snapshots WHERE guild_id=? AND x=? AND y=? ORDER BY fetched_at DESC LIMIT 1",
+                (guild_id, x, y)
+            ) as cur:
+                row = await cur.fetchone()
+                if row:
+                    result[(x, y)] = row[0] or 0
+    return result

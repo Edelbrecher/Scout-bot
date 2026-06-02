@@ -141,6 +141,8 @@
             <td style="text-align:right;color:var(--text-muted);">{{ v.get('population',0) or '—' }}</td>
             <td style="max-width:220px;">
               {% set _troops2 = v.get('troops') if v.get('troops') is mapping else {} %}
+              {% set _total_units = v.get('total_units',0) or (_troops2.values()|sum if _troops2 else 0) %}
+              {% if _total_units %}<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">∑ {{ _total_units }}</div>{% endif %}
               {% if _troops2 %}
               <div class="troop-chips" data-raw="{{ _troops2 | tojson | e }}"></div>
               {% else %}
@@ -202,19 +204,28 @@
 })();
 
 // ── Troop chips ───────────────────────────────────────────────────────────────
+const SCOUT_NAMES = new Set(['equites legati','späher','pathfinder','sopdu-erkunder','ammende nomadin','sentinel']);
+const OFF_NAMES   = new Set(['imperianer','equites imperatoris','equites caesaris','axtkämpfer','teut. ritter','keulenschwinger','theutates-blitz','haeduer','schwertkämpfer','ägyptischer reiter','khopesh-krieger','resheph-streitwagen','soldat','marauder','hunnischer reiter']);
+
 document.querySelectorAll('.troop-chips[data-raw]').forEach(el => {
   try {
-    const troops = JSON.parse(el.dataset.raw);
-    if (!Array.isArray(troops)) return;
-    const html = troops
-      .filter(t => t.count > 0)
-      .map(t => {
-        const isScout = (t.name||'').toLowerCase().includes('kundsch') || (t.name||'').toLowerCase().includes('pfad') || (t.name||'').toLowerCase().includes('late') || (t.name||'').toLowerCase().includes('scout');
-        const col = isScout ? '#34d399' : (t.type==='off'?'#f87171':'#60a5fa');
-        return `<span style="display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;padding:1px 6px;border-radius:8px;border:1px solid ${col}30;color:${col};background:${col}12;margin:.1rem;">${t.name} <strong>${t.count >= 1000 ? (t.count/1000).toFixed(1)+'k' : t.count}</strong></span>`;
-      }).join('');
+    let raw = JSON.parse(el.dataset.raw);
+    // Normalise: accept both array [{name,count}] and dict {name:count}
+    let entries;
+    if (Array.isArray(raw)) {
+      entries = raw.filter(t => t.count > 0).map(t => [t.name, t.count]);
+    } else if (raw && typeof raw === 'object') {
+      entries = Object.entries(raw).filter(([,c]) => c > 0);
+    } else { entries = []; }
+
+    const html = entries.map(([name, count]) => {
+      const low = name.toLowerCase();
+      const col = SCOUT_NAMES.has(low) ? '#34d399' : OFF_NAMES.has(low) ? '#f87171' : '#60a5fa';
+      const disp = count >= 1000 ? (count/1000).toFixed(1)+'k' : count;
+      return `<span style="display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;padding:1px 6px;border-radius:8px;border:1px solid ${col}30;color:${col};background:${col}12;margin:.1rem;">${name} <strong>${disp}</strong></span>`;
+    }).join('');
     el.innerHTML = html || '<span style="color:var(--text-muted);font-size:.75rem;">leer</span>';
-  } catch(e) { el.innerHTML = '<span style="color:var(--text-muted);">?</span>'; }
+  } catch(e) { el.innerHTML = '<span style="color:var(--text-muted);font-size:.75rem;">—</span>'; }
 });
 
 // ── Village type filter ───────────────────────────────────────────────────────
