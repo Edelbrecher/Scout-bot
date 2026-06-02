@@ -2705,20 +2705,103 @@ function _drawOpMapContent(canvas, ctx) {
 </script>
 
 <!-- Op-Karte Modal -->
-<div id="opMapOverlay" onclick="if(event.target===this)closeOpMap()"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10100;align-items:center;justify-content:center;">
-  <div id="opMapModal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-       width:min(960px,96vw);height:80vh;background:var(--bg-card);border-radius:14px;
-       border:1px solid var(--border);z-index:10101;display:flex;flex-direction:column;overflow:hidden;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <span style="font-weight:700;font-size:.95rem;">🗺️ Operation-Karte</span>
-      <button onclick="closeOpMap()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;line-height:1;">✕</button>
+<div id="opMapOverlay" style="display:none;position:fixed;inset:0;z-index:10100;pointer-events:none;">
+  <div id="opMapModal" style="position:fixed;top:5vh;left:5vw;width:90vw;height:88vh;
+       background:var(--bg-card);border-radius:14px;border:1px solid var(--border);
+       z-index:10101;display:flex;flex-direction:column;overflow:hidden;pointer-events:all;
+       box-shadow:0 24px 80px rgba(0,0,0,.7);">
+    <!-- Title bar (drag handle) -->
+    <div id="opMapTitleBar" style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;cursor:move;user-select:none;">
+      <span style="font-weight:700;font-size:.95rem;">🗺️ Operation Map</span>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <button onclick="opMapMaximize()" title="Maximize" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:.75rem;cursor:pointer;padding:2px 7px;border-radius:4px;">⛶</button>
+        <button onclick="closeOpMap()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;line-height:1;">✕</button>
+      </div>
     </div>
+    <!-- Canvas -->
     <div style="position:relative;flex:1;overflow:hidden;">
       <canvas id="opMapCanvas" style="display:block;width:100%;height:100%;cursor:crosshair;background:#1e3a14;"></canvas>
       <div id="opMapTooltip" style="position:absolute;display:none;background:rgba(10,18,10,.94);border:1px solid rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:6px;font-size:.78rem;pointer-events:none;white-space:nowrap;color:#e0e0e0;z-index:10;"></div>
     </div>
+    <!-- Resize handles -->
+    <div class="om-resize" data-dir="n"  style="position:absolute;top:0;left:8px;right:8px;height:5px;cursor:n-resize;z-index:10;"></div>
+    <div class="om-resize" data-dir="s"  style="position:absolute;bottom:0;left:8px;right:8px;height:5px;cursor:s-resize;z-index:10;"></div>
+    <div class="om-resize" data-dir="w"  style="position:absolute;left:0;top:8px;bottom:8px;width:5px;cursor:w-resize;z-index:10;"></div>
+    <div class="om-resize" data-dir="e"  style="position:absolute;right:0;top:8px;bottom:8px;width:5px;cursor:e-resize;z-index:10;"></div>
+    <div class="om-resize" data-dir="nw" style="position:absolute;top:0;left:0;width:10px;height:10px;cursor:nw-resize;z-index:11;"></div>
+    <div class="om-resize" data-dir="ne" style="position:absolute;top:0;right:0;width:10px;height:10px;cursor:ne-resize;z-index:11;"></div>
+    <div class="om-resize" data-dir="sw" style="position:absolute;bottom:0;left:0;width:10px;height:10px;cursor:sw-resize;z-index:11;"></div>
+    <div class="om-resize" data-dir="se" style="position:absolute;bottom:0;right:0;width:10px;height:10px;cursor:se-resize;z-index:11;"></div>
   </div>
 </div>
+
+<script>
+(function(){
+  const MIN_W=320, MIN_H=240;
+  let _drag=null; // {type:'move'|'resize', dir, startX, startY, startL, startT, startW, startH}
+
+  function getModal(){ return document.getElementById('opMapModal'); }
+
+  // ── Drag to move ─────────────────────────────────────────────────────────
+  document.getElementById('opMapTitleBar').addEventListener('mousedown', e=>{
+    if(e.target.tagName==='BUTTON') return;
+    const m=getModal(), r=m.getBoundingClientRect();
+    _drag={type:'move', startX:e.clientX, startY:e.clientY, startL:r.left, startT:r.top};
+    m.style.transform='none';
+    e.preventDefault();
+  });
+
+  // ── Resize handles ───────────────────────────────────────────────────────
+  document.querySelectorAll('.om-resize').forEach(el=>{
+    el.addEventListener('mousedown', e=>{
+      const m=getModal(), r=m.getBoundingClientRect();
+      _drag={type:'resize', dir:el.dataset.dir,
+             startX:e.clientX, startY:e.clientY,
+             startL:r.left, startT:r.top, startW:r.width, startH:r.height};
+      m.style.transform='none';
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  });
+
+  document.addEventListener('mousemove', e=>{
+    if(!_drag) return;
+    const m=getModal();
+    const dx=e.clientX-_drag.startX, dy=e.clientY-_drag.startY;
+    if(_drag.type==='move'){
+      m.style.left=(_drag.startL+dx)+'px';
+      m.style.top =(_drag.startT+dy)+'px';
+    } else {
+      let l=_drag.startL, t=_drag.startT, w=_drag.startW, h=_drag.startH;
+      const d=_drag.dir;
+      if(d.includes('e')) w=Math.max(MIN_W,_drag.startW+dx);
+      if(d.includes('s')) h=Math.max(MIN_H,_drag.startH+dy);
+      if(d.includes('w')){ const nw=Math.max(MIN_W,_drag.startW-dx); l=_drag.startL+(_drag.startW-nw); w=nw; }
+      if(d.includes('n')){ const nh=Math.max(MIN_H,_drag.startH-dy); t=_drag.startT+(_drag.startH-nh); h=nh; }
+      m.style.left=l+'px'; m.style.top=t+'px';
+      m.style.width=w+'px'; m.style.height=h+'px';
+      // Redraw canvas at new size
+      const canvas=document.getElementById('opMapCanvas');
+      if(canvas && canvas._omState) _drawOpMapContent(canvas, canvas.getContext('2d'));
+    }
+  });
+
+  document.addEventListener('mouseup', ()=>{ _drag=null; });
+
+  // ── Escape key ───────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeOpMap(); });
+})();
+
+function opMapMaximize(){
+  const m=document.getElementById('opMapModal');
+  m.style.left='1vw'; m.style.top='1vh';
+  m.style.width='98vw'; m.style.height='97vh';
+  m.style.transform='none';
+  setTimeout(()=>{
+    const canvas=document.getElementById('opMapCanvas');
+    if(canvas && canvas._omState) _drawOpMapContent(canvas, canvas.getContext('2d'));
+  }, 50);
+}
+</script>
 
 {% endblock %}
