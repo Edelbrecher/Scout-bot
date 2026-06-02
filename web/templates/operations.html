@@ -74,10 +74,12 @@
   vertical-align:middle; }
 .wave-table tr:last-child td { border-bottom:none; }
 .wave-type-badge { font-size:.7rem; padding:2px 7px; border-radius:6px; font-weight:700; }
-.wt-real   { background:rgba(239,68,68,.2);  color:#f87171; }
-.wt-fake   { background:rgba(107,114,128,.2);color:#9ca3af; }
-.wt-def    { background:rgba(59,130,246,.2); color:#93c5fd; }
-.wt-scout  { background:rgba(168,85,247,.2); color:#c084fc; }
+.wt-real     { background:rgba(239,68,68,.2);  color:#f87171; }
+.wt-fake     { background:rgba(107,114,128,.2);color:#9ca3af; }
+.wt-def      { background:rgba(59,130,246,.2); color:#93c5fd; }
+.wt-scout    { background:rgba(168,85,247,.2); color:#c084fc; }
+.wt-cleaner1 { background:rgba(249,115,22,.22);color:#fb923c; border:1px solid rgba(249,115,22,.4); }
+.wt-cleaner2 { background:rgba(234,179,8,.18); color:#fbbf24; border:1px solid rgba(234,179,8,.4); }
 
 /* ── Troop chips ─────────────────────────────────────────────── */
 .troop-chip {
@@ -565,10 +567,12 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div class="form-group" style="max-width:145px;">
           <label>Wavestyp</label>
           <select id="wmTypee">
-            <option value="real">⚔ Echter Attack</option>
+            <option value="real">⚔️ Echter Attack</option>
             <option value="fake">👻 Fake</option>
-            <option value="def">🛡 Defense</option>
+            <option value="def">🛡️ Defense</option>
             <option value="scout">🔍 Scout</option>
+            <option value="cleaner1">🧹 1st-Cleaner</option>
+            <option value="cleaner2">🧹 2nd-Cleaner</option>
           </select>
         </div>
       </div>
@@ -694,7 +698,7 @@ function statusLabel(s) {
   return m[s]||s;
 }
 function waveTypeeLabel(t) {
-  return {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout'}[t]||t;
+  return {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout',cleaner1:'🧹 1st-Cleaner',cleaner2:'🧹 2nd-Cleaner'}[t]||t;
 }
 function tribeName(t) {
   return {romans:'Romans',gauls:'Gauls',teutons:'Teutons',huns:'Huns',egyptians:'Egyptians'}[t]||t;
@@ -818,10 +822,12 @@ function renderTargets() {
 }
 
 function renderTargetCard(t) {
-  const realCnt  = (t.waves||[]).filter(w=>w.wave_type==='real').length;
-  const fakeCnt  = (t.waves||[]).filter(w=>w.wave_type==='fake').length;
-  const defCnt   = (t.waves||[]).filter(w=>w.wave_type==='def').length;
-  const scoutCnt = (t.waves||[]).filter(w=>w.wave_type==='scout').length;
+  const realCnt    = (t.waves||[]).filter(w=>w.wave_type==='real').length;
+  const fakeCnt    = (t.waves||[]).filter(w=>w.wave_type==='fake').length;
+  const defCnt     = (t.waves||[]).filter(w=>w.wave_type==='def').length;
+  const scoutCnt   = (t.waves||[]).filter(w=>w.wave_type==='scout').length;
+  const cleaner1Cnt= (t.waves||[]).filter(w=>w.wave_type==='cleaner1').length;
+  const cleaner2Cnt= (t.waves||[]).filter(w=>w.wave_type==='cleaner2').length;
   const fakeOk   = !realCnt || fakeCnt >= realCnt*3;
 
   return `
@@ -836,10 +842,12 @@ function renderTargetCard(t) {
         </div>
       </div>
       <div style="display:flex;gap:.3rem;align-items:center;">
-        ${realCnt ? `<span class="wave-type-badge wt-real">⚔ ${realCnt}</span>` : ''}
-        ${fakeCnt ? `<span class="wave-type-badge wt-fake">👻 ${fakeCnt}</span>` : ''}
-        ${defCnt  ? `<span class="wave-type-badge wt-def">🛡 ${defCnt}</span>` : ''}
-        ${scoutCnt? `<span class="wave-type-badge wt-scout">🔍 ${scoutCnt}</span>` : ''}
+        ${realCnt     ? `<span class="wave-type-badge wt-real">⚔ ${realCnt}</span>` : ''}
+        ${fakeCnt     ? `<span class="wave-type-badge wt-fake">👻 ${fakeCnt}</span>` : ''}
+        ${defCnt      ? `<span class="wave-type-badge wt-def">🛡 ${defCnt}</span>` : ''}
+        ${scoutCnt    ? `<span class="wave-type-badge wt-scout">🔍 ${scoutCnt}</span>` : ''}
+        ${cleaner1Cnt ? `<span class="wave-type-badge wt-cleaner1">🧹1 ${cleaner1Cnt}</span>` : ''}
+        ${cleaner2Cnt ? `<span class="wave-type-badge wt-cleaner2">🧹2 ${cleaner2Cnt}</span>` : ''}
         ${realCnt && !fakeOk ? '<span title="Zu wenig Fakes!" style="color:#f59e0b;">⚠️</span>' : ''}
         <button class="btn-icon" title="Add wave" style="font-size:.75rem;" onclick="event.stopPropagation();openWaveModal(${t.id},'${escHtml(t.player_name||'')} (${t.x}|${t.y})')">+ Welle</button>
         <button class="btn-icon" title="Als Favorit" style="font-size:.75rem;" onclick="event.stopPropagation();favTarget(${t.id})">⭐</button>
@@ -2631,7 +2639,7 @@ function _drawOpMapContent(canvas, ctx) {
 
   // ── Attack lines (drawn below dots) ──────────────────────────────────────
   // wave_type: real→red, fake→orange, chief→blue, def→purple, scout→green
-  const waveColors = { real:'#ef4444', fake:'#f97316', chief:'#3b82f6', def:'#a78bfa', scout:'#22c55e' };
+  const waveColors = { real:'#ef4444', fake:'#f97316', chief:'#3b82f6', def:'#a78bfa', scout:'#22c55e', cleaner1:'#f97316', cleaner2:'#fbbf24' };
   for(const t of targets) {
     if(t.x==null||t.y==null) continue;
     const [tx,ty]=_worldToCanvas(canvas,t.x,t.y);

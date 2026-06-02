@@ -25,6 +25,11 @@
 .mop-table tr.mop-row-past   { opacity: .55; }
 .mop-table tr.mop-row-confirmed { background: rgba(74,222,128,.04); }
 
+/* ── Cleaner badge ───────────────────────────────────────────── */
+.wt-cleaner1 { background: rgba(249,115,22,.2); color: #fb923c; border: 1px solid rgba(249,115,22,.4); }
+.wt-cleaner2 { background: rgba(234,179,8,.18); color: #fbbf24; border: 1px solid rgba(234,179,8,.4); }
+.mop-cleaner-banner { background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.4); border-radius: 12px; padding: .85rem 1.2rem; margin-bottom: 1rem; display: flex; align-items: center; gap: .75rem; }
+
 /* ── Next-wave banner ────────────────────────────────────────── */
 .mop-next-banner { border-radius: 12px; padding: .85rem 1.2rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .mop-next-banner.urgent { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.4); }
@@ -134,6 +139,9 @@
     </label>
   </div>
 
+  <!-- Cleaner role banner -->
+  <div id="cleanerBanner" style="display:none;"></div>
+
   <!-- Next wave banner -->
   <div id="nextWaveBanner" style="display:none;"></div>
 
@@ -177,8 +185,8 @@ const GUILD_ID   = '{{ guild.guild_id }}';
 const TW_WORLD   = '{{ tw_world }}';
 const WAVES_DATA = {{ waves | tojson | safe }};
 
-const TYPE_LABELS = {real:'⚔ Real Attack', fake:'👻 Fake', def:'🛡 Defense', scout:'🔍 Scout', chief:'👑 Chief', siege:'💣 Siege'};
-const TYPE_CSS    = {real:'wt-real', fake:'wt-fake', def:'wt-def', scout:'wt-scout', chief:'wt-chief', siege:'wt-siege'};
+const TYPE_LABELS = {real:'⚔️ Real Attack', fake:'👻 Fake', def:'🛡️ Defense', scout:'🔍 Scout', chief:'👑 Chief', siege:'💣 Siege', cleaner1:'🧹 1st-Cleaner', cleaner2:'🧹 2nd-Cleaner'};
+const TYPE_CSS    = {real:'wt-real', fake:'wt-fake', def:'wt-def', scout:'wt-scout', chief:'wt-chief', siege:'wt-siege', cleaner1:'wt-cleaner1', cleaner2:'wt-cleaner2'};
 const CS_ICON     = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫'};
 const CS_LABEL    = {on_time:'On time', late:'Late', not_sent:'Not sent', cant_send:'Cannot send'};
 const CS_COLOR    = {on_time:'#4ade80', late:'#fbbf24', not_sent:'#f87171', cant_send:'#f87171'};
@@ -214,6 +222,27 @@ function cdStr(sendTime) {
                      : `${s}s`;
   const cls = diff < 60 ? 'mop-cd-urgent' : diff < 300 ? 'mop-cd-soon' : 'mop-cd-ok';
   return {text, cls, secsLeft: diff};
+}
+
+// ── Cleaner role banner ───────────────────────────────────────────
+function updateCleanerBanner() {
+  const banner = document.getElementById('cleanerBanner');
+  if (!banner) return;
+  const has1 = WAVES_DATA.some(w => w.wave_type === 'cleaner1');
+  const has2 = WAVES_DATA.some(w => w.wave_type === 'cleaner2');
+  if (!has1 && !has2) { banner.style.display = 'none'; return; }
+  const roles = [];
+  if (has1) roles.push('<span style="background:rgba(249,115,22,.2);color:#fb923c;border:1px solid rgba(249,115,22,.4);border-radius:8px;padding:2px 10px;font-weight:800;font-size:.95rem;">🧹 1st-Cleaner</span>');
+  if (has2) roles.push('<span style="background:rgba(234,179,8,.18);color:#fbbf24;border:1px solid rgba(234,179,8,.4);border-radius:8px;padding:2px 10px;font-weight:800;font-size:.95rem;">🧹 2nd-Cleaner</span>');
+  banner.style.display = 'flex';
+  banner.className = 'mop-cleaner-banner';
+  banner.innerHTML = `
+    <span style="font-size:1.5rem;">🧹</span>
+    <div>
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:.2rem;">You are assigned as ${roles.join(' & ')} in this operation</div>
+      <div style="font-size:.8rem;color:var(--text-muted);">Your waves must arrive <strong style="color:#fb923c;">before</strong> the main real attacks to clear defending troops. Check your send times carefully.</div>
+    </div>
+  `;
 }
 
 // ── Next-wave banner ──────────────────────────────────────────────
@@ -631,6 +660,7 @@ function autoRefresh() {
 
 // ── Init ─────────────────────────────────────────────────────────
 render();
+updateCleanerBanner();
 updateNextWaveBanner();
 setInterval(tick, 1000);
 setInterval(autoRefresh, 60000);

@@ -7080,7 +7080,7 @@ async def op_add_wave(
 ):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
-    if wave_type not in ("real","fake","def","scout"):
+    if wave_type not in ("real","fake","def","scout","cleaner1","cleaner2"):
         wave_type = "real"
     if tribe not in database.TRAVIAN_TROOPS:
         tribe = "romans"

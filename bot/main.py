@@ -765,10 +765,12 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
             continue
 
         try:
+            _icons = {'real':'⚔','fake':'👻','def':'🛡','scout':'🔍','cleaner1':'🧹','cleaner2':'🧹'}
+            _labels = {'real':'REAL','fake':'FAKE','def':'DEF','scout':'SCOUT','cleaner1':'1st-CLEANER','cleaner2':'2nd-CLEANER'}
             wave_lines = "\n".join([
-                f"  {'⚔' if w['type']=='real' else '👻' if w['type']=='fake' else '🛡' if w['type']=='def' else '🔍'} "
-                f"**{w['type'].upper()}** → {w['target']}\n"
-                f"    📤 Senden: **{w['send_time']}** | 🕐 Marsch: {w['travel']//3600}h{(w['travel']%3600)//60}m | Von: {w['origin']}"
+                f"  {_icons.get(w['type'],'⚔')} **{_labels.get(w['type'],w['type'].upper())}** → {w['target']}"
+                + ("\n    ⚠️ **Cleaner — arrive BEFORE main attacks!**" if w['type'] in ('cleaner1','cleaner2') else "")
+                + f"\n    📤 Send: **{w['send_time']}** | 🕐 March: {w['travel']//3600}h{(w['travel']%3600)//60}m | From: {w['origin']}"
                 for w in waves
             ])
             msg = (f"⚔️ **Einsatz: {plan_name}**\n"
@@ -814,13 +816,15 @@ async def handle_op_wave_assigned(request: aiohttp_web.Request) -> aiohttp_web.R
     if not member:
         return aiohttp_web.json_response({"ok": False, "status": "not_in_server"})
 
-    type_icon = {"real": "⚔️", "fake": "👻", "def": "🛡️", "scout": "🔍", "chief": "👑"}.get(wave_type, "⚔️")
+    type_icon = {"real": "⚔️", "fake": "👻", "def": "🛡️", "scout": "🔍", "chief": "👑", "cleaner1": "🧹", "cleaner2": "🧹"}.get(wave_type, "⚔️")
+    type_label = {"cleaner1": "1st-Cleaner", "cleaner2": "2nd-Cleaner"}.get(wave_type, wave_type.upper())
     target_str = f"({target_x}|{target_y})" if target_x is not None else "?"
     try:
         msg = (
             f"⚔️ **You've been assigned a wave — {plan_name}**\n"
             f"🕐 Landing: **{landing}**\n\n"
-            f"{type_icon} **{wave_type.upper()}** → {target_str}\n"
+            f"{type_icon} **{type_label}** → {target_str}\n"
+            + (f"⚠️ **You are a Cleaner — your wave must arrive BEFORE the main attacks!**\n" if wave_type in ('cleaner1','cleaner2') else "")
             f"📤 Send time: **{send_time}**\n\n"
             f"➡️ See your full plan: TravOps → My Op Plan"
         )
