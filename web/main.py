@@ -7126,7 +7126,7 @@ async def op_map_popup(request: Request, guild_id: str, plan_id: int):
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    plan = await database.get_op_plan_with_targets(plan_id, guild_id)
+    plan = await database.get_op_plan_full(plan_id, guild_id)
     if not plan:
         return HTMLResponse("Plan not found", status_code=404)
     return templates.TemplateResponse("op_map_popup.html", {
