@@ -7,12 +7,12 @@
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
     <h1 style="margin:0.25rem 0 0;" data-i18n="settle.title">📍 Settle-Liste</h1>
-    <p class="subtitle" style="margin:0;" data-i18n="settle.subtitle">Nächste Siedlungskoordinaten koordinieren — keine Konflikte beim Worldstart</p>
+    <p class="subtitle" style="margin:0;" data-i18n="settle.subtitle">Coordinate next settlement locations — no conflicts at world start</p>
   </div>
 
-  <!-- Eintrag hinzufügen -->
+  <!-- Add entry -->
   <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin:0 0 0.75rem;" data-i18n="settle.add.title">➕ Neuen Eintrag hinzufügen</h2>
+    <h2 style="margin:0 0 0.75rem;" data-i18n="settle.add.title">➕ Add new entry</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/settle-list"
           style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-end;">
       <div class="form-group" style="margin:0;flex:0 0 160px;">
@@ -21,13 +21,13 @@
                style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-family:monospace;font-size:0.9rem;">
       </div>
       <div class="form-group" style="margin:0;flex:1;min-width:160px;">
-        <label style="font-size:0.82rem;">Spieler-Name (optional)</label>
-        <input type="text" name="player_name" placeholder="Mein Travian-Name"
+        <label style="font-size:0.82rem;">Player-Name (optional)</label>
+        <input type="text" name="player_name" placeholder="Mein Travian name"
                style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.85rem;">
       </div>
       <div class="form-group" style="margin:0;flex:2;min-width:200px;">
         <label style="font-size:0.82rem;">Notiz (optional)</label>
-        <input type="text" name="note" placeholder="z.B. Nächste Welle, Getreide-Tal"
+        <input type="text" name="note" placeholder="e.g. Next wave, Grain valley"
                style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.85rem;">
       </div>
       <button type="submit" class="btn btn-primary" style="flex-shrink:0;" data-i18n="settle.add.btn">📍 Eintragen</button>
@@ -59,7 +59,7 @@
         </div>
         {% if is_manager or e.discord_user_id == uid %}
         <form method="post" action="/guild/{{ guild.guild_id }}/settle-list/{{ e.id }}/delete"
-              onsubmit="return confirm('Eintrag löschen?')" style="flex-shrink:0;">
+              onsubmit="return confirm('Delete entry?')" style="flex-shrink:0;">
           <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.6rem;font-size:0.75rem;">✕</button>
         </form>
         {% endif %}
@@ -70,8 +70,8 @@
   {% else %}
   <div class="card" style="text-align:center;padding:3rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">📍</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="settle.empty.title">Noch keine Einträge</h2>
-    <p style="color:var(--text-muted);" data-i18n="settle.empty.hint">Trage deine geplanten Siedlungskoordinaten ein, bevor der Worldstart losgeht.</p>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="settle.empty.title">No entries yet</h2>
+    <p style="color:var(--text-muted);" data-i18n="settle.empty.hint">Trage deine geplanten Settlementskoordinaten ein, bevor der Worldstart losgeht.</p>
   </div>
   {% endif %}
 

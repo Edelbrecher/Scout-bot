@@ -12,8 +12,8 @@
   {% if not stats %}
   <div class="card" style="text-align:center;padding:3rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🔍</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="scout.stats.empty">Noch keine Daten</h2>
-    <p style="color:var(--text-muted);">Scout-Berichte als Text in Discord-Scout-Channels einfügen.<br>Der Bot erkennt Travian-Report-Formate automatisch.</p>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="scout.stats.empty">No data yet</h2>
+    <p style="color:var(--text-muted);">Paste scout reports as text in Discord scout channels.<br>The bot automatically detects Travian report formats.</p>
   </div>
   {% else %}
 
@@ -27,7 +27,7 @@
     </div>
     <div class="card" style="text-align:center;padding:1rem;">
       <div style="font-size:1.8rem;font-weight:800;color:#a855f7;">{{ unique_players }}</div>
-      <div style="font-size:0.8rem;color:var(--text-muted);">Gespielte Spieler</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);">Gespielte Player</div>
     </div>
     <div class="card" style="text-align:center;padding:1rem;">
       <div style="font-size:1.8rem;font-weight:800;color:#22c55e;">{{ stats[0].scout_count if stats else 0 }}</div>
@@ -37,17 +37,17 @@
 
   <!-- Player table -->
   <div class="card">
-    <h2 style="margin:0 0 1rem;" data-i18n="scout.stats.players">Spieler-Übersicht</h2>
+    <h2 style="margin:0 0 1rem;" data-i18n="scout.stats.players">Player-Overview</h2>
     <table class="table">
       <thead>
         <tr>
           <th>#</th>
-          <th data-i18n="scout.stats.th.player">Spieler</th>
+          <th data-i18n="scout.stats.th.player">Player</th>
           <th data-i18n="scout.stats.th.coords">Koordinaten</th>
           <th data-i18n="scout.stats.th.scouts">Scouts</th>
           <th data-i18n="scout.stats.th.last_scouted">Zuletzt gescautet</th>
           <th data-i18n="scout.stats.th.troops">Truppen (letzte Meldung)</th>
-          <th data-i18n="scout.stats.th.resources">Ressourcen (letzte)</th>
+          <th data-i18n="scout.stats.th.resources">Resources (letzte)</th>
         </tr>
       </thead>
       <tbody>

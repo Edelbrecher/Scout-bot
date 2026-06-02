@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Inaktive Suche · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Inaktive Search · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1300px;">
@@ -16,8 +16,8 @@
       </h1>
       <p class="subtitle" style="margin:0;">
         {% if snap_count == 0 %}⚠️ Kein Snapshot vorhanden — erst Snapshot holen
-        {% elif snap_count == 1 %}⚠️ Nur 1 Snapshot — für Aktivitätserkennung sind mind. 2 nötig
-        {% else %}{{ snap_count }} Snapshots verfügbar · {% if result.snap_dates %}letzter: {{ result.snap_dates[0][:10] }}{% endif %}
+        {% elif snap_count == 1 %}⚠️ Only 1 snapshot — at least 2 are needed for activity detection
+        {% else %}{{ snap_count }} snapshots available · {% if result.snap_dates %}latest: {{ result.snap_dates[0][:10] }}{% endif %}
         {% endif %}
       </p>
     </div>
@@ -46,7 +46,7 @@
           </div>
         </div>
         <div class="form-group" style="margin:0;">
-          <label>Max. Bevölkerungs-Zunahme
+          <label>Max. Populations-Zunahme
             <span class="hint" style="margin:0;">(0 = komplett inaktiv)</span>
           </label>
           <select name="max_pop_increase" class="form-control">
@@ -56,7 +56,7 @@
           </select>
         </div>
         <div class="form-group" style="margin:0;">
-          <label>Travian-Welt</label>
+          <label>Travian world</label>
           <div style="padding:0.45rem 0.65rem;background:var(--bg-main);border:1px solid var(--border);
                       border-radius:6px;font-size:0.875rem;color:var(--text-muted);">
             {{ tw_world | replace('https://','') if tw_world else '— nicht konfiguriert —' }}
@@ -68,7 +68,7 @@
       <div class="form-group" style="margin:0 0 0.75rem;">
         <label style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.35rem;display:block;">Volk</label>
         <div style="display:flex;flex-wrap:wrap;gap:0.4rem;" id="tribeChips">
-          {% set tribe_defs = [(1,'🦅 Römer'),(2,'⚔️ Teutonen'),(3,'🛡️ Gallier'),(5,'🌊 Hunnen'),(6,'🌙 Ägypter'),(7,'⚡ Spartaner')] %}
+          {% set tribe_defs = [(1,'🦅 Romans'),(2,'⚔️ Teutons'),(3,'🛡️ Gauls'),(5,'🌊 Huns'),(6,'🌙 Egyptians'),(7,'⚡ Spartans')] %}
           {% for tid, tlabel in tribe_defs %}
           <label style="cursor:pointer;">
             <input type="checkbox" name="tribes" value="{{ tid }}"
@@ -92,14 +92,14 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
         <!-- Farmlist filter -->
         <div class="form-group" style="margin:0;display:flex;align-items:center;gap:0.5rem;">
-          <label style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">📋 Farmliste</label>
+          <label style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">📋 Farm list</label>
           <select name="in_farmlist" class="form-control" style="width:auto;font-size:0.82rem;">
             <option value="" {% if in_farmlist == '' %}selected{% endif %}>Alle</option>
-            <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>Nicht in Farmliste</option>
-            <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>In Farmliste</option>
+            <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>Nicht in Farm list</option>
+            <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>In Farm list</option>
           </select>
           {% if not has_farmlist %}
-          <span style="font-size:0.75rem;color:var(--text-muted);">(keine Farmlistenanalyse vorhanden)</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">(keine Farm listnanalyse vorhanden)</span>
           {% endif %}
         </div>
 
@@ -137,7 +137,7 @@
           </div>
           <!-- Player pop -->
           <div class="form-group" style="margin:0;">
-            <label>Einwohner Spieler</label>
+            <label>Einwohner Player</label>
             <div style="display:flex;gap:0.4rem;align-items:center;">
               <input type="number" name="min_player_pop" value="{{ min_player_pop if min_player_pop > 0 else '' }}"
                      placeholder="Min" class="form-control" style="width:90px;">
@@ -148,9 +148,9 @@
           </div>
           <!-- Player filter -->
           <div class="form-group" style="margin:0;">
-            <label>Spieler (kommagetrennt)</label>
+            <label>Player (kommagetrennt)</label>
             <input type="text" name="player_filter" value="{{ player_filter }}"
-                   placeholder="Spielername…" class="form-control">
+                   placeholder="Playername…" class="form-control">
           </div>
           <!-- Alliance filter -->
           <div class="form-group" style="margin:0;">
@@ -165,32 +165,32 @@
           </div>
           <!-- Exclude players -->
           <div class="form-group" style="margin:0;">
-            <label>Spieler ausschließen</label>
+            <label>Exclude players</label>
             <input type="text" name="exclude_players" value="{{ exclude_players }}"
-                   placeholder="Spieler1, Spieler2…" class="form-control">
+                   placeholder="Player1, Player2…" class="form-control">
           </div>
           <!-- Exclude alliances -->
           <div class="form-group" style="margin:0;">
-            <label>Allianzen ausschließen</label>
+            <label>Exclude alliances</label>
             <input type="text" name="exclude_alliances" value="{{ exclude_alliances }}"
                    placeholder="Allianz1, Allianz2…" class="form-control">
           </div>
           <!-- Natars -->
           <div class="form-group" style="margin:0;">
-            <label>Natars einschließen</label>
+            <label>Include Natars</label>
             <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem;">
               <input type="checkbox" name="include_natars" value="true"
                      {% if include_natars %}checked{% endif %}
                      style="width:16px;height:16px;">
-              <span style="font-size:0.875rem;">Nataren-Dörfer anzeigen</span>
+              <span style="font-size:0.875rem;">Show Natar villages</span>
             </label>
           </div>
         </div>
       </div>
 
       <div style="display:flex;gap:0.5rem;align-items:center;">
-        <button type="submit" class="btn btn-primary">🔍 Suchen</button>
-        <a href="/guild/{{ guild.guild_id }}/farming/inactive-search" class="btn">Filter löschen</a>
+        <button type="submit" class="btn btn-primary">🔍 Searchn</button>
+        <a href="/guild/{{ guild.guild_id }}/farming/inactive-search" class="btn">Clear filters</a>
         {% if snap_count > 0 %}
         <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">
           {{ snap_count }} Snapshots ·
@@ -215,7 +215,7 @@
           <th onclick="sortResults(1)" style="cursor:pointer;">Distanz ▲</th>
           <th onclick="sortResults(2)" style="cursor:pointer;">Travian-Account</th>
           <th onclick="sortResults(3)" style="cursor:pointer;">Dorf</th>
-          <th style="text-align:center;">📋 Farmliste</th>
+          <th style="text-align:center;">📋 Farm list</th>
           {% for ts in result.snap_dates %}
           <th style="text-align:center;color:var(--text-muted);font-size:0.75rem;">
             {{ ts[5:10] }}
@@ -235,7 +235,7 @@
           <td>
             <div style="font-weight:600;color:var(--text);">{{ v.player_name or '—' }}</div>
             <div style="font-size:0.75rem;color:var(--text-muted);">
-              <span title="Spieler-Bevölkerung">👥 {{ v.player_total_pop }}</span>
+              <span title="Player-Population">👥 {{ v.player_total_pop }}</span>
               {% if v.alliance_name %}
               <span style="margin-left:0.4rem;" title="Allianz">[{{ v.alliance_name }}]</span>
               {% endif %}
@@ -249,7 +249,7 @@
                 [{{ v.x }}|{{ v.y }}]
               </a>
               <a href="{{ tw_world }}/karte.php?x={{ v.x }}&y={{ v.y }}" target="_blank"
-                 title="Karte öffnen"
+                 title="Open map"
                  style="margin-left:0.3rem;text-decoration:none;font-size:0.85rem;">🗺️</a>
               <span style="color:var(--text-muted);margin-left:0.3rem;">
                 👥 {{ v.population }}
@@ -298,7 +298,7 @@
 
   {% if result.total > result.villages | length %}
   <p style="color:var(--text-muted);font-size:0.82rem;margin-top:0.5rem;text-align:center;">
-    Zeige {{ result.villages|length }} von {{ result.total }} Ergebnissen.
+    Zeige {{ result.villages|length }} von {{ result.total }} Resultsn.
     Filter verfeinern um mehr zu sehen.
   </p>
   {% endif %}
@@ -307,9 +307,9 @@
   <div class="card" style="text-align:center;padding:2rem;">
     <p style="color:var(--text-muted);margin:0;">
       {% if snap_count < 2 %}
-      ⚠️ Mindestens 2 Snapshots nötig um Aktivität zu erkennen. Warte ca. 6 Stunden bis zum nächsten automatischen Snapshot.
+      ⚠️ At least 2 snapshots needed to detect activity. Wait approx. 6 hours for the next automatic snapshot.
       {% else %}
-      Keine inaktiven Dörfer mit diesen Filtern gefunden.
+      No inactive villages found with these filters.
       {% endif %}
     </p>
   </div>

@@ -7,42 +7,42 @@
   {% if not group %}
   <div class="card" style="text-align:center;padding:2rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">❌</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.invalid.title">Ungültiger Link</h2>
-    <p style="color:var(--text-muted);">Dieser Einladungslink ist nicht mehr gültig oder wurde erneuert.</p>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.invalid.title">Invalid link</h2>
+    <p style="color:var(--text-muted);">This invitation link is no longer valid or has been renewed.</p>
   </div>
 
   {% elif accepted %}
   <div class="card" style="text-align:center;padding:2rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🎉</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.welcome.title">Willkommen!</h2>
-    <p style="color:var(--text-muted);">Du bist der Allianz <strong>{{ group.ally_name }}</strong> beigetreten.</p>
-    <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Zum Dashboard</a>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.welcome.title">Welcome!</h2>
+    <p style="color:var(--text-muted);">You have joined the alliance <strong>{{ group.ally_name }}</strong>.</p>
+    <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Go to dashboard</a>
   </div>
 
   {% elif request.query_params.get('pending') %}
   <div class="card" style="text-align:center;padding:2rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">⏳</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.pending.title">Anfrage gesendet</h2>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.pending.title">Request sent</h2>
     <p style="color:var(--text-muted);">
-      Dein Travian-Name konnte nicht automatisch verifiziert werden.<br>
-      Ein Allianz-Verwalter muss deinen Beitritt manuell freigeben.
+      Your Travian name could not be automatically verified.<br>
+      An alliance manager must manually approve your join request.
     </p>
-    <p style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;">Du wirst benachrichtigt sobald du freigeschaltet wirst.</p>
+    <p style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;">You will be notified once you are approved.</p>
   </div>
 
   {% elif request.query_params.get('error') == 'own_group' %}
   <div class="card" style="text-align:center;padding:2rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">⚠️</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.own.title">Eigene Allianz</h2>
-    <p style="color:var(--text-muted);">Du kannst nicht deiner eigenen Allianz beitreten.</p>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="allyjoin.own.title">Own alliance</h2>
+    <p style="color:var(--text-muted);">You cannot join your own alliance.</p>
   </div>
 
   {% else %}
   <div class="card">
     <div style="text-align:center;margin-bottom:1.5rem;">
       <div style="font-size:2.5rem;margin-bottom:0.5rem;">🤝</div>
-      <h2 style="margin:0 0 0.25rem;" data-i18n="allyjoin.join.title">Allianz beitreten</h2>
-      <div style="color:var(--text-muted);font-size:0.9rem;">Einladung von <strong>{{ group.owner_username or 'Unbekannt' }}</strong></div>
+      <h2 style="margin:0 0 0.25rem;" data-i18n="allyjoin.join.title">Join alliance</h2>
+      <div style="color:var(--text-muted);font-size:0.9rem;">Invitation from <strong>{{ group.owner_username or 'Unknown' }}</strong></div>
     </div>
 
     <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1.25rem;text-align:center;">
@@ -51,20 +51,20 @@
 
     {% if not session or not session.get('uid') %}
     <div style="text-align:center;color:var(--text-muted);padding:1rem;">
-      <p>Du musst eingeloggt sein um beizutreten.</p>
-      <a href="/auth/discord?next=/ally/join/{{ token }}" class="btn btn-primary">🔐 Mit Discord einloggen</a>
+      <p>You must be logged in to join.</p>
+      <a href="/auth/discord?next=/ally/join/{{ token }}" class="btn btn-primary">🔐 Log in with Discord</a>
     </div>
     {% else %}
     <form method="post" action="/ally/join/{{ token }}">
       <div class="form-group" style="margin-bottom:1rem;">
-        <label style="font-size:0.85rem;font-weight:600;">Dein Travian-Name <span style="color:#f87171;">*</span></label>
+        <label style="font-size:0.85rem;font-weight:600;">Your Travian name <span style="color:#f87171;">*</span></label>
         <input type="text" name="travian_name" placeholder="z.B. Currax" maxlength="80" required
                style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:0.95rem;margin-top:0.3rem;">
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem;">
-          Genau wie in Travian angezeigt. Stimmt dein Name mit der Allianz-Liste überein, wirst du automatisch freigeschaltet.
+          Exactly as shown in Travian. If your name matches the alliance list, you will be automatically approved.
         </div>
       </div>
-      <button type="submit" class="btn btn-primary" style="width:100%;font-size:1rem;padding:0.65rem;" data-i18n="allyjoin.join.btn">🤝 Beitreten</button>
+      <button type="submit" class="btn btn-primary" style="width:100%;font-size:1rem;padding:0.65rem;" data-i18n="allyjoin.join.btn">🤝 Join</button>
     </form>
     {% endif %}
   </div>

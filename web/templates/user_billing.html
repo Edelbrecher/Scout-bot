@@ -108,11 +108,11 @@
   <!-- ── Flash messages ── -->
   {% if error == 'price_not_configured' %}
   <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#f87171;">
-    ⚠️ Stripe-Preis noch nicht konfiguriert. Bitte den Admin kontaktieren.
+    ⚠️ Stripe-Preis noch nicht konfiguriert. Please den Admin kontaktieren.
   </div>
   {% elif error == 'cancelled' %}
   <div style="background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#fcd34d;">
-    Zahlung abgebrochen.
+    Payment abgebrochen.
   </div>
   {% elif error %}
   <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#f87171;">
@@ -132,11 +132,11 @@
     <div style="font-size:2.5rem;">✅</div>
     <div style="flex:1;">
       <div style="font-size:1.15rem;font-weight:700;color:#4ade80;margin-bottom:0.2rem;">
-        {% if sub_status == 'trialing' %}🎁 Testphase aktiv{% else %}Player Pro aktiv{% endif %}
+        {% if sub_status == 'trialing' %}🎁 Trial aktiv{% else %}Player Pro aktiv{% endif %}
       </div>
       <div style="font-size:0.85rem;color:var(--text-muted);">
         Plan: <strong>{{ sub_plan or 'Player Pro' }}</strong>
-        {% if (user_sub or {}).get('expires_at') %} · Verlängerung: {{ (user_sub.expires_at or '')[:10] }}{% endif %}
+        {% if (user_sub or {}).get('expires_at') %} · Renewal: {{ (user_sub.expires_at or '')[:10] }}{% endif %}
       </div>
     </div>
     <form method="post" action="/billing/portal">
@@ -156,17 +156,17 @@
       Player Pro
     </h1>
     <p style="color:#94a3b8;font-size:1rem;max-width:460px;margin:0 auto 2rem;line-height:1.6;">
-      Alle Solo-Features auf einmal — kein Discord-Server nötig.<br>
-      Sofort nutzbar, jederzeit kündbar.
+      All solo features at once — no Discord server needed.<br>
+      Usable immediately, cancel anytime.
     </p>
 
     <!-- Plan Toggle -->
     <div style="display:inline-flex;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:4px;gap:4px;margin-bottom:1.75rem;">
       <button id="btnMonthly" class="plan-btn active" onclick="selectPlan('monthly')">
-        Monatlich &nbsp;<strong>€2,99</strong>
+        Monthly &nbsp;<strong>€2,99</strong>
       </button>
       <button id="btnAnnual" class="plan-btn inactive" onclick="selectPlan('annual')">
-        Jährlich &nbsp;<strong>€23,99</strong>
+        Annual &nbsp;<strong>€23,99</strong>
         <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;">–33%</span>
       </button>
     </div>
@@ -176,11 +176,11 @@
       <input type="hidden" name="tier" value="player_pro">
       <input type="hidden" name="plan" id="planInput" value="monthly">
       <button type="submit" class="checkout-btn">
-        🚀 7 Tage kostenlos testen → dann <span id="priceLabel">€2,99/Monat</span>
+        🚀 7 days free testen → dann <span id="priceLabel">€2,99/Monat</span>
       </button>
     </form>
     <p style="font-size:0.75rem;color:#475569;margin-top:0.85rem;">
-      🔒 Zahlung via Stripe &nbsp;·&nbsp; Keine Bindung &nbsp;·&nbsp; Kreditkarte oder PayPal
+      🔒 Payment via Stripe &nbsp;·&nbsp; Keine Bindung &nbsp;·&nbsp; Credit card oder PayPal
     </p>
     {% else %}
     <p style="color:var(--text-muted);font-size:0.9rem;">Stripe noch nicht konfiguriert.</p>
@@ -199,22 +199,22 @@
   <div class="pp-feature-grid">
 
     {% set features = [
-      ('📊', '#6366f1', 'Mein Account', 'Dörfer & Truppen importieren, Timeline verfolgen', True),
-      ('⚜️', '#f59e0b', 'Farming Intelligence', 'Inaktive Farmen erkennen, Wachstum tracken', True),
-      ('📋', '#f59e0b', 'Farmlist-Analyst', 'Farmlisten einfügen & automatisch auswerten', True),
-      ('🗺️', '#22c55e', 'Einsatzplanung', 'Marschzeit berechnen & Angriffe planen', True),
+      ('📊', '#6366f1', 'My Account', 'Import villages &amp; troops, track timeline', True),
+      ('⚜️', '#f59e0b', 'Farming Intelligence', 'Inactive farms erkennen, Wachstum tracken', True),
+      ('📋', '#f59e0b', 'Farmlist Analyst', 'Paste farm lists &amp; auto-evaluate', True),
+      ('🗺️', '#22c55e', 'Operation planning', 'March time berechnen & Attacke planen', True),
       ('🧭', '#22c55e', 'Karte & Koordinaten', 'Interaktive Weltkarte, Distanzrechner', True),
-      ('🦸', '#a78bfa', 'Heldenaufgaben', 'XP & Ressourcen tracken', True),
-      ('📈', '#38bdf8', 'Statistiken', 'Aktivität & Leistungsauswertung', True),
-      ('🗳️', '#38bdf8', 'Abstimmungen', 'Team-Polls & Terminkoordination', True),
-      ('🌾', '#f59e0b', 'Res-Push', 'Ressourcen-Anfragen verwalten', True),
-      ('⏱️', '#ef4444', 'Timer & Erinnerungen', 'Farmlist-Alarme & Aktions-Timer', True),
-      ('🏘️', '#22c55e', 'Settle-Liste', 'Siedlungskoordination', True),
-      ('📐', '#a78bfa', 'Blueprints', 'Bauanleitungen für alle Völker', True),
-      ('🌾', '#f59e0b', 'Getreidefeld-Rechner', 'ROI-basierte Optimierung', True),
-      ('🔭', '#38bdf8', 'Hero Scout (manuell)', 'Gegner-Helden anlegen & verfolgen', True),
+      ('🦸', '#a78bfa', 'Hero Tasks', 'XP & Resources tracken', True),
+      ('📈', '#38bdf8', 'Statistics', 'Activity &amp; performance evaluation', True),
+      ('🗳️', '#38bdf8', 'Pollen', 'Team-Polls & Terminkoordination', True),
+      ('🌾', '#f59e0b', 'Res-Push', 'Resources-Requests verwalten', True),
+      ('⏱️', '#ef4444', 'Timer & Reminderen', 'Farmlist-Alarme & Aktions-Timer', True),
+      ('🏘️', '#22c55e', 'Settle-Liste', 'Settlementskoordination', True),
+      ('📐', '#a78bfa', 'Blueprints', 'Build guides for all tribes', True),
+      ('🌾', '#f59e0b', 'Grainfeld-Rechner', 'ROI-basierte Optimierung', True),
+      ('🔭', '#38bdf8', 'Hero Scout (manuell)', 'Enemy-Helden anlegen & verfolgen', True),
       ('🧩', '#6366f1', 'Chrome Extension', 'Background Timer & Alarme direkt im Browser', True),
-      ('🤝', '#94a3b8', 'Allianz-Features', 'Mitglieder, Lazarett, Gegner-Kartei', False),
+      ('🤝', '#94a3b8', 'Allianz-Features', 'Members, Hospital, Enemy-Kartei', False),
       ('🤖', '#94a3b8', 'Discord Bot', 'Screenshots, Channel-Benachrichtigungen', False),
     ] %}
 
@@ -244,10 +244,10 @@
     <div style="font-size:1.5rem;">🤖</div>
     <div style="flex:1;">
       <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.15rem;">Auch Discord-Bot & Allianz-Features nutzen?</div>
-      <div style="font-size:0.82rem;color:var(--text-muted);">Mit einem Alliance-Plan bekommst du zusätzlich den Bot, Allianz-Übersichten, Lazarett und mehr.</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);">With an Alliance plan you also get the bot, alliance overviews, hospital and more.</div>
     </div>
     <a href="/dashboard" style="white-space:nowrap;padding:0.5rem 1.1rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.85rem;font-weight:600;">
-      Discord-Server hinzufügen →
+      Add Discord server →
     </a>
   </div>
 

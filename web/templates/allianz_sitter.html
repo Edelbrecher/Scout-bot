@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Allianz-Sitter-Listen · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Alliance-Sitter-Listen · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:900px;">
 
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;">🤝 Allianz-Sitter-Listen</h1>
-    <p class="subtitle" style="margin:0;">Freigegebene Sitter-Daten aller Mitglieder</p>
+    <h1 style="margin:0.25rem 0 0;">🤝 Alliance-Sitter-Listen</h1>
+    <p class="subtitle" style="margin:0;">Freigegebene Sitter-Daten aller Members</p>
   </div>
 
   {% if shared_sitters %}
@@ -43,19 +43,19 @@
         </div>
         {% endif %}
 
-        {# Sittet für 1 #}
+        {# Sitting for 1 #}
         {% if s.sitting1_name and s.sitting1_name != 'None' %}
         <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:.45rem .7rem;">
-          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🏰 Sittet für 1</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🏰 Sitting for 1</div>
           <div style="font-size:.88rem;font-weight:600;">{{ s.sitting1_name }}</div>
           {% if s.sitting1_travian %}<div style="font-size:.73rem;color:var(--text-muted);">{{ s.sitting1_travian }}</div>{% endif %}
         </div>
         {% endif %}
 
-        {# Sittet für 2 #}
+        {# Sitting for 2 #}
         {% if s.sitting2_name and s.sitting2_name != 'None' %}
         <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:.45rem .7rem;">
-          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🏰 Sittet für 2</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.15rem;">🏰 Sitting for 2</div>
           <div style="font-size:.88rem;font-weight:600;">{{ s.sitting2_name }}</div>
           {% if s.sitting2_travian %}<div style="font-size:.73rem;color:var(--text-muted);">{{ s.sitting2_travian }}</div>{% endif %}
         </div>
@@ -81,7 +81,7 @@
     <p style="color:var(--text-muted);">
       Noch kein Mitglied hat Sitter-Daten eingetragen.<br>
       Jeder kann seine Sitter unter <strong>Mein Account → Sitter-Verwaltung</strong> eintragen —
-      sie sind dann automatisch für alle Allianz-Mitglieder sichtbar.
+      they will then automatically be visible to all alliance members.
     </p>
   </div>
   {% endif %}

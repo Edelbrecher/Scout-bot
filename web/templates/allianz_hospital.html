@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Allianz-Lazarett · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Alliance-Hospital · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
 
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-    <h1 style="margin:0.25rem 0 0;" data-i18n="hospital.title">🏥 Allianz-Lazarett</h1>
-    <p class="subtitle" style="margin:0;" data-i18n="hospital.subtitle">Lazarett-Daten aller Mitglieder auf einen Blick</p>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="hospital.title">🏥 Alliance-Hospital</h1>
+    <p class="subtitle" style="margin:0;" data-i18n="hospital.subtitle">Hospital-Daten aller Members auf einen Blick</p>
   </div>
 
   {% if grouped %}
@@ -17,15 +17,15 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(grand_total).replace(",",".") }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.healing">🏥 Truppen in Heilung</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.healing">🏥 Troops in Heilung</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;">{{ grouped | length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.members">👥 Mitglieder</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.members">👥 Members</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;">{{ all_entries | length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.entries">📋 Einträge</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="hospital.kpi.entries">📋 Entries</div>
     </div>
   </div>
 
@@ -36,7 +36,7 @@
       <div>
         <strong style="font-size:1rem;">{{ member.discord_username }}</strong>
         <span style="margin-left:0.75rem;font-size:1.1rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(member.total).replace(",",".") }}</span>
-        <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.3rem;">Truppen</span>
+        <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.3rem;">Troops</span>
       </div>
       <span style="font-size:0.75rem;color:var(--text-muted);">
         Aktualisiert: {{ member.uploaded_at[:16] if member.uploaded_at else '—' }}
@@ -46,7 +46,7 @@
       <table class="table" style="margin:0;">
         <thead>
           <tr>
-            <th data-i18n="hospital.th.village">Dorf</th>
+            <th data-i18n="hospital.th.village">Village</th>
             <th data-i18n="hospital.th.troop">Truppe</th>
             <th style="text-align:right;" data-i18n="hospital.th.count">Anzahl</th>
             <th data-i18n="hospital.th.finish">Fertig um</th>
@@ -70,9 +70,9 @@
   {% else %}
   <div class="card" style="text-align:center;padding:2.5rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🏥</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="hospital.empty.title">Keine Lazarett-Daten vorhanden</h2>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="hospital.empty.title">Keine Hospital-Daten vorhanden</h2>
     <p style="color:var(--text-muted);">
-      Mitglieder können ihre Lazarett-Daten unter
+      Members can upload their hospital data under
       <a href="/guild/{{ guild.guild_id }}/mein-account">Mein Account</a> importieren.
     </p>
   </div>

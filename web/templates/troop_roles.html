@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Truppen-Rollen · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Troop roles · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div style="max-width:900px;margin:0 auto;padding:0 1.25rem 2rem;">
@@ -7,13 +7,13 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild_id }}/my-ally" class="back-link">← My Ally</a>
-      <h1 style="margin:.25rem 0 0;">⚔️ Truppen-Rollen</h1>
+      <h1 style="margin:.25rem 0 0;">⚔️ Troops-Rolen</h1>
       <p style="color:var(--text-muted);font-size:.85rem;margin:.25rem 0 0;">Lege fest wie jede Truppengattung klassifiziert wird. Wirkt sich auf Off/Def/Scout-Scores beim Account-Upload aus.</p>
     </div>
   </div>
 
   {% if flash == "saved" %}
-  <div class="alert alert-success">✅ Truppen-Rollen gespeichert.</div>
+  <div class="alert alert-success">✅ Troop roles gespeichert.</div>
   {% endif %}
 
   <form method="post" action="/guild/{{ guild_id }}/my-ally/troop-roles">
@@ -29,12 +29,12 @@
 
     {# Group troops by faction #}
     {% set factions = [
-      ("Römer",    ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"]),
-      ("Teutonen", ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutonen-Rammbock","Kriegsmaschine","Häuptling","Stammesführer","Siedler","Held"]),
-      ("Gallier",  ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gallier-Rammbock","Gallier-Kata","Siedler","Held"]),
-      ("Ägypter",  ["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Siedler","Held"]),
-      ("Hunnen",   ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Siedler","Held"]),
-      ("Spartaner",["Hoplite","Sentinel","Siedler","Held"]),
+      ("Romans",    ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"]),
+      ("Teutons", ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutons-Rammbock","Kriegsmaschine","Häuptling","Tribeesführer","Siedler","Held"]),
+      ("Gauls",  ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gauls-Rammbock","Gauls-Kata","Siedler","Held"]),
+      ("Egyptians",  ["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Siedler","Held"]),
+      ("Huns",   ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Siedler","Held"]),
+      ("Spartans",["Hoplite","Sentinel","Siedler","Held"]),
     ] %}
 
     {% set seen_troops = namespace(names=[]) %}

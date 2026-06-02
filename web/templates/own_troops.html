@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Eigene Dörfer & Truppen · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Own Villages & Troops · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
 
   <div style="margin-bottom:1.5rem;">
-    <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Angriff-Detection</a>
-    <h1 style="margin:0.25rem 0 0;" data-i18n="troops.title">🏰 Eigene Dörfer &amp; Truppen</h1>
+    <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Attack-Detection</a>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="troops.title">🏰 Own Villages &amp; Troops</h1>
     <p style="color:var(--text-muted); font-size:0.85rem; margin:0.25rem 0 0;">{{ guild.guild_name }}</p>
   </div>
 
   {% set uploaded = request.query_params.get('uploaded') %}
   {% if uploaded %}
   <div class="alert alert-success" style="margin-bottom:1rem;">
-    ✅ {{ uploaded }} Dorf/Dörfer erfolgreich importiert.
+    ✅ {{ uploaded }} village(s) successfully imported.
   </div>
   {% endif %}
 
@@ -21,23 +21,23 @@
   <div class="card" style="margin-bottom:1.5rem;">
     <h2 data-i18n="troops.import.title">📋 Truppendaten importieren</h2>
     <p class="hint">
-      Öffne in Travian die <strong>Truppenübersicht</strong> (Dorf → Truppen → Truppenübersicht),
-      markiere alles (<kbd>Strg+A</kbd>) und kopiere (<kbd>Strg+C</kbd>), dann hier einfügen.
+      Open in Travian the <strong>Troop Overview</strong> (Village → Troops → Troop Overview),
+      select all (<kbd>Ctrl+A</kbd>) and copy (<kbd>Ctrl+C</kbd>), then paste here.
       Die Tabelle wird automatisch erkannt.
     </p>
     <form method="post" action="/guild/{{ guild.guild_id }}/attacks/own-troops">
       <div class="form-group">
-        <label for="troop_text">Truppenübersicht (Einfügen mit Strg+V)</label>
+        <label for="troop_text">Troop overview (paste with Ctrl+V)</label>
         <textarea id="troop_text" name="troop_text" rows="8"
                   placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."
                   style="font-family:monospace; font-size:0.82rem; width:100%; resize:vertical;"></textarea>
       </div>
       <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
-        <button type="submit" class="btn btn-primary">⬆️ Importieren</button>
+        <button type="submit" class="btn btn-primary">⬆️ Import</button>
         {% if own_villages %}
         <form method="post" action="/guild/{{ guild.guild_id }}/attacks/own-troops/clear"
-              onsubmit="return confirm('Alle eigenen Dörfer löschen?')" style="margin:0;">
-          <button type="submit" class="btn btn-danger">🗑 Alle löschen</button>
+              onsubmit="return confirm('Delete all own villages?')" style="margin:0;">
+          <button type="submit" class="btn btn-danger">🗑 Delete all</button>
         </form>
         {% endif %}
       </div>
@@ -71,7 +71,7 @@
     </div>
 
     <div style="background:var(--bg-card); border:1px solid rgba(245,158,11,0.35); border-radius:12px; padding:0.9rem 1.1rem;">
-      <div style="font-size:0.72rem; color:#f59e0b; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🌾 Korn/h</div>
+      <div style="font-size:0.72rem; color:#f59e0b; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🌾 Crop/h</div>
       <div style="font-size:1.7rem; font-weight:900; color:#f59e0b; line-height:1;">{{ "{:,}".format(last.total_crop).replace(",",".") }}</div>
       {% if prev %}{% set d = last.total_crop - prev.total_crop %}
       <div style="font-size:0.78rem; margin-top:.3rem; color:{% if d >= 0 %}#f87171{% else %}#4caf82{% endif %};">
@@ -80,7 +80,7 @@
     </div>
 
     <div style="background:var(--bg-card); border:1px solid rgba(100,116,139,0.3); border-radius:12px; padding:0.9rem 1.1rem;">
-      <div style="font-size:0.72rem; color:var(--text-muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🏘️ Dörfer</div>
+      <div style="font-size:0.72rem; color:var(--text-muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:.3rem;">🏘️ Villages</div>
       <div style="font-size:1.7rem; font-weight:900; color:var(--text); line-height:1;">{{ last.village_count }}</div>
       {% if prev %}{% set d = last.village_count - prev.village_count %}
       {% if d != 0 %}<div style="font-size:0.78rem; margin-top:.3rem; color:{% if d > 0 %}#4caf82{% else %}#f87171{% endif %};">
@@ -92,7 +92,7 @@
   <!-- Charts -->
   <div class="card" style="margin-bottom:1.5rem; padding:1.25rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
-      <h2 style="margin:0; font-size:1rem;" data-i18n="troops.timeline.title">📈 Truppenstärke über Zeit</h2>
+      <h2 style="margin:0; font-size:1rem;" data-i18n="troops.timeline.title">📈 Troop strength over time</h2>
       <div style="display:flex; align-items:center; gap:.75rem;">
         <span style="font-size:0.75rem; color:var(--text-muted);">{{ history | length }} Import{% if history | length != 1 %}e{% endif %}</span>
         {% if own_villages %}
@@ -108,7 +108,7 @@
 
     {% if history | length > 1 %}
     <div style="margin-top:1.25rem; border-top:1px solid var(--border); padding-top:1rem;">
-      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:.6rem; font-weight:600;">⚖️ Off / Def Verhältnis pro Import</div>
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:.6rem; font-weight:600;">⚖️ Off / Def ratio per import</div>
       <div style="position:relative; height:80px;">
         <canvas id="ratioChart"></canvas>
       </div>
@@ -120,8 +120,8 @@
   <!-- Defense Priority -->
   {% if priority_rows %}
   <div class="card" style="margin-bottom:1.5rem; border-color:rgba(239,68,68,0.4);">
-    <h2>🎯 Verteidigungs-Empfehlung</h2>
-    <p class="hint">Angriffe die auf eigene Dörfer in der Datenbank zielen.</p>
+    <h2>🎯 Defenses-Referral</h2>
+    <p class="hint">Attacks targeting own villages in the database.</p>
     <div style="display:flex; flex-direction:column; gap:0.75rem;">
       {% for row in priority_rows %}
       {% set v = row.own_village %}
@@ -174,7 +174,7 @@
   <!-- Villages table -->
   {% if own_villages %}
   <div class="card">
-    <h2><span data-i18n="troops.villages.title">🏘️ Importierte Dörfer</span> ({{ own_villages | length }})</h2>
+    <h2><span data-i18n="troops.villages.title">🏘️ Imported Villages</span> ({{ own_villages | length }})</h2>
     <div style="overflow-x:auto;">
       <table class="table">
         <thead>
@@ -186,7 +186,7 @@
             <th style="text-align:right;">Def</th>
             <th style="text-align:right;">🌾 Korn</th>
             <th style="min-width:200px;" data-i18n="account.th.troops">Truppenverteilung</th>
-            <th style="color:var(--text-muted); font-size:0.8rem;" data-i18n="account.th.imported">Importiert</th>
+            <th style="color:var(--text-muted); font-size:0.8rem;" data-i18n="account.th.imported">Imported</th>
           </tr>
         </thead>
         <tbody>
@@ -254,7 +254,7 @@
   </div>
   {% else %}
   <div class="card">
-    <p class="empty" data-i18n="account.empty.hint">Noch keine eigenen Dörfer importiert. Nutze das Formular oben.</p>
+    <p class="empty" data-i18n="account.empty.hint">No own villages imported yet. Use the form above.</p>
   </div>
   {% endif %}
 
@@ -335,7 +335,7 @@
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
       <div>
         <h2 style="margin:0; font-size:1.1rem;">🪖 Army Details</h2>
-        <p style="margin:.2rem 0 0; font-size:.78rem; color:var(--text-muted);">Aufschlüsselung aller importierten Truppen</p>
+        <p style="margin:.2rem 0 0; font-size:.78rem; color:var(--text-muted);">Breakdown of all imported troops</p>
       </div>
       <button onclick="closeArmyModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer; line-height:1; padding:.25rem .4rem;">&times;</button>
     </div>
@@ -350,7 +350,7 @@ const OWN_VILLAGES = {{ own_villages | tojson }};
 const INFANTRY = new Set([
   'Legionär','Prätorianer','Imperianer','Senator','Siedler',
   'Keulenschwinger','Speerkämpfer','Axtkämpfer','Häuptling',
-  'Phalanx','Schwertkämpfer','Stammesältester',
+  'Phalanx','Schwertkämpfer','Tribeesältester',
   'Schleuderer','Khopesh-Krieger','Soldat','Lanzenkämpfer','Hoplite','Sentinel',
 ]);
 const CAVALRY = new Set([
@@ -362,8 +362,8 @@ const CAVALRY = new Set([
 ]);
 const SIEGE = new Set([
   'Rammbock','Feuerkatapult',
-  'Teutonen-Rammbock','Kriegsmaschine',
-  'Gallier-Rammbock','Gallier-Kata',
+  'Teutons-Rammbock','Kriegsmaschine',
+  'Gauls-Rammbock','Gauls-Kata',
 ]);
 const OFF_TROOPS = new Set([
   'Imperianer','Equites Imperatoris','Equites Caesaris',
@@ -377,9 +377,9 @@ const CROP_COST = {
   'Legionär':1,'Prätorianer':1,'Imperianer':1,'Equites Legati':2,'Equites Imperatoris':3,
   'Equites Caesaris':4,'Rammbock':5,'Feuerkatapult':6,'Senator':5,
   'Keulenschwinger':1,'Speerkämpfer':1,'Axtkämpfer':1,'Späher':1,'Paladin':2,
-  'Teut. Ritter':3,'Teutonen-Rammbock':5,'Kriegsmaschine':6,'Häuptling':4,
+  'Teut. Ritter':3,'Teutons-Rammbock':5,'Kriegsmaschine':6,'Häuptling':4,
   'Phalanx':1,'Schwertkämpfer':1,'Pathfinder':2,'Theutates-Blitz':2,
-  'Druidentreiter':2,'Haeduer':3,'Gallier-Rammbock':5,'Gallier-Kata':6,'Stammesältester':5,
+  'Druidentreiter':2,'Haeduer':3,'Gauls-Rammbock':5,'Gauls-Kata':6,'Tribeesältester':5,
   'Siedler':1,'Held':0,
 };
 
@@ -460,7 +460,7 @@ function buildArmyModal() {
         <div style="font-size:1.25rem;font-weight:800;color:#22c55e;">${totalDef.toLocaleString('de-DE')}</div>
       </div>
       <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:.65rem .85rem;">
-        <div style="font-size:.7rem;color:#f59e0b;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">🌾 Korn/h</div>
+        <div style="font-size:.7rem;color:#f59e0b;font-weight:600;text-transform:uppercase;margin-bottom:.2rem;">🌾 Crop/h</div>
         <div style="font-size:1.25rem;font-weight:800;color:#f59e0b;">${totalCrop.toLocaleString('de-DE')}</div>
       </div>
       <div style="background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.3);border-radius:8px;padding:.65rem .85rem;">
@@ -481,7 +481,7 @@ function buildArmyModal() {
 
   document.getElementById('armyModalContent').innerHTML =
     summary +
-    renderSection('Fußvolk', '🚶', '#3b82f6', infantry) +
+    renderSection('Infantry', '🚶', '#3b82f6', infantry) +
     renderSection('Kavallerie', '🐴', '#f59e0b', cavalry) +
     renderSection('Belagerung', '🏹', '#ef4444', siege) +
     (Object.keys(other).length ? renderSection('Weitere', '⚔️', '#94a3b8', other) : '');
@@ -562,7 +562,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeArmyMod
             pointBorderWidth: 2,
           },
           {
-            label: '🌾 Korn/h',
+            label: '🌾 Crop/h',
             data: history.map(h => h.total_crop),
             borderColor: '#f59e0b',
             backgroundColor: 'transparent',

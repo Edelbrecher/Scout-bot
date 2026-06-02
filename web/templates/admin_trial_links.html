@@ -9,11 +9,11 @@
     <div style="width:180px; flex-shrink:0;">
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
         <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
-        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📊 Übersicht</a>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📊 Overview</a>
         <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">👥 Kunden</a>
         <a href="/admin/servers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🖥 Server</a>
         <a href="/admin/trial-links" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">🔑 Trial-Links</a>
-        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🎟 Rabattcodes</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🎟 Discountcodes</a>
         <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">💬 Popup</a>
         <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🍪 Einwilligungen</a>
         <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📈 Statistik</a>
@@ -49,7 +49,7 @@
               <th style="padding:0.65rem 1rem;text-align:left;color:var(--text-muted);font-weight:600;">Erstellt von</th>
               <th style="padding:0.65rem 1rem;text-align:left;color:var(--text-muted);font-weight:600;">Erstellt am</th>
               <th style="padding:0.65rem 1rem;text-align:left;color:var(--text-muted);font-weight:600;">Status</th>
-              <th style="padding:0.65rem 1rem;text-align:left;color:var(--text-muted);font-weight:600;">Aktiviert für</th>
+              <th style="padding:0.65rem 1rem;text-align:left;color:var(--text-muted);font-weight:600;">Activated for</th>
             </tr>
           </thead>
           <tbody>
@@ -62,7 +62,7 @@
               <td style="padding:0.65rem 1rem;color:var(--text-muted);">{{ link.created_at[:10] if link.created_at else '–' }}</td>
               <td style="padding:0.65rem 1rem;">
                 {% if link.activated_guild_id %}
-                  <span style="background:rgba(34,197,94,0.12);color:#4ade80;padding:0.2rem 0.55rem;border-radius:6px;font-size:0.78rem;">✓ Eingelöst</span>
+                  <span style="background:rgba(34,197,94,0.12);color:#4ade80;padding:0.2rem 0.55rem;border-radius:6px;font-size:0.78rem;">✓ Redeemed</span>
                 {% else %}
                   <span style="background:rgba(245,158,11,0.12);color:#fbbf24;padding:0.2rem 0.55rem;border-radius:6px;font-size:0.78rem;">⏳ Offen</span>
                 {% endif %}
@@ -79,7 +79,7 @@
       </div>
 
       <p style="font-size:0.8rem;color:var(--text-muted);margin-top:1rem;">
-        Jeder Link kann nur einmal eingelöst werden. Der Nutzer erhält 14 Tage vollen Pro-Zugang auf seinem Workspace. Nach Ablauf wird automatisch auf Free zurückgesetzt.
+        Each link can only be redeemed once. The user receives 14 days full Pro access on their workspace. After expiry, it automatically resets to Free.
       </p>
     </div>
   </div>

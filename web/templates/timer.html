@@ -6,7 +6,7 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 data-i18n="timer.title">⏱️ Timer & Erinnerungen</h1>
+      <h1 data-i18n="timer.title">⏱️ Timer & Reminderen</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
     <button id="btnSound" class="btn btn-secondary" title="Sound an/aus" data-i18n="timer.sound.on">🔔 Sound an</button>
@@ -15,15 +15,15 @@
   <!-- ── Travian Profil ── -->
   <div class="card" style="margin-bottom:1rem;">
     <h2 style="margin-top:0;" data-i18n="timer.profile.title">🏰 Mein Travian-Profil</h2>
-    <p class="hint">Wird lokal gespeichert. Ermöglicht direkte Links zu deinem Versammlungsplatz.</p>
+    <p class="hint">Stored locally. Enables direct links to your rally point.</p>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
       <div class="form-group" style="margin:0;">
-        <label>Travian-Name</label>
+        <label>Travian name</label>
         <input type="text" id="travianName" placeholder="z.B. MaxMuster" maxlength="40"
           style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
       <div class="form-group" style="margin:0;">
-        <label>Server-URL</label>
+        <label>Server URL</label>
         <input type="url" id="travianWorld" placeholder="https://ts2.x1.europe.travian.com"
           style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
@@ -33,7 +33,7 @@
       <span id="profileLink" style="display:none;">
         <a id="rallyLink" href="#" target="_blank" class="btn btn-secondary">⚔️ Zum Versammlungsplatz</a>
       </span>
-      <span id="profileSaved" style="color:#4caf82; font-size:0.85rem; display:none;">✅ Gespeichert</span>
+      <span id="profileSaved" style="color:#4caf82; font-size:0.85rem; display:none;">✅ Saved</span>
     </div>
   </div>
 
@@ -41,7 +41,7 @@
   <div class="card" style="margin-bottom:1rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
       <h2 style="margin:0;" data-i18n="timer.farmlist.title">🌾 Farmlist-Timer</h2>
-      <span class="badge badge-warn" id="farmBadge" style="font-size:0.85rem; display:none;">⏳ läuft</span>
+      <span class="badge badge-warn" id="farmBadge" style="font-size:0.85rem; display:none;">⏳ running</span>
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:0.75rem; align-items:end; flex-wrap:wrap;">
@@ -63,7 +63,7 @@
 
     <div id="farmDisplay" style="display:none; margin-top:1.25rem; text-align:center;">
       <div id="farmCountdown" style="font-size:3.5rem; font-weight:800; font-family:monospace; color:var(--text); line-height:1;">00:00</div>
-      <div style="color:var(--text-muted); font-size:0.85rem; margin-top:0.25rem;">bis zur nächsten Farmliste</div>
+      <div style="color:var(--text-muted); font-size:0.85rem; margin-top:0.25rem;">until next farm list</div>
       <div style="background:var(--border); border-radius:4px; height:6px; margin-top:0.75rem; overflow:hidden;">
         <div id="farmProgress" style="height:100%; background:#3b82f6; border-radius:4px; transition:width 1s linear; width:100%;"></div>
       </div>
@@ -73,10 +73,10 @@
     </div>
   </div>
 
-  <!-- ── Erinnerungen ── -->
+  <!-- ── Reminderen ── -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;" data-i18n="timer.reminders.title">🔔 Erinnerungen</h2>
-    <p class="hint">Trage Datum und Uhrzeit ein, wann du erinnert werden möchtest — z.B. wenn Truppen ankommen oder ein Gebäude fertig ist.</p>
+    <h2 style="margin-top:0;" data-i18n="timer.reminders.title">🔔 Reminderen</h2>
+    <p class="hint">Enter the date and time when you want to be reminded — e.g. when troops arrive or a building is done.</p>
 
     <form id="addTimerForm" style="display:grid; grid-template-columns:2fr 1fr auto auto; gap:0.75rem; align-items:end; margin-bottom:1.25rem; flex-wrap:wrap;">
       <div class="form-group" style="margin:0;">
@@ -97,11 +97,11 @@
           <option value="1">Ja</option>
         </select>
       </div>
-      <button type="submit" class="btn btn-primary" style="white-space:nowrap; margin-bottom:0;" data-i18n="timer.add.btn">+ Hinzufügen</button>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap; margin-bottom:0;" data-i18n="timer.add.btn">+ Add</button>
     </form>
 
     <div id="timerList" style="display:flex; flex-direction:column; gap:0.6rem;">
-      <p class="empty" id="timerEmpty">Noch keine Erinnerungen. Füge oben eine hinzu.</p>
+      <p class="empty" id="timerEmpty">No reminders yet. Add one above.</p>
     </div>
   </div>
 
@@ -112,7 +112,7 @@
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <button class="btn btn-secondary" onclick="playBeep('warn')">⚠️ Warnton (30 s vorher)</button>
       <button class="btn btn-secondary" onclick="playBeep('alert')">🔔 Farmlist-Alert</button>
-      <button class="btn btn-secondary" onclick="playBeep('done')">✅ Erinnerung fällig</button>
+      <button class="btn btn-secondary" onclick="playBeep('done')">✅ Reminder due</button>
     </div>
   </div>
 </div>
@@ -284,7 +284,7 @@ function farmTick() {
   }
   if (left <= 0) {
     playBeep('alert');
-    showNotification('🌾 Farmlist jetzt!', 'Zeit, die Farmliste zu schicken!');
+    showNotification('🌾 Farmlist jetzt!', 'Zeit, die Farm list zu schicken!');
     farmCountdown.style.color = '#e05555';
     setTimeout(() => { if (farmTimer) startFarm(); }, 1500);
   }
@@ -343,7 +343,7 @@ function renderReminders() {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
-    const leftStr = done ? 'Fällig!' : h > 0
+    const leftStr = done ? 'Due!' : h > 0
       ? `${pad(h)}:${pad(m)}:${pad(s)}`
       : `${pad(m)}:${pad(s)}`;
 
@@ -404,12 +404,12 @@ function loadReminders() {
 document.getElementById('addTimerForm').addEventListener('submit', e => {
   e.preventDefault();
   getAudioCtx();
-  const label = document.getElementById('timerLabel').value.trim() || 'Erinnerung';
+  const label = document.getElementById('timerLabel').value.trim() || 'Reminder';
   const atVal = document.getElementById('timerAt').value;
   if (!atVal) return;
   const at = new Date(atVal).getTime();
   if (isNaN(at) || at <= Date.now()) {
-    alert('Bitte einen Zeitpunkt in der Zukunft wählen.');
+    alert('Please select a time in the future.');
     return;
   }
   const rally = document.getElementById('timerRally').value === '1';
@@ -433,7 +433,7 @@ setInterval(() => {
     if (!r.warnFired && left <= 30000 && left > 0) {
       r.warnFired = true;
       playBeep('warn');
-      showNotification(`⚠️ ${r.label}`, 'Erinnerung in 30 Sekunden!');
+      showNotification(`⚠️ ${r.label}`, 'Reminder in 30 Sekunden!');
     }
     if (left <= 0 && !r.done) {
       r.done = true;

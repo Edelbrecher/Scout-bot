@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Pläne & Preise · TravOps{% endblock %}
+{% block title %}Plans & Pricing · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -160,10 +160,10 @@
   <!-- Flash -->
   {% if cancelled %}
   <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;text-align:center;">
-    ✅ Dein Abo wurde gekündigt und läuft bis zum Ende der Periode weiter.
+    ✅ Your subscription has been cancelled and will continue until the end of the period.
   </div>
   {% elif error == 'cancelled' %}
-  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">❌ Zahlung abgebrochen.</div>
+  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">❌ Payment abgebrochen.</div>
   {% elif error %}
   <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">⚠️ {{ error }}</div>
   {% endif %}
@@ -174,11 +174,11 @@
   <div style="margin:1rem auto 0;max-width:640px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:0.85rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
     <div>
       <span style="color:#4ade80;font-weight:700;">✅ Aktives Abo:</span>
-      <span style="color:var(--text-muted);margin-left:0.5rem;">{{ active_plan_label }} · {{ 'Jährlich' if 'annual' in (user_sub.plan or '') else 'Monatlich' }}</span>
+      <span style="color:var(--text-muted);margin-left:0.5rem;">{{ active_plan_label }} · {{ 'Annual' if 'annual' in (user_sub.plan or '') else 'Monthly' }}</span>
       {% if user_sub.expires_at %}<span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.5rem;">bis {{ user_sub.expires_at[:10] }}</span>{% endif %}
     </div>
-    <form method="post" action="/plans/cancel" onsubmit="return confirm('Abo wirklich kündigen?')">
-      <button type="submit" class="btn btn-danger" style="font-size:0.82rem;padding:0.3rem 0.75rem;">❌ Kündigen</button>
+    <form method="post" action="/plans/cancel" onsubmit="return confirm('Really cancel subscription?')">
+      <button type="submit" class="btn btn-danger" style="font-size:0.82rem;padding:0.3rem 0.75rem;">❌ Cancel</button>
     </form>
   </div>
   {% endif %}
@@ -188,14 +188,14 @@
     <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:0.25rem 0.9rem;font-size:0.75rem;color:#fbbf24;font-weight:700;margin-bottom:0.9rem;">
       ⚔️ TRAVOPS PRO
     </div>
-    <h1 data-i18n="plans.title">Wähle deinen Plan</h1>
+    <h1 data-i18n="plans.title">Choose your plan</h1>
     <p style="color:var(--text-muted);font-size:0.95rem;max-width:500px;margin:0 auto 1.75rem;line-height:1.6;">
-      Starte mit <strong style="color:#4ade80;">7 Tagen kostenlos</strong> — keine Kreditkarte bis zum Ende der Testphase nötig.
+      Start with <strong style="color:#4ade80;">7 days free</strong> — no credit card until the end of the trial.
     </p>
     <div class="billing-toggle">
-      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">Monatlich</button>
+      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">Monthly</button>
       <button id="btnAnnual"  onclick="setBilling('annual')"  class="toggle-btn" style="background:transparent;color:var(--text-muted);display:flex;align-items:center;gap:0.4rem;">
-        Jährlich <span style="background:#22c55e;color:#000;font-size:0.62rem;font-weight:800;padding:1px 7px;border-radius:7px;">~33% GÜNSTIGER</span>
+        Annual <span style="background:#22c55e;color:#000;font-size:0.62rem;font-weight:800;padding:1px 7px;border-radius:7px;">~33% CHEAPER</span>
       </button>
     </div>
   </div>
@@ -209,20 +209,20 @@
   <div class="pp-hero-card">
     <!-- Left: info -->
     <div>
-      <div class="pp-solo-badge">⚔️ SOLO · KEIN DISCORD-SERVER NÖTIG</div>
+      <div class="pp-solo-badge">⚔️ SOLO · NO DISCORD SERVER NEEDED</div>
       <div style="font-size:1.7rem;font-weight:900;color:#c4b5fd;margin-bottom:0.15rem;">Player Pro</div>
       <div style="font-size:0.85rem;color:#94a3b8;max-width:360px;line-height:1.5;">
-        Alle persönlichen Features auf einmal — sofort nutzbar, jederzeit kündbar.
+        All personal features at once — usable immediately, cancel anytime.
       </div>
       <div class="pp-feat-chips">
         <span class="pp-chip">📊 Mein Account</span>
         <span class="pp-chip">⚜️ Farming Intelligence</span>
         <span class="pp-chip">📋 Farmlist-Analyst</span>
-        <span class="pp-chip">🗺️ Einsatzplanung</span>
+        <span class="pp-chip">🗺️ Operation planning</span>
         <span class="pp-chip">⏱️ Timer & Alarme</span>
         <span class="pp-chip">📐 Blueprints</span>
         <span class="pp-chip">🧩 Chrome Extension</span>
-        <span class="pp-chip">📈 Statistiken</span>
+        <span class="pp-chip">📈 Statistics</span>
       </div>
     </div>
 
@@ -250,10 +250,10 @@
       <form method="post" action="/plans/checkout" style="width:100%;">
         <input type="hidden" name="tier" value="player_pro">
         <input type="hidden" class="input-plan" name="plan" value="monthly">
-        <button type="submit" class="pp-cta-btn">🚀 7 Tage kostenlos testen</button>
+        <button type="submit" class="pp-cta-btn">🚀 7 days free testen</button>
       </form>
       {% endif %}
-      <div style="font-size:0.72rem;color:#475569;text-align:center;">Keine Bindung · Kreditkarte oder PayPal</div>
+      <div style="font-size:0.72rem;color:#475569;text-align:center;">Keine Bindung · Credit card oder PayPal</div>
     </div>
   </div>
 
@@ -265,29 +265,29 @@
 
   <div class="tier-grid">
     {% set tiers = [
-      ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, '1 Server · Für einzelne Gilden', False, [
-        ('🔭','Scout-System','Späh-Berichte & Bot'),
-        ('🌾','Res-Push','Ressourcen-Anfragen'),
-        ('🗺️','Einsatzplanung',''),
-        ('⚜️','Farming Intel','Inaktive Farmen'),
-        ('🚨','Angriff-Detection',''),
+      ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, '1 Server · For individual guilds', False, [
+        ('🔭','Scout system','Scout reports &amp; bot'),
+        ('🌾','Res-Push','Resources-Requests'),
+        ('🗺️','Operation planning',''),
+        ('⚜️','Farming Intel','Inactive farms'),
+        ('🚨','Attack-Detection',''),
         ('🤖','Discord Bot',''),
       ]),
-      ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, '2 Server · Für aktive Gilden', True, [
+      ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, '2 Servers · For active guilds', True, [
         ('✅','Alles aus Starter',''),
         ('🏰','2 Discord-Server','Mehrere Welten'),
-        ('🤝','Allianz-Übersicht','Mitglieder & Aktivität'),
-        ('⚡','Prioritäts-Support',''),
+        ('🤝','Alliance overview','Members &amp; activity'),
+        ('⚡','Priority support',''),
       ]),
-      ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99,'3 Server · Für Allianzen', False, [
+      ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99,'3 Servers · For alliances', False, [
         ('✅','Alles aus Clan',''),
         ('🌐','3 Discord-Server',''),
-        ('📊','Erweiterte Statistiken',''),
+        ('📊','Erweiterte Statistics',''),
       ]),
-      ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99,'5 Server · Für Communities', False, [
+      ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99,'5 Servers · For communities', False, [
         ('✅','Alles aus Alliance',''),
         ('🏛️','5 Discord-Server',''),
-        ('🎯','Dedicated Support','Direkter Kontakt'),
+        ('🎯','Dedicated Support','Direkter Contact'),
       ]),
     ] %}
 
@@ -344,10 +344,10 @@
 
   <!-- Trust -->
   <div class="trust-row">
-    <span>🔒 Zahlung via Stripe</span>
-    <span>🎟️ Gutschein beim Checkout einlösbar</span>
-    <span>↩️ Jederzeit kündbar</span>
-    <span>🎁 7 Tage gratis — keine Kreditkarte nötig</span>
+    <span>🔒 Payment via Stripe</span>
+    <span>🎟️ Voucher redeemable at checkout</span>
+    <span>↩️ Cancel anytime</span>
+    <span>🎁 7 days free — no credit card needed</span>
   </div>
 
   <div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin-bottom:2.5rem;">

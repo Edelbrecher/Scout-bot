@@ -5,21 +5,21 @@
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link" style="margin:0;">← {{ guild.guild_name }}</a>
     <a href="/guild/{{ guild.guild_id }}/map/sector-monitor" class="btn btn-secondary" style="font-size:0.82rem;">
-      📡 Sektor-Überwachung
+      📡 Sector-Monitoring
     </a>
   </div>
   <h1 style="margin:.5rem 0 .25rem;" data-i18n="worldsettings.title">🌍 World / Server</h1>
-  <p class="subtitle" style="margin:0 0 1.5rem;" data-i18n="worldsettings.subtitle">Travian-Server-URL und Bot-Einstellungen</p>
+  <p class="subtitle" style="margin:0 0 1.5rem;" data-i18n="worldsettings.subtitle">Travian server URL und Bot-Settings</p>
 
   {% if saved %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Einstellungen gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Settings gespeichert.</div>
   {% endif %}
 
   {# ── Live Serverzeit ── #}
   {% set utc_offset = guild.server_utc_offset if guild.server_utc_offset is not none else 60 %}
   <div class="card" style="padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
     <div>
-      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.2rem;">🕐 Aktuelle Travian-Serverzeit</div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.2rem;">🕐 Aktuelle Travian serverzeit</div>
       <div id="serverClock" style="font-size:1.8rem;font-weight:800;letter-spacing:.04em;font-family:monospace;color:#f1f5f9;">--:--:--</div>
       <div id="serverDate" style="font-size:.78rem;color:var(--text-muted);margin-top:.1rem;"></div>
     </div>
@@ -29,14 +29,14 @@
         {{ "UTC+%d" % (utc_offset // 60) if utc_offset >= 0 else "UTC%d" % (utc_offset // 60) }}
         ({% if utc_offset % 60 != 0 %}{{ "%+.1f" % (utc_offset / 60) }} h{% else %}{{ "%+d" % (utc_offset // 60) }} h{% endif %})
       </div>
-      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;">gegenüber UTC</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;">relative to UTC</div>
     </div>
   </div>
 
   {# ── Server URL ── #}
   <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
     <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Travian World URL</h3>
-    <p class="hint" style="margin-bottom:1rem;">Diese URL wird für Karten-Snapshots, Farming-Analyse und alle Deep-Links benötigt.</p>
+    <p class="hint" style="margin-bottom:1rem;">This URL is required for map snapshots, farming analysis and all deep links.</p>
     <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
       <div class="form-group" style="margin:0;flex:1;min-width:260px;">
         <label>Travian World URL</label>
@@ -84,16 +84,16 @@
 
   {# ── Serverzeit / Timezone ── #}
   <div class="card" style="padding:1.5rem;margin-bottom:1rem;" id="timezoneCard" data-tour="timezone">
-    <h3 style="margin:0 0 .5rem;font-size:.95rem;">⏰ Travian-Serverzeit</h3>
+    <h3 style="margin:0 0 .5rem;font-size:.95rem;">⏰ Travian serverzeit</h3>
     <p class="hint" style="margin-bottom:1rem;">
-      Alle Zeiten in TravOps (Einsatzplanung, Einschlagszeiten, Angriffserkennung) basieren auf dieser Zeitzone.
-      Travian-Server in Europa laufen typischerweise auf <strong>UTC+1 (CET)</strong> oder <strong>UTC+2 (CEST)</strong>.
+      Alle Zeiten in TravOps (Operation planning, Landing timeen, Attackserkennung) basieren auf dieser Zeitzone.
+      Travian server in Europa laufen typischerweise auf <strong>UTC+1 (CET)</strong> oder <strong>UTC+2 (CEST)</strong>.
     </p>
 
     <div id="tzSuggestion" style="display:none;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;">
       <div style="font-size:.82rem;color:#fbbf24;">
-        💡 <strong>Vorschlag:</strong> Basierend auf der Server-URL: <span id="tzSuggestionText"></span>
-        <button type="button" onclick="applyTzSuggestion()" style="margin-left:.5rem;font-size:.78rem;background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);color:#fbbf24;border-radius:6px;padding:2px 8px;cursor:pointer;">Übernehmen</button>
+        💡 <strong>Vorschlag:</strong> Basierend auf der Server URL: <span id="tzSuggestionText"></span>
+        <button type="button" onclick="applyTzSuggestion()" style="margin-left:.5rem;font-size:.78rem;background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);color:#fbbf24;border-radius:6px;padding:2px 8px;cursor:pointer;">Apply</button>
       </div>
     </div>
 
@@ -108,7 +108,7 @@
           <option value="0"    {% if utc_offset == 0    %}selected{% endif %}>UTC±0 (0 min) — z.B. UK, Portugal</option>
           <option value="60"   {% if utc_offset == 60   %}selected{% endif %}>UTC+1 (60 min) — Europa (CET) ⭐</option>
           <option value="120"  {% if utc_offset == 120  %}selected{% endif %}>UTC+2 (120 min) — Europa Sommer (CEST) ⭐</option>
-          <option value="180"  {% if utc_offset == 180  %}selected{% endif %}>UTC+3 (180 min) — Türkei, Arabien</option>
+          <option value="180"  {% if utc_offset == 180  %}selected{% endif %}>UTC+3 (180 min) — Turkey, Arabia</option>
           <option value="240"  {% if utc_offset == 240  %}selected{% endif %}>UTC+4 (240 min)</option>
           <option value="300"  {% if utc_offset == 300  %}selected{% endif %}>UTC+5 (300 min)</option>
           <option value="360"  {% if utc_offset == 360  %}selected{% endif %}>UTC+6 (360 min)</option>
@@ -127,20 +127,20 @@
     </form>
 
     <div id="tzPreview" style="margin-top:.75rem;font-size:.82rem;color:var(--text-muted);">
-      Vorschau: Aktuelle Serverzeit wäre <strong id="tzPreviewTime" style="color:#93c5fd;"></strong>
+      Preview: Current server time would be <strong id="tzPreviewTime" style="color:#93c5fd;"></strong>
     </div>
   </div>
 
   {% if guild.workspace_type != 'personal' %}
   <div class="card" style="padding:1.5rem;">
-    <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Bot-Sprache</h3>
+    <h3 style="margin:0 0 1rem;font-size:.95rem;">🌐 Bot language</h3>
     <form method="post" action="/guild/{{ guild.guild_id }}" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
       <input type="hidden" name="category_id" value="{{ guild.category_id or '' }}">
       <input type="hidden" name="archive_channel_id" value="{{ guild.archive_channel_id or '' }}">
       <input type="hidden" name="allowed_role_ids" value="{{ guild.allowed_role_ids or '' }}">
       <input type="hidden" name="scout_channel_id" value="{{ guild.scout_channel_id or '' }}">
       <div class="form-group" style="margin:0;min-width:200px;">
-        <label style="font-size:.85rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Bot-Sprache / Bot Language</label>
+        <label style="font-size:.85rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Bot language / Bot Language</label>
         <select name="bot_language" style="background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:.9rem;width:100%;">
           <option value="de" {% if (guild.bot_language or 'de') == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
           <option value="en" {% if guild.bot_language == 'en' %}selected{% endif %}>🇬🇧 English</option>

@@ -32,7 +32,7 @@
     <div>
       <a href="/guild/{{ guild.guild_id }}/blueprints" class="back-link">← Blueprints</a>
       <h1>🏘️ Dorf-Layouts</h1>
-      <p class="subtitle">Visuelle Dorfplaner für Ressourcenfelder & Gebäude</p>
+      <p class="subtitle">Visual village planner for resource fields &amp; buildings</p>
     </div>
     <a href="/guild/{{ guild.guild_id }}/blueprints/layouts/new" class="btn btn-primary">＋ Neues Layout</a>
   </div>
@@ -49,7 +49,7 @@
     {% else %}
     <div class="vl-grid">
       {% for l in admin_layouts %}
-      {% set tribe_info = tribe_meta.get(l.tribe, {'color':'#888','emoji':'?','label':l.tribe or 'Kein Stamm'}) %}
+      {% set tribe_info = tribe_meta.get(l.tribe, {'color':'#888','emoji':'?','label':l.tribe or 'Kein Tribe'}) %}
       <div class="vl-card">
         <div class="vl-card-name">{{ l.name }}</div>
         <div class="vl-card-meta">
@@ -60,7 +60,7 @@
         </div>
         <div class="vl-card-actions">
           <a href="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ l.id }}" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.7rem;">✏️ Bearbeiten</a>
-          <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ l.id }}/delete" style="display:inline;" onsubmit="return confirm('Layout &quot;{{ l.name }}&quot; wirklich löschen?')">
+          <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ l.id }}/delete" style="display:inline;" onsubmit="return confirm('Really delete layout &quot;{{ l.name }}&quot;?')">
             <button type="submit" class="btn btn-danger" style="font-size:0.8rem; padding:0.3rem 0.7rem;">🗑️</button>
           </form>
         </div>
@@ -72,17 +72,17 @@
 
   <!-- Player layouts -->
   <div>
-    <div class="section-label">👤 Spieler-Layouts</div>
+    <div class="section-label">👤 Player-Layouts</div>
     {% if not player_layouts %}
     <div class="card" style="text-align:center; padding:2rem 1rem; color:var(--text-muted);">
       <div style="font-size:2rem; margin-bottom:0.5rem;">👤</div>
-      <div style="font-weight:600; margin-bottom:0.3rem;">Keine Spieler-Layouts</div>
-      <div style="font-size:0.85rem;">Erstelle ein Layout für einen bestimmten Spieler.</div>
+      <div style="font-weight:600; margin-bottom:0.3rem;">Keine Player-Layouts</div>
+      <div style="font-size:0.85rem;">Create a layout for a specific player.</div>
     </div>
     {% else %}
     <div class="vl-grid">
       {% for l in player_layouts %}
-      {% set tribe_info = tribe_meta.get(l.tribe, {'color':'#888','emoji':'?','label':l.tribe or 'Kein Stamm'}) %}
+      {% set tribe_info = tribe_meta.get(l.tribe, {'color':'#888','emoji':'?','label':l.tribe or 'Kein Tribe'}) %}
       <div class="vl-card">
         <div class="vl-card-name">{{ l.name }}</div>
         <div class="vl-card-meta">
@@ -93,7 +93,7 @@
         </div>
         <div class="vl-card-actions">
           <a href="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ l.id }}" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.7rem;">✏️ Bearbeiten</a>
-          <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ l.id }}/delete" style="display:inline;" onsubmit="return confirm('Layout &quot;{{ l.name }}&quot; wirklich löschen?')">
+          <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ l.id }}/delete" style="display:inline;" onsubmit="return confirm('Really delete layout &quot;{{ l.name }}&quot;?')">
             <button type="submit" class="btn btn-danger" style="font-size:0.8rem; padding:0.3rem 0.7rem;">🗑️</button>
           </form>
         </div>

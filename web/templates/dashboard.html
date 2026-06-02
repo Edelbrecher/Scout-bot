@@ -130,18 +130,18 @@
   <div style="background:linear-gradient(135deg,rgba(220,38,38,0.15),rgba(153,27,27,0.1));border:1px solid rgba(220,38,38,0.4);border-radius:12px;padding:1.25rem 1.5rem;margin:1.5rem 0 0.5rem;display:flex;gap:1rem;align-items:flex-start;">
     <div style="font-size:1.8rem;flex-shrink:0;">⚠️</div>
     <div style="flex:1;">
-      <div style="font-weight:700;color:#fca5a5;margin-bottom:0.35rem;">Zahlung fehlgeschlagen — Zugang wird bald auf Free heruntergestuft</div>
+      <div style="font-weight:700;color:#fca5a5;margin-bottom:0.35rem;">Payment failed — access will be downgraded to Free soon</div>
       <div style="font-size:0.85rem;color:#f87171;margin-bottom:0.75rem;">
         {% if past_due_guilds|length == 1 %}
-          Für <strong>{{ past_due_guilds[0].guild_name }}</strong> konnte keine Zahlung eingezogen werden.
+          Payment could not be collected for <strong>{{ past_due_guilds[0].guild_name }}</strong>.
         {% else %}
-          Betroffen: {% for g in past_due_guilds %}<strong>{{ g.guild_name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
+          Affected: {% for g in past_due_guilds %}<strong>{{ g.guild_name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
         {% endif %}
       </div>
       <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
         {% for g in past_due_guilds %}
         <a href="/guild/{{ g.guild_id }}/billing" style="background:#dc2626;color:#fff;text-decoration:none;padding:0.4rem 1.1rem;border-radius:8px;font-size:0.85rem;font-weight:600;">
-          💳 Zahlung für {{ g.guild_name }} aktualisieren →
+          💳 Update payment for {{ g.guild_name }} →
         </a>
         {% endfor %}
       </div>
@@ -152,67 +152,67 @@
   <!-- ── Hero ── -->
   <div class="hero-section" style="text-align:center;padding:2.5rem 1rem 1.5rem;">
     <div style="display:inline-flex;align-items:center;gap:0.5rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:20px;padding:0.3rem 1rem;font-size:0.8rem;color:#93c5fd;margin-bottom:1rem;">
-      <span data-i18n="hero.tagline">⏱️ Spare 3+ Stunden pro Woche — automatisch.</span>
+      <span data-i18n="hero.tagline">⏱️ Save 3+ hours per week — automatically.</span>
     </div>
     <h1 class="hero-title" style="font-size:2rem;font-weight:800;margin:0 0 0.75rem;background:linear-gradient(135deg,#f1f5f9,#93c5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
       TravOps
     </h1>
     <p style="color:var(--text-muted);font-size:1rem;max-width:520px;margin:0 auto;" data-i18n="hero.sub">
-      TravOps übernimmt die mühsame Arbeit, damit deine Allianz sich auf das Wesentliche konzentrieren kann: Gewinnen.
+      TravOps handles the tedious work so your alliance can focus on what matters: winning.
     </p>
   </div>
 
   <!-- ── Benefits Grid ── -->
   <div style="margin:1.25rem 0 1.75rem;">
     <h2 style="text-align:center;font-size:0.9rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;" data-i18n="benefits.title">
-      Warum tausende Gilden auf TravOps vertrauen
+      Why thousands of guilds trust TravOps
     </h2>
     <div class="benefits-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.85rem;">
 
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
         <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">⏳</div>
         <div>
-          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Stunden pro Woche sparen</div>
-          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Automatische Karten-Snapshots, Angriffserkennung und Marschzeit-Kalkulator ersetzen stundenlange manuelle Arbeit.</div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Save hours per week</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Automatic map snapshots, attack detection and march time calculator replace hours of manual work.</div>
         </div>
       </div>
 
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
         <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">🤝</div>
         <div>
-          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Perfekte Koordination</div>
-          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Ressourcenanfragen, Angriffsmeldungen und Einsatzplanung landen direkt im Discord.</div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Perfect coordination</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Resource requests, attack alerts and operation planning land directly in Discord.</div>
         </div>
       </div>
 
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
         <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">🔭</div>
         <div>
-          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Immer einen Schritt voraus</div>
-          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Interaktive Karte, Inaktiv-Farm-Radar und Angriffsanalyse liefern Infos, die deine Gegner nicht haben.</div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Always one step ahead</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Interactive map, inactive farm radar and attack analysis provide intel your opponents don't have.</div>
         </div>
       </div>
 
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
         <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">🔔</div>
         <div>
-          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Keinen Einsatz mehr verpassen</div>
-          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Präzise Absende-Erinnerungen mit direktem 'Go Troops GO' Link im Alarm.</div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Never miss an operation</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Precise send-time reminders with a direct 'Go Troops GO' link in the alert.</div>
         </div>
       </div>
 
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;gap:0.85rem;align-items:flex-start;">
         <div style="font-size:1.6rem;flex-shrink:0;width:2rem;text-align:center;">⚡</div>
         <div>
-          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">In unter 2 Minuten startklar</div>
-          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">Ein-Klick Auto-Setup, kein technisches Wissen erforderlich.</div>
+          <div style="font-weight:700;margin-bottom:0.2rem;font-size:0.92rem;">Ready in under 2 minutes</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;">One-click auto setup, no technical knowledge required.</div>
         </div>
       </div>
 
       <div class="stat-card" style="background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.1));border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:0.4rem;">
         <div style="font-size:2.5rem;font-weight:800;color:#93c5fd;line-height:1;">3+</div>
-        <div style="font-size:0.82rem;color:var(--text-muted);">Stunden Ersparnis<br>pro Woche &amp; Server</div>
-        <div style="font-size:0.72rem;color:#3b82f6;margin-top:0.15rem;">≈ 150+ Stunden/Jahr</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);">Hours saved<br>per week &amp; server</div>
+        <div style="font-size:0.72rem;color:#3b82f6;margin-top:0.15rem;">≈ 150+ hours/year</div>
       </div>
 
     </div>
@@ -224,57 +224,57 @@
   {% set _qp = request.query_params %}
   {% if _qp.get("removed") == "1" %}
   <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#fbbf24;">
-    📦 Server archiviert — deine Daten sind erhalten. Du kannst ihn jederzeit reaktivieren.
+    📦 Server archived — your data is preserved. You can reactivate it at any time.
   </div>
   {% elif _qp.get("restored") == "1" %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
-    ✅ Server reaktiviert! Lade den Bot erneut ein um ihn zu nutzen.
+    ✅ Server reactivated! Re-invite the bot to use it.
   </div>
   {% elif _qp.get("invited") == "1" %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
-    🎉 Bot erfolgreich eingeladen!
+    🎉 Bot successfully invited!
   </div>
   {% elif _qp.get("renamed") == "1" %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
-    ✅ Server umbenannt.
+    ✅ Server renamed.
   </div>
   {% elif _qp.get("error") == "not_owner" %}
   <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#f87171;">
-    ⚠️ Nur der Workspace-Owner kann diesen Server entfernen.
+    ⚠️ Only the workspace owner can remove this server.
   </div>
   {% endif %}
 
   {% if flash == 'workspace_created' %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
-    ✅ Workspace wurde erstellt — du kannst sofort loslegen!
+    ✅ Workspace created — you can start right away!
   </div>
   {% endif %}
 
   <!-- ── Server-Liste ── -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-      <h2 style="margin:0;font-size:1.05rem;" data-i18n="dashboard.servers">Deine Workspaces &amp; Server</h2>
+      <h2 style="margin:0;font-size:1.05rem;" data-i18n="dashboard.servers">Your Workspaces &amp; Servers</h2>
       {% if slots_max > 0 %}
       <span style="font-size:0.75rem;padding:2px 10px;border-radius:20px;border:1px solid {% if slots_full %}rgba(220,38,38,0.5);background:rgba(220,38,38,0.1);color:#f87171;{% else %}var(--border);background:var(--bg-card);color:var(--text-muted);{% endif %}">
         🖥️ {{ slots_used }}/{{ slots_max }} Discord-Server
       </span>
       {% endif %}
-      <span style="font-size:0.72rem;color:rgba(255,255,255,0.2);">⠿ Reihenfolge per Drag &amp; Drop ändern</span>
+      <span style="font-size:0.72rem;color:rgba(255,255,255,0.2);">⠿ Reorder by drag &amp; drop</span>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
       <a href="/workspace/new"
          style="padding:0.4rem 1rem;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);
                 border-radius:8px;color:#c4b5fd;text-decoration:none;font-size:0.83rem;font-weight:600;">
-        ➕ Workspace anlegen
+        ➕ Create workspace
       </a>
       {% if invite_url %}
         {% if slots_full %}
         <div style="display:flex;align-items:center;gap:0.5rem;">
-          <span style="font-size:0.8rem;color:#f87171;">⚠️ Limit erreicht</span>
-          <span class="btn btn-primary" style="opacity:0.4;cursor:not-allowed;pointer-events:none;">+ Bot einladen</span>
+          <span style="font-size:0.8rem;color:#f87171;">⚠️ Limit reached</span>
+          <span class="btn btn-primary" style="opacity:0.4;cursor:not-allowed;pointer-events:none;">+ Invite bot</span>
         </div>
         {% else %}
-        <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Bot einladen</a>
+        <a href="{{ invite_url }}" target="_blank" class="btn btn-primary">+ Invite bot</a>
         {% endif %}
       {% endif %}
     </div>
@@ -287,17 +287,17 @@
     {% set is_personal = guild.workspace_type == 'personal' %}
     <div class="guild-tile" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
       <!-- Sichtbarer Drag-Handle – hier anfassen zum Verschieben -->
-      <div class="drag-handle" title="Kachel verschieben" style="justify-content:space-between;">
+      <div class="drag-handle" title="Move tile" style="justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:0.45rem;">
           <div class="grip"><span></span><span></span><span></span></div>
-          <span>Verschieben</span>
+          <span>Move</span>
         </div>
         <button
           class="tile-remove-btn"
           data-guild-id="{{ guild.guild_id }}"
           data-guild-name="{{ guild.guild_name }}"
           data-personal="{{ 'true' if is_personal else 'false' }}"
-          title="Server entfernen"
+          title="Remove server"
           onclick="confirmRemove(event, this)"
           style="background:none;border:none;cursor:pointer;padding:0.15rem 0.4rem;border-radius:4px;color:var(--text-muted);font-size:0.9rem;line-height:1;opacity:0.6;transition:opacity .15s,color .15s;"
           onmouseover="this.style.opacity='1';this.style.color='#f87171'"
@@ -312,21 +312,21 @@
           <div style="font-weight:700;font-size:0.93rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ guild.guild_name }}</div>
           <div style="display:flex;gap:0.35rem;margin-top:0.3rem;flex-wrap:wrap;">
             {% if is_personal %}
-            <span style="font-size:0.67rem;padding:1px 6px;background:rgba(139,92,246,0.15);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);border-radius:8px;">📁 Persönlich</span>
+            <span style="font-size:0.67rem;padding:1px 6px;background:rgba(139,92,246,0.15);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);border-radius:8px;">📁 Personal</span>
             {% elif guild.bot_status == 'kicked' %}
-            <span style="font-size:0.67rem;padding:1px 6px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:8px;">🚫 Bot gekickt</span>
+            <span style="font-size:0.67rem;padding:1px 6px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:8px;">🚫 Bot kicked</span>
             {% elif guild.category_id and guild.archive_channel_id %}
-            <span class="badge badge-ok" style="font-size:0.67rem;padding:1px 6px;">✅ Aktiv</span>
+            <span class="badge badge-ok" style="font-size:0.67rem;padding:1px 6px;">✅ Active</span>
             {% else %}
-            <span class="badge badge-warn" style="font-size:0.67rem;padding:1px 6px;">⚠️ Einrichtung nötig</span>
+            <span class="badge badge-warn" style="font-size:0.67rem;padding:1px 6px;">⚠️ Setup required</span>
             {% endif %}
             {% if not is_personal %}
               {% if sub == 'active' %}
               <span style="font-size:0.67rem;padding:1px 6px;background:#14532d;color:#4ade80;border-radius:8px;">✅ Pro</span>
               {% elif sub == 'trialing' %}
-              <span style="font-size:0.67rem;padding:1px 6px;background:#1e3a5f;color:#93c5fd;border-radius:8px;">🎁 Test</span>
+              <span style="font-size:0.67rem;padding:1px 6px;background:#1e3a5f;color:#93c5fd;border-radius:8px;">🎁 Trial</span>
               {% elif sub == 'past_due' %}
-              <span style="font-size:0.67rem;padding:1px 6px;background:#431407;color:#fb923c;border-radius:8px;">⚠️ Zahlung</span>
+              <span style="font-size:0.67rem;padding:1px 6px;background:#431407;color:#fb923c;border-radius:8px;">⚠️ Payment</span>
               {% else %}
               <span style="font-size:0.67rem;padding:1px 6px;background:var(--bg-main);color:var(--text-muted);border-radius:8px;border:1px solid var(--border);">Free</span>
               {% endif %}
@@ -342,10 +342,10 @@
   {% else %}
   <div class="card" style="text-align:center;padding:2rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🤖</div>
-    <p style="font-weight:600;margin-bottom:0.25rem;">Noch keine Server gefunden.</p>
-    <p style="color:var(--text-muted);font-size:0.88rem;">Lade den Bot auf einen Discord-Server ein — er erscheint hier automatisch.</p>
+    <p style="font-weight:600;margin-bottom:0.25rem;">No servers found yet.</p>
+    <p style="color:var(--text-muted);font-size:0.88rem;">Invite the bot to a Discord server — it will appear here automatically.</p>
     {% if invite_url %}
-    <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" style="margin-top:1rem;">+ Bot einladen</a>
+    <a href="{{ invite_url }}" target="_blank" class="btn btn-primary" style="margin-top:1rem;">+ Invite bot</a>
     {% endif %}
   </div>
   {% endif %}
@@ -354,7 +354,7 @@
 
 <script>
 // ══════════════════════════════════════════════
-// Drag & Drop für Guild-Kacheln
+// Drag & drop for guild tiles
 // ══════════════════════════════════════════════
 (function() {
   const grid = document.getElementById('guildGrid');
@@ -388,7 +388,7 @@
     return ph;
   }
 
-  // ── Drag nur über Handle starten ──
+  // ── Start drag only via handle ──
   // Tiles sind NICHT mehr draggable="true" per default;
   // mousedown/touchstart auf Handle setzt draggable dynamisch.
   grid.querySelectorAll('.drag-handle').forEach(handle => {
@@ -413,7 +413,7 @@
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', tile.dataset.id);
 
-    // Placeholder mit gleicher Höhe
+    // Placeholder with same height
     placeholder = createPlaceholder(tile.offsetHeight);
     requestAnimationFrame(() => tile.style.opacity = '0.35');
   });
@@ -540,8 +540,8 @@ function confirmRemove(e, btn) {
   const isPersonal = btn.dataset.personal === 'true';
 
   const msg = isPersonal
-    ? `Workspace „${guildName}" archivieren?\n\nDer Workspace wird archiviert — Daten bleiben erhalten, jederzeit reaktivierbar.`
-    : `Server „${guildName}" archivieren?\n\nDer Bot verlässt den Discord-Server sofort. Alle Daten (Scouts, Reports, Blueprints) bleiben erhalten. Du kannst den Server jederzeit reaktivieren.`;
+    ? `Archive workspace "${guildName}"?\n\nThe workspace will be archived — data is preserved, reactivate at any time.`
+    : `Archive server "${guildName}"?\n\nThe bot will leave the Discord server immediately. All data (scouts, reports, blueprints) is preserved. You can reactivate the server at any time.`;
 
   if (!confirm(msg)) return;
 
@@ -554,21 +554,21 @@ function confirmRemove(e, btn) {
 <!-- Rename modal -->
 <div id="renameModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:#1a1d2e;border:1px solid var(--border);border-radius:16px;padding:2rem;width:min(420px,90vw);box-shadow:0 25px 60px rgba(0,0,0,0.5);">
-    <h3 style="margin:0 0 0.5rem;font-size:1.1rem;">✏️ Server benennen</h3>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 1.25rem;">Gib deinem Server einen Namen wie er im Dashboard erscheinen soll.</p>
+    <h3 style="margin:0 0 0.5rem;font-size:1.1rem;">✏️ Rename server</h3>
+    <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 1.25rem;">Give your server a name as it should appear in the dashboard.</p>
     <form method="post" action="/dashboard/rename-guild">
       <input type="hidden" name="guild_id" id="renameGuildId" value="">
-      <input type="text" name="name" id="renameInput" placeholder="z.B. Meine Allianz"
+      <input type="text" name="name" id="renameInput" placeholder="e.g. My Alliance"
         style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.85rem;color:var(--text-primary);font-size:0.95rem;margin-bottom:1rem;box-sizing:border-box;"
         maxlength="64">
       <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
         <button type="button" onclick="closeRenameModal()"
           style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text-muted);padding:0.55rem 1.1rem;border-radius:8px;cursor:pointer;font-size:0.88rem;">
-          Überspringen
+          Skip
         </button>
         <button type="submit"
           style="background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;padding:0.55rem 1.4rem;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.88rem;">
-          Speichern
+          Save
         </button>
       </div>
     </form>
@@ -607,8 +607,8 @@ function closeRenameModal() {
   <details style="margin-top:2rem;">
     <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:0.6rem;padding:0.65rem 0.85rem;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-size:0.88rem;user-select:none;">
       <span style="font-size:1rem;">📦</span>
-      <span>Archiv <span style="background:rgba(255,255,255,0.08);padding:1px 8px;border-radius:10px;font-size:0.78rem;margin-left:0.25rem;">{{ archived_workspaces|length }}</span></span>
-      <span style="margin-left:auto;font-size:0.75rem;opacity:0.5;">▼ aufklappen</span>
+      <span>Archive <span style="background:rgba(255,255,255,0.08);padding:1px 8px;border-radius:10px;font-size:0.78rem;margin-left:0.25rem;">{{ archived_workspaces|length }}</span></span>
+      <span style="margin-left:auto;font-size:0.75rem;opacity:0.5;">▼ expand</span>
     </summary>
     <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
       {% for ws in archived_workspaces %}
@@ -617,21 +617,21 @@ function closeRenameModal() {
           <span style="font-size:1.3rem;">{{ '🗂️' if ws.workspace_type == 'personal' else '🏰' }}</span>
           <div>
             <div style="font-weight:600;font-size:0.9rem;">{{ ws.guild_name }}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);">Archiviert · Daten erhalten</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">Archived · Data preserved</div>
           </div>
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
           {% if ws.workspace_type != 'personal' %}
           <a href="{{ invite_url }}" target="_blank"
              style="font-size:0.78rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:0.3rem 0.8rem;border-radius:7px;text-decoration:none;white-space:nowrap;">
-            🤖 Bot neu einladen
+            🤖 Re-invite bot
           </a>
           {% endif %}
           <form method="post" action="/dashboard/restore-server" style="display:inline;">
             <input type="hidden" name="guild_id" value="{{ ws.guild_id }}">
             <button type="submit"
               style="font-size:0.78rem;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:0.3rem 0.8rem;border-radius:7px;cursor:pointer;white-space:nowrap;">
-              ↩ Reaktivieren
+              ↩ Reactivate
             </button>
           </form>
         </div>

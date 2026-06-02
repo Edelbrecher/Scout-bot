@@ -36,7 +36,7 @@
     {% if discord_guild %}
     <div class="card text-center" style="padding:1rem 0.5rem;">
       <div class="stat-number" style="font-size:2rem;">{{ discord_guild.approximate_member_count }}</div>
-      <div class="stat-label">Mitglieder</div>
+      <div class="stat-label">Members</div>
     </div>
     {% endif %}
   </div>
@@ -46,7 +46,7 @@
 
     <!-- Scout activity bar -->
     <div class="card" style="padding:1rem;">
-      <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;">🔍 Scout Aktivität</h3>
+      <h3 style="margin:0 0 0.75rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;">🔍 Scout activity</h3>
       <div style="position:relative; height:180px;"><canvas id="chartScout"></canvas></div>
     </div>
 
@@ -66,10 +66,10 @@
   <!-- ── Scout Details ── -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
     <div class="card">
-      <h2 style="margin-top:0;">Top gescoute Spieler</h2>
+      <h2 style="margin-top:0;">Top gescoute Player</h2>
       {% if scout_stats.top_players %}
       <table class="table">
-        <thead><tr><th>#</th><th>Spieler</th><th>Anfragen</th></tr></thead>
+        <thead><tr><th>#</th><th>Player</th><th>Requests</th></tr></thead>
         <tbody>
           {% for row in scout_stats.top_players %}
           <tr>
@@ -86,7 +86,7 @@
         </tbody>
       </table>
       {% else %}
-      <p class="empty">Noch keine Daten.</p>
+      <p class="empty">No data yet.</p>
       {% endif %}
     </div>
 
@@ -94,7 +94,7 @@
       <h2 style="margin-top:0;">Top Koordinaten</h2>
       {% if scout_stats.top_coords %}
       <table class="table">
-        <thead><tr><th>#</th><th>Koordinaten</th><th>Anfragen</th></tr></thead>
+        <thead><tr><th>#</th><th>Coordinates</th><th>Requests</th></tr></thead>
         <tbody>
           {% for row in scout_stats.top_coords %}
           <tr>
@@ -111,17 +111,17 @@
         </tbody>
       </table>
       {% else %}
-      <p class="empty">Noch keine Daten.</p>
+      <p class="empty">No data yet.</p>
       {% endif %}
     </div>
   </div>
 
-  <!-- ── Scout: Wer hat Anfragen gestellt ── -->
+  <!-- ── Scout: Wer hat Requests gestellt ── -->
   {% if scout_requesters %}
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;">📋 Scout-Anfragen nach Mitglied</h2>
+    <h2 style="margin-top:0;">📋 Scout-Requests nach Mitglied</h2>
     <table class="table">
-      <thead><tr><th>#</th><th>Mitglied</th><th>Anfragen gestellt</th></tr></thead>
+      <thead><tr><th>#</th><th>Member</th><th>Requests gestellt</th></tr></thead>
       <tbody>
         {% set max_req = scout_requesters[0].cnt if scout_requesters else 1 %}
         {% for row in scout_requesters %}
@@ -144,13 +144,13 @@
   <!-- ── Recent Scout ── -->
   <details class="card" style="margin-bottom:1rem;">
     <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
-      🔍 Letzte Scout-Anfragen ({{ scout_stats.recent | length }})
+      🔍 Letzte Scout-Requests ({{ scout_stats.recent | length }})
     </summary>
     <div style="margin-top:1rem; overflow-x:auto;">
     {% if scout_stats.recent %}
     <table class="table">
       <thead>
-        <tr><th>Angefragt von</th><th>Ziel-Spieler</th><th>Dorf</th><th>Koords</th><th>Zeit</th><th>Erstellt</th></tr>
+        <tr><th>Angefragt von</th><th>Ziel-Player</th><th>Village</th><th>Koords</th><th>Zeit</th><th>Created</th></tr>
       </thead>
       <tbody>
         {% for ch in scout_stats.recent %}
@@ -166,18 +166,18 @@
       </tbody>
     </table>
     {% else %}
-    <p class="empty">Noch keine Scout-Anfragen.</p>
+    <p class="empty">Noch keine Scout-Requests.</p>
     {% endif %}
     </div>
   </details>
 
-  <!-- ── Res-Push: Beiträger-Rangliste ── -->
+  <!-- ── Res-Push: Contributor leaderboard ── -->
   {% if res_leaderboard %}
   <div class="card" style="margin-bottom:1rem;">
     <h2 style="margin-top:0;">🪖 Res-Push Rangliste</h2>
     <table class="table">
       <thead>
-        <tr><th>#</th><th>Mitglied</th><th>Beiträge</th><th>Gesamt Menge</th><th>Zuletzt aktiv</th></tr>
+        <tr><th>#</th><th>Member</th><th>Contributions</th><th>Total amount</th><th>Last active</th></tr>
       </thead>
       <tbody>
         {% set max_amount = res_leaderboard[0].total_amount if res_leaderboard else 1 %}
@@ -202,7 +202,7 @@
   </div>
   {% endif %}
 
-  <!-- ── Res-Push: Einzelne Beiträge ── -->
+  <!-- ── Res-Push: Individual contributions ── -->
   <details class="card" style="margin-bottom:1rem;">
     <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">
       🪖 Beitrags-Details ({{ res_contrib_details | length }})
@@ -211,7 +211,7 @@
     {% if res_contrib_details %}
     <table class="table">
       <thead>
-        <tr><th>Mitglied</th><th>Menge</th><th>Für Spieler</th><th>Koords</th><th>Push-Höhe</th><th>Req-Status</th><th>Datum</th></tr>
+        <tr><th>Member</th><th>Amount</th><th>For player</th><th>Coords</th><th>Push amount</th><th>Req status</th><th>Date</th></tr>
       </thead>
       <tbody>
         {% for r in res_contrib_details %}
@@ -232,7 +232,7 @@
       </tbody>
     </table>
     {% else %}
-    <p class="empty">Noch keine Beiträge erfasst.</p>
+    <p class="empty">No contributions recorded yet.</p>
     {% endif %}
     </div>
   </details>
@@ -286,7 +286,7 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Mitglied</th>
+          <th>Member</th>
           <th>Teilgenommen</th>
           <th>Quote</th>
           <th style="color:#4caf82;">✅ Dabei</th>
@@ -336,7 +336,7 @@
     <summary style="cursor:pointer; font-weight:600; font-size:1rem; padding:0.25rem 0;">🏰 Discord Server Info</summary>
     <div style="margin-top:1rem;">
     <ul class="status-list">
-      <li><span class="status-label">Mitglieder</span><span>{{ discord_guild.approximate_member_count }}</span></li>
+      <li><span class="status-label">Members</span><span>{{ discord_guild.approximate_member_count }}</span></li>
       <li><span class="status-label">Online</span><span>{{ discord_guild.approximate_presence_count }}</span></li>
       <li><span class="status-label">Boost Level</span><span>{{ discord_guild.premium_tier }}</span></li>
       <li><span class="status-label">Boosts</span><span>{{ discord_guild.premium_subscription_count or 0 }}</span></li>
@@ -360,7 +360,7 @@ new Chart(document.getElementById('chartScout'), {
   data: {
     labels: ['Heute', '7 Tage', 'Gesamt'],
     datasets: [{
-      label: 'Anfragen',
+      label: 'Requests',
       data: [{{ scout_stats.today }}, {{ scout_stats.last7 }}, {{ scout_stats.total }}],
       backgroundColor: ['#3b82f6aa', '#6366f1aa', '#8b5cf6aa'],
       borderColor:     ['#3b82f6',   '#6366f1',   '#8b5cf6'],
@@ -382,7 +382,7 @@ new Chart(document.getElementById('chartScout'), {
 const resByStatus = {{ res_stats.by_status | tojson }};
 const resLabels = Object.keys(resByStatus).length
   ? Object.keys(resByStatus)
-  : ['Keine Daten'];
+  : ['No data'];
 const resData   = Object.keys(resByStatus).length
   ? Object.values(resByStatus)
   : [1];

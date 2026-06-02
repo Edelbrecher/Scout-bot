@@ -13,11 +13,11 @@
 
   {% set flash = flash %}
   {% if flash == "created" %}<div class="alert alert-success">✅ Allianz erstellt.</div>
-  {% elif flash == "saved" or flash == "settings_saved" %}<div class="alert alert-success">✅ Gespeichert.</div>
+  {% elif flash == "saved" or flash == "settings_saved" %}<div class="alert alert-success">✅ Saved.</div>
   {% elif flash == "removed" %}<div class="alert alert-success">✅ Mitglied entfernt.</div>
   {% elif flash == "rejected" %}<div class="alert alert-success">❌ Beitrittsanfrage abgelehnt.</div>
   {% elif flash == "approved" %}<div class="alert alert-success">✅ Mitglied freigeschaltet.</div>
-  {% elif flash == "deleted" %}<div class="alert alert-success">🗑️ Allianz gelöscht.</div>
+  {% elif flash == "deleted" %}<div class="alert alert-success">🗑️ Alliance deleted.</div>
   {% elif flash == "token_renewed" %}<div class="alert alert-success">🔄 Neuer Link generiert.</div>
   {% elif flash == "role_created" %}<div class="alert alert-success">✅ Role created.</div>
   {% elif flash == "role_deleted" %}<div class="alert alert-success">🗑️ Role deleted.</div>
@@ -45,8 +45,8 @@
     {% endif %}
     <div style="flex:1;"></div>
     <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/delete"
-          onsubmit="return confirm('Allianz wirklich löschen?')">
-      <button type="submit" class="btn btn-sm btn-danger" style="font-size:.78rem;">🗑️ Löschen</button>
+          onsubmit="return confirm('Really delete alliance?')">
+      <button type="submit" class="btn btn-sm btn-danger" style="font-size:.78rem;">🗑️ Delete</button>
     </form>
   </div>
 
@@ -70,14 +70,14 @@
     {# Pending (old flow) #}
     {% if pending_members %}
     <div class="card" style="border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.04);margin-bottom:1rem;">
-      <h3 style="margin:0 0 .75rem;color:#fbbf24;font-size:.95rem;">⏳ Ausstehende Anfragen ({{ pending_members|length }})</h3>
+      <h3 style="margin:0 0 .75rem;color:#fbbf24;font-size:.95rem;">⏳ Pendinge Requests ({{ pending_members|length }})</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem;">
         {% for m in pending_members %}
         <div style="background:var(--bg-main);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:.6rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
           <div>
             <div style="font-weight:700;font-size:.88rem;">{{ m.discord_username or m.discord_id }}</div>
             {% if m.travian_name %}<div style="color:#93c5fd;font-size:.78rem;">🎯 {{ m.travian_name }}</div>
-            {% else %}<div style="color:#f87171;font-size:.75rem;">⚠️ Kein Travian-Name</div>{% endif %}
+            {% else %}<div style="color:#f87171;font-size:.75rem;">⚠️ Kein Travian name</div>{% endif %}
             <div style="color:var(--text-muted);font-size:.72rem;">{{ (m.joined_at or '')[:10] }}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:.3rem;">
@@ -85,7 +85,7 @@
               <button class="btn btn-primary" style="font-size:.75rem;padding:.25rem .7rem;">✅</button>
             </form>
             <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/reject"
-                  onsubmit="return confirm('Ablehnen?')" style="margin:0;">
+                  onsubmit="return confirm('Decline?')" style="margin:0;">
               <button class="btn btn-danger" style="font-size:.75rem;padding:.25rem .7rem;">❌</button>
             </form>
           </div>
@@ -95,15 +95,15 @@
     </div>
     {% endif %}
 
-    {# Neue Mitglieder mit Eingangsrolle #}
+    {# Neue Members mit Eingangsrolle #}
     {% if new_members %}
     {% set entry_role = roles | selectattr("id", "equalto", ally_group.entry_role_id) | first %}
     <div class="card" style="border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.04);margin-bottom:1rem;">
-      <h3 style="margin:0 0 .4rem;color:#a5b4fc;font-size:.95rem;">🆕 Neue Mitglieder — warten auf Beförderung ({{ new_members|length }})</h3>
+      <h3 style="margin:0 0 .4rem;color:#a5b4fc;font-size:.95rem;">🆕 New members — waiting for promotion ({{ new_members|length }})</h3>
       <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .75rem;">
-        Diese Mitglieder haben die Eingangsrolle
+        Diese Members haben die Eingangsrolle
         <strong style="color:{% if entry_role %}{{ entry_role.color }}{% else %}#a5b4fc{% endif %};">{% if entry_role %}{{ entry_role.role_name }}{% else %}Neu{% endif %}</strong>
-        und sehen nur freigegebene Inhalte. Befördere sie zu einer anderen Rolle.
+        and can only see approved content. Promote them to another role.
       </p>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.5rem;">
         {% for m in new_members %}
@@ -111,7 +111,7 @@
           <div>
             <div style="font-weight:700;font-size:.88rem;">{{ m.discord_username or m.discord_id }}</div>
             {% if m.travian_name %}<div style="color:#93c5fd;font-size:.78rem;">🎯 {{ m.travian_name }}</div>
-            {% else %}<div style="color:var(--text-muted);font-size:.75rem;">Kein Travian-Name</div>{% endif %}
+            {% else %}<div style="color:var(--text-muted);font-size:.75rem;">Kein Travian name</div>{% endif %}
             <div style="color:var(--text-muted);font-size:.72rem;">Beigetreten {{ (m.joined_at or '')[:10] }}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-end;">
@@ -122,7 +122,7 @@
                 <option value="{{ r.id }}">{{ r.role_name }}</option>
                 {% endif %}{% endfor %}
               </select>
-              <button type="submit" class="btn btn-primary" style="font-size:.72rem;padding:.2rem .5rem;" title="Befördern">↑</button>
+              <button type="submit" class="btn btn-primary" style="font-size:.72rem;padding:.2rem .5rem;" title="Promote">↑</button>
             </form>
             <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/reject"
                   onsubmit="return confirm('{{ m.discord_username or m.discord_id }} entfernen?')" style="margin:0;">
@@ -142,9 +142,9 @@
       {# Toolbar #}
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-          <span style="font-weight:700;font-size:.95rem;">👥 Mitglieder ({{ approved_members|length }})</span>
+          <span style="font-weight:700;font-size:.95rem;">👥 Members ({{ approved_members|length }})</span>
           {% if not is_editor %}
-          <span style="font-size:.72rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#818cf8;border-radius:20px;padding:1px 8px;">🔀 Zufällige Reihenfolge</span>
+          <span style="font-size:.72rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#818cf8;border-radius:20px;padding:1px 8px;">🔀 Random order</span>
           {% endif %}
           {# Troop type filter pills #}
           <div style="display:flex;gap:.25rem;margin-left:.25rem;">
@@ -168,7 +168,7 @@
           </div>
           {% endif %}
         </div>
-        <input type="text" id="memberSearch" placeholder="🔍 Suchen…"
+        <input type="text" id="memberSearch" placeholder="🔍 Searchn…"
                oninput="filterMemberTable(this.value)"
                style="padding:.32rem .7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:150px;">
       </div>
@@ -262,14 +262,14 @@
       {% else %}
       <div style="text-align:center;color:var(--text-muted);padding:3rem 1rem;">
         <div style="font-size:2rem;margin-bottom:.5rem;">👋</div>
-        <div style="font-weight:600;">Noch keine Mitglieder</div>
+        <div style="font-weight:600;">Noch keine Members</div>
       </div>
       {% endif %}
 
       {# Footer #}
       <div style="padding:.5rem 1.1rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border);">
-        {{ approved_members|length }} Mitglieder · {{ approved_members|selectattr('travian_name')|list|length }} mit Travian-Zuordnung
-        {% if not is_editor %} · Reihenfolge zufällig{% endif %}
+        {{ approved_members|length }} Members · {{ approved_members|selectattr('travian_name')|list|length }} mit Travian-Zuordnung
+        {% if not is_editor %} · Order randomized{% endif %}
       </div>
     </div>
 
@@ -309,7 +309,7 @@
             {% elif total_scouts_sum >= 1000 %}{{ "%.0f"|format(total_scouts_sum/1000) }}k
             {% else %}{{ total_scouts_sum }}{% endif %}
           </div>
-          <div style="font-size:.7rem;color:var(--text-muted);">Equites Legati / Späher / Pathfinder</div>
+          <div style="font-size:.7rem;color:var(--text-muted);">Equites Legati / Scout / Pathfinder</div>
         </div>
         <div style="background:var(--bg-main);border:1px solid rgba({{ '239,68,68' if without_auth else '255,255,255' }},.2);border-radius:8px;padding:.7rem 1rem;">
           <div style="font-size:.72rem;color:{{ '#f87171' if without_auth else 'var(--text-muted)' }};font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">
@@ -327,7 +327,7 @@
         </div>
       </div>
       <div style="font-size:.72rem;color:var(--text-muted);">
-        Basiert auf letztem Account-Upload der Mitglieder. Off = nur Angriffs-Einheiten (keine Paladin/Druiden).
+        Basiert auf letztem Account-Upload der Members. Off = nur Attacks-Einheiten (keine Paladin/Druiden).
       </div>
     </div>
     {% endif %}
@@ -338,7 +338,7 @@
       <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Wachstum (letzte 2 Wochen)</h2>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;">
         {% for metric, label, color in [
-          ('village_count','🏘️ Dörfer','#34d399'),
+          ('village_count','🏘️ Villages','#34d399'),
           ('total_off','🗡️ Off','#f87171'),
           ('total_def','🛡️ Def','#60a5fa'),
           ('total_scouts','🔍 Scouts','#a78bfa'),
@@ -379,7 +379,7 @@
 
       {# Invite links #}
       <div class="card">
-        <h3 style="margin:0 0 .9rem;font-size:.95rem;">🔗 Einladungslinks</h3>
+        <h3 style="margin:0 0 .9rem;font-size:.95rem;">🔗 Invitationslinks</h3>
         <div style="display:flex;flex-direction:column;gap:.6rem;">
           {% set links = [
             ("Hauptallianz", ally_group.invite_token, "main", "#3b82f6"),
@@ -505,7 +505,7 @@
   {# ══════════════════════════════ TAB: ALLIANZ-BONUS ══════════════════════════════ #}
   <div id="tab-bonus" class="ma-tab-panel" style="display:none;">
     {% if flash in ['bonus_added','bonus_saved','bonus_deleted'] %}
-    <div class="alert alert-success" style="margin-bottom:.75rem;">✅ Gespeichert.</div>
+    <div class="alert alert-success" style="margin-bottom:.75rem;">✅ Saved.</div>
     {% endif %}
 
     {# Alliance Research Bonuses link card #}
@@ -530,7 +530,7 @@
       {# Bonus-Liste #}
       <div class="card">
         <h3 style="margin:0 0 .25rem;font-size:.95rem;">🎁 Bonus-Reihenfolge</h3>
-        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Ziehe Einträge per Drag &amp; Drop in die gewünschte Reihenfolge.</p>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Drag and drop entries into the desired order.</p>
 
         {% if bonuses %}
         <ul id="bonus-sortable" style="list-style:none;padding:0;margin:0 0 .75rem;display:flex;flex-direction:column;gap:.4rem;">
@@ -555,7 +555,7 @@
             <button onclick="editBonus({{ b.id }},'{{ b.name | replace("'","\\'") }}',{{ b.max_level }},{{ b.current_level }},'{{ b.description | replace("'","\\'") }}')"
                     style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.8rem;padding:2px 5px;">✏️</button>
             <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/bonuses/{{ b.id }}/delete"
-                  onsubmit="return confirm('Bonus löschen?')" style="margin:0;">
+                  onsubmit="return confirm('Delete bonus?')" style="margin:0;">
               <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.8rem;padding:2px 5px;">🗑️</button>
             </form>
           </li>
@@ -580,7 +580,7 @@
           <input type="text" name="description" placeholder="Beschreibung (optional)…" maxlength="200"
                  style="padding:.35rem .6rem;background:var(--bg-main);color:var(--text);
                         border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
-          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;align-self:flex-start;">➕ Bonus hinzufügen</button>
+          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;align-self:flex-start;">➕ Add bonus</button>
         </form>
       </div>
 
@@ -700,7 +700,7 @@
                     ("defend_manage","Manage Defense","Can close, reopen and archive defense channels."),
                   ]),
                   ("📋 Operations", [
-                    ("ep_view","View Ops","Can view planned operations (Einsatzplanung)."),
+                    ("ep_view","View Ops","Can view planned operations (Operation planning)."),
                     ("ep_manage","Manage Ops","Can create, edit and delete operations."),
                     ("ep_notify","Op Notifications","Receives Discord notifications when new operations are posted."),
                   ]),
@@ -782,8 +782,8 @@
         <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.25rem;">
           <div style="font-size:.8rem;font-weight:700;margin-bottom:.35rem;">🚪 Eingangsrolle</div>
           <p style="font-size:.74rem;color:var(--text-muted);margin:0 0 .5rem;">
-            Neue Discord-Mitglieder erhalten diese Rolle automatisch beim Beitritt.
-            Die Rolle bestimmt welche Daten sie sehen dürfen.
+            Neue Discord-Members erhalten diese Role automatisch beim Beitritt.
+            The role determines which data they can see.
           </p>
           <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/set-entry-role"
                 style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
@@ -943,15 +943,15 @@
   {# ══════════════════════════════ TAB: EINSTELLUNGEN ══════════════════════════════ #}
   <div id="tab-einstellungen" class="ma-tab-panel" style="display:none;">
     <div style="margin-bottom:.85rem;">
-      <a href="/guild/{{ guild.guild_id }}/my-ally/troop-roles" class="btn" style="font-size:.83rem;padding:.35rem .8rem;">⚔️ Truppen-Rollen konfigurieren</a>
+      <a href="/guild/{{ guild.guild_id }}/my-ally/troop-roles" class="btn" style="font-size:.83rem;padding:.35rem .8rem;">⚔️ Troops-Rolen konfigurieren</a>
       <span style="font-size:.78rem;color:var(--text-muted);margin-left:.5rem;">Off / Def / Scout Klassifizierung pro Truppengattung</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
       <div class="card">
-        <h3 style="margin:0 0 .9rem;font-size:.95rem;">⚙️ Allianz-Einstellungen</h3>
+        <h3 style="margin:0 0 .9rem;font-size:.95rem;">⚙️ Allianz-Settings</h3>
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/settings" style="display:flex;flex-direction:column;gap:.65rem;">
           <div>
-            <label class="d-label">Allianz-Name</label>
+            <label class="d-label">Alliance name</label>
             <input type="text" name="ally_name" value="{{ ally_group.ally_name }}" required maxlength="80"
                    style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
           </div>
@@ -973,13 +973,13 @@
                    style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
           </div>
 
-          {# ── Travian-Name-Sperre ── #}
+          {# ── Travian name-Sperre ── #}
           <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;">
               <div>
-                <div style="font-weight:600;font-size:.88rem;">🔒 Travian-Name sperren</div>
+                <div style="font-weight:600;font-size:.88rem;">🔒 Travian name sperren</div>
                 <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">
-                  Member können ihren Spielernamen nicht selbst ändern — nur Lead &amp; HC (ally_manage)
+                  Members cannot change their player name themselves — only Lead &amp; HC (ally_manage)
                 </div>
               </div>
               <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
@@ -1029,7 +1029,7 @@
         {% set by_tq     = leaderboard | selectattr("tq","ne",None) | sort(attribute='tq', reverse=True) | list %}
         {% for title, rows, color, field in [
           ('🏘️ Einwohner', by_pop,    '',        'population'),
-          ('⚔️ Truppen',   by_units,  '',        'total_units'),
+          ('⚔️ Troops',   by_units,  '',        'total_units'),
           ('🗡️ Off-Score', by_off,    '#f87171', 'total_off'),
           ('🛡️ Def-Score', by_def,    '#4ade80', 'total_def'),
           ('🔍 Scouts',    by_scouts, '#a78bfa', 'total_scouts'),
@@ -1079,7 +1079,7 @@
       </div>
       {% if membership.travian_name %}
       <div style="text-align:right;">
-        <div style="font-size:.78rem;color:var(--text-muted);">Dein Travian-Name</div>
+        <div style="font-size:.78rem;color:var(--text-muted);">Dein Travian name</div>
         <div style="font-size:1.05rem;font-weight:700;color:#a5b4fc;">{{ membership.travian_name }}</div>
       </div>
       {% endif %}
@@ -1093,7 +1093,7 @@
 
     {# Left: member list #}
     <div class="card">
-      <h3 style="margin:0 0 .9rem;font-size:.95rem;">👥 Mitglieder ({{ approved|length }})</h3>
+      <h3 style="margin:0 0 .9rem;font-size:.95rem;">👥 Members ({{ approved|length }})</h3>
       <div style="display:flex;flex-direction:column;gap:.35rem;">
         {% for m in approved | sort(attribute='travian_name') %}
         {% set is_me = m.discord_id == session.get('uid') %}
@@ -1117,7 +1117,7 @@
       <div style="display:flex;gap:1.5rem;margin-top:.9rem;padding-top:.75rem;border-top:1px solid var(--border);">
         <div style="text-align:center;">
           <div style="font-size:1.3rem;font-weight:700;color:#a5b4fc;">{{ approved|length }}</div>
-          <div style="font-size:.68rem;color:var(--text-muted);">Mitglieder</div>
+          <div style="font-size:.68rem;color:var(--text-muted);">Members</div>
         </div>
         {% if guild_group and guild_group.wing1_name %}
         <div style="text-align:center;">
@@ -1190,7 +1190,7 @@
     <h2 style="margin:0 0 .5rem;font-size:1rem;">➕ Eigene Allianz erstellen</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/create">
       <div class="form-group">
-        <label>Allianz-Name</label>
+        <label>Alliance name</label>
         <input type="text" name="ally_name" required placeholder="z.B. BLOOD Allianz" maxlength="80"
                style="width:100%;padding:.5rem .75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.95rem;">
       </div>
@@ -1213,11 +1213,11 @@
     {% if guild_group.invite_token %}
     <a href="/ally/join/{{ guild_group.invite_token }}" class="btn btn-primary" style="font-size:.85rem;">🤝 Jetzt beitreten</a>
     {% else %}
-    <p style="font-size:.8rem;color:var(--text-muted);">Bitte den Allianz-Verwalter um einen Einladungslink.</p>
+    <p style="font-size:.8rem;color:var(--text-muted);">Please den Allianz-Verwalter um einen Invitationslink.</p>
     {% endif %}
     {# Also show the code input as alternative #}
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
-      <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .5rem;">Oder Einladungslink/-code eingeben:</p>
+      <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .5rem;">Oder Invitationslink/-code eingeben:</p>
       <div style="display:flex;gap:.4rem;">
         <input type="text" id="joinCodeInput" placeholder="https://travops.online/ally/join/… oder Code"
                style="flex:1;padding:.42rem .7rem;border-radius:7px;background:var(--bg-main);border:1px solid var(--border);color:var(--text);font-size:.85rem;">
@@ -1230,11 +1230,11 @@
   {# No alliance on this server at all #}
   <div class="card" style="max-width:520px;">
     <h2 style="margin:0 0 .3rem;font-size:1.1rem;">🤝 Allianz beitreten</h2>
-    <p style="color:var(--text-muted);font-size:.88rem;margin:0 0 1rem;">Hast du einen Einladungslink? Gib ihn hier ein:</p>
+    <p style="color:var(--text-muted);font-size:.88rem;margin:0 0 1rem;">Hast du einen Invitationslink? Gib ihn hier ein:</p>
 
     {# PRIMARY: Join via code #}
     <div style="display:flex;gap:.4rem;margin-bottom:1.25rem;">
-      <input type="text" id="joinCodeInput" placeholder="https://travops.online/ally/join/… oder Code einfügen"
+      <input type="text" id="joinCodeInput" placeholder="https://travops.online/ally/join/… or paste code"
              style="flex:1;padding:.45rem .75rem;border-radius:8px;background:var(--bg-main);
                     border:1px solid var(--border);color:var(--text);font-size:.9rem;"
              onkeydown="if(event.key==='Enter')doJoinCode()">
@@ -1245,14 +1245,14 @@
       </button>
     </div>
     <div id="joinCodeError" style="display:none;font-size:.8rem;color:#f87171;margin-bottom:.75rem;">
-      ⚠️ Ungültiger Link oder Code. Bitte den vollständigen Einladungslink einfügen.
+      ⚠️ Invalid link or code. Please paste the full invitation link.
     </div>
 
     {# SECONDARY: Create alliance (collapsed) #}
     <details style="border-top:1px solid var(--border);padding-top:.9rem;">
       <summary style="font-size:.82rem;color:var(--text-muted);cursor:pointer;user-select:none;list-style:none;
                       display:flex;align-items:center;gap:.35rem;">
-        <span style="font-size:.7rem;">▶</span> Neue Allianz für diesen Server erstellen
+        <span style="font-size:.7rem;">▶</span> Create new alliance for this server
       </summary>
       <div style="margin-top:.75rem;">
         <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .6rem;">
@@ -1260,7 +1260,7 @@
         </p>
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/create"
               style="display:flex;flex-direction:column;gap:.5rem;">
-          <input type="text" name="ally_name" required placeholder="Allianz-Name (z.B. BLOOD)" maxlength="80"
+          <input type="text" name="ally_name" required placeholder="Alliance name (z.B. BLOOD)" maxlength="80"
                  style="width:100%;padding:.42rem .7rem;background:var(--bg-main);color:var(--text);
                         border:1px solid var(--border);border-radius:7px;font-size:.9rem;box-sizing:border-box;">
           <div>
@@ -1405,18 +1405,18 @@ function openEditMember(discordId, travianName, note, roleId, wing) {
       </div>
       <form method="post" action="/guild/${GUILD_ID_JS}/my-ally/member/${discordId}/update">
         <div style="margin-bottom:.75rem;">
-          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem;">Travian-Name</label>
-          <input type="text" name="travian_name" value="${escHtml(travianName)}" placeholder="Travian-Name"
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem;">Travian name</label>
+          <input type="text" name="travian_name" value="${escHtml(travianName)}" placeholder="Travian name"
                  style="width:100%;padding:.42rem .7rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:.9rem;box-sizing:border-box;">
         </div>
         <div style="margin-bottom:.75rem;">
           <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem;">Anmerkungen</label>
-          <input type="text" name="note" value="${escHtml(note)}" placeholder="Notiz"
+          <input type="text" name="note" value="${escHtml(note)}" placeholder="Note"
                  style="width:100%;padding:.42rem .7rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:.9rem;box-sizing:border-box;">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.25rem;">
           <div>
-            <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem;">Rolle</label>
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem;">Role</label>
             <select name="role_id" style="width:100%;padding:.42rem .6rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:.85rem;">
               <option value="">— Keine —</option>
               ${ALLY_ROLES_JS.map(r => `<option value="${r.id}" ${String(r.id)===String(roleId)?'selected':''}>${r.name}</option>`).join('')}
@@ -1440,7 +1440,7 @@ function openEditMember(discordId, travianName, note, roleId, wing) {
           <div style="display:flex;gap:.5rem;">
             <button type="button" onclick="closeEditMember()"
                     style="padding:.38rem .8rem;border-radius:7px;font-size:.82rem;cursor:pointer;
-                           background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-muted);">Abbrechen</button>
+                           background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-muted);">Cancel</button>
             <button type="submit"
                     style="padding:.38rem 1rem;border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;
                            background:#5865f2;border:none;color:#fff;">💾 Speichern</button>

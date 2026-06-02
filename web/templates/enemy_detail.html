@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{{ enemy.player_name }} · Gegner · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}{{ enemy.player_name }} · Enemy · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link"><span data-i18n="enemy.back">← Gegner-Kartei</span></a>
+      <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link"><span data-i18n="enemy.back">← Enemy-Kartei</span></a>
       <h1 style="margin:0.25rem 0 0;">🎯 {{ enemy.player_name }}</h1>
       <p class="subtitle" style="margin:0;">
         {% if enemy.coordinates %}{{ enemy.coordinates }}{% endif %}
@@ -17,8 +17,8 @@
     <div style="display:flex;gap:0.5rem;align-items:flex-end;">
       <form method="post"
             action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/delete"
-            onsubmit="return confirm('Gegner löschen?')" style="margin:0;">
-        <button type="submit" class="btn btn-danger" style="font-size:0.82rem;" data-i18n="enemy.delete.btn">🗑 Löschen</button>
+            onsubmit="return confirm('Delete enemy?')" style="margin:0;">
+        <button type="submit" class="btn btn-danger" style="font-size:0.82rem;" data-i18n="enemy.delete.btn">🗑 Delete</button>
       </form>
     </div>
   </div>
@@ -29,13 +29,13 @@
   {% if flash == 'meta_saved' %}
   <div class="alert alert-success">✅ Danger level & tags saved.</div>
   {% elif flash == 'villages_imported' %}
-  <div class="alert alert-success">✅ {{ vcount }} Dörfer importiert{% if ecount and ecount != '0' %} · <strong>{{ ecount }} neue Events erkannt</strong>{% endif %}.</div>
+  <div class="alert alert-success">✅ {{ vcount }} villages imported{% if ecount and ecount != '0' %} · <strong>{{ ecount }} new events detected</strong>{% endif %}.</div>
   {% elif flash == 'village_parse_fail' %}
-  <div class="alert alert-danger">❌ Profil konnte nicht geparst werden. Bitte direkt von der Travian-Spieler-Seite kopieren.</div>
+  <div class="alert alert-danger">❌ Profil konnte nicht geparst werden. Please direkt von der Travian-Player-Seite kopieren.</div>
   {% elif flash == 'troops_added' %}
   <div class="alert alert-success">✅ Truppen-Eintrag gespeichert.</div>
   {% elif flash == 'troops_deleted' %}
-  <div class="alert alert-success">🗑️ Eintrag gelöscht.</div>
+  <div class="alert alert-success">🗑️ Entry deleted.</div>
   {% endif %}
 
   <!-- KPI strip -->
@@ -52,7 +52,7 @@
       <div style="font-size:1.6rem;font-weight:800;color:#a78bfa;">
         {{ village_history.villages | length }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">🏘️ Dörfer</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">🏘️ Villages</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
@@ -64,7 +64,7 @@
       <div style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">
         {{ enemy.last_seen[:16].replace('T',' ') }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);">📅 Letzter Scout</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">📅 Last scout</div>
     </div>
   </div>
 
@@ -126,13 +126,13 @@
 
   <!-- Tabs -->
   <div style="display:flex;gap:.35rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
-    <button class="ed-tab active" onclick="edTab('uebersicht',this)">📋 Übersicht</button>
-    <button class="ed-tab" onclick="edTab('doerfer',this)">🏘️ Dörfer{% if village_history.villages %} ({{ village_history.villages|length }}){% endif %}</button>
-    <button class="ed-tab" onclick="edTab('truppen',this)">⚔️ Truppen{% if troop_entries %} ({{ troop_entries|length }}){% endif %}</button>
+    <button class="ed-tab active" onclick="edTab('uebersicht',this)">📋 Overview</button>
+    <button class="ed-tab" onclick="edTab('doerfer',this)">🏘️ Villages{% if village_history.villages %} ({{ village_history.villages|length }}){% endif %}</button>
+    <button class="ed-tab" onclick="edTab('truppen',this)">⚔️ Troops{% if troop_entries %} ({{ troop_entries|length }}){% endif %}</button>
     <button class="ed-tab" onclick="edTab('scouts',this)">🔭 Scout-Berichte{% if history %} ({{ history|length }}){% endif %}</button>
   </div>
 
-  <!-- ═══ TAB: ÜBERSICHT ═══ -->
+  <!-- ═══ TAB: OVERVIEW ═══ -->
   <div id="ed-uebersicht" class="ed-panel">
 
   <!-- Notes -->
@@ -140,7 +140,7 @@
     <h3 style="margin:0 0 0.6rem;font-size:0.95rem;" data-i18n="enemy.notes.title">📝 Notizen</h3>
     <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/notes">
       <textarea name="notes" rows="3"
-                placeholder="Eigene Notizen zu diesem Gegner…"
+                placeholder="Eigene Notizen zu diesem Enemy…"
                 style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
                        border:1px solid var(--border);border-radius:6px;padding:0.5rem;
                        font-size:0.875rem;box-sizing:border-box;">{{ enemy.notes or '' }}</textarea>
@@ -152,7 +152,7 @@
 
   </div>{# end ed-uebersicht #}
 
-  <!-- ═══ TAB: DÖRFER ═══ -->
+  <!-- ═══ TAB: VILLAGES ═══ -->
   <div id="ed-doerfer" class="ed-panel" style="display:none;">
   <style>
   /* Village layout styles */
@@ -465,7 +465,7 @@
       {% set is_strike  = (total_sent > 0 and total_lost >= total_sent) or stats_obj.get('text_strike', False) %}
       <div>
         <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">
-          <span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">⚔️ Truppen</span>
+          <span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">⚔️ Troops</span>
           {% if is_strike %}
           <span style="background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.5);
                        border-radius:5px;padding:0.1rem 0.6rem;font-size:0.75rem;font-weight:700;">
@@ -500,7 +500,7 @@
       {% if res %}
       <div>
         <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
-                    letter-spacing:.04em;margin-bottom:0.4rem;">🌾 Ressourcen</div>
+                    letter-spacing:.04em;margin-bottom:0.4rem;">🌾 Resources</div>
         <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
           {% for k, v in res.items() %}
           {% if v %}
@@ -521,7 +521,7 @@
       {% if stats %}
       <div>
         <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;
-                    letter-spacing:.04em;margin-bottom:0.4rem;">📊 Statistiken</div>
+                    letter-spacing:.04em;margin-bottom:0.4rem;">📊 Statistics</div>
         <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
           {% if stats.combat_attacker is defined %}
           <span style="background:rgba(147,197,253,0.1);border:1px solid rgba(147,197,253,0.2);
@@ -581,7 +581,7 @@
   {% else %}
   <div class="card">
     <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
-      Noch keine Scout-Berichte für diesen Gegner vorhanden.
+      No scout reports available for this enemy yet.
     </p>
   </div>
   {% endif %}
@@ -592,7 +592,7 @@
   <div id="ed-truppen" class="ed-panel" style="display:none;">
   <div style="margin-top:0;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-      <h2 style="margin:0;font-size:1.05rem;">⚔️ Truppen-Verlauf</h2>
+      <h2 style="margin:0;font-size:1.05rem;">⚔️ Troops-Verlauf</h2>
       <button onclick="document.getElementById('troop-form').style.display=document.getElementById('troop-form').style.display==='none'?'block':'none'"
               style="padding:0.3rem 0.85rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;
                      background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);color:#818cf8;">
@@ -603,7 +603,7 @@
     {% if flash in ['troops_added','troops_deleted'] %}
     <div style="padding:0.5rem 1rem;border-radius:7px;margin-bottom:0.75rem;
                 background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;font-size:0.85rem;">
-      ✅ {% if flash == 'troops_added' %}Eintrag gespeichert.{% else %}Eintrag gelöscht.{% endif %}
+      ✅ {% if flash == 'troops_added' %}Entry saved.{% else %}Entry deleted.{% endif %}
     </div>
     {% endif %}
 
@@ -708,7 +708,7 @@
                 </span>
                 <form method="post"
                       action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/troops/{{ e.id }}/delete"
-                      onsubmit="return confirm('Eintrag löschen?')" style="margin:0;">
+                      onsubmit="return confirm('Delete entry?')" style="margin:0;">
                   <button type="submit"
                           style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.78rem;padding:0;">🗑️</button>
                 </form>
@@ -726,7 +726,7 @@
     {% else %}
     <div class="card">
       <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
-        Noch keine Truppen eingetragen. Klicke <strong>➕ Eintragen</strong> um den ersten Eintrag hinzuzufügen.
+        No troops entered yet. Click <strong>➕ Add</strong> to add the first entry.
       </p>
     </div>
     {% endif %}
@@ -741,15 +741,15 @@
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;
               width:100%;max-width:580px;max-height:90vh;overflow-y:auto;padding:1.5rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-      <h2 style="margin:0;font-size:1.05rem;">📋 Spielerprofil importieren</h2>
+      <h2 style="margin:0;font-size:1.05rem;">📋 Playerprofil importieren</h2>
       <button onclick="document.getElementById('village-import-modal').style.display='none'"
               style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--text-muted);">✕</button>
     </div>
     <div style="padding:.55rem .8rem;border-radius:7px;margin-bottom:1rem;font-size:.8rem;line-height:1.55;
                 background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;">
-      Öffne auf Travian das <strong>Profil von {{ enemy.player_name }}</strong>,
-      markiere alles mit <kbd>Strg+A</kbd>, kopiere mit <kbd>Strg+C</kbd> und füge den Text hier ein.
-      TravOps erkennt automatisch alle Dörfer, Koordinaten und Labels (Hauptstadt, Off Villa, etc.).
+      Open in Travian the <strong>profile of {{ enemy.player_name }}</strong>,
+      select all with <kbd>Ctrl+A</kbd>, copy with <kbd>Ctrl+C</kbd> and paste the text here.
+      TravOps automatically detects all villages, coordinates and labels (capital, off villa, etc.).
     </div>
     <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/villages/import">
       <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">
@@ -759,19 +759,19 @@
              style="width:100%;margin-bottom:.75rem;padding:.4rem .6rem;background:var(--bg-main);
                     border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;">
       <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">
-        Profil-Text einfügen:
+        Paste profile text:
       </label>
       <textarea name="profile_text" rows="12" required
-                placeholder="Hier den kopierten Travian-Profiltext einfügen…"
+                placeholder="Paste the copied Travian profile text here…"
                 style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
                        border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;
                        font-size:.78rem;font-family:monospace;line-height:1.45;"></textarea>
       <div style="display:flex;gap:.5rem;margin-top:.75rem;">
         <button type="submit" style="padding:.5rem 1.25rem;border-radius:8px;font-size:.88rem;font-weight:700;
-                cursor:pointer;background:#6366f1;border:none;color:#fff;">💾 Importieren</button>
+                cursor:pointer;background:#6366f1;border:none;color:#fff;">💾 Import</button>
         <button type="button" onclick="document.getElementById('village-import-modal').style.display='none'"
                 style="padding:.5rem 1rem;border-radius:8px;font-size:.85rem;cursor:pointer;
-                       background:var(--bg-main);border:1px solid var(--border);color:var(--text-muted);">Abbrechen</button>
+                       background:var(--bg-main);border:1px solid var(--border);color:var(--text-muted);">Cancel</button>
       </div>
     </form>
   </div>

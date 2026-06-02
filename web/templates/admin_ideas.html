@@ -9,11 +9,11 @@
     <div style="width:180px; flex-shrink:0;">
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
         <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
-        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📊 Übersicht</a>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📊 Overview</a>
         <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">👥 Kunden</a>
         <a href="/admin/servers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🖥 Server</a>
         <a href="/admin/trial-links" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🔑 Trial-Links</a>
-        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🎟 Rabattcodes</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🎟 Discountcodes</a>
         <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">💬 Popup</a>
         <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">🍪 Cookie-Einwilligungen</a>
         <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;">📈 Statistik</a>
@@ -44,12 +44,12 @@
               <option value="integration">🔗 Integration</option>
             </select>
           </div>
-          <button type="submit" class="btn btn-primary" style="font-size:.85rem;">➕ Hinzufügen</button>
+          <button type="submit" class="btn btn-primary" style="font-size:.85rem;">➕ Add</button>
         </form>
       </div>
 
       {% if saved %}<div class="alert alert-success" style="margin-bottom:1rem;">✅ Idee gespeichert.</div>{% endif %}
-      {% if deleted %}<div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Idee gelöscht.</div>{% endif %}
+      {% if deleted %}<div class="alert alert-success" style="margin-bottom:1rem;">🗑️ Idea deleted.</div>{% endif %}
 
       {% if not ideas %}
       <div class="card" style="text-align:center;padding:2rem;opacity:.7;">
@@ -71,7 +71,7 @@
             {% endif %}
           </div>
           <form method="post" action="/admin/ideas/{{ idea.id }}/delete" style="margin:0;flex-shrink:0;">
-            <button type="submit" class="btn-icon danger" style="font-size:.8rem;" title="Löschen">🗑</button>
+            <button type="submit" class="btn-icon danger" style="font-size:.8rem;" title="Delete">🗑</button>
           </form>
         </div>
         {% endfor %}

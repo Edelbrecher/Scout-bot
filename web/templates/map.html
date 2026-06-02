@@ -62,7 +62,7 @@
     </div>
     <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap; margin-top:0.25rem;">
       <a href="/guild/{{ guild.guild_id }}/map/sector-monitor" class="btn btn-secondary" style="font-size:0.85rem;">
-        📡 Sektor-Überwachung
+        📡 Sector-Monitoring
       </a>
     </div>
     {% if is_admin %}
@@ -78,21 +78,21 @@
 
   {% if is_share_viewer %}
   <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:.6rem 1rem;margin-bottom:.75rem;font-size:.83rem;color:#a5b4fc;display:flex;align-items:center;gap:.6rem;">
-    🔗 <span>Geteilte Kartenansicht — du siehst diese Karte über einen freigegebenen Link. Allianz-Daten sind nicht sichtbar.</span>
+    🔗 <span>Shared map view — you are viewing this map via a shared link. Alliance data is not visible.</span>
   </div>
   {% endif %}
 
   {% if not guild.tw_world %}
-  <div class="card"><p class="empty">{% if is_admin %}Bitte zuerst einen Travian-Server eintragen.{% else %}Kein Travian-Server konfiguriert.{% endif %}</p></div>
+  <div class="card"><p class="empty">{% if is_admin %}Please zuerst einen Travian-Server eintragen.{% else %}Kein Travian-Server konfiguriert.{% endif %}</p></div>
   {% else %}
 
   <!-- Control bar -->
   <div class="map-bar">
     <!-- Player multi-filter -->
     <div style="flex:1; min-width:200px;">
-      <label>👤 Spieler</label>
+      <label>👤 Player</label>
       <div class="filter-add">
-        <input type="text" id="searchPlayer" placeholder="Spielername…" data-i18n-placeholder="map.search.player" />
+        <input type="text" id="searchPlayer" placeholder="Playername…" data-i18n-placeholder="map.search.player" />
         <button onclick="addPlayerFilter()" class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;">+</button>
       </div>
       <div class="filter-tags" id="playerTags"></div>
@@ -119,11 +119,11 @@
     <div>
       <label>🎨 Ansicht</label>
       <select id="viewMode" onchange="setViewMode(this.value)">
-        <option value="tribe">Stamm-Farben</option>
+        <option value="tribe">Tribe-Farben</option>
         <option value="alliance">Heatmap Allianzen</option>
-        <option value="player">Heatmap Spieler</option>
+        <option value="player">Heatmap Player</option>
         <option value="pop">Heatmap Population</option>
-        <option value="farmheat">🌾 Farmlist Ressourcen</option>
+        <option value="farmheat">🌾 Farmlist Resources</option>
       </select>
     </div>
     <button onclick="clearSearch()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;">✕ Reset</button>
@@ -143,7 +143,7 @@
                style="width:26px;height:26px;border:none;border-radius:4px;padding:1px;cursor:pointer;background:none;">
         <select id="drawSize" title="Strichbreite"
                 style="font-size:0.75rem;padding:0.15rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);">
-          <option value="2">Dünn</option>
+          <option value="2">Thin</option>
           <option value="4" selected>Normal</option>
           <option value="8">Dick</option>
           <option value="16">Sehr dick</option>
@@ -152,9 +152,9 @@
                 style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid rgba(99,102,241,.5);background:rgba(99,102,241,.2);color:#a5b4fc;cursor:pointer;">✏️</button>
         <button onclick="setDrawMode('erase')" id="modeErase" title="Radierer"
                 style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;">🧹</button>
-        <button onclick="drawUndo()" title="Rückgängig (Strg+Z)"
+        <button onclick="drawUndo()" title="Undo (Ctrl+Z)"
                 style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;">↩️</button>
-        <button onclick="drawClear()" title="Alles löschen"
+        <button onclick="drawClear()" title="Delete all"
                 style="font-size:0.8rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;">🗑️</button>
       </span>
     </div>
@@ -165,11 +165,11 @@
   {% if not is_share_viewer %}
   <div id="presetPanel" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;margin-bottom:.5rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
-      <span style="font-size:.82rem;font-weight:600;color:var(--text);">📁 Gespeicherte Presets</span>
+      <span style="font-size:.82rem;font-weight:600;color:var(--text);">📁 Savede Presets</span>
       <button onclick="saveCurrentPreset()" class="btn btn-primary" style="font-size:.78rem;padding:.25rem .7rem;">💾 Aktuellen Stand speichern</button>
     </div>
     <div id="presetList" style="display:flex;flex-direction:column;gap:.3rem;min-height:1.5rem;">
-      <span style="font-size:.78rem;color:var(--text-muted);">Wird geladen…</span>
+      <span style="font-size:.78rem;color:var(--text-muted);">Loading…</span>
     </div>
   </div>
   {% endif %}
@@ -216,12 +216,12 @@
     {% set total_meta = (meta_groups|length) + (meta_alliances|length) + (1 if ally_group and ally_group.wing1_name else 0) + (1 if ally_group and ally_group.wing2_name else 0) %}
     {% if total_meta > 0 %}
     <button class="meta-btn" style="color:#888; border-color:#555;"
-      onclick="addAllMetaAlliances()">Alle anzeigen</button>
+      onclick="addAllMetaAlliances()">Show all</button>
     {% endif %}
     {% if ally_group %}
     <button class="meta-btn" style="color:#64b5f6;border-color:#64b5f6;padding:.15rem .5rem;"
             onclick="document.getElementById('metaAddBar').style.display=document.getElementById('metaAddBar').style.display==='none'?'flex':'none'"
-            title="Allianz zu Meta hinzufügen">➕</button>
+            title="Add alliance to meta">➕</button>
     {% endif %}
   </div>
   {% if ally_group %}
@@ -253,12 +253,12 @@
 
   <!-- Legend -->
   <div id="legend" style="display:flex; gap:0.85rem; flex-wrap:wrap; margin-bottom:0.5rem; font-size:0.79rem; align-items:center;">
-    <span><span class="legend-dot" style="background:#c0392b;"></span>Römer</span>
-    <span><span class="legend-dot" style="background:#85929e;"></span>Teutonen</span>
-    <span><span class="legend-dot" style="background:#58d68d;"></span>Gallier</span>
-    <span><span class="legend-dot" style="background:#d4ac0d;"></span>Ägypter</span>
-    <span><span class="legend-dot" style="background:#9b59b6;"></span>Hunnen</span>
-    <span><span class="legend-dot" style="background:#1abc9c;"></span>Spartaner</span>
+    <span><span class="legend-dot" style="background:#c0392b;"></span>Romans</span>
+    <span><span class="legend-dot" style="background:#85929e;"></span>Teutons</span>
+    <span><span class="legend-dot" style="background:#58d68d;"></span>Gauls</span>
+    <span><span class="legend-dot" style="background:#d4ac0d;"></span>Egyptians</span>
+    <span><span class="legend-dot" style="background:#9b59b6;"></span>Huns</span>
+    <span><span class="legend-dot" style="background:#1abc9c;"></span>Spartans</span>
     <span><span class="legend-dot" style="background:#e67e22;"></span>Natars</span>
     <span><span class="legend-dot" style="background:#e05555; border-radius:50%;"></span>Scout</span>
     <span><span class="legend-dot" style="background:#f1c40f; border-radius:50%;"></span>Highlight</span>
@@ -272,8 +272,8 @@
     <div id="mapStatus">Lade Kartendaten…</div>
     <div id="coordDisplay">—|—</div>
   </div>
-  <div id="mapResizeHandle" title="Ziehen zum Vergrößern"></div>
-  <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scrollen = Zoom &nbsp;·&nbsp; Ziehen = Verschieben &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Doppelklick = Zentrieren &nbsp;·&nbsp; Handle unten = Größe ändern</p>
+  <div id="mapResizeHandle" title="Drag to enlarge"></div>
+  <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scroll = Zoom &nbsp;·&nbsp; Drag = Pan &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Double-click = Center &nbsp;·&nbsp; Handle = Resize</p>
   {% endif %}
 </div>
 
@@ -285,7 +285,7 @@ const SHARE_STATE   = {{ share_state_json | default('null') | safe }};
 
 const TRIBE_COLOR = { 1:'#c0392b', 2:'#85929e', 3:'#58d68d', 4:'#d4ac0d', 5:'#9b59b6', 6:'#1abc9c' };
 const NATAR_COLOR  = '#e67e22';
-const TRIBE_NAME   = { 1:'Römer', 2:'Teutonen', 3:'Gallier', 4:'Ägypter', 5:'Hunnen', 6:'Spartaner' };
+const TRIBE_NAME   = { 1:'Romans', 2:'Teutons', 3:'Gauls', 4:'Egyptians', 5:'Huns', 6:'Spartans' };
 const TERRAIN_BASE = '#2d5a1e';
 
 const canvas  = document.getElementById('mapCanvas');
@@ -571,12 +571,12 @@ async function loadFarmHeatmap() {
       if (d.resources > maxFarmRes) maxFarmRes = d.resources;
     }
     if (data.length === 0) {
-      aList.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted);">⚠️ Keine Farmlist-Analyse gefunden. Bitte erst eine Analyse im <a href="javascript:history.back()">Farmlist-Analyst</a> speichern.</span>';
+      aList.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted);">⚠️ Keine Farmlist-Analyse gefunden. Please erst eine Analyse im <a href="javascript:history.back()">Farmlist-Analyst</a> speichern.</span>';
     } else {
       // Build legend
       aList.innerHTML = `
         <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">
-          🌾 Farmlist Ressourcen-Heatmap · ${data.length} Farmen geladen
+          🌾 Farmlist Resources-Heatmap · ${data.length} Farmen geladen
           <span style="margin-left:1rem;">
             <span style="display:inline-block;width:10px;height:10px;background:#1eb41e;border-radius:2px;"></span> wenig &nbsp;
             <span style="display:inline-block;width:10px;height:10px;background:#e6c01e;border-radius:2px;"></span> mittel &nbsp;
@@ -755,7 +755,7 @@ function doSearch() {
     }
   }
   total = highlighted.size;
-  info.textContent = `${total.toLocaleString()} Dörfer`;
+  info.textContent = `${total.toLocaleString()} Villages`;
 
   if (total && total <= 8000) {
     const keys = [...highlighted.keys()].map(k => { const [x,y]=k.split('|'); return {x:+x,y:+y}; });
@@ -835,7 +835,7 @@ window.addEventListener('mousemove', e => {
     if (best.isCapital) tip += ' &nbsp;·&nbsp; 👑 Hauptstadt';
     if (sc) tip += `<br><span style="color:#e05555;">🔴 Scout: ${sc.player||''} / ${sc.village||''}</span>`;
     const fhRes = farmHeatMap.get(`${best.x}|${best.y}`);
-    if (fhRes) tip += `<br>🌾 Ressourcen (letzte Raids): <strong>${fhRes.toLocaleString()}</strong>`;
+    if (fhRes) tip += `<br>🌾 Resources (letzte Raids): <strong>${fhRes.toLocaleString()}</strong>`;
     tooltip.innerHTML = tip;
     tooltip.style.display = 'block';
     const tx = e.clientX-rect.left+16;
@@ -1070,7 +1070,7 @@ async function loadMap() {
     mapRadius = maxCoord;
     maxPop    = Math.max(1,...villages.map(v=>v.pop||0));
     const natars=villages.filter(v=>v.isNatar).length;
-    statusEl.textContent=`${(villages.length-natars).toLocaleString()} Dörfer · ${natars.toLocaleString()} Natars · ${scoutMap.size} Scout`;
+    statusEl.textContent=`${(villages.length-natars).toLocaleString()} Villages · ${natars.toLocaleString()} Natars · ${scoutMap.size} Scout`;
 
     // Default scale/cam only if not restored from URL
     const hasUrlState = new URLSearchParams(location.search).has('cx') || SHARE_STATE;
@@ -1176,7 +1176,7 @@ function drawUndo() {
 }
 
 function drawClear() {
-  if (!confirm('Alle Zeichnungen löschen?')) return;
+  if (!confirm('Delete all drawings?')) return;
   drawPaths = [];
   dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 }
@@ -1340,10 +1340,10 @@ async function loadPresets() {
         <span style="font-size:.7rem;color:var(--text-muted);">${(p.created_by||'')?escHtml(p.created_by):''}</span>
         <button onclick="applyPreset(${p.id})" title="Laden" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);background:rgba(99,102,241,.15);color:#a5b4fc;cursor:pointer;">🔄 Laden</button>
         <button onclick="renamePreset(${p.id},this)" title="Umbenennen" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;">✏️</button>
-        <button onclick="deletePreset(${p.id})" title="Löschen" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;">🗑️</button>
+        <button onclick="deletePreset(${p.id})" title="Delete" style="font-size:.8rem;padding:.15rem .45rem;border-radius:5px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;">🗑️</button>
       </div>`).join('');
   } catch(e) {
-    listEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler beim Laden.</span>';
+    listEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Error loading.</span>';
   }
 }
 
@@ -1365,7 +1365,7 @@ async function saveCurrentPreset() {
       body: JSON.stringify({name: name.trim(), state})
     });
     if (res.ok) loadPresets();
-    else alert('Fehler beim Speichern.');
+    else alert('Error saving.');
   } catch(e) { alert('Fehler: ' + e); }
 }
 
@@ -1384,11 +1384,11 @@ async function applyPreset(presetId) {
     if (state.scale != null) scale = state.scale;
     renderTags();
     doSearch();
-  } catch(e) { alert('Fehler beim Laden: ' + e); }
+  } catch(e) { alert('Error loading: ' + e); }
 }
 
 async function deletePreset(presetId) {
-  if (!confirm('Preset löschen?')) return;
+  if (!confirm('Delete preset?')) return;
   try {
     await fetch(`/guild/${GUILD_ID}/map/presets/${presetId}/delete`, {
       method: 'POST', credentials: 'same-origin'

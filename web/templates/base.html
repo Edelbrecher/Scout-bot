@@ -8,8 +8,8 @@
   <!-- Open Graph / Discord Embed -->
   <meta property="og:site_name"    content="TravOps" />
   <meta property="og:type"         content="website" />
-  <meta property="og:title"        content="{% block og_title %}TravOps — Travian Allianz-Management{% endblock %}" />
-  <meta property="og:description"  content="{% block og_desc %}Scout-Tracking, Einsatzplanung, Defend-Koordination und mehr für Travian Legends.{% endblock %}" />
+  <meta property="og:title"        content="{% block og_title %}TravOps — Travian Alliance Management{% endblock %}" />
+  <meta property="og:description"  content="{% block og_desc %}Scout tracking, operation planning, defense coordination and more for Travian Legends.{% endblock %}" />
   <meta property="og:image"        content="https://travops.online/static/logo.png" />
   <meta property="og:image:width"  content="512" />
   <meta property="og:image:height" content="512" />
@@ -33,13 +33,13 @@
     </a>
     <div class="nav-links" style="align-items:center;">
       <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
-      <a href="/plans" data-i18n="nav.plans">Preise</a>
+      <a href="/plans" data-i18n="nav.plans">Pricing</a>
       {% if _is_admin %}
       <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
       {% endif %}
-      <!-- Tour-Button: startet die passende Tour für die aktuelle Seite -->
+      <!-- Tour button: starts the appropriate tour for the current page -->
       <button id="nav-tour-btn" onclick="navStartTour()"
-        title="Geführte Tour starten"
+        title="Start guided tour"
         style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;
                padding:0.25rem 0.75rem;cursor:pointer;color:#a5b4fc;font-size:0.82rem;
                display:flex;align-items:center;gap:0.3rem;transition:background 0.15s;">
@@ -61,7 +61,7 @@
             <div class="nav-avatar nav-avatar-lg">{{ _username[0] | upper }}</div>
             <div>
               <div style="font-weight:600;">{{ _username }}</div>
-              <div style="font-size:0.78rem; color:var(--text-muted);" data-i18n="nav.logged_in">Eingeloggt</div>
+              <div style="font-size:0.78rem; color:var(--text-muted);" data-i18n="nav.logged_in">Logged in</div>
             </div>
           </div>
           {% if _is_admin %}
@@ -71,23 +71,23 @@
           <div id="nav-past-due-block" style="display:none;">
             <div class="nav-profile-divider"></div>
             <div id="nav-past-due-content" style="padding:0.6rem 1rem; background:rgba(220,38,38,0.1);">
-              <div style="font-size:0.78rem; font-weight:700; color:#f87171; margin-bottom:0.3rem;" data-i18n="nav.payment_failed">⚠️ Zahlung fehlgeschlagen</div>
+              <div style="font-size:0.78rem; font-weight:700; color:#f87171; margin-bottom:0.3rem;" data-i18n="nav.payment_failed">⚠️ Payment failed</div>
               <div id="nav-past-due-text" style="font-size:0.75rem; color:#fca5a5; line-height:1.4; margin-bottom:0.4rem;"></div>
               <div id="nav-past-due-links"></div>
             </div>
           </div>
           <div class="nav-profile-divider"></div>
           <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem;">
-            <span style="font-size:0.8rem; color:var(--text-muted);" data-i18n="nav.language_label">Sprache:</span>
+            <span style="font-size:0.8rem; color:var(--text-muted);" data-i18n="nav.language_label">Language:</span>
             <button class="lang-btn" data-lang="de" onclick="setLanguage('de')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="Deutsch">🇩🇪 DE</button>
             <button class="lang-btn" data-lang="en" onclick="setLanguage('en')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text);font-size:0.8rem;" title="English">🇬🇧 EN</button>
           </div>
           <div class="nav-profile-divider"></div>
-          <a id="nav-billing-link" href="#" class="nav-profile-item" style="display:none;">💳 <span data-i18n="nav.billing">Abonnement</span></a>
+          <a id="nav-billing-link" href="#" class="nav-profile-item" style="display:none;">💳 <span data-i18n="nav.billing">Subscription</span></a>
           <div class="nav-profile-divider"></div>
-          <a href="/profile" class="nav-profile-item">👤 Mein Profil</a>
+          <a href="/profile" class="nav-profile-item">👤 My Profile</a>
           <div class="nav-profile-divider"></div>
-          <a href="/logout" class="nav-profile-item" data-i18n="logout">🚪 Abmelden</a>
+          <a href="/logout" class="nav-profile-item" data-i18n="logout">🚪 Log out</a>
         </div>
       </div>
       {% endif %}
@@ -154,9 +154,9 @@ fetch('/api/my-alerts').then(function(r){ return r.json(); }).then(function(data
   var linksEl = document.getElementById('nav-past-due-links');
   if (textEl) {
     if (data.past_due.length === 1) {
-      textEl.textContent = 'Für "' + data.past_due[0].guild_name + '" ist eine Zahlung offen. Bitte aktualisiere deine Zahlungsdaten.';
+      textEl.textContent = 'Payment is overdue for "' + data.past_due[0].guild_name + '". Please update your payment details.';
     } else {
-      textEl.textContent = data.past_due.length + ' Server haben offene Zahlungen. Bitte aktualisiere deine Zahlungsdaten.';
+      textEl.textContent = data.past_due.length + ' servers have overdue payments. Please update your payment details.';
     }
   }
   if (linksEl) {
@@ -183,7 +183,7 @@ document.addEventListener('click', e => {
   <!-- Guild Sidebar (injected via JS if on a /guild/... page) -->
   <div id="guild-sidebar" style="display:none;" aria-label="Guild navigation">
     <div class="gs-toggle">
-      <button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Sidebar einklappen">◀</button>
+      <button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse sidebar">◀</button>
     </div>
     <div class="gs-scroll" id="gs-nav-items">
       <!-- populated by JS -->
@@ -226,7 +226,7 @@ document.addEventListener('click', e => {
       document.getElementById('beb-popup-title').textContent = cfg.title || '';
       document.getElementById('beb-popup-body').textContent = cfg.body || '';
       const btn = document.getElementById('beb-popup-btn');
-      btn.textContent = cfg.button_text || 'Mehr erfahren';
+      btn.textContent = cfg.button_text || 'Learn more';
       btn.href = cfg.button_url || '#';
       if (cfg.bg_color) inner.style.background = cfg.bg_color;
       el.style.display = 'block';
@@ -381,7 +381,7 @@ document.addEventListener('click', e => {
     let tourName = null;
     if (path === '/profile')                          tourName = 'my-account';
     else if (guildId && /\/guild\/\d+\/?$/.test(path)) tourName = 'start';
-    // Weitere Touren hier ergänzen:
+    // Add more tours here:
     // else if (path.includes('/operations'))         tourName = 'operations';
     // else if (path.includes('/attacks'))            tourName = 'attacks';
 
@@ -393,7 +393,7 @@ document.addEventListener('click', e => {
         localStorage.removeItem('beb_tour_done');
         TravOpsTour && TravOpsTour.start('start', guildId);
       } else {
-        alert('{{ "Für diese Seite gibt es noch keine Tour." if True else "" }}');
+        alert('{{ "No tour available for this page yet." if True else "" }}');
       }
     }
   }
@@ -403,14 +403,14 @@ document.addEventListener('click', e => {
   <div id="cookie-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:10000; background:#1a1a2e; border-top:1px solid #334155; padding:1rem 1.5rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
     <div style="flex:1; min-width:0;">
       <span style="font-size:0.88rem; color:#e2e8f0;">
-        <span data-i18n="cookie.text">🍪 Wir verwenden technisch notwendige Cookies für den Login sowie lokalen Browser-Speicher für deine Einstellungen. Keine Tracking- oder Werbe-Cookies.</span>
-        <a href="/cookies" style="color:#3b82f6; margin-left:0.3rem;" data-i18n="cookie.learn_more">Mehr erfahren</a>
+        <span data-i18n="cookie.text">🍪 We use technically necessary cookies for login and local browser storage for your settings. No tracking or advertising cookies.</span>
+        <a href="/cookies" style="color:#3b82f6; margin-left:0.3rem;" data-i18n="cookie.learn_more">Learn more</a>
       </span>
     </div>
     <div style="display:flex; gap:0.5rem; flex-shrink:0;">
       <a href="/cookies" style="padding:0.4rem 0.9rem; border:1px solid #475569; border-radius:6px; color:#94a3b8; text-decoration:none; font-size:0.83rem;" data-i18n="cookie.details">Details</a>
-      <button onclick="declineCookies()" style="padding:0.4rem 0.9rem; background:none; border:1px solid #475569; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:0.83rem;" data-i18n="cookie.decline">Ablehnen</button>
-      <button onclick="acceptCookies()" style="padding:0.4rem 1.1rem; background:#3b82f6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.83rem; font-weight:600;" data-i18n="cookie.accept">Akzeptieren</button>
+      <button onclick="declineCookies()" style="padding:0.4rem 0.9rem; background:none; border:1px solid #475569; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:0.83rem;" data-i18n="cookie.decline">Decline</button>
+      <button onclick="acceptCookies()" style="padding:0.4rem 1.1rem; background:#3b82f6; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.83rem; font-weight:600;" data-i18n="cookie.accept">Accept</button>
     </div>
   </div>
   <script>
@@ -439,13 +439,13 @@ document.addEventListener('click', e => {
   <!-- Footer -->
   <footer style="text-align:center; padding:1.5rem 1rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.8rem; margin-top:2rem;">
     <div style="display:flex; justify-content:center; gap:1.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
-      <a href="/impressum" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.imprint">Impressum</a>
-      <a href="/datenschutz" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.privacy">Datenschutz</a>
-      <a href="/agb" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.terms">AGB</a>
+      <a href="/impressum" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.imprint">Imprint</a>
+      <a href="/datenschutz" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.privacy">Privacy</a>
+      <a href="/agb" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.terms">Terms</a>
       <a href="/cookies" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.cookies">Cookies</a>
-      <a href="/kontakt" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.contact">Kontakt</a>
+      <a href="/kontakt" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'" data-i18n="footer.contact">Contact</a>
     </div>
-    © {{ current_year }} TravOps · Alle Rechte vorbehalten
+    © {{ current_year }} TravOps · All rights reserved
   </footer>
 </body>
 </html>

@@ -20,7 +20,7 @@
   {% if not notifications %}
   <div class="card" style="text-align:center;padding:2.5rem;opacity:.7;">
     <div style="font-size:2rem;margin-bottom:.5rem;">🔕</div>
-    <p style="color:var(--text-muted);margin:0;" data-i18n="notif.empty">Keine Benachrichtigungen.</p>
+    <p style="color:var(--text-muted);margin:0;" data-i18n="notif.empty">No notifications.</p>
   </div>
   {% else %}
   <div style="display:flex;flex-direction:column;gap:.5rem;">
@@ -43,7 +43,7 @@
           <div style="display:flex;gap:.75rem;align-items:center;margin-top:.4rem;flex-wrap:wrap;">
             <span style="font-size:.72rem;color:var(--text-muted);">{{ n.created_at[:16].replace('T',' ') }}</span>
             {% if n.plan_id %}
-            <a href="/guild/{{ guild.guild_id }}/operations" style="font-size:.75rem;color:#6366f1;" data-i18n="notif.to_plan">→ Zum Einsatzplan</a>
+            <a href="/guild/{{ guild.guild_id }}/operations" style="font-size:.75rem;color:#6366f1;" data-i18n="notif.to_plan">→ Zum Operationplan</a>
             {% endif %}
           </div>
         </div>

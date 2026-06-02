@@ -12,9 +12,9 @@
   <div class="card">
     <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/new">
       <div class="form-group">
-        <label for="tribe">Stamm</label>
+        <label for="tribe">Tribe</label>
         <select name="tribe" id="tribe" required>
-          <option value="">— Stamm wählen —</option>
+          <option value="">— Select tribe —</option>
           {% for tribe_name, ti in tribe_meta.items() %}
           <option value="{{ tribe_name }}">{{ ti.emoji }} {{ ti.label }}</option>
           {% endfor %}
@@ -30,7 +30,7 @@
       </div>
       <div style="display:flex; gap:0.75rem; margin-top:1.25rem;">
         <button type="submit" class="btn btn-primary">Vorlage erstellen</button>
-        <a href="/guild/{{ guild.guild_id }}/blueprints" class="btn btn-secondary">Abbrechen</a>
+        <a href="/guild/{{ guild.guild_id }}/blueprints" class="btn btn-secondary">Cancel</a>
       </div>
     </form>
   </div>

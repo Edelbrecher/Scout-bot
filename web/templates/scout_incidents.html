@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Gegner-Scouts · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Enemy-Scouts · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
@@ -7,22 +7,22 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;">👁️ Gegner-Scouts</h1>
-      <p class="subtitle" style="margin:0;">Gemeldete Späh-Aktionen auf Allianz-Mitglieder</p>
+      <h1 style="margin:0.25rem 0 0;">👁️ Enemy-Scouts</h1>
+      <p class="subtitle" style="margin:0;">Gemeldete Scout actions auf Allianz-Members</p>
     </div>
   </div>
 
   {% if flash == 'deleted' %}
   <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;">
-    ✅ Eintrag gelöscht.
+    ✅ Entry deleted.
   </div>
   {% endif %}
 
-  <!-- Top-Späher der letzten 30 Tage -->
+  <!-- Top scouts of the last 30 days -->
   {% if stats %}
   <div class="card" style="margin-bottom:1.25rem;">
     <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.75rem;">
-      🔥 Häufigste Späher (letzte 30 Tage)
+      🔥 Most frequent scouts (last 30 days)
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
       {% for s in stats %}
@@ -39,7 +39,7 @@
     </div>
     {% if stats | selectattr('cnt', 'ge', 3) | list %}
     <div style="margin-top:0.75rem;padding:0.5rem 0.75rem;border-radius:6px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);font-size:0.82rem;color:#f87171;">
-      ⚠️ Achtung: Spieler mit 3+ Scouts könnten einen Angriff vorbereiten!
+      ⚠️ Warning: Players with 3+ scouts may be preparing an attack!
     </div>
     {% endif %}
   </div>
@@ -48,16 +48,16 @@
   <!-- Filter -->
   <form method="get" style="display:flex;gap:0.5rem;margin-bottom:1rem;align-items:center;">
     <input type="text" name="enemy" value="{{ enemy_filter }}"
-           placeholder="Nach Gegner filtern…"
+           placeholder="Nach Enemy filtern…"
            style="flex:1;max-width:300px;padding:0.4rem 0.75rem;border-radius:6px;
                   background:var(--card);border:1px solid var(--border);color:var(--text);font-size:0.85rem;">
     <button type="submit"
             style="padding:0.4rem 0.9rem;border-radius:6px;background:rgba(99,102,241,0.15);
                    border:1px solid rgba(99,102,241,0.35);color:#818cf8;font-size:0.85rem;font-weight:600;cursor:pointer;">
-      🔍 Suchen
+      🔍 Searchn
     </button>
     {% if enemy_filter %}
-    <a href="?" style="padding:0.4rem 0.75rem;border-radius:6px;font-size:0.82rem;color:var(--text-muted);text-decoration:none;">✕ Zurücksetzen</a>
+    <a href="?" style="padding:0.4rem 0.75rem;border-radius:6px;font-size:0.82rem;color:var(--text-muted);text-decoration:none;">✕ Reset</a>
     {% endif %}
   </form>
 
@@ -72,7 +72,7 @@
                        border-radius:4px;padding:0.15rem 0.5rem;font-weight:700;">
             👁️ {{ inc.enemy_player }}
           </span>
-          <span style="font-size:0.85rem;color:var(--text-muted);">hat gespäht:</span>
+          <span style="font-size:0.85rem;color:var(--text-muted);">scouted:</span>
           <span style="font-weight:600;">{{ inc.victim_player }}</span>
           {% if inc.victim_village %}
           <span style="font-size:0.82rem;color:var(--text-muted);">· {{ inc.victim_village }}</span>
@@ -87,7 +87,7 @@
           </span>
           <span style="font-size:0.72rem;color:var(--text-muted);">{{ inc.created_at[:16].replace('T',' ') }} UTC</span>
           <form method="post" action="/guild/{{ guild.guild_id }}/scout-incidents/delete/{{ inc.id }}"
-                onsubmit="return confirm('Eintrag löschen?')" style="margin:0;">
+                onsubmit="return confirm('Delete entry?')" style="margin:0;">
             <button type="submit"
                     style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);
                            border-radius:5px;padding:0.15rem 0.5rem;color:#f87171;cursor:pointer;font-size:0.75rem;">
@@ -99,15 +99,15 @@
       {% if inc.notes %}
       <div style="margin-top:0.4rem;font-size:0.8rem;color:var(--text-muted);">{{ inc.notes }}</div>
       {% endif %}
-      <div style="margin-top:0.4rem;font-size:0.72rem;color:var(--text-muted);">Gemeldet von {{ inc.reported_by_name }}</div>
+      <div style="margin-top:0.4rem;font-size:0.72rem;color:var(--text-muted);">Reported by {{ inc.reported_by_name }}</div>
     </div>
     {% endfor %}
   </div>
   {% else %}
   <div class="card">
     <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
-      {% if enemy_filter %}Keine Einträge für „{{ enemy_filter }}".
-      {% else %}Noch keine Gegner-Scouts gemeldet. Nutzt den <strong>👁️ Gegner-Scout</strong> Button im Discord Hub.{% endif %}
+      {% if enemy_filter %}No entries for "{{ enemy_filter }}".
+      {% else %}Noch keine Enemy-Scouts gemeldet. Nutzt den <strong>👁️ Enemy-Scout</strong> Button im Discord Hub.{% endif %}
     </p>
   </div>
   {% endif %}

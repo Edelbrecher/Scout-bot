@@ -194,8 +194,8 @@
       {% if layout.description %}<p class="subtitle" style="margin-top:0.25rem;">{{ layout.description }}</p>{% endif %}
     </div>
     <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/layouts/{{ layout.id }}/delete"
-          onsubmit="return confirm('Layout &quot;{{ layout.name }}&quot; wirklich löschen?')" style="align-self:flex-end;">
-      <button type="submit" class="btn btn-danger" style="font-size:0.8rem; padding:0.35rem 0.8rem;">🗑️ Löschen</button>
+          onsubmit="return confirm('Really delete layout &quot;{{ layout.name }}&quot;?')" style="align-self:flex-end;">
+      <button type="submit" class="btn btn-danger" style="font-size:0.8rem; padding:0.35rem 0.8rem;">🗑️ Delete</button>
     </form>
   </div>
 
@@ -220,16 +220,16 @@
       <div style="margin-top:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:0.9rem;">
         <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:0.5rem;">Legende</div>
         <div class="legend-grid" id="legend-fields">
-          <div class="legend-dot"><div class="legend-swatch" style="background:#22c55e;"></div> 🌲 Holz</div>
-          <div class="legend-dot"><div class="legend-swatch" style="background:#f97316;"></div> 🏺 Lehm</div>
-          <div class="legend-dot"><div class="legend-swatch" style="background:#94a3b8;"></div> ⚙️ Eisen</div>
-          <div class="legend-dot"><div class="legend-swatch" style="background:#eab308;"></div> 🌾 Getreide</div>
+          <div class="legend-dot"><div class="legend-swatch" style="background:#22c55e;"></div> 🌲 Wood</div>
+          <div class="legend-dot"><div class="legend-swatch" style="background:#f97316;"></div> 🏺 Clay</div>
+          <div class="legend-dot"><div class="legend-swatch" style="background:#94a3b8;"></div> ⚙️ Iron</div>
+          <div class="legend-dot"><div class="legend-swatch" style="background:#eab308;"></div> 🌾 Grain</div>
         </div>
         <div class="legend-grid" id="legend-buildings" style="display:none;">
-          <div class="legend-dot"><div class="legend-swatch" style="background:#ef4444;"></div> ⚔️ Militär</div>
+          <div class="legend-dot"><div class="legend-swatch" style="background:#ef4444;"></div> ⚔️ Military</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#f59e0b;"></div> 💰 Wirtschaft</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#6366f1;"></div> 🏛️ Verwaltung</div>
-          <div class="legend-dot"><div class="legend-swatch" style="background:#3b82f6;"></div> 🛡️ Verteidigung</div>
+          <div class="legend-dot"><div class="legend-swatch" style="background:#3b82f6;"></div> 🛡️ Defense</div>
           <div class="legend-dot"><div class="legend-swatch" style="background:#8b5cf6;"></div> ✨ Sonstiges</div>
         </div>
       </div>
@@ -328,11 +328,11 @@ const BUILDINGS = [
   'Kornspeicher','Lager','Versteck','Stadtmauer',
   'Rathaus','Residenz','Palast','Schatzhaus','Wunderwerk',
   'Turniersplatz','Heldenresidenz','Sägewerk','Ziegelei',
-  'Eisengießerei','Getreidemühle','Bäckerei','Falle',
+  'Irongießerei','Grainmühle','Bäckerei','Falle',
 ];
 const BUILDING_CATEGORIES = {
   military: ['Kaserne','Stall','Werkstatt','Akademie','Schmiede'],
-  economy:  ['Marktplatz','Lager','Kornspeicher','Sägewerk','Ziegelei','Eisengießerei','Getreidemühle','Bäckerei'],
+  economy:  ['Marktplatz','Lager','Kornspeicher','Sägewerk','Ziegelei','Irongießerei','Grainmühle','Bäckerei'],
   admin:    ['Hauptgebäude','Rathaus','Botschaft','Residenz','Palast'],
   defense:  ['Stadtmauer','Falle','Versammlungsplatz'],
   other:    ['Versteck','Heldenresidenz','Schatzhaus','Turniersplatz','Wunderwerk'],
@@ -344,7 +344,7 @@ function getBuildingCategory(b) {
   return 'other';
 }
 const RESOURCE_EMOJIS = { wood:'🌲', clay:'🏺', iron:'⚙️', wheat:'🌾' };
-const RESOURCE_LABELS = { wood:'Holz', clay:'Lehm', iron:'Eisen', wheat:'Getreide' };
+const RESOURCE_LABELS = { wood:'Wood', clay:'Clay', iron:'Iron', wheat:'Grain' };
 
 // ── Runtime state ─────────────────────────────────────────────────
 // slots: Map<slot_num, {id, slot_num, zone, building_type, target_level, notes, pos_x, pos_y}>

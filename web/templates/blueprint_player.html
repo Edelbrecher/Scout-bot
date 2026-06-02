@@ -290,12 +290,12 @@ function toggleStep(blueprintId, stepId, el) {
         if (prevDone) _doneSteps--;
         // Move back to todo list
         moveToTodo(el);
-        showToast('↩️ Schritt zurückgesetzt');
+        showToast('↩️ Step reset');
       }
       updateCurrentHighlight();
       updateProgress();
     })
-    .catch(function() { showToast('❌ Fehler beim Speichern'); });
+    .catch(function() { showToast('❌ Error saving'); });
 }
 
 function updateCurrentHighlight() {

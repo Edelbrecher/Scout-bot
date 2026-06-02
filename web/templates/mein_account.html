@@ -8,37 +8,37 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;" data-i18n="account.title">🏰 Mein Account</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="account.title">🏰 My Account</h1>
       <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
     </div>
     <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;">
       {% if my_waves %}
       <a href="#missionsCard" onclick="document.getElementById('missionsCard').scrollIntoView({behavior:'smooth'});return false;"
          class="btn btn-primary" style="align-self:flex-end;position:relative;">
-        ⚔️ Meine Einsätze
+        ⚔️ My Operations
         {% set pending = my_waves | selectattr('confirm_status', 'equalto', '') | list | length %}
         {% if pending %}<span style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending }}</span>{% endif %}
       </a>
       {% endif %}
-      <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Kampfkraft-Rechner</a>
+      <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Combat Power Calculator</a>
     </div>
   </div>
 
   <!-- Flash messages -->
   {% if uploaded %}
-  <div class="alert alert-success">✅ {{ uploaded }} Dorf/Dörfer erfolgreich importiert.</div>
+  <div class="alert alert-success">✅ {{ uploaded }} village(s) successfully imported.</div>
   {% endif %}
   {% if cleared %}
-  <div class="alert alert-success">🗑️ Alle Dörfer wurden gelöscht.</div>
+  <div class="alert alert-success">🗑️ All villages deleted.</div>
   {% endif %}
   {% if hospital_uploaded %}
-  <div class="alert alert-success">✅ {{ hospital_uploaded }} Lazarett-Einträge erfolgreich importiert.</div>
+  <div class="alert alert-success">✅ {{ hospital_uploaded }} hospital entries successfully imported.</div>
   {% endif %}
   {% if hospital_cleared %}
-  <div class="alert alert-success">🗑️ Lazarett-Daten gelöscht.</div>
+  <div class="alert alert-success">🗑️ Hospital data deleted.</div>
   {% endif %}
   {% if saved == 'scout_village' %}
-  <div class="alert alert-success">🔭 Scout-Dorf {% if scout_village %}gesetzt: {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}entfernt{% endif %}.</div>
+  <div class="alert alert-success">🔭 Scout village {% if scout_village %}set: {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}removed{% endif %}.</div>
   {% endif %}
 
   <!-- KPI Strip mit Delta (nur wenn Daten vorhanden) -->
@@ -51,7 +51,7 @@
       <div style="font-size:1.7rem;font-weight:900;color:#ef4444;line-height:1;">{{ "{:,}".format(total_off).replace(",",".") }}</div>
       {% if prev %}{% set d = (last.total_off - prev.total_off) %}
       <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#4caf82{% else %}#f87171{% endif %};">
-        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
+        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} since last import
       </div>{% endif %}
     </div>
     <div style="background:var(--bg-card);border:1px solid rgba(34,197,94,0.35);border-radius:12px;padding:.9rem 1.1rem;">
@@ -63,7 +63,7 @@
       </div>{% endif %}
     </div>
     <div style="background:var(--bg-card);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:.9rem 1.1rem;">
-      <div style="font-size:.72rem;color:#f59e0b;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🌾 Korn/h</div>
+      <div style="font-size:.72rem;color:#f59e0b;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🌾 Crop/h</div>
       <div style="font-size:1.7rem;font-weight:900;color:#f59e0b;line-height:1;">{{ "{:,}".format(total_crop).replace(",",".") }}</div>
       {% if prev %}{% set d = (last.total_crop - prev.total_crop) %}
       <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#f87171{% else %}#4caf82{% endif %};">
@@ -71,11 +71,11 @@
       </div>{% endif %}
     </div>
     <div style="background:var(--bg-card);border:1px solid rgba(100,116,139,0.3);border-radius:12px;padding:.9rem 1.1rem;">
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🏘️ Dörfer</div>
+      <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🏘️ Villages</div>
       <div style="font-size:1.7rem;font-weight:900;color:var(--text);line-height:1;">{{ own_villages|length }}</div>
       {% if prev %}{% set d = (last.village_count - prev.village_count) %}
       {% if d != 0 %}<div style="font-size:.78rem;margin-top:.3rem;color:{% if d>0 %}#4caf82{% else %}#f87171{% endif %};">
-        {% if d>0 %}▲{% else %}▼{% endif %} {{ d|abs }} Dorf{% if d|abs != 1 %}e{% endif %}
+        {% if d>0 %}▲{% else %}▼{% endif %} {{ d|abs }} village{% if d|abs != 1 %}s{% endif %}
       </div>{% endif %}{% endif %}
     </div>
   </div>
@@ -85,15 +85,15 @@
 
     <!-- Upload -->
     <div class="card">
-      <h2 style="margin:0 0 0.4rem;" data-i18n="account.import.title">📋 Daten importieren</h2>
+      <h2 style="margin:0 0 0.4rem;" data-i18n="account.import.title">📋 Import data</h2>
       <p class="hint" data-i18n-html="account.import.hint" style="margin-bottom:0.75rem;">
-        Öffne in Travian die <strong>Truppenübersicht</strong> (Dorf → Truppen → Truppenübersicht),
-        markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.
+        Open in Travian the <strong>Troop Overview</strong> (Village → Troops → Troop Overview),
+        select all (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.
       </p>
       <form method="post" action="/guild/{{ guild.guild_id }}/mein-account">
         <div style="margin-bottom:.6rem;">
           <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.25rem;">
-            🏷 <span data-i18n="account.import.name_label">Dein Travian Spielername</span> <span style="color:#f87171;">*</span>
+            🏷 <span data-i18n="account.import.name_label">Your Travian player name</span> <span style="color:#f87171;">*</span>
           </label>
           {% if lock_travian_name %}
           <input type="text" name="travian_name" value="{{ my_travian_name or '' }}"
@@ -101,34 +101,34 @@
             style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);color:var(--text-muted);
                    border:1px solid var(--border);border-radius:6px;padding:.4rem .7rem;font-size:.9rem;cursor:not-allowed;">
           <div style="font-size:.73rem;color:#f59e0b;margin-top:.25rem;">
-            🔒 Dein Spielername wurde von einem Admin gesetzt und kann nicht geändert werden.
+            🔒 Your player name was set by an admin and cannot be changed.
           </div>
           {% else %}
           <input type="text" name="travian_name" value="{{ my_travian_name or '' }}"
             placeholder="z.B. MaxMustermann" required
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .7rem;font-size:.9rem;">
           <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;" data-i18n="account.import.name_hint">
-            Genau wie in Travian angezeigt — wird für die EP-Planung und Allianz-Verifikation genutzt.
+            Exactly as shown in Travian — used for operation planning and alliance verification.
           </div>
           {% endif %}
         </div>
         <textarea name="troop_text" rows="7"
-          placeholder="Dorfname&#9;(X|Y)&#9;Legionär&#9;Prätorianer&#9;...&#10;Mein Dorf 1&#9;(100|50)&#9;200&#9;100&#9;..."
+          placeholder="Village name&#9;(X|Y)&#9;Legionnaire&#9;Praetorian&#9;...&#10;My village 1&#9;(100|50)&#9;200&#9;100&#9;..."
           style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;"></textarea>
         <div style="margin:.45rem 0 .3rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-          <label style="font-size:.8rem;color:var(--text-muted);">Volk (nur nötig bei mobilem Browser):</label>
+          <label style="font-size:.8rem;color:var(--text-muted);">Tribe (only required on mobile browser):</label>
           <select name="tribe" style="font-size:.82rem;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);">
-            <option value="">– automatisch –</option>
-            <option value="römer">Römer</option>
+            <option value="">– auto –</option>
+            <option value="römer">Romans</option>
             <option value="teutonen">Teutonen</option>
             <option value="gallier">Gallier</option>
-            <option value="ägypter">Ägypter</option>
+            <option value="ägypter">Egyptians</option>
             <option value="hunnen">Hunnen</option>
             <option value="spartaner">Spartaner</option>
           </select>
         </div>
         <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap;">
-          <button type="submit" class="btn btn-primary" data-i18n="account.import.btn">⬆️ Speichern &amp; Importieren</button>
+          <button type="submit" class="btn btn-primary" data-i18n="account.import.btn">⬆️ Save &amp; Import</button>
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='flex'" style="display:flex;align-items:center;gap:.4rem;">
             🏥 Lazarett
             {% if hospital_data %}
@@ -140,45 +140,45 @@
           </button>
           {% if own_villages %}
           <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/clear" style="margin:0;"
-                onsubmit="return confirm('Alle eigenen Dörfer löschen?')">
-            <button type="submit" class="btn btn-danger">🗑 Löschen</button>
+                onsubmit="return confirm('Delete all own villages?')">
+            <button type="submit" class="btn btn-danger">🗑 Delete</button>
           </form>
           {% endif %}
         </div>
       </form>
     </div>
 
-    <!-- Dieses Hub erklärt welche Features die Daten nutzen -->
+    <!-- This hub explains which features use the data -->
     <div class="card" style="background:linear-gradient(135deg,var(--bg-card),#0f1629);">
-      <h2 style="margin:0 0 0.75rem;" data-i18n="account.hub.title">🔗 Verwendete Daten</h2>
-      <p class="hint" style="margin-bottom:0.75rem;">Deine importierten Dörfer werden automatisch von folgenden Features genutzt:</p>
+      <h2 style="margin:0 0 0.75rem;" data-i18n="account.hub.title">🔗 Data usage</h2>
+      <p class="hint" style="margin-bottom:0.75rem;">Your imported villages are automatically used by the following features:</p>
       <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.5rem;">
         <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
           <span style="width:24px;text-align:center;">⚔️</span>
           <div>
             <strong>Angriff-Detection</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Eigene Dörfer als Angriffsziele erkennen</div>
+            <div style="color:var(--text-muted);font-size:0.78rem;">Detect own villages as attack targets</div>
           </div>
         </li>
         <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
           <span style="width:24px;text-align:center;">🎯</span>
           <div>
             <strong>Einsatzplanung</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Truppenverteilung für Angriffspläne</div>
+            <div style="color:var(--text-muted);font-size:0.78rem;">Troop distribution for attack plans</div>
           </div>
         </li>
         <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
           <span style="width:24px;text-align:center;">🪖</span>
           <div>
             <strong>Res-Push</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Koordinaten der eigenen Dörfer</div>
+            <div style="color:var(--text-muted);font-size:0.78rem;">Coordinates of own villages</div>
           </div>
         </li>
         <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
           <span style="width:24px;text-align:center;">📊</span>
           <div>
             <strong>Statistiken</strong>
-            <div style="color:var(--text-muted);font-size:0.78rem;">Truppenstärke-Timeline</div>
+            <div style="color:var(--text-muted);font-size:0.78rem;">Troop strength timeline</div>
           </div>
         </li>
       </ul>
@@ -192,13 +192,13 @@
 
   <!-- Sitter-Verwaltung -->
   <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin:0 0 0.75rem;" data-i18n="account.sitter.title">🤝 Sitter-Verwaltung</h2>
+    <h2 style="margin:0 0 0.75rem;" data-i18n="account.sitter.title">🤝 Sitter Management</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/sitters">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
 
         <!-- Meine Sitter -->
         <div>
-          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">👥 Meine Sitter (sitten meinen Account)</h3>
+          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">👥 My Sitters (sitting my account)</h3>
           <div style="display:flex;flex-direction:column;gap:0.5rem;">
             <div style="display:flex;gap:0.5rem;">
               <input type="text" name="sitter1_name" value="{{ sitters.sitter1_name if sitters else '' }}"
@@ -217,7 +217,7 @@
 
         <!-- Accounts die ich sitte -->
         <div>
-          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">🕹️ Accounts die ich sitte</h3>
+          <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);">🕹️ Accounts I am sitting</h3>
           <div style="display:flex;flex-direction:column;gap:0.5rem;">
             <div style="display:flex;gap:0.5rem;">
               <input type="text" name="sitting1_name" value="{{ sitters.sitting1_name if sitters else '' }}"
@@ -236,24 +236,24 @@
       </div>
 
       <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-        <button type="submit" class="btn btn-primary">💾 Sitter-Daten speichern</button>
-        <span style="font-size:.78rem;color:var(--text-muted);">🔒 Sichtbar für alle Mitglieder deiner Allianz</span>
+        <button type="submit" class="btn btn-primary">💾 Save sitter data</button>
+        <span style="font-size:.78rem;color:var(--text-muted);">🔒 Visible to all members of your alliance</span>
         {# Hidden so existing logic keeps working #}
         <input type="hidden" name="is_shared" value="1">
       </div>
     </form>
   </div>
 
-  <!-- Dual-Accounts + Meine Einsätze nebeneinander -->
+  <!-- Dual accounts + My operations side by side -->
   <div id="dualMissionsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;align-items:start;">
   <div class="card" style="margin-bottom:0;height:100%;box-sizing:border-box;">
-    <h2 style="margin:0 0 0.75rem;" data-i18n="account.dual.title">🔗 Dual-Accounts</h2>
+    <h2 style="margin:0 0 0.75rem;" data-i18n="account.dual.title">🔗 Dual Accounts</h2>
 
     {% if dual_created %}
     <div class="alert alert-success" style="margin-bottom:0.75rem;">
-      ✅ Einladungslink erstellt:<br>
+      ✅ Invite link created:<br>
       <code id="dualLink" style="font-size:0.85rem;word-break:break-all;">{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dual_created }}</code>
-      <button type="button" onclick="copyDualLink()" class="btn btn-secondary" style="padding:0.2rem 0.6rem;font-size:0.75rem;margin-left:0.5rem;">📋 Kopieren</button>
+      <button type="button" onclick="copyDualLink()" class="btn btn-secondary" style="padding:0.2rem 0.6rem;font-size:0.75rem;margin-left:0.5rem;">📋 Copy</button>
     </div>
     {% endif %}
 
@@ -266,48 +266,48 @@
             {% if dl.status == 'active' %}
               🟢 {{ dl.dual_username or dl.dual_discord_id }}
             {% elif dl.status == 'pending' %}
-              🟡 Ausstehend
+              🟡 Pending
             {% else %}
-              ⛔ Widerrufen
+              ⛔ Revoked
             {% endif %}
           </div>
           <div style="font-size:0.75rem;color:var(--text-muted);">
             {{ dl.created_at[:10] if dl.created_at else '' }}
             {% if dl.status == 'pending' %}
-              · <span style="color:#3b82f6;cursor:pointer;" onclick="navigator.clipboard.writeText('{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dl.invite_token }}')">Link kopieren</span>
+              · <span style="color:#3b82f6;cursor:pointer;" onclick="navigator.clipboard.writeText('{{ request.url.scheme }}://{{ request.url.netloc }}/dual/join/{{ dl.invite_token }}')">Copy link</span>
             {% endif %}
           </div>
         </div>
         {% if dl.status != 'revoked' %}
         <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/revoke"
-              onsubmit="return confirm('Einladung widerrufen?')" style="margin:0;">
+              onsubmit="return confirm('Revoke invitation?')" style="margin:0;">
           <input type="hidden" name="token" value="{{ dl.invite_token }}">
-          <button type="submit" class="btn btn-danger" style="padding:0.2rem 0.6rem;font-size:0.75rem;">Widerrufen</button>
+          <button type="submit" class="btn btn-danger" style="padding:0.2rem 0.6rem;font-size:0.75rem;">Revoke</button>
         </form>
         {% endif %}
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">Noch keine Dual-Verbindungen.</p>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">No dual connections yet.</p>
     {% endif %}
 
     <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/create">
-      <button type="submit" class="btn btn-secondary">🔗 Neuen Dual-Invite erstellen</button>
+      <button type="submit" class="btn btn-secondary">🔗 Create new dual invite</button>
     </form>
   </div>
 
-  <!-- Meine Einsätze -->
+  <!-- My operations -->
   <div class="card" id="missionsCard" style="margin-bottom:0;height:100%;box-sizing:border-box;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
       <div>
-        <h2 style="margin:0 0 .2rem;" data-i18n="account.missions.title">⚔️ Meine Einsätze</h2>
-        <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Wellen aus aktiven Einsatzplänen, die dir zugewiesen sind.</p>
+        <h2 style="margin:0 0 .2rem;" data-i18n="account.missions.title">⚔️ My Operations</h2>
+        <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Waves from active operation plans assigned to you.</p>
       </div>
-      <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Einsatzplanung</a>
+      <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Operation Planning</a>
     </div>
     <div id="missionsContent">
-      <div style="color:var(--text-muted);font-size:.85rem;">Lade Einsätze…</div>
+      <div style="color:var(--text-muted);font-size:.85rem;">Loading operations…</div>
     </div>
   </div>
 
@@ -318,10 +318,10 @@
   <div class="card" style="margin-bottom:1.25rem; padding:1.25rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
       <div>
-        <h2 style="margin:0;font-size:1rem;" data-i18n="account.timeline.title">📈 Truppenstärke-Timeline</h2>
+        <h2 style="margin:0;font-size:1rem;" data-i18n="account.timeline.title">📈 Troop Strength Timeline</h2>
       </div>
       <div style="display:flex;align-items:center;gap:.75rem;">
-        <span style="font-size:.75rem;color:var(--text-muted);">{{ history|length }} Import{% if history|length != 1 %}e{% endif %}</span>
+        <span style="font-size:.75rem;color:var(--text-muted);">{{ history|length }} import{% if history|length != 1 %}s{% endif %}</span>
         {% if own_villages %}
         <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem;font-size:.8rem;" data-i18n="account.army.btn">🪖 Army Details</button>
         {% endif %}
@@ -332,7 +332,7 @@
     </div>
     {% if history|length > 1 %}
     <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1rem;">
-      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.6rem;font-weight:600;">⚖️ Off / Def Verhältnis pro Import</div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.6rem;font-weight:600;">⚖️ Off / Def ratio per import</div>
       <div style="position:relative;height:80px;">
         <canvas id="ratioChart"></canvas>
       </div>
@@ -344,12 +344,12 @@
   <!-- Troop projection -->
   {% if history and history | length >= 2 %}
   <div class="card" style="margin-bottom:1.25rem;padding:1.25rem;">
-    <h2 style="margin:0 0 .85rem;font-size:1rem;">🔮 Truppenstärke-Projektion</h2>
+    <h2 style="margin:0 0 .85rem;font-size:1rem;">🔮 Troop Strength Projection</h2>
     <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">
-      Hochrechnung basierend auf deinem durchschnittlichen Wachstum zwischen den letzten Importen.
+      Projection based on your average growth between the last imports.
     </p>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
-      {% for d, label in [(7,'7 Tage'),(14,'14 Tage'),(30,'30 Tage'),(60,'60 Tage')] %}
+      {% for d, label in [(7,'7 days'),(14,'14 days'),(30,'30 days'),(60,'60 days')] %}
       <button class="proj-day-btn{% if loop.first %} active{% endif %}" data-days="{{ d }}"
               onclick="selectProjDays({{ d }},this)"
               style="font-size:.77rem;padding:.2rem .75rem;border-radius:12px;border:1px solid var(--border);background:{% if loop.first %}rgba(99,102,241,.2){% else %}var(--bg-main){% endif %};color:{% if loop.first %}#a5b4fc{% else %}var(--text-muted){% endif %};cursor:pointer;">
@@ -410,7 +410,7 @@
         {f:'total_off',   label:'⚔️ Off',       color:'#ef4444'},
         {f:'total_def',   label:'🛡️ Def',       color:'#22c55e'},
         {f:'total_crop',  label:'🌾 Crop',      color:'#f59e0b'},
-        {f:'village_count',label:'🏘️ Dörfer',  color:'#a5b4fc'},
+        {f:'village_count',label:'🏘️ Villages',  color:'#a5b4fc'},
       ];
       const wrap = document.getElementById('projResult');
       wrap.innerHTML = configs.map(c => {
@@ -434,19 +434,19 @@
   <!-- Villages table -->
   {% if own_villages %}
   <div class="card">
-    <h2 style="margin:0 0 1rem;"><span data-i18n="account.villages.title">🏘️ Dörfer</span> ({{ own_villages|length }})</h2>
+    <h2 style="margin:0 0 1rem;"><span data-i18n="account.villages.title">🏘️ Villages</span> ({{ own_villages|length }})</h2>
     <div style="overflow-x:auto;">
       <table class="table">
         <thead>
           <tr>
-            <th data-i18n="account.th.village">Dorf</th>
-            <th data-i18n="account.th.coords">Koords</th>
-            <th data-i18n="account.th.type">Typ</th>
+            <th data-i18n="account.th.village">Village</th>
+            <th data-i18n="account.th.coords">Coords</th>
+            <th data-i18n="account.th.type">Type</th>
             <th style="text-align:right;">⚔️ Off</th>
             <th style="text-align:right;">🛡️ Def</th>
             <th style="text-align:right;">🌾 Korn</th>
-            <th style="min-width:200px;" data-i18n="account.th.troops">Truppenverteilung</th>
-            <th data-i18n="account.th.imported">Importiert</th>
+            <th style="min-width:200px;" data-i18n="account.th.troops">Troop distribution</th>
+            <th data-i18n="account.th.imported">Imported</th>
           </tr>
         </thead>
         <tbody>
@@ -493,7 +493,7 @@
                 {% endif %}{% endfor %}
               </div>
               {% else %}
-              <span style="color:var(--text-muted);font-size:0.82rem;">Keine Truppen</span>
+              <span style="color:var(--text-muted);font-size:0.82rem;">No troops</span>
               {% endif %}
             </td>
             <td style="color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">
@@ -506,7 +506,7 @@
               <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/set-scout-village" style="margin:0;">
                 <input type="hidden" name="x" value="{{ v.x }}">
                 <input type="hidden" name="y" value="{{ v.y }}">
-                <button type="submit" title="{% if is_sv %}Scout-Dorf entfernen{% else %}Als Scout-Dorf markieren{% endif %}"
+                <button type="submit" title="{% if is_sv %}Remove scout village{% else %}Mark as scout village{% endif %}"
                         style="background:{% if is_sv %}rgba(99,102,241,.25){% else %}none{% endif %};
                                border:1px solid {% if is_sv %}#818cf8{% else %}var(--border){% endif %};
                                border-radius:6px;cursor:pointer;font-size:.82rem;padding:3px 8px;
@@ -525,8 +525,8 @@
   {% else %}
   <div class="card" style="text-align:center;padding:2.5rem 1rem;">
     <div style="font-size:2.5rem;margin-bottom:0.75rem;">🏰</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="account.empty.title">Noch keine Dörfer importiert</h2>
-    <p style="color:var(--text-muted);" data-i18n="account.empty.hint">Nutze das Importformular oben um deine Truppenübersicht einzufügen.</p>
+    <h2 style="margin:0 0 0.5rem;" data-i18n="account.empty.title">No villages imported yet</h2>
+    <p style="color:var(--text-muted);" data-i18n="account.empty.hint">Use the import form above to paste your troop overview.</p>
   </div>
   {% endif %}
 
@@ -541,7 +541,7 @@
     <button onclick="document.getElementById('hospitalModal').style.display='none'"
             style="position:absolute;top:0.9rem;right:0.9rem;background:none;border:none;
                    color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">✕</button>
-    <h2 style="margin:0 0 1rem;">🏥 Lazarett</h2>
+    <h2 style="margin:0 0 1rem;">🏥 Hospital</h2>
 
     {% if hospital_data %}
     {% set total_healing = hospital_data | sum(attribute='count') %}
@@ -549,15 +549,15 @@
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
       <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:.65rem 1rem;min-width:130px;text-align:center;">
         <div style="font-size:1.3rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(total_healing).replace(",",".") }}</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">🩺 In Heilung</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">🩺 In recovery</div>
       </div>
       <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:.65rem 1rem;min-width:150px;text-align:center;">
         <div style="font-size:1.1rem;font-weight:800;color:#f59e0b;" id="hospitalTotalTime">—</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">⏱️ Alle geheilt in</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">⏱️ All healed in</div>
       </div>
       <div style="background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.3);border-radius:10px;padding:.65rem 1rem;min-width:150px;text-align:center;">
         <div style="font-size:1.1rem;font-weight:700;color:var(--text-muted);" id="hospitalFinishAt">—</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">🏁 Fertig um</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">🏁 Finished at</div>
       </div>
     </div>
     <!-- Tabelle -->
@@ -565,9 +565,9 @@
       <table class="table" style="margin:0;">
         <thead>
           <tr>
-            <th>Dorf</th><th>Truppe</th>
+            <th>Village</th><th>Troop</th>
             <th style="text-align:right;">Anzahl</th>
-            <th>Fertig um</th><th>Verbleibend</th>
+            <th>Finished at</th><th>Remaining</th>
           </tr>
         </thead>
         <tbody>
@@ -587,16 +587,16 @@
 
     <!-- Import-Formular -->
     <details {% if not hospital_data %}open{% endif %} style="margin-bottom:0.75rem;">
-      <summary style="cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text-muted);padding:0.3rem 0;">⬆️ Neue Daten importieren</summary>
+      <summary style="cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text-muted);padding:0.3rem 0;">⬆️ Import new data</summary>
       <div style="margin-top:0.6rem;">
-        <p class="hint" style="margin-bottom:0.5rem;">Öffne in Travian das <strong>Lazarett</strong>, markiere alles (<kbd>Strg+A</kbd>), kopiere (<kbd>Strg+C</kbd>) und füge hier ein.</p>
+        <p class="hint" style="margin-bottom:0.5rem;">Open in Travian the <strong>Hospital</strong>, select all (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.</p>
         <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/hospital">
           <textarea name="hospital_text" rows="8"
             placeholder="Dorfname&#10;Legionär&#9;45&#9;08:32:15&#10;Prätorianer&#9;12&#9;09:15:00&#10;..."
             style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;box-sizing:border-box;"></textarea>
           <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
-            <button type="submit" class="btn btn-primary">⬆️ Importieren</button>
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='none'">Abbrechen</button>
+            <button type="submit" class="btn btn-primary">⬆️ Import</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='none'">Cancel</button>
           </div>
         </form>
       </div>
@@ -604,8 +604,8 @@
 
     {% if hospital_data %}
     <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/hospital/clear" style="margin:0;"
-          onsubmit="return confirm('Lazarett-Daten löschen?')">
-      <button type="submit" class="btn btn-danger" style="font-size:0.8rem;">🗑 Alle Lazarett-Daten löschen</button>
+          onsubmit="return confirm('Delete hospital data?')">
+      <button type="submit" class="btn btn-danger" style="font-size:0.8rem;">🗑 Delete all hospital data</button>
     </form>
     {% endif %}
   </div>
@@ -629,7 +629,7 @@
     return null;
   }
   function fmtRemaining(ms) {
-    if (ms <= 0) return '<span style="color:#2ed573;">✓ fertig</span>';
+    if (ms <= 0) return '<span style="color:#2ed573;">✓ done</span>';
     const s = Math.floor(ms/1000), hh=Math.floor(s/3600), mm=Math.floor((s%3600)/60), ss=s%60;
     const col = hh>4?'#f59e0b':hh>0?'#ef4444':'#2ed573';
     const txt = hh>0?`${hh}h ${String(mm).padStart(2,'0')}m`:`${mm}m ${String(ss).padStart(2,'0')}s`;
@@ -657,11 +657,11 @@
     }
   }
   update(); setInterval(update,1000);
-  // Öffne Modal automatisch wenn nach Import zurückgekehrt
+  // Open modal automatically when returned after import
   {% if hospital_uploaded or hospital_cleared %}
   document.addEventListener('DOMContentLoaded',()=>{ document.getElementById('hospitalModal').style.display='flex'; });
   {% endif %}
-  // Schließen mit Escape
+  // Close with Escape
   document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElementById('hospitalModal').style.display='none'; });
 })();
 </script>
@@ -701,7 +701,7 @@ function copyDualLink() {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
       <div>
         <h2 style="margin:0;font-size:1.1rem;">🪖 Army Details</h2>
-        <p style="margin:.2rem 0 0;font-size:.78rem;color:var(--text-muted);">Aufschlüsselung aller importierten Truppen</p>
+        <p style="margin:.2rem 0 0;font-size:.78rem;color:var(--text-muted);">Breakdown of all imported troops</p>
       </div>
       <button onclick="closeArmyModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.25rem .4rem;">&times;</button>
     </div>
@@ -766,7 +766,7 @@ function openArmyModal() {
       <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.06);"><div style="width:${offPct}%;background:rgba(239,68,68,.75);"></div><div style="flex:1;background:rgba(34,197,94,.65);"></div></div>
       <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);margin-top:.25rem;"><span>⚔️ Off ${offPct}%</span><span>🛡️ Def ${100-offPct}%</span></div>
     </div>
-    ${sec('Fußvolk','🚶','#3b82f6',infantry)}${sec('Kavallerie','🐴','#f59e0b',cavalry)}${sec('Belagerung','🏹','#ef4444',siege)}${Object.keys(other).length?sec('Weitere','⚔️','#94a3b8',other):''}`;
+    ${sec('Infantry','🚶','#3b82f6',infantry)}${sec('Cavalry','🐴','#f59e0b',cavalry)}${sec('Siege','🏹','#ef4444',siege)}${Object.keys(other).length?sec('Other','⚔️','#94a3b8',other):''}`;
   document.getElementById('armyModal').style.display='flex';
   document.body.style.overflow='hidden';
 }
@@ -831,16 +831,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeArmyModal();});
 }
 </style>
 
-<!-- Delta-Modal for "Unpünktlich" -->
+<!-- Delta modal for "Late" -->
 <div id="deltaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:min(340px,95vw);box-shadow:0 20px 60px rgba(0,0,0,.5);">
-    <h3 style="margin:0 0 1rem;">⏱ Abweichung angeben</h3>
-    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.75rem;">Wie viele Sekunden war dein Abschicken von der geplanten Sendezeit entfernt?<br><span style="color:#fbbf24;">+ = zu spät &nbsp;·&nbsp; − = zu früh</span></p>
-    <input id="deltaInput" type="number" placeholder="z.B. +15 oder -5"
+    <h3 style="margin:0 0 1rem;">⏱ Enter deviation</h3>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.75rem;">How many seconds was your send time from the planned send time?<br><span style="color:#fbbf24;">+ = too late &nbsp;·&nbsp; − = too early</span></p>
+    <input id="deltaInput" type="number" placeholder="e.g. +15 or -5"
            style="width:100%;padding:.5rem .75rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:1rem;margin-bottom:1rem;box-sizing:border-box;">
     <div style="display:flex;gap:.5rem;">
-      <button onclick="closeDeltaModal()" class="btn btn-secondary" style="flex:1;">Abbrechen</button>
-      <button onclick="saveDelta()" class="btn btn-primary" style="flex:1;">Bestätigen</button>
+      <button onclick="closeDeltaModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>
+      <button onclick="saveDelta()" class="btn btn-primary" style="flex:1;">Confirm</button>
     </div>
   </div>
 </div>
@@ -871,7 +871,7 @@ async function saveDelta() {
 }
 
 async function markCantSend(waveId, waveData=null) {
-  if (!confirm('Bestätigen: Du kannst diese Welle nicht abschicken?')) return;
+  if (!confirm('Confirm: You cannot send this wave?')) return;
   await confirmWave(waveId, 'cant_send', 0, waveData);
 }
 
@@ -908,7 +908,7 @@ function loadMissions() {
       const el = document.getElementById('missionsContent');
       const waves = data.waves || [];
       if (!waves.length) {
-        el.innerHTML='<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem 0;">Keine Einsätze zugewiesen.</div>';
+        el.innerHTML='<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem 0;">No operations assigned.</div>';
         document.getElementById('missionsCard').style.opacity='.6';
         return;
       }
@@ -922,10 +922,10 @@ function loadMissions() {
         byPlan[key].waves.push(w);
       });
 
-      const typeLabels = {real:'⚔ Echter Angriff', fake:'👻 Fake', def:'🛡 Verteidigung', scout:'🔍 Aufklärung'};
+      const typeLabels = {real:'⚔ Real Attack', fake:'👻 Fake', def:'🛡 Defense', scout:'🔍 Scout'};
       const typeColors = {real:'wt-real', fake:'wt-fake', def:'wt-def', scout:'wt-scout'};
       const csIcons   = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫'};
-      const csLabels  = {on_time:'Pünktlich', late:'Unpünktlich', not_sent:'Nicht abgeschickt', cant_send:'Kann nicht'};
+      const csLabels  = {on_time:'On time', late:'Late', not_sent:'Not sent', cant_send:'Cannot send'};
       const csBg      = {on_time:'rgba(74,222,128,.06)', late:'rgba(251,191,36,.08)', not_sent:'rgba(248,113,113,.08)', cant_send:'rgba(248,113,113,.08)'};
 
       el.innerHTML = Object.values(byPlan).map(p => {
@@ -944,8 +944,8 @@ function loadMissions() {
             ? `<span style="font-size:.85rem;" title="${csLabels[cs]||cs}${deltaStr}">${csIcons[cs]||'?'} ${csLabels[cs]||cs}${deltaStr}</span>`
             : (isPast
               ? `<div style="display:flex;gap:.3rem;flex-wrap:wrap;">
-                  <button onclick="confirmWave(${w.id},'on_time',0,${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#16a34a22;color:#4ade80;border:1px solid #4ade8044;border-radius:5px;cursor:pointer;">✅ Pünktlich</button>
-                  <button onclick="openDeltaModal(${w.id},${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#d9770622;color:#fbbf24;border:1px solid #fbbf2444;border-radius:5px;cursor:pointer;">⏱ Unpünktlich</button>
+                  <button onclick="confirmWave(${w.id},'on_time',0,${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#16a34a22;color:#4ade80;border:1px solid #4ade8044;border-radius:5px;cursor:pointer;">✅ On time</button>
+                  <button onclick="openDeltaModal(${w.id},${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#d9770622;color:#fbbf24;border:1px solid #fbbf2444;border-radius:5px;cursor:pointer;">⏱ Late</button>
                   <button onclick="confirmWave(${w.id},'not_sent',0,${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262622;color:#f87171;border:1px solid #f8717144;border-radius:5px;cursor:pointer;">❌ Nicht abgeschickt</button>
                 </div>`
               : `<button onclick="markCantSend(${w.id},${JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y})})" style="font-size:.72rem;padding:.2rem .5rem;background:#dc262611;color:#f87171;border:1px solid #f8717133;border-radius:5px;cursor:pointer;">🚫 Kann nicht abschicken</button>`);
@@ -967,11 +967,11 @@ function loadMissions() {
           </div>
           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.83rem;">
             <thead><tr style="border-bottom:1px solid var(--border);">
-              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Typ</th>
-              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Ziel</th>
-              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Sendezeit</th>
-              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Marschzeit</th>
-              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Notiz</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Type</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Target</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Send time</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">March time</th>
+              <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Note</th>
               <th style="padding:.35rem .6rem;color:var(--text-muted);text-align:left;font-weight:600;">Status</th>
             </tr></thead>
             <tbody>${rows}</tbody>
@@ -979,7 +979,7 @@ function loadMissions() {
         </div>`;
       }).join('');
     })
-    .catch(()=>{ document.getElementById('missionsContent').innerHTML='<div style="color:var(--text-muted);font-size:.83rem;">Einsätze konnten nicht geladen werden.</div>'; });
+    .catch(()=>{ document.getElementById('missionsContent').innerHTML='<div style="color:var(--text-muted);font-size:.83rem;">Operations could not be loaded.</div>'; });
 }
 loadMissions();
 </script>

@@ -7,12 +7,12 @@
   <div style="margin-bottom:1.5rem;">
     <a href="/dashboard" class="back-link">← Dashboard</a>
     <h1 style="margin:0.25rem 0 0;" data-i18n="profile.title">👤 Mein Profil</h1>
-    <p class="subtitle" style="margin:0;" data-i18n="profile.subtitle">Einladungen, TravOps-Points und Belohnungen</p>
+    <p class="subtitle" style="margin:0;" data-i18n="profile.subtitle">Invitationen, TravOps-Points und Rewarden</p>
   </div>
 
   {% if redeemed == '1' %}
   <div class="alert" style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#86efac;">
-    🎉 Eingelöst! Dein Pro-Zugang wurde um 1 Monat verlängert.
+    🎉 Redeemed! Your Pro access has been extended by 1 month.
   </div>
   {% elif redeemed == '0' %}
   <div class="alert" style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#f87171;">
@@ -27,26 +27,26 @@
         <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.25rem;" data-i18n="profile.points.label">TravOps-Points</div>
         <div style="font-size:2.5rem;font-weight:700;color:#f59e0b;line-height:1;">
           {{ ref_stats.points }}
-          <span style="font-size:1rem;color:var(--text-muted);font-weight:400;">/ 10 für 1 Monat Pro</span>
+          <span style="font-size:1rem;color:var(--text-muted);font-weight:400;">/ 10 for 1 month Pro</span>
         </div>
         <!-- Progress bar -->
         <div style="margin-top:0.75rem;background:rgba(255,255,255,0.08);border-radius:999px;height:8px;width:280px;max-width:100%;">
           <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#fbbf24);width:{{ [ref_stats.points * 10, 100] | min }}%;transition:width 0.4s;"></div>
         </div>
         <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.4rem;">
-          {{ ref_stats.referred_count }} erfolgreiche Einladung(en) · {{ 10 - ref_stats.points if ref_stats.points < 10 else 0 }} Points bis zur Einlösung
+          {{ ref_stats.referred_count }} successful invitation(s) · {{ 10 - ref_stats.points if ref_stats.points < 10 else 0 }} points until redemption
         </p>
       </div>
       {% if ref_stats.points >= 10 %}
       <form method="post" action="/profile/redeem">
         <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;padding:0.65rem 1.4rem;border-radius:10px;font-weight:600;cursor:pointer;color:#fff;white-space:nowrap;" data-i18n="profile.redeem.btn">
-          🎁 10 Points einlösen → 1 Monat Pro
+          🎁 Redeem 10 points → 1 month Pro
         </button>
       </form>
       {% else %}
       <div style="text-align:center;opacity:0.5;">
         <div style="font-size:2rem;">🎁</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">Noch {{ 10 - ref_stats.points }} Points nötig</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">Still {{ 10 - ref_stats.points }} points needed</div>
       </div>
       {% endif %}
     </div>
@@ -54,9 +54,9 @@
 
   <!-- ── REF-LINK ── -->
   <div class="card" style="margin-bottom:1.25rem;">
-    <h3 style="margin:0 0 0.5rem;font-size:1rem;" data-i18n="profile.reflink.title">🔗 Dein persönlicher Einladungslink</h3>
+    <h3 style="margin:0 0 0.5rem;font-size:1rem;" data-i18n="profile.reflink.title">🔗 Your personal invitation link</h3>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:0.85rem;">
-      Teile diesen Link. Sobald jemand über deinen Link ein <strong>Pro-Abo</strong> kauft, bekommst du automatisch <strong>+1 TravOps-Point</strong>. Pro eingeladener Person einmalig.
+      Share this link. Once someone buys a <strong>Pro subscription</strong> via your link, you automatically get <strong>+1 TravOps point</strong>. Once per invited person.
     </p>
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
       <input
@@ -72,7 +72,7 @@
         id="copyBtn"
         style="background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;padding:0.55rem 1rem;border-radius:8px;cursor:pointer;font-size:0.85rem;white-space:nowrap;"
       >
-        📋 Kopieren
+        📋 Copy
       </button>
     </div>
     <div id="copiedHint" style="display:none;margin-top:0.4rem;font-size:0.78rem;color:#86efac;">✓ Link kopiert!</div>
@@ -81,7 +81,7 @@
     <div style="display:flex;gap:1.5rem;margin-top:1rem;flex-wrap:wrap;">
       <div style="text-align:center;">
         <div style="font-size:1.6rem;font-weight:700;color:#a78bfa;">{{ ref_stats.referred_count }}</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);">Einladungen gesamt</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">Invitationen gesamt</div>
       </div>
       <div style="text-align:center;">
         <div style="font-size:1.6rem;font-weight:700;color:#f59e0b;">{{ ref_stats.points }}</div>
@@ -89,7 +89,7 @@
       </div>
       <div style="text-align:center;">
         <div style="font-size:1.6rem;font-weight:700;color:#34d399;">{{ (ref_stats.points // 10) }}</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);">Monate einlösbar</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">Months redeemable</div>
       </div>
     </div>
   </div>
@@ -97,8 +97,8 @@
   <!-- ── TOUR RESTART ── -->
   <div class="card" style="margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
     <div>
-      <div style="font-weight:600;font-size:.92rem;">🗺️ Einführungstour</div>
-      <div style="font-size:.78rem;color:var(--text-muted);margin-top:.15rem;">Tour beim nächsten Aufruf des Dashboards erneut starten.</div>
+      <div style="font-weight:600;font-size:.92rem;">🗺️ Introduction tour</div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:.15rem;">Restart tour on next dashboard visit.</div>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <button onclick="restartAccountTour()" class="btn btn-secondary" style="font-size:.82rem;white-space:nowrap;">
@@ -141,7 +141,7 @@
   </div>
   {% elif df and df not in ('linked','unlinked','code_reset') %}
   {% set err_msgs = {
-    'invalid_code': 'Ungültiger Code — bitte prüfen.',
+    'invalid_code': 'Invalid code — please check.',
     'self_link': 'Du kannst dich nicht mit dir selbst verlinken.',
     'already_anchor': 'Du hast bereits Duals – du kannst nicht gleichzeitig Dual eines anderen sein.',
     'already_dual': 'Du bist bereits als Dual verlinkt. Erst trennen, dann neu verbinden.',
@@ -154,7 +154,7 @@
   {% endif %}
 
   <div class="card" style="margin-bottom:1.25rem;">
-    <h3 style="margin:0 0 0.25rem;font-size:0.95rem;">👥 Dual-Spieler</h3>
+    <h3 style="margin:0 0 0.25rem;font-size:0.95rem;">👥 Dual-Player</h3>
     <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 1rem;">
       Spielst du einen Travian-Account gemeinsam mit anderen? Verlinke deine Duals — sie sehen dann alle deine Allianz-Inhalte und erhalten dieselben Benachrichtigungen.
     </p>
@@ -184,12 +184,12 @@
                onclick="this.select()">
         <button onclick="copyDualCode()" id="copyDualBtn"
                 style="background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.85rem;white-space:nowrap;">
-          📋 Kopieren
+          📋 Copy
         </button>
         <form method="post" action="/profile/dual/regenerate" style="margin:0;">
           <button type="submit" title="Neuen Code generieren"
                   style="background:none;border:1px solid var(--border);color:var(--text-muted);padding:.5rem .7rem;border-radius:8px;cursor:pointer;font-size:.78rem;"
-                  onclick="return confirm('Neuen Code generieren? Der alte Code funktioniert dann nicht mehr für neue Verlinkungen (bestehende Verbindungen bleiben bestehen).')">
+                  onclick="return confirm('Generate new code? The old code will no longer work for new links (existing connections remain).')">
             🔄
           </button>
         </form>
@@ -220,7 +220,7 @@
     <!-- Link a new Dual -->
     {% if dual_info.dual_count < 10 %}
     <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;">
-      <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;">➕ Dual hinzufügen</div>
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;">➕ Add dual</div>
       <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .6rem;">Dein Dual-Partner gibt seinen eigenen Code bei dir ein — oder du gibst deinen Code bei ihm ein.</p>
       <form method="post" action="/profile/dual/link" style="display:flex;gap:.5rem;flex-wrap:wrap;">
         <input type="text" name="code" placeholder="Dual-Code (z.B. D-ABCDE12345)" required
@@ -240,11 +240,11 @@
   <div class="card" style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);">
     <h3 style="margin:0 0 0.75rem;font-size:0.95rem;color:#a5b4fc;">ℹ️ So funktioniert es</h3>
     <ol style="margin:0;padding-left:1.2rem;font-size:0.83rem;color:var(--text-muted);line-height:1.8;">
-      <li>Teile deinen persönlichen Einladungslink mit anderen Spielern.</li>
-      <li>Wenn jemand über deinen Link ein <strong style="color:var(--text-primary);">Pro-Abo</strong> abschließt, bekommst du automatisch <strong style="color:#f59e0b;">+1 TravOps-Point</strong>.</li>
+      <li>Share your personal invitation link with other players.</li>
+      <li>When someone signs up for a <strong style="color:var(--text-primary);">Pro subscription</strong> via your link, you automatically get <strong style="color:#f59e0b;">+1 TravOps point</strong>.</li>
       <li>Pro eingeladener Person gibt es nur einmal einen Point.</li>
       <li>Mit <strong style="color:var(--text-primary);">10 TravOps-Points</strong> kannst du dir <strong style="color:#34d399;">1 Monat Pro kostenlos</strong> sichern.</li>
-      <li>Points verfallen nicht — sammle so viele du möchtest!</li>
+      <li>Points never expire — collect as many as you like!</li>
     </ol>
   </div>
 
@@ -258,7 +258,7 @@ function copyRef() {
     document.getElementById('copyBtn').textContent = '✓ Kopiert';
     setTimeout(() => {
       document.getElementById('copiedHint').style.display = 'none';
-      document.getElementById('copyBtn').textContent = '📋 Kopieren';
+      document.getElementById('copyBtn').textContent = '📋 Copy';
     }, 2500);
   });
 }
@@ -269,7 +269,7 @@ function copyDualCode() {
     document.getElementById('copyDualBtn').textContent = '✓ Kopiert';
     setTimeout(() => {
       document.getElementById('dualCopiedHint').style.display = 'none';
-      document.getElementById('copyDualBtn').textContent = '📋 Kopieren';
+      document.getElementById('copyDualBtn').textContent = '📋 Copy';
     }, 2500);
   });
 }

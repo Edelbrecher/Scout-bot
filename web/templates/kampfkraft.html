@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Kampfkraft-Rechner · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Combat power-Rechner · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1200px;">
 
   <div style="margin-bottom:1.25rem;">
     <a href="/guild/{{ guild.guild_id }}/mein-account" class="back-link">← Mein Account</a>
-    <h1 style="margin:0.25rem 0 0;" data-i18n="kk.title">⚔️ Kampfkraft-Rechner</h1>
+    <h1 style="margin:0.25rem 0 0;" data-i18n="kk.title">⚔️ Combat power-Rechner</h1>
     <p class="subtitle" style="margin:0;">{{ guild.guild_name }}</p>
   </div>
 
@@ -25,11 +25,11 @@
     <div class="card" style="margin-bottom:1rem;padding:0.85rem 1.1rem;">
       <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;">
         <div>
-          <label style="font-size:0.8rem;color:var(--text-muted);">Stamm</label>
+          <label style="font-size:0.8rem;color:var(--text-muted);">Tribe</label>
           <div style="display:flex;gap:0.4rem;margin-top:0.3rem;">
-            <button class="tribe-btn active" data-tribe="roman"  onclick="setTribe('roman')">🦅 Römer</button>
-            <button class="tribe-btn"        data-tribe="gaul"   onclick="setTribe('gaul')">🍀 Gallier</button>
-            <button class="tribe-btn"        data-tribe="teuton" onclick="setTribe('teuton')">⚒️ Teutonen</button>
+            <button class="tribe-btn active" data-tribe="roman"  onclick="setTribe('roman')">🦅 Romans</button>
+            <button class="tribe-btn"        data-tribe="gaul"   onclick="setTribe('gaul')">🍀 Gauls</button>
+            <button class="tribe-btn"        data-tribe="teuton" onclick="setTribe('teuton')">⚒️ Teutons</button>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:0.2rem;">
@@ -53,8 +53,8 @@
             <th>Truppe</th>
             <th style="text-align:center;">🌾 Korn</th>
             <th style="text-align:center;">💨 Speed</th>
-            <th style="text-align:right;">⚔️ Angriff (Basis)</th>
-            <th style="text-align:right;">⚔️ Angriff (+Schmiede)</th>
+            <th style="text-align:right;">⚔️ Attack (Basis)</th>
+            <th style="text-align:right;">⚔️ Attack (+Schmiede)</th>
             <th style="text-align:right;">🛡️ Def Inf (Basis)</th>
             <th style="text-align:right;">🛡️ Def Inf (+Schmiede)</th>
             <th style="text-align:right;">🐎 Def Kav (Basis)</th>
@@ -67,8 +67,8 @@
     </div>
 
     <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
-      Formel: <code>Wert + (Wert + 300 × Korn/7) × (1,008<sup>Stufe</sup> − 1)</code> &nbsp;·&nbsp;
-      Gilt für Angriff und beide Def-Werte &nbsp;·&nbsp; Teure Einheiten (hohes Korn) profitieren mehr &nbsp;·&nbsp;
+      Formel: <code>Wert + (Wert + 300 × Korn/7) × (1,008<sup>Level</sup> − 1)</code> &nbsp;·&nbsp;
+      Applies to attack and both def values &nbsp;·&nbsp; Expensive units (high crop) benefit more &nbsp;·&nbsp;
       Quelle: <a href="https://blog.travian.com/2023/10/game-secrets-smithy-and-total-strength-of-an-army/" target="_blank" style="color:#3b82f6;">Travian Game Secrets</a>
     </p>
   </div>
@@ -80,17 +80,17 @@
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
 
-      <!-- Left: Einstellungen -->
+      <!-- Left: Settings -->
       <div class="card">
-        <h3 style="margin:0 0 0.75rem;">⚙️ Einstellungen</h3>
+        <h3 style="margin:0 0 0.75rem;">⚙️ Settings</h3>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
           <div>
-            <label style="font-size:0.8rem;color:var(--text-muted);">Stamm</label>
+            <label style="font-size:0.8rem;color:var(--text-muted);">Tribe</label>
             <select id="calcTribe" onchange="calcRebuild()" style="width:100%;margin-top:0.3rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
-              <option value="roman">🦅 Römer</option>
-              <option value="gaul">🍀 Gallier</option>
-              <option value="teuton">⚒️ Teutonen</option>
+              <option value="roman">🦅 Romans</option>
+              <option value="gaul">🍀 Gauls</option>
+              <option value="teuton">⚒️ Teutons</option>
             </select>
           </div>
           <div>
@@ -102,13 +102,13 @@
         </div>
 
         <div id="pferdtraenkeBlock" style="display:none;margin-top:0.75rem;">
-          <label style="font-size:0.8rem;color:var(--text-muted);">🐴 Pferdetränke-Stufe</label>
+          <label style="font-size:0.8rem;color:var(--text-muted);">🐴 Horse drinking trough level</label>
           <select id="pferdtraenke" onchange="calcUpdate()"
                   style="width:100%;margin-top:0.3rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
             <option value="0">Nicht gebaut</option>
-            <option value="10">Stufe 10 (Equites Legati: 2→1 🌾)</option>
-            <option value="15">Stufe 15 (+ Equites Imperatoris: 3→2 🌾)</option>
-            <option value="20">Stufe 20 (+ Equites Caesaris: 4→3 🌾)</option>
+            <option value="10">Level 10 (Equites Legati: 2→1 🌾)</option>
+            <option value="15">Level 15 (+ Equites Imperatoris: 3→2 🌾)</option>
+            <option value="20">Level 20 (+ Equites Caesaris: 4→3 🌾)</option>
           </select>
         </div>
 
@@ -121,27 +121,27 @@
                    style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;">
           </div>
           <div>
-            <label style="font-size:0.78rem;color:var(--text-muted);">Kampfstärke-Punkte</label>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Fighting strength points</label>
             <input type="number" id="heroFighting" min="0" max="500" value="0" oninput="calcUpdate()"
                    style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;"
                    placeholder="0–500">
           </div>
           <div>
-            <label style="font-size:0.78rem;color:var(--text-muted);">Equipment-Bonus Angriff (%)</label>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Equipment-Bonus Attack (%)</label>
             <input type="number" id="heroOffBonus" min="0" max="100" value="0" oninput="calcUpdate()"
                    style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;">
           </div>
           <div>
-            <label style="font-size:0.78rem;color:var(--text-muted);">Equipment-Bonus Verteidigung (%)</label>
+            <label style="font-size:0.78rem;color:var(--text-muted);">Equipment-Bonus Defense (%)</label>
             <input type="number" id="heroDefBonus" min="0" max="100" value="0" oninput="calcUpdate()"
                    style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.35rem;">
           </div>
         </div>
         <div style="margin-top:0.5rem;">
-          <label style="font-size:0.78rem;color:var(--text-muted);">Held-Modus (für diesen Kampf)</label>
+          <label style="font-size:0.78rem;color:var(--text-muted);">Hero mode (for this fight)</label>
           <select id="heroMode" onchange="calcUpdate()" style="width:100%;margin-top:0.25rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem;">
-            <option value="off">100% Angriff</option>
-            <option value="def">100% Verteidigung</option>
+            <option value="off">100% Attack</option>
+            <option value="def">100% Defense</option>
             <option value="none">Kein Held</option>
           </select>
         </div>
@@ -152,29 +152,29 @@
 
         {% if own_villages %}
         <button onclick="prefillFromVillages()" class="btn btn-secondary" style="margin-top:0.6rem;font-size:0.8rem;width:100%;">
-          📥 Aus importierten Dörfern befüllen
+          📥 Fill from imported villages
         </button>
         {% endif %}
       </div>
 
-      <!-- Right: Ergebnis -->
+      <!-- Right: Result -->
       <div>
         <div class="card" style="margin-bottom:0.75rem;border-color:rgba(239,68,68,0.35);background:linear-gradient(135deg,var(--bg-card),#1a0a0a);">
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">⚔️ Gesamter Angriffswert</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">⚔️ Gesamter Attackswert</div>
           <div id="resultAtt" style="font-size:2.2rem;font-weight:800;color:#ef4444;">0</div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;" id="resultAttBreakdown"></div>
         </div>
         <div class="card" style="margin-bottom:0.75rem;border-color:rgba(34,197,94,0.35);background:linear-gradient(135deg,var(--bg-card),#0a1a0a);">
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">🛡️ Gesamter Verteidigungswert (Inf.)</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">🛡️ Gesamter Defenseswert (Inf.)</div>
           <div id="resultDefI" style="font-size:2.2rem;font-weight:800;color:#22c55e;">0</div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;" id="resultDefIBreakdown"></div>
         </div>
         <div class="card" style="margin-bottom:0.75rem;border-color:rgba(96,165,250,0.35);background:linear-gradient(135deg,var(--bg-card),#0a0f1a);">
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">🐎 Gesamter Verteidigungswert (Kav.)</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">🐎 Gesamter Defenseswert (Kav.)</div>
           <div id="resultDefC" style="font-size:2.2rem;font-weight:800;color:#60a5fa;">0</div>
         </div>
         <div class="card" style="border-color:rgba(245,158,11,0.3);">
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;">📋 Aufschlüsselung</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.3rem;">📋 Breakdown</div>
           <div id="calcBreakdown" style="font-size:0.8rem;display:flex;flex-direction:column;gap:0.3rem;"></div>
         </div>
       </div>
@@ -189,16 +189,16 @@
             <tr>
               <th>Schmiede-Level</th>
               <th style="text-align:right;">Bonus</th>
-              <th style="text-align:right;color:#ef4444;">⚔️ Angriff</th>
+              <th style="text-align:right;color:#ef4444;">⚔️ Attack</th>
               <th style="text-align:right;color:#22c55e;">🛡️ Def Inf</th>
               <th style="text-align:right;color:#60a5fa;">🐎 Def Kav</th>
-              <th style="text-align:right;">🌾 Korn/h</th>
+              <th style="text-align:right;">🌾 Crop/h</th>
             </tr>
           </thead>
           <tbody id="smithyCompareBody"></tbody>
         </table>
       </div>
-      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">Formel: <code>BASIS + (BASIS + 300×Korn/7) × (1,008<sup>Stufe</sup>−1)</code> — Höherer Kornverbrauch = größerer Bonus pro Stufe.</p>
+      <p style="font-size:0.73rem;color:var(--text-muted);margin-top:0.4rem;">Formula: <code>BASE + (BASE + 300×Crop/7) × (1.008<sup>Level</sup>−1)</code> — Higher crop consumption = larger bonus per level.</p>
     </div>
   </div>
 
@@ -247,9 +247,9 @@ const TROOPS = {
     { name:"Theutates-Blitz",     att:90,  defI:25,  defC:40,  crop:2, speed:19, type:"cav"  },
     { name:"Druidentreiter",      att:45,  defI:115, defC:55,  crop:2, speed:16, type:"cav"  },
     { name:"Haeduer",             att:140, defI:60,  defC:165, crop:3, speed:13, type:"cav"  },
-    { name:"Gallier-Rammbock",    att:50,  defI:30,  defC:105, crop:5, speed:4,  type:"siege"},
-    { name:"Gallier-Kata",        att:70,  defI:45,  defC:10,  crop:6, speed:3,  type:"siege"},
-    { name:"Stammesältester",     att:40,  defI:50,  defC:50,  crop:5, speed:5,  type:"inf"  },
+    { name:"Gauls-Rammbock",    att:50,  defI:30,  defC:105, crop:5, speed:4,  type:"siege"},
+    { name:"Gauls-Kata",        att:70,  defI:45,  defC:10,  crop:6, speed:3,  type:"siege"},
+    { name:"Tribeesältester",     att:40,  defI:50,  defC:50,  crop:5, speed:5,  type:"inf"  },
     { name:"Siedler",             att:0,   defI:80,  defC:80,  crop:1, speed:5,  type:"settler"},
   ],
   teuton: [
@@ -259,14 +259,14 @@ const TROOPS = {
     { name:"Späher",              att:0,   defI:10,  defC:5,   crop:1, speed:9,  type:"scout"},
     { name:"Paladin",             att:55,  defI:100, defC:40,  crop:2, speed:10, type:"cav"  },
     { name:"Teut. Ritter",        att:150, defI:50,  defC:75,  crop:3, speed:9,  type:"cav"  },
-    { name:"Teutonen-Rammbock",   att:65,  defI:30,  defC:80,  crop:5, speed:5,  type:"siege"},
+    { name:"Teutons-Rammbock",   att:65,  defI:30,  defC:80,  crop:5, speed:5,  type:"siege"},
     { name:"Kriegsmaschine",      att:50,  defI:60,  defC:10,  crop:6, speed:3,  type:"siege"},
     { name:"Häuptling",           att:40,  defI:60,  defC:40,  crop:4, speed:5,  type:"inf"  },
     { name:"Siedler",             att:0,   defI:80,  defC:80,  crop:1, speed:5,  type:"settler"},
   ],
 };
 
-const TYPE_LABEL = { inf:'⚔️ Inf', cav:'🐎 Kav', siege:'💣 Belagerung', scout:'🔭 Späher', settler:'🏕️ Siedler' };
+const TYPE_LABEL = { inf:'⚔️ Inf', cav:'🐎 Cav', siege:'💣 Siege', scout:'🔭 Scout', settler:'🏕️ Settler' };
 const TYPE_COLOR = { inf:'#3b82f6', cav:'#a855f7', siege:'#f59e0b', scout:'#22c55e', settler:'#64748b' };
 
 let currentTribe = 'roman';
@@ -275,7 +275,7 @@ let smithyLevel  = 0;
 /**
  * Offizielle Travian-Schmiede-Formel:
  * verbesserter_wert = BASIS + (BASIS + 300 × KORN/7) × (1,008^STUFE − 1)
- * Gilt für Angriff, Def-Inf und Def-Kav gleichermaßen.
+ * Applies to attack, def-inf and def-cav equally.
  * Quelle: blog.travian.com / support.travian.com
  */
 function boosted(base, lvl, crop) {
@@ -387,7 +387,7 @@ function calcUpdate() {
   const heroDefPct  = (parseFloat(document.getElementById('heroDefBonus').value)||0) / 100;
   const heroMode    = document.getElementById('heroMode').value;
 
-  // Hero base attack per Kampfstärke-Punkt: 100 + 10 per level, scaled by fighting points
+  // Hero base attack per fighting strength point: 100 + 10 per level, scaled by fighting points
   // Approximation: each fighting point = 100 base att; hero total att = heroFight * (100 + heroLvl * 10)
   const heroBaseAtt = heroFight * (100 + heroLvl * 10);
 
@@ -446,7 +446,7 @@ function calcUpdate() {
     </div>
   ` : '') + `
     <div style="display:flex;justify-content:space-between;padding:0.3rem 0;font-weight:700;border-top:1px solid var(--border);margin-top:0.25rem;">
-      <span>🌾 Korn/h gesamt</span><span>${fmt(totalCrop)}</span>
+      <span>🌾 Crop/h gesamt</span><span>${fmt(totalCrop)}</span>
     </div>
   `;
 

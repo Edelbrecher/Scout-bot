@@ -40,7 +40,7 @@
     <div style="font-size:2.5rem;margin-bottom:.75rem;">📭</div>
     <div style="font-weight:600;margin-bottom:.35rem;">Noch keine Truppendaten importiert</div>
     <div style="font-size:.85rem;color:var(--text-muted);">
-      Der Spieler muss seine Dörfer über das Bot-Kommando oder die eigene Profilseite importieren.
+      The player must import their villages via the bot command or their own profile page.
     </div>
   </div>
 
@@ -51,7 +51,7 @@
     {% set kpis = [
       ('⚔️ Off-Score',   troops.total_off   or 0, '#f87171', 'off'),
       ('🛡️ Def-Score',   troops.total_def   or 0, '#60a5fa', 'def'),
-      ('🌾 Getreide',    troops.total_crop  or 0, '#fbbf24', None),
+      ('🌾 Grain',    troops.total_crop  or 0, '#fbbf24', None),
       ('🪖 Truppen',     troops.total_units or 0, '#a78bfa', None),
       ('🔭 Scouts',      troops.total_scouts or 0,'#34d399', 'scout'),
     ] %}
@@ -72,7 +72,7 @@
   {% if villages %}
   <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.25rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.1rem;border-bottom:1px solid var(--border);">
-      <h2 style="margin:0;font-size:1rem;">🏘️ Dörfer ({{ villages|length }})</h2>
+      <h2 style="margin:0;font-size:1rem;">🏘️ Villages ({{ villages|length }})</h2>
       <!-- Filter -->
       <div style="display:flex;gap:.35rem;">
         <button class="vf-btn active" onclick="filterVillages('all',this)"
@@ -93,14 +93,14 @@
       <table class="table" id="villageTable" style="font-size:.83rem;">
         <thead>
           <tr>
-            <th>Dorf</th>
-            <th>Typ</th>
+            <th>Village</th>
+            <th>Type</th>
             <th style="text-align:right;">⚔️ Off</th>
             <th style="text-align:right;">🛡️ Def</th>
             <th style="text-align:right;">🔭 Scouts</th>
             <th style="text-align:right;">🌾 Crop</th>
             <th style="text-align:right;">👥 Pop</th>
-            <th>Truppen</th>
+            <th>Troops</th>
           </tr>
         </thead>
         <tbody>
@@ -165,7 +165,7 @@
       {% for metric, label, color in [
         ('total_off','⚔️ Off','#f87171'),
         ('total_def','🛡️ Def','#60a5fa'),
-        ('village_count','🏘️ Dörfer','#34d399'),
+        ('village_count','🏘️ Villages','#34d399'),
         ('total_crop','🌾 Crop','#fbbf24'),
       ] %}
       <button class="gm-btn{% if loop.first %} gm-active{% endif %}"

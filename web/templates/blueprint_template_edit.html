@@ -62,7 +62,7 @@
     {% if not tmpl.steps %}
     <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted);">
       <div style="font-size:2rem; margin-bottom:0.5rem;">📭</div>
-      <div>Noch keine Schritte. Füge unten den ersten Schritt hinzu.</div>
+      <div>No steps yet. Add the first step below.</div>
     </div>
     {% else %}
     <div class="step-list">
@@ -70,14 +70,14 @@
       <div class="step-row">
         <div class="step-num">{{ loop.index }}</div>
         <span class="step-badge {% if step.step_type == 'troops' %}step-badge-troops{% else %}step-badge-building{% endif %}">
-          {% if step.step_type == 'troops' %}⚔️ Truppen{% else %}🏗️ Gebäude{% endif %}
+          {% if step.step_type == 'troops' %}⚔️ Troops{% else %}🏗️ Building{% endif %}
         </span>
         <div style="flex:1; min-width:0;">
           <div class="step-title">{{ step.title }}{% if step.target %} <span class="step-target">→ {{ step.target }}</span>{% endif %}</div>
           {% if step.description %}<div class="step-desc">{{ step.description }}</div>{% endif %}
         </div>
-        <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/step/{{ step.id }}/delete" onsubmit="return confirm('Schritt löschen?')">
-          <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.55rem;" title="Löschen">🗑️</button>
+        <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/step/{{ step.id }}/delete" onsubmit="return confirm('Delete step?')">
+          <button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.3rem 0.55rem;" title="Delete">🗑️</button>
         </form>
       </div>
       {% endfor %}
@@ -87,14 +87,14 @@
 
   <!-- Add step form -->
   <div class="card">
-    <h2 style="font-size:1rem; margin-bottom:1rem;">＋ Schritt hinzufügen</h2>
+    <h2 style="font-size:1rem; margin-bottom:1rem;">＋ Add step</h2>
     <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/step/add">
       <div style="display:grid; grid-template-columns:160px 1fr 160px; gap:0.75rem; margin-bottom:0.75rem;">
         <div class="form-group" style="margin:0;">
           <label style="font-size:0.8rem;">Typ</label>
           <select name="step_type" id="step_type">
-            <option value="building">🏗️ Gebäude</option>
-            <option value="troops">⚔️ Truppen</option>
+            <option value="building">🏗️ Building</option>
+            <option value="troops">⚔️ Troops</option>
           </select>
         </div>
         <div class="form-group" style="margin:0;">
@@ -103,14 +103,14 @@
         </div>
         <div class="form-group" style="margin:0;">
           <label style="font-size:0.8rem;">Ziel</label>
-          <input type="text" name="target" placeholder="z.B. Lvl 5 / 200 Stück" maxlength="60" />
+          <input type="text" name="target" placeholder="e.g. Level 5 / 200 pieces" maxlength="60" />
         </div>
       </div>
       <div class="form-group">
-        <label style="font-size:0.8rem;">Beschreibung <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
-        <textarea name="description" rows="2" placeholder="Zusätzliche Hinweise…" style="resize:vertical;"></textarea>
+        <label style="font-size:0.8rem;">Description <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+        <textarea name="description" rows="2" placeholder="Additional notes…" style="resize:vertical;"></textarea>
       </div>
-      <button type="submit" class="btn btn-primary">Hinzufügen</button>
+      <button type="submit" class="btn btn-primary">Add</button>
     </form>
   </div>
 </div>

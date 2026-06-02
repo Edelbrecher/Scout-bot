@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Einsatzplanung · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Operation planning · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container">
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 data-i18n="personal.title">🎯 Einsatzplanung</h1>
-      <p class="subtitle" data-i18n="personal.subtitle">Koordinierte Angriffe planen – mit automatischer Marschzeit &amp; Timer-Integration</p>
+      <h1 data-i18n="personal.title">🎯 Operation planning</h1>
+      <p class="subtitle" data-i18n="personal.subtitle">Koordinierte Attacke planen – mit automatischer March time &amp; Timer-Integration</p>
     </div>
   </div>
 
   {% if saved %}
   <div class="alert alert-success" style="margin-bottom:1rem; padding:0.75rem 1rem; background:#1a3a2a; border:1px solid #4caf82; border-radius:8px; color:#4caf82;">
-    ✅ Einsatzplan gespeichert.
+    ✅ Operationplan gespeichert.
   </div>
   {% endif %}
 
@@ -22,7 +22,7 @@
     <h2 style="margin-top:0;"><span data-i18n="personal.profile.title">🏰 Mein Travian-Profil</span> <small style="font-size:0.7rem; color:var(--text-muted); font-weight:400;" data-i18n="personal.profile.local">(lokal gespeichert)</small></h2>
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.75rem; align-items:end;">
       <div class="form-group" style="margin:0;">
-        <label>Server-URL</label>
+        <label>Server URL</label>
         <input type="url" id="profileServer" placeholder="https://ts2.x1.europe.travian.com"
           style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
       </div>
@@ -59,12 +59,12 @@
           <optgroup label="Pferdesporen (flacher F/h-Bonus, ganzer Marsch)">
             <option value="spurs:3">Kleine Pferdesporen (+3/6/9 F/h · je Servergeschw.)</option>
             <option value="spurs:4">Pferdesporen (+4/8/12 F/h · je Servergeschw.)</option>
-            <option value="spurs:5">Große Pferdesporen (+5/10/15 F/h · je Servergeschw.)</option>
+            <option value="spurs:5">Large horseshoes (+5/10/15 F/h · per server speed)</option>
           </optgroup>
-          <optgroup label="Soldaten-/Führerstiefel (% nach 20 Feldern)">
+          <optgroup label="Soldier/commander boots (% after 20 squares)">
             <option value="pct:25">Soldatenstiefel Tier 1 (+25% nach 20 Feldern)</option>
             <option value="pct:50">Soldatenstiefel Tier 2 (+50% nach 20 Feldern)</option>
-            <option value="pct:75">Führerstiefel (+75% nach 20 Feldern)</option>
+            <option value="pct:75">Commander boots (+75% after 20 squares)</option>
           </optgroup>
         </select>
         <div id="bootsHint" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;"></div>
@@ -92,16 +92,16 @@
     <p id="profileSaved" style="color:#4caf82; font-size:0.85rem; margin-top:0.5rem; display:none;">✅ Profil gespeichert</p>
   </div>
 
-  <!-- ── Neuen Einsatz erstellen ── -->
+  <!-- ── Neuen Operation erstellen ── -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;" data-i18n="personal.create.title">➕ Neuen Einsatz erstellen</h2>
+    <h2 style="margin-top:0;" data-i18n="personal.create.title">➕ Neuen Operation erstellen</h2>
 
     <form method="post" action="/guild/{{ guild.guild_id }}/einsatz/create">
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:0.75rem; margin-bottom:0.75rem;">
 
         <div class="form-group" style="margin:0; grid-column:1/-1;">
-          <label>Bezeichnung des Einsatzes *</label>
-          <input type="text" name="plan_name" required maxlength="80" placeholder="z.B. Angriff auf DeathKnight"
+          <label>Bezeichnung des Operationes *</label>
+          <input type="text" name="plan_name" required maxlength="80" placeholder="z.B. Attack auf DeathKnight"
             style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
         </div>
 
@@ -112,7 +112,7 @@
         </div>
         <div class="form-group" style="margin:0;">
           <label>Zielspieler</label>
-          <input type="text" name="player_name" id="inp_player_name" maxlength="60" placeholder="Spielername"
+          <input type="text" name="player_name" id="inp_player_name" maxlength="60" placeholder="Playername"
             style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
         </div>
         <div class="form-group" style="margin:0;">
@@ -129,19 +129,19 @@
         </div>
 
         <div class="form-group" style="margin:0;">
-          <label>Ankunftszeit (lokal) *</label>
+          <label>Arrival time (lokal) *</label>
           <input type="datetime-local" name="arrival_time" id="inp_arrival" required
             style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;"
             oninput="updateSendTime()" />
         </div>
 
         <div class="form-group" style="margin:0;">
-          <label>Angriffstyp</label>
+          <label>Attackstyp</label>
           <select name="wave_type" id="inp_wave"
             style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
-            <option value="attack">⚔️ Angriff (Normal)</option>
-            <option value="raid">🪖 Plündern (Raid)</option>
-            <option value="reinforce">🛡️ Verstärken</option>
+            <option value="attack">⚔️ Attack (Normal)</option>
+            <option value="raid">🪖 Raid</option>
+            <option value="reinforce">🛡️ Reinforce</option>
             <option value="spy">🕵️ Spionage</option>
           </select>
         </div>
@@ -150,9 +150,9 @@
           <label>Truppentyp / Geschwindigkeit</label>
           <select id="troopPreset" onchange="applyTroopPreset(this.value)"
             style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
-            <optgroup label="Römer">
-              <option value="6">Legionär (6 F/h)</option>
-              <option value="5">Prätorianer (5 F/h)</option>
+            <optgroup label="Romans">
+              <option value="6">Legionnaire (6 F/h)</option>
+              <option value="5">Praetorian (5 F/h)</option>
               <option value="7">Imperianer (7 F/h)</option>
               <option value="16">Equites Legati (16 F/h)</option>
               <option value="14">Equites Imperatoris (14 F/h)</option>
@@ -162,12 +162,12 @@
             </optgroup>
             <optgroup label="Germanen">
               <option value="7">Keulenschwinger (7 F/h)</option>
-              <option value="7">Speerkämpfer (7 F/h)</option>
-              <option value="7">Axtkämpfer (7 F/h)</option>
+              <option value="7">Spearman (7 F/h)</option>
+              <option value="7">Axefighter (7 F/h)</option>
               <option value="10">Paladin (10 F/h)</option>
               <option value="9">Teut. Ritter (9 F/h)</option>
             </optgroup>
-            <optgroup label="Gallier">
+            <optgroup label="Gauls">
               <option value="7">Phalanx (7 F/h)</option>
               <option value="19">Theutates-Blitz (19 F/h)</option>
               <option value="16">Druidentreiter (16 F/h)</option>
@@ -197,7 +197,7 @@
             <strong id="sendTimeDisplay" style="font-size:1.15rem; font-family:monospace; color:#f59e0b;">–</strong>
           </div>
           <div>
-            <span style="color:var(--text-muted); font-size:0.82rem;">Marschzeit:</span><br>
+            <span style="color:var(--text-muted); font-size:0.82rem;">March time:</span><br>
             <strong id="marchTimeDisplay" style="font-size:1.15rem; font-family:monospace;">–</strong>
           </div>
           <div>
@@ -212,20 +212,20 @@
       </div>
 
       <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-        <button type="submit" class="btn btn-primary" data-i18n="personal.save.btn">💾 Einsatz speichern</button>
+        <button type="submit" class="btn btn-primary" data-i18n="personal.save.btn">💾 Operation speichern</button>
         <span id="profileMissingHint" style="color:#f59e0b; font-size:0.85rem; align-self:center; display:none;">
-          ⚠️ Profil-Koordinaten setzen für Marschzeit-Kalkulation
+          ⚠️ Set profile coordinates for march time calculation
         </span>
       </div>
     </form>
   </div>
 
-  <!-- ── Einsatzpläne ── -->
+  <!-- ── Operation plans ── -->
   <div class="card">
-    <h2 style="margin-top:0;"><span data-i18n="personal.plans.title">📋 Aktive Einsätze</span> ({{ plans|length }})</h2>
+    <h2 style="margin-top:0;"><span data-i18n="personal.plans.title">📋 Aktive Operations</span> ({{ plans|length }})</h2>
 
     {% if not plans %}
-    <p class="empty" data-i18n="personal.empty">Noch keine Einsätze geplant.</p>
+    <p class="empty" data-i18n="personal.empty">Noch keine Operations geplant.</p>
     {% else %}
     <div style="display:flex; flex-direction:column; gap:1rem;">
       {% for plan in plans %}
@@ -253,7 +253,7 @@
               ⏳ …
             </span>
             <form method="post" action="/guild/{{ guild.guild_id }}/einsatz/delete/{{ plan.id }}" style="display:inline;"
-              onsubmit="return confirm('Einsatz löschen?')">
+              onsubmit="return confirm('Delete operation?')">
               <button type="submit" class="btn btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.8rem;">🗑️</button>
             </form>
           </div>
@@ -263,14 +263,14 @@
           <div><span style="color:var(--text-muted);">Ziel:</span>
             <strong>{{ plan.target_name or '–' }}</strong>
             <code style="font-size:0.78rem;">({{ plan.target_x }}|{{ plan.target_y }})</code></div>
-          <div><span style="color:var(--text-muted);">Spieler:</span> {{ plan.player_name or '–' }}</div>
+          <div><span style="color:var(--text-muted);">Player:</span> {{ plan.player_name or '–' }}</div>
           <div><span style="color:var(--text-muted);">Ankunft:</span>
             <strong>{{ plan.arrival_time[:16].replace('T',' ') }}</strong></div>
           <div><span style="color:var(--text-muted);">Basis F/h:</span> {{ plan.troop_speed }}</div>
           <div><span style="color:var(--text-muted);">Eff. F/h:</span> <strong class="eff-speed-val" style="color:#93c5fd;">–</strong></div>
           <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">Absendezeit:</span>
             <strong class="send-time-val">–</strong></div>
-          <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">Marschzeit:</span>
+          <div class="march-info" data-id="{{ plan.id }}"><span style="color:var(--text-muted);">March time:</span>
             <strong class="march-time-val">–</strong></div>
         </div>
 
@@ -311,14 +311,14 @@
 const PROFILE_KEY = 'travian_profile_einsatz';
 let profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
 
-// ── Marschzeit-Formel (Travian-korrekt) ────────────────────────────────────
+// ── March time-Formel (Travian-korrekt) ────────────────────────────────────
 // Pferdesporen   → flacher F/h-Bonus × Servergeschwindigkeit (ganzer Marsch)
 // Soldatenstiefel → % nur nach den ersten 20 Feldern
 // Turnierplatz   → % nur nach den ersten 20 Feldern
 //
-// Formel für dist > 20:
+// Formula for dist > 20:
 //   t = (20 / effBase) + ((dist-20) / (effBase × bootMulti × tpMulti))
-// Für dist ≤ 20:
+// For dist ≤ 20:
 //   t = dist / effBase  (keine % Boni wirksam)
 
 function parsedBoots() {
@@ -418,7 +418,7 @@ function applyTroopPreset(val) {
   updateSendTime();
 }
 
-// ── Marschzeit-Kalkulation ─────────────────────────────────────────────────
+// ── March time-Kalkulation ─────────────────────────────────────────────────
 const MAP_SIZE = 400;
 
 function travianDistance(x1, y1, x2, y2) {
@@ -489,12 +489,12 @@ function updateGoLinks() {
       a.href = `${server}/build.php?gid=16&tt=${tt}&x=${x}&y=${y}`;
     } else {
       a.href = '#';
-      a.onclick = () => { alert('Bitte zuerst deine Server-URL im Profil eintragen!'); return false; };
+      a.onclick = () => { alert('Please zuerst deine Server URL im Profil eintragen!'); return false; };
     }
   });
 }
 
-// ── Marschzeiten für bestehende Pläne ─────────────────────────────────────
+// ── March times for existing plans ─────────────────────────────────────
 function renderAllMarchTimes() {
   if (profile.x === undefined || profile.y === undefined) return;
 
@@ -544,7 +544,7 @@ function updateCountdowns() {
 setInterval(updateCountdowns, 1000);
 updateCountdowns();
 
-// ── Timer erstellen (in localStorage für Timer-Seite) ─────────────────────
+// ── Create timer (in localStorage for timer page) ─────────────────────
 // Uses same key & format as timer.html: 'travianReminders', at in ms, rally bool + rallyUrl
 const TIMER_KEY = 'travianReminders';
 

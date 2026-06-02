@@ -1,26 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Angriffs-Analyse #{{ report.id }} · {{ guild.guild_name }}{% endblock %}
+{% block title %}Attacks-Analyse #{{ report.id }} · {{ guild.guild_name }}{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1040px;">
 
   <div style="margin-bottom:1.5rem;">
-    <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Angriff-Detection</a>
+    <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Attack-Detection</a>
     <h1 style="margin:0.25rem 0 0; display:flex; align-items:center; gap:0.5rem;">
-      <span data-i18n="analysis.title">🔬 Angriffs-Analyse</span>
+      <span data-i18n="analysis.title">🔬 Attacks-Analyse</span>
       <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">Meldung #{{ report.id }}</span>
     </h1>
     <p style="color:var(--text-muted); font-size:0.85rem; margin:0.25rem 0 0;">
       Gemeldet von <strong>{{ report.reporter_name }}</strong>
       am {{ report.created_at[:16].replace('T',' ') }} UTC ·
-      {{ attacks|length }} Angriff(e) erkannt
+      {{ attacks|length }} Attack(e) erkannt
     </p>
   </div>
 
   <!-- Zwischendef-Warnung -->
   {% if zwischendef_windows %}
   <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.5); border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
-    <div style="font-weight:700; color:#fbbf24; margin-bottom:0.6rem;">⚠️ Zwischendef möglich — unterschiedliche Ankunftszeiten!</div>
+    <div style="font-weight:700; color:#fbbf24; margin-bottom:0.6rem;">⚠️ Intermediate def possible — different arrival times!</div>
     <div style="display:flex; flex-direction:column; gap:0.5rem;">
       {% for zw in zwischendef_windows %}
       <div style="background:rgba(0,0,0,0.2); border-radius:6px; padding:0.6rem 0.9rem; font-size:0.85rem; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
@@ -40,7 +40,7 @@
   </div>
   {% endif %}
 
-  <!-- ── Je Angriff eine Analyse-Karte ── -->
+  <!-- ── Je Attack eine Analyse-Karte ── -->
   {% for atk in attacks %}
   <div class="atk-card" id="atk-{{ loop.index0 }}"
        data-ax="{{ atk.atk_x if atk.atk_x is not none else '' }}"
@@ -90,7 +90,7 @@
       {% set vtype = ov.village_type %}
       <div style="background:rgba(34,197,94,0.07); border:1px solid rgba(34,197,94,0.35); border-radius:8px; padding:0.75rem 1rem;">
         <div style="font-weight:700; color:#22c55e; margin-bottom:0.4rem; font-size:0.9rem;">
-          📊 Eigene Truppen in diesem Dorf:
+          📊 Own troops in diesem Dorf:
           <strong>{{ ov.village_name or '?' }}</strong>
           <span style="font-weight:400; color:var(--text-muted);">({{ ov.x }}|{{ ov.y }})</span>
           <span style="margin-left:0.5rem;
@@ -135,9 +135,9 @@
             <div>{{ atk.attacker_village_data.village_name or '—' }} · <strong>{{ atk.attacker }}</strong>
               {% if atk.attacker_data and atk.attacker_data.alliance_name %} [{{ atk.attacker_data.alliance_name }}]{% endif %}
             </div>
-            <div style="color:var(--text-muted);">{{ {1:'Römer',2:'Germanen',3:'Gallier',4:'Natars',5:'Hunnen'}.get(atk.attacker_data.tribe if atk.attacker_data else 0, '?') }} · BW: {{ atk.attacker_village_data.population or '?' }}</div>
+            <div style="color:var(--text-muted);">{{ {1:'Romans',2:'Germanen',3:'Gauls',4:'Natars',5:'Huns'}.get(atk.attacker_data.tribe if atk.attacker_data else 0, '?') }} · BW: {{ atk.attacker_village_data.population or '?' }}</div>
             {% elif atk.attacker_data %}
-            <div><strong>{{ atk.attacker }}</strong> — Dorf nicht in Karte für diese Koords</div>
+            <div><strong>{{ atk.attacker }}</strong> — Village not in map for these coords</div>
             {% else %}<div style="color:var(--text-muted);">Kein Karteneintrag</div>{% endif %}
           </div>
           <div style="flex:1; min-width:200px; background:rgba(34,197,94,0.07); border:1px solid rgba(34,197,94,0.25); border-radius:8px; padding:0.6rem 0.9rem; font-size:0.83rem;">
@@ -147,7 +147,7 @@
             <div>{{ dv.village_name or '—' }} · <strong>{{ dv.player_name or '?' }}</strong>
               {% if dv.alliance_name %} [{{ dv.alliance_name }}]{% endif %}
             </div>
-            <div style="color:var(--text-muted);">{{ {1:'Römer',2:'Germanen',3:'Gallier',4:'Natars',5:'Hunnen'}.get(dv.tribe, '?') }} · BW: {{ dv.population or '?' }}</div>
+            <div style="color:var(--text-muted);">{{ {1:'Romans',2:'Germanen',3:'Gauls',4:'Natars',5:'Huns'}.get(dv.tribe, '?') }} · BW: {{ dv.population or '?' }}</div>
             {% else %}<div style="color:var(--text-muted);">Kein Karteneintrag (eigenes Dorf?)</div>{% endif %}
           </div>
         </div>
@@ -159,7 +159,7 @@
             <div style="font-weight:700; font-family:monospace;">{{ sa.dist }} F</div>
           </div>
           <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.6rem; text-align:center;">
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Verbleibend</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.2rem;">Remaining</div>
             <div style="font-weight:700; font-family:monospace; color:#f59e0b;">{{ sa.remaining_hours }}h</div>
           </div>
           {% if sa.offline_hours > 0 %}
@@ -182,14 +182,14 @@
           </div>
         </div>
 
-        <!-- Mögliche Marschgeschwindigkeiten + Abfahrtszeiten -->
+        <!-- Possible march speeds + departure times -->
         {% if sa.possible_speeds %}
-        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.4rem; font-weight:600;">Mögliche Marschgeschwindigkeiten &amp; Abfahrtszeiten:</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.4rem; font-weight:600;">Possible march speeds &amp; departure times:</div>
         <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
           <thead>
             <tr style="background:var(--bg-main);">
               <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Geschw.</th>
-              <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Mögliche Truppen</th>
+              <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Possible troops</th>
               <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Gesamtmarsch</th>
               <th style="padding:0.35rem 0.6rem; text-align:left; color:var(--text-muted); font-weight:500;">Abfahrt (Server)</th>
             </tr>
@@ -215,21 +215,21 @@
           </tbody>
         </table>
         {% else %}
-        <p style="color:#ef4444; font-size:0.83rem; margin:0;">Keine konsistente Geschwindigkeit gefunden — Koordinaten prüfen.</p>
+        <p style="color:#ef4444; font-size:0.83rem; margin:0;">No consistent speed found — check coordinates.</p>
         {% endif %}
         {% else %}
         <!-- JS fallback wenn keine Defender-Coords im Report -->
         <div class="speed-analysis" data-ax="{{ atk.atk_x if atk.atk_x is not none else '' }}" data-ay="{{ atk.atk_y if atk.atk_y is not none else '' }}" data-remaining="{{ atk.remaining_seconds or '' }}" style="font-size:0.85rem; color:var(--text-muted);">
           {% if atk.def_x is none %}
-          <em>⚠️ Keine Verteidiger-Koordinaten im Report — beim nächsten Angriff im Discord-Modal eintragen, oder unten manuell eingeben:</em>
+          <em>⚠️ No defender coordinates in report — enter in the Discord modal for the next attack, or enter manually below:</em>
           {% endif %}
         </div>
         {% endif %}
       </div>
 
-      <!-- ── Section 3: Truppen / Mögliche Truppen ── -->
+      <!-- ── Section 3: Troops / Possible troops ── -->
       <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">⚔️ Truppen</h3>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">⚔️ Troops</h3>
         {% if atk.troops and atk.total_troops > 0 %}
         <div style="display:flex; flex-direction:column; gap:0.35rem;">
           {% for tname, count in atk.troops.items() %}
@@ -262,7 +262,7 @@
           {% endfor %}
         </div>
         {% else %}
-        <div class="possible-troops" style="font-size:0.83rem; color:var(--text-muted);"><em>Koordinaten im Discord-Modal eintragen für Analyse.</em></div>
+        <div class="possible-troops" style="font-size:0.83rem; color:var(--text-muted);"><em>Enter coordinates in Discord modal for analysis.</em></div>
         {% endif %}
         {% endif %}
       </div>
@@ -274,16 +274,16 @@
         {% set ad = atk.attacker_data %}
         <div style="display:flex; flex-wrap:wrap; gap:1rem;">
           <div style="display:flex; flex-direction:column; gap:0.3rem; font-size:0.85rem;">
-            <div>🏰 <strong>{{ ad.village_count }}</strong> Dörfer</div>
+            <div>🏰 <strong>{{ ad.village_count }}</strong> Villages</div>
             <div>👥 Gesamtbev.: <strong>{{ ad.total_pop | int }}</strong></div>
             {% if ad.alliance_name %}<div>🛡️ Allianz: <strong>{{ ad.alliance_name }}</strong></div>{% endif %}
             {% if ad.tribe %}
-            <div>{{ TRIBE_EMOJI.get(ad.tribe, '❓') }} Volk: <strong>{{ {1:'Römer', 2:'Germanen', 3:'Gallier', 4:'Natars', 5:'Hunnen'}.get(ad.tribe, 'Unbekannt') }}</strong></div>
+            <div>{{ TRIBE_EMOJI.get(ad.tribe, '❓') }} Volk: <strong>{{ {1:'Romans', 2:'Germanen', 3:'Gauls', 4:'Natars', 5:'Huns'}.get(ad.tribe, 'Unbekannt') }}</strong></div>
             {% endif %}
           </div>
           {% if ad.villages %}
           <details style="flex:1; min-width:200px;">
-            <summary style="font-size:0.82rem; color:var(--text-muted); cursor:pointer;">Alle {{ ad.village_count }} Dörfer anzeigen</summary>
+            <summary style="font-size:0.82rem; color:var(--text-muted); cursor:pointer;">Show all {{ ad.village_count }} villages</summary>
             <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.2rem; max-height:160px; overflow-y:auto;">
               {% for v in ad.villages %}
               <div style="font-size:0.78rem; display:flex; justify-content:space-between; color:var(--text-muted); padding:0.2rem 0; border-bottom:1px solid var(--border);">
@@ -298,14 +298,14 @@
         </div>
         {% else %}
         <p style="color:var(--text-muted); font-size:0.85rem; margin:0;">
-          Kein Karteneintrag für <em>{{ atk.attacker }}</em>. Tipp: Karten-Snapshot unter Farming aktualisieren.
+          No map entry for <em>{{ atk.attacker }}</em>. Tip: Update the map snapshot under Farming.
         </p>
         {% endif %}
       </div>
 
-      <!-- ── Section 5: TP-Einschätzung ── -->
+      <!-- ── Section 5: TP estimate ── -->
       <div>
-        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">💎 TP-Einschätzung</h3>
+        <h3 style="margin:0 0 0.6rem; font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">💎 TP estimate</h3>
         {% if atk.total_troops > 0 %}
         <p style="font-size:0.83rem; color:var(--text-muted); margin:0;">Bekannte Truppen — TP direkt aus Zusammensetzung berechenbar.</p>
         {% elif atk.speed_analysis and atk.speed_analysis.best_speed %}
@@ -319,7 +319,7 @@
           {% if td.get('atk', 0) > 0 %}
           <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; font-size:0.82rem; min-width:140px;">
             <div style="font-weight:600; margin-bottom:0.2rem;">{{ tname }}</div>
-            <div style="color:var(--text-muted);">Angriff: <span style="color:#ef4444; font-weight:700;">{{ td.get('atk', '?') }}</span></div>
+            <div style="color:var(--text-muted);">Attack: <span style="color:#ef4444; font-weight:700;">{{ td.get('atk', '?') }}</span></div>
             <div style="color:var(--text-muted);">TP: <span style="color:#f59e0b; font-weight:700;">{{ td.get('tp', '?') }}</span></div>
             <div style="color:var(--text-muted);">Speed: {{ td.get('speed', '?') }} F/h</div>
           </div>
@@ -327,32 +327,32 @@
           {% endfor %}
         </div>
         {% else %}
-        <p style="font-size:0.83rem; color:var(--text-muted); margin:0;"><em>Truppen unbekannt. Dorfkoordinaten im Discord-Modal eintragen für Einschätzung.</em></p>
+        <p style="font-size:0.83rem; color:var(--text-muted); margin:0;"><em>Troops unknown. Enter village coordinates in Discord modal for estimate.</em></p>
         {% endif %}
       </div>
 
     </div>
 
-    <!-- ── Section 7: Empfehlung ── -->
+    <!-- ── Section 7: Referral ── -->
     <div style="border-top:1px solid var(--border); padding:0.75rem 1.25rem; background:rgba(0,0,0,0.15);">
-      <span style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">💡 Empfehlung: </span>
+      <span style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">💡 Referral: </span>
       <span style="font-size:0.85rem;">
         {% if atk.classification.startswith('🪶') %}
-          Wahrscheinlich ein Fake oder Probe-Angriff. Geringe Truppen — kein Stress, aber im Auge behalten. Prüfe ob weitere Wellen folgen.
+          Likely a fake or probe attack. Low troops — no panic, but keep an eye on it. Check if more waves follow.
         {% elif atk.classification.startswith('💥') %}
-          <strong style="color:#dc2626;">Echte Belagerung mit Katapulten/Rammen!</strong> Sofort Verstärkung anfordern, Truppen in Sicherheit bringen.
+          <strong style="color:#dc2626;">Real siege with catapults/rams!</strong> Request reinforcements immediately, move troops to safety.
         {% elif atk.classification.startswith('⚡') %}
           {% if atk.is_stack %}
-            <strong style="color:#fbbf24;">Koordinierter Stack!</strong> Mehrere Wellen gleichzeitig — höchste Alarmstufe, Allianz sofort benachrichtigen.
+            <strong style="color:#fbbf24;">Coordinated stack!</strong> Multiple waves simultaneously — highest alert, notify alliance immediately.
           {% else %}
-            Kavallerie-Angriff — schnell und schlagkräftig. Reaktionszeit prüfen, Def-Kavallerie schicken.
+            Cavalry attack — fast and powerful. Check reaction time, send def cavalry.
           {% endif %}
         {% elif atk.classification.startswith('⚔️') %}
-          Großangriff — Allianz benachrichtigen, maximale Verteidigung organisieren.
+          Major attack — notify alliance, organise maximum defense.
         {% elif atk.classification.startswith('🗡️') %}
-          Normaler Angriff. Verteidigung bereitstellen basierend auf geschickten Truppen.
+          Normaler Attack. Defense bereitstellen basierend auf geschickten Truppen.
         {% else %}
-          Truppen unbekannt — Marschgeschwindigkeit analysieren und mögliche Einheiten prüfen. Vorsichtshalber Verstärkung anfordern.
+          Troops unknown — analyse march speed and check possible units. Request reinforcements as a precaution.
         {% endif %}
       </span>
     </div>
@@ -363,7 +363,7 @@
   {% if history %}
   <div class="card" style="margin-bottom:1.5rem;">
     <h2 style="margin-top:0;">📅 Angreifer-Historie ({{ history_count }} Meldungen)</h2>
-    <p class="hint">Alle früheren gemeldeten Angriffe dieser Spieler.</p>
+    <p class="hint">All previously reported attacks by this player.</p>
     <div style="display:flex; flex-direction:column; gap:0.5rem;">
       {% for hr in history %}
       {% set h_attacks = hr.attacks_json | from_json %}
@@ -414,8 +414,8 @@ function fmtLocalTime(dateObj) {
          dateObj.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
 }
 
-const TRIBES = ["Römer", "Germanen", "Gallier"];
-const TRIBE_COLORS = {"Römer": "#a78bfa", "Germanen": "#f87171", "Gallier": "#34d399"};
+const TRIBES = ["Romans", "Germanen", "Gauls"];
+const TRIBE_COLORS = {"Romans": "#a78bfa", "Germanen": "#f87171", "Gauls": "#34d399"};
 
 // Offensive troops only (atk > 0), excluding pure scouts
 const OFF_TROOPS = Object.entries(TROOP_DATA).filter(([n, d]) => d.atk > 0);
@@ -425,7 +425,7 @@ function runAnalysis() {
   const dx = parseFloat(document.getElementById('def-x').value);
   const dy = parseFloat(document.getElementById('def-y').value);
   if (isNaN(dx) || isNaN(dy)) {
-    document.getElementById('coord-hint').textContent = '⚠️ Bitte gültige Koordinaten eingeben.';
+    document.getElementById('coord-hint').textContent = '⚠️ Please enter valid coordinates.';
     return;
   }
   document.getElementById('coord-hint').textContent = '';
@@ -466,7 +466,7 @@ function analyseCard(card, dx, dy) {
         const arrivalTime = new Date(Date.now() + remainingSec * 1000);
         speedHtml += `
           <div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center;">
-            <div style="font-size:0.7rem; color:var(--text-muted);">Verbleibend</div>
+            <div style="font-size:0.7rem; color:var(--text-muted);">Remaining</div>
             <div style="font-weight:700; font-family:monospace; font-size:1rem; color:#f59e0b;">${fmtDur(remainingSec)}</div>
           </div>
           <div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center;">
@@ -479,14 +479,14 @@ function analyseCard(card, dx, dy) {
           </div>`;
       } else {
         speedHtml += `<div style="background:var(--bg-main); border-radius:6px; padding:0.6rem; text-align:center; grid-column:span 2;">
-          <div style="font-size:0.78rem; color:var(--text-muted);">Keine Zeitangabe im Report — Geschwindigkeitsberechnung nicht möglich.</div>
+          <div style="font-size:0.78rem; color:var(--text-muted);">No time given in report — speed calculation not possible.</div>
         </div>`;
       }
       speedHtml += `</div>
         <div style="font-size:0.78rem; color:var(--text-muted);">Angreifer: <code>(${ax}|${ay})</code> → Verteidiger: <code>(${dx}|${dy})</code></div>`;
       speedEl.innerHTML = speedHtml;
     } else {
-      speedEl.innerHTML = '<em style="color:var(--text-muted);">Angriffskoordinaten unbekannt — Analyse nicht möglich.</em>';
+      speedEl.innerHTML = '<em style="color:var(--text-muted);">Attack coordinates unknown — analysis not possible.</em>';
     }
   }
 
@@ -498,7 +498,7 @@ function analyseCard(card, dx, dy) {
   if (!possibleEl) return; // troops known, skip
 
   if (isNaN(ax) || isNaN(ay) || isNaN(remainingSec) || remainingSec <= 0) {
-    if (possibleEl) possibleEl.innerHTML = '<em style="color:var(--text-muted);">Keine ausreichenden Daten für Truppenberechnung.</em>';
+    if (possibleEl) possibleEl.innerHTML = '<em style="color:var(--text-muted);">Insufficient data for troop calculation.</em>';
     return;
   }
 
@@ -531,7 +531,7 @@ function analyseCard(card, dx, dy) {
           <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Geschw.</th>
           <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">ATK</th>
           <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">TP</th>
-          <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Möglich?</th>
+          <th style="text-align:center; padding:0.2rem 0.4rem; border-bottom:1px solid var(--border);">Possible?</th>
         </tr></thead>
         <tbody>`;
     [...possible[tribe], ...impossible[tribe]].forEach(([name, d]) => {
@@ -584,22 +584,22 @@ function analyseCard(card, dx, dy) {
     if (tribeRaw) {
       const n = parseInt(tribeRaw);
       if (!isNaN(n)) {
-        tribeStr = {1:'Römer', 2:'Germanen', 3:'Gallier'}[n] || null;
+        tribeStr = {1:'Romans', 2:'Germanen', 3:'Gauls'}[n] || null;
       } else {
         tribeStr = tribeRaw || null;
       }
     }
 
     const TYPICAL_OFF = {
-      "Römer": [
+      "Romans": [
         {name: "Imperianer-Bash", comp: {"Imperianer": 500, "Equites Imperatoris": 200}},
         {name: "Cav-Only", comp: {"Equites Caesaris": 300, "Equites Imperatoris": 100}},
       ],
       "Germanen": [
-        {name: "Axtkämpfer-Masse", comp: {"Axtkämpfer": 800, "Teut. Ritter": 100}},
-        {name: "Ritter-Bash", comp: {"Teut. Ritter": 400, "Axtkämpfer": 200}},
+        {name: "Axefighters mass", comp: {"Axtkämpfer": 800, "Teut. Ritter": 100}},
+        {name: "Knight bash", comp: {"Teut. Ritter": 400, "Axtkämpfer": 200}},
       ],
-      "Gallier": [
+      "Gauls": [
         {name: "Blitz-Rush", comp: {"Theutates-Blitz": 400, "Haeduer": 100}},
         {name: "Haeduer-Bash", comp: {"Haeduer": 300, "Druidentreiter": 150}},
       ],
@@ -617,17 +617,17 @@ function analyseCard(card, dx, dy) {
           · ATK ~${atk.toLocaleString('de-DE')}
         </div>`;
       });
-      tpHtml += `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">* Nur Schätzwerte. Echte Werte hängen von Kasernen-Stufe, Helden-Bonus und Forschungsstand ab.</div>`;
+      tpHtml += `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">* Estimates only. Real values depend on barracks level, hero bonus and research level.</div>`;
     } else {
       // Compute range across possible troops
       const possibleAll = TRIBES.flatMap(t => possible[t]);
       if (possibleAll.length > 0) {
         const minTP = Math.min(...possibleAll.map(([,d]) => d.tp));
         const maxTP = Math.max(...possibleAll.map(([,d]) => d.tp));
-        tpHtml = `<div style="font-size:0.82rem;">Mögliche Einheitenarten: TP-Spanne pro Einheit <strong>${minTP}–${maxTP}</strong>.
-          <br>Volk nicht eindeutig erkennbar. Karten-Snapshot für genauere Einschätzung nutzen.</div>`;
+        tpHtml = `<div style="font-size:0.82rem;">Possible unit types: TP range per unit <strong>${minTP}–${maxTP}</strong>.
+          <br>Tribe not clearly identifiable. Use map snapshot for a more precise estimate.</div>`;
       } else {
-        tpHtml = '<em style="color:var(--text-muted);">Keine möglichen Einheiten ermittelt.</em>';
+        tpHtml = '<em style="color:var(--text-muted);">No possible units determined.</em>';
       }
     }
     tpEl.innerHTML = tpHtml;

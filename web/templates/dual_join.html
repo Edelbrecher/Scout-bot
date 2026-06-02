@@ -7,33 +7,33 @@
     <div style="font-size:3rem;margin-bottom:0.75rem;">🔗</div>
 
     {% if already_active %}
-    <h1 style="margin:0 0 0.5rem;font-size:1.5rem;" data-i18n="dualjoin.already.title">Dual bereits verbunden</h1>
+    <h1 style="margin:0 0 0.5rem;font-size:1.5rem;" data-i18n="dualjoin.already.title">Dual already connected</h1>
     <p style="color:var(--text-muted);">
-      {{ link.dual_username or link.dual_discord_id }} ist bereits als Dual von
+      {{ link.dual_username or link.dual_discord_id }} is already registered as dual of
       <strong>{{ link.owner_username or link.owner_discord_id }}</strong> eingetragen.
     </p>
     <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Zum Dashboard</a>
 
     {% elif request.query_params.get("accepted") %}
-    <h1 style="margin:0 0 0.5rem;font-size:1.5rem;color:#22c55e;" data-i18n="dualjoin.success.title">✅ Erfolgreich verbunden!</h1>
+    <h1 style="margin:0 0 0.5rem;font-size:1.5rem;color:#22c55e;" data-i18n="dualjoin.success.title">✅ Successfully connected!</h1>
     <p style="color:var(--text-muted);">
-      Du bist jetzt als Dual von <strong>{{ link.owner_username or link.owner_discord_id }}</strong> registriert.
+      You are now registered as dual of <strong>{{ link.owner_username or link.owner_discord_id }}</strong>.
     </p>
     <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Zum Dashboard</a>
 
     {% else %}
-    <h1 style="margin:0 0 0.5rem;font-size:1.5rem;" data-i18n="dualjoin.invite.title">Dual-Einladung</h1>
+    <h1 style="margin:0 0 0.5rem;font-size:1.5rem;" data-i18n="dualjoin.invite.title">Dual invitation</h1>
     <p style="color:var(--text-muted);margin-bottom:1.5rem;">
-      <strong>{{ link.owner_username or link.owner_discord_id }}</strong> lädt dich ein,
-      als Dual-Account beigetreten zu werden.
+      <strong>{{ link.owner_username or link.owner_discord_id }}</strong> invites you
+      to join as a dual account.
     </p>
     <form method="post" action="/dual/join/{{ token }}">
       <button type="submit" class="btn btn-primary" style="width:100%;padding:0.75rem;font-size:1rem;" data-i18n="dualjoin.accept.btn">
-        🔗 Einladung annehmen
+        🔗 Accept invitation
       </button>
     </form>
     <p style="margin-top:1rem;font-size:0.78rem;color:var(--text-muted);">
-      Mit dem Annehmen wird dein Discord-Name als Dual gespeichert.
+      By accepting, your Discord name will be saved as dual.
     </p>
     {% endif %}
   </div>

@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Defend-Statistiken · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Defend-Statistics · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
 
-  <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Verteidigung</a>
-  <h1 style="margin:0.25rem 0 1.5rem;" data-i18n="defense.stats.title">📊 Defend-Statistiken</h1>
+  <a href="/guild/{{ guild.guild_id }}/verteidigung" class="back-link">← Defense</a>
+  <h1 style="margin:0.25rem 0 1.5rem;" data-i18n="defense.stats.title">📊 Defend-Statistics</h1>
 
   <!-- Summary cards -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
     <div class="card" style="text-align:center;padding:1rem;">
       <div style="font-size:1.8rem;font-weight:700;color:#f87171;">{{ stats.totals.total or 0 }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Defend-Anfragen gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Defend-Requests gesamt</div>
     </div>
     <div class="card" style="text-align:center;padding:1rem;">
       <div style="font-size:1.8rem;font-weight:700;color:#f59e0b;">{{ stats.totals.open_count or 0 }}</div>
@@ -43,7 +43,7 @@
       <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.attackers">😤 Nervigste Angreifer</h2>
       {% if stats.attackers %}
       <table class="table" style="font-size:0.83rem;">
-        <thead><tr><th>#</th><th>Angreifer</th><th style="text-align:right;">Angriffe</th></tr></thead>
+        <thead><tr><th>#</th><th>Attacker</th><th style="text-align:right;">Attacke</th></tr></thead>
         <tbody>
           {% for row in stats.attackers %}
           {% set max_attacks = stats.attackers[0].attacks %}
@@ -61,16 +61,16 @@
         </tbody>
       </table>
       {% else %}
-      <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Daten.</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">No data yet.</p>
       {% endif %}
     </div>
 
-    <!-- Meistangegriffene unserer Spieler -->
+    <!-- Meistangegriffene unserer Player -->
     <div class="card">
-      <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.targeted">🎯 Am meisten angegriffen (unsere Spieler)</h2>
+      <h2 style="margin:0 0 0.75rem;font-size:1rem;" data-i18n="defense.stats.targeted">🎯 Am meisten angegriffen (unsere Player)</h2>
       {% if stats.targeted %}
       <table class="table" style="font-size:0.83rem;">
-        <thead><tr><th>#</th><th>Spieler</th><th style="text-align:right;">Anfragen</th></tr></thead>
+        <thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Requests</th></tr></thead>
         <tbody>
           {% for row in stats.targeted %}
           {% set max_def = stats.targeted[0].defends %}
@@ -88,7 +88,7 @@
         </tbody>
       </table>
       {% else %}
-      <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Daten.</p>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">No data yet.</p>
       {% endif %}
     </div>
 
@@ -104,7 +104,7 @@
       <h2 style="margin:0;font-size:1rem;">🛡️ Verteidiger-Dashboard</h2>
       <div style="display:flex;gap:.35rem;">
         <button class="vs-sort-btn active" onclick="vsSort('troops',this)">↕ Truppen</button>
-        <button class="vs-sort-btn" onclick="vsSort('part',this)">↕ Einsätze</button>
+        <button class="vs-sort-btn" onclick="vsSort('part',this)">↕ Operations</button>
         <button class="vs-sort-btn" onclick="vsSort('speed',this)">↕ Reaktion</button>
       </div>
     </div>
@@ -157,7 +157,7 @@
           {# Participations #}
           <div style="text-align:right;min-width:55px;">
             <div style="font-weight:700;font-size:.9rem;color:#f59e0b;">{{ part }}×</div>
-            <div style="font-size:.65rem;color:var(--text-muted);">Einsätze</div>
+            <div style="font-size:.65rem;color:var(--text-muted);">Operations</div>
           </div>
 
           {# Response time #}
@@ -176,7 +176,7 @@
               {% elif g >= 1000 %}{{ "%.1f"|format(g/1000) }}k
               {% else %}{{ g }}{% endif %}/h
             </div>
-            <div style="font-size:.65rem;color:var(--text-muted);">Korn/h</div>
+            <div style="font-size:.65rem;color:var(--text-muted);">Crop/h</div>
           </div>
 
           {# Share bar #}
@@ -213,7 +213,7 @@
   {% else %}
   <div class="card" style="margin-bottom:1rem;">
     <h2 style="margin:0 0 .5rem;font-size:1rem;">🛡️ Verteidiger-Dashboard</h2>
-    <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Noch keine Truppenbeiträge erfasst.</p>
+    <p style="color:var(--text-muted);font-size:.85rem;margin:0;">No troop contributions recorded yet.</p>
   </div>
   {% endif %}
 
@@ -227,11 +227,11 @@
         <tr>
           <th>#</th>
           <th>Verteidiger</th>
-          <th>Angreifer</th>
+          <th>Attacker</th>
           <th>Koords</th>
           <th style="text-align:right;">Truppen</th>
           <th style="text-align:right;">Beteiligte</th>
-          <th>Ziel</th>
+          <th>Target</th>
           <th style="text-align:right;">Datum</th>
         </tr>
       </thead>
@@ -259,7 +259,7 @@
     </table>
     </div>
     {% else %}
-    <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Noch keine Daten.</p>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">No data yet.</p>
     {% endif %}
   </div>
 

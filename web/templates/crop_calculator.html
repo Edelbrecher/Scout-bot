@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Getreidefeld-Rechner · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Grainfeld-Rechner · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -230,11 +230,11 @@
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
     <div>
       <a href="/guild/{{ guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 data-i18n="crop.title">🌾 Getreidefeld-Effizienz-Rechner</h1>
-      <p class="subtitle" data-i18n="crop.subtitle">Optimale Upgrade-Reihenfolge für Getreidefelder — ROI-basiert (T4.4 Extended)</p>
+      <h1 data-i18n="crop.title">🌾 Grainfeld-Effizienz-Rechner</h1>
+      <p class="subtitle" data-i18n="crop.subtitle">Optimal upgrade order for grain fields — ROI-based (T4.4 Extended)</p>
       <div style="margin-top:1rem;">
         <a href="/guild/{{ guild_id }}/tools/crop-supply" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.5rem 1.25rem;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.95rem;">
-          🏪 <span data-i18n="crop.supply.link">Getreide-Versorgungsrechner</span>
+          🏪 <span data-i18n="crop.supply.link">Grain-Versorgungsrechner</span>
         </a>
       </div>
     </div>
@@ -250,13 +250,13 @@
         <label>Dorftyp</label>
         <div class="cc-radio-group" id="villageTypeGroup">
           <label class="cc-radio-btn selected" onclick="setVillageType('15c',this)">
-            <input type="radio" name="villageType" value="15c" checked> 15-Getreide
+            <input type="radio" name="villageType" value="15c" checked> 15-Grain
           </label>
           <label class="cc-radio-btn" onclick="setVillageType('9c',this)">
-            <input type="radio" name="villageType" value="9c"> 9-Getreide
+            <input type="radio" name="villageType" value="9c"> 9-Grain
           </label>
           <label class="cc-radio-btn" onclick="setVillageType('7c',this)">
-            <input type="radio" name="villageType" value="7c"> 7-Getreide
+            <input type="radio" name="villageType" value="7c"> 7-Grain
           </label>
         </div>
       </div>
@@ -273,7 +273,7 @@
 
       <!-- Egyptian -->
       <div class="cc-field">
-        <label>Ägypter?</label>
+        <label>Egyptians?</label>
         <div class="cc-radio-group">
           <div class="cc-toggle" id="egyptToggle" onclick="toggleEgypt()">
             <span id="egyptIcon">✗</span> Nein
@@ -299,24 +299,24 @@
         <label>Oase 1</label>
         <select id="oasis1">
           <option value="0">Keine</option>
-          <option value="25">+25% Getreide</option>
-          <option value="50">+50% Getreide</option>
+          <option value="25">+25% Grain</option>
+          <option value="50">+50% Grain</option>
         </select>
       </div>
       <div class="cc-field">
         <label>Oase 2</label>
         <select id="oasis2">
           <option value="0">Keine</option>
-          <option value="25">+25% Getreide</option>
-          <option value="50">+50% Getreide</option>
+          <option value="25">+25% Grain</option>
+          <option value="50">+50% Grain</option>
         </select>
       </div>
       <div class="cc-field">
         <label>Oase 3</label>
         <select id="oasis3">
           <option value="0">Keine</option>
-          <option value="25">+25% Getreide</option>
-          <option value="50">+50% Getreide</option>
+          <option value="25">+25% Grain</option>
+          <option value="50">+50% Grain</option>
         </select>
       </div>
     </div>
@@ -330,7 +330,7 @@
       <!-- Fields grid -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.4rem;">
-          <div style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Getreidefelder (Level)</div>
+          <div style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Grainfelder (Level)</div>
           <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
             <span style="font-size:0.7rem;color:var(--text-muted);align-self:center;margin-right:0.2rem;">Alle auf:</span>
             {% for lvl in [1,5,10,12,15,16,17,18,19,20,21] %}
@@ -357,7 +357,7 @@
       <!-- Right column: controls -->
       <div style="display:flex;flex-direction:column;gap:1rem;min-width:200px;">
         <div class="cc-field">
-          <label>Mühle (Level)</label>
+          <label>Mill (Level)</label>
           <select id="millLevel">
             <option value="0">0</option>
             <option value="1">1</option>
@@ -368,7 +368,7 @@
           </select>
         </div>
         <div class="cc-field">
-          <label>Bäckerei (Level)</label>
+          <label>Bakery (Level)</label>
           <select id="bakeryLevel">
             <option value="0">0</option>
             <option value="1">1</option>
@@ -419,13 +419,13 @@
   <!-- Buttons -->
   <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem;">
     <button class="btn-calc" onclick="runCalculation()">🌾 Berechnen</button>
-    <button class="btn-reset" onclick="resetForm()">Zurücksetzen</button>
+    <button class="btn-reset" onclick="resetForm()">Reset</button>
   </div>
 
   <!-- Results -->
   <div id="resultsSection" style="display:none;">
     <div class="cc-section">
-      <h2>Ergebnis-Zusammenfassung</h2>
+      <h2>Result-Zusammenfassung</h2>
       <div class="cc-summary-row" id="summaryRow"></div>
       <div class="cc-info-box" id="infoBox"></div>
     </div>
@@ -437,7 +437,7 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>Aktion</th>
+              <th>Action</th>
               <th>Kosten (H/L/E/G)</th>
               <th>Produktion nach Upgrade</th>
               <th>Gewinn (G/h)</th>
@@ -793,7 +793,7 @@ function roiClass(days) {
 function renderResults(steps, finalState, totalOasisPct) {
   if (steps.length === 0) {
     document.getElementById('resultsSection').style.display = 'none';
-    alert('Keine weiteren Upgrades möglich — alles maximal ausgebaut.');
+    alert('No more upgrades possible — everything fully upgraded.');
     return;
   }
 
@@ -822,8 +822,8 @@ function renderResults(steps, finalState, totalOasisPct) {
     <div class="cc-kpi"><div class="cc-kpi-label">Startproduktion</div><div class="cc-kpi-value">${fmtNum(Math.round(startProd))} G/h</div></div>
     <div class="cc-kpi"><div class="cc-kpi-label">Endproduktion</div><div class="cc-kpi-value" style="color:#22c55e;">${fmtNum(Math.round(finalProd))} G/h</div></div>
     <div class="cc-kpi"><div class="cc-kpi-label">Schritte</div><div class="cc-kpi-value">${steps.length}</div></div>
-    <div class="cc-kpi"><div class="cc-kpi-label">Mühle → End</div><div class="cc-kpi-value">${startMillLvl} → ${finalState.mill}</div></div>
-    <div class="cc-kpi"><div class="cc-kpi-label">Bäckerei → End</div><div class="cc-kpi-value">${startBakeryLvl} → ${finalState.bakery}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Mill → End</div><div class="cc-kpi-value">${startMillLvl} → ${finalState.mill}</div></div>
+    <div class="cc-kpi"><div class="cc-kpi-label">Bakery → End</div><div class="cc-kpi-value">${startBakeryLvl} → ${finalState.bakery}</div></div>
     <div class="cc-kpi"><div class="cc-kpi-label">Oasen-Bonus</div><div class="cc-kpi-value">+${totalOasisPct}%</div></div>
     ${heroWheatVal > 0 ? `<div class="cc-kpi"><div class="cc-kpi-label">Held-Bonus</div><div class="cc-kpi-value">+${fmtNum(heroWheatVal)} G/h</div></div>` : ''}
   `;
@@ -833,10 +833,10 @@ function renderResults(steps, finalState, totalOasisPct) {
   infoBox.innerHTML = `
     <strong>Konfiguration:</strong>
     ${getFieldCount()} Felder · ${isCapital ? 'Hauptstadt (max. Lvl 21)' : 'Normaldorf (max. Lvl 10)'} ·
-    ${isEgypt ? 'Ägypter (Bäckerei +10%/Lvl)' : 'Standard (Bäckerei +5%/Lvl)'} ·
+    ${isEgypt ? 'Egyptians (Bakery +10%/lvl)' : 'Standard (Bakery +5%/lvl)'} ·
     ${isGold ? 'Gold-Bonus (+25%)' : 'Kein Gold-Bonus'} ·
-    Mühle +${finalState.mill * 5}% · Bäckerei +${finalState.bakery * bakeryPctPerLevel}% · Oasen +${totalOasisPct}%
-    ${allMax ? ' · <span style="color:#22c55e;font-weight:700;">✓ Vollständig ausgebaut!</span>' : ''}
+    Mill +${finalState.mill * 5}% · Bakery +${finalState.bakery * bakeryPctPerLevel}% · Oases +${totalOasisPct}%
+    ${allMax ? ' · <span style="color:#22c55e;font-weight:700;">✓ Fully upgraded!</span>' : ''}
   `;
 
   // Results table
@@ -850,14 +850,14 @@ function renderResults(steps, finalState, totalOasisPct) {
       actionBadge = `<span class="cc-action-badge cc-action-field">Feld ${a.idx+1}</span>`;
       actionDesc  = `Lvl ${a.fromLvl} → ${a.toLvl}`;
     } else if (a.type === 'mill') {
-      actionBadge = `<span class="cc-action-badge cc-action-mill">Mühle</span>`;
+      actionBadge = `<span class="cc-action-badge cc-action-mill">Mill</span>`;
       actionDesc  = `Lvl ${a.fromLvl} → ${a.toLvl}`;
     } else if (a.type === 'bakery') {
-      actionBadge = `<span class="cc-action-badge cc-action-bakery">Bäckerei</span>`;
+      actionBadge = `<span class="cc-action-badge cc-action-bakery">Bakery</span>`;
       actionDesc  = `Lvl ${a.fromLvl} → ${a.toLvl}`;
     } else if (a.type === 'oasis') {
       actionBadge = `<span class="cc-action-badge cc-action-oasis">Oase</span>`;
-      actionDesc  = `+${a.pct}% Getreide`;
+      actionDesc  = `+${a.pct}% Grain`;
     }
 
     const roiTxt = a.roi === 0 ? '—' : a.roi.toFixed(2) + ' T';
@@ -894,20 +894,20 @@ buildFieldInputs();
 <div class="cc-section" style="margin-top:2rem;">
   <h2>🚛 Traderouten-Rechner</h2>
   <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.25rem;">
-    Berechnet wie viele Traderouten du brauchst, um einen Getreidemangel dauerhaft auszugleichen.
-    Basiert auf Marktplatzstufe, Händlerkapazität und Handelsgeschwindigkeit deines Stammes.
+    Berechnet wie viele Traderouten du brauchst, um einen Grainmangel dauerhaft auszugleichen.
+    Based on marketplace level, merchant capacity and trade speed of your tribe.
   </p>
 
   <div class="cc-row" style="gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">
 
     <div class="cc-field">
-      <label>Stamm</label>
+      <label>Tribe</label>
       <select id="tr-tribe" onchange="calcTradeRoutes()">
-        <option value="roman">Römer</option>
+        <option value="roman">Romans</option>
         <option value="teuton">Germanen</option>
-        <option value="gaul">Gallier</option>
-        <option value="egyptian">Ägypter</option>
-        <option value="hun">Hunnen</option>
+        <option value="gaul">Gauls</option>
+        <option value="egyptian">Egyptians</option>
+        <option value="hun">Huns</option>
       </select>
     </div>
 
@@ -916,28 +916,28 @@ buildFieldInputs();
       <input type="number" id="tr-market-lvl" min="1" max="20" value="10" oninput="calcTradeRoutes()">
     </div>
 
-    <div class="cc-field" title="Handelskontor — jede Stufe erhöht die Händlerkapazität um 5 % (max. Stufe 20 = +100 %)">
+    <div class="cc-field" title="Trade office — each level increases merchant capacity by 5% (max level 20 = +100%)">
       <label style="display:flex;align-items:center;gap:.35rem;">
         Handelskontor
         <span style="font-size:.68rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);
-                     color:#a5b4fc;border-radius:10px;padding:1px 6px;">+5 % / Stufe</span>
+                     color:#a5b4fc;border-radius:10px;padding:1px 6px;">+5 % / Level</span>
       </label>
       <input type="number" id="tr-trade-center" min="0" max="20" value="0" oninput="calcTradeRoutes()">
     </div>
 
-    <div class="cc-field" title="Allianz-Bonus auf Händlerkapazität — Stufe 1=+30%, 2=+60%, 3=+90%, 4=+120%, 5=+150%">
+    <div class="cc-field" title="Alliance bonus on merchant capacity — Level 1=+30%, 2=+60%, 3=+90%, 4=+120%, 5=+150%">
       <label style="display:flex;align-items:center;gap:.35rem;">
         Allianz-Bonus
         <span style="font-size:.68rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);
-                     color:#4ade80;border-radius:10px;padding:1px 6px;">Stufe</span>
+                     color:#4ade80;border-radius:10px;padding:1px 6px;">Level</span>
       </label>
       <select id="tr-ally-bonus" onchange="calcTradeRoutes()">
         <option value="0">Kein Bonus (0%)</option>
-        <option value="30">Stufe 1 (+30%)</option>
-        <option value="60">Stufe 2 (+60%)</option>
-        <option value="90">Stufe 3 (+90%)</option>
-        <option value="120">Stufe 4 (+120%)</option>
-        <option value="150">Stufe 5 (+150%)</option>
+        <option value="30">Level 1 (+30%)</option>
+        <option value="60">Level 2 (+60%)</option>
+        <option value="90">Level 3 (+90%)</option>
+        <option value="120">Level 4 (+120%)</option>
+        <option value="150">Level 5 (+150%)</option>
       </select>
     </div>
 
@@ -947,7 +947,7 @@ buildFieldInputs();
     </div>
 
     <div class="cc-field">
-      <label>Getreidemangel / h</label>
+      <label>Grainmangel / h</label>
       <input type="number" id="tr-deficit" min="0" value="5000" oninput="calcTradeRoutes()">
     </div>
 
@@ -961,11 +961,11 @@ buildFieldInputs();
   <div id="tr-result" style="margin-top:1.5rem;display:none;">
     <div class="cc-summary-row">
       <div class="cc-kpi">
-        <div class="cc-kpi-label">Basis-Kapazität</div>
+        <div class="cc-kpi-label">Base capacity</div>
         <div class="cc-kpi-value" id="tr-base-capacity">—</div>
       </div>
       <div class="cc-kpi" style="border-color:rgba(99,102,241,.4);">
-        <div class="cc-kpi-label">Kapazität mit Boni</div>
+        <div class="cc-kpi-label">Capacity with bonuses</div>
         <div class="cc-kpi-value" id="tr-capacity" style="color:#a5b4fc;">—</div>
       </div>
       <div class="cc-kpi">
@@ -981,7 +981,7 @@ buildFieldInputs();
         <div class="cc-kpi-value" id="tr-crop-per-route">—</div>
       </div>
       <div class="cc-kpi" style="border-color:rgba(34,197,94,.5);">
-        <div class="cc-kpi-label">Benötigte Routen</div>
+        <div class="cc-kpi-label">Required routes</div>
         <div class="cc-kpi-value" id="tr-needed" style="color:#4ade80;">—</div>
       </div>
     </div>
@@ -1016,7 +1016,7 @@ function calcTradeRoutes() {
   // ── Capacity calculation ──────────────────────────────────────────
   // Base carry from tribe
   const baseCarry = t.carry;
-  // Market level scaling: each level adds 10% of base (Stufe 1 = 100 %, Stufe 20 = 290 %)
+  // Market level scaling: each level adds 10% of base (Level 1 = 100 %, Level 20 = 290 %)
   const marketMult  = 1 + (mLvl - 1) * 0.10;
   // Trade Center: each level +5 % of base capacity (stacks additively before ally bonus)
   const tcMult      = 1 + tcLvl * 0.05;
@@ -1046,33 +1046,33 @@ function calcTradeRoutes() {
 
   // ── Bonus breakdown ───────────────────────────────────────────────
   const breakdownParts = [
-    `Stamm-Basis: <strong>${baseCarry.toLocaleString('de')}</strong>`,
-    `Marktplatz Stufe ${mLvl}: <strong>×${marketMult.toFixed(2)}</strong> → ${baseCapacity.toLocaleString('de')}`,
+    `Tribe-Basis: <strong>${baseCarry.toLocaleString('de')}</strong>`,
+    `Marktplatz Level ${mLvl}: <strong>×${marketMult.toFixed(2)}</strong> → ${baseCapacity.toLocaleString('de')}`,
   ];
   if (tcLvl > 0) {
-    breakdownParts.push(`Handelskontor Stufe ${tcLvl}: <strong>+${(tcLvl * 5)} %</strong>`);
+    breakdownParts.push(`Handelskontor Level ${tcLvl}: <strong>+${(tcLvl * 5)} %</strong>`);
   }
   if (allyBonus > 0) {
     breakdownParts.push(`Allianz-Bonus: <strong>+${allyBonus} %</strong>`);
   }
   if (tcLvl > 0 || allyBonus > 0) {
     const totalBonus = Math.round((fullCapacity / baseCapacity - 1) * 100);
-    breakdownParts.push(`Gesamt-Bonus auf Basis-Kapazität: <strong>+${totalBonus} %</strong> → ${fullCapacity.toLocaleString('de')} ☀️`);
+    breakdownParts.push(`Total bonus on base capacity: <strong>+${totalBonus} %</strong> → ${fullCapacity.toLocaleString('en')} ☀️`);
   }
   document.getElementById('tr-bonus-breakdown').innerHTML = breakdownParts.join('&nbsp;&nbsp;·&nbsp;&nbsp;');
 
   // ── Info message ──────────────────────────────────────────────────
   let info = '';
   if (deficit === 0) {
-    info = '✅ Kein Getreidemangel — keine Traderouten nötig.';
+    info = '✅ No grain shortage — no trade routes needed.';
   } else if (needed > maxRoutes) {
     const minMarketLvl = Math.ceil(needed / t.merchants_per_level);
-    info = `⚠️ ${needed} Routen benötigt, aber Marktplatz Stufe ${mLvl} erlaubt nur ${maxRoutes} Händler gleichzeitig. `
-         + `Lösungen: Marktplatz auf Stufe ${minMarketLvl} erhöhen, Entfernung verkürzen, `
-         + (tcLvl < 20 ? `Handelskontor ausbauen (aktuell Stufe ${tcLvl}), ` : '')
+    info = `⚠️ ${needed} routes needed, but marketplace level ${mLvl} only allows ${maxRoutes} merchants simultaneously. `
+         + `Solutions: upgrade marketplace to level ${minMarketLvl}, shorten distance, `
+         + (tcLvl < 20 ? `Handelskontor ausbauen (aktuell Level ${tcLvl}), ` : '')
          + 'oder Allianz-Bonus nutzen.';
   } else {
-    info = `✅ ${needed} von ${maxRoutes} möglichen Traderouten reichen aus, um ${deficit.toLocaleString('de')} ☀️/h auszugleichen.`;
+    info = `✅ ${needed} of ${maxRoutes} possible trade routes are sufficient to compensate ${deficit.toLocaleString('en')} ☀️/h.`;
   }
   document.getElementById('tr-info').textContent = info;
   document.getElementById('tr-result').style.display = 'block';

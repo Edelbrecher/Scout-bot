@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Angriff-Detection · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Attack-Detection · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container">
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">&larr; {{ guild.guild_name }}</a>
-      <h1>&#x2694;&#xFE0F; Angriff-Detection</h1>
+      <h1>&#x2694;&#xFE0F; Attack-Detection</h1>
       <p class="subtitle">{{ guild.guild_name }}</p>
     </div>
     <div style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.25rem; flex-wrap:wrap;">
@@ -17,7 +17,7 @@
         &#x1F50D; Allianz-Analyse
       </button>
       <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
-        &#x1F3F0; Eigene Dörfer
+        &#x1F3F0; Own Villages
       </a>
     </div>
   </div>
@@ -29,20 +29,20 @@
         <h2 style="margin:0;">&#x1F4CB; Rallyepunkt importieren</h2>
         <button onclick="closeImportModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;">&times;</button>
       </div>
-      <p class="hint" style="margin-bottom:0.75rem;">Rallyepunkt-Seite aus Travian kopieren und hier einfügen. Mehrere Sektionen werden automatisch erkannt.</p>
+      <p class="hint" style="margin-bottom:0.75rem;">Copy the rally point page from Travian and paste it here. Multiple sections are automatically detected.</p>
       <textarea id="rallyInput" rows="14"
         style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:0.75rem; font-family:monospace; font-size:0.82rem; resize:vertical;"
-        placeholder="Hier Rallyepunkt-Text einfügen..."></textarea>
+        placeholder="Paste rally point text here..."></textarea>
       <div id="parseStatus" style="margin-top:0.5rem; font-size:0.82rem; color:var(--text-muted);"></div>
 
       <!-- Preview -->
       <div id="importPreview" style="display:none; margin-top:1rem;">
-        <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Vorschau (<span id="previewCount">0</span> Angriffe erkannt)</h3>
+        <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Vorschau (<span id="previewCount">0</span> Attacke erkannt)</h3>
         <div id="previewList" style="display:flex; flex-direction:column; gap:0.4rem; max-height:280px; overflow-y:auto;"></div>
       </div>
 
       <div style="display:flex; gap:0.75rem; margin-top:1rem; justify-content:flex-end;">
-        <button class="btn btn-secondary" onclick="closeImportModal()">Abbrechen</button>
+        <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
         <button class="btn btn-primary" id="btnSaveImport" onclick="saveImport()" disabled>
           &#x1F4BE; Speichern
         </button>
@@ -54,7 +54,7 @@
   <div id="playerModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1001; overflow-y:auto;">
     <div style="max-width:620px; margin:2rem auto; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 id="playerModalTitle" style="margin:0;">Spielerprofil</h2>
+        <h2 id="playerModalTitle" style="margin:0;">Playerprofil</h2>
         <button onclick="closePlayerModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;">&times;</button>
       </div>
       <div id="playerModalBody">
@@ -67,7 +67,7 @@
   <div id="alliancePanel" style="display:none; margin-bottom:1.5rem;">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
-        <h2 style="margin:0;">&#x1F50D; Allianz-Analyse — Alle eingehenden Angriffe</h2>
+        <h2 style="margin:0;">&#x1F50D; Allianz-Analyse — Alle eingehenden Attacke</h2>
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
           <label style="font-size:0.82rem; display:flex; align-items:center; gap:0.3rem;">
             <input type="checkbox" id="filterNonFake" onchange="renderAlliance()"> Nur Nicht-Fake (Score &lt; 60)
@@ -93,7 +93,7 @@
   <div id="ownAttacksSection">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-        <h2 style="margin:0;">&#x2694;&#xFE0F; Eingehende Angriffe (eigene Dörfer)</h2>
+        <h2 style="margin:0;">&#x2694;&#xFE0F; Incoming attacks (own villages)</h2>
         <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.25rem 0.6rem;" onclick="loadOwnAttacks()">&#x21BB; Aktualisieren</button>
       </div>
       <div id="ownAttacksContent">
@@ -113,12 +113,12 @@
         <form method="post" action="/guild/{{ guild.guild_id }}/attacks/config">
           <div class="form-group">
             <label for="attack_channel_id">Alarm-Kanal ID</label>
-            <p class="field-hint">Channel wo Angriff-Meldungen gepostet werden.</p>
+            <p class="field-hint">Channel wo Attack-Meldungen gepostet werden.</p>
             <input type="text" id="attack_channel_id" name="attack_channel_id"
               value="{{ guild.attack_channel_id or '' }}"
               placeholder="z.B. 1234567890123456789" />
           </div>
-          <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="submit" class="btn btn-primary">Save</button>
         </form>
         <hr style="margin:1.5rem 0;">
         {% if not guild.attack_channel_id %}
@@ -129,7 +129,7 @@
         {% else %}
         <h3>Reset Setup</h3>
         <form method="post" action="/guild/{{ guild.guild_id }}/attacks/reset"
-              onsubmit="return confirm('Angriff-Konfiguration zurücksetzen?')">
+              onsubmit="return confirm('Reset attack configuration?')">
           <button type="submit" class="btn btn-danger">&#x1F504; Reset</button>
         </form>
         {% endif %}
@@ -263,7 +263,7 @@
       if (m) { serverTime = m[1]; break; }
     }
 
-    const TROOP_HEADERS_RE = /^(Legio|Prätor|Imperia|Equites|Rammbock|Feuerkata|Senator|Siedler|Held|Phalanx|Schwertkämpfer|Pathfinder|Theutates|Druide|Eduier|Trebuchet|Häuptling|Keule|Speer|Sklave|Axtkämpfer|Aufklärer|Paladin|Ritter|Katapult|Stammesführer|Legionnaire|Praetorian|Imperian|Equites\s+Legati|Equites\s+Impe|Equites\s+Caes|Battering|Fire\s+Cat|Senator|Clubswinger|Spearman|Slave|Axeman|Scout|Paladin|Teutonic|Catapult|Chief|Phalanx|Swordsman|Pathfinder|Theutates|Druidrider|Haeduan|Ram|Trebuchet|Chieftain)/i;
+    const TROOP_HEADERS_RE = /^(Legio|Prätor|Imperia|Equites|Rammbock|Feuerkata|Senator|Siedler|Held|Phalanx|Schwertkämpfer|Pathfinder|Theutates|Druide|Eduier|Trebuchet|Häuptling|Keule|Speer|Sklave|Axtkämpfer|Aufklärer|Paladin|Ritter|Katapult|Tribeesführer|Legionnaire|Praetorian|Imperian|Equites\s+Legati|Equites\s+Impe|Equites\s+Caes|Battering|Fire\s+Cat|Senator|Clubswinger|Spearman|Slave|Axeman|Scout|Paladin|Teutonic|Catapult|Chief|Phalanx|Swordsman|Pathfinder|Theutates|Druidrider|Haeduan|Ram|Trebuchet|Chieftain)/i;
 
     // Allow starting without the "Ankommende Truppen" header — some browsers omit it
     let inSection = false;
@@ -272,7 +272,7 @@
     let lastPlainLine = '';   // tracks last non-special line as potential src-village
 
     // Attack line format variants:
-    // DE (old):  "- 04 VillageName  Angriff markieren PlayerName greift TargetVillage an"
+    // DE (old):  "- 04 VillageName  Attack markieren PlayerName greift TargetVillage an"
     // DE (new):  "- 04:32:10  VillageName  PlayerName greift TargetVillage an"
     // DE (alt):  "VillageName  PlayerName greift TargetVillage an  04:32:10"
     // EN:        "- 04 VillageName  Mark attack  PlayerName attacks TargetVillage"
@@ -295,11 +295,11 @@
       // Real EN format: "mark attackPlayerName attacks DstVillage"  (mark attack + player concatenated)
       { re: /^mark attack(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
         mk: (m, src) => ({ src, player: m[1].trim(), type: m[2]==='raids'?'raid':'attack', dst: m[3].trim() }) },
-      // Real DE format: "Angriff markierenSpielerName greift DstVillage an"
-      { re: /^Angriff markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+      // Real DE format: "Attack markierenPlayerName greift DstVillage an"
+      { re: /^Attack markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: (m, src) => ({ src, player: m[1].trim(), type: m[4]==='aus'?'raid':'attack', dst: m[3].trim() }) },
-      // Classic DE: dash + counter + src + "Angriff markieren" + player + greift/raubt + dst + an/aus
-      { re: /^[-–]\s*\d+\s+(.+?)\s+Angriff markieren\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+      // Classic DE: dash + counter + src + "Attack markieren" + player + greift/raubt + dst + an/aus
+      { re: /^[-–]\s*\d+\s+(.+?)\s+Attack markieren\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: m => ({ src: m[1], player: m[2], type: m[5]==='aus'?'raid':'attack', dst: m[4] }) },
       // Classic EN: dash + counter + src + "mark attack" + player + attacks/raids + dst
       { re: /^[-–]\s*\d+\s+(.+?)\s+mark attack\s*(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
@@ -326,7 +326,7 @@
         continue;
       }
       // Auto-start section if we see a clear attack pattern even without the header
-      if (/Aufgaben|Startseite|©\s*200/i.test(line)) break;
+      if (/Taskn|Startseite|©\s*200/i.test(line)) break;
 
       // Try all attack line patterns
       let matched = false;
@@ -437,11 +437,11 @@
         a => a.artifact_type === 'scout' && a.artifact_size === 'unique'
       );
       if (hasUniqueScout) {
-        reasons.push('Truppen sichtbar (Unique Späher-Artefakt vorhanden - kein Fake-Signal)');
+        reasons.push('Troops visible (Unique scout artifact present — no fake signal)');
         score = 40;
       } else {
         score = 98;
-        reasons.push('Truppen sichtbar ohne Unique Späher = sehr wahrscheinlich Fake');
+        reasons.push('Troops visible without unique scout = very likely fake');
       }
       if (attack.troop_count === 1) {
         score = 99;
@@ -452,7 +452,7 @@
       }
     } else {
       score = 40;
-      reasons.push('Truppen verdeckt (≥20) - möglicherweise echter Angriff');
+      reasons.push('Troops hidden (≥20) — possibly real attack');
     }
     if (attack.attack_type === 'raid') {
       score = Math.min(100, score + 15);
@@ -465,12 +465,12 @@
     if (score >= 90) return `<span class="fake-badge fake-red" data-tip="Fake-Score ${score}% – sehr wahrsch. Fake">🔴 Fake</span>`;
     if (score >= 70) return `<span class="fake-badge fake-orange" data-tip="Fake-Score ${score}% – wahrscheinlich Fake">🟠 Wahrsch. Fake</span>`;
     if (score >= 40) return `<span class="fake-badge fake-yellow" data-tip="Fake-Score ${score}% – nicht eindeutig">🟡 Unbekannt</span>`;
-    return `<span class="fake-badge fake-green" data-tip="Fake-Score ${score}% – mögl. echter Angriff">🟢 Mögl. Echt</span>`;
+    return `<span class="fake-badge fake-green" data-tip="Fake score ${score}% — possibly real attack">🟢 Possibly real</span>`;
   }
 
   function typeBadge(t) {
     if (t === 'raid') return '<span class="type-raid" data-tip="Raubzug (+15% Fake-Wahrscheinlichkeit)">💰 Raubzug</span>';
-    return '<span class="type-attack" data-tip="Normaler Angriff">⚔️ Angriff</span>';
+    return '<span class="type-attack" data-tip="Normaler Attack">⚔️ Attack</span>';
   }
 
   function fmtArrival(t) {
@@ -519,11 +519,11 @@
 
     const cnt = parsedAttacks.length;
     if (cnt > 0) {
-      document.getElementById('parseStatus').textContent = cnt + ' Angriffe erkannt.';
+      document.getElementById('parseStatus').textContent = cnt + ' Attacke erkannt.';
       document.getElementById('parseStatus').style.color = '#4ade80';
     } else {
       document.getElementById('parseStatus').innerHTML =
-        'Keine Angriffe erkannt. ' +
+        'Keine Attacke erkannt. ' +
         '<span style="color:#f87171;">Kopiere den kompletten Versammlungsplatz (alle Zeilen ab "Ankommende Truppen").</span> ' +
         '<a href="#" onclick="window._debugRallyParse(document.getElementById(\'rallyInput\').value);return false;" ' +
         'style="color:#a5b4fc;font-size:.8rem;">Debug in Console</a>';
@@ -564,7 +564,7 @@
       if (resp.ok) {
         closeImportModal();
         loadOwnAttacks();
-        showToast('✅ ' + data.saved + ' Angriffe gespeichert.');
+        showToast('✅ ' + data.saved + ' Attacke gespeichert.');
       } else {
         showToast('❌ Fehler: ' + (data.error || resp.status));
         btn.disabled = false;
@@ -585,7 +585,7 @@
     cont.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>';
     try {
       const resp = await fetch('/guild/' + GUILD_ID + '/attacks/api/incoming');
-      if (!resp.ok) { cont.innerHTML = '<p class="hint" style="text-align:center;">Fehler beim Laden.</p>'; return; }
+      if (!resp.ok) { cont.innerHTML = '<p class="hint" style="text-align:center;">Error loading.</p>'; return; }
       const attacks = await resp.json();
       renderOwnAttacks(attacks, cont);
     } catch(e) {
@@ -629,14 +629,14 @@
       parts.push(`Welle ${i+1} (${arr1}) → Welle ${i+2} (${arr2}): ${gapLabel} Abstand`);
     }
     return `<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;font-size:0.8rem;color:#fbbf24;">
-      ⏱️ <strong>Zwischendef möglich!</strong> ${waves.length} Wellen mit Zeitabstand:<br>
+      ⏱️ <strong>Intermediate def possible!</strong> ${waves.length} waves with time gap:<br>
       ${parts.map(p => '• ' + p).join('<br>')}
     </div>`;
   }
 
   function renderOwnAttacks(attacks, cont) {
     if (!attacks.length) {
-      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine eingehenden Angriffe. Importiere deinen Rallyepunkt.</p>';
+      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine eingehenden Attacke. Importiere deinen Rallyepunkt.</p>';
       return;
     }
 
@@ -659,8 +659,8 @@
         <div class="village-card-header">
           🏰 ${escHtml(g.name)}${escHtml(coords)}
           <span style="margin-left:auto; font-size:0.8rem; color:var(--text-muted); font-weight:400;">
-            ${waves.length} Welle(n) · ${g.attacks.length} Angriff(e)
-            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' mögl. echt</span>' : ''}
+            ${waves.length} Welle(n) · ${g.attacks.length} Attack(e)
+            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' possibly real</span>' : ''}
           </span>
         </div>
         <div style="display:flex; flex-direction:column; gap:0.4rem;">
@@ -701,7 +701,7 @@
         ${labelBadge(a.label||'')}
         ${CAN_LABEL ? labelButtons(a.id, a.label||'') : ''}
         ${importedBy}
-        <button onclick="dismissAttack(${a.id})" data-tip="Angriff ausblenden"
+        <button onclick="dismissAttack(${a.id})" data-tip="Attack ausblenden"
           style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>
       </span>
     </div>`;
@@ -709,8 +709,8 @@
 
   const LABEL_CFG = {
     fake: { color:'#94a3b8', bg:'rgba(148,163,184,.15)', border:'rgba(148,163,184,.35)', icon:'👻', text:'Fake',  tip:'Als Fake markieren' },
-    hard: { color:'#f87171', bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.35)', icon:'💀', text:'Hard',  tip:'Als harten Angriff markieren' },
-    low:  { color:'#fbbf24', bg:'rgba(251,191,36,.12)',  border:'rgba(251,191,36,.3)',   icon:'⚠️', text:'Low',   tip:'Als schwachen Angriff markieren' },
+    hard: { color:'#f87171', bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.35)', icon:'💀', text:'Hard',  tip:'Als harten Attack markieren' },
+    low:  { color:'#fbbf24', bg:'rgba(251,191,36,.12)',  border:'rgba(251,191,36,.3)',   icon:'⚠️', text:'Low',   tip:'Als schwachen Attack markieren' },
   };
 
   function labelBadge(label) {
@@ -745,7 +745,7 @@
       });
       const data = await r.json();
       if (!data.ok && data.error === 'no_permission') {
-        alert('Keine Berechtigung. Nur Leader/HC können Angriffe markieren.');
+        alert('No permission. Only leaders/HC can mark attacks.');
         return;
       }
       // Re-render buttons + badge in the row
@@ -795,7 +795,7 @@
     cont.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>';
     try {
       const resp = await fetch('/guild/' + GUILD_ID + '/attacks/api/alliance');
-      if (!resp.ok) { cont.innerHTML = '<p class="hint">Fehler beim Laden.</p>'; return; }
+      if (!resp.ok) { cont.innerHTML = '<p class="hint">Error loading.</p>'; return; }
       allianceAttacks = await resp.json();
       allianceLoaded = true;
       renderAlliance();
@@ -816,7 +816,7 @@
     if (filterHidden)  attacks = attacks.filter(a => a.troops_hidden);
 
     if (!attacks.length) {
-      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine Angriffe gefunden.</p>';
+      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine Attacke gefunden.</p>';
       return;
     }
 
@@ -849,7 +849,7 @@
       const windowMin = Math.round((last-first)/60000);
       if (windowMin <= 30) {
         coordWarning = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:6px;padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.83rem;color:#f87171;">
-          🚨 <strong>Koordinierter Großangriff erkannt!</strong> ${villageKeys.length} Dörfer werden innerhalb von ${windowMin} Minuten angegriffen.
+          🚨 <strong>Coordinated large attack detected!</strong> ${villageKeys.length} villages will be attacked within ${windowMin} minutes.
         </div>`;
       }
     }
@@ -867,8 +867,8 @@
         <div class="village-card-header">
           🏰 ${escHtml(g.name||'')}${escHtml(coords)}
           <span style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);font-weight:400;">
-            ${waves.length} Welle(n) · ${g.attacks.length} Angriff(e)
-            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' mögl. echt</span>' : ''}
+            ${waves.length} Welle(n) · ${g.attacks.length} Attack(e)
+            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' possibly real</span>' : ''}
           </span>
         </div>
         <div style="display:flex;flex-direction:column;gap:0.4rem;">
@@ -962,11 +962,11 @@
       html += `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:0.75rem; margin-bottom:1.25rem;">
         <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:6px;padding:0.75rem;text-align:center;">
           <div style="font-size:1.5rem;font-weight:700;">${player.total_pop||0}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">Bevölkerung</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">Population</div>
         </div>
         <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:6px;padding:0.75rem;text-align:center;">
           <div style="font-size:1.5rem;font-weight:700;">${player.village_count||0}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">Dörfer</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">Villages</div>
         </div>
         <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:6px;padding:0.75rem;text-align:center;">
           <div style="font-size:1rem;font-weight:700;">${escHtml(player.alliance_name||'—')}</div>
@@ -983,17 +983,17 @@
 
     // Artifacts
     const ARTIFACT_TYPES = [
-      {key:'scout',      label:'Späher'},
+      {key:'scout',      label:'Scout'},
       {key:'architect',  label:'Architekt'},
       {key:'blacksmith', label:'Schmied'},
       {key:'boots',      label:'Stiefel'},
-      {key:'diet',       label:'Diät'},
+      {key:'diet',       label:'Diet'},
       {key:'storage',    label:'Lager'},
       {key:'trainer',    label:'Trainer'},
       {key:'confusion',  label:'Verwirrung'},
       {key:'fool',       label:'Narr'},
     ];
-    const SIZES = [{key:'unique',label:'Einzigartig'},{key:'large',label:'Groß'},{key:'small',label:'Klein'}];
+    const SIZES = [{key:'unique',label:'Unique'},{key:'large',label:'Large'},{key:'small',label:'Small'}];
 
     html += '<h3 style="font-size:0.95rem; margin:0 0 0.75rem;">Bekannte Artefakte</h3>';
     html += '<div style="display:flex; flex-direction:column; gap:0.75rem;">';

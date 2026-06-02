@@ -108,13 +108,13 @@
         <div style="font-size:2.5rem;margin-bottom:.75rem;">📋</div>
         <div style="font-weight:600;margin-bottom:.4rem;">Noch keine Vorlagen</div>
         <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.2rem;">
-          Importiere einen vorgefertigten Bauplan oder erstelle eine eigene Vorlage.
+          Importiere einen vorgefertigten Blueprint oder erstelle eine eigene Vorlage.
         </div>
         <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;">
           <button onclick="openPresetModal()"
                   style="padding:.42rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;
                          background:#5865f2;border:none;color:#fff;">
-            📥 Vorgefertigte Baupläne laden
+            📥 Vorgefertigte Blueprints laden
           </button>
           <a href="/guild/{{ guild.guild_id }}/blueprints/templates/new"
              style="padding:.42rem 1rem;border-radius:8px;font-size:.85rem;font-weight:600;
@@ -152,7 +152,7 @@
                     ✏️
                   </a>
                   <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/templates/{{ tmpl.id }}/delete"
-                        style="display:inline;" onsubmit="return confirm('Vorlage &quot;{{ tmpl.name }}&quot; wirklich löschen?')">
+                        style="display:inline;" onsubmit="return confirm('Really delete template &quot;{{ tmpl.name }}&quot;?')">
                     <button type="submit"
                             style="padding:.28rem .6rem;border-radius:6px;font-size:.75rem;
                                    background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
@@ -213,7 +213,7 @@
                 </div>
               </div>
               <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}/delete"
-                    onsubmit="return confirm('Diesen Blueprint wirklich löschen?')">
+                    onsubmit="return confirm('Really delete this blueprint?')">
                 <button type="submit"
                         style="padding:.25rem .5rem;border-radius:6px;font-size:.72rem;
                                background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
@@ -229,18 +229,18 @@
             <a href="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}"
                style="padding:.3rem .8rem;border-radius:6px;font-size:.78rem;font-weight:700;
                       background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);
-                      color:#818cf8;text-decoration:none;">📋 Öffnen</a>
+                      color:#818cf8;text-decoration:none;">📋 Open</a>
           </div>
           {% endfor %}
         </div>
         {% endif %}
       </div>
 
-      <!-- Alle Spieler-Blueprints (Admin) -->
+      <!-- Alle Player-Blueprints (Admin) -->
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;">
           <h2 style="font-size:1rem;font-weight:700;margin:0;">
-            👥 Alle Spieler-Blueprints
+            👥 Alle Player-Blueprints
             <span style="font-size:.72rem;font-weight:400;color:var(--text-muted);">(Admin-Ansicht)</span>
           </h2>
           {% if all_templates %}
@@ -255,17 +255,17 @@
         {% if not player_blueprints %}
         <div class="card" style="text-align:center;padding:2rem 1rem;">
           <div style="font-size:2rem;margin-bottom:.6rem;">👥</div>
-          <div style="font-weight:600;margin-bottom:.3rem;">Keine Spieler-Blueprints</div>
-          <div style="font-size:.83rem;color:var(--text-muted);">Weise Spielern Blueprints zu, um ihren Fortschritt zu verfolgen.</div>
+          <div style="font-weight:600;margin-bottom:.3rem;">Keine Player-Blueprints</div>
+          <div style="font-size:.83rem;color:var(--text-muted);">Weise Playern Blueprints zu, um ihren Progress zu verfolgen.</div>
         </div>
         {% else %}
         <div class="card" style="padding:0;overflow:hidden;">
           <table class="table" style="font-size:.85rem;">
             <thead>
               <tr>
-                <th>Spieler / Dorf</th>
+                <th>Player / Dorf</th>
                 <th>Vorlage</th>
-                <th>Fortschritt</th>
+                <th>Progress</th>
                 <th></th>
               </tr>
             </thead>
@@ -296,9 +296,9 @@
                   <a href="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}"
                      style="padding:.25rem .6rem;border-radius:6px;font-size:.75rem;font-weight:600;
                             background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);
-                            color:#818cf8;text-decoration:none;">📋 Öffnen</a>
+                            color:#818cf8;text-decoration:none;">📋 Open</a>
                   <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/{{ pb.id }}/delete"
-                        style="display:inline;" onsubmit="return confirm('Blueprint für {{ pb.player_name }} löschen?')">
+                        style="display:inline;" onsubmit="return confirm('Delete blueprint for {{ pb.player_name }}?')">
                     <button type="submit"
                             style="padding:.25rem .5rem;border-radius:6px;font-size:.75rem;
                                    background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);
@@ -326,16 +326,16 @@
               style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">×</button>
     </div>
     <p style="font-size:.84rem;color:var(--text-muted);margin-bottom:1rem;">
-      Der Blueprint wird für deinen Account aktiviert. Du kannst ihn mehrfach aktivieren – z. B. für verschiedene Dörfer.
+      The blueprint will be activated for your account. You can activate it multiple times — e.g. for different villages.
     </p>
     <form id="activateForm" method="post" action="#">
       <div style="margin-bottom:.9rem;">
-        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.4rem;">Dorf-Rolle</label>
+        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.4rem;">Dorf-Role</label>
         <div style="display:flex;gap:.4rem;flex-wrap:wrap;" id="roleChips">
           <button type="button" class="role-chip" onclick="selectRole('Hauptdorf')">🏠 Hauptdorf</button>
           <button type="button" class="role-chip" onclick="selectRole('Supportdorf')">🌾 Supportdorf</button>
-          <button type="button" class="role-chip" onclick="selectRole('Off-Dorf')">⚔️ Off-Dorf</button>
-          <button type="button" class="role-chip" onclick="selectRole('Def-Dorf')">🛡️ Def-Dorf</button>
+          <button type="button" class="role-chip" onclick="selectRole('Off village')">⚔️ Off village</button>
+          <button type="button" class="role-chip" onclick="selectRole('Def village')">🛡️ Def village</button>
         </div>
       </div>
       <div style="margin-bottom:.75rem;">
@@ -383,7 +383,7 @@
     </div>
     <form method="post" action="/guild/{{ guild.guild_id }}/blueprints/player/new">
       <div style="margin-bottom:.75rem;">
-        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.35rem;">Spieler-Name</label>
+        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.35rem;">Player-Name</label>
         <input type="text" name="player_name" required placeholder="z. B. MaxMuster"
                style="width:100%;padding:.42rem .7rem;border-radius:7px;background:var(--bg);
                       border:1px solid var(--border);color:var(--text);font-size:.9rem;box-sizing:border-box;">
@@ -407,7 +407,7 @@
         <select name="template_id" required
                 style="width:100%;padding:.42rem .7rem;border-radius:7px;background:var(--bg);
                        border:1px solid var(--border);color:var(--text);font-size:.9rem;box-sizing:border-box;">
-          <option value="">— Vorlage wählen —</option>
+          <option value="">— Select template —</option>
           {% for tribe_name, tribe_info in tribe_meta.items() %}
             {% set tribe_templates = all_templates | selectattr('tribe', 'eq', tribe_name) | list %}
             {% if tribe_templates %}
@@ -446,7 +446,7 @@
               style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">×</button>
     </div>
     <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:1rem;">
-      Wähle ein vorgefertigtes Blueprint-Preset aus und importiere es als neue Vorlage.
+      Select a pre-made blueprint preset and import it as a new template.
     </p>
     <div id="presetList" style="display:flex;flex-direction:column;gap:.6rem;max-height:360px;overflow-y:auto;">
       <div style="text-align:center;color:var(--text-muted);font-size:.85rem;padding:1rem;">Lade Presets…</div>
@@ -455,7 +455,7 @@
       <button onclick="closePresetModal()"
               style="padding:.42rem .9rem;border-radius:7px;font-size:.85rem;cursor:pointer;
                      background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-muted);">
-        Schließen
+        Close
       </button>
     </div>
   </div>
@@ -526,7 +526,7 @@ function openPresetModal() {
     .then(data => {
       const list = document.getElementById('presetList');
       if (!data.presets || !data.presets.length) {
-        list.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem;">Keine Presets verfügbar.</div>';
+        list.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem;">No presets available.</div>';
         return;
       }
       list.innerHTML = data.presets.map((p, i) => `
@@ -539,12 +539,12 @@ function openPresetModal() {
           </div>
           <button style="padding:.32rem .8rem;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;flex-shrink:0;
                          background:#5865f2;border:none;color:#fff;white-space:nowrap;"
-                  onclick="importPreset(${i}, this)">📥 Importieren</button>
+                  onclick="importPreset(${i}, this)">📥 Import</button>
         </div>
       `).join('');
     })
     .catch(() => {
-      document.getElementById('presetList').innerHTML = '<div style="color:var(--text-muted);">Fehler beim Laden.</div>';
+      document.getElementById('presetList').innerHTML = '<div style="color:var(--text-muted);">Error loading.</div>';
     });
 }
 function closePresetModal() { document.getElementById('presetModal').classList.remove('open'); }
@@ -559,9 +559,9 @@ function importPreset(index, btn) {
   .then(r => r.json())
   .then(data => {
     if (data.ok) { window.location.href = data.redirect; }
-    else { btn.disabled = false; btn.textContent = '📥 Importieren'; alert('Fehler: ' + (data.error || 'Unbekannt')); }
+    else { btn.disabled = false; btn.textContent = '📥 Import'; alert('Fehler: ' + (data.error || 'Unbekannt')); }
   })
-  .catch(() => { btn.disabled = false; btn.textContent = '📥 Importieren'; alert('Netzwerkfehler.'); });
+  .catch(() => { btn.disabled = false; btn.textContent = '📥 Import'; alert('Netzwerkfehler.'); });
 }
 </script>
 {% endblock %}

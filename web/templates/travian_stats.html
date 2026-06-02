@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Statistiken · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Statistics · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1300px;">
@@ -7,27 +7,27 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.25rem 0 0;">📊 Statistiken-Verlauf</h1>
-      <p class="subtitle" style="margin:0;">Wöchentliche Travian-Stats — Trends & Anomalien pro Spieler/Allianz</p>
+      <h1 style="margin:.25rem 0 0;">📊 Statistics-Verlauf</h1>
+      <p class="subtitle" style="margin:0;">Weekly Travian stats — trends &amp; anomalies per player/alliance</p>
     </div>
     <button onclick="openImport()"
             style="padding:.45rem 1.1rem;border-radius:8px;font-size:.88rem;font-weight:700;
                    cursor:pointer;background:#6366f1;border:none;color:#fff;">
-      📋 Importieren
+      📋 Import
     </button>
   </div>
 
   {% if flash == 'imported' %}
-  <div class="alert-ok" style="margin-bottom:1rem;">✅ {{ request.query_params.get('count','?') }} Spieler importiert.</div>
+  <div class="alert-ok" style="margin-bottom:1rem;">✅ {{ request.query_params.get('count','?') }} Player importiert.</div>
   {% elif flash == 'deleted' %}
-  <div class="alert-muted" style="margin-bottom:1rem;">🗑️ Snapshot gelöscht.</div>
+  <div class="alert-muted" style="margin-bottom:1rem;">🗑️ Snapshot deleted.</div>
   {% elif error == 'parse' %}
-  <div class="alert-err" style="margin-bottom:1rem;">❌ Text konnte nicht geparst werden. Bitte die Tabelle direkt von Travian kopieren.</div>
+  <div class="alert-err" style="margin-bottom:1rem;">❌ Text konnte nicht geparst werden. Please die Tabelle direkt von Travian kopieren.</div>
   {% elif error == 'empty' %}
-  <div class="alert-err" style="margin-bottom:1rem;">❌ Kein Text eingefügt.</div>
+  <div class="alert-err" style="margin-bottom:1rem;">❌ No text pasted.</div>
   {% elif error == 'cooldown' %}
   <div class="alert-err" style="margin-bottom:1rem;">
-    ⏳ Import zu früh — bitte noch <strong>{{ request.query_params.get('wait','?') }} Minuten</strong> warten. Erlaubt ist maximal 1× pro {{ cooldown_minutes }} Minuten.
+    ⏳ Import too early — please wait another <strong>{{ request.query_params.get('wait','?') }} minutes</strong>. Maximum 1× per {{ cooldown_minutes }} minutes.
   </div>
   {% endif %}
 
@@ -35,7 +35,7 @@
   <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
     <div id="timer-player" class="import-timer">
       <span class="timer-dot" id="dot-player">●</span>
-      <span style="font-size:.78rem;color:var(--text-muted);">Spieler-Import:</span>
+      <span style="font-size:.78rem;color:var(--text-muted);">Player-Import:</span>
       <span id="timer-player-text" style="font-size:.82rem;font-weight:700;">—</span>
     </div>
     <div id="timer-alliance" class="import-timer">
@@ -45,11 +45,11 @@
     </div>
   </div>
 
-  <!-- ── Spieler / Allianz Toggle ── -->
+  <!-- ── Player / Allianz Toggle ── -->
   <div style="display:flex;gap:.35rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
     <button class="st-tab {% if active_tab == 'player' %}active{% endif %}"
             onclick="switchView('player',this)">
-      👤 Spieler
+      👤 Player
       {% if player_snapshots %}<span style="font-size:.7rem;opacity:.7;">({{ player_snapshots|length }} Snapshots)</span>{% endif %}
     </button>
     <button class="st-tab {% if active_tab == 'alliance' %}active{% endif %}"
@@ -64,23 +64,23 @@
     {% if not player_snapshots %}
     <div class="card" style="text-align:center;padding:3rem 1rem;">
       <div style="font-size:3rem;margin-bottom:.75rem;">👤</div>
-      <h2 style="margin:0 0 .5rem;font-size:1.1rem;">Noch keine Spieler-Statistiken importiert</h2>
+      <h2 style="margin:0 0 .5rem;font-size:1.1rem;">Noch keine Player-Statistics importiert</h2>
       <p style="color:var(--text-muted);font-size:.88rem;max-width:420px;margin:0 auto 1.25rem;">
-        Öffne auf Travian die Statistik-Seite → Tab <strong>Player(s)</strong> → alles markieren → kopieren → hier importieren.
+        Open the statistics page on Travian → Tab <strong>Player(s)</strong> → select all → copy → import here.
       </p>
       <button onclick="openImport('player')" style="padding:.45rem 1.1rem;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;background:#6366f1;border:none;color:#fff;">
-        📋 Spieler-Stats importieren
+        📋 Player-Stats importieren
       </button>
     </div>
     {% else %}
     <div id="player-content">
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
-        <input type="text" id="playerFilter" placeholder="🔍 Spieler suchen…" oninput="renderView('player')"
+        <input type="text" id="playerFilter" placeholder="🔍 Player suchen…" oninput="renderView('player')"
                style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
         <!-- Category filter -->
         <div style="display:flex;gap:.25rem;" id="catFilterP">
           <button class="cat-btn active" data-cat="all"    onclick="setCat('player','all',this)">Alle</button>
-          <button class="cat-btn"        data-cat="raid"   onclick="setCat('player','raid',this)">⛏️ Räuber</button>
+          <button class="cat-btn"        data-cat="raid"   onclick="setCat('player','raid',this)">⛏️ Raiders</button>
           <button class="cat-btn"        data-cat="off"    onclick="setCat('player','off',this)">⚔️ PvP</button>
           <button class="cat-btn"        data-cat="pve"    onclick="setCat('player','pve',this)">🐾 PvE</button>
           <button class="cat-btn"        data-cat="def"    onclick="setCat('player','def',this)">🛡️ Def</button>
@@ -88,11 +88,11 @@
         <select id="sortKeyP" onchange="renderView('player')"
                 style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
           <option value="name">↕ Name</option>
-          <option value="raid_points">↕ ⛏️ Räuber</option>
+          <option value="raid_points">↕ ⛏️ Raiders</option>
           <option value="off_points">↕ ⚔️ PvP</option>
           <option value="pve_points">↕ 🐾 PvE</option>
           <option value="def_points">↕ 🛡️ Def</option>
-          <option value="raid_delta">↕ ⛏️ Δ Räuber</option>
+          <option value="raid_delta">↕ ⛏️ Δ Raiders</option>
           <option value="off_delta">↕ ⚔️ Δ PvP</option>
           <option value="anomaly">↕ Anomalien zuerst</option>
         </select>
@@ -119,9 +119,9 @@
     {% if not alliance_snapshots %}
     <div class="card" style="text-align:center;padding:3rem 1rem;">
       <div style="font-size:3rem;margin-bottom:.75rem;">🏰</div>
-      <h2 style="margin:0 0 .5rem;font-size:1.1rem;">Noch keine Allianz-Statistiken importiert</h2>
+      <h2 style="margin:0 0 .5rem;font-size:1.1rem;">Noch keine Allianz-Statistics importiert</h2>
       <p style="color:var(--text-muted);font-size:.88rem;max-width:420px;margin:0 auto 1.25rem;">
-        Öffne auf Travian die Statistik-Seite → Tab <strong>Alliance</strong> → kopieren → hier importieren.
+        Open the statistics page on Travian → Tab <strong>Alliance</strong> → copy → import here.
       </p>
       <button onclick="openImport('alliance')" style="padding:.45rem 1.1rem;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;background:#6366f1;border:none;color:#fff;">
         📋 Allianz-Stats importieren
@@ -130,11 +130,11 @@
     {% else %}
     <div id="alliance-content">
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
-        <input type="text" id="allianceFilter" placeholder="🔍 Allianz suchen…" oninput="renderView('alliance')"
+        <input type="text" id="allianceFilter" placeholder="🔍 Search alliance…" oninput="renderView('alliance')"
                style="padding:.35rem .7rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;min-width:180px;">
         <div style="display:flex;gap:.25rem;" id="catFilterA">
           <button class="cat-btn active" data-cat="all"  onclick="setCat('alliance','all',this)">Alle</button>
-          <button class="cat-btn"        data-cat="raid"    onclick="setCat('alliance','raid',this)">⛏️ Räuber</button>
+          <button class="cat-btn"        data-cat="raid"    onclick="setCat('alliance','raid',this)">⛏️ Raiders</button>
           <button class="cat-btn"        data-cat="off"     onclick="setCat('alliance','off',this)">⚔️ Angreifer</button>
           <button class="cat-btn"        data-cat="climber" onclick="setCat('alliance','climber',this)">📈 Aufsteiger</button>
           <button class="cat-btn"        data-cat="def"     onclick="setCat('alliance','def',this)">🛡️ Def</button>
@@ -142,11 +142,11 @@
         <select id="sortKeyA" onchange="renderView('alliance')"
                 style="padding:.35rem .6rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:.83rem;">
           <option value="name">↕ Name</option>
-          <option value="raid_points">↕ ⛏️ Räuber</option>
+          <option value="raid_points">↕ ⛏️ Raiders</option>
           <option value="off_points">↕ ⚔️ PvP</option>
           <option value="pve_points">↕ 🐾 PvE</option>
           <option value="def_points">↕ 🛡️ Def</option>
-          <option value="raid_delta">↕ ⛏️ Δ Räuber</option>
+          <option value="raid_delta">↕ ⛏️ Δ Raiders</option>
           <option value="off_delta">↕ ⚔️ Δ PvP</option>
           <option value="anomaly">↕ Anomalien zuerst</option>
         </select>
@@ -176,21 +176,21 @@
   <div style="background:var(--bg-card,#2b2d31);border:1px solid var(--border);border-radius:12px;
               width:100%;max-width:620px;max-height:90vh;overflow-y:auto;padding:1.5rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-      <h2 style="margin:0;font-size:1.05rem;">📋 Statistiken importieren</h2>
+      <h2 style="margin:0;font-size:1.05rem;">📋 Statistics importieren</h2>
       <button onclick="document.getElementById('importModal').style.display='none'"
               style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--text-muted);">✕</button>
     </div>
     <div style="padding:.6rem .85rem;border-radius:7px;margin-bottom:1rem;font-size:.82rem;
                 background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;line-height:1.55;">
-      Öffne auf Travian die <strong>Statistik-Seite</strong>, wähle den Tab (Player / Alliance),
-      markiere alles mit <kbd>Strg+A</kbd>, kopiere (<kbd>Strg+C</kbd>) und füge unten ein.
+      Open the <strong>statistics page</strong> on Travian, select the tab (Player / Alliance),
+      select all with <kbd>Ctrl+A</kbd>, copy (<kbd>Ctrl+C</kbd>) and paste below.
       Die Wochenbericht-Sektion mit PvP / PvE / Defenders / Robbers wird automatisch erkannt.
     </div>
     <form method="post" action="/guild/{{ guild.guild_id }}/travian-stats/import">
       <div style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;">
         <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;cursor:pointer;padding:.4rem .75rem;border-radius:6px;border:1px solid var(--border);flex:1;min-width:130px;">
           <input type="radio" name="stats_type" value="player" id="typePlayer" checked style="accent-color:#6366f1;">
-          👤 Spieler-Stats
+          👤 Player-Stats
         </label>
         <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;cursor:pointer;padding:.4rem .75rem;border-radius:6px;border:1px solid var(--border);flex:1;min-width:130px;">
           <input type="radio" name="stats_type" value="alliance" id="typeAlliance" style="accent-color:#6366f1;">
@@ -206,17 +206,17 @@
                       border-radius:6px;color:var(--text);font-size:.85rem;width:100%;">
       </div>
       <div style="margin-bottom:.75rem;">
-        <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Text einfügen:</label>
+        <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Paste text:</label>
         <textarea name="stats_text" rows="10" required
-                  placeholder="Hier den kopierten Text der Travian-Statistikseite einfügen…"
+                  placeholder="Paste the copied text from the Travian statistics page here…"
                   style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
                          border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;
                          font-size:.78rem;font-family:monospace;line-height:1.45;"></textarea>
       </div>
       <div style="display:flex;gap:.5rem;">
-        <button type="submit" style="padding:.5rem 1.25rem;border-radius:8px;font-size:.88rem;font-weight:700;cursor:pointer;background:#6366f1;border:none;color:#fff;">💾 Importieren</button>
+        <button type="submit" style="padding:.5rem 1.25rem;border-radius:8px;font-size:.88rem;font-weight:700;cursor:pointer;background:#6366f1;border:none;color:#fff;">💾 Import</button>
         <button type="button" onclick="document.getElementById('importModal').style.display='none'"
-                style="padding:.5rem 1rem;border-radius:8px;font-size:.85rem;cursor:pointer;background:var(--bg-input,#1e1f22);border:1px solid var(--border);color:var(--text-muted);">Abbrechen</button>
+                style="padding:.5rem 1rem;border-radius:8px;font-size:.85rem;cursor:pointer;background:var(--bg-input,#1e1f22);border:1px solid var(--border);color:var(--text-muted);">Cancel</button>
       </div>
     </form>
   </div>
@@ -295,7 +295,7 @@ function updateTimers() {
 
       if (readyIn <= 0) {
         const ago = Math.floor(agoMin);
-        textEl.textContent = `vor ${ago < 60 ? ago+' Min' : Math.floor(ago/60)+'h '+Math.floor(ago%60)+'m'} — ✅ Import möglich`;
+        textEl.textContent = `${ago < 60 ? ago+' min' : Math.floor(ago/60)+'h '+Math.floor(ago%60)+'m'} ago — ✅ Import available`;
         textEl.style.color = '#4ade80';
         dotEl.style.color  = '#4ade80';
       } else {
@@ -481,13 +481,13 @@ function makeFazit(player, timeline) {
   if (lastRaid !== undefined && avgRaid > 0) {
     const ratio = lastRaid / avgRaid;
     if (ratio < 0.3) {
-      messages.push(`⬇️ Farm stark eingebrochen (${fmtDelta(lastRaid)} vs Ø ${fmtNum(avgRaid)}) — möglicherweise Truppen gesammelt oder Inaktivität.`);
+      messages.push(`⬇️ Farm dropped significantly (${fmtDelta(lastRaid)} vs avg ${fmtNum(avgRaid)}) — possibly troops recalled or inactivity.`);
       level = 'warn';
     } else if (ratio < 0.6) {
       messages.push(`📉 Farm unter Durchschnitt (${fmtDelta(lastRaid)} vs Ø ${fmtNum(avgRaid)}).`);
       if (level === 'neutral') level = 'warn';
     } else if (ratio > 2.5) {
-      messages.push(`📈 Farm überdurchschnittlich hoch (${fmtDelta(lastRaid)}).`);
+      messages.push(`📈 Farm above average (${fmtDelta(lastRaid)}).`);
     }
   }
 
@@ -497,7 +497,7 @@ function makeFazit(player, timeline) {
       messages.push(`⚔️ Starker PvP-Anstieg (${fmtDelta(lastOff)}) — aktiver Angreifer diese Woche.`);
       level = 'warn';
     } else if (lastOff > avgOff * 1.5) {
-      messages.push(`⚔️ PvP-Punkte erhöht (${fmtDelta(lastOff)} vs Ø ${fmtNum(avgOff)}).`);
+      messages.push(`⚔️ PvP points increased (${fmtDelta(lastOff)} vs avg ${fmtNum(avgOff)}).`);
     }
   }
 
@@ -505,9 +505,9 @@ function makeFazit(player, timeline) {
   if (lastDef !== undefined && avgDef > 0) {
     const ratio = lastDef / avgDef;
     if (ratio > 3) {
-      messages.push(`🛡️ Def-Punkte stark gestiegen (${fmtDelta(lastDef)}) — viel Verteidigung geleistet oder angegriffen worden.`);
+      messages.push(`🛡️ Def-Punkte stark gestiegen (${fmtDelta(lastDef)}) — viel Defense geleistet oder angegriffen worden.`);
     } else if (ratio < 0.2 && avgDef > 1000) {
-      messages.push(`🛡️ Def-Punkte stark gefallen — Dörfer weniger aktiv verteidigt.`);
+      messages.push(`🛡️ Def points dropped significantly — villages less actively defended.`);
     }
   }
 
@@ -522,7 +522,7 @@ function makeFazit(player, timeline) {
   }
 
   if (!messages.length) {
-    messages.push('✅ Keine auffälligen Veränderungen — Aktivität im normalen Bereich.');
+    messages.push('✅ No notable changes — activity within normal range.');
     level = 'good';
   }
 
@@ -557,12 +557,12 @@ function renderView(view) {
   const anomOnly   = document.getElementById(anomCheckId)?.checked || false;
 
   const CATS = view === 'alliance' ? [
-    { key:'raid_points', delta:'raid_delta',  label:'⛏️ Räuber',    color:'#f59e0b' },
+    { key:'raid_points', delta:'raid_delta',  label:'⛏️ Raiders',    color:'#f59e0b' },
     { key:'off_points',  delta:'off_delta',   label:'⚔️ Angreifer', color:'#f87171' },
     { key:'population',  delta:null,          label:'📈 Aufsteiger', color:'#818cf8' },
     { key:'def_points',  delta:'def_delta',   label:'🛡️ Def',       color:'#4ade80' },
   ] : [
-    { key:'raid_points', delta:'raid_delta', label:'⛏️ Räuber', color:'#f59e0b' },
+    { key:'raid_points', delta:'raid_delta', label:'⛏️ Raiders', color:'#f59e0b' },
     { key:'off_points',  delta:'off_delta',  label:'⚔️ PvP',    color:'#f87171' },
     { key:'pve_points',  delta:'pve_delta',  label:'🐾 PvE',    color:'#a78bfa' },
     { key:'def_points',  delta:'def_delta',  label:'🛡️ Def',    color:'#4ade80' },
@@ -603,14 +603,14 @@ function renderView(view) {
     });
 
   if (!entries.length) {
-    grid.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;padding:.5rem;">Keine Spieler gefunden.</p>';
+    grid.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;padding:.5rem;">Keine Player gefunden.</p>';
     document.getElementById(anomBarId).style.display='none';
     return;
   }
 
   // Table header
   let html = `<table class="stats-table"><thead><tr>
-    <th style="width:180px;">Spieler</th>
+    <th style="width:180px;">Player</th>
     ${CATS.map(c=>`<th class="right" style="width:80px;">${c.label}</th><th style="width:80px;padding-left:0;"></th>`).join('')}
     <th style="width:20px;"></th>
   </tr></thead><tbody>`;

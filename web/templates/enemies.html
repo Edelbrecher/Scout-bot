@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Gegner-Kartei · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Enemy-Kartei · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
@@ -7,9 +7,9 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;" data-i18n="enemies.title">🎯 Gegner-Kartei</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="enemies.title">🎯 Enemy-Kartei</h1>
       <p class="subtitle" style="margin:0;" data-i18n="enemies.subtitle">
-        Wird automatisch befüllt wenn Scout-Berichte im Discord eingehen
+        Automatically populated when scout reports arrive in Discord
       </p>
     </div>
     <div>
@@ -103,7 +103,7 @@
   </div>
 
   {% if saved == 'deleted' %}
-  <div class="alert alert-success">🗑️ Gegner gelöscht.</div>
+  <div class="alert alert-success">🗑️ Enemy deleted.</div>
   {% elif saved == 'report_channel' %}
   <div class="alert alert-success">✅ Report-Channel gespeichert.</div>
   {% elif saved == 'report_channel_cleared' %}
@@ -157,13 +157,13 @@
                       background:var(--bg-card);color:var(--text);font-size:0.875rem;width:185px;">
         <input type="hidden" name="channel_name" value="">
         <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.85rem;" data-i18n="enemies.channel.link">
-          Verknüpfen
+          Link
         </button>
       </form>
     </div>
     <p style="font-size:0.75rem;color:var(--text-muted);margin:0.55rem 0 0;">
       „Channel erstellen" legt automatisch einen <strong>#battle-reports</strong>-Channel
-      in der Scout-Kategorie an. Alternativ kannst du eine bestehende Channel-ID verknüpfen.
+      in the scout category. Alternatively you can link an existing channel ID.
     </p>
     {% endif %}
   </div>
@@ -174,7 +174,7 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#f87171;">{{ enemies|length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.known">Gegner bekannt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.known">Enemy bekannt</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
@@ -192,7 +192,7 @@
 
   <!-- Search -->
   <div style="margin-bottom:0.75rem;">
-    <input type="text" id="enemySearch" placeholder="🔍 Gegner suchen…"
+    <input type="text" id="enemySearch" placeholder="🔍 Enemy suchen…"
            oninput="filterEnemies()"
            style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
                   background:var(--bg-card);color:var(--text);font-size:0.875rem;width:240px;">
@@ -203,7 +203,7 @@
     <table class="table" id="enemyTable">
       <thead>
         <tr>
-          <th data-i18n="enemies.th.player">Spieler</th>
+          <th data-i18n="enemies.th.player">Player</th>
           <th data-i18n="enemies.th.coords">Koordinaten</th>
           <th data-i18n="enemies.th.village">Dorf</th>
           <th style="text-align:center;" data-i18n="enemies.th.scouts">Scouts</th>
@@ -270,7 +270,7 @@
   {% else %}
   <div class="card">
     <p style="color:var(--text-muted);font-size:0.88rem;margin:0;">
-      Noch keine Gegner bekannt. Sobald ein Scout-Bericht mit einem Gegner-Spielernamen
+      Noch keine Enemy bekannt. Sobald ein Scout-Bericht mit einem Enemy-Playernamen
       im Discord Scout-Kanal eingereicht wird, erscheint dieser automatisch hier.
     </p>
   </div>
@@ -292,7 +292,7 @@ function filterEnemies() {
     if (vis) shown++;
   });
   document.getElementById('enemyCount').textContent =
-    shown < rows.length ? `${shown} von ${rows.length}` : `${rows.length} Gegner`;
+    shown < rows.length ? `${shown} von ${rows.length}` : `${rows.length} Enemy`;
 }
 filterEnemies();
 

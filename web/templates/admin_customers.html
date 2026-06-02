@@ -9,11 +9,11 @@
     <div style="width:180px; flex-shrink:0;">
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
         <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
-        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Overview</a>
         <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">👥 Kunden</a>
         <a href="/admin/servers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🖥 Server</a>
         <a href="/admin/trial-links" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🔑 Trial-Links</a>
-        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Rabattcodes</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🎟 Discountcodes</a>
         <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
         <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
         <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
@@ -42,7 +42,7 @@
       </div>
 
       {% if saved %}
-      <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✓ Änderungen gespeichert.</div>
+      <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✓ Changes saved.</div>
       {% endif %}
       {% if error %}
       <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#ef4444; font-size:0.9rem;">⚠ {{ error }}</div>
@@ -152,7 +152,7 @@
                   </span>
                   <span style="color:var(--text-muted);">Plan</span>
                   <span>{{ usub.plan or '—' }}</span>
-                  <span style="color:var(--text-muted);">Läuft ab</span>
+                  <span style="color:var(--text-muted);">Expires</span>
                   <span style="font-size:0.8rem;">{{ (usub.expires_at or '—')[:10] }}</span>
                   <span style="color:var(--text-muted);">Stripe Customer</span>
                   <span style="font-family:monospace; font-size:0.75rem;">{{ usub.stripe_customer_id or '—' }}</span>
@@ -181,7 +181,7 @@
                   {% endfor %}
                   {% endfor %}
                 </select>
-                <button type="submit" style="background:#3b82f6; border:none; border-radius:6px; padding:0.3rem 0.75rem; color:#fff; font-size:0.82rem; cursor:pointer; font-weight:600;">Speichern</button>
+                <button type="submit" style="background:#3b82f6; border:none; border-radius:6px; padding:0.3rem 0.75rem; color:#fff; font-size:0.82rem; cursor:pointer; font-weight:600;">Save</button>
               </form>
             </div>
           </div>
@@ -219,7 +219,7 @@
                   {% if g.category_id and g.archive_channel_id %}
                   <div style="margin-top:0.3rem; color:#22c55e; font-size:0.72rem;">✅ Eingerichtet</div>
                   {% else %}
-                  <div style="margin-top:0.3rem; color:#f59e0b; font-size:0.72rem;">⚠ Setup nötig</div>
+                  <div style="margin-top:0.3rem; color:#f59e0b; font-size:0.72rem;">⚠ Setup required</div>
                   {% endif %}
                 </div>
                 <!-- Edit guild sub -->
@@ -235,9 +235,9 @@
                     <option value="{{ tier }}" {% if g.subscription_plan == tier %}selected{% endif %}>{{ tier | capitalize }}</option>
                     {% endfor %}
                   </select>
-                  <button type="submit" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; color:var(--text); font-size:0.78rem; cursor:pointer;">Speichern</button>
+                  <button type="submit" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; color:var(--text); font-size:0.78rem; cursor:pointer;">Save</button>
                 </form>
-                <a href="/guild/{{ g.guild_id }}" style="font-size:0.78rem; color:#3b82f6; text-decoration:none;">→ öffnen</a>
+                <a href="/guild/{{ g.guild_id }}" style="font-size:0.78rem; color:#3b82f6; text-decoration:none;">→ open</a>
                 <form method="post" action="/admin/preview/set" style="display:inline;">
                   <input type="hidden" name="guild_id" value="{{ g.guild_id }}">
                   <input type="hidden" name="plan" value="{{ (g.subscription_plan or 'starter') | lower | replace('_monthly','') | replace('_annual','') }}">
@@ -254,9 +254,9 @@
           <!-- Danger zone: delete customer -->
           {% if uid != '__unowned__' %}
           <div style="padding:0.75rem 1.25rem;border-top:1px solid var(--border);background:rgba(239,68,68,0.04);display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-            <span style="font-size:0.8rem;color:var(--text-muted);">⚠️ Kunden-Abonnement entfernen (Server bleiben erhalten, nur Abo-Verknüpfung wird gelöscht)</span>
+            <span style="font-size:0.8rem;color:var(--text-muted);">⚠️ Remove customer subscription (servers are preserved, only the subscription link is deleted)</span>
             <form method="post" action="/admin/customers/{{ uid }}/delete"
-                  onsubmit="return confirm('Kunden {{ c.discord_username }} wirklich entfernen? Das Abonnement wird gelöscht und alle Server werden entkoppelt.')"
+                  onsubmit="return confirm('Really remove customer {{ c.discord_username }}? The subscription will be deleted and all servers will be unlinked.')"
                   style="margin:0;margin-left:auto;">
               <button type="submit" class="btn btn-danger" style="font-size:0.78rem;padding:0.25rem 0.65rem;">🗑 Kunden entfernen</button>
             </form>

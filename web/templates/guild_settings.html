@@ -5,7 +5,7 @@
 <div class="container" style="max-width:800px;">
 
   <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-  <h1 style="margin:0.5rem 0 1.5rem; font-size:1.5rem;" data-i18n="settings.title">⚙️ Server-Verwaltung</h1>
+  <h1 style="margin:0.5rem 0 1.5rem; font-size:1.5rem;" data-i18n="settings.title">⚙️ Server Management</h1>
 
   {% if flash %}
   <div style="padding:0.75rem 1rem; border-radius:8px; margin-bottom:1rem;
@@ -17,21 +17,21 @@
 
   <!-- Dashboard-Zugang -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin:0 0 0.75rem; font-size:1rem;" data-i18n="settings.dashboard_access.title">👥 Dashboard-Zugang</h2>
+    <h2 style="margin:0 0 0.75rem; font-size:1rem;" data-i18n="settings.dashboard_access.title">👥 Dashboard Access</h2>
     <div style="font-size:0.85rem; color:var(--text-muted); line-height:1.7;" data-i18n-html="settings.dashboard_access.body">
-      Alle Discord-Mitglieder dieses Servers mit <strong style="color:var(--text);">Administrator</strong> oder <strong style="color:var(--text);">Server verwalten</strong> Berechtigung können sich unter <strong style="color:var(--text);">travops.online</strong> mit Discord einloggen und diesen Server verwalten.<br>
-      <span style="color:#f59e0b;">💳 Abonnement &amp; Bot-Entfernung</span> sind nur für den Inhaber des Abonnements verfügbar.
+      All Discord members of this server with <strong style="color:var(--text);">Administrator</strong> or <strong style="color:var(--text);">Manage Server</strong> permission can log in at <strong style="color:var(--text);">travops.online</strong> via Discord and manage this server.<br>
+      <span style="color:#f59e0b;">💳 Subscription &amp; bot removal</span> is only available to the subscription owner.
     </div>
   </div>
 
   <!-- Berechtigungen reparieren -->
   {% if guild.archive_channel_id %}
   <div class="card" style="margin-bottom:1rem; border-color:rgba(245,158,11,0.3);">
-    <h2 style="margin:0 0 0.5rem; font-size:1rem; color:#f59e0b;" data-i18n="settings.archive_perms.title">🔧 Archive-Channel Berechtigungen</h2>
-    <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem;" data-i18n="settings.archive_perms.hint">Falls Bilder nicht archiviert werden: Bot-Berechtigungen im Archive-Channel neu setzen.</p>
+    <h2 style="margin:0 0 0.5rem; font-size:1rem; color:#f59e0b;" data-i18n="settings.archive_perms.title">🔧 Archive Channel Permissions</h2>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem;" data-i18n="settings.archive_perms.hint">If images are not being archived: reset bot permissions in the archive channel.</p>
     <form method="post" action="/guild/{{ guild.guild_id }}/fix-archive-perms">
       <button type="submit" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:0.45rem 1.1rem; color:#f59e0b; cursor:pointer; font-size:0.85rem; font-weight:600;" data-i18n="settings.archive_perms.btn">
-        🔧 Berechtigungen reparieren
+        🔧 Fix permissions
       </button>
     </form>
   </div>
@@ -39,10 +39,10 @@
 
   <!-- Rollen & Berechtigungen -->
   <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin:0 0 0.75rem; font-size:1rem;" data-i18n="settings.roles.title">🔐 Rollen &amp; Berechtigungen
-      <small style="font-size:0.75rem; font-weight:400; color:var(--text-muted); margin-left:0.5rem;">({{ roles|length }} Rollen)</small>
+    <h2 style="margin:0 0 0.75rem; font-size:1rem;" data-i18n="settings.roles.title">🔐 Roles &amp; Permissions
+      <small style="font-size:0.75rem; font-weight:400; color:var(--text-muted); margin-left:0.5rem;">({{ roles|length }} roles)</small>
     </h2>
-    <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem;" data-i18n="settings.roles.hint">Bestimme welche Rollen auf welche Bereiche zugreifen dürfen. Änderungen wirken sofort.</p>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem;" data-i18n="settings.roles.hint">Define which roles can access which areas. Changes take effect immediately.</p>
     {% if roles %}
     {% set scout_roles   = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
     {% set res_roles     = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
@@ -50,15 +50,15 @@
     {% set defend_roles  = (guild.defend_role_ids or '').split(',') | map('trim') | list %}
     {% set archive_roles = (guild.archive_role_ids or '').split(',') | map('trim') | list %}
     <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">
-      🔒 <strong>Privater Channel</strong>: Fallback = Scout-Rollen wenn leer. &nbsp;
-      🛡️ <strong>Defend</strong>: Fallback = Scout-Rollen wenn leer. &nbsp;
-      📦 <strong>Archive</strong>: Fallback = Scout-Rollen wenn leer.
+      🔒 <strong>Private Channel</strong>: Fallback = Scout roles if empty. &nbsp;
+      🛡️ <strong>Defend</strong>: Fallback = Scout roles if empty. &nbsp;
+      📦 <strong>Archive</strong>: Fallback = Scout roles if empty.
     </p>
     <div style="overflow-x:auto;">
       <table class="table">
         <thead>
           <tr>
-            <th>Rolle</th>
+            <th>Role</th>
             <th>ID</th>
             <th>📁 Scout</th>
             <th>🪖 Res-Answer</th>
@@ -101,7 +101,7 @@
             <td style="text-align:center;">
               <button class="role-toggle {% if role.id in archive_roles %}active{% endif %}"
                 data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="archive_role_ids"
-                title="Sichtbarkeit des Archive-Channels im Discord"
+                title="Visibility of the archive channel in Discord"
               >{{ '✅' if role.id in archive_roles else '○' }}</button>
             </td>
           </tr>
@@ -111,28 +111,28 @@
       </table>
     </div>
     {% else %}
-    <p style="color:var(--text-muted); font-size:0.85rem; margin:0;" data-i18n="settings.roles.empty">Rollen konnten nicht geladen werden.</p>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:0;" data-i18n="settings.roles.empty">Roles could not be loaded.</p>
     {% endif %}
   </div>
 
   <!-- Bot entfernen -->
   {% if is_owner %}
   <div class="card" style="border-color:rgba(239,68,68,0.3);">
-    <h2 style="margin:0 0 0.5rem; font-size:1rem; color:#f87171;" data-i18n="settings.remove_bot.title">🚫 Bot entfernen</h2>
+    <h2 style="margin:0 0 0.5rem; font-size:1rem; color:#f87171;" data-i18n="settings.remove_bot.title">🚫 Remove bot</h2>
     <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.75rem; line-height:1.6;" data-i18n-html="settings.remove_bot.hint">
-      Der Bot verlässt diesen Server und dein Abo-Slot wird wieder freigegeben.<br>
-      <strong style="color:#f87171;">Achtung:</strong> Alle Scout-Kanäle und Einstellungen bleiben gespeichert und können nach erneutem Einladen wiederhergestellt werden.
+      The bot will leave this server and your subscription slot will be freed.<br>
+      <strong style="color:#f87171;">Warning:</strong> All scout channels and settings remain saved and can be restored after re-inviting.
     </p>
     <form method="post" action="/guild/{{ guild.guild_id }}/remove-bot"
-          onsubmit="return confirm((window.T&&window.T['confirm.remove_bot']||'Bot wirklich von {guild} entfernen? Der Slot wird freigegeben.').replace('{guild}','{{ guild.guild_name }}'))">
+          onsubmit="return confirm((window.T&&window.T['confirm.remove_bot']||'Really remove bot from {guild}? The slot will be freed.').replace('{guild}','{{ guild.guild_name }}'))">
       <button type="submit" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:0.45rem 1.1rem; color:#f87171; cursor:pointer; font-size:0.85rem; font-weight:600;">
-        <span data-i18n="settings.remove_bot.btn">🚫 Bot jetzt entfernen</span>
+        <span data-i18n="settings.remove_bot.btn">🚫 Remove bot now</span>
       </button>
     </form>
   </div>
   {% else %}
   <div class="card">
-    <p style="margin:0; font-size:0.85rem; color:var(--text-muted); font-style:italic;" data-i18n="settings.owner_only">Nur der Abo-Inhaber kann den Bot entfernen.</p>
+    <p style="margin:0; font-size:0.85rem; color:var(--text-muted); font-style:italic;" data-i18n="settings.owner_only">Only the subscription owner can remove the bot.</p>
   </div>
   {% endif %}
 

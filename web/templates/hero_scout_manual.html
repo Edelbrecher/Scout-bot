@@ -5,15 +5,15 @@
 <div class="container" style="max-width:860px;">
 
   <div style="margin-bottom:1.25rem;">
-    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="back-link" data-i18n="manual.back">← Helden-Scout</a>
+    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="back-link" data-i18n="manual.back">← Hero Scout</a>
     <h1 style="margin:0.25rem 0 0;">
       {% if edit_player %}✏️ Neue Version: {{ edit_player }}{% else %}➕ Held manuell anlegen{% endif %}
     </h1>
     <p class="subtitle" style="margin:0;">
       {% if edit_player %}
-        Aktualisiere Ausrüstung und Daten — wird als neue Version in der Zeitlinie gespeichert.
+        Update equipment and data — saved as a new version in the timeline.
       {% else %}
-        Trage einen gegnerischen Helden manuell ein und weise Ausrüstungs-Items zu.
+        Enter an enemy hero manually and assign equipment items.
       {% endif %}
     </p>
   </div>
@@ -28,9 +28,9 @@
     <div class="card" style="margin-bottom:1.25rem;">
       <h2 style="font-size:1rem;margin:0 0 1rem;" data-i18n="manual.section.info">👤 Held-Informationen</h2>
 
-      <!-- Spieler-Suche -->
+      <!-- Player-Search -->
       <div style="margin-bottom:1rem;position:relative;" id="playerSearchWrap">
-        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">🔍 Spieler suchen (Karte)</label>
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">🔍 Player suchen (Karte)</label>
         <input
           id="playerSearchInput"
           type="text"
@@ -47,7 +47,7 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
 
         <div>
-          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.player_name">Spielername *</label>
+          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.player_name">Playername *</label>
           <input type="text" name="player_name" id="fieldPlayerName" required
                  value="{{ prefill.player_name or edit_player or '' }}"
                  placeholder="z.B. ZalmecAwp"
@@ -55,11 +55,11 @@
         </div>
 
         <div>
-          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.tribe">Stamm</label>
+          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.tribe">Tribe</label>
           <select name="tribe" id="tribeSelect" onchange="filterWeapons()"
                   style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
             <option value="" data-i18n="manual.tribe.unknown">– unbekannt –</option>
-            {% for t in ['Römer','Germanen','Gallier','Ägypter','Hunnen','Spartaner'] %}
+            {% for t in ['Romans','Germanen','Gauls','Egyptians','Huns','Spartans'] %}
             <option value="{{ t }}" {% if prefill.tribe == t %}selected{% endif %}>{{ t }}</option>
             {% endfor %}
           </select>
@@ -81,14 +81,14 @@
         </div>
 
         <div>
-          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.hero_xp">Erfahrung (XP)</label>
+          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.hero_xp">Experience (XP)</label>
           <input type="number" name="hero_xp" min="0"
                  value="{{ prefill.hero_xp or 0 }}"
                  style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
         </div>
 
         <div>
-          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.villages">Dörfer</label>
+          <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;" data-i18n="manual.field.villages">Villages</label>
           <input type="number" name="villages" min="0"
                  value="{{ prefill.villages or 0 }}"
                  style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
@@ -119,21 +119,21 @@
       </div>
     </div>
 
-    <!-- Ausrüstungs-Slots -->
+    <!-- Equipment slots -->
     <div class="card" style="margin-bottom:1.25rem;">
-      <h2 style="font-size:1rem;margin:0 0 0.25rem;" data-i18n="manual.section.equipment">⚔️ Ausrüstung</h2>
+      <h2 style="font-size:1rem;margin:0 0 0.25rem;" data-i18n="manual.section.equipment">⚔️ Equipment</h2>
       <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 1rem;" data-i18n="manual.equipment.hint">
-        Tier 1 = Bronze · Tier 2 = Silber · Tier 3 = Gold. Wähle Stamm oben um Waffen zu filtern.
+        Tier 1 = Bronze · Tier 2 = Silver · Tier 3 = Gold. Select tribe above to filter weapons.
       </p>
 
       <div style="display:grid;gap:1rem;">
 
         {# Slot-Konfiguration: (form_name, cat_key, icon, label) #}
         {% set slots_cfg = [
-          ('helm',   'helmet', '🪖', 'Helm'),
-          ('armor',  'armor',  '🛡️', 'Rüstung'),
-          ('boots',  'boots',  '👢', 'Stiefel'),
-          ('weapon', 'weapon', '⚔️', 'Waffe'),
+          ('helm',   'helmet', '🪖', 'Helmet'),
+          ('armor',  'armor',  '🛡️', 'Armor'),
+          ('boots',  'boots',  '👢', 'Boots'),
+          ('weapon', 'weapon', '⚔️', 'Weapon'),
           ('mount',  'mount',  '🐴', 'Pferd / Reittier'),
           ('misc',   'misc',   '💍', 'Linke Hand / Diverses'),
         ] %}
@@ -150,13 +150,13 @@
             <option value="" data-i18n="manual.slot.unknown">– kein Item / unbekannt –</option>
 
             {% if cat_key == 'weapon' %}
-              {# Waffen nach Stamm gruppiert #}
+              {# Weaponn nach Tribe gruppiert #}
               {% set tribe_groups = [
-                ('🏛️ Römer',    '🏛️'),
+                ('🏛️ Romans',    '🏛️'),
                 ('⚒️ Germanen', '⚒️'),
-                ('🍀 Gallier',  '🍀'),
-                ('🏹 Hunnen',   '🏹'),
-                ('☀️ Ägypter',  '☀️'),
+                ('🍀 Gauls',  '🍀'),
+                ('🏹 Huns',   '🏹'),
+                ('☀️ Egyptians',  '☀️'),
               ] %}
               {% for group_label, marker in tribe_groups %}
               <optgroup label="{{ group_label }}" class="weapon-group" data-tribe="{{ group_label }}">
@@ -209,13 +209,13 @@
 </div>
 
 <script>
-// Stamm-Filter für Waffen: zeigt passende optgroup hervor
+// Tribe filter for weapons: highlights the matching optgroup
 const TRIBE_MAP = {
-  'Römer':    '🏛️ Römer',
+  'Romans':    '🏛️ Romans',
   'Germanen': '⚒️ Germanen',
-  'Gallier':  '🍀 Gallier',
-  'Hunnen':   '🏹 Hunnen',
-  'Ägypter':  '☀️ Ägypter',
+  'Gauls':  '🍀 Gauls',
+  'Huns':   '🏹 Huns',
+  'Egyptians':  '☀️ Egyptians',
 };
 
 function filterWeapons() {
@@ -228,7 +228,7 @@ function filterWeapons() {
     const matchLabel = TRIBE_MAP[tribe] || '';
     if (!tribe || g.label === matchLabel) {
       g.style.display = '';
-      // Styling: aktiver Stamm hervorheben
+      // Styling: aktiver Tribe hervorheben
       if (tribe && g.label === matchLabel) {
         g.style.fontWeight = 'bold';
       } else {
@@ -240,10 +240,10 @@ function filterWeapons() {
   });
 }
 
-// Beim Laden Stamm-Filter anwenden
+// Beim Laden Tribe-Filter anwenden
 filterWeapons();
 
-// ── Spieler-Suche ──
+// ── Player-Search ──
 const GUILD_ID = '{{ guild.guild_id }}';
 let _searchTimer = null;
 
@@ -260,7 +260,7 @@ async function doPlayerSearch(q) {
     const resp = await fetch(`/guild/${GUILD_ID}/operations/api/villages?q=${encodeURIComponent(q)}`);
     if (!resp.ok) { hideDrop(); return; }
     const data = await resp.json();
-    // Deduplizieren: pro Spieler nur ein Eintrag (erstes Dorf für Allianz)
+    // Deduplicate: only one entry per player (first village for alliance)
     const seen = new Map();
     for (const v of (data.results || [])) {
       if (!seen.has(v.player_name)) seen.set(v.player_name, v);

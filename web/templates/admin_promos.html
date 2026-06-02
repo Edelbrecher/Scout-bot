@@ -9,11 +9,11 @@
     <div style="width:180px; flex-shrink:0;">
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
         <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
-        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Übersicht</a>
+        <a href="/admin" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📊 Overview</a>
         <a href="/admin/customers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">👥 Kunden</a>
         <a href="/admin/servers" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🖥 Server</a>
         <a href="/admin/trial-links" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🔑 Trial-Links</a>
-        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">🎟 Rabattcodes</a>
+        <a href="/admin/promos" style="display:block; padding:0.65rem 1rem; color:#f59e0b; text-decoration:none; font-size:0.9rem; background:rgba(245,158,11,0.08);">🎟 Discountcodes</a>
         <a href="/admin/popup" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">💬 Popup</a>
         <a href="/admin/consents" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">🍪 Cookie-Einwilligungen</a>
         <a href="/admin/stats" style="display:block; padding:0.65rem 1rem; color:var(--text-muted); text-decoration:none; font-size:0.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">📈 Statistik</a>
@@ -50,7 +50,7 @@
             <input name="code" required placeholder="SOMMER20" style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; color:var(--text); font-size:0.9rem; box-sizing:border-box; text-transform:uppercase;" />
           </div>
           <div>
-            <label style="display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.3rem;">Rabatt (%)</label>
+            <label style="display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.3rem;">Discount (%)</label>
             <input name="percent_off" type="number" min="5" max="100" value="20" required style="width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; color:var(--text); font-size:0.9rem; box-sizing:border-box;" />
           </div>
           <div>
@@ -75,7 +75,7 @@
           <thead>
             <tr style="background:var(--bg-main);">
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Name</th>
-              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Rabatt</th>
+              <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Discount</th>
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Dauer</th>
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Status</th>
               <th style="padding:0.65rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Promo-Codes</th>
@@ -110,9 +110,9 @@
                 {% endif %}
               </td>
               <td style="padding:0.65rem 1rem;">
-                <form method="post" action="/admin/promos/delete" onsubmit="return confirm('Coupon {{ c.name }} komplett löschen?')">
+                <form method="post" action="/admin/promos/delete" onsubmit="return confirm('Completely delete coupon {{ c.name }}?')">
                   <input type="hidden" name="coupon_id" value="{{ c.id }}" />
-                  <button type="submit" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:6px; color:#ef4444; cursor:pointer; font-size:0.8rem; padding:0.25rem 0.6rem;">🗑 Löschen</button>
+                  <button type="submit" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:6px; color:#ef4444; cursor:pointer; font-size:0.8rem; padding:0.25rem 0.6rem;">🗑 Delete</button>
                 </form>
               </td>
             </tr>

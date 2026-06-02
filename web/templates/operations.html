@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Einsatzplanung · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Operation Planning · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <script>document.body.classList.add('op-page');</script>
@@ -248,7 +248,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">
           <a href="/guild/{{ guild.guild_id }}" style="color:var(--text-muted);text-decoration:none;">← {{ guild.guild_name }}</a>
         </div>
-        <div style="font-weight:700;font-size:.95rem;margin-top:.1rem;" data-i18n="ops.title">⚔️ Einsatzplanung</div>
+        <div style="font-weight:700;font-size:.95rem;margin-top:.1rem;" data-i18n="ops.title">⚔️ Operation planning</div>
       </div>
       <button class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;" onclick="openNewPlanModal()">+ Neu</button>
     </div>
@@ -256,8 +256,8 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
     <!-- Filter chips -->
     <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;gap:.3rem;flex-wrap:wrap;">
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('all')" id="filter-all">Alle</button>
-      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('draft')" id="filter-draft">Entwurf</button>
-      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('active')" id="filter-active">Aktiv</button>
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('draft')" id="filter-draft">Draft</button>
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('active')" id="filter-active">Active</button>
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('completed')" id="filter-completed">Fertig</button>
     </div>
 
@@ -275,7 +275,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
         <span id="topCountdown" style="font-size:.8rem;font-family:monospace;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:6px;padding:.15rem .5rem;display:none;"></span>
-        <span id="topLandingTime" title="Klicken um Einschlagszeit zu ändern"
+        <span id="topLandingTime" title="Click to change landing time"
               style="font-size:.82rem;color:#fbbf24;font-family:monospace;cursor:pointer;padding:.2rem .4rem;border-radius:4px;"
               onmouseenter="this.style.background='rgba(251,191,36,.12)'" onmouseleave="this.style.background=''"
               onclick="openInlineLandingEditor()"></span>
@@ -283,7 +283,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                style="display:none;font-size:.8rem;background:var(--bg-card);color:var(--text);border:1px solid #fbbf24;border-radius:6px;padding:.2rem .4rem;"
                onblur="saveInlineLanding()" onkeydown="if(event.key==='Enter')saveInlineLanding();if(event.key==='Escape')closeInlineLanding()">
         <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openOpMap()">🗺️ Karte</button>
-        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Prüfung</button>
+        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Check</button>
         <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
         <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
         <button class="btn-icon danger" onclick="deletePlan()">🗑</button>
@@ -294,9 +294,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <!-- Empty state -->
       <div class="op-empty" id="opEmptyState">
         <div class="op-empty-icon">⚔️</div>
-        <h2 style="margin:0 0 .5rem;" data-i18n="ops.title">Einsatzplanung</h2>
-        <p style="max-width:360px;margin:0 auto .75rem;" data-i18n="ops.empty_hint">Erstelle einen neuen Einsatzplan oder wähle einen aus der Liste.</p>
-        <button class="btn btn-primary" onclick="openNewPlanModal()" data-i18n="ops.new.btn">+ Ersten Einsatz erstellen</button>
+        <h2 style="margin:0 0 .5rem;" data-i18n="ops.title">Operation Planning</h2>
+        <p style="max-width:360px;margin:0 auto .75rem;" data-i18n="ops.empty_hint">Create a new operation plan or select one from the list.</p>
+        <button class="btn btn-primary" onclick="openNewPlanModal()" data-i18n="ops.new.btn">+ Ersten Operation erstellen</button>
       </div>
 
       <!-- Plan editor (hidden until plan selected) -->
@@ -307,15 +307,15 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <div style="position:relative;">
             <!-- Add target row -->
             <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
-              <div style="font-size:.9rem;font-weight:700;flex:1;">🎯 Ziele</div>
-              <input id="targetSearch" type="text" placeholder="Spieler / Koordinaten suchen…"
+              <div style="font-size:.9rem;font-weight:700;flex:1;">🎯 Targets</div>
+              <input id="targetSearch" type="text" placeholder="Player / Coordinates suchen…"
                      style="width:220px;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.35rem .7rem;color:var(--text);font-size:.82rem;"
                      oninput="debounceSearch(this.value)" autocomplete="off">
               <button class="btn btn-secondary" style="font-size:.8rem;" id="allyFilterToggleBtn" onclick="toggleAlliancePanel()" title="Allianz-Filter">
                 🏰 Filter <span id="allyFilterBadge" style="display:none;background:#6366f1;color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;margin-left:.2rem;"></span>
               </button>
               <button class="btn btn-primary" id="pbOpenBtn" style="font-size:.8rem;display:none;" onclick="openPlayerBrowser()">
-                👥 Spieler <span id="pbOpenCount"></span>
+                👥 Player <span id="pbOpenCount"></span>
               </button>
               <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
             </div>
@@ -324,7 +324,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
             <div id="allianceFilterRow" style="display:none;position:absolute;z-index:200;top:auto;left:0;right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;box-shadow:0 8px 32px rgba(0,0,0,.45);margin-top:.2rem;">
               <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
                 <span style="font-size:.74rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">🏰 Allianz-Filter</span>
-                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">Keine Auswahl = alle Spieler</span>
+                <span id="allianceFilterHint" style="font-size:.72rem;color:var(--text-muted);flex:1;">Keine Auswahl = alle Player</span>
                 <button class="btn-icon" id="allyResetBtn" style="font-size:.7rem;padding:.15rem .5rem;display:none;" onclick="resetAllianceFilter()">↺ Reset</button>
                 <button class="btn-icon" style="font-size:.7rem;padding:.1rem .35rem;" onclick="toggleAlliancePanel()">✕</button>
               </div>
@@ -340,7 +340,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
             <div id="targetList"></div>
 
             <div id="noTargets" style="text-align:center;padding:2rem;color:var(--text-muted);font-size:.85rem;display:none;">
-              Noch keine Ziele — suche nach einem Spieler oder gib Koordinaten manuell ein.
+              Noch keine Targets — suche nach einem Player oder gib Coordinates manuell ein.
             </div>
           </div>
 
@@ -349,10 +349,10 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
             <div class="op-panel">
               <div class="op-panel-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);overflow:visible;">
                 <div class="op-panel-tab active" onclick="switchPanel('info',this)">📋 Plan</div>
-                <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favoriten</div>
-                <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Truppen</div>
+                <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favorites</div>
+                <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Troops</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)">🔍 Check</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('stats',this);loadStats()">📊 Auswertung</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('stats',this);loadStats()">📊 Evaluation</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
               </div>
 
@@ -363,29 +363,29 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 
               <!-- Favourites -->
               <div class="op-panel-body" id="panel-favs" style="display:none;">
-                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;">Klicken um als Ziel hinzuzufügen · 🗑 zum Löschen</div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;">Click to add as target · 🗑 to delete</div>
                 <div id="favsList"></div>
-                <div id="noFavs" style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">Noch keine Favoriten. Ziele über ⭐ speichern.</div>
+                <div id="noFavs" style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">No favorites yet. Save targets via ⭐.</div>
               </div>
 
               <!-- Members / Troops -->
               <div class="op-panel-body" id="panel-members" style="display:none;">
-                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;">Truppenstand aus letztem Account-Upload</div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;">Troopsstand aus letztem Account-Upload</div>
                 <div id="membersList"></div>
               </div>
 
               <!-- Plausibility check -->
               <div class="op-panel-body" id="panel-check" style="display:none;">
-                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Automatische Überprüfung des Plans auf häufige Fehler.</div>
-                <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="runCheck()">🔍 Jetzt prüfen</button>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Automatic check of the plan for common errors.</div>
+                <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="runCheck()">🔍 Check now</button>
                 <div id="checkResults"></div>
               </div>
 
-              <!-- Statistics / Auswertung -->
+              <!-- Statistics / Evaluation -->
               <div class="op-panel-body" id="panel-stats" style="display:none;">
-                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Bestätigungsstatus aller Angreifer nach dem Einschlag.</div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Confirmation status of all attackers after landing.</div>
                 <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Aktualisieren</button>
-                <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">Noch keine Daten.</div></div>
+                <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">No data yet.</div></div>
               </div>
 
               <!-- Msg Log -->
@@ -395,7 +395,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                   <button class="btn btn-secondary" style="font-size:.72rem;padding:.15rem .5rem;" onclick="loadNotifyLog()">🔄</button>
                 </div>
                 <div id="notifyLogContent">
-                  <div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">⏳ Laden…</div>
+                  <div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">⏳ Loading…</div>
                 </div>
               </div>
             </div>
@@ -413,28 +413,28 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 <div class="op-modal-overlay" id="planModal">
   <div class="op-modal">
     <div class="op-modal-header">
-      <span id="planModalTitle" style="font-weight:700;">Neuer Einsatz</span>
+      <span id="planModalTitle" style="font-weight:700;">Neuer Operation</span>
       <button class="btn-icon" onclick="closeModal('planModal')">✕</button>
     </div>
     <div class="op-modal-body">
       <div class="form-row">
         <div class="form-group" style="flex:2;">
-          <label>Einsatzname</label>
+          <label>Operationname</label>
           <input id="pmName" type="text" placeholder="z.B. Op Sturmvogel" maxlength="100">
         </div>
         <div class="form-group">
           <label>Status</label>
           <select id="pmStatus">
-            <option value="draft">Entwurf</option>
-            <option value="active">Aktiv</option>
-            <option value="completed">Abgeschlossen</option>
-            <option value="cancelled">Abgebrochen</option>
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Ankunftszeit (Serverzeit)</label>
+          <label>Arrival time (Serverzeit)</label>
           <input id="pmLanding" type="datetime-local">
         </div>
         <div class="form-group" style="max-width:120px;">
@@ -455,13 +455,13 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </div>
       </div>
       <div class="form-group">
-        <label>Notizen</label>
-        <textarea id="pmNotes" rows="2" placeholder="Infos, Ziele, Koordination…" style="resize:vertical;"></textarea>
+        <label>Noteen</label>
+        <textarea id="pmNotes" rows="2" placeholder="Infos, Targets, Koordination…" style="resize:vertical;"></textarea>
       </div>
     </div>
     <div class="op-modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('planModal')">Abbrechen</button>
-      <button class="btn btn-primary" onclick="savePlan()">💾 Speichern</button>
+      <button class="btn btn-secondary" onclick="closeModal('planModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePlan()">💾 Save</button>
     </div>
   </div>
 </div>
@@ -470,18 +470,18 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 <div class="op-modal-overlay" id="targetModal">
   <div class="op-modal">
     <div class="op-modal-header">
-      <span style="font-weight:700;">🎯 Ziel hinzufügen</span>
+      <span style="font-weight:700;">🎯 Add target</span>
       <button class="btn-icon" onclick="closeModal('targetModal')">✕</button>
     </div>
     <div class="op-modal-body">
       <div class="form-row">
         <div class="form-group">
-          <label>Spieler</label>
-          <input id="tmPlayer" type="text" placeholder="Spielername">
+          <label>Player</label>
+          <input id="tmPlayer" type="text" placeholder="Playername">
         </div>
         <div class="form-group">
-          <label>Dorfname</label>
-          <input id="tmVillage" type="text" placeholder="Dorfname">
+          <label>Villagename</label>
+          <input id="tmVillage" type="text" placeholder="Villagename">
         </div>
       </div>
       <div class="form-row">
@@ -494,7 +494,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <input id="tmY" type="number" placeholder="-400…400">
         </div>
         <div class="form-group" style="max-width:110px;">
-          <label>Bevölkerung</label>
+          <label>Population</label>
           <input id="tmPop" type="number" placeholder="0" min="0">
         </div>
         <div style="display:flex;align-items:flex-end;">
@@ -502,13 +502,13 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </div>
       </div>
       <div class="form-group">
-        <label>Notizen</label>
+        <label>Noteen</label>
         <input id="tmNotes" type="text" placeholder="optional">
       </div>
     </div>
     <div class="op-modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('targetModal')">Abbrechen</button>
-      <button class="btn btn-primary" onclick="addTarget()">+ Ziel hinzufügen</button>
+      <button class="btn btn-secondary" onclick="closeModal('targetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addTarget()">+ Add target</button>
     </div>
   </div>
 </div>
@@ -517,24 +517,24 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 <div class="op-modal-overlay" id="waveModal">
   <div class="op-modal" style="width:min(760px,97vw);">
     <div class="op-modal-header">
-      <span style="font-weight:700;" id="waveModalTitle">💥 Welle hinzufügen — <span id="waveModalTarget"></span></span>
+      <span style="font-weight:700;" id="waveModalTitle">💥 Add wave — <span id="waveModalTarget"></span></span>
       <button class="btn-icon" onclick="closeModal('waveModal')">✕</button>
     </div>
     <div class="op-modal-body">
 
-      <!-- Row 1: Angreifer + Dorf -->
+      <!-- Row 1: Angreifer + Village -->
       <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Angreifer</div>
       <div class="form-row" style="margin-bottom:.6rem;">
         <div class="form-group" style="flex:1;">
           <label>Allianz-Mitglied</label>
           <select id="wmAttackerSelect" onchange="onAttackerSelect()">
-            <option value="">— Angreifer wählen —</option>
+            <option value="">— Select attacker —</option>
           </select>
         </div>
         <div class="form-group" style="flex:2;">
-          <label>Angreifer-Dorf</label>
+          <label>Angreifer-Village</label>
           <select id="wmVillageSelect" onchange="onVillageSelect()" disabled>
-            <option value="">— erst Angreifer wählen —</option>
+            <option value="">— select attacker first —</option>
           </select>
         </div>
       </div>
@@ -549,51 +549,51 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <input id="wmOY" type="number" placeholder="Y" oninput="recalcWaveTime()">
         </div>
         <div class="form-group" style="max-width:80px;">
-          <label title="Turnierplatz-Stufe (0–20), erhöht Marschgeschwindigkeit um 20% je Stufe">Turnierpl. <span style="font-size:.68rem;color:var(--text-muted);">(0–20)</span></label>
+          <label title="Tournament square level (0–20), increases march speed by 20% per level">Tournament sq. <span style="font-size:.68rem;color:var(--text-muted);">(0–20)</span></label>
           <input id="wmTournament" type="number" min="0" max="20" value="0" placeholder="0" oninput="recalcWaveTime()">
         </div>
         <div class="form-group" style="max-width:130px;">
           <label>Volk</label>
           <select id="wmTribe" onchange="updateTroopGrid(); recalcWaveTime();">
-            <option value="romans">Römer</option>
-            <option value="gauls">Gallier</option>
-            <option value="teutons">Teutonen</option>
-            <option value="huns">Hunnen</option>
-            <option value="egyptians">Ägypter</option>
+            <option value="romans">Romans</option>
+            <option value="gauls">Gauls</option>
+            <option value="teutons">Teutons</option>
+            <option value="huns">Huns</option>
+            <option value="egyptians">Egyptians</option>
           </select>
         </div>
         <div class="form-group" style="max-width:145px;">
-          <label>Wellentyp</label>
-          <select id="wmType">
-            <option value="real">⚔ Echter Angriff</option>
+          <label>Wavestyp</label>
+          <select id="wmTypee">
+            <option value="real">⚔ Echter Attack</option>
             <option value="fake">👻 Fake</option>
-            <option value="def">🛡 Verteidigung</option>
-            <option value="scout">🔍 Aufklärung</option>
+            <option value="def">🛡 Defense</option>
+            <option value="scout">🔍 Scout</option>
           </select>
         </div>
       </div>
 
       <!-- Troop grid -->
       <div style="margin-bottom:.6rem;">
-        <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Truppen</div>
+        <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Troops</div>
         <div class="troop-grid" id="troopGrid"></div>
       </div>
 
       <!-- Timing preview -->
       <div id="waveTiming" style="margin:.6rem 0;padding:.6rem .85rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;display:none;">
-        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.2rem;">Berechnete Sendezeit</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.2rem;">Berechnete Send time</div>
         <div id="waveTimingText" style="font-family:monospace;color:#fbbf24;font-size:.95rem;font-weight:700;"></div>
         <div id="waveTravelText" style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;"></div>
       </div>
 
       <div class="form-group">
-        <label>Notizen</label>
+        <label>Noteen</label>
         <input id="wmNotes" type="text" placeholder="optional">
       </div>
     </div>
     <div class="op-modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('waveModal')">Abbrechen</button>
-      <button class="btn btn-primary" id="wmSaveBtn" onclick="saveWave()">+ Welle hinzufügen</button>
+      <button class="btn btn-secondary" onclick="closeModal('waveModal')">Cancel</button>
+      <button class="btn btn-primary" id="wmSaveBtn" onclick="saveWave()">+ Add wave</button>
     </div>
   </div>
 </div>
@@ -602,12 +602,12 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 <div class="op-modal-overlay" id="playerBrowserModal">
   <div class="pb-modal" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
     <div class="op-modal-header">
-      <span style="font-weight:700;">👥 Spieler-Browser — <span id="pbAllianceLabel"></span></span>
+      <span style="font-weight:700;">👥 Player-Browser — <span id="pbAllianceLabel"></span></span>
       <button class="btn-icon" onclick="closeModal('playerBrowserModal')">✕</button>
     </div>
     <!-- Toolbar -->
     <div style="padding:.5rem .9rem .4rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
-      <input class="pb-search" id="pbSearch" placeholder="Spieler oder Dorf suchen…" oninput="filterPlayerBrowser(this.value)" style="flex:1;min-width:180px;">
+      <input class="pb-search" id="pbSearch" placeholder="Player oder Village suchen…" oninput="filterPlayerBrowser(this.value)" style="flex:1;min-width:180px;">
       <div style="display:flex;gap:.3rem;">
         <button class="pb-sort-btn active" id="pbSortPop" onclick="sortPlayerBrowser('pop')">↓ Population</button>
         <button class="pb-sort-btn" id="pbSortName" onclick="sortPlayerBrowser('name')">A–Z Name</button>
@@ -621,7 +621,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div id="pbBody" style="overflow-y:auto;flex:1;padding:.6rem .9rem;"></div>
         <div style="padding:.5rem .9rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
           <span id="pbAddedCount" style="font-size:.8rem;color:#4ade80;"></span>
-          <button class="btn btn-secondary" onclick="closeModal('playerBrowserModal')">Schließen</button>
+          <button class="btn btn-secondary" onclick="closeModal('playerBrowserModal')">Close</button>
         </div>
       </div>
       <!-- Right: assignment panel -->
@@ -629,7 +629,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div id="pbAssignPanel">
           <div class="pb-right-empty">
             <span style="font-size:1.5rem;">🎯</span>
-            <span>Dorf anklicken<br>um eigene Spieler<br>mit Laufzeiten zu sehen</span>
+            <span>Village anklicken<br>um eigene Player<br>mit Laufzeiten zu sehen</span>
           </div>
         </div>
       </div>
@@ -690,14 +690,14 @@ function fmtTravel(sec) {
   return [h?h+'h':'', m?m+'m':'', s2?s2+'s':''].filter(Boolean).join(' ');
 }
 function statusLabel(s) {
-  const m = {draft:'Entwurf',active:'Aktiv',completed:'Abgeschlossen',cancelled:'Abgebrochen'};
+  const m = {draft:'Draft',active:'Active',completed:'Completed',cancelled:'Cancelled'};
   return m[s]||s;
 }
-function waveTypeLabel(t) {
+function waveTypeeLabel(t) {
   return {real:'⚔ Echt',fake:'👻 Fake',def:'🛡 Def',scout:'🔍 Scout'}[t]||t;
 }
 function tribeName(t) {
-  return {romans:'Römer',gauls:'Gallier',teutons:'Teutonen',huns:'Hunnen',egyptians:'Ägypter'}[t]||t;
+  return {romans:'Romans',gauls:'Gauls',teutons:'Teutons',huns:'Huns',egyptians:'Egyptians'}[t]||t;
 }
 let _searchTimer;
 function debounceSearch(q) { clearTimeout(_searchTimer); _searchTimer = setTimeout(()=>doSearch(q), 300); }
@@ -707,7 +707,7 @@ function renderPlanList() {
   const el = document.getElementById('planList');
   const filtered = planFilter==='all' ? plans : plans.filter(p=>p.status===planFilter);
   if (!filtered.length) {
-    el.innerHTML = '<div style="padding:1.25rem;text-align:center;color:var(--text-muted);font-size:.82rem;">Keine Pläne.</div>';
+    el.innerHTML = '<div style="padding:1.25rem;text-align:center;color:var(--text-muted);font-size:.82rem;">No plans.</div>';
     return;
   }
   el.innerHTML = filtered.map(p => `
@@ -739,7 +739,7 @@ async function loadPlan(id) {
     if (!availableAlliances.length) loadAlliances();
     else renderAllianceFilter();
     if (!attackers.length) loadAttackers();
-  } catch(e) { alert('Fehler beim Laden: '+e.message); }
+  } catch(e) { alert('Error loading: '+e.message); }
 }
 
 function renderEditor() {
@@ -771,35 +771,35 @@ function renderPlanInfo() {
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Status</td><td style="padding:.2rem .4rem;"><span class="status-badge status-${p.status}">${statusLabel(p.status)}</span></td></tr>
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Ankunft</td><td style="padding:.2rem .4rem;font-family:monospace;color:#fbbf24;">${fmtDatetime(p.landing_time)}</td></tr>
       <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Speed</td><td style="padding:.2rem .4rem;">${p.server_speed}x</td></tr>
-      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Gegner-Ally</td><td style="padding:.2rem .4rem;">${escHtml(p.target_ally||'—')}</td></tr>
-      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Ziele</td><td style="padding:.2rem .4rem;">${(p.targets||[]).length}</td></tr>
-      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Wellen</td><td style="padding:.2rem .4rem;">${(p.targets||[]).reduce((a,t)=>a+(t.waves||[]).length,0)}</td></tr>
-      ${p.notes ? `<tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Notizen</td><td style="padding:.2rem .4rem;">${escHtml(p.notes)}</td></tr>` : ''}
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Enemy-Ally</td><td style="padding:.2rem .4rem;">${escHtml(p.target_ally||'—')}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Targets</td><td style="padding:.2rem .4rem;">${(p.targets||[]).length}</td></tr>
+      <tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Waves</td><td style="padding:.2rem .4rem;">${(p.targets||[]).reduce((a,t)=>a+(t.waves||[]).length,0)}</td></tr>
+      ${p.notes ? `<tr><td style="color:var(--text-muted);padding:.2rem .4rem;">Noteen</td><td style="padding:.2rem .4rem;">${escHtml(p.notes)}</td></tr>` : ''}
     </table>
     <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.75rem;">
       ${p.status === 'draft' ? `
-        <button class="btn" style="background:#16a34a;color:#fff;font-size:.82rem;font-weight:600;" onclick="setPlanStatus('active')" title="Einsatz aktivieren und Spieler benachrichtigen">
-          🚀 Einsatz aktivieren
+        <button class="btn" style="background:#16a34a;color:#fff;font-size:.82rem;font-weight:600;" onclick="setPlanStatus('active')" title="Operation aktivieren und Player benachrichtigen">
+          🚀 Operation aktivieren
         </button>` : ''}
       ${p.status === 'active' ? `
-        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('completed')" title="Einsatz als abgeschlossen markieren">
-          ✅ Abschließen
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('completed')" title="Operation als abgeschlossen markieren">
+          ✅ Complete
         </button>
-        <button class="btn btn-secondary" style="font-size:.78rem;color:#f87171;" onclick="setPlanStatus('cancelled')" title="Einsatz abbrechen">
-          ❌ Abbrechen
+        <button class="btn btn-secondary" style="font-size:.78rem;color:#f87171;" onclick="setPlanStatus('cancelled')" title="Operation abbrechen">
+          ❌ Cancel
         </button>` : ''}
       ${p.status === 'cancelled' ? `
-        <button class="btn" style="background:#16a34a;color:#fff;font-size:.82rem;font-weight:600;" onclick="setPlanStatus('active')" title="Einsatz reaktivieren und erneut Spieler benachrichtigen">
+        <button class="btn" style="background:#16a34a;color:#fff;font-size:.82rem;font-weight:600;" onclick="setPlanStatus('active')" title="Operation reaktivieren und erneut Player benachrichtigen">
           🚀 Erneut aktivieren
         </button>` : ''}
       ${p.status === 'completed' || p.status === 'cancelled' ? `
-        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Zurück zu Entwurf">
-          ↩ Zurück zu Entwurf
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Revert to draft">
+          ↩ Revert to draft
         </button>` : ''}
-      <button class="btn btn-secondary" style="font-size:.78rem;" onclick="recalcTimes()" title="Alle Sendezeiten neu berechnen basierend auf aktueller Einschlagszeit">
-        ⏱ Sendezeiten neu berechnen
+      <button class="btn btn-secondary" style="font-size:.78rem;" onclick="recalcTimes()" title="Alle Send timeen neu berechnen basierend auf aktueller Landing time">
+        ⏱ Send timeen neu berechnen
       </button>
-      <button class="btn btn-secondary" style="font-size:.78rem;" id="launchPollBtn" onclick="launchPoll()" title="Verfügbarkeitsumfrage in Discord starten">
+      <button class="btn btn-secondary" style="font-size:.78rem;" id="launchPollBtn" onclick="launchPoll()" title="Availablekeitsumfrage in Discord starten">
         📊 Umfrage starten
       </button>
       <div id="pollStatusLine" style="font-size:.72rem;color:var(--text-muted);"></div>
@@ -841,7 +841,7 @@ function renderTargetCard(t) {
         ${defCnt  ? `<span class="wave-type-badge wt-def">🛡 ${defCnt}</span>` : ''}
         ${scoutCnt? `<span class="wave-type-badge wt-scout">🔍 ${scoutCnt}</span>` : ''}
         ${realCnt && !fakeOk ? '<span title="Zu wenig Fakes!" style="color:#f59e0b;">⚠️</span>' : ''}
-        <button class="btn-icon" title="Welle hinzufügen" style="font-size:.75rem;" onclick="event.stopPropagation();openWaveModal(${t.id},'${escHtml(t.player_name||'')} (${t.x}|${t.y})')">+ Welle</button>
+        <button class="btn-icon" title="Add wave" style="font-size:.75rem;" onclick="event.stopPropagation();openWaveModal(${t.id},'${escHtml(t.player_name||'')} (${t.x}|${t.y})')">+ Welle</button>
         <button class="btn-icon" title="Als Favorit" style="font-size:.75rem;" onclick="event.stopPropagation();favTarget(${t.id})">⭐</button>
         <button class="btn-icon danger" title="Ziel entfernen" style="font-size:.75rem;" onclick="event.stopPropagation();deleteTarget(${t.id})">🗑</button>
         <span style="color:var(--text-muted);font-size:.8rem;" id="tc-chevron-${t.id}">▼</span>
@@ -868,7 +868,7 @@ function _waveGroupKey(w) {
 }
 
 function renderWavesTable(t) {
-  if (!t.waves?.length) return `<div style="color:var(--text-muted);font-size:.82rem;padding:.25rem 0;">Keine Wellen — klicke "+ Welle" um eine hinzuzufügen.</div>`;
+  if (!t.waves?.length) return `<div style="color:var(--text-muted);font-size:.82rem;padding:.25rem 0;">No waves — click "+ Wave" to add one.</div>`;
 
   // Group consecutive identical waves
   const groups = [];
@@ -888,28 +888,28 @@ function renderWavesTable(t) {
     const ids = g.waves.map(x=>x.id);
     const troops = Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
       .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('');
-    const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;" title="Turnierplatz Stufe ${w.tournament_square}">🏆${w.tournament_square}</span>` : '';
+    const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;" title="Turnierplatz Level ${w.tournament_square}">🏆${w.tournament_square}</span>` : '';
     // Confirm status (only shown when count=1, grouped waves have none by design)
-    const csMap = {on_time:['✅','#4ade80','Pünktlich abgeschickt'], late:['⏱','#fbbf24',`Unpünktlich (${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s)`], not_sent:['❌','#f87171','Nicht abgeschickt'], cant_send:['🚫','#f87171','Kann nicht abschicken']};
+    const csMap = {on_time:['✅','#4ade80','Sent on time'], late:['⏱','#fbbf24',`Late (${w.confirm_delta_seconds>0?'+':''}${w.confirm_delta_seconds}s)`], not_sent:['❌','#f87171','Not sent'], cant_send:['🚫','#f87171','Cannot send']};
     const cs = csMap[w.confirm_status];
     const confirmIndicator = cs ? `<span title="${cs[2]}" style="font-size:.85rem;margin-left:.2rem;">${cs[0]}</span>` : '';
     const rowBg = cs ? (w.confirm_status==='on_time'?'rgba(74,222,128,.04)':w.confirm_status==='late'?'rgba(251,191,36,.06)':'rgba(248,113,113,.06)') : '';
     // Count badge
     const countBadge = count > 1
-      ? `<span title="${count} identische Wellen" style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;min-width:18px;height:18px;padding:0 4px;margin-left:.3rem;">×${count}</span>`
+      ? `<span title="${count} identische Waves" style="display:inline-flex;align-items:center;justify-content:center;background:#6366f1;color:#fff;font-size:.65rem;font-weight:800;border-radius:9px;min-width:18px;height:18px;padding:0 4px;margin-left:.3rem;">×${count}</span>`
       : '';
     // Low-troop fake warning (< 20 troops total)
     const totalTroops = Object.values(w.troop_json||{}).reduce((s,v)=>s+(parseInt(v)||0), 0);
     const lowTroopBadge = (w.wave_type==='fake' && totalTroops > 0 && totalTroops < 20)
-      ? `<span title="Nur ${totalTroops} Truppen — Fake könnte zu wenig sein (< 20)" style="color:#f87171;font-size:.85rem;margin-left:.2rem;" >🔻</span>`
+      ? `<span title="Only ${totalTroops} troops — fake might be too few (< 20)" style="color:#f87171;font-size:.85rem;margin-left:.2rem;" >🔻</span>`
       : '';
     // Action buttons — for grouped waves: dup+edit on representative, delete deletes all in group
     const deleteHandler = count > 1
-      ? `if(confirm('${count} identische Wellen löschen?')) { ${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')} }`
+      ? `if(confirm('Delete ${count} identical waves?')) { ${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')} }`
       : `deleteWave(${w.id},${t.id})`;
     return `
     <tr style="background:${rowBg}">
-      <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeLabel(w.wave_type)}</span>${countBadge}${lowTroopBadge}</td>
+      <td><span class="wave-type-badge wt-${w.wave_type}">${waveTypeeLabel(w.wave_type)}</span>${countBadge}${lowTroopBadge}</td>
       <td>
         <strong>${escHtml(w.attacker_name)}</strong>${confirmIndicator}
         <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}${tsInfo}</span>
@@ -925,7 +925,7 @@ function renderWavesTable(t) {
         <button class="wave-action-btn" title="Welle duplizieren" onclick="duplicateWave(${w.id})">⧉</button>
         <button class="wave-action-btn" title="Duplizieren &amp; sofort bearbeiten" onclick="duplicateWaveEdit(${w.id},${t.id})">⧉✏</button>
         <button class="wave-action-btn" title="Welle bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
-        <button class="wave-action-btn danger" title="${count>1?count+' Wellen löschen':'Welle löschen'}" onclick="${deleteHandler}">🗑${count>1?` ×${count}`:''}</button>
+        <button class="wave-action-btn danger" title="${count>1?count+' waves delete':'Delete wave'}" onclick="${deleteHandler}">🗑${count>1?` ×${count}`:''}</button>
         <button class="wave-action-btn" title="Direkt zum Rallypoint — Ziel: ${t.x}|${t.y}${TW_WORLD?'':' (Travian-Server nicht konfiguriert)'}" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);font-size:.85rem;">🏹</button>
       </td>
     </tr>`;
@@ -933,7 +933,7 @@ function renderWavesTable(t) {
   return `
   <table class="wave-table">
     <thead><tr>
-      <th>Typ</th><th>Angreifer</th><th>Volk</th><th>Truppen</th><th>Sendezeit</th><th>Notiz</th><th></th>
+      <th>Type</th><th>Attacker</th><th>Volk</th><th>Troops</th><th>Send time</th><th>Note</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -1017,7 +1017,7 @@ function renderAllianceFilter() {
     metaGroups.forEach(g => {
       const allActive = g.alliances.length > 0 && g.alliances.every(a => selectedAlliances.has(a));
       html += `<span class="ally-chip${allActive?' active':''}" onclick="toggleMetaGroup('${escJs(g.meta_name)}')"
-        title="${allActive?'Meta-Gruppe abwählen':'Alle Allianzen dieser Meta-Gruppe wählen'} (${g.alliances.join(', ')})">
+        title="${allActive?'Deselect meta-group':'Select all alliances in this meta-group'} (${g.alliances.join(', ')})">
         🏰 ${escHtml(g.meta_name)}
         <span style="font-size:.68rem;opacity:.7;">${g.alliances.length} Ally</span>
         <span class="chip-x">${allActive?' ✕':''}</span>
@@ -1033,7 +1033,7 @@ function renderAllianceFilter() {
     const rankColor = rank <= 3 ? '#fbbf24' : rank <= 10 ? '#94a3b8' : 'var(--text-muted)';
     html += `<span class="ally-chip${active?' active':''}"
       onclick="toggleAlliance('${escJs(a.name)}')"
-      title="${active?'Filter entfernen':'Als Filter hinzufügen (max. 2)'} · Rang ${rank} · ${a.players} Spieler · Pop ${fmtPop(a.pop)}">
+      title="${active?'Remove filter':'Add as filter (max. 2)'} · Rank ${rank} · ${a.players} Player · Pop ${fmtPop(a.pop)}">
       <span style="font-size:.68rem;color:${rankColor};font-weight:700;min-width:1.4rem;">#${rank}</span>
       ${escHtml(a.name)}
       <span style="font-size:.68rem;color:var(--text-muted);">${a.players}👤</span>
@@ -1045,9 +1045,9 @@ function renderAllianceFilter() {
 
   const hasFilter = selectedAlliances.size > 0;
   if (!hasFilter) {
-    hint.textContent = 'Keine Auswahl = alle Spieler';
+    hint.textContent = 'Keine Auswahl = alle Player';
   } else {
-    hint.textContent = `Aktiv: ${[...selectedAlliances].join(' + ')}`;
+    hint.textContent = `Active: ${[...selectedAlliances].join(' + ')}`;
   }
   // Reset button
   const resetBtn = document.getElementById('allyResetBtn');
@@ -1079,7 +1079,7 @@ function toggleAlliance(name) {
   } else if (selectedAlliances.size < 2) {
     selectedAlliances.add(name);
   } else {
-    showToast('Max. 2 Allianzen gleichzeitig. Erst eine abwählen.');
+    showToast('Max. 2 alliances at once. Deselect one first.');
     return;
   }
   renderAllianceFilter();
@@ -1117,13 +1117,13 @@ let pbSortMode   = 'pop';
 let pbAddedCount = 0;
 
 async function openPlayerBrowser() {
-  if (!activePlanId) { alert('Bitte erst einen Plan auswählen.'); return; }
+  if (!activePlanId) { alert('Please select a plan first.'); return; }
   const allyParam = selectedAlliances.size > 0
     ? `?alliances=${encodeURIComponent([...selectedAlliances].join(','))}` : '';
   document.getElementById('pbAllianceLabel').textContent =
     selectedAlliances.size ? [...selectedAlliances].join(' + ') : 'Alle';
   document.getElementById('pbBody').innerHTML =
-    '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Lade Spieler…</div>';
+    '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Lade Player…</div>';
   document.getElementById('pbSearch').value = '';
   document.getElementById('pbAddedCount').textContent = '';
   pbAddedCount = 0;
@@ -1167,11 +1167,11 @@ function renderPlayerBrowser() {
   const body = document.getElementById('pbBody');
   const count = document.getElementById('pbCount');
   if (!pbFiltered.length) {
-    body.innerHTML = '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Keine Spieler gefunden.</div>';
+    body.innerHTML = '<div style="color:var(--text-muted);padding:1rem;text-align:center;">Keine Player gefunden.</div>';
     count.textContent = '';
     return;
   }
-  count.textContent = `${pbFiltered.length} Spieler`;
+  count.textContent = `${pbFiltered.length} Player`;
 
   // Group by alliance
   const byAlliance = {};
@@ -1183,7 +1183,7 @@ function renderPlayerBrowser() {
 
   body.innerHTML = Object.entries(byAlliance).map(([allyName, players]) => `
     <div class="pb-alliance-section">
-      <div class="pb-alliance-header">🏰 ${escHtml(allyName)} <span style="font-weight:400;opacity:.6;">(${players.length} Spieler)</span></div>
+      <div class="pb-alliance-header">🏰 ${escHtml(allyName)} <span style="font-weight:400;opacity:.6;">(${players.length} Player)</span></div>
       ${players.map(p => renderPbPlayer(p)).join('')}
     </div>
   `).join('');
@@ -1197,7 +1197,7 @@ function renderPbPlayer(p) {
   <div class="pb-player" id="pbp-${escHtml(p.player_name).replace(/\s/g,'_')}">
     <div class="pb-player-header" onclick="togglePbPlayer(this)">
       <span class="pb-player-name">${escHtml(p.player_name)}${pollBadge(p.discord_id||'')}</span>
-      <span class="pb-player-pop">${fmtPop(p.total_pop)} Pop · ${p.villages.length} Dörfer</span>
+      <span class="pb-player-pop">${fmtPop(p.total_pop)} Pop · ${p.villages.length} Villages</span>
       <span class="pb-chevron">▼</span>
     </div>
     <div class="pb-villages">
@@ -1229,7 +1229,7 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
     });
     pbAddedCount++;
     document.getElementById('pbAddedCount').textContent =
-      `✓ ${pbAddedCount} Ziel${pbAddedCount>1?'e':''} hinzugefügt`;
+      `✓ ${pbAddedCount} target${pbAddedCount>1?'s':''} added`;
     reloadActivePlan();
     // Open assignment panel for this target
     openAssignmentPanel(x, y, player, village);
@@ -1408,7 +1408,7 @@ function _renderAssignmentPanel(settings) {
               const label = tDef ? tDef.name : id;
               return `<span style="font-size:.68rem;background:rgba(255,255,255,.06);border-radius:4px;padding:.1rem .35rem;white-space:nowrap;">${escHtml(label)}: <b>${cnt.toLocaleString()}</b></span>`;
             }).join('')
-          : '<span style="font-size:.68rem;color:var(--text-muted);">Keine Truppendaten</span>';
+          : '<span style="font-size:.68rem;color:var(--text-muted);">Keine Troopsdaten</span>';
         const hasTroops = troopEntries.length > 0;
         return `
         <div class="atk-row" id="atk-row-${i}">
@@ -1419,7 +1419,7 @@ function _renderAssignmentPanel(settings) {
           </div>
           <div class="atk-village" style="display:flex;justify-content:space-between;align-items:center;">
             <span>${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</span>
-            <button onclick="toggleTroopRow(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem;padding:0 .2rem;" title="Truppen anzeigen/ausblenden">
+            <button onclick="toggleTroopRow(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem;padding:0 .2rem;" title="Troops anzeigen/ausblenden">
               🪖 <span id="troop-toggle-${i}">▼</span>
             </button>
           </div>
@@ -1459,7 +1459,7 @@ async function saveGuildDefaultTS() {
   try {
     const r = await fetch(`/guild/{{ guild.guild_id }}/operations/api/save-default-ts`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Typee':'application/json'},
       body: JSON.stringify({ts})
     });
     if (r.ok) {
@@ -1561,7 +1561,7 @@ async function doSearch(q) {
 async function addTargetFromSearch(x, y, player, village, pop) {
   document.getElementById('searchDropdown').style.display='none';
   document.getElementById('targetSearch').value='';
-  if (!activePlanId) { alert('Bitte zuerst einen Einsatzplan auswählen oder erstellen.'); return; }
+  if (!activePlanId) { alert('Please select or create an operation plan first.'); return; }
   try {
     await apiPost(`/plans/${activePlanId}/targets`, {
       player_name: player, village_name: village,
@@ -1584,7 +1584,7 @@ async function addTarget() {
   if (!activePlanId) return;
   const x = parseInt(document.getElementById('tmX').value);
   const y = parseInt(document.getElementById('tmY').value);
-  if (isNaN(x)||isNaN(y)) { alert('Koordinaten erforderlich.'); return; }
+  if (isNaN(x)||isNaN(y)) { alert('Coordinates erforderlich.'); return; }
   try {
     const r = await apiPost(`/plans/${activePlanId}/targets`, {
       player_name: document.getElementById('tmPlayer').value,
@@ -1599,7 +1599,7 @@ async function addTarget() {
 }
 
 async function deleteTarget(id) {
-  if (!confirm('Ziel und alle Wellen löschen?')) return;
+  if (!confirm('Delete target and all waves?')) return;
   await apiPost(`/targets/${id}/delete`);
   await reloadActivePlan();
 }
@@ -1641,8 +1641,8 @@ function classifyVillage(village, tribe) {
 function openWaveModal(targetId, targetLabel) {
   currentTargetId = targetId;
   editingWaveId = null;
-  document.getElementById('waveModalTitle').innerHTML = `💥 Welle hinzufügen — <span id="waveModalTarget">${escHtml(targetLabel)}</span>`;
-  document.getElementById('wmSaveBtn').textContent = '+ Welle hinzufügen';
+  document.getElementById('waveModalTitle').innerHTML = `💥 Add wave — <span id="waveModalTarget">${escHtml(targetLabel)}</span>`;
+  document.getElementById('wmSaveBtn').textContent = '+ Add wave';
   _resetWaveForm();
   _populateAttackerDropdown();
   openModal('waveModal');
@@ -1655,12 +1655,12 @@ function openWaveEditModal(waveId, targetId) {
   editingWaveId = waveId;
   const t = activePlan?.targets?.find(t => t.id === targetId);
   document.getElementById('waveModalTitle').innerHTML = `✏ Welle bearbeiten — <span id="waveModalTarget">${escHtml(t ? t.player_name + ' ('+t.x+'|'+t.y+')' : '')}</span>`;
-  document.getElementById('wmSaveBtn').textContent = '💾 Änderungen speichern';
+  document.getElementById('wmSaveBtn').textContent = '💾 Save changes';
   _resetWaveForm();
   _populateAttackerDropdown();
   // Pre-fill from wave data
   document.getElementById('wmTribe').value = wave.tribe || 'romans';
-  document.getElementById('wmType').value = wave.wave_type || 'real';
+  document.getElementById('wmTypee').value = wave.wave_type || 'real';
   document.getElementById('wmOX').value = wave.origin_x ?? '';
   document.getElementById('wmOY').value = wave.origin_y ?? '';
   document.getElementById('wmTournament').value = wave.tournament_square || 0;
@@ -1695,7 +1695,7 @@ function _resetWaveForm() {
   document.getElementById('wmOY').value = '';
   document.getElementById('wmTournament').value = '0';
   document.getElementById('wmTribe').value = 'romans';
-  document.getElementById('wmType').value = 'real';
+  document.getElementById('wmTypee').value = 'real';
   document.getElementById('wmNotes').value = '';
   document.getElementById('waveTiming').style.display = 'none';
   updateTroopGrid();
@@ -1703,7 +1703,7 @@ function _resetWaveForm() {
 
 function _populateAttackerDropdown() {
   const sel = document.getElementById('wmAttackerSelect');
-  sel.innerHTML = '<option value="">— Angreifer wählen —</option>';
+  sel.innerHTML = '<option value="">— Select attacker —</option>';
   const src = attackers.length ? attackers : members.map(m => ({
     player_name: m.travian_name || m.discord_name,
     discord_name: m.discord_name,
@@ -1716,7 +1716,7 @@ function _populateAttackerDropdown() {
     sel.add(opt);
   });
   const vs = document.getElementById('wmVillageSelect');
-  vs.innerHTML = '<option value="">— erst Angreifer wählen —</option>';
+  vs.innerHTML = '<option value="">— select attacker first —</option>';
   vs.disabled = true;
 }
 
@@ -1724,7 +1724,7 @@ function onAttackerSelect(resetCoords = true) {
   const name = document.getElementById('wmAttackerSelect').value;
   const a = _findAttacker(name);
   const vs = document.getElementById('wmVillageSelect');
-  vs.innerHTML = '<option value="">— Dorf wählen —</option>';
+  vs.innerHTML = '<option value="">— Select village —</option>';
   if (!a) { vs.disabled = true; return; }
   vs.disabled = false;
   if (a.tribe && TROOPS_DEF[a.tribe]) {
@@ -1735,7 +1735,7 @@ function onAttackerSelect(resetCoords = true) {
   const roleLabel = {off:'OFF', def:'DEF', scout:'Scout'};
   (a.villages || []).forEach((v, i) => {
     const role = classifyVillage(v, a.tribe);
-    const vName = v.name || v.village_name || 'Dorf '+(i+1);
+    const vName = v.name || v.village_name || 'Village '+(i+1);
     const label = `${roleIcon[role]} [${roleLabel[role]}] ${vName} (${v.x}|${v.y})`;
     const opt = new Option(label, i);
     opt.dataset.x = v.x;
@@ -1811,8 +1811,8 @@ function recalcWaveTime() {
   const sendStr = sendDt.toISOString().replace('T',' ').slice(0,16);
   document.getElementById('waveTiming').style.display='block';
   document.getElementById('waveTimingText').textContent = sendStr + ' (Serverzeit)';
-  const tsInfo = ts > 0 ? ` · TP Stufe ${ts} (+${(ts*20)}% Speed)` : '';
-  document.getElementById('waveTravelText').textContent = `🕐 Marschzeit: ${fmtTravel(travelSec)} · ${slowestName} (${slowestSpeed}→${effectiveSpeed.toFixed(1)} Fel/h × ${spd}x${tsInfo})`;
+  const tsInfo = ts > 0 ? ` · TP Level ${ts} (+${(ts*20)}% Speed)` : '';
+  document.getElementById('waveTravelText').textContent = `🕐 March time: ${fmtTravel(travelSec)} · ${slowestName} (${slowestSpeed}→${effectiveSpeed.toFixed(1)} Fel/h × ${spd}x${tsInfo})`;
 }
 
 async function saveWave() {
@@ -1832,7 +1832,7 @@ async function saveWave() {
     origin_village: '',
     origin_x: ox||'',
     origin_y: oy||'',
-    wave_type: document.getElementById('wmType').value,
+    wave_type: document.getElementById('wmTypee').value,
     tribe,
     troop_json: JSON.stringify(troops),
     landing_time: activePlan?.landing_time||'',
@@ -1899,7 +1899,7 @@ async function duplicateWaveEdit(waveId, targetId) {
 }
 
 async function deleteWave(waveId, targetId, silent=false) {
-  if (!silent && !confirm('Welle löschen?')) return;
+  if (!silent && !confirm('Delete wave?')) return;
   await apiPost(`/waves/${waveId}/delete`);
   await reloadActivePlan();
 }
@@ -1911,11 +1911,11 @@ function openRallypoint(tx, ty, sendTime) {
     window.open(url, '_blank');
   } else {
     // Fallback: copy coords to clipboard
-    const txt = `Ziel: ${tx}|${ty}\nSendezeit: ${sendTime || '—'}`;
+    const txt = `Ziel: ${tx}|${ty}\nSend time: ${sendTime || '—'}`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(txt).then(() => showToast('📋 Ziel & Sendezeit kopiert: ' + tx+'|'+ty));
+      navigator.clipboard.writeText(txt).then(() => showToast('📋 Ziel & Send time kopiert: ' + tx+'|'+ty));
     } else {
-      prompt('Für den Rallypoint — Ziel & Sendezeit:', txt);
+      prompt('For the rally point — target & send time:', txt);
     }
   }
 }
@@ -1950,7 +1950,7 @@ function renderFavs() {
 }
 
 async function addTargetFromFav(x,y,player,village) {
-  if (!activePlanId) { alert('Bitte zuerst einen Einsatzplan auswählen oder erstellen.'); return; }
+  if (!activePlanId) { alert('Please select or create an operation plan first.'); return; }
   try {
     await apiPost(`/plans/${activePlanId}/targets`, {
       player_name: player, village_name: village,
@@ -1970,14 +1970,14 @@ async function deleteFav(id) {
 function renderMembers() {
   const el = document.getElementById('membersList');
   if (!members.length) {
-    el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">Keine Truppenstand-Uploads. Mitglieder können in "Mein Account" ihre Truppen hochladen.</div>';
+    el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">No troop data uploaded. Members can upload their troops in "My Account".</div>';
     return;
   }
   el.innerHTML = members.map(m => `
     <div class="member-item" onclick="selectMemberForWave('${escJs(m.discord_name)}')">
       <div style="font-weight:600;font-size:.85rem;">${escHtml(m.discord_name)} <span style="color:var(--text-muted);font-weight:400;font-size:.75rem;">${m.travian_name?'· '+escHtml(m.travian_name):''}</span></div>
       <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">
-        ⚔ Off: ${m.total_off||0} · 🛡 Def: ${m.total_def||0} · 🏘 ${(m.villages||[]).length} Dörfer
+        ⚔ Off: ${m.total_off||0} · 🛡 Def: ${m.total_def||0} · 🏘 ${(m.villages||[]).length} Villages
         · <span style="opacity:.7;">${m.updated_at?m.updated_at.slice(0,10):''}</span>
       </div>
     </div>
@@ -1992,7 +1992,7 @@ async function runCheck() {
   if (!activePlanId) return;
   switchPanel('check', document.querySelectorAll('.op-panel-tab')[3]);
   const el = document.getElementById('checkResults');
-  el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">Prüfe…</div>';
+  el.innerHTML='<div style="color:var(--text-muted);font-size:.82rem;">Checking…</div>';
   try {
     const data = await apiFetch(`/plans/${activePlanId}/check`);
     const s = data.summary || {};
@@ -2018,10 +2018,10 @@ async function runCheck() {
 
     html += section(data.errors,      '❌', '#f87171', 'Fehler');
     html += section(data.warnings,    '⚠️', '#fbbf24', 'Warnungen');
-    html += section(data.suggestions, '💡', '#93c5fd', 'Vorschläge');
+    html += section(data.suggestions, '💡', '#93c5fd', 'Suggestions');
     html += section(data.ok,          '✅', '#4ade80', 'Positiv');
 
-    el.innerHTML = html || '<div style="color:var(--text-muted);">Keine Ergebnisse.</div>';
+    el.innerHTML = html || '<div style="color:var(--text-muted);">Keine Results.</div>';
   } catch(e) { el.innerHTML=`<div style="color:#f87171;">Fehler: ${e.message}</div>`; }
 }
 
@@ -2036,7 +2036,7 @@ function loadStats() {
   );
 
   if (!allWaves.length) {
-    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">Keine Wellen im Plan.</div>';
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;">Keine Waves im Plan.</div>';
     return;
   }
 
@@ -2049,7 +2049,7 @@ function loadStats() {
 
   const csIcons  = {on_time:'✅', late:'⏱', not_sent:'❌', cant_send:'🚫', '':'⬜'};
   const csColors = {on_time:'#4ade80', late:'#fbbf24', not_sent:'#f87171', cant_send:'#f87171', '':'var(--text-muted)'};
-  const csLabels = {on_time:'Pünktlich', late:'Unpünktlich', not_sent:'Nicht abg.', cant_send:'Fällt aus', '':'Ausstehend'};
+  const csLabels = {on_time:'On time', late:'Late', not_sent:'Not sent', cant_send:'Dropped out', '':'Pending'};
 
   // Summary counts
   const totalWaves  = allWaves.length;
@@ -2065,11 +2065,11 @@ function loadStats() {
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:.85rem;">
     <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
       <div style="font-size:1.1rem;font-weight:800;color:#4ade80;">${onTimeCnt}</div>
-      <div style="font-size:.65rem;color:var(--text-muted);">✅ Pünktlich</div>
+      <div style="font-size:.65rem;color:var(--text-muted);">✅ On time</div>
     </div>
     <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
       <div style="font-size:1.1rem;font-weight:800;color:#fbbf24;">${lateCnt}</div>
-      <div style="font-size:.65rem;color:var(--text-muted);">⏱ Unpünktlich</div>
+      <div style="font-size:.65rem;color:var(--text-muted);">⏱ Late</div>
     </div>
     <div style="background:var(--bg-main);border-radius:7px;padding:.45rem .5rem;text-align:center;">
       <div style="font-size:1.1rem;font-weight:800;color:#f87171;">${notSentCnt+cantSendCnt}</div>
@@ -2078,13 +2078,13 @@ function loadStats() {
   </div>
   <div style="margin-bottom:.6rem;">
     <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">
-      <span>Bestätigt: ${confirmedCnt} / ${totalWaves}</span>
+      <span>Confirmed: ${confirmedCnt} / ${totalWaves}</span>
       <span>${pct}%</span>
     </div>
     <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;">
       <div style="height:100%;width:${pct}%;background:${pct>=80?'#4ade80':pct>=50?'#fbbf24':'#f87171'};transition:width .3s;border-radius:3px;"></div>
     </div>
-    ${pendingCnt ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">⬜ ${pendingCnt} Welle${pendingCnt!==1?'n':''} noch ohne Bestätigung</div>` : ''}
+    ${pendingCnt ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">⬜ ${pendingCnt} wave${pendingCnt!==1?'s':''} without confirmation yet</div>` : ''}
   </div>`;
 
   // Per-attacker rows
@@ -2138,8 +2138,8 @@ async function saveInlineLanding() {
 // ══ Recalc times ══════════════════════════════════════════════════════════
 async function setPlanStatus(newStatus) {
   if (!activePlanId) return;
-  const labels = { active: 'aktivieren', completed: 'abschließen', cancelled: 'abbrechen', draft: 'zurücksetzen' };
-  if (!confirm(`Einsatz wirklich ${labels[newStatus] || newStatus}?`)) return;
+  const labels = { active: 'activate', completed: 'complete', cancelled: 'cancel', draft: 'reset' };
+  if (!confirm(`Operation wirklich ${labels[newStatus] || newStatus}?`)) return;
   try {
     await apiPost(`/plans/${activePlanId}/update`, { status: newStatus });
     await reloadActivePlan();
@@ -2149,11 +2149,11 @@ async function setPlanStatus(newStatus) {
 
 async function recalcTimes() {
   if (!activePlanId) return;
-  if (!activePlan?.landing_time) { showToast('⚠️ Keine Einschlagszeit gesetzt.'); return; }
-  if (!confirm('Alle Sendezeiten neu berechnen?\nDies überschreibt manuell gesetzte Sendezeiten.')) return;
+  if (!activePlan?.landing_time) { showToast('⚠️ Keine Landing time gesetzt.'); return; }
+  if (!confirm('Recalculate all send times?\nThis will overwrite manually set send times.')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/recalc-times`);
-    showToast(`✅ ${r.updated} Sendezeit${r.updated!==1?'en':''} neu berechnet.`);
+    showToast(`✅ ${r.updated} Send time${r.updated!==1?'en':''} neu berechnet.`);
     await loadPlan(activePlanId);
   } catch(e) { showToast('❌ Fehler: '+e.message); }
 }
@@ -2184,7 +2184,7 @@ async function loadPollAvailability() {
 
 async function launchPoll() {
   if (!activePlanId) return;
-  if (!confirm('Verfügbarkeitsumfrage für diesen EP in Discord starten?')) return;
+  if (!confirm('Start availability poll for this op in Discord?')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/launch-poll`);
     if (r.ok) {
@@ -2201,7 +2201,7 @@ function pollBadge(discordId) {
   const r = pollAvailability[discordId];
   if (!r) return '';
   const map = {available:'✅', maybe:'⏰', unavailable:'❌'};
-  const tip = {available:'Verfügbar', maybe:'Vielleicht', unavailable:'Nicht verfügbar'};
+  const tip = {available:'Available', maybe:'Vielleicht', unavailable:'Not available'};
   return `<span title="${tip[r]||r}" style="font-size:.75rem;margin-left:.2rem;">${map[r]||''}</span>`;
 }
 
@@ -2216,7 +2216,7 @@ function startCountdown(landingTime) {
     const land = new Date(landingTime).getTime();
     const diff = land - now;
     if (diff <= 0) {
-      el.textContent = '💥 Einschlag!';
+      el.textContent = '💥 Landing!';
       el.style.color = '#f87171';
       el.style.display = '';
       return;
@@ -2236,7 +2236,7 @@ function startCountdown(landingTime) {
 // ══ Discord notify ════════════════════════════════════════════════════════
 async function sendNotify() {
   if (!activePlanId) return;
-  if (!confirm('Plan als Discord-Nachricht an alle betroffenen Mitglieder senden?')) return;
+  if (!confirm('Plan als Discord-Nachricht an alle betroffenen Members senden?')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/notify`);
     // Always switch to log tab — success or failure
@@ -2260,7 +2260,7 @@ async function loadNotifyLog() {
     const data = await apiGet(`/plans/${activePlanId}/notify-log`);
     const logs = data.logs || [];
     if (!logs.length) {
-      el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">Noch keine Benachrichtigungen für diesen Plan.</div>';
+      el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">No notifications for this plan yet.</div>';
       return;
     }
     const statusLabel = s => ({
@@ -2276,7 +2276,7 @@ async function loadNotifyLog() {
       const sent    = entries.filter(e => e.status === 'sent').length;
       const failed  = entries.filter(e => e.status !== 'sent').length;
       const typeTag = log.trigger_type === 'auto'
-        ? '<span style="background:rgba(99,102,241,.15);color:#a5b4fc;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🚀 Auto (Aktivierung)</span>'
+        ? '<span style="background:rgba(99,102,241,.15);color:#a5b4fc;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🚀 Auto (Activeierung)</span>'
         : '<span style="background:rgba(245,158,11,.12);color:#fbbf24;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">📢 Manuell</span>';
 
       const rows = entries.length ? entries.map(e => `
@@ -2287,7 +2287,7 @@ async function loadNotifyLog() {
           <span style="flex-shrink:0;">${statusLabel(e.status)}</span>
           ${e.error ? `<span style="font-size:.67rem;color:#f87171;flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.error}">${e.error}</span>` : ''}
         </div>`).join('')
-        : '<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ Keine Wellen mit Discord-ID oder kein Ally-Mitglied gefunden.</div>';
+        : '<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ Keine Waves mit Discord-ID oder kein Ally-Mitglied gefunden.</div>';
 
       return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden;">
         <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;border-bottom:1px solid var(--border);">
@@ -2311,7 +2311,7 @@ function apiGet(path) {
 // ══ Plan modal ════════════════════════════════════════════════════════════
 function openNewPlanModal() {
   editingPlanId = null;
-  document.getElementById('planModalTitle').textContent = 'Neuer Einsatz';
+  document.getElementById('planModalTitle').textContent = 'Neuer Operation';
   document.getElementById('pmName').value = '';
   document.getElementById('pmStatus').value = 'draft';
   document.getElementById('pmLanding').value = '';
@@ -2323,7 +2323,7 @@ function openNewPlanModal() {
 function openEditPlanModal() {
   if (!activePlan) return;
   editingPlanId = activePlan.id;
-  document.getElementById('planModalTitle').textContent = 'Einsatz bearbeiten';
+  document.getElementById('planModalTitle').textContent = 'Operation bearbeiten';
   document.getElementById('pmName').value = activePlan.name||'';
   document.getElementById('pmStatus').value = activePlan.status||'draft';
   document.getElementById('pmLanding').value = (activePlan.landing_time||'').slice(0,16);
@@ -2335,7 +2335,7 @@ function openEditPlanModal() {
 
 async function savePlan() {
   const data = {
-    name: document.getElementById('pmName').value.trim()||'Neuer Einsatz',
+    name: document.getElementById('pmName').value.trim()||'Neuer Operation',
     status: document.getElementById('pmStatus').value,
     landing_time: document.getElementById('pmLanding').value,
     server_speed: document.getElementById('pmSpeed').value,
@@ -2358,7 +2358,7 @@ async function savePlan() {
 }
 
 async function deletePlan() {
-  if (!activePlanId||!confirm('Einsatz und alle Ziele/Wellen unwiderruflich löschen?')) return;
+  if (!activePlanId||!confirm('Irreversibly delete operation and all targets/waves?')) return;
   await apiPost(`/plans/${activePlanId}/delete`);
   activePlanId=null; activePlan=null;
   await refreshPlanList();
@@ -2404,9 +2404,9 @@ document.addEventListener('click', e => {
 function saveAsFav() {
   const x=parseInt(document.getElementById('tmX').value);
   const y=parseInt(document.getElementById('tmY').value);
-  if(isNaN(x)||isNaN(y)){alert('Koordinaten fehlen.');return;}
+  if(isNaN(x)||isNaN(y)){alert('Coordinates fehlen.');return;}
   apiPost('/favorites',{player_name:document.getElementById('tmPlayer').value,village_name:document.getElementById('tmVillage').value,x,y,label:''})
-    .then(r=>{alert('⭐ Gespeichert!');favs.push({id:r.id,x,y,player_name:document.getElementById('tmPlayer').value,village_name:document.getElementById('tmVillage').value,label:''});renderFavs();})
+    .then(r=>{alert('⭐ Saved!');favs.push({id:r.id,x,y,player_name:document.getElementById('tmPlayer').value,village_name:document.getElementById('tmVillage').value,label:''});renderFavs();})
     .catch(()=>{});
 }
 
@@ -2426,7 +2426,7 @@ if (firstActive) loadPlan(firstActive.id);
 
 // ══ Op-Karte Modal ══════════════════════════════════════════════════════════
 function openOpMap() {
-  if (!activePlan) { alert('Bitte erst einen Einsatzplan auswählen.'); return; }
+  if (!activePlan) { alert('Please select an operation plan first.'); return; }
   const overlay = document.getElementById('opMapOverlay');
   overlay.style.display = 'flex';
   renderOpMap();
@@ -2460,7 +2460,7 @@ function renderOpMap() {
     ctx.fillStyle = '#aaa';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Keine Koordinaten vorhanden', canvas.width/2, canvas.height/2);
+    ctx.fillText('Keine Coordinates vorhanden', canvas.width/2, canvas.height/2);
     return;
   }
 
@@ -2654,7 +2654,7 @@ function _drawOpMapContent(canvas, ctx) {
        width:min(960px,96vw);height:80vh;background:var(--bg-card);border-radius:14px;
        border:1px solid var(--border);z-index:10101;display:flex;flex-direction:column;overflow:hidden;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <span style="font-weight:700;font-size:.95rem;">🗺️ Einsatz-Karte</span>
+      <span style="font-weight:700;font-size:.95rem;">🗺️ Operation-Karte</span>
       <button onclick="closeOpMap()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;line-height:1;">✕</button>
     </div>
     <div style="position:relative;flex:1;overflow:hidden;">

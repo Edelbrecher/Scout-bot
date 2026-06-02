@@ -10,8 +10,8 @@
 {% set has_alliance_pro = is_premium and _plan != 'player_pro' %}
 {% if preview_plan %}
 <div style="position:sticky;top:0;z-index:9999;background:#7c2d12;border-bottom:2px solid #f97316;padding:0.5rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-  <span style="color:#fed7aa;font-weight:700;font-size:0.9rem;">👁️ VORSCHAU-MODUS</span>
-  <span style="color:#fdba74;font-size:0.85rem;">Simuliertes Paket: <strong style="color:#fff;">{{ preview_plan | upper }}</strong></span>
+  <span style="color:#fed7aa;font-weight:700;font-size:0.9rem;">👁️ PREVIEW MODE</span>
+  <span style="color:#fdba74;font-size:0.85rem;">Simulated plan: <strong style="color:#fff;">{{ preview_plan | upper }}</strong></span>
   <form method="post" action="/admin/preview/set" style="display:flex;gap:0.4rem;align-items:center;margin-left:auto;">
     <input type="hidden" name="guild_id" value="{{ guild.guild_id }}">
     <select name="plan" onchange="this.form.submit()" style="background:#431407;color:#fed7aa;border:1px solid #f97316;border-radius:6px;padding:0.2rem 0.5rem;font-size:0.82rem;cursor:pointer;">
@@ -22,7 +22,7 @@
   </form>
   <form method="post" action="/admin/preview/clear">
     <input type="hidden" name="redirect" value="/guild/{{ guild.guild_id }}">
-    <button type="submit" style="background:transparent;border:1px solid #f97316;color:#fed7aa;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;">✕ Vorschau beenden</button>
+    <button type="submit" style="background:transparent;border:1px solid #f97316;color:#fed7aa;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;">✕ End preview</button>
   </form>
 </div>
 {% endif %}
@@ -37,7 +37,7 @@
         {% if is_personal %}🗂️{% else %}🏰{% endif %} {{ guild.guild_name }}
       </h1>
       {% if is_personal %}
-      <span style="font-size:0.78rem;padding:2px 10px;background:rgba(139,92,246,0.12);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);border-radius:20px;">📁 Persönlicher Workspace · kein Discord-Server nötig</span>
+      <span style="font-size:0.78rem;padding:2px 10px;background:rgba(139,92,246,0.12);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);border-radius:20px;">📁 Personal Workspace · no Discord server needed</span>
       {% else %}
       <span style="color:var(--text-muted); font-size:0.82rem; font-family:monospace;">Server ID: {{ guild.guild_id }}</span>
       {% endif %}
@@ -46,11 +46,11 @@
     {% set sub = guild.subscription_status or 'free' %}
     <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="text-decoration:none; align-self:flex-start;">
       {% if sub == 'active' %}
-        <span class="badge" style="background:#14532d; color:#4ade80; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #4ade80;">✅ Pro aktiv</span>
+        <span class="badge" style="background:#14532d; color:#4ade80; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #4ade80;">✅ Pro active</span>
       {% elif sub == 'trialing' %}
-        <span class="badge" style="background:#1e3a5f; color:#93c5fd; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #93c5fd;">🎁 Testphase</span>
+        <span class="badge" style="background:#1e3a5f; color:#93c5fd; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #93c5fd;">🎁 Trial</span>
       {% elif sub == 'past_due' %}
-        <span class="badge" style="background:#431407; color:#fb923c; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #fb923c;">⚠️ Zahlung fällig</span>
+        <span class="badge" style="background:#431407; color:#fb923c; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #fb923c;">⚠️ Payment due</span>
       {% else %}
         <span class="badge" style="background:var(--bg-card); color:var(--text-muted); font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid var(--border);">💳 Free – Upgrade</span>
       {% endif %}
@@ -62,33 +62,33 @@
   {% set _error = request.query_params.get("error") %}
   {% if _saved == "perms_fixed" %}
   <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">
-    ✅ Bot-Berechtigungen im Archive-Channel wurden erfolgreich gesetzt. Bilder werden ab sofort archiviert.
+    ✅ Bot permissions in the archive channel set successfully. Images will now be archived.
   </div>
   {% elif _saved == "hub_created" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Anfragen-Hub Channel erstellt.</div>
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Request hub channel created.</div>
   {% elif _saved == "hub_refreshed" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🔄 Anfragen-Hub wurde aktualisiert.</div>
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🔄 Request hub updated.</div>
   {% elif _saved == "channels_cleaned" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Veraltete Kanal-Einträge wurden bereinigt.</div>
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Stale channel entries cleaned up.</div>
   {% elif _saved == "hub_cleared" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🗑️ Anfragen-Hub entfernt.</div>
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🗑️ Request hub removed.</div>
   {% elif _saved %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Gespeichert.</div>
+  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Saved.</div>
   {% endif %}
   {% if _error == "billing_owner_only" %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Nur der Abo-Inhaber kann die Zahlungseinstellungen öffnen.</div>
+  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Only the subscription owner can open payment settings.</div>
   {% elif _error == "only_owner" %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Nur der Abo-Inhaber kann den Bot entfernen.</div>
+  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Only the subscription owner can remove the bot.</div>
   {% elif _error %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Fehler: {{ _error }}</div>
+  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Error: {{ _error }}</div>
   {% endif %}
   {% if is_personal %}
   <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1rem;align-items:flex-start;">
     <div style="font-size:1.6rem;flex-shrink:0;">🗂️</div>
     <div>
-      <div style="font-weight:700;color:#c4b5fd;margin-bottom:0.3rem;">Persönlicher Workspace — kein Discord-Server nötig</div>
+      <div style="font-weight:700;color:#c4b5fd;margin-bottom:0.3rem;">Personal Workspace — no Discord server needed</div>
       <div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6;">
-        Alle web-basierten Features sind sofort verfügbar. Features die den Discord Bot benötigen (Screenshots, Benachrichtigungen) sind mit <span style="background:rgba(239,68,68,0.15);color:#f87171;padding:1px 6px;border-radius:4px;font-size:0.78rem;">🤖 Bot</span> markiert — verknüpfe später einen Discord-Server um sie freizuschalten.
+        All web-based features are available immediately. Features that require the Discord bot (screenshots, notifications) are marked with <span style="background:rgba(239,68,68,0.15);color:#f87171;padding:1px 6px;border-radius:4px;font-size:0.78rem;">🤖 Bot</span> — connect a Discord server later to unlock them.
       </div>
     </div>
   </div>
@@ -96,7 +96,7 @@
 
   {% if request.query_params.get("trial_activated") %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;color:#4ade80;font-size:0.9rem;">
-    🎉 <strong>14-Tage Trial aktiviert!</strong> Du hast vollen Pro-Zugang bis {{ trial_expires_at[:10] if trial_expires_at else '' }}. Danach wird automatisch auf Free umgestellt, es sei denn du hast ein Abo.
+    🎉 <strong>14-day trial activated!</strong> You have full Pro access until {{ trial_expires_at[:10] if trial_expires_at else '' }}. After that, you'll automatically be switched to Free unless you have a subscription.
   </div>
   {% endif %}
 
@@ -107,14 +107,14 @@
     <div style="display:flex;align-items:center;gap:0.75rem;">
       <span style="font-size:1.4rem;">⏳</span>
       <div>
-        <div style="font-weight:700;color:#fbbf24;margin-bottom:0.15rem;">Testzugang läuft ab</div>
+        <div style="font-weight:700;color:#fbbf24;margin-bottom:0.15rem;">Trial access expiring</div>
         <div style="font-size:0.82rem;color:var(--text-muted);" id="trialCountdown">
-          Trial endet am {{ trial_expires_at[:10] }}
+          Trial ends on {{ trial_expires_at[:10] }}
         </div>
       </div>
     </div>
     <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="background:#f59e0b;color:#000;padding:0.5rem 1.1rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.85rem;white-space:nowrap;">
-      💳 Jetzt upgraden
+      💳 Upgrade now
     </a>
   </div>
   <script>
@@ -124,9 +124,9 @@
     var diff = Math.round((exp - now) / 86400000);
     var el = document.getElementById('trialCountdown');
     if (el && diff >= 0) {
-      el.textContent = diff === 0 ? '⚠️ Trial läuft heute ab!' :
-                       diff === 1 ? '⚠️ Noch 1 Tag — morgen verlierst du den Pro-Zugang.' :
-                       '⚠️ Noch ' + diff + ' Tage — endet am {{ trial_expires_at[:10] }}';
+      el.textContent = diff === 0 ? '⚠️ Trial expires today!' :
+                       diff === 1 ? '⚠️ 1 day left — you lose Pro access tomorrow.' :
+                       '⚠️ ' + diff + ' days left — ends on {{ trial_expires_at[:10] }}';
     }
   })();
   </script>
@@ -137,22 +137,22 @@
   {% set stale_channels = perm_issues | rejectattr('missing') | list %}
   {% if missing_perms %}
   <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">
-    ⚠️ <strong>Bot-Berechtigungen fehlen</strong> — der Bot hat in folgenden Channels nicht alle nötigen Rechte:
+    ⚠️ <strong>Bot permissions missing</strong> — the bot does not have all required permissions in the following channels:
     <ul style="margin:0.5rem 0 0 1rem; padding:0;">
       {% for issue in missing_perms %}
-      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>: fehlende Rechte: {{ issue.missing | join(", ") }}</li>
+      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>: missing permissions: {{ issue.missing | join(", ") }}</li>
       {% endfor %}
     </ul>
-    Bitte gib dem Bot in diesen Channels die fehlenden Rechte zurück.
+    Please restore the missing permissions for the bot in these channels.
   </div>
   {% endif %}
   {% if stale_channels %}
   <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#fbbf24; font-size:0.9rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-    <span>🗑️ <strong>Veraltete Kanal-Einträge</strong> — diese Channels existieren im Discord nicht mehr:
+    <span>🗑️ <strong>Stale channel entries</strong> — these channels no longer exist in Discord:
       {% for issue in stale_channels %}<strong>#{{ issue.channel_id }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
     </span>
     <form method="post" action="/guild/{{ guild.guild_id }}/clear-stale-channels" style="margin:0;">
-      <button type="submit" class="btn" style="font-size:0.8rem;padding:0.3rem 0.75rem;border-color:rgba(245,158,11,0.5);color:#fbbf24;">🗑️ Einträge bereinigen</button>
+      <button type="submit" class="btn" style="font-size:0.8rem;padding:0.3rem 0.75rem;border-color:rgba(245,158,11,0.5);color:#fbbf24;">🗑️ Clean up entries</button>
     </form>
   </div>
   {% endif %}
@@ -160,7 +160,7 @@
 
   <!-- ── Tile-Edit Button ── -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:.5rem;">
-    <button id="editTilesBtn" onclick="toggleEditMode()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;">✏️ Anpassen</button>
+    <button id="editTilesBtn" onclick="toggleEditMode()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;">✏️ Customize</button>
   </div>
 
   <!-- ── Feature-Grid ── -->
@@ -177,7 +177,7 @@
   <!-- ── Spieler ── -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
     <span style="font-size:1.1rem;">👤</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.player">Spieler</h2>
+    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.player">Player</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
@@ -188,10 +188,10 @@
         {% if pending_waves %}<span style="position:absolute;top:-4px;right:-8px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending_waves }}</span>{% endif %}
       </div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.account.title">Mein Account</span>
+        <div class="feature-title"><span data-i18n="guild.feature.account.title">My Account</span>
           {% if pending_waves %}<span style="background:#ef4444;color:#fff;font-size:.62rem;padding:1px 6px;border-radius:8px;margin-left:.4rem;font-weight:700;animation:pulse 2s infinite;">{{ pending_waves }} EP-Welle{{ 'n' if pending_waves != 1 }}</span>{% endif %}
         </div>
-        <div class="feature-desc">{% if pending_waves %}⚔️ Du hast zugewiesene Einsatzwellen — jetzt ansehen!{% else %}<span data-i18n="guild.feature.account.desc">Eigene Dörfer & Truppen importieren — Datenbasis für alle Features</span>{% endif %}</div>
+        <div class="feature-desc">{% if pending_waves %}⚔️ You have assigned operation waves — view now!{% else %}<span data-i18n="guild.feature.account.desc">Import own villages &amp; troops — data foundation for all features</span>{% endif %}</div>
       </div>
       <span style="color:{% if pending_waves %}#ef4444{% else %}var(--text-muted){% endif %};font-size:1rem;">→</span>
     </a>
@@ -202,7 +202,7 @@
       <div class="feature-icon">⚜️</div>
       <div class="feature-body">
         <div class="feature-title"><span data-i18n="guild.feature.farming.title">Farming Intelligence</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.farming.desc">Inaktive Farmen erkennen, Farmlisten verwalten und analysieren</div>
+        <div class="feature-desc" data-i18n="guild.feature.farming.desc">Detect inactive farms, manage and analyse farm lists</div>
       </div>
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
@@ -212,7 +212,7 @@
       <div class="feature-icon">📋</div>
       <div class="feature-body">
         <div class="feature-title"><span data-i18n="guild.feature.farmlist.title">Farmlist-Analyst</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.farmlist.desc">Farmlisten auswerten — gute, mittelmäßige und sinnlose Farmen erkennen</div>
+        <div class="feature-desc" data-i18n="guild.feature.farmlist.desc">Analyse farm lists — identify good, mediocre and pointless farms</div>
       </div>
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
@@ -221,10 +221,10 @@
     <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;{% if unread_notif %}border:2px solid #ef4444;animation:pulse-strong 1.4s ease-in-out infinite;{% endif %}">
       <div class="feature-icon">🔔</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.notifications.title">Benachrichtigungen</span>
+        <div class="feature-title"><span data-i18n="guild.feature.notifications.title">Notifications</span>
           {% if unread_notif %}<span style="background:#ef4444;color:#fff;font-size:.65rem;padding:1px 7px;border-radius:10px;margin-left:.4rem;font-weight:700;">{{ unread_notif }}</span>{% endif %}
         </div>
-        <div class="feature-desc" data-i18n="guild.feature.notifications.desc">EP-Ausfälle, Statusmeldungen, Allianz-Updates</div>
+        <div class="feature-desc" data-i18n="guild.feature.notifications.desc">Operation failures, status messages, alliance updates</div>
       </div>
       <span style="color:var(--text-muted);">→</span>
     </a>
@@ -233,8 +233,8 @@
     <a href="/guild/{{ guild.guild_id }}/operations" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.ops.title">Einsatzplanung</span> {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.ops.desc">Allianz-Ops planen · Wellen-Builder · Fake-Check · Marschzeiten</div>
+        <div class="feature-title"><span data-i18n="guild.feature.ops.title">Operation Planner</span> {{ ALLIANCE_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.ops.desc">Plan alliance ops · Wave builder · Fake check · March times</div>
       </div>
       {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
     </a>
@@ -244,7 +244,7 @@
       <div class="feature-icon">📋</div>
       <div class="feature-body">
         <div class="feature-title"><span data-i18n="guild.feature.personal.title">Personal Planning</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.personal.desc">Persönliche Marschzeiten, Wellen und Solo-Planung</div>
+        <div class="feature-desc" data-i18n="guild.feature.personal.desc">Personal march times, waves and solo planning</div>
       </div>
       {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
     </a>
@@ -253,8 +253,8 @@
     <a href="/guild/{{ guild.guild_id }}/timer" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">⏱️</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.timer.title">Timer & Erinnerungen</div>
-        <div class="feature-desc" data-i18n="guild.feature.timer.desc">Farmlisten-Timer, Angriffs-Erinnerungen und akustische Alarme</div>
+        <div class="feature-title" data-i18n="guild.feature.timer.title">Timer &amp; Reminders</div>
+        <div class="feature-desc" data-i18n="guild.feature.timer.desc">Farm list timer, attack reminders and audio alarms</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -264,7 +264,7 @@
       <div class="feature-icon">📍</div>
       <div class="feature-body">
         <div class="feature-title" data-i18n="guild.feature.settle.title">Settle-Liste</div>
-        <div class="feature-desc" data-i18n="guild.feature.settle.desc">Nächste Siedlungen koordinieren — verhindert Konflikte beim Worldstart</div>
+        <div class="feature-desc" data-i18n="guild.feature.settle.desc">Coordinate next settlements — prevents conflicts at world start</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -273,8 +273,8 @@
     <a href="/guild/{{ guild.guild_id }}/polls" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📅</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.polls.title">Abstimmungen</div>
-        <div class="feature-desc" data-i18n="guild.feature.polls.desc">Team-Polls erstellen, Termine koordinieren und Ergebnisse auswerten</div>
+        <div class="feature-title" data-i18n="guild.feature.polls.title">Polls</div>
+        <div class="feature-desc" data-i18n="guild.feature.polls.desc">Create team polls, coordinate schedules and evaluate results</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -284,7 +284,7 @@
       <div class="feature-icon">🪖</div>
       <div class="feature-body">
         <div class="feature-title" data-i18n="guild.feature.respush.title">Res-Push</div>
-        <div class="feature-desc" data-i18n="guild.feature.respush.desc">Ressourcen-Anfragen verwalten, annehmen und koordinieren</div>
+        <div class="feature-desc" data-i18n="guild.feature.respush.desc">Manage, accept and coordinate resource requests</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -293,8 +293,8 @@
     <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">📊</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.stats.title">Statistiken</div>
-        <div class="feature-desc" data-i18n="guild.feature.stats.desc">Aktivität, Scout-Verlauf und Teamleistung auf einen Blick</div>
+        <div class="feature-title" data-i18n="guild.feature.stats.title">Statistics</div>
+        <div class="feature-desc" data-i18n="guild.feature.stats.desc">Activity, scout history and team performance at a glance</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -304,7 +304,7 @@
       <div class="feature-icon">📈</div>
       <div class="feature-body">
         <div class="feature-title">Ranking-Import</div>
-        <div class="feature-desc">Farm-, Off- & Def-Trends aus Travian-Statistiken — Anomalien & Muster erkennen</div>
+        <div class="feature-desc">Farm, off &amp; def trends from Travian statistics — detect anomalies &amp; patterns</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -313,8 +313,8 @@
     <a href="/guild/{{ guild.guild_id }}/tools/hero-tasks" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🗡️</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.herotasks.title">Heldenaufgaben</div>
-        <div class="feature-desc" data-i18n="guild.feature.herotasks.desc">Meilensteine tracken, Ressourcen & XP-Belohnungen sammeln</div>
+        <div class="feature-title" data-i18n="guild.feature.herotasks.title">Hero Tasks</div>
+        <div class="feature-desc" data-i18n="guild.feature.herotasks.desc">Track milestones, collect resources &amp; XP rewards</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -323,8 +323,8 @@
     <a href="/guild/{{ guild.guild_id }}/tools/crop-calculator" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🌾</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.crop.title">Getreidefeld-Rechner</div>
-        <div class="feature-desc" data-i18n="guild.feature.crop.desc">Optimale Upgrade-Reihenfolge für Getreidefelder — ROI-basiert (T4.4 Extended)</div>
+        <div class="feature-title" data-i18n="guild.feature.crop.title">Cropland Calculator</div>
+        <div class="feature-desc" data-i18n="guild.feature.crop.desc">Optimal upgrade order for croplands — ROI-based (T4.4 Extended)</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -334,7 +334,7 @@
       <div class="feature-icon">📐</div>
       <div class="feature-body">
         <div class="feature-title" data-i18n="guild.feature.blueprints.title">Blueprints</div>
-        <div class="feature-desc" data-i18n="guild.feature.blueprints.desc">Schritt-für-Schritt Bauanleitung für alle Völker — bis zu den Artefakten</div>
+        <div class="feature-desc" data-i18n="guild.feature.blueprints.desc">Step-by-step build guide for all tribes — up to the artifacts</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -344,7 +344,7 @@
       <div class="feature-icon">🧩</div>
       <div class="feature-body">
         <div class="feature-title" data-i18n="guild.feature.extension.title">Chrome Extension</div>
-        <div class="feature-desc" data-i18n="guild.feature.extension.desc">Background Timer mit Countdown und Uhrzeiten-Alarmen — für Farmlist-Erinnerungen</div>
+        <div class="feature-desc" data-i18n="guild.feature.extension.desc">Background timer with countdown and clock alarms — for farm list reminders</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -354,8 +354,8 @@
     <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
       <div class="feature-icon">🗺️</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.map.title">Karte</span> {{ ALLIANCE_BADGE }} {{ WIP_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.map.desc">Interaktive Travian-Karte mit Allianz-Heatmap und Spieler-Suche</div>
+        <div class="feature-title"><span data-i18n="guild.feature.map.title">Map</span> {{ ALLIANCE_BADGE }} {{ WIP_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.map.desc">Interactive Travian map with alliance heatmap and player search</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -366,8 +366,8 @@
     <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);{% if is_personal %}opacity:0.5;{% endif %}">
       <div class="feature-icon">⚔️</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.attacks.title">Angriff-Detection</span> {{ WIP_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
-        <div class="feature-desc" data-i18n="guild.feature.attacks.desc">Eingehende Angriffe per Discord-Modal melden und auswerten</div>
+        <div class="feature-title"><span data-i18n="guild.feature.attacks.title">Attack Detection</span> {{ WIP_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
+        <div class="feature-desc" data-i18n="guild.feature.attacks.desc">Report and analyse incoming attacks via Discord modal</div>
       </div>
       {{ LOCK_ARROW if is_personal else OK_ARROW }}
     </a>
@@ -379,7 +379,7 @@
   <!-- ── Allianz ── -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
     <span style="font-size:1.1rem;">🛡️</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.alliance">Allianz</h2>
+    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.alliance">Alliance</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
@@ -389,7 +389,7 @@
       <div class="feature-icon">🤝</div>
       <div class="feature-body">
         <div class="feature-title" data-i18n="guild.feature.myally.title">My Ally</div>
-        <div class="feature-desc" data-i18n="guild.feature.myally.desc">Allianz-Mitglieder einladen, auflisten & verwalten</div>
+        <div class="feature-desc" data-i18n="guild.feature.myally.desc">Invite, list &amp; manage alliance members</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -399,7 +399,7 @@
       <div class="feature-icon">👥</div>
       <div class="feature-body">
         <div class="feature-title">Meta-Builder</div>
-        <div class="feature-desc" data-i18n="guild.feature.members.desc">Mitgliederliste importieren — Übersicht, Stämme, Bevölkerung, Punkte</div>
+        <div class="feature-desc" data-i18n="guild.feature.members.desc">Import member list — overview, tribes, population, points</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -408,8 +408,8 @@
     <a href="/guild/{{ guild.guild_id }}/allianz/sitter-liste" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🤝</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.sitter.title">Allianz-Listen</div>
-        <div class="feature-desc" data-i18n="guild.feature.sitter.desc">Freigegebene Sitter- und Dual-Listen aller Mitglieder auf einen Blick</div>
+        <div class="feature-title" data-i18n="guild.feature.sitter.title">Alliance Lists</div>
+        <div class="feature-desc" data-i18n="guild.feature.sitter.desc">Shared sitter and dual lists of all members at a glance</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -418,8 +418,8 @@
     <a href="/guild/{{ guild.guild_id }}/allianz/hospital" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🏥</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.hospital.title">Allianz-Lazarett</span> {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.hospital.desc">Heilende Truppen aller Mitglieder auf einen Blick koordinieren</div>
+        <div class="feature-title"><span data-i18n="guild.feature.hospital.title">Alliance Hospital</span> {{ ALLIANCE_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.hospital.desc">Coordinate healing troops of all members at a glance</div>
       </div>
       {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
     </a>
@@ -428,8 +428,8 @@
     <a href="/guild/{{ guild.guild_id }}/enemies" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
       <div class="feature-icon">🎯</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.enemies.title">Gegner-Kartei</span> {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.enemies.desc">Scout-Historie pro Gegner — Ressourcen, Truppen, Dörfer über Zeit</div>
+        <div class="feature-title"><span data-i18n="guild.feature.enemies.title">Enemy Records</span> {{ ALLIANCE_BADGE }}</div>
+        <div class="feature-desc" data-i18n="guild.feature.enemies.desc">Scout history per enemy — resources, troops, villages over time</div>
       </div>
       {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
     </a>
@@ -448,8 +448,8 @@
     <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🗡️</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.heroscout.title">Helden-Scout</div>
-        <div class="feature-desc" data-i18n="guild.feature.heroscout.desc">Gegner-Helden beobachten — Ausrüstungswechsel & XP-Sprünge automatisch erkennen</div>
+        <div class="feature-title" data-i18n="guild.feature.heroscout.title">Hero Scout</div>
+        <div class="feature-desc" data-i18n="guild.feature.heroscout.desc">Monitor enemy heroes — automatically detect equipment changes &amp; XP jumps</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -458,8 +458,8 @@
     <a href="/guild/{{ guild.guild_id }}/verteidigung" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">🛡️</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.defense.title">Verteidigung</div>
-        <div class="feature-desc" data-i18n="guild.feature.defense.desc">Defend- und Timed-Defend Anfragen koordinieren und verwalten</div>
+        <div class="feature-title" data-i18n="guild.feature.defense.title">Defense</div>
+        <div class="feature-desc" data-i18n="guild.feature.defense.desc">Coordinate and manage defend and timed-defend requests</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -468,8 +468,8 @@
     <a href="/guild/{{ guild.guild_id }}/scout-incidents" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">👁️</div>
       <div class="feature-body">
-        <div class="feature-title">Gegner-Scouts</div>
-        <div class="feature-desc">Gemeldete Späh-Aktionen auf Allianz-Mitglieder – Häufungen frühzeitig erkennen</div>
+        <div class="feature-title">Enemy Scouts</div>
+        <div class="feature-desc">Reported scouting actions against alliance members — detect concentrations early</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -479,7 +479,7 @@
       <div class="feature-icon">🔍</div>
       <div class="feature-body">
         <div class="feature-title"><span data-i18n="guild.feature.scout.title">Scout</span> {{ ALLIANCE_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
-        <div class="feature-desc" data-i18n="guild.feature.scout.desc">Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte</div>
+        <div class="feature-desc" data-i18n="guild.feature.scout.desc">Scout archive, channel management and role access rights</div>
       </div>
       {{ LOCK_ARROW if (not has_alliance_pro or is_personal) else OK_ARROW }}
     </a>
@@ -489,7 +489,7 @@
   <!-- ── Einstellungen ── -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
     <span style="font-size:1.1rem;">⚙️</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.settings">Einstellungen</h2>
+    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.settings">Settings</h2>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
 
@@ -503,8 +503,8 @@
       <div style="display:flex;align-items:center;gap:1rem;width:100%;">
         <div class="feature-icon">📋</div>
         <div class="feature-body">
-          <div class="feature-title" data-i18n="guild.settings.hub.title">Anfragen-Hub</div>
-          <div class="feature-desc" data-i18n="guild.settings.hub.desc">Ein Channel mit allen Buttons — Scout, Defend, Res-Push und mehr</div>
+          <div class="feature-title" data-i18n="guild.settings.hub.title">Request Hub</div>
+          <div class="feature-desc" data-i18n="guild.settings.hub.desc">One channel with all buttons — Scout, Defend, Res-Push and more</div>
         </div>
       </div>
       {% if request_hub and request_hub.channel_id %}
@@ -514,29 +514,29 @@
           ✅ #{{ request_hub.channel_name or request_hub.channel_id }}
         </span>
         <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/refresh" style="margin:0;">
-          <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.15rem 0.5rem;">🔄 Aktualisieren</button>
+          <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.15rem 0.5rem;">🔄 Refresh</button>
         </form>
         <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/clear" style="margin:0;">
-          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;" data-i18n="guild.settings.hub.remove">Entfernen</button>
+          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;" data-i18n="guild.settings.hub.remove">Remove</button>
         </form>
       </div>
       {% else %}
       <div style="padding-left:3.4rem;">
         <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/create" style="margin:0;">
-          <button type="submit" class="btn btn-primary" style="font-size:0.875rem;" data-i18n="guild.settings.hub.create">➕ Hub-Channel erstellen</button>
+          <button type="submit" class="btn btn-primary" style="font-size:0.875rem;" data-i18n="guild.settings.hub.create">➕ Create hub channel</button>
         </form>
       </div>
       {% endif %}
     </div>
     {% endif %}{# end not is_personal #}
 
-    <!-- Helden-Scout Setup (Bot optional, manuell immer möglich) -->
+    <!-- Hero scout setup (bot optional, always possible manually) -->
     <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
       <div style="display:flex;align-items:center;gap:1rem;width:100%;">
         <div class="feature-icon">🗡️</div>
         <div class="feature-body">
-          <div class="feature-title" data-i18n="guild.settings.heroscout.title">Helden-Scout{% if is_personal %} <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">(manuell)</span>{% endif %}</div>
-          <div class="feature-desc" data-i18n="guild.settings.heroscout.desc">Discord-Channel für Screenshots — Bot erkennt Ausrüstung & XP automatisch</div>
+          <div class="feature-title" data-i18n="guild.settings.heroscout.title">Hero Scout{% if is_personal %} <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">(manual)</span>{% endif %}</div>
+          <div class="feature-desc" data-i18n="guild.settings.heroscout.desc">Discord channel for screenshots — bot detects equipment &amp; XP automatically</div>
         </div>
       </div>
       {% if hero_scout_channel %}
@@ -546,7 +546,7 @@
           ✅ Channel-ID: {{ hero_scout_channel }}
         </span>
         <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
-           style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;" data-i18n="guild.settings.heroscout.change">Ändern →</a>
+           style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;" data-i18n="guild.settings.heroscout.change">Change →</a>
       </div>
       {% else %}
       <div style="padding-left:3.4rem;">
@@ -555,14 +555,14 @@
            class="btn btn-primary" style="font-size:0.875rem;text-decoration:none;display:inline-block;
            padding:0.4rem 1rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);
            border-radius:8px;color:#f59e0b;font-weight:600;">
-          ⚔️ Hero Scout öffnen →
+          ⚔️ Open Hero Scout →
         </a>
         {% else %}
         <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
            class="btn btn-primary" style="font-size:0.875rem;text-decoration:none;display:inline-block;
            padding:0.4rem 1rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);
            border-radius:8px;color:#f59e0b;font-weight:600;" data-i18n="guild.settings.heroscout.configure">
-          ➕ Channel konfigurieren
+          ➕ Configure channel
         </a>
         {% endif %}
       </div>
@@ -573,8 +573,8 @@
     <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="feature-card" style="text-decoration:none;{% if needs_setup %}border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.2);{% endif %}">
       <div class="feature-icon">🌍</div>
       <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.world.title">World / Server</span>{% if needs_setup %} <span data-i18n="guild.feature.world.setup" style="font-size:.72rem;background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;margin-left:4px;">Einrichten</span>{% endif %}</div>
-        <div class="feature-desc">{% if guild.tw_world %}<span style="color:#4ade80;">✅ {{ guild.tw_world.replace('https://','') }}</span>{% else %}<span data-i18n="guild.feature.world.desc">Travian-Server-URL & Bot-Sprache konfigurieren</span>{% endif %}</div>
+        <div class="feature-title"><span data-i18n="guild.feature.world.title">World / Server</span>{% if needs_setup %} <span data-i18n="guild.feature.world.setup" style="font-size:.72rem;background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;margin-left:4px;">Set up</span>{% endif %}</div>
+        <div class="feature-desc">{% if guild.tw_world %}<span style="color:#4ade80;">✅ {{ guild.tw_world.replace('https://','') }}</span>{% else %}<span data-i18n="guild.feature.world.desc">Configure Travian server URL &amp; bot language</span>{% endif %}</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -584,8 +584,8 @@
     <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">
       <div class="feature-icon">⚙️</div>
       <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.settings.server.title">Server-Verwaltung</div>
-        <div class="feature-desc" data-i18n="guild.settings.server.desc">Dashboard-Zugang, Berechtigungen und Bot-Einstellungen</div>
+        <div class="feature-title" data-i18n="guild.settings.server.title">Server Management</div>
+        <div class="feature-desc" data-i18n="guild.settings.server.desc">Dashboard access, permissions and bot settings</div>
       </div>
       {{ OK_ARROW }}
     </a>
@@ -685,7 +685,7 @@ function saveOrder() {
 function toggleEditMode() {
   editMode = !editMode;
   const btn = document.getElementById('editTilesBtn');
-  btn.textContent = editMode ? '✅ Fertig' : '✏️ Anpassen';
+  btn.textContent = editMode ? '✅ Done' : '✏️ Customize';
   btn.style.background = editMode ? 'rgba(74,222,128,.15)' : '';
   btn.style.borderColor = editMode ? '#4ade80' : '';
   document.querySelectorAll('.tile-grid .feature-card').forEach(el => {

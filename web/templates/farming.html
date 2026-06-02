@@ -75,7 +75,7 @@
       {% endif %}
     </div>
 
-    <!-- Inaktive Farmen -->
+    <!-- Inactive farms -->
     <div class="card" style="padding:1rem;text-align:center;position:relative;overflow:hidden;cursor:pointer;" onclick="switchTab('inactive')">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{% if farm_stats.inactive_count > 0 %}#f59e0b{% else %}var(--border){% endif %};"></div>
       <div style="font-size:2rem;font-weight:800;line-height:1.1;margin-top:0.25rem;color:{% if farm_stats.inactive_count > 0 %}#f59e0b{% else %}var(--text){% endif %};">{{ farm_stats.inactive_count }}</div>
@@ -394,7 +394,7 @@
           {% if farm_stats.snapshot_count > 0 %}
           <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshots/clear"
                 onsubmit="return confirm('Delete all snapshots and restart?')" style="margin:0;">
-            <button type="submit" class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.65rem;" title="Snapshots zurücksetzen">
+            <button type="submit" class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.65rem;" title="Reset snapshots">
               🗑 Reset
             </button>
           </form>
@@ -466,7 +466,7 @@
                   {% endif %}
                   {% if farm_list %}
                   {% if is_on_list %}
-                  <span style="font-size:0.68rem;background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">✅ Farmliste</span>
+                  <span style="font-size:0.68rem;background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">✅ Farm list</span>
                   {% else %}
                   <span style="font-size:0.68rem;background:rgba(251,146,60,0.12);color:#fb923c;border:1px solid rgba(251,146,60,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">➕ Fehlt</span>
                   {% endif %}
@@ -959,7 +959,7 @@
 </div><!-- /container -->
 
 
-<!-- ══ MODAL: Farm hinzufügen ══════════════════════════════════════════════ -->
+<!-- ══ MODAL: Add farm ══════════════════════════════════════════════ -->
 <div id="addFarmModal" style="display:none;position:fixed;inset:0;z-index:1000;
      background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:1rem;">
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
