@@ -150,6 +150,7 @@
               {% if closeable %}<span class="pill pill-active">Live</span>{% else %}<span class="pill pill-closed">Closed</span>{% endif %}
               <span class="type-badge" style="border:1px solid {{ pt.color }}22;color:{{ pt.color }};">{{ pt.label }}</span>
               {% if is_priv %}<span class="tb-private type-badge">🔒 Private</span>{% else %}<span class="tb-all type-badge">🌐 Public</span>{% endif %}
+              {% for lbl in poll.get('target_labels', []) %}<span class="type-badge" style="background:rgba(255,255,255,.06);color:#94a3b8;">{{ lbl }}</span>{% endfor %}
             </div>
             <div class="poll-meta">
               <span>🕐 {{ poll.event_datetime.replace('T',' ')[:16] }}{% if poll.get('event_end_datetime') %} → {{ poll.event_end_datetime.replace('T',' ')[:16] }}{% endif %}</span>

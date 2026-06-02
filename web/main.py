@@ -2483,13 +2483,37 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
         return RedirectResponse("/dashboard")
     polls = await database.get_polls(guild_id)
     import json as _json
+    # Pre-load roles + battle groups for label resolution
+    _ally_group_pre = await database.get_ally_group_for_guild(guild_id)
+    _roles_map = {}
+    _bgroups_map = {}
+    if _ally_group_pre:
+        for r in await database.get_ally_roles(_ally_group_pre["id"]):
+            _roles_map[r["id"]] = r
+        for bg in await database.get_battle_groups(_ally_group_pre["id"]):
+            _bgroups_map[bg["id"]] = bg
     for p in polls:
         responses = await database.get_poll_responses(p["id"])
         p["count_available"]   = sum(1 for r in responses if r["response"] == "available")
         p["count_maybe"]       = sum(1 for r in responses if r["response"] == "maybe")
         p["count_unavailable"] = sum(1 for r in responses if r["response"] == "unavailable")
         p["responses"]         = responses
-        p["target_ids_list"]   = _json.loads(p.get("target_ids") or "[]")
+        try:
+            p["target_ids_list"] = _json.loads(p.get("target_ids") or "[]")
+        except Exception:
+            p["target_ids_list"] = []
+        # Resolve target labels
+        tt = p.get("target_type", "all")
+        tids = p["target_ids_list"]
+        if tt == "role":
+            p["target_labels"] = [_roles_map[i]["role_name"] for i in tids if i in _roles_map]
+        elif tt == "wing":
+            wing_n = {1: _ally_group_pre.get("wing1_name") or "Wing 1", 2: _ally_group_pre.get("wing2_name") or "Wing 2"} if _ally_group_pre else {}
+            p["target_labels"] = [wing_n.get(i, f"Wing {i}") for i in tids]
+        elif tt == "battlegroup":
+            p["target_labels"] = [_bgroups_map[i]["name"] for i in tids if i in _bgroups_map]
+        else:
+            p["target_labels"] = []
     is_admin = session.get("type") == "admin"
     can_manage = is_admin or await has_perm(request, guild_id, "poll_manage")
     can_view   = can_manage or await has_perm(request, guild_id, "poll_view")
