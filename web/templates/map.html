@@ -1383,7 +1383,7 @@ async function applyPreset(presetId) {
     if (state.camY != null) camY = state.camY;
     if (state.scale != null) scale = state.scale;
     renderTags();
-    draw();
+    doSearch();
   } catch(e) { alert('Fehler beim Laden: ' + e); }
 }
 
