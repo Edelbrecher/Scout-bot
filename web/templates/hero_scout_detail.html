@@ -44,7 +44,7 @@
       <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/{{ player_name | urlencode }}/add"
          style="padding:0.5rem 1.1rem;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
                 border-radius:8px;color:#86efac;font-weight:600;text-decoration:none;font-size:0.88rem;white-space:nowrap;">
-        <span data-i18n="scout.detail.add_version">✏️ Neue Version anlegen</span>
+        <span data-i18n="scout.detail.add_version">✏️ Add new version</span>
       </a>
       <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/delete-player"
             onsubmit="return confirm((window.T&&window.T['confirm.delete_hero_all']||'Really delete all entries for {name}? This cannot be undone.').replace('{name}','{{ player_name }}'))">
@@ -85,18 +85,18 @@
           {% endif %}
           {% if e.source == 'manual' %}
           <span style="font-size:0.72rem;font-weight:700;background:rgba(139,92,246,0.15);color:#c4b5fd;
-                border-radius:4px;padding:0.15rem 0.5rem;" data-i18n="scout.detail.badge.manual">✏️ Manuell eingetragen</span>
+                border-radius:4px;padding:0.15rem 0.5rem;" data-i18n="scout.detail.badge.manual">✏️ Manually entered</span>
           {% else %}
           <span style="font-size:0.72rem;font-weight:700;background:rgba(59,130,246,0.1);color:#93c5fd;
                 border-radius:4px;padding:0.15rem 0.5rem;" data-i18n="scout.detail.badge.screenshot">📷 Screenshot (Bot)</span>
           {% endif %}
           <span style="font-size:0.78rem;color:var(--text-muted);">
-            <span data-i18n="scout.detail.badge.by">von</span> <strong>{{ e.reporter_name or '?' }}</strong>
+            by <strong>{{ e.reporter_name or '?' }}</strong>
           </span>
         </div>
         <div style="text-align:right;font-size:0.78rem;color:var(--text-muted);">
-          {% if e.server_time %}<div>🕐 <span data-i18n="scout.detail.field.servertime">Serverzeit:</span> {{ e.server_time }}</div>{% endif %}
-          <div><span data-i18n="scout.detail.field.entered">Eingetragen:</span> {{ e.created_at[:16].replace('T',' ') }} UTC</div>
+          {% if e.server_time %}<div>🕐 Server time: {{ e.server_time }}</div>{% endif %}
+          <div>Entered: {{ e.created_at[:16].replace('T',' ') }} UTC</div>
         </div>
       </div>
 
@@ -110,7 +110,7 @@
         {% endif %}
         {% if e.alliance %}
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="scout.detail.field.alliance">Allianz</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="scout.detail.field.alliance">Alliance</div>
           <div style="font-weight:600;color:#22c55e;">{{ e.alliance }}</div>
         </div>
         {% endif %}
@@ -122,7 +122,7 @@
         {% endif %}
         {% if e.hero_level %}
         <div>
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="scout.detail.field.herolevel">Heldenlvl</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="scout.detail.field.herolevel">Hero Level</div>
           <div style="font-weight:600;color:#f59e0b;">{{ e.hero_level }}</div>
         </div>
         {% endif %}
@@ -135,13 +135,13 @@
         {% if e.attacker_rank %}
         <div>
           <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="scout.detail.field.attacker">Attacker</div>
-          <div style="font-weight:600;color:#f87171;"><span data-i18n="scout.detail.field.rank">Rang</span> {{ e.attacker_rank }}</div>
+          <div style="font-weight:600;color:#f87171;">Rank {{ e.attacker_rank }}</div>
         </div>
         {% endif %}
         {% if e.defender_rank %}
         <div>
           <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;" data-i18n="scout.detail.field.defender">Defender</div>
-          <div style="font-weight:600;color:#93c5fd;"><span data-i18n="scout.detail.field.rank">Rang</span> {{ e.defender_rank }}</div>
+          <div style="font-weight:600;color:#93c5fd;">Rank {{ e.defender_rank }}</div>
         </div>
         {% endif %}
       </div>
@@ -150,9 +150,9 @@
       {% set slot_cfg = [
         ('helm',   'icon-helm',   '#60a5fa', 'Helm'),
         ('armor',  'icon-armor',  '#34d399', 'Armor'),
-        ('boots',  'icon-boots',  '#a78bfa', 'Schuhe'),
-        ('weapon', 'icon-weapon', '#f87171', 'Waffe'),
-        ('mount',  'icon-mount',  '#fbbf24', 'Pferd'),
+        ('boots',  'icon-boots',  '#a78bfa', 'Boots'),
+        ('weapon', 'icon-weapon', '#f87171', 'Weapon'),
+        ('mount',  'icon-mount',  '#fbbf24', 'Mount'),
         ('misc',   'icon-misc',   '#94a3b8', 'Off-Hand'),
       ] %}
       <div>
@@ -182,7 +182,7 @@
               {{ item_val }}
             </span>
             {% else %}
-            <span style="color:rgba(255,255,255,0.2);font-size:0.78rem;" data-i18n="scout.detail.unknown">— unbekannt —</span>
+            <span style="color:rgba(255,255,255,0.2);font-size:0.78rem;" data-i18n="scout.detail.unknown">— unknown —</span>
             {% endif %}
           </div>
           {% endfor %}
@@ -224,7 +224,7 @@
       <div style="margin-top:0.6rem;">
         <a href="{{ e.discord_url }}" target="_blank" rel="noopener"
            style="font-size:0.78rem;color:var(--text-muted);text-decoration:none;" data-i18n="scout.detail.screenshot_link">
-          🔗 Original-Screenshot ansehen
+          🔗 View original screenshot
         </a>
       </div>
       {% endif %}
@@ -235,12 +235,12 @@
 
   {% else %}
   <div class="card" style="text-align:center;padding:2rem;">
-    <p style="color:var(--text-muted);" data-i18n="scout.detail.no_entries">No entries gefunden.</p>
+    <p style="color:var(--text-muted);" data-i18n="scout.detail.no_entries">No entries found.</p>
     <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/{{ player_name | urlencode }}/add"
        style="display:inline-block;margin-top:0.75rem;padding:0.5rem 1.1rem;background:rgba(59,130,246,0.15);
               border:1px solid rgba(59,130,246,0.4);border-radius:8px;color:#93c5fd;text-decoration:none;font-size:0.88rem;"
        data-i18n="scout.detail.add_first">
-      ➕ Ersten Eintrag anlegen
+      ➕ Add first entry
     </a>
   </div>
   {% endif %}
