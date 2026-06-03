@@ -67,7 +67,10 @@
             <div style="font-size:1rem;font-weight:800;letter-spacing:.01em;">Hero Scout
               <span id="hs_header_name" style="color:#c084fc;margin-left:.4rem;"></span>
             </div>
-            <div style="font-size:.74rem;color:var(--text-muted);margin-top:.1rem;">Held-Ausrüstung des Angreifers erfassen</div>
+            <div style="display:flex;align-items:center;gap:.6rem;margin-top:.1rem;">
+              <div style="font-size:.74rem;color:var(--text-muted);">Held-Ausrüstung des Angreifers erfassen</div>
+              <div id="hs_queue_indicator" style="display:none;font-size:.7rem;font-weight:600;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.4);color:#c084fc;border-radius:10px;padding:1px 8px;"></div>
+            </div>
           </div>
         </div>
         <button onclick="closeHeroScoutModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:.2rem .5rem;border-radius:6px;transition:color .15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
@@ -845,10 +848,34 @@
       if (resp.ok) {
         closeImportModal();
         loadOwnAttacks();
-        showToast('✅ ' + data.saved + ' Attacke gespeichert.');
-        // Auto-open hero scout modal with first attacker pre-filled
-        const firstAttacker = parsedAttacks[0]?.attacker_name || '';
-        openHeroScoutModal(firstAttacker);
+        // Build toast: show saved + skipped counts
+        let toastMsg = '';
+        if (data.saved > 0 && data.skipped > 0) {
+          toastMsg = `✅ ${data.saved} neu gespeichert · ⏭️ ${data.skipped} bereits vorhanden`;
+        } else if (data.saved > 0) {
+          toastMsg = `✅ ${data.saved} Angriff${data.saved !== 1 ? 'e' : ''} gespeichert`;
+        } else {
+          toastMsg = `ℹ️ Alle ${data.skipped} Angriffe bereits importiert – nichts Neues`;
+        }
+        showToast(toastMsg);
+
+        // Build queue of unique attacker names from newly saved attacks
+        // (only open hero modal if at least one was actually new)
+        if (data.saved > 0) {
+          const seen = new Set();
+          const attackerQueue = [];
+          for (const a of parsedAttacks) {
+            const name = (a.attacker_player || '').trim();
+            if (name && !seen.has(name)) {
+              seen.add(name);
+              attackerQueue.push(name);
+            }
+          }
+          // Open hero scout modals sequentially — next opens after save/close
+          window._hsQueue = attackerQueue;
+          window._hsQueueIdx = 0;
+          _openNextHeroModal();
+        }
       } else {
         showToast('❌ Fehler: ' + (data.error || resp.status));
         btn.disabled = false;
@@ -1035,6 +1062,32 @@
     }
   };
 
+  // Sequential hero scout queue: called after each save or close
+  window._hsQueue = [];
+  window._hsQueueIdx = 0;
+  window._openNextHeroModal = function() {
+    if (window._hsQueueIdx >= window._hsQueue.length) {
+      // Queue done — hide indicator
+      const ind = document.getElementById('hs_queue_indicator');
+      if (ind) ind.style.display = 'none';
+      return;
+    }
+    const name = window._hsQueue[window._hsQueueIdx++];
+    const total = window._hsQueue.length;
+    const current = window._hsQueueIdx;
+    // Show progress indicator if >1 attacker
+    const ind = document.getElementById('hs_queue_indicator');
+    if (ind) {
+      if (total > 1) {
+        ind.textContent = `${current} / ${total} Angreifer`;
+        ind.style.display = 'block';
+      } else {
+        ind.style.display = 'none';
+      }
+    }
+    openHeroScoutModal(name);
+  };
+
   window.openHeroScoutModal = function(attackerName = '') {
     _buildSlotGrid();
     document.getElementById('hs_player').value = attackerName || '';
@@ -1059,6 +1112,8 @@
   window.closeHeroScoutModal = function() {
     document.getElementById('heroScoutModal').style.display = 'none';
     document.body.style.overflow = '';
+    // Open next attacker in queue (if any)
+    _openNextHeroModal();
   };
 
   window.saveHeroScout = async function() {
@@ -1092,8 +1147,12 @@
 
     try {
       await fetch(`/guild/${GUILD_ID}/defense/hero-scout/manual/save`, { method:'POST', body:fd });
-      closeHeroScoutModal();
+      // Close WITHOUT triggering queue (save itself triggers next)
+      document.getElementById('heroScoutModal').style.display = 'none';
+      document.body.style.overflow = '';
       showToast(`✅ Hero Scout gespeichert für ${player}`);
+      // Open next attacker in queue
+      _openNextHeroModal();
     } catch(e) {
       showToast('❌ Fehler: ' + e.message);
     } finally {

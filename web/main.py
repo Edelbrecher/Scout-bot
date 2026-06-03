@@ -4748,8 +4748,8 @@ async def attacks_import_rally(request: Request, guild_id: str):
 
     discord_id = session.get("uid", "")
     discord_name = session.get("username", "")
-    saved = await database.save_incoming_attacks(guild_id, attacks, discord_id, discord_name)
-    return _JSONResponse({"saved": saved})
+    saved, skipped = await database.save_incoming_attacks(guild_id, attacks, discord_id, discord_name)
+    return _JSONResponse({"saved": saved, "skipped": skipped})
 
 
 def _compute_fake_score_server(atk: dict, artifacts: list) -> dict:

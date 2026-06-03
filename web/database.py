@@ -7825,11 +7825,20 @@ async def _init_attack_detection_tables():
             except Exception:
                 pass
         # Unique index so duplicate imports are silently skipped (INSERT OR IGNORE)
+        # Primary: coord-based (works when coords are known)
         try:
             await db.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_incoming_attacks_unique
                 ON incoming_attacks(guild_id, own_village_x, own_village_y,
                                     attacker_x, attacker_y, arrival_time)
+            """)
+        except Exception:
+            pass
+        # Fallback unique index: player+own_village+arrival — catches duplicates when coords are NULL
+        try:
+            await db.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_incoming_attacks_unique2
+                ON incoming_attacks(guild_id, attacker_player, own_village_name, arrival_time)
             """)
         except Exception:
             pass
@@ -7859,10 +7868,11 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
     await _init_attack_detection_tables()
     now = __import__('datetime').datetime.utcnow().isoformat()
     saved = 0
+    skipped = 0
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for atk in attacks:
             try:
-                await db.execute("""
+                cur = await db.execute("""
                     INSERT OR IGNORE INTO incoming_attacks (
                         guild_id, imported_by_discord_id, imported_by_name, import_time,
                         server_time_at_import,
@@ -7892,11 +7902,14 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
                     atk.get("fake_score", 50),
                     _json.dumps(atk.get("fake_reasons", [])),
                 ))
-                saved += 1
+                if cur.rowcount > 0:
+                    saved += 1
+                else:
+                    skipped += 1
             except Exception:
-                pass
+                skipped += 1
         await db.commit()
-    return saved
+    return saved, skipped
 
 
 async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = None,
