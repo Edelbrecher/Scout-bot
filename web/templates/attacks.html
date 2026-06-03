@@ -560,8 +560,12 @@
     const expandedLines = [];
     for (const line of lines) {
       if (line.includes('\t')) {
-        // "Einheiten" and "Units" troop-count lines: join with spaces instead of splitting
+        // Lines that must stay together: troop count and arrival time
         if (/^(Einheiten|Units)\b/i.test(line)) {
+          // "Einheiten\t?\t?\t..." — keep as one space-joined line
+          expandedLines.push(line.replace(/\t+/g, ' ').trim());
+        } else if (/^(Ankunft|Arrival)\b/i.test(line)) {
+          // "Ankunft\tin 18:18:32 Std.um 07:59:59" — keep as one line
           expandedLines.push(line.replace(/\t+/g, ' ').trim());
         } else {
           // Split on tab — each tab-segment is treated as a separate line
@@ -579,11 +583,11 @@
       // Real EN format: "mark attackPlayerName attacks DstVillage"  (mark attack + player concatenated)
       { re: /^mark attack(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
         mk: (m, src) => ({ src, player: m[1].trim(), type: m[2]==='raids'?'raid':'attack', dst: m[3].trim() }) },
-      // Real DE format: "Attack markierenPlayerName greift DstVillage an"
-      { re: /^Attack markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+      // Real DE format: "Angriff markierenPlayerName greift DstVillage an"  (DE UI)
+      { re: /^(?:Angriff|Attack) markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: (m, src) => ({ src, player: m[1].trim(), type: m[4]==='aus'?'raid':'attack', dst: m[3].trim() }) },
-      // Classic DE: dash + counter + src + "Attack markieren" + player + greift/raubt + dst + an/aus
-      { re: /^[-–]\s*\d+\s+(.+?)\s+Attack markieren\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
+      // Classic DE: dash + counter + src + "Angriff/Attack markieren" + player + greift/raubt + dst + an/aus
+      { re: /^[-–]\s*\d+\s+(.+?)\s+(?:Angriff|Attack) markieren\s+(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$/i,
         mk: m => ({ src: m[1], player: m[2], type: m[5]==='aus'?'raid':'attack', dst: m[4] }) },
       // Classic EN: dash + counter + src + "mark attack" + player + attacks/raids + dst
       { re: /^[-–]\s*\d+\s+(.+?)\s+mark attack\s*(.+?)\s+(attacks|raids)\s+(.+?)\s*$/i,
@@ -605,12 +609,15 @@
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (/Ankommende Truppen|Incoming troops/i.test(line)) {
+      if (/Ankommende\s+Truppen|Incoming\s+troops/i.test(line)) {
         inSection = true;
         continue;
       }
-      // Auto-start section if we see a clear attack pattern even without the header
-      if (/Taskn|Startseite|©\s*200/i.test(line)) break;
+      // Stop parsing at footer/navigation lines (only AFTER we found at least one attack)
+      if (attacks.length > 0 || currentAttack) {
+        if (/^(Startseite|Discord|Impressum|Spielregeln|AGB|©\s*200[0-9])/i.test(line)) break;
+      }
+      if (/Taskn/i.test(line)) break;
 
       // Try all attack line patterns
       let matched = false;
@@ -675,7 +682,8 @@
 
         // Arrival line: "Ankunft um 12:45:00" or "Arrival at 12:45:00"
         if (/^(Ankunft|Arrival)\b/i.test(line)) {
-          const absM = line.match(/(?:um|at)\s+(\d{1,2}:\d{2}:\d{2})\s*(AM|PM)?/i);
+          // Match "um 07:59:59", "Std.um 07:59:59", "at 07:59:59"
+          const absM = line.match(/(?:Std\.)?(?:um|at)\s+(\d{1,2}:\d{2}:\d{2})\s*(AM|PM)?/i);
           if (absM) {
             let timeStr = absM[1];
             if (absM[2]) {
