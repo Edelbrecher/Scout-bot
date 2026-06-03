@@ -466,6 +466,32 @@ async def _require_alliance(guild: dict | None, guild_id: str):
     return None
 
 
+async def _require_ally_or_plan(guild: dict | None, guild_id: str, uid: str,
+                                 perm_flag: str = "") -> "Response | None":
+    """Alliance gate that also accepts approved ally members (with optional perm check).
+    - Guild owner or admin → always pass
+    - Guild has alliance plan → pass
+    - User is an approved ally member (and optionally has perm_flag) → pass
+    Returns redirect response if denied, None if granted."""
+    # Try plan gate first
+    plan_err = await _require_alliance(guild, guild_id)
+    if plan_err is None:
+        return None  # plan is fine
+    # Plan gate failed — check if the user is an approved ally member
+    membership = await database.get_ally_membership(guild_id, uid) if uid else None
+    if membership and membership.get("status") == "approved":
+        # If a specific permission flag is required, check it
+        if perm_flag:
+            perms = await database.get_member_permissions(guild_id, uid)
+            if perm_flag in perms:
+                return None
+            # No specific perm — but they are a member, still show the page
+            # (most view pages are accessible to any approved member)
+        else:
+            return None
+    return plan_err
+
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -2012,11 +2038,14 @@ async def fix_archive_perms(request: Request, guild_id: str):
 async def guild_stats(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
 
     scout_stats = await database.get_guild_stats(guild_id)
     res_stats = await database.get_res_stats(guild_id)
@@ -2292,11 +2321,14 @@ async def res_auto_setup(request: Request, guild_id: str):
 async def res_push_stats(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
     stats = await database.get_res_stats(guild_id)
     return templates.TemplateResponse("res_push_stats.html", {"request": request, "guild": guild, "stats": stats})
 
@@ -3331,7 +3363,7 @@ async def map_player_search(request: Request, guild_id: str, q: str = ""):
     """Return players + villages matching query, parsed from map.sql (cached 10 min)."""
     session, err = _require_session(request)
     if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
 
     import time as _time
@@ -9375,12 +9407,13 @@ def parse_alliance_members(text: str) -> list[dict]:
 async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_alliance(guild, guild_id)
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     enemies = await database.get_enemies(guild_id)
     report_channel = await database.get_report_channel(guild_id)
@@ -10065,12 +10098,13 @@ TRIBE_META = {
 async def blueprints_main(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_premium(guild, guild_id)
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     templates_list = await database.get_blueprint_templates(guild_id)
     player_bps = await database.get_player_blueprints(guild_id)
@@ -10523,14 +10557,13 @@ async def _get_hero_scout_entries(guild_id: str) -> list:
     import aiosqlite
     db_path = Path("/app/data/scouter.db")
     async with aiosqlite.connect(db_path) as db:
-        # Migration sicherstellen
         try:
             await db.execute("ALTER TABLE hero_scout_entries ADD COLUMN source TEXT DEFAULT 'screenshot'")
             await db.commit()
         except Exception:
             pass
         db.row_factory = aiosqlite.Row
-        # Nur den neuesten Eintrag pro Spieler
+        # Latest entry per player
         async with db.execute("""
             SELECT e.*, COALESCE(e.source, 'screenshot') as source,
                    GROUP_CONCAT(s.img_hash ORDER BY s.slot_index) as slot_hashes,
@@ -10544,7 +10577,46 @@ async def _get_hero_scout_entries(guild_id: str) -> list:
             GROUP BY e.id
             ORDER BY e.created_at DESC
         """, (guild_id,)) as cur:
-            return [dict(r) for r in await cur.fetchall()]
+            entries = [dict(r) for r in await cur.fetchall()]
+
+        # Per-slot item names for latest entry + previous entry for change detection
+        SLOT_NAMES = ['helm', 'armor', 'boots', 'weapon', 'mount', 'misc']
+        for entry in entries:
+            player = entry['player_name']
+            entry_id = entry['id']
+
+            # Fetch current slot items
+            async with db.execute("""
+                SELECT slot_name, item_name FROM hero_scout_slots WHERE entry_id=?
+            """, (entry_id,)) as scur:
+                cur_slots = {r['slot_name']: (r['item_name'] or '') for r in await scur.fetchall()}
+
+            # Fetch previous entry id for same player
+            async with db.execute("""
+                SELECT id FROM hero_scout_entries
+                WHERE guild_id=? AND lower(player_name)=lower(?) AND id < ?
+                ORDER BY id DESC LIMIT 1
+            """, (guild_id, player, entry_id)) as pcur:
+                prev_row = await pcur.fetchone()
+
+            changed_slots = set()
+            if prev_row:
+                prev_id = prev_row['id']
+                async with db.execute("""
+                    SELECT slot_name, item_name FROM hero_scout_slots WHERE entry_id=?
+                """, (prev_id,)) as pscur:
+                    prev_slots = {r['slot_name']: (r['item_name'] or '') for r in await pscur.fetchall()}
+                for slot in SLOT_NAMES:
+                    if cur_slots.get(slot, '') != prev_slots.get(slot, ''):
+                        changed_slots.add(slot)
+
+            entry['changed_slots'] = list(changed_slots)
+            entry['changed'] = bool(changed_slots)
+            # Also expose slot item names for template
+            for slot in SLOT_NAMES:
+                entry[f'slot_{slot}'] = cur_slots.get(slot, '')
+
+        return entries
 
 async def _get_hero_scout_history(guild_id: str, player_name: str) -> list:
     import aiosqlite
@@ -10597,11 +10669,15 @@ async def _get_discord_channels(guild_id: str) -> list:
 async def hero_scout_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
+    uid = session.get("uid", "")
+    # Hero scout is open to all approved ally members (no specific perm needed)
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
 
     entries = await _get_hero_scout_entries(guild_id)
     scout_channel = await _get_hero_scout_channel(guild_id)
@@ -10620,11 +10696,14 @@ async def hero_scout_page(request: Request, guild_id: str):
 async def hero_scout_detail(request: Request, guild_id: str, player_name: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
 
     history = await _get_hero_scout_history(guild_id, player_name)
 

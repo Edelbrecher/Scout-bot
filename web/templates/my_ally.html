@@ -815,6 +815,15 @@
                     ("poll_view","View Polls","Can view availability polls and see who voted."),
                     ("poll_manage","Manage Polls","Can create, close and delete polls; change responses."),
                   ]),
+                  ("🦸 Hero Scout", [
+                    ("hero_scout_view","View Hero Scout","Can view the hero scout overview and all hero entries."),
+                  ]),
+                  ("📊 Statistics", [
+                    ("stats_view","View Stats","Can view guild statistics, res leaderboard and poll results."),
+                  ]),
+                  ("📐 Blueprints", [
+                    ("blueprint_view","View Blueprints","Can view and use building blueprints / action plans."),
+                  ]),
                 ] %}
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.45rem;margin-bottom:.85rem;">
@@ -926,6 +935,9 @@
               ("📦 Res-Push","res_push_view / res_push_manage","View resource requests; accept, archive and manage push channels."),
               ("📡 Sector","sector_view","View sector monitoring."),
               ("🏥 Hospital","hospital_view","View troop recovery tracker."),
+              ("🦸 Hero Scout","hero_scout_view","View hero scout entries."),
+              ("📊 Statistics","stats_view","View guild statistics and leaderboards."),
+              ("📐 Blueprints","blueprint_view","View and use building blueprints."),
               ("📅 Polls","poll_view / poll_manage","View polls & responses; create, close and delete polls."),
             ] %}
             {% for icon_label, flags, desc in legend %}
