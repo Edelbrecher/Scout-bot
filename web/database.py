@@ -7872,26 +7872,45 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
     now = __import__('datetime').datetime.utcnow().isoformat()
     saved = 0
     skipped = 0
+
+    # Pre-count how many times each (player, village, arrival_time) appears
+    # in THIS import batch — multiple waves from same player at same second are valid!
+    from collections import Counter as _Counter
+    batch_counts = _Counter()
+    for atk in attacks:
+        key = (
+            atk.get("attacker_player", "").strip(),
+            atk.get("own_village_name", "").strip(),
+            atk.get("arrival_time", "").strip(),
+        )
+        batch_counts[key] += 1
+
+    # Track how many we've inserted per key in this session
+    inserted_this_batch = _Counter()
+
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for atk in attacks:
             attacker_player  = atk.get("attacker_player", "").strip()
             own_village_name = atk.get("own_village_name", "").strip()
             arrival_time     = atk.get("arrival_time", "").strip()
 
-            # Skip completely empty entries
             if not attacker_player or not arrival_time:
                 skipped += 1
                 continue
 
-            # Explicit duplicate check — do NOT rely on UNIQUE index alone,
-            # because the index may have failed to create if old duplicates exist.
-            # Match on: guild + attacker_player + own_village_name + arrival_time
-            dup_cur = await db.execute("""
-                SELECT id FROM incoming_attacks
+            key = (attacker_player, own_village_name, arrival_time)
+
+            # Count how many with this exact key already exist in DB
+            cnt_cur = await db.execute("""
+                SELECT COUNT(*) FROM incoming_attacks
                 WHERE guild_id=? AND attacker_player=? AND own_village_name=? AND arrival_time=?
-                LIMIT 1
             """, (guild_id, attacker_player, own_village_name, arrival_time))
-            if await dup_cur.fetchone():
+            existing_count = (await cnt_cur.fetchone())[0]
+
+            # How many are we allowed to insert for this key?
+            # = batch_count - already_in_db - already_inserted_this_run
+            allowed = batch_counts[key] - existing_count - inserted_this_batch[key]
+            if allowed <= 0:
                 skipped += 1
                 continue
 
@@ -7927,6 +7946,7 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
                     _json.dumps(atk.get("fake_reasons", [])),
                 ))
                 saved += 1
+                inserted_this_batch[key] += 1
             except Exception:
                 skipped += 1
         await db.commit()
