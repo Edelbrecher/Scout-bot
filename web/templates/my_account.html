@@ -20,7 +20,7 @@
         {% if pending %}<span style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending }}</span>{% endif %}
       </a>
       {% endif %}
-      <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Combat Power</a>
+      <a href="/guild/{{ guild.guild_id }}/my-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Combat Power</a>
     </div>
   </div>
 
@@ -83,7 +83,7 @@
         Open in Travian the <strong>Troop Overview</strong> (Village → Troops → Troop Overview),
         select all (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.
       </p>
-      <form method="post" action="/guild/{{ guild.guild_id }}/mein-account">
+      <form method="post" action="/guild/{{ guild.guild_id }}/my-account">
         <div style="margin-bottom:.6rem;">
           <label style="font-size:.82rem;color:var(--text-muted);display:block;margin-bottom:.25rem;">
             🏷 <span data-i18n="account.import.name_label">Your Travian player name</span> <span style="color:#f87171;">*</span>
@@ -132,7 +132,7 @@
             {% endif %}
           </button>
           {% if own_villages %}
-          <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/clear" style="margin:0;"
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-account/clear" style="margin:0;"
                 onsubmit="return confirm('Delete all own villages?')">
             <button type="submit" class="btn btn-danger">🗑 Delete</button>
           </form>
@@ -147,7 +147,7 @@
       <!-- Sitter-Verwaltung -->
       <div class="card" style="margin-bottom:0;">
         <h2 style="margin:0 0 0.65rem;" data-i18n="account.sitter.title">🤝 Sitter Management</h2>
-        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/sitters">
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-account/sitters">
           <div style="display:flex;flex-direction:column;gap:.6rem;">
             <div style="font-size:.8rem;color:var(--text-muted);font-weight:600;">👥 My Sitters</div>
             <div style="display:flex;gap:.4rem;">
@@ -200,7 +200,7 @@
               </div>
             </div>
             {% if dl.status != 'revoked' %}
-            <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/revoke"
+            <form method="post" action="/guild/{{ guild.guild_id }}/my-account/dual/revoke"
                   onsubmit="return confirm('Revoke invitation?')" style="margin:0;">
               <input type="hidden" name="token" value="{{ dl.invite_token }}">
               <button type="submit" class="btn btn-danger" style="padding:0.2rem 0.55rem;font-size:0.72rem;">Revoke</button>
@@ -213,7 +213,7 @@
         <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:.75rem;">No dual connections yet.</p>
         {% endif %}
 
-        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/dual/create">
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-account/dual/create">
           <button type="submit" class="btn btn-secondary" style="font-size:.82rem;padding:.3rem .75rem;">🔗 Create dual invite</button>
         </form>
       </div>
@@ -428,7 +428,7 @@
             <td>
               {% if v.x is not none %}
               {% set is_sv = scout_village and scout_village.x == v.x and scout_village.y == v.y %}
-              <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/set-scout-village" style="margin:0;">
+              <form method="post" action="/guild/{{ guild.guild_id }}/my-account/set-scout-village" style="margin:0;">
                 <input type="hidden" name="x" value="{{ v.x }}">
                 <input type="hidden" name="y" value="{{ v.y }}">
                 <button type="submit" title="{% if is_sv %}Remove scout village{% else %}Mark as scout village{% endif %}"
@@ -515,7 +515,7 @@
       <summary style="cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text-muted);padding:0.3rem 0;">⬆️ Import new data</summary>
       <div style="margin-top:0.6rem;">
         <p class="hint" style="margin-bottom:0.5rem;">Open in Travian the <strong>Hospital</strong>, select all (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.</p>
-        <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/hospital">
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-account/hospital">
           <textarea name="hospital_text" rows="8"
             placeholder="Dorfname&#10;Legionär&#9;45&#9;08:32:15&#10;Prätorianer&#9;12&#9;09:15:00&#10;..."
             style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;box-sizing:border-box;"></textarea>
@@ -528,7 +528,7 @@
     </details>
 
     {% if hospital_data %}
-    <form method="post" action="/guild/{{ guild.guild_id }}/mein-account/hospital/clear" style="margin:0;"
+    <form method="post" action="/guild/{{ guild.guild_id }}/my-account/hospital/clear" style="margin:0;"
           onsubmit="return confirm('Delete hospital data?')">
       <button type="submit" class="btn btn-danger" style="font-size:0.8rem;">🗑 Delete all hospital data</button>
     </form>

@@ -183,7 +183,7 @@
   <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
 
     <!-- Mein Account (Free) -->
-    <a href="/guild/{{ guild.guild_id }}/mein-account{% if pending_waves %}#missionsCard{% endif %}" class="feature-card" style="text-decoration:none;{% if pending_waves %}border-color:rgba(239,68,68,.5);box-shadow:0 0 0 2px rgba(239,68,68,.15);{% endif %}">
+    <a href="/guild/{{ guild.guild_id }}/my-account{% if pending_waves %}#missionsCard{% endif %}" class="feature-card" style="text-decoration:none;{% if pending_waves %}border-color:rgba(239,68,68,.5);box-shadow:0 0 0 2px rgba(239,68,68,.15);{% endif %}">
       <div class="feature-icon" style="position:relative;">🏰
         {% if pending_waves %}<span style="position:absolute;top:-4px;right:-8px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending_waves }}</span>{% endif %}
       </div>

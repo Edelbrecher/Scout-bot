@@ -4368,8 +4368,8 @@ def _enrich_own_villages(own_villages: list) -> list:
     return own_villages
 
 
-@app.get("/guild/{guild_id}/mein-account", response_class=HTMLResponse)
-async def mein_account_page(request: Request, guild_id: str):
+@app.get("/guild/{guild_id}/my-account", response_class=HTMLResponse)
+async def my_account_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -4418,7 +4418,7 @@ async def mein_account_page(request: Request, guild_id: str):
 
     my_waves = await database.get_my_op_waves(guild_id, discord_id)
 
-    return templates.TemplateResponse("mein_account.html", {
+    return templates.TemplateResponse("my_account.html", {
         "request":            request,
         "guild":              guild,
         "own_villages":       own_villages,
@@ -4444,8 +4444,8 @@ async def mein_account_page(request: Request, guild_id: str):
     })
 
 
-@app.post("/guild/{guild_id}/mein-account")
-async def mein_account_upload(
+@app.post("/guild/{guild_id}/my-account")
+async def my_account_upload(
     request: Request,
     guild_id: str,
     travian_name: str = Form(""),
@@ -4524,11 +4524,11 @@ async def mein_account_upload(
             tribe=tribe, total_off=total_off, total_def=total_def,
             total_crop=total_crop, total_units=total_units, total_scouts=total_scouts,
         )
-    return RedirectResponse(f"/guild/{guild_id}/mein-account?uploaded={len(parsed)}", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account?uploaded={len(parsed)}", status_code=303)
 
 
-@app.post("/guild/{guild_id}/mein-account/set-scout-village")
-async def mein_account_set_scout_village(
+@app.post("/guild/{guild_id}/my-account/set-scout-village")
+async def my_account_set_scout_village(
     request: Request, guild_id: str,
     x: int = Form(...), y: int = Form(...),
 ):
@@ -4538,11 +4538,11 @@ async def mein_account_set_scout_village(
     if err: return err
     discord_id = session.get("uid", "") or session.get("discord_id", "")
     await database.set_scout_village(guild_id, discord_id, x, y)
-    return RedirectResponse(f"/guild/{guild_id}/mein-account?saved=scout_village", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account?saved=scout_village", status_code=303)
 
 
-@app.post("/guild/{guild_id}/mein-account/clear")
-async def mein_account_clear(request: Request, guild_id: str):
+@app.post("/guild/{guild_id}/my-account/clear")
+async def my_account_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -4552,10 +4552,10 @@ async def mein_account_clear(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     discord_id = session.get("uid", "")
     await database.delete_own_villages(guild_id, discord_id)
-    return RedirectResponse(f"/guild/{guild_id}/mein-account?cleared=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account?cleared=1", status_code=303)
 
 
-@app.post("/guild/{guild_id}/mein-account/sitters")
+@app.post("/guild/{guild_id}/my-account/sitters")
 async def save_sitters(
     request: Request,
     guild_id: str,
@@ -4584,10 +4584,10 @@ async def save_sitters(
         "sitting2_travian": sitting2_travian or None,
         "is_shared": bool(is_shared),
     })
-    return RedirectResponse(f"/guild/{guild_id}/mein-account?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account?saved=1", status_code=303)
 
 
-@app.get("/guild/{guild_id}/mein-account/kampfkraft", response_class=HTMLResponse)
+@app.get("/guild/{guild_id}/my-account/kampfkraft", response_class=HTMLResponse)
 async def kampfkraft_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
@@ -4700,7 +4700,7 @@ async def attacks_delete_report(request: Request, guild_id: str, report_id: int)
 
 @app.get("/guild/{guild_id}/attacks/own-troops")
 async def _legacy_own_troops_get(guild_id: str):
-    return RedirectResponse(f"/guild/{guild_id}/mein-account", status_code=301)
+    return RedirectResponse(f"/guild/{guild_id}/my-account", status_code=301)
 
 
 # ---------------------------------------------------------------------------
@@ -5076,7 +5076,7 @@ async def settle_list_delete(request: Request, guild_id: str, entry_id: int):
 # Routes — Dual-Link System (Feature 3)
 # ---------------------------------------------------------------------------
 
-@app.post("/guild/{guild_id}/mein-account/dual/create")
+@app.post("/guild/{guild_id}/my-account/dual/create")
 async def dual_create(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
@@ -5090,17 +5090,17 @@ async def dual_create(request: Request, guild_id: str):
         owner_id=session.get("uid", ""),
         owner_username=session.get("username", ""),
     )
-    return RedirectResponse(f"/guild/{guild_id}/mein-account?dual_created={token}", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account?dual_created={token}", status_code=303)
 
 
-@app.post("/guild/{guild_id}/mein-account/dual/revoke")
+@app.post("/guild/{guild_id}/my-account/dual/revoke")
 async def dual_revoke(request: Request, guild_id: str, token: str = Form(...)):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     await database.revoke_dual_link(token, session.get("uid", ""))
-    return RedirectResponse(f"/guild/{guild_id}/mein-account", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account", status_code=303)
 
 
 @app.get("/dual/join/{token}", response_class=HTMLResponse)
@@ -7782,7 +7782,7 @@ async def op_delete_hero_action(request: Request, guild_id: str, action_id: int)
     return _JSONResponse({"ok": True})
 
 
-# ── Personal missions (used by mein-account tab) ──────────────────────────────
+# ── Personal missions (used by my-account tab) ──────────────────────────────
 
 @app.get("/guild/{guild_id}/operations/api/my-missions")
 async def op_my_missions(request: Request, guild_id: str):
@@ -8609,10 +8609,10 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "flag",      "label": "Settle List",     "url_suffix": "/settle-list"},
     {"type": "item",  "icon": "poll",      "label": "Polls",           "url_suffix": "/polls"},
     {"type": "item",  "icon": "blueprint", "label": "Blueprints",      "url_suffix": "/blueprints"},
-    {"type": "item",  "icon": "fist",      "label": "Combat Power",    "url_suffix": "/mein-account/kampfkraft"},
+    {"type": "item",  "icon": "fist",      "label": "Combat Power",    "url_suffix": "/my-account/kampfkraft"},
     {"type": "item",  "icon": "crop",      "label": "Crop Calculator", "url_suffix": "/tools/crop-calculator"},
     {"type": "group", "label": "Account"},
-    {"type": "item",  "icon": "person",    "label": "My Account",      "url_suffix": "/mein-account"},
+    {"type": "item",  "icon": "person",    "label": "My Account",      "url_suffix": "/my-account"},
     {"type": "item",  "icon": "bell",      "label": "Notifications",   "url_suffix": "/notifications"},
     {"type": "item",  "icon": "gear",      "label": "Settings",        "url_suffix": "/settings"},
     {"type": "item",  "icon": "card",      "label": "Billing",         "url_suffix": "/billing"},
@@ -9115,7 +9115,7 @@ def parse_hospital(text: str) -> list[dict]:
 # Routes — Lazarett-Tracker (Hospital)
 # ---------------------------------------------------------------------------
 
-@app.post("/guild/{guild_id}/mein-account/hospital")
+@app.post("/guild/{guild_id}/my-account/hospital")
 async def hospital_upload(
     request: Request,
     guild_id: str,
@@ -9137,12 +9137,12 @@ async def hospital_upload(
         entries=entries,
     )
     return RedirectResponse(
-        f"/guild/{guild_id}/mein-account?hospital_uploaded={len(entries)}",
+        f"/guild/{guild_id}/my-account?hospital_uploaded={len(entries)}",
         status_code=303,
     )
 
 
-@app.post("/guild/{guild_id}/mein-account/hospital/clear")
+@app.post("/guild/{guild_id}/my-account/hospital/clear")
 async def hospital_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
@@ -9153,7 +9153,7 @@ async def hospital_clear(request: Request, guild_id: str):
         return RedirectResponse("/dashboard", status_code=303)
 
     await database.delete_hospital_data(guild_id, session.get("uid", ""))
-    return RedirectResponse(f"/guild/{guild_id}/mein-account?hospital_cleared=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-account?hospital_cleared=1", status_code=303)
 
 
 @app.get("/guild/{guild_id}/allianz/hospital", response_class=HTMLResponse)

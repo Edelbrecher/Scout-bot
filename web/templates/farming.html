@@ -347,13 +347,13 @@
       <span>🔭 Scout village: <strong>{{ scout_village.village_name }}</strong>
         <span style="color:var(--text-muted);">({{ scout_village.x }}|{{ scout_village.y }})</span></span>
       <span style="color:var(--text-muted);font-size:.75rem;">Scout links in the table open the troop-send form with the target coordinates pre-filled.</span>
-      <a href="/guild/{{ guild.guild_id }}/mein-account" style="font-size:.75rem;color:#818cf8;">Change →</a>
+      <a href="/guild/{{ guild.guild_id }}/my-account" style="font-size:.75rem;color:#818cf8;">Change →</a>
     </div>
     {% elif not scout_village %}
     <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;
                 padding:.5rem 1rem;margin-bottom:.75rem;font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:.5rem;">
       🔭 No scout village set —
-      <a href="/guild/{{ guild.guild_id }}/mein-account" style="color:#818cf8;">configure in My Account</a>
+      <a href="/guild/{{ guild.guild_id }}/my-account" style="color:#818cf8;">configure in My Account</a>
       to enable scout links in the table.
     </div>
     {% endif %}
