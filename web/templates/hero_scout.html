@@ -246,34 +246,47 @@
 
 <!-- ── Hero Detail Modal ── -->
 <div id="heroDetailOverlay" onclick="closeHeroDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;backdrop-filter:blur(3px);"></div>
-<div id="heroDetailPanel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(760px,96vw);max-height:90vh;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;z-index:10002;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-main);position:sticky;top:0;z-index:1;">
-    <div style="display:flex;align-items:center;gap:0.6rem;">
-      <span style="font-size:1.2rem;">🗡️</span>
-      <h2 style="margin:0;font-size:1rem;" id="heroDetailTitle">Scout-Details</h2>
+<div id="heroDetailPanel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(960px,96vw);max-height:92vh;background:var(--bg-card);border:1px solid rgba(99,102,241,.3);border-radius:18px;z-index:10002;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.7);">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:1.15rem 1.6rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(168,85,247,.07));position:sticky;top:0;z-index:1;">
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <span style="font-size:1.5rem;">🗡️</span>
+      <div>
+        <h2 style="margin:0;font-size:1.15rem;font-weight:800;" id="heroDetailTitle">Scout-Details</h2>
+        <div id="heroDetailMeta" style="font-size:0.78rem;color:var(--text-muted);margin-top:.1rem;"></div>
+      </div>
     </div>
-    <div style="display:flex;align-items:center;gap:0.5rem;">
-      <a id="heroDetailLink" href="#" style="font-size:0.78rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:0.25rem 0.65rem;border-radius:6px;text-decoration:none;">↗ Vollansicht</a>
-      <button onclick="closeHeroDetail()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);cursor:pointer;color:var(--text-muted);font-size:1rem;width:1.9rem;height:1.9rem;border-radius:8px;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">×</button>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <a id="heroDetailLink" href="#" style="font-size:0.82rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:0.3rem 0.8rem;border-radius:7px;text-decoration:none;">↗ Vollansicht</a>
+      <button onclick="closeHeroDetail()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);cursor:pointer;color:var(--text-muted);font-size:1.1rem;width:2.1rem;height:2.1rem;border-radius:8px;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">×</button>
     </div>
   </div>
-  <div id="heroDetailContent" style="overflow-y:auto;max-height:calc(90vh - 60px);padding:1.1rem 1.25rem;"></div>
+  <div id="heroDetailContent" style="overflow-y:auto;max-height:calc(92vh - 70px);padding:1.4rem 1.6rem;"></div>
 </div>
 
 <style>
-/* Panel animation via display toggle — no opacity trick */
-.hd-slot-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem;margin-bottom:1rem; }
+/* Panel animation via display toggle */
+.hd-slot-grid {
+  display:grid;grid-template-columns:repeat(6,1fr);gap:0.65rem;margin-bottom:1.1rem;
+}
 .hd-slot {
-  aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;
+  aspect-ratio:1;border-radius:11px;overflow:hidden;position:relative;
   background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.07);
   transition:border-color .15s,box-shadow .15s;
 }
-.hd-slot.has-item { border-color:rgba(255,255,255,.18); box-shadow:0 0 8px rgba(255,255,255,.06); }
+.hd-slot.has-item { border-color:rgba(255,255,255,.22); box-shadow:0 0 10px rgba(255,255,255,.07); }
 .hd-slot img { width:100%;height:100%;object-fit:cover; }
-.hd-slot-label { font-size:0.62rem;color:var(--text-muted);text-align:center;margin-top:0.25rem;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%; }
-.hd-entry { background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:0.6rem; }
-.hd-entry-header { display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;font-size:0.78rem; }
+.hd-slot-label {
+  font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:0.3rem;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;
+}
+.hd-entry {
+  background:var(--bg-main);border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.15rem;margin-bottom:0.75rem;
+}
+.hd-entry-header {
+  display:flex;align-items:center;gap:0.55rem;margin-bottom:0.75rem;font-size:0.85rem;
+}
 </style>
 
 <script>
@@ -294,7 +307,15 @@ function openHeroDetail(encodedName) {
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(data => {
       try {
-        document.getElementById('heroDetailTitle').textContent = '🗡️ ' + data.player_name;
+        document.getElementById('heroDetailTitle').textContent = data.player_name;
+        const latest = (data.history||[])[0] || {};
+        const meta = [
+          latest.tribe   ? latest.tribe : null,
+          latest.alliance ? '🏆 ' + latest.alliance : null,
+          latest.hero_level ? '⭐ Lvl ' + latest.hero_level : null,
+          (data.history||[]).length + ' Einträge',
+        ].filter(Boolean).join(' · ');
+        document.getElementById('heroDetailMeta').textContent = meta;
         document.getElementById('heroDetailContent').innerHTML = renderHeroDetail(data, encodedName);
       } catch(e) {
         console.error(e);
@@ -335,17 +356,17 @@ function renderHeroDetail(data, encodedName) {
     const isLatest = idx === 0;
     const date = (entry.created_at || '').slice(0, 16).replace('T', ' ');
     const srcBadge = entry.source === 'manual'
-      ? '<span style="font-size:0.65rem;background:#3b1f6b;color:#c4b5fd;border-radius:4px;padding:1px 5px;font-weight:600;">✏️ Manuell</span>'
-      : '<span style="font-size:0.65rem;background:#1a3a5c;color:#93c5fd;border-radius:4px;padding:1px 5px;font-weight:600;">📷 Screenshot</span>';
+      ? '<span style="font-size:0.72rem;background:#3b1f6b;color:#c4b5fd;border-radius:5px;padding:2px 7px;font-weight:600;">✏️ Manuell</span>'
+      : '<span style="font-size:0.72rem;background:#1a3a5c;color:#93c5fd;border-radius:5px;padding:2px 7px;font-weight:600;">📷 Screenshot</span>';
 
     html += `<div class="hd-entry" ${isLatest ? 'style="border-color:rgba(99,102,241,0.5);"' : ''}>
       <div class="hd-entry-header">
-        ${isLatest ? '<span style="font-size:0.65rem;background:rgba(99,102,241,0.2);color:#a5b4fc;border-radius:4px;padding:1px 5px;font-weight:600;">Aktuell</span>' : ''}
+        ${isLatest ? '<span style="font-size:0.72rem;background:rgba(99,102,241,0.2);color:#a5b4fc;border-radius:5px;padding:2px 7px;font-weight:700;">✦ Aktuell</span>' : ''}
         ${srcBadge}
         <span style="color:var(--text-muted);">${date}</span>
-        ${entry.hero_level ? `<span style="color:var(--text-muted);">· Lvl ${entry.hero_level}</span>` : ''}
-        ${entry.tribe ? `<span style="color:var(--text-muted);">· ${entry.tribe}</span>` : ''}
-        ${entry.alliance ? `<span style="color:var(--text-muted);">· ${entry.alliance}</span>` : ''}
+        ${entry.hero_level ? `<span style="color:var(--text-muted);">⭐ Lvl ${entry.hero_level}</span>` : ''}
+        ${entry.tribe ? `<span style="color:var(--text-muted);">${entry.tribe}</span>` : ''}
+        ${entry.alliance ? `<span style="color:var(--text-muted);">🏆 ${entry.alliance}</span>` : ''}
       </div>
       <div class="hd-slot-grid">`;
 
@@ -363,16 +384,16 @@ function renderHeroDetail(data, encodedName) {
             <svg width="60%" height="60%" viewBox="0 0 48 48"><use href="#${s.icon}"/></svg>
           </div>
         </div>
-        <div class="hd-slot-label" title="${itemName}">${hasItem ? `<span style="color:${s.color};font-weight:600;">${shortName.slice(0,14)}</span>` : `<span style="opacity:.4">${s.label}</span>`}</div>
+        <div class="hd-slot-label" title="${itemName}">${hasItem ? `<span style="color:${s.color};font-weight:600;">${shortName.slice(0,16)}</span>` : `<span style="opacity:.35">${s.label}</span>`}</div>
       </div>`;
     });
 
     html += `</div></div>`;
   });
 
-  html += `<div style="text-align:center;margin-top:0.5rem;">
+  html += `<div style="text-align:center;margin-top:0.75rem;">
     <a href="/guild/${GUILD_ID_HS}/defense/hero-scout/manual/${encodedName}/add"
-       style="font-size:0.8rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#86efac;padding:0.35rem 0.9rem;border-radius:6px;text-decoration:none;">
+       style="font-size:0.88rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#86efac;padding:0.45rem 1.2rem;border-radius:8px;text-decoration:none;font-weight:600;">
       ✏️ Neue Version anlegen
     </a>
   </div>`;
