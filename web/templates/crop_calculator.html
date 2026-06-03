@@ -232,11 +232,6 @@
       <a href="/guild/{{ guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
       <h1 data-i18n="crop.title">🌾 Grainfeld-Effizienz-Rechner</h1>
       <p class="subtitle" data-i18n="crop.subtitle">Optimal upgrade order for grain fields — ROI-based (T4.4 Extended)</p>
-      <div style="margin-top:1rem;">
-        <a href="/guild/{{ guild_id }}/tools/crop-supply" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.5rem 1.25rem;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.95rem;">
-          🏪 <span data-i18n="crop.supply.link">Grain-Versorgungsrechner</span>
-        </a>
-      </div>
     </div>
   </div>
 
@@ -1085,5 +1080,554 @@ function formatMinutes(mins) {
 }
 
 calcTradeRoutes();
+</script>
+
+{# ══════════════════════════════════════════════════════════════
+   GRAIN SUPPLY SIMULATOR
+══════════════════════════════════════════════════════════════ #}
+<style>
+.cs-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.cs-card h2 {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.cs-input {
+  background: var(--bg-main, var(--bg));
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.cs-input:focus { outline: none; border-color: #22c55e; }
+.cs-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+.cs-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; }
+.cs-kpi {
+  background: var(--bg-main, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  min-width: 140px;
+  flex: 1;
+}
+.cs-kpi-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+.cs-kpi-value { font-size: 1.2rem; font-weight: 800; font-family: monospace; line-height: 1; }
+.cs-ok    { color: #22c55e; }
+.cs-warn  { color: #f59e0b; }
+.cs-danger{ color: #ef4444; }
+.cs-alert {
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.cs-alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.05rem; }
+.cs-alert-danger { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.35); }
+.cs-alert-warn   { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.35); }
+.cs-alert-ok     { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.35);  }
+.cs-tag-in  { display:inline-flex;align-items:center;gap:3px;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3); }
+.cs-tag-out { display:inline-flex;align-items:center;gap:3px;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3); }
+.cs-btn-primary {
+  padding: 0.6rem 1.5rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.cs-btn-primary:hover { opacity: .88; }
+.cs-btn-secondary {
+  padding: 0.6rem 1rem;
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.cs-btn-secondary:hover { border-color: #22c55e; color: var(--text); }
+</style>
+
+<div class="cc-section" style="margin-top:2rem;" id="grain-supply-section">
+  <h2>📈 Grain Supply Simulator</h2>
+  <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.5rem;">
+    Simulates grain flow over time — troop starvation, warehouse overflow and merchant deliveries at a glance.
+  </p>
+
+  <!-- Village params -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem;margin-bottom:1.25rem;">
+    <div>
+      <label class="cs-label">Current Grain</label>
+      <input type="text" id="cs-currentGrain" class="cs-input" placeholder="e.g. 481.744">
+      <div class="cs-hint">Current grain stock in village</div>
+    </div>
+    <div>
+      <label class="cs-label">Net Grain / h</label>
+      <input type="text" id="cs-netGrainPerH" class="cs-input" placeholder="e.g. -3.800"
+        style="border-color: rgba(239,68,68,.4);" oninput="csUpdateNetStyle(this)">
+      <div class="cs-hint">Production minus consumption — negative = deficit</div>
+    </div>
+    <div>
+      <label class="cs-label">Warehouse Capacity</label>
+      <input type="text" id="cs-granaryCapacity" class="cs-input" placeholder="e.g. 960.000">
+      <div class="cs-hint">0 = ignore overflow</div>
+    </div>
+    <div>
+      <label class="cs-label">Simulation Duration</label>
+      <select id="cs-simHours" class="cs-input" style="cursor:pointer;">
+        <option value="3">3 hours</option>
+        <option value="6">6 hours</option>
+        <option value="12">12 hours</option>
+        <option value="24">24 hours</option>
+        <option value="48" selected>48 hours</option>
+        <option value="72">72 hours</option>
+        <option value="96">96 hours</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Marketplace paste -->
+  <div style="margin-bottom:1rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
+      <div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">📋 Paste Marketplace Data <span style="font-weight:400;text-transform:none;font-size:.75rem;">(optional)</span></div>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:.2rem 0 0;">
+          In Travian: Marketplace → Delivery overview → Show all → Ctrl+A → Ctrl+C → paste here.
+        </p>
+      </div>
+      <button class="cs-btn-secondary" onclick="document.getElementById('cs-marketPaste').value='';document.getElementById('cs-parseStatus').textContent='';" style="padding:.35rem .8rem;font-size:.8rem;">✕ Clear</button>
+    </div>
+    <textarea id="cs-marketPaste" rows="6" class="cs-input"
+      style="font-family:monospace;font-size:.79rem;resize:vertical;min-height:90px;line-height:1.5;"
+      placeholder="Paste full marketplace content here (Ctrl+V) …&#10;&#10;Incoming and outgoing deliveries are automatically detected."></textarea>
+  </div>
+
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;">
+    <button class="cs-btn-primary" onclick="csParsAndSimulate()">📈 Analyse &amp; Simulate</button>
+    <button class="cs-btn-secondary" onclick="csLoadExample()">📄 Load example</button>
+    <span id="cs-parseStatus" style="font-size:.82rem;color:var(--text-muted);"></span>
+  </div>
+
+  <!-- Results (hidden until calc) -->
+  <div id="cs-resultsSection" style="display:none;">
+    <div id="cs-alertsSection" style="margin-bottom:1.25rem;"></div>
+    <div id="cs-kpiRow" style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;"></div>
+
+    <!-- Chart -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+        <div>
+          <div style="font-size:.95rem;font-weight:700;">📈 Grain Over Time</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;" id="cs-chartSubtitle"></div>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;font-size:.72rem;color:var(--text-muted);">
+          <span style="display:inline-flex;align-items:center;gap:4px;color:#22c55e;"><span style="width:12px;height:3px;background:#22c55e;display:inline-block;border-radius:2px;"></span> Grain</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;color:#ef4444;"><span style="width:12px;height:2px;border-top:2px dashed #ef4444;display:inline-block;"></span> Zero</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b;"><span style="width:12px;height:2px;border-top:2px dashed #f59e0b;display:inline-block;"></span> Full</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;color:#4ade80;"><span style="width:8px;height:8px;background:#4ade80;border-radius:50%;display:inline-block;"></span> Incoming</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;"><span style="width:8px;height:8px;background:#f87171;border-radius:50%;display:inline-block;"></span> Outgoing</span>
+        </div>
+      </div>
+      <div style="position:relative;height:300px;">
+        <canvas id="cs-grainChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Starvation detail -->
+    <div id="cs-starvationBox" style="display:none;" class="cc-section" style="border-color:rgba(239,68,68,.4);">
+      <h2 style="color:#ef4444;">⚠️ Troop Starvation — Details</h2>
+      <div id="cs-starvationDetails"></div>
+    </div>
+
+    <!-- Delivery table -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+        <div style="font-size:.85rem;font-weight:700;">📦 Detected Deliveries</div>
+        <span id="cs-deliveryCount" style="font-size:.82rem;color:var(--text-muted);"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:.5rem .75rem;text-align:left;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">Direction</th>
+              <th style="padding:.5rem .75rem;text-align:left;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">Arrives in</th>
+              <th style="padding:.5rem .75rem;text-align:left;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">Time</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#f59e0b;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">🌾 Grain</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#4ade80;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">🪵 Wood</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#fb923c;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">🧱 Clay</th>
+              <th style="padding:.5rem .75rem;text-align:right;color:#94a3b8;font-weight:700;font-size:.72rem;text-transform:uppercase;white-space:nowrap;">⚙️ Iron</th>
+            </tr>
+          </thead>
+          <tbody id="cs-deliveryTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- end cs-resultsSection -->
+</div><!-- end grain-supply-section -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// ── Grain Supply Simulator ────────────────────────────────────────────────────
+
+function csCleanUnicode(s) {
+  return s
+    .replace(/ | /g, '\n')
+    .replace(/ /g, ' ')
+    .replace(/[​‌‍‎‏‪‫‬‭‮⁠⁦⁧⁨⁩؜﻿­]/g, '');
+}
+function csParseGermanNum(s) {
+  if (!s) return 0;
+  s = s.trim();
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
+  s = s.replace(/,/g, '');
+  return parseInt(s, 10) || 0;
+}
+function csIsNoise(line) {
+  return /^(transport\s+von|rohstoffe|ankunft|resources|arrival|erwartet\s+gesamt|alle\s+anzeigen|keine\s+(ein|aus|outgoing|incoming)|no\s+(incoming|outgoing)|ankommende|ausgehende|incoming\s+deliveries|outgoing\s+deliveries|delivery\s+overview|händler|kapazit|gesamt|lieferübers|privacy|serverzeit|marktplatz|verwaltung|verschick|handelsrouten|kaufen|verkaufen)/i.test(line)
+    || /^\(\d+\|\d+\)$/.test(line)
+    || /^[─━═]+$/.test(line)
+    || /^-\s+\d+/.test(line)
+    || /^\d+\s*\/\s*\d/.test(line);
+}
+function csParseSectionLines(lines, isOutgoing) {
+  const deliveries = [];
+  const numBuf = [];
+  let currentBlockIsReturn = false;
+  const reReturn = /^(return\s+from|rückgabe\s+(von|aus)|zurück\s+von|retour\s+(de|von))/i;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (csIsNoise(line)) { numBuf.length = 0; currentBlockIsReturn = false; continue; }
+    if (/^\d+\s*[×xX]/.test(line)) continue;
+    if (/^=\s*\d/.test(line)) break;
+    const timeMatch = line.match(/^in\s+(\d{1,3}):(\d{2}):(\d{2})(?:\s+(?:um|at)\s+(\d{1,2}):(\d{2}))?/i);
+    if (timeMatch) {
+      const offsetSec = +timeMatch[1]*3600 + +timeMatch[2]*60 + +timeMatch[3];
+      const serverTime = timeMatch[4] ? `${timeMatch[4]}:${timeMatch[5]}` : null;
+      const effectiveIsOutgoing = isOutgoing && !currentBlockIsReturn;
+      while (numBuf.length >= 4) {
+        const [wood,clay,iron,grain] = numBuf.splice(0,4);
+        deliveries.push({offsetSec,serverTime,wood,clay,iron,grain,isOutgoing:effectiveIsOutgoing,isReturn:currentBlockIsReturn});
+      }
+      numBuf.length = 0;
+      currentBlockIsReturn = false;
+      continue;
+    }
+    const numOnly = line.replace(/(\d)\.(\d{3})(?!\d)/g,'$1$2').replace(/(\d)\.(\d{3})(?!\d)/g,'$1$2').replace(/(\d),(\d{3})(?!\d)/g,'$1$2');
+    if (/^\d+$/.test(numOnly)) { numBuf.push(parseInt(numOnly)); continue; }
+    if (/[a-zA-ZäöüÄÖÜß]/.test(line)) { numBuf.length = 0; currentBlockIsReturn = reReturn.test(line); }
+  }
+  return deliveries;
+}
+function csParseMarketText(rawText) {
+  const text = csCleanUnicode(rawText);
+  const lines = text.split('\n').map(l => l.trim());
+  const reIn  = /^(ankommende?\s*(lieferungen?)?|incoming\s*(deliveries?)?|eingehende?\s*(lieferungen?)?)\s*(\(\d+\))?$/i;
+  const reOut = /^(ausgehende?\s*(lieferungen?)?|outgoing\s*(deliveries?)?)\s*(\(\d+\))?$/i;
+  let inStart=-1, outStart=-1;
+  for (let i=0;i<lines.length;i++) {
+    if (inStart<0 && reIn.test(lines[i])) { inStart=i+1; continue; }
+    if (reOut.test(lines[i])) { outStart=i+1; break; }
+  }
+  const inEnd  = outStart>0 ? outStart-1 : lines.length;
+  const inLines  = inStart>=0 ? lines.slice(inStart,inEnd) : lines;
+  const outLines = outStart>=0 ? lines.slice(outStart) : [];
+  return { incoming: csParseSectionLines(inLines,false), outgoing: csParseSectionLines(outLines,true) };
+}
+
+function csReadNum(id) {
+  const val = document.getElementById(id).value.trim();
+  return csParseGermanNum(val.replace(/[^\d.,]/g,''));
+}
+function csReadSignedNum(id) {
+  const val = document.getElementById(id).value.trim();
+  const negative = val.startsWith('-');
+  const abs = csParseGermanNum(val.replace(/[^\d.,]/g,''));
+  return negative ? -abs : abs;
+}
+function csUpdateNetStyle(el) {
+  const val = el.value.trim();
+  const neg = val.startsWith('-') || parseFloat(val.replace(/[^\d.,-]/g,'').replace(',','.')) < 0;
+  el.style.borderColor = neg ? 'rgba(239,68,68,.6)' : 'rgba(34,197,94,.6)';
+}
+function csFmt(n) {
+  if (n===null||n===undefined) return '—';
+  n = Math.round(n);
+  if (Math.abs(n)>=1_000_000) return (n/1_000_000).toFixed(2).replace('.',',')+' M';
+  if (Math.abs(n)>=1_000) return (n/1_000).toFixed(1).replace('.',',')+' k';
+  return n.toLocaleString('de-DE');
+}
+function csFmtDuration(sec) {
+  if (sec<0) return '—';
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60);
+  return h>0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m ${String(Math.floor(sec%60)).padStart(2,'0')}s`;
+}
+function csFmtAbsTime(nowMs, offsetSec) {
+  return new Date(nowMs+offsetSec*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+
+function csSimulate({currentGrain,productionPerH,consumptionPerH,granaryCapacity,incoming,outgoing,durationH}) {
+  const netPerH=productionPerH-consumptionPerH, netPerSec=netPerH/3600;
+  const durationSec=durationH*3600, STEP=120, totalSteps=Math.ceil(durationSec/STEP);
+  const events=[...incoming.map(d=>({...d,grainDelta:+d.grain,sign:+1})),...outgoing.map(d=>({...d,grainDelta:-d.grain,sign:-1}))].sort((a,b)=>a.offsetSec-b.offsetSec);
+  let grain=currentGrain, evIdx=0;
+  const labels=[], grainData=[], deliveryPoints={incoming:[],outgoing:[]};
+  let zeroSec=null, overflowSec=null, prevGrain=currentGrain;
+  for (let step=0;step<=totalSteps;step++) {
+    const t=step*STEP, prevT=(step-1)*STEP;
+    while (evIdx<events.length && events[evIdx].offsetSec<=t) {
+      const ev=events[evIdx++];
+      if (ev.offsetSec>prevT||step===0) {
+        grain+=ev.grainDelta;
+        const pt={x:step,y:Math.max(0,grain),label:ev};
+        if (ev.sign>0) deliveryPoints.incoming.push(pt);
+        else deliveryPoints.outgoing.push(pt);
+      }
+    }
+    if (step>0) grain+=netPerSec*STEP;
+    if (grain<0&&zeroSec===null) {
+      const rate=(grain-prevGrain)/STEP;
+      zeroSec = rate<0 ? t-STEP+(-prevGrain/rate) : t;
+    }
+    if (granaryCapacity>0&&grain>=granaryCapacity&&overflowSec===null) {
+      const rate=(grain-prevGrain)/STEP;
+      overflowSec = rate>0 ? t-STEP+(granaryCapacity-prevGrain)/rate : t;
+    }
+    prevGrain=grain;
+    labels.push(step);
+    grainData.push(Math.round(grain));
+  }
+  return {labels,grainData,deliveryPoints,zeroSec,overflowSec,netPerH,totalSteps,STEP};
+}
+
+let csChartInstance=null;
+function csBuildChart(simResult,granaryCapacity,durationH,nowMs) {
+  const {labels,grainData,deliveryPoints,STEP}=simResult;
+  const canvas=document.getElementById('cs-grainChart');
+  const ctx=canvas.getContext('2d');
+  if (csChartInstance) { csChartInstance.destroy(); csChartInstance=null; }
+  const xLabels=labels.map(step=>new Date(nowMs+step*STEP*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}));
+  const grad=ctx.createLinearGradient(0,0,0,300);
+  grad.addColorStop(0,'rgba(34,197,94,0.35)');
+  grad.addColorStop(0.5,'rgba(34,197,94,0.12)');
+  grad.addColorStop(1,'rgba(34,197,94,0.02)');
+  const segColor=(ctx2)=>{
+    const g=grainData[ctx2.p0DataIndex];
+    if (g<=0) return 'rgba(239,68,68,0.9)';
+    if (granaryCapacity>0&&g>=granaryCapacity*0.95) return 'rgba(245,158,11,0.9)';
+    return 'rgba(34,197,94,0.9)';
+  };
+  const datasets=[
+    {label:'🌾 Grain',data:grainData,borderColor:segColor,backgroundColor:grad,segment:{borderColor:segColor},borderWidth:2,fill:true,tension:0.35,pointRadius:0,pointHoverRadius:5,order:1},
+    {label:'Zero',data:grainData.map(()=>0),borderColor:'rgba(239,68,68,0.6)',borderWidth:1.5,borderDash:[6,4],fill:false,pointRadius:0,order:3},
+  ];
+  if (granaryCapacity>0) datasets.push({label:'Full',data:grainData.map(()=>granaryCapacity),borderColor:'rgba(245,158,11,0.6)',borderWidth:1.5,borderDash:[6,4],fill:false,pointRadius:0,order:4});
+  if (deliveryPoints.incoming.length) datasets.push({label:'↓ Incoming',data:deliveryPoints.incoming.map(p=>({x:p.x,y:Math.max(0,p.y)})),type:'scatter',borderColor:'#4ade80',backgroundColor:'#4ade80',pointRadius:5,pointHoverRadius:7,showLine:false,order:2});
+  if (deliveryPoints.outgoing.length) datasets.push({label:'↑ Outgoing',data:deliveryPoints.outgoing.map(p=>({x:p.x,y:Math.max(0,p.y)})),type:'scatter',borderColor:'#f87171',backgroundColor:'#f87171',pointRadius:5,pointHoverRadius:7,showLine:false,order:2});
+  const tickEvery=Math.max(1,Math.floor(3600/STEP));
+  csChartInstance=new Chart(ctx,{type:'line',data:{labels:xLabels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9ca3af',font:{size:11},usePointStyle:true,pointStyleWidth:10,padding:14}},tooltip:{backgroundColor:'rgba(15,20,35,.95)',borderColor:'rgba(255,255,255,.12)',borderWidth:1,padding:10,callbacks:{title:(items)=>xLabels[items[0].dataIndex]||'',label:(item)=>{if (item.dataset.label==='Zero'||item.dataset.label==='Full') return null;const val=item.raw?.y!==undefined?item.raw.y:item.raw;return ` ${item.dataset.label}: ${csFmt(val)}`;}}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)',drawTicks:false},ticks:{color:'#6b7280',font:{size:10},maxRotation:0,callback:(val,idx)=>idx%tickEvery===0?xLabels[idx]:''},border:{color:'rgba(255,255,255,.08)'}},y:{grid:{color:'rgba(255,255,255,.05)',drawTicks:false},ticks:{color:'#9ca3af',font:{size:10},callback:v=>csFmt(v),padding:6},border:{display:false},beginAtZero:true}}}});
+}
+
+function csParsAndSimulate() {
+  const rawText=document.getElementById('cs-marketPaste').value;
+  const currentGrain=csReadNum('cs-currentGrain');
+  const netPerH=csReadSignedNum('cs-netGrainPerH');
+  const productionPerH=netPerH>=0?netPerH:0;
+  const consumptionPerH=netPerH<0?-netPerH:0;
+  const granaryCapacity=csReadNum('cs-granaryCapacity');
+  const durationH=parseInt(document.getElementById('cs-simHours').value)||48;
+  const statusEl=document.getElementById('cs-parseStatus');
+  let parsed={incoming:[],outgoing:[]};
+  if (rawText.trim().length>5) {
+    try {
+      parsed=csParseMarketText(rawText);
+      const total=parsed.incoming.length+parsed.outgoing.length;
+      statusEl.textContent = total===0 ? '⚠️ No deliveries detected' : `✅ ${parsed.incoming.length} incoming, ${parsed.outgoing.length} outgoing`;
+      statusEl.style.color = total===0 ? '#f87171' : '#4ade80';
+    } catch(e) { statusEl.textContent='⚠️ Parse error: '+e.message; statusEl.style.color='#f87171'; }
+  } else {
+    statusEl.textContent='No marketplace data — pure production simulation';
+    statusEl.style.color='var(--text-muted)';
+  }
+  if (!currentGrain&&netPerH===0&&!parsed.incoming.length&&!parsed.outgoing.length) {
+    statusEl.textContent='⚠️ Please enter village parameters or paste marketplace data.';
+    statusEl.style.color='#f87171';
+    return;
+  }
+  const simResult=csSimulate({currentGrain,productionPerH,consumptionPerH,granaryCapacity,incoming:parsed.incoming,outgoing:parsed.outgoing,durationH});
+  csRenderResults(simResult,{currentGrain,productionPerH,consumptionPerH,granaryCapacity,durationH,incoming:parsed.incoming,outgoing:parsed.outgoing});
+}
+
+function csRenderResults(sim,params) {
+  const {zeroSec,overflowSec,netPerH,grainData}=sim;
+  const {currentGrain,productionPerH,consumptionPerH,granaryCapacity,durationH,incoming,outgoing}=params;
+  const nowMs=Date.now();
+  document.getElementById('cs-resultsSection').style.display='block';
+  document.getElementById('cs-resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Alerts
+  const alerts=[];
+  if (zeroSec!==null&&zeroSec>=0) {
+    alerts.push({type:'danger',icon:'💀',html:`<strong>Troop starvation imminent!</strong> Grain runs out <strong>in ${csFmtDuration(zeroSec)} (at ${csFmtAbsTime(nowMs,zeroSec)})</strong>.${netPerH<0?` Net deficit: <strong>${csFmt(Math.abs(netPerH))} G/h</strong>.`:''}`});
+  } else {
+    alerts.push({type:'ok',icon:'✅',html:`Grain supply secured for <strong>${durationH} hours</strong>. No troop starvation.`});
+  }
+  if (overflowSec!==null&&granaryCapacity>0) {
+    alerts.push({type:'warn',icon:'🏚️',html:`<strong>Warehouse overflows</strong> in ${csFmtDuration(overflowSec)} (at ${csFmtAbsTime(nowMs,overflowSec)}). Grain will be lost.`});
+  }
+  document.getElementById('cs-alertsSection').innerHTML=alerts.map(a=>`<div class="cs-alert cs-alert-${a.type}"><span class="cs-alert-icon">${a.icon}</span><div>${a.html}</div></div>`).join('');
+
+  // KPIs
+  const totalIncoming=incoming.reduce((s,d)=>s+d.grain,0);
+  const totalOutgoing=outgoing.reduce((s,d)=>s+d.grain,0);
+  const kpis=[
+    {label:'🌾 Current',value:csFmt(currentGrain),cls:''},
+    {label:'⚖️ Net / h',value:(netPerH>=0?'+':'')+csFmt(netPerH)+' G/h',cls:netPerH>=0?'cs-ok':'cs-danger'},
+    {label:'↓ Incoming',value:csFmt(totalIncoming)+' G',cls:'cs-ok'},
+    {label:'↑ Outgoing',value:csFmt(totalOutgoing)+' G',cls:totalOutgoing>0?'cs-warn':''},
+    {label:'📊 Max',value:csFmt(Math.max(...grainData)),cls:''},
+    {label:'📊 Min',value:csFmt(Math.min(...grainData)),cls:Math.min(...grainData)<0?'cs-danger':''},
+  ];
+  if (zeroSec!==null) kpis.push({label:'💀 Starvation in',value:csFmtDuration(zeroSec),cls:'cs-danger'});
+  if (overflowSec!==null) kpis.push({label:'🏚️ Overflow in',value:csFmtDuration(overflowSec),cls:'cs-warn'});
+  document.getElementById('cs-kpiRow').innerHTML=kpis.map(k=>`<div class="cs-kpi"><div class="cs-kpi-label">${k.label}</div><div class="cs-kpi-value ${k.cls}">${k.value}</div></div>`).join('');
+
+  // Chart subtitle
+  document.getElementById('cs-chartSubtitle').textContent=`${durationH}h simulation · ${incoming.length+outgoing.length} deliveries · Net ${netPerH>=0?'+':''}${csFmt(netPerH)} G/h`;
+
+  // Starvation box
+  if (zeroSec!==null) {
+    document.getElementById('cs-starvationBox').style.display='block';
+    const needed=Math.max(0,Math.ceil(consumptionPerH*durationH-productionPerH*durationH-currentGrain-totalIncoming+totalOutgoing));
+    document.getElementById('cs-starvationDetails').innerHTML=`
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+        <div class="cs-kpi" style="border-color:rgba(239,68,68,.35);"><div class="cs-kpi-label">Time to starvation</div><div class="cs-kpi-value cs-danger">${csFmtDuration(zeroSec)}</div></div>
+        <div class="cs-kpi" style="border-color:rgba(239,68,68,.35);"><div class="cs-kpi-label">Deficit after 0</div><div class="cs-kpi-value cs-danger">${csFmt(Math.abs(netPerH))} G/h</div></div>
+        ${needed>0?`<div class="cs-kpi" style="border-color:rgba(245,158,11,.35);"><div class="cs-kpi-label">Missing grain (${durationH}h)</div><div class="cs-kpi-value cs-warn">${csFmt(needed)}</div></div>`:''}
+      </div>
+      <p style="font-size:.84rem;color:var(--text-muted);margin:0;line-height:1.6;">
+        ⚠️ Troops consume <strong style="color:#f87171;">${csFmt(consumptionPerH)} G/h</strong>,
+        production delivers <strong style="color:#4ade80;">${csFmt(productionPerH)} G/h</strong> —
+        deficit <strong style="color:#f87171;">${csFmt(Math.abs(netPerH))} G/h</strong>.
+        ${needed>0?`To avoid starvation for ${durationH}h, you need <strong>${csFmt(needed)} grain</strong> additionally.`:'Current deliveries cover the period.'}
+      </p>`;
+  } else {
+    document.getElementById('cs-starvationBox').style.display='none';
+  }
+
+  // Delivery table
+  const allDel=[...incoming,...outgoing].sort((a,b)=>a.offsetSec-b.offsetSec);
+  document.getElementById('cs-deliveryCount').textContent=`${incoming.length} incoming · ${outgoing.length} outgoing · ${csFmt(totalIncoming)} G incoming`;
+  const tbody=document.getElementById('cs-deliveryTableBody');
+  if (allDel.length===0) {
+    tbody.innerHTML=`<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.85rem;">No deliveries detected — paste marketplace data for merchant analysis.</td></tr>`;
+  } else {
+    tbody.innerHTML=allDel.map(d=>{
+      const dir=d.isReturn
+        ?`<span class="cs-tag-in" style="background:rgba(96,165,250,.15);color:#93c5fd;border-color:rgba(96,165,250,.3);">↩ Return</span>`
+        :d.isOutgoing
+          ?`<span class="cs-tag-out">↑ Outgoing</span>`
+          :`<span class="cs-tag-in">↓ Incoming</span>`;
+      const when=d.serverTime||csFmtAbsTime(nowMs,d.offsetSec);
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+        <td style="padding:.45rem .75rem;">${dir}</td>
+        <td style="padding:.45rem .75rem;font-family:monospace;font-size:.82rem;color:#fbbf24;">${csFmtDuration(d.offsetSec)}</td>
+        <td style="padding:.45rem .75rem;font-family:monospace;font-size:.82rem;color:var(--text-muted);">${when}</td>
+        <td style="padding:.45rem .75rem;text-align:right;${d.grain>0?'font-weight:700;color:#f59e0b;':''}">${d.grain>0?csFmt(d.grain):'—'}</td>
+        <td style="padding:.45rem .75rem;text-align:right;color:var(--text-muted);">${d.wood>0?csFmt(d.wood):'—'}</td>
+        <td style="padding:.45rem .75rem;text-align:right;color:var(--text-muted);">${d.clay>0?csFmt(d.clay):'—'}</td>
+        <td style="padding:.45rem .75rem;text-align:right;color:var(--text-muted);">${d.iron>0?csFmt(d.iron):'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  csBuildChart(sim,granaryCapacity,durationH,nowMs);
+}
+
+function csLoadExample() {
+  document.getElementById('cs-currentGrain').value='481.743';
+  document.getElementById('cs-netGrainPerH').value='-3.800';
+  document.getElementById('cs-netGrainPerH').style.borderColor='rgba(239,68,68,.6)';
+  document.getElementById('cs-granaryCapacity').value='960.000';
+  document.getElementById('cs-simHours').value='48';
+  document.getElementById('cs-marketPaste').value=`Ankommende Lieferungen
+Transport von - 11 Oddysee : Currax
+3×
+0
+22.000
+0
+0
+0
+22.000
+0
+0
+in 00:06:33 um 02:05
+0
+22.000
+0
+0
+in 01:00:37 um 02:59
+Transport von - 12 Pointed : Currax
+1×
+0
+0
+0
+2.700
+in 00:14:38 um 02:13
+Transport von 01 - In Flames : Borknagar_sk
+1×
+33.000
+33.000
+33.000
+0
+in 00:25:25 um 02:24
+Ausgehende Lieferungen
+0
+Keine ausgehenden Lieferungen`;
+  csParsAndSimulate();
+}
+
+// Live parse feedback
+document.getElementById('cs-marketPaste').addEventListener('input', () => {
+  const raw=document.getElementById('cs-marketPaste').value.trim();
+  const statusEl=document.getElementById('cs-parseStatus');
+  if (raw.length<10) { statusEl.textContent=''; return; }
+  try {
+    const p=csParseMarketText(raw);
+    const total=p.incoming.length+p.outgoing.length;
+    statusEl.textContent = total===0 ? '⚠️ No deliveries detected' : `✅ ${p.incoming.length} incoming · ${p.outgoing.length} outgoing`;
+    statusEl.style.color = total===0 ? '#f59e0b' : '#4ade80';
+  } catch(e) { statusEl.textContent='⚠️ '+e.message; statusEl.style.color='#f87171'; }
+});
 </script>
 {% endblock %}
