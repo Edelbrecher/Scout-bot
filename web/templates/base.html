@@ -32,11 +32,6 @@
       <span class="nav-brand">TravOps</span>
     </a>
     <div class="nav-links" style="align-items:center;">
-      <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
-      <a href="/plans" data-i18n="nav.plans">Pricing</a>
-      {% if _is_admin %}
-      <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
-      {% endif %}
       {% if guild is defined and guild %}
         {% set _world_url = guild.tw_world or '' %}
         {% set _world_name = _world_url | replace('https://','') | replace('http://','') | replace('/','') if _world_url else '' %}
@@ -54,6 +49,11 @@
              title="{{ _world_url }}">{{ _world_name }}</a>
           {% endif %}
         </div>
+      {% endif %}
+      <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
+      <a href="/plans" data-i18n="nav.plans">Pricing</a>
+      {% if _is_admin %}
+      <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
       {% endif %}
       <!-- Tour button: starts the appropriate tour for the current page -->
       <button id="nav-tour-btn" onclick="navStartTour()"
