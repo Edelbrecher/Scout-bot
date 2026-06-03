@@ -3187,6 +3187,20 @@ async def sector_monitor_page(request: Request, guild_id: str):
     monitor = await database.get_sector_monitor(guild_id) or {} if has_player_pro else {}
     alerts = await database.get_sector_alerts(guild_id, include_dismissed=False, limit=100) if has_player_pro else []
     meta_groups = await database.get_meta_groups(guild_id) if has_player_pro else []
+    available_alliances = await database.get_alliance_names_from_snapshot(guild_id) if has_player_pro else []
+    # Parse stored monitored_alliances into a set for template
+    monitored_set = set()
+    if monitor:
+        raw = str(monitor.get("monitored_alliances") or "")
+        monitored_set = {a.strip() for a in raw.split(",") if a.strip()}
+    # Decode extra JSON in alerts
+    import json as _json
+    for a in alerts:
+        if isinstance(a.get("extra"), str):
+            try: a["extra"] = _json.loads(a["extra"])
+            except Exception: a["extra"] = {}
+        elif not isinstance(a.get("extra"), dict):
+            a["extra"] = {}
     scanned = request.query_params.get("scanned")
     new_count = int(request.query_params.get("new_count", 0))
     # Count stats
@@ -3197,6 +3211,7 @@ async def sector_monitor_page(request: Request, guild_id: str):
         "fast_growth": sum(1 for a in alerts if a["alert_type"] == "fast_growth"),
     }
     billing_url = _billing_url(guild, guild_id, "premium_required")
+    stats["capital_change"] = sum(1 for a in alerts if a["alert_type"] == "capital_change")
     return templates.TemplateResponse("sector_monitor.html", {
         "request": request,
         "guild": guild,
@@ -3205,6 +3220,8 @@ async def sector_monitor_page(request: Request, guild_id: str):
         "monitor": monitor,
         "alerts": alerts,
         "meta_groups": meta_groups,
+        "available_alliances": available_alliances,
+        "monitored_set": monitored_set,
         "stats": stats,
         "scanned": scanned,
         "new_count": new_count,
@@ -3212,32 +3229,29 @@ async def sector_monitor_page(request: Request, guild_id: str):
 
 
 @app.post("/guild/{guild_id}/map/sector-monitor/save")
-async def sector_monitor_save(
-    request: Request, guild_id: str,
-    enabled: int = Form(0),
-    x1: int = Form(-50), y1: int = Form(-50),
-    x2: int = Form(50),  y2: int = Form(50),
-    watch_new_village: int = Form(0),
-    watch_nobling: int = Form(0),
-    watch_fast_growth: int = Form(0),
-    growth_threshold: int = Form(200),
-    nobling_threshold: int = Form(500),
-    sectors: str = Form(""),
-):
+async def sector_monitor_save(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    form = await request.form()
+    def _fi(k, d):
+        try: return int(form.get(k, d))
+        except: return d
+    # Collect multi-value monitored_alliances checkboxes
+    monitored_alliances = ",".join(form.getlist("monitored_alliances"))
     await database.upsert_sector_monitor(
         guild_id,
-        enabled=enabled,
-        x1=x1, y1=y1, x2=x2, y2=y2,
-        watch_new_village=watch_new_village,
-        watch_nobling=watch_nobling,
-        watch_fast_growth=watch_fast_growth,
-        growth_threshold=growth_threshold,
-        nobling_threshold=nobling_threshold,
-        sectors=sectors,
+        enabled              = _fi("enabled", 0),
+        x1=_fi("x1",-50), y1=_fi("y1",-50), x2=_fi("x2",50), y2=_fi("y2",50),
+        watch_new_village    = _fi("watch_new_village", 0),
+        watch_nobling        = _fi("watch_nobling", 0),
+        watch_fast_growth    = _fi("watch_fast_growth", 0),
+        watch_capital_change = _fi("watch_capital_change", 0),
+        growth_threshold     = _fi("growth_threshold", 200),
+        nobling_threshold    = _fi("nobling_threshold", 500),
+        sectors              = str(form.get("sectors", "")),
+        monitored_alliances  = monitored_alliances,
     )
     return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor?saved=1", status_code=303)
 

@@ -280,32 +280,51 @@
           </div>
         </div>
 
+        {# HD (capital) change detection #}
+        <div style="margin-bottom:1.5rem;">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;">
+            <input type="hidden" name="watch_capital_change" value="0">
+            <input type="checkbox" name="watch_capital_change" value="1"
+              {% if monitor.get('watch_capital_change') %}checked{% endif %}
+              style="accent-color:#a78bfa;">
+            🏰 Capital (HD) change — detect when a player moves their capital
+          </label>
+        </div>
+
+        {# Monitored Alliances #}
+        <div style="margin-bottom:1.5rem;">
+          <div style="font-size:.85rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem;">🔭 Monitored Alliances</div>
+          {% if available_alliances %}
+          <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.6rem;">
+            Select which alliances to watch. Leave all unchecked to use the
+            <a href="/guild/{{ guild.guild_id }}/map" style="color:#60a5fa;">Meta-Builder</a> groups instead.
+          </div>
+          <div id="alliancePickerWrap" style="max-height:220px;overflow-y:auto;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;display:flex;flex-direction:column;gap:.25rem;">
+            {% for a in available_alliances %}
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.83rem;padding:.15rem 0;">
+              <input type="checkbox" name="monitored_alliances" value="{{ a.alliance_name }}"
+                {% if a.alliance_name in monitored_set %}checked{% endif %}
+                style="accent-color:#6366f1;flex-shrink:0;">
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.alliance_name }}</span>
+              <span style="font-size:.7rem;color:var(--text-muted);flex-shrink:0;">{{ a.village_count }} villages · {{ a.member_count }} members</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div style="margin-top:.4rem;display:flex;gap:.5rem;font-size:.75rem;">
+            <button type="button" onclick="document.querySelectorAll('[name=monitored_alliances]').forEach(c=>c.checked=true)" style="background:none;border:none;color:#6366f1;cursor:pointer;padding:0;">Select all</button>
+            <button type="button" onclick="document.querySelectorAll('[name=monitored_alliances]').forEach(c=>c.checked=false)" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;">Clear all</button>
+          </div>
+          {% else %}
+          <p style="font-size:.8rem;color:#f59e0b;">⚠️ No snapshot data yet — fetch a map snapshot first to see alliances.</p>
+          {% endif %}
+        </div>
+
         <button type="submit" class="btn btn-primary">💾 Save settings</button>
       </form>
 
       <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/scan" style="margin-top:.75rem;">
         <button type="submit" class="btn btn-secondary">🔍 Scan now</button>
       </form>
-
-      <p style="margin-top:1rem;font-size:.8rem;color:var(--text-muted);">
-        ℹ️ Monitored meta-alliances are configured in the
-        <a href="/guild/{{ guild.guild_id }}/map" style="color:#60a5fa;">Meta-Builder</a> on the map page.
-      </p>
-
-      {% if meta_groups %}
-      <div style="margin-top:.75rem;">
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;">Monitored alliances:</div>
-        <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
-          {% for group in meta_groups %}
-            {% for aname in group.alliances %}
-            <span style="font-size:.78rem;background:var(--bg-main);border:1px solid var(--border);border-radius:12px;padding:2px 10px;color:var(--text);">{{ aname }}</span>
-            {% endfor %}
-          {% endfor %}
-        </div>
-      </div>
-      {% else %}
-      <p style="margin-top:.5rem;font-size:.8rem;color:#f59e0b;">⚠️ No meta-alliances configured. Set them up in the Meta-Builder first.</p>
-      {% endif %}
     </div>
   </details>
 
@@ -313,7 +332,7 @@
   <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;margin-bottom:1.5rem;align-items:start;">
 
     {# KPI cards #}
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
       <div class="card" style="padding:1rem;text-align:center;">
         <div style="font-size:1.6rem;font-weight:800;color:#f1f5f9;">{{ stats.total }}</div>
         <div style="font-size:.75rem;color:var(--text-muted);">Total alerts</div>
@@ -329,6 +348,10 @@
       <div class="card" style="padding:1rem;text-align:center;">
         <div style="font-size:1.6rem;font-weight:800;color:#fbbf24;">{{ stats.fast_growth }}</div>
         <div style="font-size:.75rem;color:var(--text-muted);">📈 Fast growth</div>
+      </div>
+      <div class="card" style="padding:1rem;text-align:center;">
+        <div style="font-size:1.6rem;font-weight:800;color:#a78bfa;">{{ stats.capital_change }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);">🏰 HD changes</div>
       </div>
     </div>
 
@@ -392,6 +415,8 @@
           <circle cx="{{ ax }}" cy="{{ ay }}" r="3" fill="#60a5fa" opacity="0.9"/>
         {% elif alert.alert_type == 'nobling' %}
           <circle cx="{{ ax }}" cy="{{ ay }}" r="3" fill="#f87171" opacity="0.9"/>
+        {% elif alert.alert_type == 'capital_change' %}
+          <circle cx="{{ ax }}" cy="{{ ay }}" r="4" fill="#a78bfa" opacity="0.9"/>
         {% else %}
           <circle cx="{{ ax }}" cy="{{ ay }}" r="3" fill="#fbbf24" opacity="0.9"/>
         {% endif %}
@@ -430,26 +455,47 @@
       {% set bg='#1e3a5f' %}{% set col='#93c5fd' %}{% set bd='#1d4ed8' %}{% set lbl='🆕 New village' %}
     {% elif alert.alert_type == 'nobling' %}
       {% set bg='#3b0f0f' %}{% set col='#fca5a5' %}{% set bd='#b91c1c' %}{% set lbl='👑 Nobling' %}
+    {% elif alert.alert_type == 'capital_change' %}
+      {% set bg='#2a1a4a' %}{% set col='#c4b5fd' %}{% set bd='#7c3aed' %}{% set lbl='🏰 HD changed' %}
     {% else %}
       {% set bg='#2d2006' %}{% set col='#fde68a' %}{% set bd='#b45309' %}{% set lbl='📈 Fast growth' %}
     {% endif %}
-    <div class="card" style="padding:.9rem 1.1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
-      <div style="display:flex;align-items:center;gap:.85rem;flex-wrap:wrap;flex:1;min-width:0;">
-        <span style="font-size:.75rem;font-weight:700;background:{{ bg }};color:{{ col }};border:1px solid {{ bd }};border-radius:12px;padding:3px 10px;white-space:nowrap;">{{ lbl }}</span>
-        <div style="min-width:0;">
+    <div class="card" style="padding:.9rem 1.1rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+      <div style="display:flex;align-items:flex-start;gap:.85rem;flex-wrap:wrap;flex:1;min-width:0;">
+        <span style="font-size:.75rem;font-weight:700;background:{{ bg }};color:{{ col }};border:1px solid {{ bd }};border-radius:12px;padding:3px 10px;white-space:nowrap;flex-shrink:0;">{{ lbl }}</span>
+        <div style="min-width:0;flex:1;">
           <div style="font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ alert.village_name or '—' }}</div>
           <div style="font-size:.78rem;color:var(--text-muted);">{{ alert.player_name or '—' }} · {{ alert.alliance_name or '—' }}</div>
-        </div>
-        <span style="font-family:monospace;font-size:.85rem;color:#93c5fd;white-space:nowrap;">{{ alert.x }}|{{ alert.y }}</span>
-        <div style="font-size:.85rem;white-space:nowrap;">
-          <span>{{ alert.population }} pop</span>
-          {% if alert.pop_change and alert.pop_change > 0 %}
-          <span style="color:#4ade80;font-size:.8rem;"> +{{ alert.pop_change }}</span>
+          {% if alert.alert_type == 'capital_change' %}
+            {% set ex = alert.extra or {} %}
+            {% if ex.get('old_is_capital') == 0 and ex.get('new_is_capital') == 1 %}
+            <div style="font-size:.78rem;color:#a78bfa;margin-top:.2rem;">
+              🏰 → Became capital
+              <span style="color:var(--text-muted);">between
+                <strong>{{ (ex.get('ts_old') or '')[:16].replace('T',' ') }}</strong>
+                and
+                <strong>{{ (ex.get('ts_new') or '')[:16].replace('T',' ') }}</strong>
+              </span>
+            </div>
+            {% elif ex.get('old_is_capital') == 1 and ex.get('new_is_capital') == 0 %}
+            <div style="font-size:.78rem;color:#f87171;margin-top:.2rem;">
+              ❌ Lost capital status
+              <span style="color:var(--text-muted);">between
+                <strong>{{ (ex.get('ts_old') or '')[:16].replace('T',' ') }}</strong>
+                and
+                <strong>{{ (ex.get('ts_new') or '')[:16].replace('T',' ') }}</strong>
+              </span>
+            </div>
+            {% endif %}
           {% endif %}
         </div>
-        <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">{{ alert.detected_at[:16].replace('T',' ') if alert.detected_at else '' }}</span>
+        <div style="display:flex;flex-direction:column;gap:.2rem;flex-shrink:0;">
+          <span style="font-family:monospace;font-size:.85rem;color:#93c5fd;">{{ alert.x }}|{{ alert.y }}</span>
+          <span style="font-size:.85rem;">{{ alert.population }} pop{% if alert.pop_change and alert.pop_change > 0 %} <span style="color:#4ade80;font-size:.8rem;">+{{ alert.pop_change }}</span>{% endif %}</span>
+          <span style="font-size:.72rem;color:var(--text-muted);">{{ alert.detected_at[:16].replace('T',' ') if alert.detected_at else '' }}</span>
+        </div>
       </div>
-      <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/dismiss/{{ alert.id }}">
+      <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/dismiss/{{ alert.id }}" style="flex-shrink:0;">
         <button type="submit" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;opacity:.7;">✕ Dismiss</button>
       </form>
     </div>

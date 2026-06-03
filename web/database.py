@@ -2017,9 +2017,9 @@ async def get_own_village_ids(guild_id: str, discord_id: str, tw_player_name: st
         if not own:
             return []
         # Lookup village_ids from latest snapshot
-        latest_ts_row = await db.execute(
+        latest_ts_cur = await db.execute(
             "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,))
-        row = await (await latest_ts_row).fetchone()
+        row = await latest_ts_cur.fetchone()
         latest_ts = row[0] if row else None
         if not latest_ts:
             return [{**v, "village_id": None} for v in own]
@@ -8041,9 +8041,19 @@ async def _init_sector_monitor_tables():
             await db.commit()
         except Exception:
             pass
-        # Migration: add sectors column if missing
+        # Migrations
+        for col, default in [
+            ("sectors",              "''"),
+            ("monitored_alliances",  "''"),
+            ("watch_capital_change", "0"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE sector_monitors ADD COLUMN {col} TEXT DEFAULT {default}")
+                await db.commit()
+            except Exception:
+                pass
         try:
-            await db.execute("ALTER TABLE sector_monitors ADD COLUMN sectors TEXT DEFAULT ''")
+            await db.execute("ALTER TABLE sector_alerts ADD COLUMN extra TEXT DEFAULT '{}'")
             await db.commit()
         except Exception:
             pass
@@ -8069,16 +8079,18 @@ async def upsert_sector_monitor(guild_id: str, **fields) -> None:
         "enabled": 1,
         "x1": -50, "y1": -50, "x2": 50, "y2": 50,
         "watch_new_village": 1, "watch_nobling": 1, "watch_fast_growth": 1,
+        "watch_capital_change": 0,
         "growth_threshold": 200, "nobling_threshold": 500,
+        "monitored_alliances": "", "sectors": "",
     }
     existing.update(fields)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT OR REPLACE INTO sector_monitors
                 (guild_id, enabled, x1, y1, x2, y2,
-                 watch_new_village, watch_nobling, watch_fast_growth,
-                 growth_threshold, nobling_threshold, sectors, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+                 watch_new_village, watch_nobling, watch_fast_growth, watch_capital_change,
+                 growth_threshold, nobling_threshold, sectors, monitored_alliances, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
         """, (
             guild_id,
             int(existing.get("enabled", 1)),
@@ -8087,9 +8099,11 @@ async def upsert_sector_monitor(guild_id: str, **fields) -> None:
             int(existing.get("watch_new_village", 1)),
             int(existing.get("watch_nobling", 1)),
             int(existing.get("watch_fast_growth", 1)),
+            int(existing.get("watch_capital_change", 0)),
             int(existing.get("growth_threshold", 200)),
             int(existing.get("nobling_threshold", 500)),
             str(existing.get("sectors", "")),
+            str(existing.get("monitored_alliances", "")),
         ))
         await db.commit()
 
@@ -8165,9 +8179,9 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
 
-        # Load villages in bounding box for both snapshots
+        # Load villages in bounding box for both snapshots (include is_capital)
         async with db.execute(
-            """SELECT village_id, x, y, village_name, player_name, alliance_name, population
+            """SELECT village_id, x, y, village_name, player_name, alliance_name, population, is_capital
                FROM map_snapshots
                WHERE guild_id=? AND fetched_at=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?""",
             (guild_id, ts_new, x1, x2, y1, y2)
@@ -8175,57 +8189,46 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
             new_rows = [dict(r) for r in await cur.fetchall()]
 
         async with db.execute(
-            """SELECT village_id, x, y, village_name, player_name, alliance_name, population
+            """SELECT village_id, x, y, village_name, player_name, alliance_name, population, is_capital
                FROM map_snapshots
                WHERE guild_id=? AND fetched_at=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?""",
             (guild_id, ts_old, x1, x2, y1, y2)
         ) as cur:
             old_rows = [dict(r) for r in await cur.fetchall()]
 
-        # Get all meta-alliance names for this guild
-        async with db.execute(
-            """SELECT LOWER(amm.alliance_name) as aname
-               FROM alliance_meta_members amm
-               JOIN alliance_meta_groups amg ON amg.id = amm.group_id
-               WHERE amg.guild_id=?""",
-            (guild_id,)
-        ) as cur:
-            meta_rows = await cur.fetchall()
+        # Build alliance filter: prefer monitored_alliances, fallback to meta-groups
+        monitored_alliances_raw = str(monitor.get("monitored_alliances") or "").strip()
+        if monitored_alliances_raw:
+            # Direct alliance selection
+            selected_alliances = {a.strip().lower() for a in monitored_alliances_raw.split(",") if a.strip()}
+        else:
+            # Fallback: meta-groups
+            async with db.execute(
+                """SELECT LOWER(amm.alliance_name) as aname
+                   FROM alliance_meta_members amm
+                   JOIN alliance_meta_groups amg ON amg.id = amm.group_id
+                   WHERE amg.guild_id=?""",
+                (guild_id,)
+            ) as cur:
+                meta_rows = await cur.fetchall()
+            selected_alliances = {r["aname"] for r in meta_rows}
 
-    meta_alliance_names = {r["aname"] for r in meta_rows}
+    def in_selected(row):
+        return (row.get("alliance_name") or "").lower() in selected_alliances
 
-    # Filter by meta-alliance membership
-    def in_meta(row):
-        return (row.get("alliance_name") or "").lower() in meta_alliance_names
-
-    new_filtered = [r for r in new_rows if in_meta(r)]
-    old_filtered = [r for r in old_rows if in_meta(r)]
+    new_filtered = [r for r in new_rows if in_selected(r)]
+    old_filtered = [r for r in old_rows if in_selected(r)]
 
     old_by_id = {r["village_id"]: r for r in old_filtered}
     new_by_id = {r["village_id"]: r for r in new_filtered}
 
     new_alerts: list[dict] = []
 
-    for vid, nv in new_by_id.items():
-        alert_type = None
-        pop_change = 0
+    import json as _json
 
-        if monitor.get("watch_new_village") and vid not in old_by_id:
-            alert_type = "new_village"
-        elif vid in old_by_id:
-            diff = nv["population"] - old_by_id[vid]["population"]
-            if diff >= nobling_thr and monitor.get("watch_nobling"):
-                alert_type = "nobling"
-                pop_change = diff
-            elif diff >= growth_thr and monitor.get("watch_fast_growth"):
-                alert_type = "fast_growth"
-                pop_change = diff
-
-        if not alert_type:
-            continue
-
-        # Skip duplicate: same guild+x+y+alert_type within 1 hour
+    async def _insert_alert(nv, alert_type, pop_change=0, extra=None):
         async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT id FROM sector_alerts
                    WHERE guild_id=? AND x=? AND y=? AND alert_type=?
@@ -8234,33 +8237,57 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
             ) as cur:
                 dup = await cur.fetchone()
             if dup:
-                continue
-
+                return
+            extra_json = _json.dumps(extra or {}, ensure_ascii=False)
             await db.execute(
                 """INSERT INTO sector_alerts
-                   (guild_id, alert_type, x, y, village_name, player_name, alliance_name, population, pop_change)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
-                (
-                    guild_id, alert_type, nv["x"], nv["y"],
-                    nv.get("village_name", ""), nv.get("player_name", ""),
-                    nv.get("alliance_name", ""), nv.get("population", 0), pop_change,
-                )
+                   (guild_id, alert_type, x, y, village_name, player_name,
+                    alliance_name, population, pop_change, extra)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (guild_id, alert_type, nv["x"], nv["y"],
+                 nv.get("village_name", ""), nv.get("player_name", ""),
+                 nv.get("alliance_name", ""), nv.get("population", 0), pop_change, extra_json)
             )
             await db.commit()
-
-            async with db.execute(
-                "SELECT * FROM sector_alerts WHERE rowid=last_insert_rowid()"
-            ) as cur:
-                db.row_factory = aiosqlite.Row
-                pass
             async with db.execute(
                 "SELECT * FROM sector_alerts WHERE guild_id=? ORDER BY id DESC LIMIT 1",
                 (guild_id,)
             ) as cur:
-                db.row_factory = aiosqlite.Row
                 inserted = await cur.fetchone()
                 if inserted:
-                    new_alerts.append(dict(inserted))
+                    d = dict(inserted)
+                    try: d["extra"] = _json.loads(d.get("extra") or "{}")
+                    except Exception: d["extra"] = {}
+                    new_alerts.append(d)
+
+    for vid, nv in new_by_id.items():
+        if monitor.get("watch_new_village") and vid not in old_by_id:
+            await _insert_alert(nv, "new_village")
+            continue
+
+        if vid not in old_by_id:
+            continue
+
+        ov = old_by_id[vid]
+        diff = nv["population"] - ov["population"]
+
+        if diff >= nobling_thr and monitor.get("watch_nobling"):
+            await _insert_alert(nv, "nobling", pop_change=diff)
+        elif diff >= growth_thr and monitor.get("watch_fast_growth"):
+            await _insert_alert(nv, "fast_growth", pop_change=diff)
+
+        # HD (capital) change detection
+        if monitor.get("watch_capital_change"):
+            old_cap = int(ov.get("is_capital") or 0)
+            new_cap = int(nv.get("is_capital") or 0)
+            if old_cap != new_cap:
+                extra = {
+                    "old_is_capital": old_cap,
+                    "new_is_capital": new_cap,
+                    "ts_old": ts_old,
+                    "ts_new": ts_new,
+                }
+                await _insert_alert(nv, "capital_change", extra=extra)
 
     # Send dashboard notifications to guild leaders
     if new_alerts:
