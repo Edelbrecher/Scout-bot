@@ -124,6 +124,19 @@
           </form>
           {% endif %}
 
+          {# Archive rejected request — always available for leads/admins #}
+          {% if req.status == 'rejected' %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/archive"
+                onsubmit="return confirm('Archive this rejected request? It will be moved to inactive and the channel (if any) will be archived.')"
+                style="margin:0;">
+            <button type="submit" title="Archive rejected request"
+                    style="padding:.22rem .6rem;border-radius:5px;font-size:.74rem;font-weight:600;cursor:pointer;
+                           background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.4);color:#818cf8;">
+              📦 Archive
+            </button>
+          </form>
+          {% endif %}
+
           {# Reactivate #}
           {% if req.status in ('inactive', 'hold') %}
           <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/activate" style="margin:0;">

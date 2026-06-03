@@ -716,10 +716,10 @@
       }
       if (attack.troop_count === 1) {
         score = 99;
-        reasons.push('Nur 1 Einheit = Fake');
+        reasons.push('Only 1 unit = Fake');
       } else if (attack.troop_count <= 5 && attack.troop_count > 0) {
         score = Math.max(score, 92);
-        reasons.push('Nur ' + attack.troop_count + ' Einheiten sichtbar');
+        reasons.push('Only ' + attack.troop_count + ' units visible');
       }
     } else {
       score = 40;
@@ -727,21 +727,21 @@
     }
     if (attack.attack_type === 'raid') {
       score = Math.min(100, score + 15);
-      reasons.push('Raubzug-Typ (+15% Fake-Wahrscheinlichkeit)');
+      reasons.push('Raid type (+15% fake probability)');
     }
     return { score: Math.min(100, Math.max(0, score)), reasons };
   }
 
   function fakeBadge(score) {
-    if (score >= 90) return `<span class="fake-badge fake-red" data-tip="Fake-Score ${score}% – sehr wahrsch. Fake">🔴 Fake</span>`;
-    if (score >= 70) return `<span class="fake-badge fake-orange" data-tip="Fake-Score ${score}% – wahrscheinlich Fake">🟠 Wahrsch. Fake</span>`;
-    if (score >= 40) return `<span class="fake-badge fake-yellow" data-tip="Fake-Score ${score}% – nicht eindeutig">🟡 Unbekannt</span>`;
+    if (score >= 90) return `<span class="fake-badge fake-red" data-tip="Fake score ${score}% — very likely fake">🔴 Fake</span>`;
+    if (score >= 70) return `<span class="fake-badge fake-orange" data-tip="Fake score ${score}% — probably fake">🟠 Likely Fake</span>`;
+    if (score >= 40) return `<span class="fake-badge fake-yellow" data-tip="Fake score ${score}% — unclear">🟡 Unknown</span>`;
     return `<span class="fake-badge fake-green" data-tip="Fake score ${score}% — possibly real attack">🟢 Possibly real</span>`;
   }
 
   function typeBadge(t) {
-    if (t === 'raid') return '<span class="type-raid" data-tip="Raubzug (+15% Fake-Wahrscheinlichkeit)">💰 Raubzug</span>';
-    return '<span class="type-attack" data-tip="Normaler Attack">⚔️ Attack</span>';
+    if (t === 'raid') return '<span class="type-raid" data-tip="Raid (+15% fake probability)">💰 Raid</span>';
+    return '<span class="type-attack" data-tip="Normal attack">⚔️ Attack</span>';
   }
 
   function fmtArrival(t) {
@@ -867,61 +867,63 @@
   const HS_ITEMS = {
     weapon: [
       // Romans
-      "Kurzschwert des Legionärs [T1]","Schwert des Legionärs [T2]","Langschwert des Legionärs [T3]",
-      "Kurzschwert des Prätorianers [T1]","Schwert des Prätorianers [T2]","Langschwert des Prätorianers [T3]",
-      "Kurzschwert des Imperianers [T1]","Schwert des Imperianers [T2]","Langschwert des Imperianers [T3]",
-      "Kurzschwert des Imperatoris [T1]","Schwert des Imperatoris [T2]","Langschwert des Imperatoris [T3]",
-      "Leichte Lanze des Caesaris [T1]","Lanze des Caesaris [T2]","Schwere Lanze des Caesaris [T3]",
+      "Short Sword of the Legionnaire [T1]","Sword of the Legionnaire [T2]","Long Sword of the Legionnaire [T3]",
+      "Short Sword of the Praetorian [T1]","Sword of the Praetorian [T2]","Long Sword of the Praetorian [T3]",
+      "Short Sword of the Imperian [T1]","Sword of the Imperian [T2]","Long Sword of the Imperian [T3]",
+      "Short Sword of the Imperatoris [T1]","Sword of the Imperatoris [T2]","Long Sword of the Imperatoris [T3]",
+      "Light Lance of the Caesaris [T1]","Lance of the Caesaris [T2]","Heavy Lance of the Caesaris [T3]",
       // Teutons
-      "Keule des Keulenschwingers [T1]","Morgenstern des Keulenschwingers [T2]","Streitkolben des Keulenschwingers [T3]",
-      "Speer des Speerkämpfers [T1]","Spitze des Speerkämpfers [T2]","Lanze des Speerkämpfers [T3]",
-      "Beil des Axtkämpfers [T1]","Axt des Axtkämpfers [T2]","Streitaxt des Axtkämpfers [T3]",
-      "Leichter Hammer des Paladins [T1]","Hammer des Paladins [T2]","Schwerer Hammer des Paladins [T3]",
-      "Kurzschwert des Teutonischen Ritters [T1]","Schwert des Teutonischen Ritters [T2]","Langschwert des Teutonischen Ritters [T3]",
+      "Club of the Clubswinger [T1]","Morning Star of the Clubswinger [T2]","Mace of the Clubswinger [T3]",
+      "Spear of the Spearman [T1]","Head of the Spearman [T2]","Lance of the Spearman [T3]",
+      "Hatchet of the Axeman [T1]","Axe of the Axeman [T2]","Battle Axe of the Axeman [T3]",
+      "Light Hammer of the Paladin [T1]","Hammer of the Paladin [T2]","Heavy Hammer of the Paladin [T3]",
+      "Short Sword of the Teutonic Knight [T1]","Sword of the Teutonic Knight [T2]","Long Sword of the Teutonic Knight [T3]",
       // Gauls
-      "Speer der Phalanx [T1]","Pike der Phalanx [T2]","Lanze der Phalanx [T3]",
-      "Kurzschwert des Schwertkämpfers [T1]","Schwert des Schwertkämpfers [T2]","Langschwert des Schwertkämpfers [T3]",
-      "Kurzbogen des Theutates [T1]","Bogen des Theutates [T2]","Langbogen des Theutates [T3]",
-      "Wanderstab des Druidentreiters [T1]","Stab des Druidentreiters [T2]","Großer Stab des Druidentreiters [T3]",
-      "Leichte Lanze des Haeduers [T1]","Lanze des Haeduers [T2]","Schwere Lanze des Haeduers [T3]",
+      "Spear of the Phalanx [T1]","Pike of the Phalanx [T2]","Lance of the Phalanx [T3]",
+      "Short Sword of the Swordsman [T1]","Sword of the Swordsman [T2]","Long Sword of the Swordsman [T3]",
+      "Short Bow of the Theutates [T1]","Bow of the Theutates [T2]","Long Bow of the Theutates [T3]",
+      "Walking Staff of the Druidrider [T1]","Staff of the Druidrider [T2]","Large Staff of the Druidrider [T3]",
+      "Light Lance of the Haeduan [T1]","Lance of the Haeduan [T2]","Heavy Lance of the Haeduan [T3]",
       // Huns
-      "Beil des Söldners [T1]","Axt des Söldners [T2]","Streitaxt des Söldners [T3]",
-      "Kurzbogen des Bogenschützen [T1]","Bogen des Bogenschützen [T2]","Langbogen des Bogenschützen [T3]",
-      "Spatha des Steppenreiters [T1]","Schwert des Steppenreiters [T2]","Langschwert des Steppenreiters [T3]",
+      "Hatchet of the Mercenary [T1]","Axe of the Mercenary [T2]","Battle Axe of the Mercenary [T3]",
+      "Short Bow of the Bowman [T1]","Bow of the Bowman [T2]","Long Bow of the Bowman [T3]",
+      "Spatha of the Steppe Rider [T1]","Sword of the Steppe Rider [T2]","Long Sword of the Steppe Rider [T3]",
+      "Composite Bow of the Marksman [T1]","Reinforced Bow of the Marksman [T2]","Large Composite Bow of the Marksman [T3]",
+      "Spatha of the Marauder [T1]","Sword of the Marauder [T2]","Long Sword of the Marauder [T3]",
       // Egyptians
-      "Keule der Sklavenmiliz [T1]","Morgenstern der Sklavenmiliz [T2]","Streitkolben der Sklavenmiliz [T3]",
-      "Beil des Aschenwächters [T1]","Axt des Aschenwächters [T2]","Streitaxt des Aschenwächters [T3]",
-      "Khopesh des Khopesh-Kriegers [T1]","Großer Khopesh [T2]","Riesiger Khopesh [T3]",
+      "Club of the Slave Militia [T1]","Morning Star of the Slave Militia [T2]","Mace of the Slave Militia [T3]",
+      "Hatchet of the Ash Warden [T1]","Axe of the Ash Warden [T2]","Battle Axe of the Ash Warden [T3]",
+      "Khopesh of the Khopesh Warrior [T1]","Large Khopesh of the Khopesh Warrior [T2]","Giant Khopesh of the Khopesh Warrior [T3]",
     ],
     helmet: [
-      "Helm des Bewusstseins [T1]","Helm der Erleuchtung [T2]","Helm der Weisheit [T3]",
-      "Helm der Erneuerung [T1]","Helm der Gesundheit [T2]","Helm der Heilung [T3]",
-      "Helm des Gladiators [T1]","Helm des Tribuns [T2]","Helm des Konsuls [T3]",
-      "Helm des Söldners [T1]","Helm des Kriegers [T2]","Helm des Archons [T3]",
-      "Helm des Reiters [T1]","Helm der Kavallerie [T2]","Helm der schweren Kavallerie [T3]",
+      "Helmet of Awareness [T1]","Helmet of Enlightenment [T2]","Helmet of Wisdom [T3]",
+      "Helmet of Renewal [T1]","Helmet of Health [T2]","Helmet of Healing [T3]",
+      "Helmet of the Gladiator [T1]","Helmet of the Tribune [T2]","Helmet of the Consul [T3]",
+      "Helmet of the Mercenary [T1]","Helmet of the Warrior [T2]","Helmet of the Archon [T3]",
+      "Helmet of the Horseman [T1]","Helmet of the Cavalry [T2]","Helmet of the Heavy Cavalry [T3]",
     ],
     armor: [
-      "Leichter Brustpanzer [T1]","Brustpanzer [T2]","Schwerer Brustpanzer [T3]",
-      "Leichter Schienenpanzer [T1]","Schienenpanzer [T2]","Schwerer Schienenpanzer [T3]",
-      "Rüstung der Erneuerung [T1]","Rüstung der Gesundheit [T2]","Rüstung der Heilung [T3]",
-      "Leichter Schuppenpanzer [T1]","Schuppenpanzer [T2]","Schwerer Schuppenpanzer [T3]",
+      "Light Breastplate [T1]","Breastplate [T2]","Heavy Breastplate [T3]",
+      "Light Lamellar Armor [T1]","Lamellar Armor [T2]","Heavy Lamellar Armor [T3]",
+      "Armor of Renewal [T1]","Armor of Health [T2]","Armor of Healing [T3]",
+      "Light Scale Armor [T1]","Scale Armor [T2]","Heavy Scale Armor [T3]",
     ],
     boots: [
-      "Kleine Sporen [T1]","Sporen [T2]","Große Sporen [T3]",
-      "Stiefel des Söldners [T1]","Stiefel des Kriegers [T2]","Stiefel des Archons [T3]",
-      "Stiefel der Erneuerung [T1]","Stiefel der Gesundheit [T2]","Stiefel der Heilung [T3]",
+      "Small Spurs [T1]","Spurs [T2]","Large Spurs [T3]",
+      "Boots of the Mercenary [T1]","Boots of the Warrior [T2]","Boots of the Archon [T3]",
+      "Boots of Renewal [T1]","Boots of Health [T2]","Boots of Healing [T3]",
     ],
     mount: [
-      "Wallach [T1] 14 Felder/Std.","Vollblut [T2] 17 Felder/Std.","Streitross [T3] 20 Felder/Std.",
+      "Gelding [T1] 14 sq/h","Thoroughbred [T2] 17 sq/h","Warhorse [T3] 20 sq/h",
     ],
     misc: [
-      "Kleiner Schild [T1]","Schild [T2]","Großer Schild [T3]",
-      "Kleines Horn des Natarers [T1]","Horn des Natarers [T2]","Großes Horn des Natarers [T3]",
-      "Beutel des Diebes [T1]","Tasche des Diebes [T2]","Sack des Diebes [T3]",
-      "Kleine Karte [T1]","Karte [T2]","Große Karte [T3]",
-      "Kleiner Wimpel [T1]","Wimpel [T2]","Großer Wimpel [T3]",
-      "Kleines Banner [T1]","Banner [T2]","Großes Banner [T3]",
-      "Kleine Verbände","Verbände","Salbe","Pergament","Eimer","Käfig","Kunstwerk","Gesetzestafel","Buch der Weisheit",
+      "Small Shield [T1]","Shield [T2]","Large Shield [T3]",
+      "Small Horn of the Natarian [T1]","Horn of the Natarian [T2]","Large Horn of the Natarian [T3]",
+      "Thief's Gloves [T1]","Thief's Bag [T2]","Thief's Sack [T3]",
+      "Small Map [T1]","Map [T2]","Large Map [T3]",
+      "Small Pennant [T1]","Pennant [T2]","Large Pennant [T3]",
+      "Small Banner [T1]","Banner [T2]","Large Banner [T3]",
+      "Small Bandage","Bandage","Ointment","Scroll","Bucket","Cage","Artwork","Stone Tablet","Book of Wisdom",
     ],
   };
 
