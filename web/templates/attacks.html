@@ -56,82 +56,184 @@
   </div>
 
   <!-- ===== HERO SCOUT MODAL (opens after import) ===== -->
-  <div id="heroScoutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1100;overflow-y:auto;backdrop-filter:blur(4px);">
-    <div style="max-width:700px;margin:2rem auto;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.6);">
+  <div id="heroScoutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:1100;overflow-y:auto;backdrop-filter:blur(6px);">
+    <div style="max-width:800px;margin:1.5rem auto 3rem;background:var(--bg-card);border:1px solid rgba(168,85,247,.35);border-radius:18px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.7);">
 
       <!-- Header -->
-      <div style="background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(99,102,241,.1));border-bottom:1px solid var(--border);padding:1.1rem 1.4rem;display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div style="font-size:1.05rem;font-weight:800;">🦸 Hero Scout</div>
-          <div style="font-size:.78rem;color:var(--text-muted);margin-top:.15rem;">Configure the hero gear of your attacker — attacker name is pre-filled from import</div>
+      <div style="background:linear-gradient(135deg,rgba(168,85,247,.22),rgba(99,102,241,.15));border-bottom:1px solid rgba(168,85,247,.25);padding:1rem 1.4rem;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <div style="font-size:1.4rem;">🦸</div>
+          <div>
+            <div style="font-size:1rem;font-weight:800;letter-spacing:.01em;">Hero Scout
+              <span id="hs_header_name" style="color:#c084fc;margin-left:.4rem;"></span>
+            </div>
+            <div style="font-size:.74rem;color:var(--text-muted);margin-top:.1rem;">Held-Ausrüstung des Angreifers erfassen</div>
+          </div>
         </div>
-        <button onclick="closeHeroScoutModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .4rem;">&times;</button>
+        <button onclick="closeHeroScoutModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:.2rem .5rem;border-radius:6px;transition:color .15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
       </div>
 
-      <!-- Body -->
-      <div style="padding:1.2rem 1.4rem;">
+      <!-- Character + Slots -->
+      <div style="display:grid;grid-template-columns:190px 1fr;gap:0;min-height:320px;">
 
-        <!-- Player info row -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:1rem;">
-          <div>
-            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">👤 Player name *</label>
-            <input id="hs_player" type="text" placeholder="Exact Travian name"
-              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
-          </div>
-          <div>
-            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">🏛️ Tribe</label>
-            <select id="hs_tribe" style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
-              <option value="">— unknown —</option>
-              <option value="römer">🏛️ Romans</option>
-              <option value="teutonen">⚒️ Teutons</option>
-              <option value="gallier">🍀 Gauls</option>
-              <option value="ägypter">☀️ Egyptians</option>
-              <option value="hunnen">🏹 Huns</option>
-              <option value="spartaner">⚔️ Spartans</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">🏘️ Villages</label>
-            <input id="hs_villages" type="number" min="0" placeholder="0"
-              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
-          </div>
+        <!-- LEFT: Character silhouette -->
+        <div style="background:linear-gradient(180deg,rgba(168,85,247,.07) 0%,rgba(99,102,241,.04) 100%);border-right:1px solid rgba(168,85,247,.15);display:flex;align-items:center;justify-content:center;padding:1rem .5rem;">
+          <svg id="hsCharSvg" viewBox="0 0 200 320" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:auto;filter:drop-shadow(0 4px 16px rgba(168,85,247,.25));">
+            <!-- Spear shaft -->
+            <line x1="156" y1="18" x2="156" y2="295" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+            <!-- Spear tip -->
+            <polygon points="156,6 148,28 164,28" fill="#94a3b8" stroke="#cbd5e1" stroke-width="1.5"/>
+            <!-- Spear cross-guard -->
+            <line x1="146" y1="35" x2="166" y2="35" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+
+            <!-- Helmet dome -->
+            <path d="M76 42 Q76 12 100 10 Q124 12 124 42 Q124 64 100 68 Q76 64 76 42Z" fill="#475569" stroke="#94a3b8" stroke-width="2.5"/>
+            <!-- Helmet brim -->
+            <rect x="72" y="58" width="56" height="9" rx="4" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+            <!-- Visor slit -->
+            <rect x="84" y="50" width="32" height="9" rx="3" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+            <!-- Helmet center ridge -->
+            <line x1="100" y1="10" x2="100" y2="58" stroke="#94a3b8" stroke-width="1.5" opacity=".5"/>
+            <!-- Helmet cheek guards -->
+            <path d="M76 58 L72 74 Q76 78 82 76 L84 67Z" fill="#374151" stroke="#64748b" stroke-width="1.5"/>
+            <path d="M124 58 L128 74 Q124 78 118 76 L116 67Z" fill="#374151" stroke="#64748b" stroke-width="1.5"/>
+
+            <!-- Neck -->
+            <rect x="91" y="68" width="18" height="14" rx="5" fill="#374151" stroke="#64748b" stroke-width="1.5"/>
+
+            <!-- Pauldrons (shoulders) -->
+            <path d="M50 85 Q66 74 100 80 Q134 74 150 85 L148 100 Q132 92 100 96 Q68 92 52 100Z" fill="#475569" stroke="#94a3b8" stroke-width="2.5"/>
+            <path d="M50 85 Q42 92 44 104 Q50 108 58 104 L52 100Z" fill="#475569" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M150 85 Q158 92 156 104 Q150 108 142 104 L148 100Z" fill="#475569" stroke="#94a3b8" stroke-width="2"/>
+
+            <!-- Chest plate -->
+            <path d="M66 96 L100 92 L134 96 L132 154 Q100 162 68 154Z" fill="#334155" stroke="#94a3b8" stroke-width="2.5"/>
+            <!-- Chest plate center line -->
+            <line x1="100" y1="92" x2="100" y2="154" stroke="#64748b" stroke-width="1.5" opacity=".7"/>
+            <!-- Chest V-detail -->
+            <path d="M84 100 L100 112 L116 100" stroke="#94a3b8" stroke-width="1.5" fill="none"/>
+            <!-- Chest rivet dots -->
+            <circle cx="78" cy="120" r="2.5" fill="#64748b"/>
+            <circle cx="122" cy="120" r="2.5" fill="#64748b"/>
+            <circle cx="78" cy="138" r="2.5" fill="#64748b"/>
+            <circle cx="122" cy="138" r="2.5" fill="#64748b"/>
+            <!-- Tassets (hip armor) -->
+            <path d="M68 150 L62 168 L80 168 L82 150Z" fill="#3b4a5c" stroke="#64748b" stroke-width="1.5"/>
+            <path d="M132 150 L138 168 L120 168 L118 150Z" fill="#3b4a5c" stroke="#64748b" stroke-width="1.5"/>
+            <path d="M84 152 L84 170 L100 170 L116 170 L116 152Z" fill="#3b4a5c" stroke="#64748b" stroke-width="1.5"/>
+
+            <!-- LEFT ARM (shield side) -->
+            <path d="M52 98 Q36 106 32 126 Q30 145 36 158 Q42 166 54 162 Q64 157 66 142 L68 96Z" fill="#3b4a5c" stroke="#94a3b8" stroke-width="2"/>
+            <!-- Left vambrace detail -->
+            <line x1="42" y1="128" x2="58" y2="124" stroke="#64748b" stroke-width="1.5" opacity=".6"/>
+            <line x1="40" y1="140" x2="56" y2="136" stroke="#64748b" stroke-width="1.5" opacity=".6"/>
+            <!-- Left gauntlet -->
+            <path d="M30 154 Q32 168 42 168 Q52 168 56 162 L54 152 Q44 158 36 156Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+
+            <!-- SHIELD (left arm) -->
+            <path d="M6 108 Q10 90 24 88 Q38 90 40 108 L37 134 Q24 144 11 134Z" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2.5"/>
+            <path d="M6 108 Q10 90 24 88 Q38 90 40 108 L37 134 Q24 144 11 134Z" fill="none" stroke="#93c5fd" stroke-width="1" opacity=".4"/>
+            <!-- Shield cross -->
+            <line x1="23" y1="94" x2="23" y2="138" stroke="#60a5fa" stroke-width="2" opacity=".6"/>
+            <line x1="11" y1="116" x2="37" y2="116" stroke="#60a5fa" stroke-width="2" opacity=".6"/>
+            <!-- Shield boss -->
+            <circle cx="23" cy="116" r="5" fill="#2563eb" stroke="#93c5fd" stroke-width="1.5"/>
+
+            <!-- RIGHT ARM -->
+            <path d="M148 98 L132 96 Q136 142 140 158 Q148 168 156 162 Q166 156 166 140 Q166 118 160 104 Q156 96 148 98Z" fill="#3b4a5c" stroke="#94a3b8" stroke-width="2"/>
+            <!-- Right vambrace -->
+            <line x1="142" y1="128" x2="158" y2="124" stroke="#64748b" stroke-width="1.5" opacity=".6"/>
+            <!-- Right gauntlet -->
+            <path d="M138 154 Q142 168 152 168 Q162 168 166 156 L162 148 Q156 158 148 156Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+
+            <!-- Belt -->
+            <rect x="66" y="154" width="68" height="12" rx="5" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <!-- Belt buckle -->
+            <rect x="92" y="156" width="16" height="8" rx="3" fill="#374151" stroke="#94a3b8" stroke-width="1.5"/>
+            <rect x="95" y="158" width="10" height="4" rx="2" fill="#64748b"/>
+
+            <!-- LEFT LEG -->
+            <path d="M68 166 Q64 185 62 215 Q61 240 66 256 Q72 264 82 260 Q92 255 93 242 L96 166Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+            <!-- Left knee guard -->
+            <ellipse cx="78" cy="208" rx="14" ry="10" fill="#3b4a5c" stroke="#94a3b8" stroke-width="2"/>
+            <!-- RIGHT LEG -->
+            <path d="M132 166 L104 166 Q106 200 107 230 Q107 248 112 258 Q118 266 128 262 Q138 257 139 242 Q140 215 138 185 Q136 175 132 166Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+            <!-- Right knee guard -->
+            <ellipse cx="122" cy="208" rx="14" ry="10" fill="#3b4a5c" stroke="#94a3b8" stroke-width="2"/>
+
+            <!-- LEFT BOOT -->
+            <path d="M60 255 Q58 272 60 278 Q66 284 82 284 Q92 284 94 278 L94 260 Q84 266 72 264 Q64 262 62 256Z" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/>
+            <line x1="60" y1="273" x2="94" y2="273" stroke="#475569" stroke-width="1.5" opacity=".5"/>
+            <!-- RIGHT BOOT -->
+            <path d="M106 260 L106 278 Q108 284 124 284 Q140 284 142 278 Q144 272 140 255 Q134 262 124 264 Q114 266 106 260Z" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/>
+            <line x1="106" y1="273" x2="140" y2="273" stroke="#475569" stroke-width="1.5" opacity=".5"/>
+
+            <!-- Tribe indicator glow (colored by JS) -->
+            <circle id="hsTribeGlow" cx="100" cy="39" r="6" fill="rgba(168,85,247,.6)" stroke="rgba(168,85,247,.8)" stroke-width="1.5" opacity="0"/>
+          </svg>
         </div>
 
-        <!-- Hero stats row -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.1rem;">
-          <div>
-            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">⭐ Hero Level</label>
-            <input id="hs_level" type="number" min="0" placeholder="0"
-              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
-          </div>
-          <div>
-            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">🏆 Alliance</label>
-            <input id="hs_alliance" type="text" placeholder="Alliance tag or name"
-              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
+        <!-- RIGHT: Equipment slots 2×3 grid -->
+        <div style="padding:1rem 1.2rem;display:flex;flex-direction:column;justify-content:center;gap:.6rem;">
+          <div style="font-size:.68rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.1rem;">⚔️ Ausrüstung</div>
+          <div id="hsSlotGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
+            <!-- Slots injected by JS -->
           </div>
         </div>
+      </div>
 
-        <!-- Gear slots -->
-        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;">⚔️ Hero Equipment</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.1rem;" id="hsSlotGrid">
-          <!-- slots injected by JS -->
-        </div>
-
-        <!-- Notes -->
+      <!-- Player info -->
+      <div style="border-top:1px solid var(--border);padding:.9rem 1.4rem;display:grid;grid-template-columns:1.4fr 1fr 0.7fr 1fr;gap:.6rem;">
         <div>
-          <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">📝 Notes (optional)</label>
-          <input id="hs_notes" type="text" placeholder="e.g. spotted on screenshot, time of sighting…"
-            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.85rem;">
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">👤 Spielername *</label>
+          <input id="hs_player" type="text" placeholder="Exakter Travian-Name"
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
+        <div>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏛️ Volk</label>
+          <select id="hs_tribe" onchange="hsUpdateTribe(this.value)"
+            style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
+            <option value="">— unbekannt —</option>
+            <option value="römer">🏛️ Römer</option>
+            <option value="teutonen">⚒️ Teutonen</option>
+            <option value="gallier">🍀 Gallier</option>
+            <option value="ägypter">☀️ Ägypter</option>
+            <option value="hunnen">🏹 Hunnen</option>
+            <option value="spartaner">⚔️ Spartaner</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">⭐ Level</label>
+          <input id="hs_level" type="number" min="0" placeholder="0"
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
+        </div>
+        <div>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏆 Allianz</label>
+          <input id="hs_alliance" type="text" placeholder="Tag oder Name"
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
+        </div>
+      </div>
 
+      <!-- Notes + villages row -->
+      <div style="padding:0 1.4rem .85rem;display:grid;grid-template-columns:0.6fr 1fr;gap:.6rem;">
+        <div>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏘️ Dörfer</label>
+          <input id="hs_villages" type="number" min="0" placeholder="0"
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
+        </div>
+        <div>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">📝 Notizen</label>
+          <input id="hs_notes" type="text" placeholder="z.B. Screenshot-Fund, Uhrzeit…"
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
+        </div>
       </div>
 
       <!-- Footer -->
-      <div style="padding:.9rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;background:rgba(255,255,255,.02);">
-        <div style="font-size:.75rem;color:var(--text-muted);">💡 Visible to all alliance leaders in Hero Scout</div>
+      <div style="padding:.85rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;background:rgba(168,85,247,.04);">
+        <div style="font-size:.73rem;color:var(--text-muted);">💡 Für alle Allianzleiter in Hero Scout sichtbar</div>
         <div style="display:flex;gap:.5rem;">
-          <button onclick="closeHeroScoutModal()" class="btn btn-secondary" style="font-size:.82rem;">Skip</button>
-          <button onclick="saveHeroScout()" id="btnSaveHero" class="btn btn-primary" style="font-size:.82rem;">🦸 Save Hero Scout</button>
+          <button onclick="closeHeroScoutModal()" class="btn btn-secondary" style="font-size:.82rem;">Überspringen</button>
+          <button onclick="saveHeroScout()" id="btnSaveHero" class="btn btn-primary" style="font-size:.82rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);border-color:#7c3aed;">🦸 Hero Scout speichern</button>
         </div>
       </div>
     </div>
@@ -331,6 +433,37 @@
 .wave-group-header {
   font-size:0.78rem; color:#f87171; font-weight:700; margin-bottom:0.4rem;
 }
+/* ===== HERO SCOUT SLOT CARDS ===== */
+.hs-slot {
+  background:var(--bg-main); border:2px solid var(--border); border-radius:10px;
+  padding:.55rem .45rem .45rem; display:flex; flex-direction:column; align-items:center;
+  gap:.22rem; transition:border-color .2s, background .2s, box-shadow .2s;
+  position:relative; overflow:hidden;
+}
+.hs-slot:hover { border-color:rgba(168,85,247,.45); }
+.hs-slot.equipped {
+  border-color:rgba(251,191,36,.65);
+  background:rgba(251,191,36,.05);
+  box-shadow:0 0 12px rgba(251,191,36,.12);
+}
+.hs-slot-ico { width:38px; height:38px; color:#4b5563; transition:color .2s, transform .2s; flex-shrink:0; }
+.hs-slot.equipped .hs-slot-ico { color:#fbbf24; transform:scale(1.08); }
+.hs-slot-lbl { font-size:.62rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.hs-slot-item {
+  font-size:.64rem; color:#fbbf24; text-align:center; width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  min-height:.8rem; padding:0 .1rem;
+  opacity:0; transition:opacity .2s;
+}
+.hs-slot.equipped .hs-slot-item { opacity:1; }
+.hs-slot-sel {
+  width:100%; background:transparent; border:none;
+  border-top:1px solid var(--border); color:var(--text);
+  font-size:.68rem; padding:.2rem .2rem .1rem; cursor:pointer;
+  margin-top:.2rem; text-align:center;
+  max-width:120px;
+}
+.hs-slot-sel:focus { outline:none; }
 /* label-border: applied via JS when a label is set */
 .atk-row.lbl-hard  { border-left:3px solid #ef4444 !important; }
 .atk-row.lbl-fake  { border-left:3px solid #4ade80 !important; }
@@ -795,42 +928,120 @@
   // Slot key → backend form field name mapping
   const HS_FIELD_MAP = { weapon:'slot_weapon', helmet:'slot_helm', armor:'slot_armor', boots:'slot_boots', mount:'slot_mount', misc:'slot_misc' };
 
+  // Original SVG icons — own design, generic fantasy equipment shapes
+  const HS_SLOT_ICONS = {
+    weapon: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="10" y1="38" x2="36" y2="12" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+      <rect x="30" y="7" width="11" height="11" rx="2" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="2"/>
+      <line x1="8" y1="36" x2="14" y2="42" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <line x1="18" y1="28" x2="10" y2="36" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".5"/>
+      <circle cx="11" cy="39" r="4" fill="currentColor" opacity=".3" stroke="currentColor" stroke-width="2"/>
+    </svg>`,
+    helmet: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 30 Q10 10 24 9 Q38 10 38 30" stroke="currentColor" stroke-width="3" fill="currentColor" fill-opacity=".2"/>
+      <rect x="6" y="28" width="36" height="8" rx="4" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2.5"/>
+      <rect x="13" y="34" width="22" height="7" rx="3" fill="currentColor" fill-opacity=".15" stroke="currentColor" stroke-width="2"/>
+      <line x1="24" y1="9" x2="24" y2="34" stroke="currentColor" stroke-width="1.5" opacity=".4"/>
+    </svg>`,
+    armor: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 16 L8 24 L8 42 L40 42 L40 24 L34 16Z" fill="currentColor" fill-opacity=".15" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M14 16 Q24 10 34 16 L34 28 Q24 34 14 28Z" fill="currentColor" fill-opacity=".3" stroke="currentColor" stroke-width="2.5"/>
+      <line x1="24" y1="16" x2="24" y2="42" stroke="currentColor" stroke-width="1.5" opacity=".4"/>
+      <path d="M18 19 L24 24 L30 19" stroke="currentColor" stroke-width="2" fill="none"/>
+    </svg>`,
+    boots: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M16 6 L16 34 Q15 42 24 44 L40 44 Q44 44 44 40 L44 36 Q44 32 38 32 L28 32 L28 6Z" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="2.5"/>
+      <line x1="16" y1="24" x2="28" y2="24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16" y1="14" x2="28" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+    </svg>`,
+    mount: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="22" cy="26" rx="13" ry="17" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M30 12 Q40 8 44 16 Q40 20 34 18" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M10 40 Q8 47 12 48" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path d="M20 44 Q20 48 23 48" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="18" cy="18" r="2.5" fill="currentColor"/>
+      <path d="M30 12 Q28 6 30 4 Q33 6 32 10" fill="currentColor" fill-opacity=".4" stroke="currentColor" stroke-width="1.5"/>
+    </svg>`,
+    misc: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 6 L42 17 L42 39 Q24 48 6 39 L6 17Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M18 22 L24 18 L30 22 L30 32 L24 36 L18 32Z" fill="currentColor" fill-opacity=".28" stroke="currentColor" stroke-width="2"/>
+      <circle cx="24" cy="27" r="3.5" fill="currentColor" opacity=".4"/>
+    </svg>`,
+  };
+
+  // Tribe accent colors for the character glow
+  const HS_TRIBE_COLORS = {
+    'römer':    '#ef4444',
+    'teutonen': '#f97316',
+    'gallier':  '#22c55e',
+    'ägypter':  '#eab308',
+    'hunnen':   '#8b5cf6',
+    'spartaner':'#06b6d4',
+  };
+
   function _buildSlotGrid() {
     const grid = document.getElementById('hsSlotGrid');
     if (!grid) return;
     grid.innerHTML = HS_SLOTS.map(s => {
-      const opts = (HS_ITEMS[s.key] || []).map(i => `<option value="${i}">${i}</option>`).join('');
-      return `<div>
-        <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">${s.label}</label>
-        <div style="position:relative;">
-          <select id="hs_slot_${s.key}"
-            style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .65rem;font-size:.82rem;appearance:none;padding-right:2rem;">
-            <option value="">— not equipped —</option>
-            ${opts}
-          </select>
-          <span style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-muted);font-size:.75rem;">▾</span>
-        </div>
+      const opts = (HS_ITEMS[s.key] || []).map(i => `<option value="${escHtml(i)}">${escHtml(i)}</option>`).join('');
+      return `<div class="hs-slot" id="hsSlot_${s.key}">
+        <div class="hs-slot-ico">${HS_SLOT_ICONS[s.key] || ''}</div>
+        <div class="hs-slot-lbl">${s.label.replace(/^[^ ]+ /, '')}</div>
+        <div class="hs-slot-item" id="hsSlotItem_${s.key}">—</div>
+        <select class="hs-slot-sel" id="hs_slot_${s.key}" onchange="hsUpdateSlot('${s.key}',this.value)">
+          <option value="">— leer —</option>
+          ${opts}
+        </select>
       </div>`;
     }).join('');
   }
 
+  window.hsUpdateSlot = function(key, value) {
+    const card = document.getElementById('hsSlot_' + key);
+    const lbl  = document.getElementById('hsSlotItem_' + key);
+    if (!card || !lbl) return;
+    if (value) {
+      card.classList.add('equipped');
+      // Strip tier suffix [T1]/[T2]/[T3] for display, keep short
+      lbl.textContent = value.replace(/\s*\[T\d\]\s*$/, '').replace(/\s*\d+\s*Felder.*$/, '');
+    } else {
+      card.classList.remove('equipped');
+      lbl.textContent = '—';
+    }
+  };
+
+  window.hsUpdateTribe = function(tribe) {
+    const glow = document.getElementById('hsTribeGlow');
+    if (!glow) return;
+    const col = HS_TRIBE_COLORS[tribe] || null;
+    if (col) {
+      glow.setAttribute('fill', col.replace(')', ',.5)').replace('rgb', 'rgba'));
+      glow.setAttribute('stroke', col);
+      glow.setAttribute('opacity', '1');
+    } else {
+      glow.setAttribute('opacity', '0');
+    }
+  };
+
   window.openHeroScoutModal = function(attackerName = '') {
     _buildSlotGrid();
-    // Pre-fill attacker name
     document.getElementById('hs_player').value = attackerName || '';
-    // Clear other fields
+    document.getElementById('hs_header_name').textContent = attackerName ? '— ' + attackerName : '';
     ['hs_tribe','hs_villages','hs_level','hs_alliance','hs_notes'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    HS_SLOTS.forEach(s => {
-      const el = document.getElementById('hs_slot_' + s.key);
-      if (el) el.value = '';
-    });
+    HS_SLOTS.forEach(s => hsUpdateSlot(s.key, ''));
+    hsUpdateTribe('');
     document.getElementById('heroScoutModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
-    // Focus player name if empty
-    setTimeout(() => { if (!attackerName) document.getElementById('hs_player').focus(); }, 100);
+    setTimeout(() => {
+      if (!attackerName) document.getElementById('hs_player').focus();
+    }, 120);
+    // Live update header as player types
+    document.getElementById('hs_player').oninput = function() {
+      document.getElementById('hs_header_name').textContent = this.value ? '— ' + this.value : '';
+    };
   };
 
   window.closeHeroScoutModal = function() {
@@ -849,35 +1060,33 @@
 
     const btn = document.getElementById('btnSaveHero');
     btn.disabled = true;
-    btn.textContent = 'Saving…';
+    btn.textContent = 'Speichere…';
 
     const fd = new FormData();
     fd.append('player_name', player);
-    fd.append('tribe',       document.getElementById('hs_tribe').value);
-    fd.append('alliance',    document.getElementById('hs_alliance').value.trim());
-    fd.append('hero_level',  document.getElementById('hs_level').value || '0');
-    fd.append('hero_xp',     '0');
-    fd.append('villages',    document.getElementById('hs_villages').value || '0');
+    fd.append('tribe',        document.getElementById('hs_tribe').value);
+    fd.append('alliance',     document.getElementById('hs_alliance').value.trim());
+    fd.append('hero_level',   document.getElementById('hs_level').value || '0');
+    fd.append('hero_xp',      '0');
+    fd.append('villages',     document.getElementById('hs_villages').value || '0');
     fd.append('attacker_rank','0');
     fd.append('defender_rank','0');
-    fd.append('server_time', '');
+    fd.append('server_time',  '');
     HS_SLOTS.forEach(s => {
       const val = document.getElementById('hs_slot_' + s.key)?.value || '';
       fd.append(HS_FIELD_MAP[s.key], val);
     });
+    fd.append('notes', document.getElementById('hs_notes').value.trim());
 
     try {
-      const resp = await fetch(`/guild/${GUILD_ID}/defense/hero-scout/manual/save`, {
-        method: 'POST', body: fd
-      });
-      // Backend redirects (303) — that's fine, we just close modal
+      await fetch(`/guild/${GUILD_ID}/defense/hero-scout/manual/save`, { method:'POST', body:fd });
       closeHeroScoutModal();
-      showToast(`✅ Hero scout saved for ${player}`);
+      showToast(`✅ Hero Scout gespeichert für ${player}`);
     } catch(e) {
-      showToast('❌ Error: ' + e.message);
+      showToast('❌ Fehler: ' + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = '🦸 Save Hero Scout';
+      btn.textContent = '🦸 Hero Scout speichern';
     }
   };
 
