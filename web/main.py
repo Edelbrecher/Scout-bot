@@ -4932,6 +4932,21 @@ async def attacks_label(request: Request, guild_id: str, attack_id: int):
     return _JSONResponse({"ok": ok, "label": label})
 
 
+@app.post("/guild/{guild_id}/attacks/note/{attack_id}")
+async def attacks_save_note(request: Request, guild_id: str, attack_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    notes = body.get("notes", "")
+    ok = await database.save_attack_note(attack_id, guild_id, notes)
+    return _JSONResponse({"ok": ok})
+
+
 @app.get("/guild/{guild_id}/api/player-info")
 async def guild_api_player_info(request: Request, guild_id: str, player: str = ""):
     session, err = _require_session(request)

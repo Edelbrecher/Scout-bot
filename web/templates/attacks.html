@@ -1363,7 +1363,10 @@
     const cbx = CAN_LABEL
       ? `<input type="checkbox" class="atk-checkbox" data-id="${a.id}" onchange="onRowCheck(this)" onclick="e=>e.stopPropagation()">`
       : '';
-    return `<div class="atk-row${lblClass}" data-id="${a.id}" data-label="${lbl}">
+    const heroUrl = `/guild/${GUILD_ID}/defense/hero-scout/${encodeURIComponent(a.attacker_player)}`;
+    const hasNote = !!(a.notes && a.notes.trim());
+    const noteId = `note-${a.id}`;
+    return `<div class="atk-row${lblClass}" data-id="${a.id}" data-label="${lbl}" style="flex-wrap:wrap;">
       ${cbx}
       ${typeBadge(a.attack_type)}
       <a class="player-link" onclick="openPlayerModal('${escHtml(a.attacker_player).replace(/'/g,"\\'")}')">
@@ -1378,6 +1381,15 @@
         ${labelBadge(lbl)}
         ${CAN_LABEL ? labelButtons(a.id, lbl) : ''}
         ${importedBy}
+        <a href="${heroUrl}" target="_blank" data-tip="Hero Scout für ${escHtml(a.attacker_player)}"
+           style="font-size:0.78rem;padding:1px 7px;border-radius:8px;cursor:pointer;font-weight:600;
+                  background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);
+                  color:#c084fc;text-decoration:none;white-space:nowrap;">🦸</a>
+        <button onclick="toggleNote(${a.id})" data-tip="${hasNote ? 'Notiz bearbeiten' : 'Notiz hinzufügen'}"
+           style="font-size:0.78rem;padding:1px 7px;border-radius:8px;cursor:pointer;font-weight:600;
+                  background:${hasNote ? 'rgba(251,191,36,.12)' : 'rgba(255,255,255,.04)'};
+                  border:1px solid ${hasNote ? 'rgba(251,191,36,.3)' : 'rgba(255,255,255,.08)'};
+                  color:${hasNote ? '#fbbf24' : 'var(--text-muted)'};">✏️</button>
         ${CAN_LABEL
           ? `<button onclick="archiveAttack(${a.id})" data-tip="Archivieren"
               style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">📁</button>
@@ -1387,8 +1399,50 @@
               style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>`
         }
       </span>
+      <div id="${noteId}" style="display:${hasNote ? 'flex' : 'none'};width:100%;padding:.3rem .3rem .1rem 1.2rem;gap:.4rem;align-items:flex-start;">
+        <textarea rows="1" placeholder="Notiz…"
+          style="flex:1;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:6px;
+                 color:var(--text);font-size:.78rem;padding:.3rem .5rem;resize:vertical;min-height:28px;"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';"
+          onblur="saveNote(${a.id},this.value)"
+          id="notetext-${a.id}">${escHtml(a.notes||'')}</textarea>
+        <button onclick="saveNote(${a.id},document.getElementById('notetext-${a.id}').value)"
+          style="font-size:.72rem;padding:.25rem .55rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);
+                 border-radius:6px;color:#fbbf24;cursor:pointer;white-space:nowrap;flex-shrink:0;">💾 Save</button>
+      </div>
     </div>`;
   }
+
+  window.toggleNote = function(id) {
+    const div = document.getElementById('note-'+id);
+    if (!div) return;
+    const visible = div.style.display !== 'none';
+    div.style.display = visible ? 'none' : 'flex';
+    if (!visible) {
+      setTimeout(() => {
+        const ta = document.getElementById('notetext-'+id);
+        if (ta) { ta.focus(); ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
+      }, 50);
+    }
+  };
+
+  window.saveNote = async function(id, text) {
+    try {
+      await fetch(`/guild/${GUILD_ID}/attacks/note/${id}`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({notes: text})
+      });
+      // Update note button style
+      const btn = document.querySelector(`[data-id="${id}"] button[onclick*="toggleNote"]`);
+      if (btn) {
+        const has = text.trim().length > 0;
+        btn.style.background = has ? 'rgba(251,191,36,.12)' : 'rgba(255,255,255,.04)';
+        btn.style.borderColor = has ? 'rgba(251,191,36,.3)' : 'rgba(255,255,255,.08)';
+        btn.style.color = has ? '#fbbf24' : 'var(--text-muted)';
+      }
+    } catch(e) { console.warn('saveNote failed', e); }
+  };
 
   const LABEL_CFG = {
     fake: { color:'#94a3b8', bg:'rgba(148,163,184,.15)', border:'rgba(148,163,184,.35)', icon:'👻', text:'Fake',  tip:'Als Fake markieren' },

@@ -7821,8 +7821,8 @@ async def _init_attack_detection_tables():
             CREATE INDEX IF NOT EXISTS idx_incoming_attacks_arrival
             ON incoming_attacks(arrival_time)
         """)
-        # Migration: add label columns if missing
-        for col, default in [("label","''"), ("labeled_by","''"), ("labeled_at","''")]:
+        # Migration: add columns if missing
+        for col, default in [("label","''"), ("labeled_by","''"), ("labeled_at","''"), ("notes","''")]:
             try:
                 await db.execute(f"ALTER TABLE incoming_attacks ADD COLUMN {col} TEXT DEFAULT {default}")
             except Exception:
@@ -8036,6 +8036,18 @@ async def delete_attack(attack_id: int, guild_id: str) -> bool:
         cur = await db.execute(
             "DELETE FROM incoming_attacks WHERE id=? AND guild_id=?",
             (attack_id, guild_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def save_attack_note(attack_id: int, guild_id: str, notes: str) -> bool:
+    """Save or update the notes field for an attack."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            "UPDATE incoming_attacks SET notes=? WHERE id=? AND guild_id=?",
+            (notes.strip(), attack_id, guild_id)
         )
         await db.commit()
         return cur.rowcount > 0
