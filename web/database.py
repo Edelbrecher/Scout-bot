@@ -7863,7 +7863,7 @@ async def _init_attack_detection_tables():
 
 async def save_incoming_attacks(guild_id: str, attacks: list[dict],
                                  imported_by_discord_id: str = "",
-                                 imported_by_name: str = "") -> int:
+                                 imported_by_name: str = "") -> tuple:
     import json as _json
     await _init_attack_detection_tables()
     now = __import__('datetime').datetime.utcnow().isoformat()
@@ -7871,9 +7871,30 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
     skipped = 0
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for atk in attacks:
+            attacker_player  = atk.get("attacker_player", "").strip()
+            own_village_name = atk.get("own_village_name", "").strip()
+            arrival_time     = atk.get("arrival_time", "").strip()
+
+            # Skip completely empty entries
+            if not attacker_player or not arrival_time:
+                skipped += 1
+                continue
+
+            # Explicit duplicate check — do NOT rely on UNIQUE index alone,
+            # because the index may have failed to create if old duplicates exist.
+            # Match on: guild + attacker_player + own_village_name + arrival_time
+            dup_cur = await db.execute("""
+                SELECT id FROM incoming_attacks
+                WHERE guild_id=? AND attacker_player=? AND own_village_name=? AND arrival_time=?
+                LIMIT 1
+            """, (guild_id, attacker_player, own_village_name, arrival_time))
+            if await dup_cur.fetchone():
+                skipped += 1
+                continue
+
             try:
-                cur = await db.execute("""
-                    INSERT OR IGNORE INTO incoming_attacks (
+                await db.execute("""
+                    INSERT INTO incoming_attacks (
                         guild_id, imported_by_discord_id, imported_by_name, import_time,
                         server_time_at_import,
                         own_village_name, own_village_x, own_village_y,
@@ -7887,10 +7908,10 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
                     imported_by_name,
                     now,
                     atk.get("server_time_at_import", ""),
-                    atk.get("own_village_name", ""),
+                    own_village_name,
                     atk.get("own_x"),
                     atk.get("own_y"),
-                    atk.get("attacker_player", ""),
+                    attacker_player,
                     atk.get("attacker_village_name", ""),
                     atk.get("attacker_x"),
                     atk.get("attacker_y"),
@@ -7898,14 +7919,11 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
                     1 if atk.get("troops_hidden") else 0,
                     atk.get("troop_count", 0),
                     _json.dumps(atk.get("troop_details", {})),
-                    atk.get("arrival_time", ""),
+                    arrival_time,
                     atk.get("fake_score", 50),
                     _json.dumps(atk.get("fake_reasons", [])),
                 ))
-                if cur.rowcount > 0:
-                    saved += 1
-                else:
-                    skipped += 1
+                saved += 1
             except Exception:
                 skipped += 1
         await db.commit()
