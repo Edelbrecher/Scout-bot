@@ -4654,17 +4654,19 @@ async def kampfkraft_page(request: Request, guild_id: str):
 async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
     attack_stats = await database.get_attack_stats(guild_id)
     attack_reports = await database.get_attack_reports(guild_id, limit=50)
-    uid = session.get("uid", "")
     is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id")
     perms = await database.get_member_permissions(guild_id, uid)
-    can_label = is_admin or "ally_manage" in perms or "defend_manage" in perms
+    can_label = is_admin or "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
     return templates.TemplateResponse("attacks.html", {
         "request": request, "guild": guild, "guild_id": guild_id,
         "attack_stats": attack_stats, "attack_reports": attack_reports,
@@ -4753,15 +4755,29 @@ async def _legacy_own_troops_get(guild_id: str):
 # Attack Detection — API routes
 # ---------------------------------------------------------------------------
 
+async def _attack_access(request, guild_id):
+    """Shared access check for attack API routes: session + async guild + ally-or-plan."""
+    session, err = _require_session(request)
+    if err:
+        return None, _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err:
+        return None, _JSONResponse({"error": "forbidden"}, status_code=403)
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return None, _JSONResponse({"error": "not_found"}, status_code=404)
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err:
+        return None, _JSONResponse({"error": "alliance_required"}, status_code=403)
+    return session, None
+
+
 @app.post("/guild/{guild_id}/attacks/import-rally")
 async def attacks_import_rally(request: Request, guild_id: str):
     import json as _json
-    session, err = _require_session(request)
-    if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     try:
         body = await request.json()
     except Exception:
@@ -4824,36 +4840,24 @@ def _compute_fake_score_server(atk: dict, artifacts: list) -> dict:
 @app.get("/guild/{guild_id}/attacks/api/incoming")
 async def attacks_api_incoming(request: Request, guild_id: str,
                                 x: int = None, y: int = None):
-    session, err = _require_session(request)
-    if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     attacks = await database.get_incoming_attacks(guild_id, x, y)
     return _JSONResponse(attacks)
 
 
 @app.get("/guild/{guild_id}/attacks/api/alliance")
 async def attacks_api_alliance(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     attacks = await database.get_incoming_attacks_alliance(guild_id)
     return _JSONResponse(attacks)
 
 
 @app.post("/guild/{guild_id}/attacks/dismiss/{attack_id}")
 async def attacks_dismiss(request: Request, guild_id: str, attack_id: int):
-    session, err = _require_session(request)
-    if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     await database.dismiss_attack(attack_id, guild_id)
     return _JSONResponse({"ok": True})
 
@@ -4867,10 +4871,8 @@ def _attacks_can_manage(session: dict, guild: dict, perms: list) -> bool:
 
 @app.post("/guild/{guild_id}/attacks/archive/{attack_id}")
 async def attacks_archive(request: Request, guild_id: str, attack_id: int):
-    session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
     perms = await database.get_member_permissions(guild_id, uid)
@@ -4882,10 +4884,8 @@ async def attacks_archive(request: Request, guild_id: str, attack_id: int):
 
 @app.post("/guild/{guild_id}/attacks/delete/{attack_id}")
 async def attacks_delete(request: Request, guild_id: str, attack_id: int):
-    session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
     perms = await database.get_member_permissions(guild_id, uid)
@@ -4897,10 +4897,8 @@ async def attacks_delete(request: Request, guild_id: str, attack_id: int):
 
 @app.get("/guild/{guild_id}/attacks/api/archived")
 async def attacks_api_archived(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
     perms = await database.get_member_permissions(guild_id, uid)
@@ -4912,17 +4910,14 @@ async def attacks_api_archived(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/attacks/label/{attack_id}")
 async def attacks_label(request: Request, guild_id: str, attack_id: int):
-    session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
-    # Only guild owner, admin, or members with ally_manage/defend_manage permission
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
     is_admin  = session.get("type") == "admin"
     is_owner  = guild and guild.get("owner_discord_id") == uid
     perms     = await database.get_member_permissions(guild_id, uid)
-    has_right = "ally_manage" in perms or "defend_manage" in perms
+    has_right = "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
     if not (is_admin or is_owner or has_right):
         return _JSONResponse({"error": "no_permission"}, status_code=403)
     body = await request.json()
@@ -4934,10 +4929,8 @@ async def attacks_label(request: Request, guild_id: str, attack_id: int):
 
 @app.post("/guild/{guild_id}/attacks/note/{attack_id}")
 async def attacks_save_note(request: Request, guild_id: str, attack_id: int):
-    session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     try:
         body = await request.json()
     except Exception:
@@ -4965,24 +4958,16 @@ async def guild_api_player_info(request: Request, guild_id: str, player: str = "
 
 @app.get("/guild/{guild_id}/attacks/api/enemy-artifacts/{player_name}")
 async def attacks_api_get_enemy_artifacts(request: Request, guild_id: str, player_name: str):
-    session, err = _require_session(request)
-    if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     artifacts = await database.get_enemy_artifacts(guild_id, player_name)
     return _JSONResponse(artifacts)
 
 
 @app.post("/guild/{guild_id}/attacks/api/enemy-artifacts/{player_name}/toggle")
 async def attacks_api_toggle_enemy_artifact(request: Request, guild_id: str, player_name: str):
-    session, err = _require_session(request)
-    if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
-    if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
     try:
         body = await request.json()
     except Exception:
