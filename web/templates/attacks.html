@@ -519,9 +519,12 @@
   // =========================================================
   function cleanUnicode(s) {
     return s
-      .replace(/\u00a0|\u2028|\u2029/g, '\n')
+      .replace(/\u2028|\u2029/g, '\n')
       .replace(/\u00a0/g, ' ')
-      .replace(/[\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\u061c\ufeff\u00ad\u180e]/g, '');
+      // Strip directional / invisible formatting characters
+      .replace(/[\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u061c\ufeff\u00ad\u180e]/g, '')
+      // Replace Unicode minus (U+2212) with regular hyphen-minus so coords like (54|\u2212142) parse correctly
+      .replace(/\u2212/g, '-');
   }
   function parseRallyPoint(rawText) {
     const text = cleanUnicode(rawText);
@@ -549,11 +552,18 @@
     // EN:        "- 04 VillageName  Mark attack  PlayerName attacks TargetVillage"
     // Pre-process: split tab-separated lines into logical sub-lines
     // Real Travian format: "SrcVillage\tmark attackPlayer attacks DstVillage"
+    // Exception: "Einheiten\t?\t?\t..." must NOT be split — keep as one line
+    // so the troop parser sees "Einheiten ? ? ? ..." intact.
     const expandedLines = [];
     for (const line of lines) {
       if (line.includes('\t')) {
-        // Split on tab — each tab-segment is treated as a separate line
-        line.split('\t').forEach(seg => { if (seg.trim()) expandedLines.push(seg.trim()); });
+        // "Einheiten" and "Units" troop-count lines: join with spaces instead of splitting
+        if (/^(Einheiten|Units)\b/i.test(line)) {
+          expandedLines.push(line.replace(/\t+/g, ' ').trim());
+        } else {
+          // Split on tab — each tab-segment is treated as a separate line
+          line.split('\t').forEach(seg => { if (seg.trim()) expandedLines.push(seg.trim()); });
+        }
       } else {
         expandedLines.push(line);
       }
