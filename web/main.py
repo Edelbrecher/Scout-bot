@@ -10745,20 +10745,20 @@ _HERO_ITEMS_BY_CAT = {
     "armor": [
         # Breastplate
         ("armor_breast_1",       "Light Breastplate [T1] +500 fighting str."),
-        ("armor_breast_2",       "Breastplate [T2] +1,000 fighting str."),
-        ("armor_breast_3",       "Heavy Breastplate [T3] +1,500 fighting str."),
+        ("armor_breast_2",       "Breastplate [T2] +2,000 fighting str."),
+        ("armor_breast_3",       "Heavy Breastplate [T3] +4,000 fighting str."),
         # Lamellar armor
-        ("armor_seg_1",          "Light Lamellar Armor [T1]"),
-        ("armor_seg_2",          "Lamellar Armor [T2]"),
-        ("armor_seg_3",          "Heavy Lamellar Armor [T3]"),
+        ("armor_seg_1",          "Light Lamellar Armor [T1] +500 fighting str."),
+        ("armor_seg_2",          "Lamellar Armor [T2] +2,000 fighting str."),
+        ("armor_seg_3",          "Heavy Lamellar Armor [T3] +4,000 fighting str."),
         # Regen armor
         ("armor_regen_1",        "Armor of Renewal [T1] +20 HP/day"),
         ("armor_regen_2",        "Armor of Health [T2] +30 HP/day"),
         ("armor_regen_3",        "Armor of Healing [T3] +40 HP/day"),
         # Scale armor
-        ("armor_scale_1",        "Light Scale Armor [T1]"),
-        ("armor_scale_2",        "Scale Armor [T2]"),
-        ("armor_scale_3",        "Heavy Scale Armor [T3]"),
+        ("armor_scale_1",        "Light Scale Armor [T1] +500 fighting str."),
+        ("armor_scale_2",        "Scale Armor [T2] +2,000 fighting str."),
+        ("armor_scale_3",        "Heavy Scale Armor [T3] +4,000 fighting str."),
     ],
     "boots": [
         # Spurs
@@ -10864,8 +10864,8 @@ _HERO_ITEMS_BY_CAT = {
     "misc": [
         # Shields
         ("misc_shield_1",        "Small Shield [T1] +500 fighting str."),
-        ("misc_shield_2",        "Shield [T2] +1,000 fighting str."),
-        ("misc_shield_3",        "Large Shield [T3] +1,500 fighting str."),
+        ("misc_shield_2",        "Shield [T2] +2,000 fighting str."),
+        ("misc_shield_3",        "Large Shield [T3] +4,000 fighting str."),
         # Horn of the Natarian
         ("misc_horn_1",          "Small Horn of the Natarian [T1] +20% vs. Natars"),
         ("misc_horn_2",          "Horn of the Natarian [T2] +25% vs. Natars"),
