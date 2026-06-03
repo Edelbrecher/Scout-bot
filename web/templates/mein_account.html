@@ -4,8 +4,8 @@
 {% block content %}
 <div class="container" style="max-width:100%;padding:0 1.5rem 3rem;">
 
-  <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+  <!-- Header + KPI inline -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.1rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
       <h1 style="margin:0.25rem 0 0;" data-i18n="account.title">🏰 My Account</h1>
@@ -20,9 +20,36 @@
         {% if pending %}<span style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending }}</span>{% endif %}
       </a>
       {% endif %}
-      <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Combat Power Calculator</a>
+      <a href="/guild/{{ guild.guild_id }}/mein-account/kampfkraft" class="btn btn-secondary" style="align-self:flex-end;">⚔️ Combat Power</a>
     </div>
   </div>
+
+  <!-- KPI Pills (compact, inline) -->
+  {% if own_villages %}
+  {% set last = history[-1] if history else none %}
+  {% set prev = history[-2] if history and history|length > 1 else none %}
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.1rem;align-items:center;">
+    {% set kpis = [
+      ('⚔️', 'Off', total_off, (last.total_off - prev.total_off) if prev else none, '#ef4444', 'rgba(239,68,68,.12)', 'rgba(239,68,68,.3)', true),
+      ('🛡️', 'Def', total_def, (last.total_def - prev.total_def) if prev else none, '#22c55e', 'rgba(34,197,94,.12)', 'rgba(34,197,94,.3)', true),
+      ('🌾', 'Crop/h', total_crop, (last.total_crop - prev.total_crop) if prev else none, '#f59e0b', 'rgba(245,158,11,.12)', 'rgba(245,158,11,.3)', false),
+      ('🏘️', 'Villages', own_villages|length, (last.village_count - prev.village_count) if prev else none, '#a5b4fc', 'rgba(99,102,241,.1)', 'rgba(99,102,241,.28)', true),
+    ] %}
+    {% for icon, label, val, delta, color, bg, border, crop_inv in kpis %}
+    <div style="display:flex;align-items:center;gap:.55rem;background:{{ bg }};border:1px solid {{ border }};border-radius:10px;padding:.45rem .85rem;min-width:0;">
+      <div>
+        <div style="font-size:.65rem;color:{{ color }};font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">{{ icon }} {{ label }}</div>
+        <div style="font-size:1.05rem;font-weight:800;color:{{ color }};line-height:1.1;white-space:nowrap;">{{ "{:,}".format(val).replace(",",".") }}</div>
+      </div>
+      {% if delta is not none and delta != 0 %}
+      <div style="font-size:.7rem;font-weight:700;color:{% if (delta > 0 and not crop_inv) or (delta < 0 and crop_inv) %}#4ade80{% else %}#f87171{% endif %};white-space:nowrap;border-left:1px solid {{ border }};padding-left:.55rem;">
+        {% if delta > 0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(delta|abs).replace(",",".") }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Flash messages -->
   {% if uploaded %}
@@ -39,46 +66,6 @@
   {% endif %}
   {% if saved == 'scout_village' %}
   <div class="alert alert-success">🔭 Scout village {% if scout_village %}set: {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}removed{% endif %}.</div>
-  {% endif %}
-
-  <!-- KPI Strip mit Delta (nur wenn Daten vorhanden) -->
-  {% if own_villages %}
-  {% set last = history[-1] if history else none %}
-  {% set prev = history[-2] if history and history|length > 1 else none %}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
-    <div style="background:var(--bg-card);border:1px solid rgba(239,68,68,0.35);border-radius:12px;padding:.9rem 1.1rem;">
-      <div style="font-size:.72rem;color:#ef4444;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">⚔️ Off-Score</div>
-      <div style="font-size:1.7rem;font-weight:900;color:#ef4444;line-height:1;">{{ "{:,}".format(total_off).replace(",",".") }}</div>
-      {% if prev %}{% set d = (last.total_off - prev.total_off) %}
-      <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#4caf82{% else %}#f87171{% endif %};">
-        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} since last import
-      </div>{% endif %}
-    </div>
-    <div style="background:var(--bg-card);border:1px solid rgba(34,197,94,0.35);border-radius:12px;padding:.9rem 1.1rem;">
-      <div style="font-size:.72rem;color:#22c55e;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🛡️ Def-Score</div>
-      <div style="font-size:1.7rem;font-weight:900;color:#22c55e;line-height:1;">{{ "{:,}".format(total_def).replace(",",".") }}</div>
-      {% if prev %}{% set d = (last.total_def - prev.total_def) %}
-      <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#4caf82{% else %}#f87171{% endif %};">
-        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
-      </div>{% endif %}
-    </div>
-    <div style="background:var(--bg-card);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:.9rem 1.1rem;">
-      <div style="font-size:.72rem;color:#f59e0b;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🌾 Crop/h</div>
-      <div style="font-size:1.7rem;font-weight:900;color:#f59e0b;line-height:1;">{{ "{:,}".format(total_crop).replace(",",".") }}</div>
-      {% if prev %}{% set d = (last.total_crop - prev.total_crop) %}
-      <div style="font-size:.78rem;margin-top:.3rem;color:{% if d>=0 %}#f87171{% else %}#4caf82{% endif %};">
-        {% if d>=0 %}▲{% else %}▼{% endif %} {{ "{:,}".format(d|abs).replace(",",".") }} seit letztem Import
-      </div>{% endif %}
-    </div>
-    <div style="background:var(--bg-card);border:1px solid rgba(100,116,139,0.3);border-radius:12px;padding:.9rem 1.1rem;">
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.3rem;">🏘️ Villages</div>
-      <div style="font-size:1.7rem;font-weight:900;color:var(--text);line-height:1;">{{ own_villages|length }}</div>
-      {% if prev %}{% set d = (last.village_count - prev.village_count) %}
-      {% if d != 0 %}<div style="font-size:.78rem;margin-top:.3rem;color:{% if d>0 %}#4caf82{% else %}#f87171{% endif %};">
-        {% if d>0 %}▲{% else %}▼{% endif %} {{ d|abs }} village{% if d|abs != 1 %}s{% endif %}
-      </div>{% endif %}{% endif %}
-    </div>
-  </div>
   {% endif %}
 
   <!-- Flash: sitters saved -->
