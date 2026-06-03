@@ -9184,3 +9184,106 @@ async def get_village_populations_by_coords(guild_id: str, coords: list[tuple]) 
                 if row:
                     result[(x, y)] = row[0] or 0
     return result
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DEF CROP TRACKER
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def _init_def_crop_table():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS def_crop_sends (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id         TEXT NOT NULL,
+                sender_discord_id TEXT NOT NULL,
+                sender_name      TEXT DEFAULT '',
+                recipient_name   TEXT DEFAULT '',
+                recipient_village TEXT DEFAULT '',
+                tribe            TEXT DEFAULT '',
+                troops           TEXT DEFAULT '{}',
+                crop_per_hour    REAL DEFAULT 0,
+                notes            TEXT DEFAULT '',
+                active           INTEGER DEFAULT 1,
+                created_at       TEXT DEFAULT (datetime('now')),
+                updated_at       TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def save_def_crop_send(guild_id: str, sender_discord_id: str, sender_name: str,
+                              recipient_name: str, recipient_village: str,
+                              tribe: str, troops: dict, crop_per_hour: float,
+                              notes: str = "") -> int:
+    import json as _json
+    await _init_def_crop_table()
+    now = __import__('datetime').datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("""
+            INSERT INTO def_crop_sends
+              (guild_id, sender_discord_id, sender_name, recipient_name,
+               recipient_village, tribe, troops, crop_per_hour, notes,
+               active, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,1,?,?)
+        """, (guild_id, sender_discord_id, sender_name, recipient_name,
+              recipient_village, tribe, _json.dumps(troops, ensure_ascii=False),
+              crop_per_hour, notes, now, now))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_def_crop_sends(guild_id: str, sender_discord_id: str) -> list[dict]:
+    import json as _json
+    await _init_def_crop_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM def_crop_sends
+            WHERE guild_id=? AND sender_discord_id=? AND active=1
+            ORDER BY created_at DESC
+        """, (guild_id, sender_discord_id)) as cur:
+            rows = await cur.fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["troops"] = _json.loads(d.get("troops") or "{}")
+        except Exception:
+            d["troops"] = {}
+        result.append(d)
+    return result
+
+
+async def get_all_def_crop_sends(guild_id: str) -> list[dict]:
+    """All active sends for the guild (for overview)."""
+    import json as _json
+    await _init_def_crop_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM def_crop_sends
+            WHERE guild_id=? AND active=1
+            ORDER BY sender_name, created_at DESC
+        """, (guild_id,)) as cur:
+            rows = await cur.fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["troops"] = _json.loads(d.get("troops") or "{}")
+        except Exception:
+            d["troops"] = {}
+        result.append(d)
+    return result
+
+
+async def deactivate_def_crop_send(send_id: int, guild_id: str) -> bool:
+    await _init_def_crop_table()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE def_crop_sends SET active=0 WHERE id=? AND guild_id=?",
+            (send_id, guild_id)
+        )
+        await db.commit()
+    return True

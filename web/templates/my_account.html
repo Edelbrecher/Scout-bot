@@ -911,4 +911,103 @@ function loadMissions() {
 }
 loadMissions();
 </script>
+
+<!-- ===== DEF CROP TRACKER WIDGET ===== -->
+<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:.75rem;overflow:hidden;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-bottom:1px solid var(--border);">
+    <span style="font-size:.88rem;font-weight:700;">🌾 Def Crop Tracker</span>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <span style="font-size:.75rem;color:var(--text-muted);">Use <code style="background:rgba(255,255,255,.07);padding:.1rem .35rem;border-radius:4px;">/def-crop</code> in Discord to log troops</span>
+      <button onclick="loadCropSends()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;font-size:.75rem;padding:.2rem .5rem;">↻</button>
+    </div>
+  </div>
+  <div id="cropTrackerBody" style="padding:.75rem 1rem;">
+    <div style="text-align:center;color:var(--text-muted);font-size:.83rem;padding:1rem;">Loading…</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const GUILD_ID_CROP = '{{ guild.guild_id }}';
+
+  const INTERVALS = [1,2,3,4,6,8,12,24];
+
+  function fmtCrop(n){ return Math.round(n).toLocaleString(); }
+
+  function renderCropSend(s) {
+    const cph = parseFloat(s.crop_per_hour) || 0;
+    const troops = s.troops || {};
+    const troopList = Object.entries(troops)
+      .filter(([,v])=>v>0)
+      .map(([k,v])=>`<span style="font-size:.75rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:.1rem .4rem;">${k.replace(/_[rthge]$|_[12]$/, '').replace(/_/g,' ')} ×${v.toLocaleString()}</span>`)
+      .join(' ');
+
+    const intervalRows = INTERVALS.map(h => {
+      const amt = Math.round(cph * h);
+      const bar = Math.min(100, Math.round((h / 24) * 100));
+      return `<div style="display:flex;align-items:center;gap:.6rem;padding:.22rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+        <div style="width:3rem;font-size:.72rem;color:var(--text-muted);flex-shrink:0;">Every ${h}h</div>
+        <div style="flex:1;background:rgba(255,255,255,.05);border-radius:4px;height:6px;overflow:hidden;">
+          <div style="width:${bar}%;height:100%;background:linear-gradient(90deg,#f59e0b,#ef4444);border-radius:4px;"></div>
+        </div>
+        <div style="width:5.5rem;text-align:right;font-size:.8rem;font-weight:700;color:#fbbf24;">${fmtCrop(amt)} 🌾</div>
+      </div>`;
+    }).join('');
+
+    return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;margin-bottom:.6rem;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:.88rem;font-weight:700;">📍 ${escHtml(s.recipient_name)}${s.recipient_village ? ' <span style="color:var(--text-muted);font-size:.78rem;font-weight:400;">— '+escHtml(s.recipient_village)+'</span>' : ''}</div>
+          <div style="font-size:.73rem;color:var(--text-muted);margin-top:.15rem;">${escHtml(s.tribe||'')} · logged ${escHtml((s.created_at||'').slice(0,10))}</div>
+          <div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.25rem;">${troopList}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:1.15rem;font-weight:800;color:#f59e0b;">${fmtCrop(cph)}<span style="font-size:.72rem;font-weight:400;color:var(--text-muted);">/h</span></div>
+          <div style="font-size:.72rem;color:var(--text-muted);">${fmtCrop(cph*24)}/day</div>
+          <button onclick="removeCropSend(${s.id})" style="margin-top:.35rem;background:none;border:1px solid rgba(239,68,68,.25);border-radius:5px;color:#f87171;cursor:pointer;font-size:.7rem;padding:.15rem .4rem;">✕ Remove</button>
+        </div>
+      </div>
+      ${s.notes ? `<div style="font-size:.73rem;color:var(--text-muted);margin-bottom:.5rem;">📝 ${escHtml(s.notes)}</div>` : ''}
+      <details style="margin-top:.3rem;">
+        <summary style="font-size:.75rem;color:var(--text-muted);cursor:pointer;user-select:none;">📦 Trade route schedule</summary>
+        <div style="margin-top:.45rem;">${intervalRows}</div>
+      </details>
+    </div>`;
+  }
+
+  function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  window.loadCropSends = async function() {
+    const body = document.getElementById('cropTrackerBody');
+    try {
+      const r = await fetch(`/guild/${GUILD_ID_CROP}/api/def-crop/my`);
+      const data = await r.json();
+      if (!data.length) {
+        body.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:.83rem;padding:1.2rem 0;">
+          No crop obligations logged yet.<br>
+          <span style="font-size:.77rem;">Use <code style="background:rgba(255,255,255,.07);padding:.1rem .35rem;border-radius:4px;">/def-crop</code> in Discord to add your first entry.</span>
+        </div>`;
+        return;
+      }
+      // Summary bar: total crop/h across all active sends
+      const totalCph = data.reduce((s,d)=>s+parseFloat(d.crop_per_hour||0),0);
+      const summary = `<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:.55rem .9rem;margin-bottom:.7rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
+        <div style="font-size:.82rem;font-weight:700;color:#fbbf24;">Total obligation: ${fmtCrop(totalCph)} 🌾/hour · ${fmtCrop(totalCph*24)} 🌾/day</div>
+        <div style="font-size:.75rem;color:var(--text-muted);">${data.length} active def send${data.length!==1?'s':''}</div>
+      </div>`;
+      body.innerHTML = summary + data.map(renderCropSend).join('');
+    } catch(e) {
+      body.innerHTML = `<div style="color:#f87171;font-size:.83rem;">Could not load: ${e.message}</div>`;
+    }
+  };
+
+  window.removeCropSend = async function(id) {
+    if (!confirm('Remove this crop obligation?')) return;
+    await fetch(`/guild/${GUILD_ID_CROP}/api/def-crop/${id}/deactivate`, {method:'POST'});
+    loadCropSends();
+  };
+
+  loadCropSends();
+})();
+</script>
 {% endblock %}

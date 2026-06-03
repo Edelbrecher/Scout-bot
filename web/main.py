@@ -8821,6 +8821,56 @@ async def page_cookies(request: Request):
 # API — popup config (public, for JS fetch)
 # ---------------------------------------------------------------------------
 
+# ──────────────────────────────────────────────────────────────────────────────
+# DEF CROP TRACKER API
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.post("/api/def-crop/save")
+async def api_def_crop_save(request: Request):
+    """Bot posts here when a user logs sent def troops."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _JSONResponse({"error": "invalid json"}, status_code=400)
+    guild_id          = body.get("guild_id", "")
+    sender_discord_id = body.get("sender_discord_id", "")
+    if not guild_id or not sender_discord_id:
+        return _JSONResponse({"error": "missing fields"}, status_code=400)
+    send_id = await database.save_def_crop_send(
+        guild_id          = guild_id,
+        sender_discord_id = sender_discord_id,
+        sender_name       = body.get("sender_name", ""),
+        recipient_name    = body.get("recipient_name", ""),
+        recipient_village = body.get("recipient_village", ""),
+        tribe             = body.get("tribe", ""),
+        troops            = body.get("troops", {}),
+        crop_per_hour     = float(body.get("crop_per_hour", 0)),
+        notes             = body.get("notes", ""),
+    )
+    return _JSONResponse({"ok": True, "id": send_id})
+
+
+@app.get("/guild/{guild_id}/api/def-crop/my")
+async def api_def_crop_my(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    discord_id = session.get("uid", "")
+    sends = await database.get_def_crop_sends(guild_id, discord_id)
+    return _JSONResponse(sends)
+
+
+@app.post("/guild/{guild_id}/api/def-crop/{send_id}/deactivate")
+async def api_def_crop_deactivate(request: Request, guild_id: str, send_id: int):
+    session, err = _require_session(request)
+    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    await database.deactivate_def_crop_send(send_id, guild_id)
+    return _JSONResponse({"ok": True})
+
+
 @app.get("/api/me")
 async def api_me(request: Request):
     session = get_session(request)
