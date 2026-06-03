@@ -4785,6 +4785,8 @@ async def attacks_import_rally(request: Request, guild_id: str):
 
 
 def _compute_fake_score_server(atk: dict, artifacts: list) -> dict:
+    if atk.get("attack_type") == "support":
+        return {"score": 0, "reasons": ["Support troops — not an attack"]}
     score = 50
     reasons = []
     troops_hidden = bool(atk.get("troops_hidden"))
