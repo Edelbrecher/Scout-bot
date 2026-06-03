@@ -55,6 +55,88 @@
     </div>
   </div>
 
+  <!-- ===== HERO SCOUT MODAL (opens after import) ===== -->
+  <div id="heroScoutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1100;overflow-y:auto;backdrop-filter:blur(4px);">
+    <div style="max-width:700px;margin:2rem auto;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.6);">
+
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(99,102,241,.1));border-bottom:1px solid var(--border);padding:1.1rem 1.4rem;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:1.05rem;font-weight:800;">🦸 Hero Scout</div>
+          <div style="font-size:.78rem;color:var(--text-muted);margin-top:.15rem;">Configure the hero gear of your attacker — attacker name is pre-filled from import</div>
+        </div>
+        <button onclick="closeHeroScoutModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .4rem;">&times;</button>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:1.2rem 1.4rem;">
+
+        <!-- Player info row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:1rem;">
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">👤 Player name *</label>
+            <input id="hs_player" type="text" placeholder="Exact Travian name"
+              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">🏛️ Tribe</label>
+            <select id="hs_tribe" style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
+              <option value="">— unknown —</option>
+              <option value="römer">🏛️ Romans</option>
+              <option value="teutonen">⚒️ Teutons</option>
+              <option value="gallier">🍀 Gauls</option>
+              <option value="ägypter">☀️ Egyptians</option>
+              <option value="hunnen">🏹 Huns</option>
+              <option value="spartaner">⚔️ Spartans</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">🏘️ Villages</label>
+            <input id="hs_villages" type="number" min="0" placeholder="0"
+              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
+          </div>
+        </div>
+
+        <!-- Hero stats row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.1rem;">
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">⭐ Hero Level</label>
+            <input id="hs_level" type="number" min="0" placeholder="0"
+              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">🏆 Alliance</label>
+            <input id="hs_alliance" type="text" placeholder="Alliance tag or name"
+              style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.88rem;">
+          </div>
+        </div>
+
+        <!-- Gear slots -->
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;">⚔️ Hero Equipment</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.1rem;" id="hsSlotGrid">
+          <!-- slots injected by JS -->
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">📝 Notes (optional)</label>
+          <input id="hs_notes" type="text" placeholder="e.g. spotted on screenshot, time of sighting…"
+            style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;font-size:.85rem;">
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:.9rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;background:rgba(255,255,255,.02);">
+        <div style="font-size:.75rem;color:var(--text-muted);">💡 Visible to all alliance leaders in Hero Scout</div>
+        <div style="display:flex;gap:.5rem;">
+          <button onclick="closeHeroScoutModal()" class="btn btn-secondary" style="font-size:.82rem;">Skip</button>
+          <button onclick="saveHeroScout()" id="btnSaveHero" class="btn btn-primary" style="font-size:.82rem;">🦸 Save Hero Scout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== PLAYER PROFILE MODAL ===== -->
   <div id="playerModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1001; overflow-y:auto;">
     <div style="max-width:620px; margin:2rem auto; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
@@ -582,6 +664,9 @@
         closeImportModal();
         loadOwnAttacks();
         showToast('✅ ' + data.saved + ' Attacke gespeichert.');
+        // Auto-open hero scout modal with first attacker pre-filled
+        const firstAttacker = parsedAttacks[0]?.attacker_name || '';
+        openHeroScoutModal(firstAttacker);
       } else {
         showToast('❌ Fehler: ' + (data.error || resp.status));
         btn.disabled = false;
@@ -593,6 +678,174 @@
       btn.textContent = '💾 Speichern';
     }
   };
+
+  // =========================================================
+  // HERO SCOUT MODAL
+  // =========================================================
+  const HS_SLOTS = [
+    { key: 'weapon', label: '⚔️ Weapon',    icon: '⚔️' },
+    { key: 'helmet', label: '🪖 Helmet',    icon: '🪖' },
+    { key: 'armor',  label: '🛡️ Body',      icon: '🛡️' },
+    { key: 'boots',  label: '👟 Boots',     icon: '👟' },
+    { key: 'mount',  label: '🐴 Mount',     icon: '🐴' },
+    { key: 'misc',   label: '🎒 Off-hand',  icon: '🎒' },
+  ];
+
+  // All items grouped by slot key (from backend _HERO_ITEMS_BY_CAT)
+  const HS_ITEMS = {
+    weapon: [
+      // Romans
+      "Kurzschwert des Legionärs [T1]","Schwert des Legionärs [T2]","Langschwert des Legionärs [T3]",
+      "Kurzschwert des Prätorianers [T1]","Schwert des Prätorianers [T2]","Langschwert des Prätorianers [T3]",
+      "Kurzschwert des Imperianers [T1]","Schwert des Imperianers [T2]","Langschwert des Imperianers [T3]",
+      "Kurzschwert des Imperatoris [T1]","Schwert des Imperatoris [T2]","Langschwert des Imperatoris [T3]",
+      "Leichte Lanze des Caesaris [T1]","Lanze des Caesaris [T2]","Schwere Lanze des Caesaris [T3]",
+      // Teutons
+      "Keule des Keulenschwingers [T1]","Morgenstern des Keulenschwingers [T2]","Streitkolben des Keulenschwingers [T3]",
+      "Speer des Speerkämpfers [T1]","Spitze des Speerkämpfers [T2]","Lanze des Speerkämpfers [T3]",
+      "Beil des Axtkämpfers [T1]","Axt des Axtkämpfers [T2]","Streitaxt des Axtkämpfers [T3]",
+      "Leichter Hammer des Paladins [T1]","Hammer des Paladins [T2]","Schwerer Hammer des Paladins [T3]",
+      "Kurzschwert des Teutonischen Ritters [T1]","Schwert des Teutonischen Ritters [T2]","Langschwert des Teutonischen Ritters [T3]",
+      // Gauls
+      "Speer der Phalanx [T1]","Pike der Phalanx [T2]","Lanze der Phalanx [T3]",
+      "Kurzschwert des Schwertkämpfers [T1]","Schwert des Schwertkämpfers [T2]","Langschwert des Schwertkämpfers [T3]",
+      "Kurzbogen des Theutates [T1]","Bogen des Theutates [T2]","Langbogen des Theutates [T3]",
+      "Wanderstab des Druidentreiters [T1]","Stab des Druidentreiters [T2]","Großer Stab des Druidentreiters [T3]",
+      "Leichte Lanze des Haeduers [T1]","Lanze des Haeduers [T2]","Schwere Lanze des Haeduers [T3]",
+      // Huns
+      "Beil des Söldners [T1]","Axt des Söldners [T2]","Streitaxt des Söldners [T3]",
+      "Kurzbogen des Bogenschützen [T1]","Bogen des Bogenschützen [T2]","Langbogen des Bogenschützen [T3]",
+      "Spatha des Steppenreiters [T1]","Schwert des Steppenreiters [T2]","Langschwert des Steppenreiters [T3]",
+      // Egyptians
+      "Keule der Sklavenmiliz [T1]","Morgenstern der Sklavenmiliz [T2]","Streitkolben der Sklavenmiliz [T3]",
+      "Beil des Aschenwächters [T1]","Axt des Aschenwächters [T2]","Streitaxt des Aschenwächters [T3]",
+      "Khopesh des Khopesh-Kriegers [T1]","Großer Khopesh [T2]","Riesiger Khopesh [T3]",
+    ],
+    helmet: [
+      "Helm des Bewusstseins [T1]","Helm der Erleuchtung [T2]","Helm der Weisheit [T3]",
+      "Helm der Erneuerung [T1]","Helm der Gesundheit [T2]","Helm der Heilung [T3]",
+      "Helm des Gladiators [T1]","Helm des Tribuns [T2]","Helm des Konsuls [T3]",
+      "Helm des Söldners [T1]","Helm des Kriegers [T2]","Helm des Archons [T3]",
+      "Helm des Reiters [T1]","Helm der Kavallerie [T2]","Helm der schweren Kavallerie [T3]",
+    ],
+    armor: [
+      "Leichter Brustpanzer [T1]","Brustpanzer [T2]","Schwerer Brustpanzer [T3]",
+      "Leichter Schienenpanzer [T1]","Schienenpanzer [T2]","Schwerer Schienenpanzer [T3]",
+      "Rüstung der Erneuerung [T1]","Rüstung der Gesundheit [T2]","Rüstung der Heilung [T3]",
+      "Leichter Schuppenpanzer [T1]","Schuppenpanzer [T2]","Schwerer Schuppenpanzer [T3]",
+    ],
+    boots: [
+      "Kleine Sporen [T1]","Sporen [T2]","Große Sporen [T3]",
+      "Stiefel des Söldners [T1]","Stiefel des Kriegers [T2]","Stiefel des Archons [T3]",
+      "Stiefel der Erneuerung [T1]","Stiefel der Gesundheit [T2]","Stiefel der Heilung [T3]",
+    ],
+    mount: [
+      "Wallach [T1] 14 Felder/Std.","Vollblut [T2] 17 Felder/Std.","Streitross [T3] 20 Felder/Std.",
+    ],
+    misc: [
+      "Kleiner Schild [T1]","Schild [T2]","Großer Schild [T3]",
+      "Kleines Horn des Natarers [T1]","Horn des Natarers [T2]","Großes Horn des Natarers [T3]",
+      "Beutel des Diebes [T1]","Tasche des Diebes [T2]","Sack des Diebes [T3]",
+      "Kleine Karte [T1]","Karte [T2]","Große Karte [T3]",
+      "Kleiner Wimpel [T1]","Wimpel [T2]","Großer Wimpel [T3]",
+      "Kleines Banner [T1]","Banner [T2]","Großes Banner [T3]",
+      "Kleine Verbände","Verbände","Salbe","Pergament","Eimer","Käfig","Kunstwerk","Gesetzestafel","Buch der Weisheit",
+    ],
+  };
+
+  // Slot key → backend form field name mapping
+  const HS_FIELD_MAP = { weapon:'slot_weapon', helmet:'slot_helm', armor:'slot_armor', boots:'slot_boots', mount:'slot_mount', misc:'slot_misc' };
+
+  function _buildSlotGrid() {
+    const grid = document.getElementById('hsSlotGrid');
+    if (!grid) return;
+    grid.innerHTML = HS_SLOTS.map(s => {
+      const opts = (HS_ITEMS[s.key] || []).map(i => `<option value="${i}">${i}</option>`).join('');
+      return `<div>
+        <label style="font-size:.72rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">${s.label}</label>
+        <div style="position:relative;">
+          <select id="hs_slot_${s.key}"
+            style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .65rem;font-size:.82rem;appearance:none;padding-right:2rem;">
+            <option value="">— not equipped —</option>
+            ${opts}
+          </select>
+          <span style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-muted);font-size:.75rem;">▾</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  window.openHeroScoutModal = function(attackerName = '') {
+    _buildSlotGrid();
+    // Pre-fill attacker name
+    document.getElementById('hs_player').value = attackerName || '';
+    // Clear other fields
+    ['hs_tribe','hs_villages','hs_level','hs_alliance','hs_notes'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    HS_SLOTS.forEach(s => {
+      const el = document.getElementById('hs_slot_' + s.key);
+      if (el) el.value = '';
+    });
+    document.getElementById('heroScoutModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    // Focus player name if empty
+    setTimeout(() => { if (!attackerName) document.getElementById('hs_player').focus(); }, 100);
+  };
+
+  window.closeHeroScoutModal = function() {
+    document.getElementById('heroScoutModal').style.display = 'none';
+    document.body.style.overflow = '';
+  };
+
+  window.saveHeroScout = async function() {
+    const player = document.getElementById('hs_player').value.trim();
+    if (!player) {
+      document.getElementById('hs_player').style.borderColor = '#f87171';
+      document.getElementById('hs_player').focus();
+      return;
+    }
+    document.getElementById('hs_player').style.borderColor = '';
+
+    const btn = document.getElementById('btnSaveHero');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const fd = new FormData();
+    fd.append('player_name', player);
+    fd.append('tribe',       document.getElementById('hs_tribe').value);
+    fd.append('alliance',    document.getElementById('hs_alliance').value.trim());
+    fd.append('hero_level',  document.getElementById('hs_level').value || '0');
+    fd.append('hero_xp',     '0');
+    fd.append('villages',    document.getElementById('hs_villages').value || '0');
+    fd.append('attacker_rank','0');
+    fd.append('defender_rank','0');
+    fd.append('server_time', '');
+    HS_SLOTS.forEach(s => {
+      const val = document.getElementById('hs_slot_' + s.key)?.value || '';
+      fd.append(HS_FIELD_MAP[s.key], val);
+    });
+
+    try {
+      const resp = await fetch(`/guild/${GUILD_ID}/defense/hero-scout/manual/save`, {
+        method: 'POST', body: fd
+      });
+      // Backend redirects (303) — that's fine, we just close modal
+      closeHeroScoutModal();
+      showToast(`✅ Hero scout saved for ${player}`);
+    } catch(e) {
+      showToast('❌ Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🦸 Save Hero Scout';
+    }
+  };
+
+  // Close on backdrop click
+  document.getElementById('heroScoutModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('heroScoutModal')) closeHeroScoutModal();
+  });
 
   // =========================================================
   // OWN ATTACKS
