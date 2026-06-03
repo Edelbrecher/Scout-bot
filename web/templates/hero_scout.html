@@ -278,7 +278,8 @@ function openHeroDetail(encodedName) {
   overlay.style.display = 'block';
   panel.style.display   = 'block';
   panel.classList.remove('closing');
-  requestAnimationFrame(() => panel.classList.add('open'));
+  // Double rAF ensures display:block is painted before opacity transition starts
+  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
   document.getElementById('heroDetailContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">⏳ Loading…</div>';
   document.body.style.overflow = 'hidden';
 
