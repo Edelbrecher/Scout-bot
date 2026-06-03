@@ -222,67 +222,65 @@
   </div>{# end top grid #}
 
   <!-- My operations — full width -->
-  <div class="card" id="missionsCard" style="margin-bottom:1.25rem;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
-      <div>
-        <h2 style="margin:0 0 .2rem;" data-i18n="account.missions.title">⚔️ My Operations</h2>
-        <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Waves from active operation plans assigned to you.</p>
-      </div>
-      <div style="display:flex;gap:.5rem;align-items:center;">
-        <a href="/guild/{{ guild.guild_id }}/my-operations" class="btn btn-primary" style="font-size:.8rem;">📋 Full Op Plan</a>
-        <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.8rem;">→ Op Planning</a>
+  <div id="missionsCard" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:.75rem;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.4rem;">
+      <span style="font-size:.88rem;font-weight:700;">⚔️ My Operations</span>
+      <div style="display:flex;gap:.4rem;align-items:center;">
+        <a href="/guild/{{ guild.guild_id }}/my-operations" class="btn btn-primary" style="font-size:.75rem;padding:.2rem .65rem;">📋 Full Op Plan</a>
+        <a href="/guild/{{ guild.guild_id }}/operations" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .65rem;">→ Planning</a>
       </div>
     </div>
-    <div id="missionsContent">
+    <div id="missionsContent" style="padding:.75rem 1rem;">
       <div style="color:var(--text-muted);font-size:.85rem;">Loading operations…</div>
     </div>
   </div>
 
   <!-- Timeline chart -->
   {% if history and history | length > 0 %}
-  <div class="card" style="margin-bottom:1.25rem; padding:1.25rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
-      <div>
-        <h2 style="margin:0;font-size:1rem;" data-i18n="account.timeline.title">📈 Troop Strength Timeline</h2>
-      </div>
-      <div style="display:flex;align-items:center;gap:.75rem;">
-        <span style="font-size:.75rem;color:var(--text-muted);">{{ history|length }} import{% if history|length != 1 %}s{% endif %}</span>
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:.75rem;overflow:hidden;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.4rem;">
+      <span style="font-size:.88rem;font-weight:700;">📈 Troop Strength Timeline</span>
+      <div style="display:flex;align-items:center;gap:.6rem;">
+        <span style="font-size:.72rem;color:var(--text-muted);">{{ history|length }} import{% if history|length != 1 %}s{% endif %}</span>
         {% if own_villages %}
-        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.3rem .8rem;font-size:.8rem;" data-i18n="account.army.btn">🪖 Army Details</button>
+        <button onclick="openArmyModal()" class="btn btn-secondary" style="padding:.2rem .65rem;font-size:.75rem;">🪖 Army Details</button>
         {% endif %}
       </div>
     </div>
-    <div style="position:relative;height:260px;">
-      <canvas id="historyChart"></canvas>
-    </div>
-    {% if history|length > 1 %}
-    <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1rem;">
-      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.6rem;font-weight:600;">⚖️ Off / Def ratio per import</div>
-      <div style="position:relative;height:80px;">
-        <canvas id="ratioChart"></canvas>
+    <div style="padding:.75rem 1rem;">
+      <div style="position:relative;height:220px;">
+        <canvas id="historyChart"></canvas>
       </div>
+      {% if history|length > 1 %}
+      <div style="margin-top:.75rem;border-top:1px solid var(--border);padding-top:.6rem;">
+        <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.4rem;font-weight:600;">⚖️ Off / Def ratio</div>
+        <div style="position:relative;height:60px;">
+          <canvas id="ratioChart"></canvas>
+        </div>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
   </div>
   {% endif %}
 
   <!-- Troop projection -->
   {% if history and history | length >= 2 %}
-  <div class="card" style="margin-bottom:1.25rem;padding:1.25rem;">
-    <h2 style="margin:0 0 .85rem;font-size:1rem;">🔮 Troop Strength Projection</h2>
-    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">
-      Projection based on your average growth between the last imports.
-    </p>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
-      {% for d, label in [(7,'7 days'),(14,'14 days'),(30,'30 days'),(60,'60 days')] %}
-      <button class="proj-day-btn{% if loop.first %} active{% endif %}" data-days="{{ d }}"
-              onclick="selectProjDays({{ d }},this)"
-              style="font-size:.77rem;padding:.2rem .75rem;border-radius:12px;border:1px solid var(--border);background:{% if loop.first %}rgba(99,102,241,.2){% else %}var(--bg-main){% endif %};color:{% if loop.first %}#a5b4fc{% else %}var(--text-muted){% endif %};cursor:pointer;">
-        {{ label }}
-      </button>
-      {% endfor %}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:.75rem;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.5rem;">
+      <span style="font-size:.88rem;font-weight:700;">🔮 Troop Projection</span>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;">
+        {% for d, label in [(7,'7d'),(14,'14d'),(30,'30d'),(60,'60d')] %}
+        <button class="proj-day-btn{% if loop.first %} active{% endif %}" data-days="{{ d }}"
+                onclick="selectProjDays({{ d }},this)"
+                style="font-size:.73rem;padding:.15rem .6rem;border-radius:10px;border:1px solid var(--border);background:{% if loop.first %}rgba(99,102,241,.2){% else %}var(--bg-main){% endif %};color:{% if loop.first %}#a5b4fc{% else %}var(--text-muted){% endif %};cursor:pointer;">
+          {{ label }}
+        </button>
+        {% endfor %}
+      </div>
     </div>
-    <div id="projResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;"></div>
+    <div style="padding:.75rem 1rem;">
+      <div id="projResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.5rem;"></div>
+    </div>
   </div>
   <script>
   (function(){
@@ -358,9 +356,11 @@
 
   <!-- Villages table -->
   {% if own_villages %}
-  <div class="card">
-    <h2 style="margin:0 0 1rem;"><span data-i18n="account.villages.title">🏘️ Villages</span> ({{ own_villages|length }})</h2>
-    <div style="overflow-x:auto;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:.75rem;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:.88rem;font-weight:700;">🏘️ Villages <span style="font-weight:400;color:var(--text-muted);">({{ own_villages|length }})</span></span>
+    </div>
+    <div style="overflow-x:auto;padding:.5rem 0;">
       <table class="table">
         <thead>
           <tr>
@@ -448,10 +448,10 @@
     </div>
   </div>
   {% else %}
-  <div class="card" style="text-align:center;padding:2.5rem 1rem;">
-    <div style="font-size:2.5rem;margin-bottom:0.75rem;">🏰</div>
-    <h2 style="margin:0 0 0.5rem;" data-i18n="account.empty.title">No villages imported yet</h2>
-    <p style="color:var(--text-muted);" data-i18n="account.empty.hint">Use the import form above to paste your troop overview.</p>
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;text-align:center;padding:2rem 1rem;margin-bottom:.75rem;">
+    <div style="font-size:2rem;margin-bottom:0.5rem;">🏰</div>
+    <div style="font-size:.95rem;font-weight:600;margin-bottom:.3rem;" data-i18n="account.empty.title">No villages imported yet</div>
+    <p style="color:var(--text-muted);font-size:.82rem;margin:0;" data-i18n="account.empty.hint">Use the import form above to paste your troop overview.</p>
   </div>
   {% endif %}
 
