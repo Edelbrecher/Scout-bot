@@ -825,8 +825,8 @@ async def handle_op_wave_assigned(request: aiohttp_web.Request) -> aiohttp_web.R
             f"🕐 Landing: **{landing}**\n\n"
             f"{type_icon} **{type_label}** → {target_str}\n"
             + (f"⚠️ **You are a Cleaner — your wave must arrive BEFORE the main attacks!**\n" if wave_type in ('cleaner1','cleaner2') else "")
-            f"📤 Send time: **{send_time}**\n\n"
-            f"➡️ See your full plan: TravOps → My Op Plan"
+            + f"📤 Send time: **{send_time}**\n\n"
+            + f"➡️ See your full plan: TravOps → My Op Plan"
         )
         await member.send(msg)
         return aiohttp_web.json_response({"ok": True, "status": "sent"})
