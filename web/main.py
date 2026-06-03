@@ -4684,7 +4684,7 @@ async def attack_analysis_page(request: Request, guild_id: str, report_id: int):
     })
 
 
-@app.post("/guild/{guild_id}/attacks/delete/{report_id}")
+@app.post("/guild/{guild_id}/attacks/report/delete/{report_id}")
 async def attacks_delete_report(request: Request, guild_id: str, report_id: int):
     session, err = _require_session(request)
     if err: return err
