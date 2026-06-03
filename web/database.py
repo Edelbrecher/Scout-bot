@@ -8,7 +8,11 @@ DB_PATH = Path("/app/data/scouter.db")
 
 
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Enable WAL mode for better concurrent read/write performance
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA synchronous=NORMAL")
+        await db.commit()
         await db.execute("""
             CREATE TABLE IF NOT EXISTS guild_configs (
                 guild_id                TEXT PRIMARY KEY,
@@ -44,10 +48,27 @@ async def init_db():
                 password_hash TEXT NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS def_crop_sends (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id         TEXT NOT NULL,
+                sender_discord_id TEXT NOT NULL,
+                sender_name      TEXT DEFAULT '',
+                recipient_name   TEXT DEFAULT '',
+                recipient_village TEXT DEFAULT '',
+                tribe            TEXT DEFAULT '',
+                troops           TEXT DEFAULT '{}',
+                crop_per_hour    REAL DEFAULT 0,
+                notes            TEXT DEFAULT '',
+                active           INTEGER DEFAULT 1,
+                created_at       TEXT DEFAULT (datetime('now')),
+                updated_at       TEXT DEFAULT (datetime('now'))
+            )
+        """)
         await db.commit()
 
     # Migrations
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS scout_reports (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -326,7 +347,7 @@ async def init_db():
         await db.commit()
 
     # Report channels table
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS report_channels (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -339,7 +360,7 @@ async def init_db():
         await db.commit()
 
     # Request Hub + Defend channels tables
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS request_hub (
                 guild_id    TEXT PRIMARY KEY,
@@ -385,7 +406,7 @@ async def init_db():
     await _init_scout_incidents_table()
 
     # New column migrations
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for col in ["alliance_manager_role_ids TEXT", "tw_alliance_name TEXT",
                     "server_utc_offset INTEGER DEFAULT 60"]:
             try:
@@ -406,7 +427,7 @@ async def init_db():
 
 
 async def ensure_admin(username: str, password: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT id FROM admin_users WHERE username = ?", (username,)
         ) as cursor:
@@ -421,7 +442,7 @@ async def ensure_admin(username: str, password: str):
 
 
 async def verify_password(username: str, password: str) -> bool:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT password_hash FROM admin_users WHERE username = ?", (username,)
         ) as cursor:
@@ -432,7 +453,7 @@ async def verify_password(username: str, password: str) -> bool:
 
 
 async def get_all_guilds() -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM guild_configs WHERE COALESCE(workspace_status,'active') != 'archived' ORDER BY guild_name") as cursor:
             rows = await cursor.fetchall()
@@ -440,7 +461,7 @@ async def get_all_guilds() -> list[dict]:
 
 
 async def get_guild(guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM guild_configs WHERE guild_id = ?", (guild_id,)
@@ -457,7 +478,7 @@ async def update_guild_config(
     scout_channel_id: str = "",
     bot_language: str = "",
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET category_id = ?, archive_channel_id = ?, allowed_role_ids = ?,
@@ -480,7 +501,7 @@ async def update_guild_config_fields(guild_id: str, **fields):
         return
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     vals = list(updates.values()) + [guild_id]
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(f"UPDATE guild_configs SET {set_clause} WHERE guild_id = ?", vals)
         await db.commit()
 
@@ -488,7 +509,7 @@ async def update_guild_config_fields(guild_id: str, **fields):
 async def create_personal_workspace(owner_discord_id: str, name: str) -> str:
     """Create a personal (Discord-less) workspace and return its guild_id (UUID)."""
     ws_id = "ws_" + uuid.uuid4().hex[:16]
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO guild_configs (guild_id, guild_name, workspace_type, workspace_owner_id, owner_discord_id)
             VALUES (?, ?, 'personal', ?, ?)
@@ -499,7 +520,7 @@ async def create_personal_workspace(owner_discord_id: str, name: str) -> str:
 
 async def get_personal_workspaces(owner_discord_id: str) -> list[dict]:
     """Return all personal workspaces owned by a user."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM guild_configs
@@ -521,14 +542,14 @@ async def get_or_create_default_workspace(owner_discord_id: str, username: str) 
 
 
 async def update_tw_world(guild_id: str, tw_world: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("UPDATE guild_configs SET tw_world = ? WHERE guild_id = ?", (tw_world or None, guild_id))
         await db.commit()
 
 
 async def get_scouted_coordinates(guild_id: str) -> list[dict]:
     """Return list of {coordinates, player, village} from scout_channels."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT coordinates, player, village FROM scout_channels WHERE guild_id = ? AND coordinates IS NOT NULL",
@@ -538,7 +559,7 @@ async def get_scouted_coordinates(guild_id: str) -> list[dict]:
 
 
 async def update_button_message(guild_id: str, scout_channel_id: str, button_message_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET scout_channel_id = ?, button_message_id = ?
@@ -554,7 +575,7 @@ async def auto_setup_guild(
     archive_channel_id: str,
     button_message_id: str,
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET category_id = ?, scout_channel_id = ?, archive_channel_id = ?, button_message_id = ?
@@ -564,7 +585,7 @@ async def auto_setup_guild(
 
 
 async def get_guild_stats(guild_id: str) -> dict:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         async with db.execute(
@@ -616,7 +637,7 @@ async def get_guild_stats(guild_id: str) -> dict:
 
 
 async def get_scout_channels(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM scout_channels WHERE guild_id = ? ORDER BY created_at DESC",
@@ -633,7 +654,7 @@ async def update_res_config(
     res_push_category_id: str,
     res_manager_role_ids: str,
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET res_request_channel_id = ?,
@@ -652,7 +673,7 @@ async def update_res_config(
 
 
 async def update_res_button(guild_id: str, res_request_channel_id: str, res_button_message_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET res_request_channel_id = ?, res_button_message_id = ?
@@ -662,7 +683,7 @@ async def update_res_button(guild_id: str, res_request_channel_id: str, res_butt
 
 
 async def get_res_requests(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM res_requests WHERE guild_id = ? ORDER BY created_at DESC",
@@ -673,7 +694,7 @@ async def get_res_requests(guild_id: str) -> list[dict]:
 
 async def get_res_contributions_per_request(guild_id: str) -> dict[str, list]:
     """Return {request_id: [contributions]} for all requests in a guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT rc.request_id, rc.user_name, rc.amount, rc.created_at
@@ -692,7 +713,7 @@ async def get_res_contributions_per_request(guild_id: str) -> dict[str, list]:
 
 async def get_poll_participation_stats(guild_id: str) -> list[dict]:
     """Per-user participation rate across all polls in the guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT
@@ -713,7 +734,7 @@ async def get_poll_participation_stats(guild_id: str) -> list[dict]:
 
 async def get_res_contribution_leaderboard(guild_id: str) -> list[dict]:
     """Per-user contribution totals across all res-push requests."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT
@@ -732,7 +753,7 @@ async def get_res_contribution_leaderboard(guild_id: str) -> list[dict]:
 
 async def get_res_contribution_details(guild_id: str) -> list[dict]:
     """Recent individual contributions with request context."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT
@@ -749,7 +770,7 @@ async def get_res_contribution_details(guild_id: str) -> list[dict]:
 
 async def get_scout_requester_stats(guild_id: str) -> list[dict]:
     """Who submitted the most scout requests (needs requested_by_name column)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Only works if the column exists (added by migration below)
         try:
@@ -769,7 +790,7 @@ async def get_scout_requester_stats(guild_id: str) -> list[dict]:
 
 
 async def get_res_contributions_for_guild(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT rc.*, rr.player_name, rr.coordinates, rr.push_height
@@ -782,7 +803,7 @@ async def get_res_contributions_for_guild(guild_id: str) -> list[dict]:
 
 
 async def get_res_stats(guild_id: str) -> dict:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         async with db.execute(
@@ -822,7 +843,7 @@ async def get_res_stats(guild_id: str) -> dict:
 
 
 async def reset_scout_config(guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET scout_channel_id = NULL, category_id = NULL,
@@ -833,7 +854,7 @@ async def reset_scout_config(guild_id: str):
 
 
 async def reset_res_config(guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs
             SET res_request_channel_id = NULL, res_answer_channel_id = NULL,
@@ -844,7 +865,7 @@ async def reset_res_config(guild_id: str):
 
 
 async def set_res_request_status_by_id(request_id: int, status: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE res_requests SET status = ? WHERE id = ?", (status, request_id)
         )
@@ -852,7 +873,7 @@ async def set_res_request_status_by_id(request_id: int, status: str):
 
 
 async def delete_res_request(request_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM res_contributions WHERE request_id = ?", (request_id,))
         await db.execute("DELETE FROM res_requests WHERE id = ?", (request_id,))
         await db.commit()
@@ -861,7 +882,7 @@ async def delete_res_request(request_id: int):
 async def upsert_poll_response_admin(poll_id: int, user_id: str, user_name: str, response: str):
     """Admin override — works on open and closed polls."""
     from datetime import datetime
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO poll_responses (poll_id, user_id, user_name, response, responded_at)
             VALUES (?, ?, ?, ?, ?)
@@ -872,7 +893,7 @@ async def upsert_poll_response_admin(poll_id: int, user_id: str, user_name: str,
 
 
 async def delete_poll_response(poll_id: int, user_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM poll_responses WHERE poll_id = ? AND user_id = ?",
             (poll_id, user_id),
@@ -881,7 +902,7 @@ async def delete_poll_response(poll_id: int, user_id: str):
 
 
 async def get_res_request_by_id_web(request_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM res_requests WHERE id = ?", (request_id,)
@@ -891,7 +912,7 @@ async def get_res_request_by_id_web(request_id: int) -> dict | None:
 
 
 async def get_scout_channel_info(channel_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM scout_channels WHERE channel_id = ?", (channel_id,)) as cur:
             row = await cur.fetchone()
@@ -899,7 +920,7 @@ async def get_scout_channel_info(channel_id: str) -> dict | None:
 
 
 async def delete_scout_channel(channel_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM scout_channels WHERE channel_id = ?", (channel_id,))
         await db.commit()
 
@@ -907,7 +928,7 @@ async def delete_scout_channel(channel_id: str):
 async def close_scout_channel_by_message(discord_message_id: str):
     """Mark a scout_channel as closed when its Discord message is deleted."""
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE scout_channels SET closed_at = ?, closed_by = 'discord_delete'
             WHERE discord_message_id = ? AND closed_at IS NULL
@@ -920,7 +941,7 @@ async def save_scout_image(
     discord_message_id: str = "", scout_report_id: int | None = None
 ) -> int:
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO scout_images (scout_report_id, guild_id, channel_id,
                                       discord_url, discord_message_id, created_at)
@@ -932,7 +953,7 @@ async def save_scout_image(
 
 
 async def get_scout_images_for_channel(channel_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM scout_images WHERE channel_id = ? ORDER BY created_at DESC
@@ -949,7 +970,7 @@ async def upsert_enemy(
     """Create or update an enemy entry. Returns the enemy id."""
     from datetime import datetime as _dt
     now = _dt.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         await db.execute("""
             INSERT INTO enemies (guild_id, player_name, coordinates, village,
@@ -973,7 +994,7 @@ async def upsert_enemy(
 
 
 async def get_enemies(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT e.*,
@@ -990,7 +1011,7 @@ async def get_enemies(guild_id: str) -> list[dict]:
 
 
 async def get_enemy(guild_id: str, player_name: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM enemies WHERE guild_id=? AND player_name=?",
@@ -1002,7 +1023,7 @@ async def get_enemy(guild_id: str, player_name: str) -> dict | None:
 
 async def get_enemy_scout_history(guild_id: str, player_name: str) -> list[dict]:
     """All scout reports for an enemy, with images."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT sr.*,
@@ -1031,7 +1052,7 @@ async def get_enemy_scout_history(guild_id: str, player_name: str) -> list[dict]
 
 
 async def update_enemy_notes(guild_id: str, player_name: str, notes: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE enemies SET notes=? WHERE guild_id=? AND player_name=?",
             (notes, guild_id, player_name)
@@ -1044,7 +1065,7 @@ async def update_enemy_meta(
     danger_level: str = "", tags: str = "", alliance_name: str | None = None
 ):
     """Update danger level, tags (comma-sep), optional alliance_name."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         if alliance_name is not None:
             await db.execute(
                 "UPDATE enemies SET danger_level=?, tags=?, alliance_name=? WHERE guild_id=? AND player_name=?",
@@ -1059,7 +1080,7 @@ async def update_enemy_meta(
 
 
 async def delete_enemy(guild_id: str, player_name: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM enemies WHERE guild_id=? AND player_name=?",
             (guild_id, player_name)
@@ -1070,7 +1091,7 @@ async def delete_enemy(guild_id: str, player_name: str):
 async def set_report_channel(guild_id: str, channel_id: str | None, channel_name: str | None):
     from datetime import datetime
     now = datetime.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO report_channels (guild_id, channel_id, channel_name, created_at)
             VALUES (?, ?, ?, ?)
@@ -1082,7 +1103,7 @@ async def set_report_channel(guild_id: str, channel_id: str | None, channel_name
 
 
 async def get_report_channel(guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM report_channels WHERE guild_id = ?", (guild_id,)
@@ -1092,7 +1113,7 @@ async def get_report_channel(guild_id: str) -> dict | None:
 
 
 async def is_report_channel(channel_id: str) -> bool:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT 1 FROM report_channels WHERE channel_id = ?", (channel_id,)
         ) as cur:
@@ -1115,7 +1136,7 @@ async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
         role_ids.add(role_id)
         added = True
     new_value = ",".join(sorted(role_ids)) or None
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(f"UPDATE guild_configs SET {field} = ? WHERE guild_id = ?", (new_value, guild_id))
         await db.commit()
     return added
@@ -1126,7 +1147,7 @@ async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
 # ---------------------------------------------------------------------------
 
 async def update_poll_channel(guild_id: str, poll_channel_id: str, poll_public_channel_id: str | None = None):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("UPDATE guild_configs SET poll_channel_id = ? WHERE guild_id = ?", (poll_channel_id or None, guild_id))
         if poll_public_channel_id is not None:
             await db.execute("UPDATE guild_configs SET poll_public_channel_id = ? WHERE guild_id = ?", (poll_public_channel_id or None, guild_id))
@@ -1135,7 +1156,7 @@ async def update_poll_channel(guild_id: str, poll_channel_id: str, poll_public_c
 
 async def create_poll(guild_id: str, title: str, description: str, event_datetime: str) -> int:
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO availability_polls (guild_id, title, description, event_datetime, created_at)
             VALUES (?, ?, ?, ?, ?)
@@ -1145,13 +1166,13 @@ async def create_poll(guild_id: str, title: str, description: str, event_datetim
 
 
 async def set_poll_message_id(poll_id: int, message_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("UPDATE availability_polls SET discord_message_id = ? WHERE id = ?", (message_id, poll_id))
         await db.commit()
 
 
 async def get_polls(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM availability_polls WHERE guild_id = ? ORDER BY created_at DESC", (guild_id,)
@@ -1160,7 +1181,7 @@ async def get_polls(guild_id: str) -> list[dict]:
 
 
 async def get_poll(poll_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM availability_polls WHERE id = ?", (poll_id,)) as cur:
             row = await cur.fetchone()
@@ -1168,7 +1189,7 @@ async def get_poll(poll_id: int) -> dict | None:
 
 
 async def get_poll_responses(poll_id: int) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM poll_responses WHERE poll_id = ? ORDER BY responded_at ASC", (poll_id,)
@@ -1177,13 +1198,13 @@ async def get_poll_responses(poll_id: int) -> list[dict]:
 
 
 async def close_poll(poll_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("UPDATE availability_polls SET status = 'closed' WHERE id = ?", (poll_id,))
         await db.commit()
 
 
 async def delete_poll(poll_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM poll_responses WHERE poll_id = ?", (poll_id,))
         await db.execute("DELETE FROM availability_polls WHERE id = ?", (poll_id,))
         await db.commit()
@@ -1198,7 +1219,7 @@ async def create_poll_targeted(
     """Create a poll with optional targeting. Returns poll id."""
     import json as _json
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO availability_polls
                 (guild_id, title, description, event_datetime, event_end_datetime,
@@ -1212,7 +1233,7 @@ async def create_poll_targeted(
 
 async def set_poll_thread(poll_id: int, channel_id: str, thread_id: str | None, message_id: str):
     """Save discord IDs for a posted poll."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             """UPDATE availability_polls
                SET poll_channel_id=?, thread_id=?, discord_message_id=? WHERE id=?""",
@@ -1223,7 +1244,7 @@ async def set_poll_thread(poll_id: int, channel_id: str, thread_id: str | None, 
 
 async def queue_thread_invites(thread_id: str, guild_id: str, user_ids: list[str]):
     import json as _json
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "INSERT INTO pending_thread_invites (thread_id, guild_id, user_ids) VALUES (?,?,?)",
             (thread_id, guild_id, _json.dumps(user_ids))
@@ -1242,7 +1263,7 @@ async def get_poll_target_members(guild_id: str, target_type: str, target_ids_js
     if not group:
         return []
     gid = group["id"]
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if target_type == "all" or not ids:
             sql = """SELECT am.discord_id, am.discord_username, am.travian_name, am.role_id, am.wing,
@@ -1294,7 +1315,7 @@ async def get_poll_target_members(guild_id: str, target_type: str, target_ids_js
 
 
 async def get_guild_by_stripe_customer(stripe_customer_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM guild_configs WHERE stripe_customer_id = ?", (stripe_customer_id,)
@@ -1312,7 +1333,7 @@ async def update_subscription(
     expires_at: str | None,
     owner_discord_id: str | None = None,
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE guild_configs SET
                 stripe_customer_id      = ?,
@@ -1328,7 +1349,7 @@ async def update_subscription(
 
 async def get_owner_active_guilds(owner_discord_id: str) -> list[dict]:
     """All guilds where this Discord user is the subscription owner and sub is active/trialing."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT guild_id, guild_name, subscription_status, subscription_plan
@@ -1351,7 +1372,7 @@ async def get_owner_tier_limit(owner_discord_id: str) -> int:
         plan = (user_sub.get("plan") or "starter").split("_")[0]
         return _tier_limits.get(plan, 1)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT subscription_plan FROM guild_configs
@@ -1373,7 +1394,7 @@ async def get_owner_tier_limit(owner_discord_id: str) -> int:
 
 async def set_bot_kicked(guild_id: str):
     """Mark guild as kicked — bot was removed from the server."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET bot_status = 'kicked', bot_kicked_at = datetime('now') WHERE guild_id = ?",
             (guild_id,),
@@ -1383,7 +1404,7 @@ async def set_bot_kicked(guild_id: str):
 
 async def set_bot_active(guild_id: str):
     """Mark guild as active — bot rejoined or is present."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET bot_status = 'active', bot_kicked_at = NULL WHERE guild_id = ?",
             (guild_id,),
@@ -1393,7 +1414,7 @@ async def set_bot_active(guild_id: str):
 
 async def update_bot_last_seen(guild_id: str):
     """Update the timestamp when bot last had activity in this guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET bot_last_seen = datetime('now') WHERE guild_id = ?",
             (guild_id,),
@@ -1403,7 +1424,7 @@ async def update_bot_last_seen(guild_id: str):
 
 async def set_guild_active_flag(guild_id: str, active: bool):
     """Set is_active flag (1=active, 0=inactive) for a guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET is_active = ? WHERE guild_id = ?",
             (1 if active else 0, guild_id),
@@ -1413,7 +1434,7 @@ async def set_guild_active_flag(guild_id: str, active: bool):
 
 async def archive_guild(guild_id: str):
     """Archive a guild (hide from dashboard, mark bot as kicked)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET workspace_status='archived', bot_status='kicked' WHERE guild_id = ?",
             (guild_id,),
@@ -1423,7 +1444,7 @@ async def archive_guild(guild_id: str):
 
 async def unarchive_guild(guild_id: str):
     """Restore an archived guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET workspace_status='active' WHERE guild_id = ?",
             (guild_id,),
@@ -1433,7 +1454,7 @@ async def unarchive_guild(guild_id: str):
 
 async def get_archived_guilds() -> list[dict]:
     """Return all guilds with workspace_status='archived'."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT guild_id, guild_name, owner_discord_id, subscription_status, subscription_plan,
@@ -1446,7 +1467,7 @@ async def get_archived_guilds() -> list[dict]:
 
 async def delete_customer(discord_user_id: str):
     """Remove a customer (user subscription + unlink owned guilds)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Remove user subscription
         await db.execute("DELETE FROM user_subscriptions WHERE discord_user_id = ?", (discord_user_id,))
         # Unlink guilds owned by this user (don't delete the guilds themselves)
@@ -1458,7 +1479,7 @@ async def delete_customer(discord_user_id: str):
 
 
 async def set_subscription_status(guild_id: str, status: str, expires_at: str | None = None):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET subscription_status = ?, subscription_expires_at = ? WHERE guild_id = ?",
             (status, expires_at, guild_id),
@@ -1471,7 +1492,7 @@ async def set_subscription_status(guild_id: str, status: str, expires_at: str | 
 # ---------------------------------------------------------------------------
 
 async def get_attack_reports(guild_id: str, limit: int = 50) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM attack_reports WHERE guild_id = ? ORDER BY created_at DESC LIMIT ?",
@@ -1483,7 +1504,7 @@ async def get_attack_reports(guild_id: str, limit: int = 50) -> list[dict]:
 async def get_attack_stats(guild_id: str) -> dict:
     import json as _json
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         async with db.execute(
@@ -1533,7 +1554,7 @@ async def get_attack_stats(guild_id: str) -> dict:
 
 
 async def set_attack_channel_web(guild_id: str, attack_channel_id: str, attack_button_message_id: str = ""):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET attack_channel_id = ?, attack_button_message_id = ? WHERE guild_id = ?",
             (attack_channel_id or None, attack_button_message_id or None, guild_id),
@@ -1542,7 +1563,7 @@ async def set_attack_channel_web(guild_id: str, attack_channel_id: str, attack_b
 
 
 async def get_attack_report(guild_id: str, report_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM attack_reports WHERE id = ? AND guild_id = ?",
@@ -1556,7 +1577,7 @@ async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | No
     """Look up a player by name in the latest map snapshot."""
     if not player_name:
         return None
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Get the latest snapshot time for this guild
         async with db.execute(
@@ -1599,7 +1620,7 @@ async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | No
 
 async def get_village_from_snapshot(guild_id: str, x: int, y: int) -> dict | None:
     """Look up a village by exact coords in the latest map snapshot."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
@@ -1631,7 +1652,7 @@ async def get_reports_by_attackers(guild_id: str, attacker_names: list[str]) -> 
     """Return all reports where any of the given attacker names appear in attacks_json."""
     if not attacker_names:
         return []
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM attack_reports WHERE guild_id = ? ORDER BY created_at DESC",
@@ -1652,7 +1673,7 @@ async def get_reports_by_attackers(guild_id: str, attacker_names: list[str]) -> 
 
 
 async def delete_attack_report(report_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM attack_reports WHERE id = ?", (report_id,))
         await db.commit()
 
@@ -1662,7 +1683,7 @@ async def delete_attack_report(report_id: int):
 # ---------------------------------------------------------------------------
 
 async def _init_farming_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS map_snapshots (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1720,7 +1741,7 @@ async def _init_farming_tables():
 async def save_map_snapshot(guild_id: str, villages: list[dict]):
     from datetime import datetime as _dt
     fetched_at = _dt.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.executemany("""
             INSERT INTO map_snapshots
                 (guild_id, fetched_at, village_id, x, y, village_name, player_id, player_name,
@@ -1742,7 +1763,7 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
 
 
 async def get_latest_snapshot_time(guild_id: str) -> str | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT MAX(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,)
         ) as cur:
@@ -1751,14 +1772,14 @@ async def get_latest_snapshot_time(guild_id: str) -> str | None:
 
 
 async def clear_all_snapshots(guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM map_snapshots WHERE guild_id = ?", (guild_id,))
         await db.commit()
 
 
 async def get_village_pop_history(guild_id: str, x: int, y: int, days: int = 7) -> list[dict]:
     """Return daily population snapshots for a village, newest first, up to `days` distinct dates."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("""
             SELECT DATE(fetched_at) as snap_date, MAX(population) as population
             FROM map_snapshots
@@ -1774,7 +1795,7 @@ async def get_village_pop_history(guild_id: str, x: int, y: int, days: int = 7) 
 
 async def get_player_pop_growth(guild_id: str, player_name: str, days: int = 7) -> dict:
     """Return player's total pop at latest snapshot vs N days ago."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("""
             SELECT SUM(population) FROM map_snapshots
             WHERE guild_id=? AND player_name=?
@@ -1799,7 +1820,7 @@ async def get_bulk_village_pop_history(guild_id: str, coords: list, days: int = 
     if not coords:
         return {}
     result: dict = {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         or_clauses = " OR ".join("(x=? AND y=?)" for _ in coords)
         flat = [val for (x, y) in coords for val in (x, y)]
         async with db.execute(f"""
@@ -1820,7 +1841,7 @@ async def get_bulk_player_pop_growth(guild_id: str, player_names: list, days: in
     """Return {player_name: {"delta": N, "latest": M}} for multiple players."""
     if not player_names:
         return {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Latest snapshot time
         async with db.execute(
             "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,)
@@ -1867,7 +1888,7 @@ async def get_bulk_player_pop_growth(guild_id: str, player_names: list, days: in
 
 async def get_servers_overview() -> list[dict]:
     """Return all guilds with tw_world set, plus snapshot stats per guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # All guilds (not archived)
         async with db.execute("""
@@ -1931,7 +1952,7 @@ async def get_servers_overview() -> list[dict]:
 
 
 async def prune_old_snapshots(guild_id: str, keep_days: int = 30):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             DELETE FROM map_snapshots
             WHERE guild_id = ?
@@ -1941,7 +1962,7 @@ async def prune_old_snapshots(guild_id: str, keep_days: int = 30):
 
 
 async def get_snapshot_count(guild_id: str) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COUNT(DISTINCT fetched_at) as cnt FROM map_snapshots WHERE guild_id = ?", (guild_id,)
         ) as cur:
@@ -1956,7 +1977,7 @@ async def get_inactive_farms(
     max_pop: int = 9999,
     include_ww: bool = False,
 ) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT village_id, x, y, village_name, player_name, tribe,
@@ -1994,7 +2015,7 @@ async def get_inactive_farms(
 
 async def get_village_id_by_xy(guild_id: str, x: int, y: int) -> str | None:
     """Return Travian village_id for a given coordinate from the latest snapshot."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("""
             SELECT village_id FROM map_snapshots
             WHERE guild_id=? AND x=? AND y=?
@@ -2007,7 +2028,7 @@ async def get_village_id_by_xy(guild_id: str, x: int, y: int) -> str | None:
 async def get_own_village_ids(guild_id: str, discord_id: str, tw_player_name: str = "") -> list[dict]:
     """Return own villages with Travian village_ids looked up from map_snapshots."""
     await _init_own_villages_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT village_name, x, y FROM guild_own_villages WHERE guild_id=? AND discord_id=? AND x IS NOT NULL",
@@ -2036,7 +2057,7 @@ async def get_own_village_ids(guild_id: str, discord_id: str, tw_player_name: st
 
 async def get_snapshot_pop_range(guild_id: str) -> dict:
     """Return min/max population seen in snapshots for this guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT MIN(population), MAX(population) FROM map_snapshots WHERE guild_id=? AND population > 0",
             (guild_id,)
@@ -2068,7 +2089,7 @@ async def search_inactive_advanced(
 ) -> dict:
     import math
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
 
         # Ensure indexes exist for fast lookups
         await db.execute("""
@@ -2241,7 +2262,7 @@ async def add_farm_list_entry(
     notes: str | None,
 ) -> int:
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO farm_list_entries
                 (guild_id, added_by_id, added_by_name, x, y, village_name, player_name, population, notes, added_at)
@@ -2255,7 +2276,7 @@ async def add_farm_list_entry(
 
 
 async def get_farm_list(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM farm_list_entries WHERE guild_id = ? ORDER BY added_at DESC", (guild_id,)
@@ -2264,7 +2285,7 @@ async def get_farm_list(guild_id: str) -> list[dict]:
 
 
 async def delete_farm_list_entry(guild_id: str, entry_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM farm_list_entries WHERE id = ? AND guild_id = ?", (entry_id, guild_id)
         )
@@ -2275,7 +2296,7 @@ async def get_farm_stats(guild_id: str) -> dict:
     snapshot_count = await get_snapshot_count(guild_id)
     latest_snapshot = await get_latest_snapshot_time(guild_id)
     inactive = await get_inactive_farms(guild_id)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COUNT(*) as cnt FROM farm_list_entries WHERE guild_id = ?", (guild_id,)
         ) as cur:
@@ -2291,7 +2312,7 @@ async def get_farm_stats(guild_id: str) -> dict:
 
 async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
     """Return top growing / shrinking players between first and last snapshot."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # We need first and last snapshot times
         cur = await db.execute(
@@ -2348,7 +2369,7 @@ async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
 
 async def search_map_snapshot(guild_id: str, query: str) -> list[dict]:
     """Search villages/players in the latest snapshot."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?", (guild_id,)
@@ -2372,7 +2393,7 @@ async def search_map_snapshot(guild_id: str, query: str) -> list[dict]:
 async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
     """Full player intelligence: villages, pop history, alliance history, village origin, growth."""
     import datetime as _dt_mod
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # Latest snapshot timestamp
@@ -2555,7 +2576,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
 
 async def search_players_in_snapshot(guild_id: str, query: str, limit: int = 20) -> list[str]:
     """Return distinct player names matching query from the latest snapshot."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?", (guild_id,)
         ) as cur:
@@ -2574,7 +2595,7 @@ async def search_players_in_snapshot(guild_id: str, query: str, limit: int = 20)
 
 async def get_farmlist_heatmap(guild_id: str, discord_user_id: str) -> list[dict]:
     """Return all farm coords with resource totals from user's latest farmlist analysis."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             """SELECT farms_json FROM farmlist_analyses
@@ -2629,7 +2650,7 @@ async def get_farming_cross_reference(guild_id: str, min_days: int = 3) -> list[
 # ── Einsatzplanung ────────────────────────────────────────────────────────────
 
 async def _init_einsatz_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS attack_plans (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2652,7 +2673,7 @@ async def _init_einsatz_tables():
 
 
 async def get_attack_plans(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM attack_plans WHERE guild_id = ? ORDER BY arrival_time ASC",
@@ -2670,7 +2691,7 @@ async def create_attack_plan(
     notes: str | None,
 ) -> int:
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO attack_plans
                 (guild_id, created_by, created_name, plan_name, target_x, target_y,
@@ -2687,7 +2708,7 @@ async def create_attack_plan(
 
 
 async def delete_attack_plan(guild_id: str, plan_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM attack_plans WHERE id = ? AND guild_id = ?",
             (plan_id, guild_id)
@@ -2698,7 +2719,7 @@ async def delete_attack_plan(guild_id: str, plan_id: int):
 # ── Admin settings ────────────────────────────────────────────────────────────
 
 async def _init_admin_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS admin_settings (
                 key   TEXT PRIMARY KEY,
@@ -2709,7 +2730,7 @@ async def _init_admin_tables():
 
 
 async def get_setting(key: str) -> str | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT value FROM admin_settings WHERE key = ?", (key,)
         ) as cur:
@@ -2718,7 +2739,7 @@ async def get_setting(key: str) -> str | None:
 
 
 async def set_setting(key: str, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "INSERT INTO admin_settings (key, value) VALUES (?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -2728,7 +2749,7 @@ async def set_setting(key: str, value: str):
 
 
 async def update_subscription_plan(guild_id: str, status: str, plan: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET subscription_status = ?, subscription_plan = ? WHERE guild_id = ?",
             (status, plan, guild_id),
@@ -2738,7 +2759,7 @@ async def update_subscription_plan(guild_id: str, status: str, plan: str):
 
 async def get_recent_guilds(limit: int = 10) -> list[dict]:
     """Return the most recently added guilds (no created_at column, use rowid)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM guild_configs ORDER BY rowid DESC LIMIT ?", (limit,)
@@ -2751,7 +2772,7 @@ async def get_recent_guilds(limit: int = 10) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 async def _init_consent_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS cookie_consents (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2784,7 +2805,7 @@ async def log_cookie_consent(
     user_agent: str | None,
 ):
     from datetime import datetime as _dt2
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "INSERT INTO cookie_consents (user_id, username, action, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (user_id, username, action, ip, user_agent, _dt2.utcnow().isoformat()),
@@ -2793,7 +2814,7 @@ async def log_cookie_consent(
 
 
 async def get_cookie_consents(limit: int = 200) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM cookie_consents ORDER BY created_at DESC LIMIT ?", (limit,)
@@ -2812,7 +2833,7 @@ async def log_page_visit(
     ip: str | None,
 ):
     from datetime import datetime as _dt3
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "INSERT INTO page_visits (user_id, username, path, ip, created_at) VALUES (?, ?, ?, ?, ?)",
             (user_id, username, path, ip, _dt3.utcnow().isoformat()),
@@ -2821,7 +2842,7 @@ async def log_page_visit(
 
 
 async def get_funnel_stats() -> dict:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COUNT(*) FROM page_visits WHERE path LIKE '%/billing' OR path LIKE '%/billing/' AND created_at >= datetime('now', '-30 days')"
         ) as cur:
@@ -2849,7 +2870,7 @@ async def get_funnel_stats() -> dict:
 # ---------------------------------------------------------------------------
 
 async def _init_user_sub_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_subscriptions (
                 discord_user_id         TEXT PRIMARY KEY,
@@ -2878,7 +2899,7 @@ async def get_user_subscription(discord_user_id: str) -> dict | None:
     """Return the user_subscriptions row for this Discord user, or None."""
     if not discord_user_id:
         return None
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM user_subscriptions WHERE discord_user_id = ?", (discord_user_id,)
@@ -2896,7 +2917,7 @@ async def upsert_user_subscription(
     expires_at: str | None = None,
 ):
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO user_subscriptions
                 (discord_user_id, stripe_customer_id, stripe_subscription_id,
@@ -2927,7 +2948,7 @@ async def get_user_available_slots(discord_user_id: str) -> tuple[int, int]:
     _tier_limits = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
 
     # Count used slots
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             """SELECT COUNT(*) FROM guild_configs
                WHERE owner_discord_id = ?
@@ -2945,7 +2966,7 @@ async def get_user_available_slots(discord_user_id: str) -> tuple[int, int]:
         return slots_used, slots_max
 
     # Fall back to guild-level plans
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT subscription_plan FROM guild_configs
@@ -2971,7 +2992,7 @@ async def get_user_available_slots(discord_user_id: str) -> tuple[int, int]:
 
 async def get_user_by_stripe_customer(stripe_customer_id: str) -> dict | None:
     """Return the user_subscriptions row for a given Stripe customer ID."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM user_subscriptions WHERE stripe_customer_id = ?", (stripe_customer_id,)
@@ -2982,7 +3003,7 @@ async def get_user_by_stripe_customer(stripe_customer_id: str) -> dict | None:
 
 async def get_billing_visitors_without_sub() -> list[dict]:
     """Users who visited billing pages but don't have active subscription."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT pv.user_id, pv.username, pv.path, MAX(pv.created_at) as last_visit
@@ -3003,7 +3024,7 @@ async def get_billing_visitors_without_sub() -> list[dict]:
 
 async def cache_discord_username(discord_user_id: str, username: str):
     """Store/update discord username in user_subscriptions for admin visibility."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO user_subscriptions (discord_user_id, discord_username, updated_at)
             VALUES (?, ?, datetime('now'))
@@ -3023,7 +3044,7 @@ async def get_customers_overview() -> list[dict]:
     Each customer has: discord_user_id, discord_username, user_sub (plan/status),
     guilds (list of their servers), slots_used, slots_max.
     """
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # All guilds that have an owner set
@@ -3116,7 +3137,7 @@ async def update_user_subscription_admin(
     stripe_customer_id: str = "", stripe_subscription_id: str = "",
 ):
     """Admin override for user-level subscription."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO user_subscriptions
                 (discord_user_id, subscription_status, plan, stripe_customer_id,
@@ -3133,7 +3154,7 @@ async def update_user_subscription_admin(
 
 
 async def has_logged_in_before(discord_id: str) -> bool:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT discord_username FROM user_subscriptions WHERE discord_user_id = ? AND discord_username IS NOT NULL",
             (discord_id,)
@@ -3152,7 +3173,7 @@ async def log_auth(
     has_active_sub: bool = False,
     is_returning: bool = False,
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO auth_logs
                 (status, discord_id, username, ip, detail, guild_count, accessible_guilds, has_active_sub, is_returning)
@@ -3163,7 +3184,7 @@ async def log_auth(
 
 
 async def get_auth_logs(limit: int = 200) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM auth_logs ORDER BY created_at DESC LIMIT ?
@@ -3172,7 +3193,7 @@ async def get_auth_logs(limit: int = 200) -> list[dict]:
 
 
 async def _init_own_villages_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS guild_own_villages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3216,7 +3237,7 @@ async def _init_own_villages_table():
 async def set_scout_village(guild_id: str, discord_id: str, x: int, y: int) -> None:
     """Toggle a village as scout village — unsets all others first."""
     await _init_own_villages_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Check if this village is already the scout village
         async with db.execute(
             "SELECT is_scout_village FROM guild_own_villages WHERE guild_id=? AND discord_id=? AND x=? AND y=?",
@@ -3241,7 +3262,7 @@ async def set_scout_village(guild_id: str, discord_id: str, x: int, y: int) -> N
 async def get_scout_village(guild_id: str, discord_id: str) -> dict | None:
     """Return the marked scout village for a user, or None."""
     await _init_own_villages_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM guild_own_villages WHERE guild_id=? AND discord_id=? AND is_scout_village=1 LIMIT 1",
@@ -3278,7 +3299,7 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         sum(CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
         for v in villages
     )
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Replace only this user's villages
         if discord_id:
             await db.execute(
@@ -3336,7 +3357,7 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
 
 async def get_own_villages(guild_id: str, discord_id: str = "") -> list[dict]:
     """Return own villages for a guild (filtered by discord_id if provided)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if discord_id:
             async with db.execute(
@@ -3353,7 +3374,7 @@ async def get_own_villages(guild_id: str, discord_id: str = "") -> list[dict]:
 
 async def delete_own_villages(guild_id: str, discord_id: str = ""):
     """Delete own villages for a guild (filtered by discord_id if provided)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         if discord_id:
             await db.execute(
                 "DELETE FROM guild_own_villages WHERE guild_id = ? AND discord_id = ?",
@@ -3366,7 +3387,7 @@ async def delete_own_villages(guild_id: str, discord_id: str = ""):
 
 
 async def _init_own_villages_history_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS guild_own_villages_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3394,7 +3415,7 @@ async def _init_own_villages_history_table():
 
 async def get_own_villages_history(guild_id: str, discord_id: str = "") -> list[dict]:
     """Return historical snapshots for own villages, oldest first."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if discord_id:
             async with db.execute(
@@ -3410,7 +3431,7 @@ async def get_own_villages_history(guild_id: str, discord_id: str = "") -> list[
 
 
 async def get_auth_stats() -> dict:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT status, COUNT(*) as count
@@ -3448,7 +3469,7 @@ async def get_auth_stats() -> dict:
 
 
 async def _init_sitter_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS account_sitters (
                 guild_id        TEXT NOT NULL,
@@ -3470,7 +3491,7 @@ async def _init_sitter_table():
 
 async def get_account_sitters(guild_id: str, user_id: str) -> dict | None:
     await _init_sitter_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM account_sitters WHERE guild_id = ? AND discord_user_id = ?",
@@ -3484,7 +3505,7 @@ async def save_account_sitters(guild_id: str, user_id: str, data: dict):
     await _init_sitter_table()
     from datetime import datetime as _dt
     is_shared = 1 if data.get("is_shared") else 0
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO account_sitters
                 (guild_id, discord_user_id, sitter1_name, sitter1_travian,
@@ -3515,7 +3536,7 @@ async def save_account_sitters(guild_id: str, user_id: str, data: dict):
 
 
 async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT sr.*,
@@ -3541,7 +3562,7 @@ async def get_scout_reports_for_channel(channel_id: str) -> list[dict]:
 
 
 async def _init_settle_list_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS settle_list (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3559,7 +3580,7 @@ async def _init_settle_list_table():
 
 async def get_settle_list(guild_id: str) -> list[dict]:
     await _init_settle_list_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM settle_list WHERE guild_id = ? ORDER BY created_at DESC",
@@ -3573,7 +3594,7 @@ async def add_settle_entry(
     player_name: str | None, coordinates: str, note: str | None,
 ) -> int:
     await _init_settle_list_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO settle_list (guild_id, discord_user_id, discord_username, player_name, coordinates, note)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -3584,7 +3605,7 @@ async def add_settle_entry(
 
 async def delete_settle_entry(entry_id: int, guild_id: str, user_id: str, is_manager: bool):
     await _init_settle_list_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         if is_manager:
             await db.execute(
                 "DELETE FROM settle_list WHERE id = ? AND guild_id = ?",
@@ -3599,7 +3620,7 @@ async def delete_settle_entry(entry_id: int, guild_id: str, user_id: str, is_man
 
 
 async def _init_dual_links_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS dual_links (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3621,7 +3642,7 @@ async def create_dual_invite(guild_id: str, owner_id: str, owner_username: str) 
     await _init_dual_links_table()
     import secrets as _sec
     token = _sec.token_urlsafe(24)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO dual_links (guild_id, owner_discord_id, owner_username, invite_token)
             VALUES (?, ?, ?, ?)
@@ -3632,7 +3653,7 @@ async def create_dual_invite(guild_id: str, owner_id: str, owner_username: str) 
 
 async def get_dual_link_by_token(token: str) -> dict | None:
     await _init_dual_links_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM dual_links WHERE invite_token = ?", (token,)
@@ -3643,7 +3664,7 @@ async def get_dual_link_by_token(token: str) -> dict | None:
 
 async def accept_dual_invite(token: str, dual_id: str, dual_username: str):
     await _init_dual_links_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE dual_links
             SET dual_discord_id = ?, dual_username = ?, status = 'active',
@@ -3655,7 +3676,7 @@ async def accept_dual_invite(token: str, dual_id: str, dual_username: str):
 
 async def get_dual_links_for_owner(guild_id: str, owner_id: str) -> list[dict]:
     await _init_dual_links_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM dual_links WHERE guild_id = ? AND owner_discord_id = ? ORDER BY created_at DESC",
@@ -3666,7 +3687,7 @@ async def get_dual_links_for_owner(guild_id: str, owner_id: str) -> list[dict]:
 
 async def revoke_dual_link(token: str, owner_id: str):
     await _init_dual_links_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE dual_links SET status = 'revoked' WHERE invite_token = ? AND owner_discord_id = ?",
             (token, owner_id),
@@ -3677,7 +3698,7 @@ async def revoke_dual_link(token: str, owner_id: str):
 # ── My Ally ──────────────────────────────────────────────────────────────────
 
 async def _init_ally_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS meta_alliances (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3802,7 +3823,7 @@ async def _init_ally_tables():
 async def get_ally_group_for_guild(guild_id: str) -> dict | None:
     """Return the one ally group for this guild (if any)."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM ally_groups WHERE guild_id=?", (guild_id,)) as cur:
             row = await cur.fetchone()
@@ -3812,7 +3833,7 @@ async def get_ally_group_for_guild(guild_id: str) -> dict | None:
 async def set_ally_group_entry_role(ally_group_id: int, role_id: int | None):
     """Set which role is auto-assigned to new Discord members on join."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE ally_groups SET entry_role_id=? WHERE id=?", (role_id, ally_group_id)
         )
@@ -3823,7 +3844,7 @@ async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, a
     await _init_ally_tables()
     import secrets as _sec
     token = _sec.token_urlsafe(24)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         try:
             cur = await db.execute("""
                 INSERT INTO ally_groups (guild_id, owner_discord_id, owner_username, ally_name, invite_token)
@@ -3844,7 +3865,7 @@ async def create_ally_group(guild_id: str, owner_id: str, owner_username: str, a
 
 async def delete_ally_group(ally_group_id: int, owner_id: str):
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM ally_members WHERE ally_group_id=?", (ally_group_id,))
         await db.execute(
@@ -3857,7 +3878,7 @@ async def delete_ally_group(ally_group_id: int, owner_id: str):
 async def get_alliance_bonuses(guild_id: str) -> dict:
     """Return current alliance bonus levels as dict, e.g. {'recruitment': 2, 'philosophy': 1}."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("SELECT alliance_bonuses FROM ally_groups WHERE guild_id=?", (guild_id,)) as cur:
             row = await cur.fetchone()
             if row and row[0]:
@@ -3873,7 +3894,7 @@ async def save_alliance_bonuses(guild_id: str, bonuses: dict) -> None:
     """Persist alliance bonus levels for a guild."""
     import json as _json
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE ally_groups SET alliance_bonuses=? WHERE guild_id=?",
             (_json.dumps(bonuses), guild_id)
@@ -3889,7 +3910,7 @@ async def update_ally_group(ally_group_id: int, owner_id: str, **kwargs):
         return
     set_clause = ", ".join(f"{k}=?" for k in updates)
     vals = list(updates.values()) + [ally_group_id, owner_id]
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             f"UPDATE ally_groups SET {set_clause} WHERE id=? AND owner_discord_id=?", vals)
         await db.commit()
@@ -3897,7 +3918,7 @@ async def update_ally_group(ally_group_id: int, owner_id: str, **kwargs):
 
 async def get_ally_roles(ally_group_id: int) -> list[dict]:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # migrate: add sort_order if missing
         try:
             await db.execute("ALTER TABLE ally_roles ADD COLUMN sort_order INTEGER DEFAULT 0")
@@ -3913,7 +3934,7 @@ async def get_ally_roles(ally_group_id: int) -> list[dict]:
 
 async def reorder_ally_roles(ally_group_id: int, ordered_ids: list[int]):
     """Set sort_order for each role id in the given order."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for i, rid in enumerate(ordered_ids):
             await db.execute(
                 "UPDATE ally_roles SET sort_order=? WHERE id=? AND ally_group_id=?",
@@ -3924,7 +3945,7 @@ async def reorder_ally_roles(ally_group_id: int, ordered_ids: list[int]):
 
 async def create_ally_role(ally_group_id: int, role_name: str, color: str, permissions: str = "") -> int:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # new role goes to the end
         async with db.execute(
             "SELECT COALESCE(MAX(sort_order),0)+1 FROM ally_roles WHERE ally_group_id=?", (ally_group_id,)
@@ -3948,20 +3969,20 @@ async def update_ally_role(role_id: int, ally_group_id: int, color: str | None =
     if not sets:
         return
     vals += [role_id, ally_group_id]
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(f"UPDATE ally_roles SET {', '.join(sets)} WHERE id=? AND ally_group_id=?", vals)
         await db.commit()
 
 
 async def delete_ally_role(ally_group_id: int, role_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM ally_roles WHERE id=? AND ally_group_id=?", (role_id, ally_group_id))
         await db.execute("UPDATE ally_members SET role_id=NULL WHERE role_id=?", (role_id,))
         await db.commit()
 
 
 async def set_member_role_and_wing(ally_group_id: int, discord_id: str, role_id: int | None, wing: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE ally_members SET role_id=?, wing=? WHERE ally_group_id=? AND discord_id=?",
             (role_id, wing, ally_group_id, discord_id),
@@ -3971,7 +3992,7 @@ async def set_member_role_and_wing(ally_group_id: int, discord_id: str, role_id:
 
 async def get_ally_group_by_token(token: str) -> dict | None:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM ally_groups WHERE invite_token = ?", (token,)) as cur:
             row = await cur.fetchone()
@@ -3980,7 +4001,7 @@ async def get_ally_group_by_token(token: str) -> dict | None:
 
 async def get_ally_group_by_wing_token(token: str) -> dict | None:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM ally_groups WHERE wing1_token=? OR wing2_token=?", (token, token)
@@ -3991,7 +4012,7 @@ async def get_ally_group_by_wing_token(token: str) -> dict | None:
 
 async def get_ally_group_for_owner(guild_id: str, owner_id: str) -> dict | None:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM ally_groups WHERE guild_id=? AND owner_discord_id=?",
@@ -4005,14 +4026,14 @@ async def get_ally_group_for_owner(guild_id: str, owner_id: str) -> dict | None:
 
 async def get_battle_groups(ally_group_id: int) -> list[dict]:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM ally_battle_groups WHERE ally_group_id=? ORDER BY name", (ally_group_id,)
         ) as cur:
             groups = [dict(r) for r in await cur.fetchall()]
     for g in groups:
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT abgm.discord_id, am.discord_username, am.travian_name, ar.role_name, ar.color as role_color
@@ -4028,7 +4049,7 @@ async def get_battle_groups(ally_group_id: int) -> list[dict]:
 
 async def create_battle_group(ally_group_id: int, name: str, color: str = "#6366f1", description: str = "") -> int:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "INSERT INTO ally_battle_groups (ally_group_id, name, color, description) VALUES (?,?,?,?)",
             (ally_group_id, name[:60], color, description[:200])
@@ -4039,7 +4060,7 @@ async def create_battle_group(ally_group_id: int, name: str, color: str = "#6366
 
 async def update_battle_group(bg_id: int, ally_group_id: int, name: str, color: str, description: str):
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE ally_battle_groups SET name=?, color=?, description=? WHERE id=? AND ally_group_id=?",
             (name[:60], color, description[:200], bg_id, ally_group_id)
@@ -4048,13 +4069,13 @@ async def update_battle_group(bg_id: int, ally_group_id: int, name: str, color: 
 
 
 async def delete_battle_group(bg_id: int, ally_group_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM ally_battle_groups WHERE id=? AND ally_group_id=?", (bg_id, ally_group_id))
         await db.commit()
 
 
 async def set_battle_group_members(bg_id: int, discord_ids: list[str]):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM ally_battle_group_members WHERE battle_group_id=?", (bg_id,))
         for did in discord_ids:
             await db.execute(
@@ -4065,7 +4086,7 @@ async def set_battle_group_members(bg_id: int, discord_ids: list[str]):
 
 
 async def get_battle_group_members_discord_ids(bg_id: int) -> list[str]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT discord_id FROM ally_battle_group_members WHERE battle_group_id=?", (bg_id,)
@@ -4075,7 +4096,7 @@ async def get_battle_group_members_discord_ids(bg_id: int) -> list[str]:
 
 async def get_ally_members(ally_group_id: int) -> list[dict]:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT am.*, ar.role_name, ar.color AS role_color
@@ -4090,7 +4111,7 @@ async def get_ally_members(ally_group_id: int) -> list[dict]:
 async def join_ally_group(ally_group_id: int, discord_id: str, discord_username: str,
                           travian_name: str = "", wing: int = 0, status: str = "approved") -> bool:
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         try:
             await db.execute("""
                 INSERT INTO ally_members (ally_group_id, discord_id, discord_username, travian_name, wing, status)
@@ -4111,7 +4132,7 @@ async def join_ally_member(guild_id: str, discord_id: str, discord_username: str
     """Called when a Discord member joins the alliance (gets allowed_role).
     Creates them with the configured entry_role_id. Ignores if already a member."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT id, entry_role_id FROM ally_groups WHERE guild_id=?", (guild_id,)
@@ -4136,7 +4157,7 @@ async def join_ally_member(guild_id: str, discord_id: str, discord_username: str
 async def set_ally_member_status(ally_group_id: int, discord_id: str, status: str):
     """Approve or reject a pending member (status: 'approved' | 'rejected')."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE ally_members SET status=? WHERE ally_group_id=? AND discord_id=?",
             (status, ally_group_id, discord_id)
@@ -4148,7 +4169,7 @@ async def update_ally_member(ally_group_id: int, discord_id: str, travian_name, 
                              role_id=None, wing=None):
     """Update member fields — pass None to leave a field unchanged."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         sets, vals = [], []
         if travian_name is not None:
             sets.append("travian_name=?"); vals.append(travian_name)
@@ -4170,7 +4191,7 @@ async def update_ally_member(ally_group_id: int, discord_id: str, travian_name, 
 
 async def remove_ally_member(ally_group_id: int, discord_id: str):
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM ally_members WHERE ally_group_id=? AND discord_id=?",
             (ally_group_id, discord_id),
@@ -4181,7 +4202,7 @@ async def remove_ally_member(ally_group_id: int, discord_id: str):
 async def get_ally_membership_guild_id(discord_id: str) -> str | None:
     """Return the guild_id of any approved ally membership for this user (latest joined)."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT ag.guild_id FROM ally_members am
@@ -4196,7 +4217,7 @@ async def get_ally_membership_guild_id(discord_id: str) -> str | None:
 async def get_ally_membership(guild_id: str, discord_id: str) -> dict | None:
     """Return the ally_group this user has joined (not owner) in this guild."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT ag.*, am.travian_name, am.note, am.joined_at AS member_since
@@ -4218,7 +4239,7 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
         "attack_manage", "attack_view", "scout_manage", "scout_view",
         "map_manage", "map_view", "sector_view", "hospital_view",
     }
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Check if they are the ally group owner
         async with db.execute(
@@ -4249,7 +4270,7 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
 async def regenerate_ally_token(ally_group_id: int, owner_id: str) -> str:
     import secrets as _sec
     token = _sec.token_urlsafe(24)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE ally_groups SET invite_token=? WHERE id=? AND owner_discord_id=?",
             (token, ally_group_id, owner_id),
@@ -4264,7 +4285,7 @@ async def get_all_shared_sitters(guild_id: str) -> list[dict]:
     Looks up by discord_id across all guild_ids (covers workspace saves)."""
     await _init_sitter_table()
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Collect all approved member discord_ids + owner
         async with db.execute("""
@@ -4301,7 +4322,7 @@ async def get_all_shared_sitters(guild_id: str) -> list[dict]:
 
 
 async def _init_farmlist_analyses_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS farmlist_analyses (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4362,7 +4383,7 @@ async def save_farmlist_analysis(
     else:
         fazit = "sehr schlecht"
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO farmlist_analyses
                 (guild_id, discord_user_id, discord_username,
@@ -4387,7 +4408,7 @@ async def save_farmlist_analysis(
 
 async def get_farmlist_analyses(guild_id: str, discord_user_id: str, limit: int = 20) -> list[dict]:
     await _init_farmlist_analyses_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM farmlist_analyses
@@ -4402,7 +4423,7 @@ async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str) -> dict:
     cross-referenced with map_snapshots to get coordinates."""
     await _init_farmlist_analyses_table()
     import json as _json
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT farms_json FROM farmlist_analyses
@@ -4447,7 +4468,7 @@ async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str) -> dict:
 
 async def get_farmlist_analysis(analysis_id: int, discord_user_id: str) -> dict | None:
     await _init_farmlist_analyses_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM farmlist_analyses WHERE id = ? AND discord_user_id = ?",
@@ -4459,7 +4480,7 @@ async def get_farmlist_analysis(analysis_id: int, discord_user_id: str) -> dict 
 
 async def delete_farmlist_analysis(analysis_id: int, discord_user_id: str):
     await _init_farmlist_analyses_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM farmlist_analyses WHERE id = ? AND discord_user_id = ?",
             (analysis_id, discord_user_id),
@@ -4469,7 +4490,7 @@ async def delete_farmlist_analysis(analysis_id: int, discord_user_id: str):
 
 async def get_scout_stats(guild_id: str) -> list[dict]:
     """Aggregate scout reports per target player for statistics view."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT
@@ -4492,7 +4513,7 @@ async def get_scout_stats(guild_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 async def _init_hospital_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS hospital_entries (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4515,7 +4536,7 @@ async def save_hospital_data(
     discord_username: str | None,
     entries: list[dict],
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM hospital_entries WHERE guild_id = ? AND discord_user_id = ?",
             (guild_id, discord_user_id),
@@ -4532,7 +4553,7 @@ async def save_hospital_data(
 
 
 async def get_hospital_data(guild_id: str, discord_user_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM hospital_entries
@@ -4544,7 +4565,7 @@ async def get_hospital_data(guild_id: str, discord_user_id: str) -> list[dict]:
 
 
 async def get_all_hospital_data(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM hospital_entries
@@ -4556,7 +4577,7 @@ async def get_all_hospital_data(guild_id: str) -> list[dict]:
 
 
 async def delete_hospital_data(guild_id: str, discord_user_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM hospital_entries WHERE guild_id = ? AND discord_user_id = ?",
             (guild_id, discord_user_id),
@@ -4567,7 +4588,7 @@ async def delete_hospital_data(guild_id: str, discord_user_id: str):
 # ── Allianz-Mitglieder ────────────────────────────────────────────────────────
 
 async def _init_alliance_members_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS alliance_members (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4665,7 +4686,7 @@ async def _init_alliance_members_table():
 async def upsert_travian_server(url: str, players: int, speed: int, region: str):
     from datetime import datetime as _dt
     now = _dt.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO travian_servers (url, players_count, speed, region, last_checked, is_active, discovered_at)
             VALUES (?, ?, ?, ?, ?, 1, COALESCE((SELECT discovered_at FROM travian_servers WHERE url=?), ?))
@@ -4682,7 +4703,7 @@ async def upsert_travian_server(url: str, players: int, speed: int, region: str)
 async def mark_travian_server_snapshot(url: str, village_count: int):
     from datetime import datetime as _dt
     now = _dt.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE travian_servers SET last_snapshot=?, village_count=? WHERE url=?
         """, (now, village_count, url))
@@ -4690,7 +4711,7 @@ async def mark_travian_server_snapshot(url: str, village_count: int):
 
 
 async def get_travian_servers() -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT ts.*,
@@ -4704,7 +4725,7 @@ async def get_travian_servers() -> list[dict]:
 
 
 async def delete_travian_server(url: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM travian_servers WHERE url=?", (url,))
         await db.commit()
 
@@ -4712,7 +4733,7 @@ async def delete_travian_server(url: str):
 async def save_alliance_members(guild_id: str, members: list[dict], imported_by: str):
     from datetime import datetime as _dt
     now = _dt.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM alliance_members WHERE guild_id = ?", (guild_id,))
         await db.executemany("""
             INSERT INTO alliance_members
@@ -4727,7 +4748,7 @@ async def save_alliance_members(guild_id: str, members: list[dict], imported_by:
 
 
 async def get_alliance_members(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM alliance_members WHERE guild_id = ? ORDER BY rank ASC",
@@ -4743,7 +4764,7 @@ async def get_strike_info_for_players(guild_id: str, player_names: list[str]) ->
     if not player_names:
         return {}
     placeholders = ",".join("?" * len(player_names))
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(f"""
             SELECT attacker_player, MAX(created_at) as last_strike
             FROM scout_reports
@@ -4777,7 +4798,7 @@ async def get_strike_info_for_players(guild_id: str, player_names: list[str]) ->
 
 async def get_alliance_members_meta(guild_id: str) -> dict | None:
     """Return import metadata (count, when, by whom)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             """SELECT COUNT(*) as cnt, MAX(imported_at) as last_import, imported_by
@@ -4791,7 +4812,7 @@ async def get_alliance_members_meta(guild_id: str) -> dict | None:
 
 
 async def get_tw_alliance_name(guild_id: str) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT tw_alliance_name FROM guild_configs WHERE guild_id = ?", (guild_id,)
@@ -4801,7 +4822,7 @@ async def get_tw_alliance_name(guild_id: str) -> str:
 
 
 async def set_tw_alliance_name(guild_id: str, name: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET tw_alliance_name = ? WHERE guild_id = ?",
             (name.strip() or None, guild_id)
@@ -4816,7 +4837,7 @@ async def sync_alliance_members_from_snapshot(guild_id: str) -> int:
     if not alliance_name:
         return 0
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # Latest snapshot time
@@ -4863,7 +4884,7 @@ async def sync_alliance_members_from_snapshot(guild_id: str) -> int:
             "auto-sync"
         ))
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM alliance_members WHERE guild_id = ?", (guild_id,))
         await db.executemany(
             """INSERT INTO alliance_members
@@ -4878,7 +4899,7 @@ async def sync_alliance_members_from_snapshot(guild_id: str) -> int:
 
 async def get_alliance_pop_history(guild_id: str, alliance_name: str, days: int = 14) -> list[dict]:
     """Return aggregated population/village count per snapshot for a given alliance (last N days)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT fetched_at,
@@ -4897,7 +4918,7 @@ async def get_alliance_pop_history(guild_id: str, alliance_name: str, days: int 
 
 async def get_player_pop_from_snapshot(guild_id: str, travian_name: str) -> list[dict]:
     """Return per-snapshot population sum for a player (last 14 days)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT fetched_at,
@@ -4917,7 +4938,7 @@ async def get_all_members_pop_from_snapshot(guild_id: str, travian_names: list[s
     """Return {travian_name: [{'fetched_at':..,'total_pop':..}]} for all given players."""
     if not travian_names:
         return {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         ph = ",".join("?" * len(travian_names))
         async with db.execute(f"""
@@ -4939,7 +4960,7 @@ async def get_players_from_snapshot(guild_id: str, player_names: list[str]) -> l
     """Return aggregated stats per player from the latest snapshot."""
     if not player_names:
         return []
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,)) as c:
             row = await c.fetchone()
@@ -4962,7 +4983,7 @@ async def get_players_from_snapshot(guild_id: str, player_names: list[str]) -> l
 
 async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
     """Return all distinct alliances from the latest snapshot, sorted by village count."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?", (guild_id,)
@@ -4989,7 +5010,7 @@ async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
 
 async def set_alliance_member_note(guild_id: str, player_name: str, notes: str) -> bool:
     """Update the notes for a single alliance member. Returns True if row updated."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "UPDATE alliance_members SET notes=? WHERE guild_id=? AND player_name=?",
             (notes[:500], guild_id, player_name)
@@ -5000,7 +5021,7 @@ async def set_alliance_member_note(guild_id: str, player_name: str, notes: str) 
 
 async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> list[dict]:
     """Top alliances by total population from the latest snapshot."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT alliance_name,
@@ -5020,7 +5041,7 @@ async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> lis
 
 async def init_alliance_meta_table():
     """Create alliance_meta_groups and alliance_meta_members tables."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS alliance_meta_groups (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5043,7 +5064,7 @@ async def init_alliance_meta_table():
 async def get_meta_groups(guild_id: str) -> list[dict]:
     """Return all meta groups for a guild, each with their alliances list."""
     await init_alliance_meta_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT id, meta_name, created_at FROM alliance_meta_groups WHERE guild_id = ? ORDER BY created_at",
@@ -5062,7 +5083,7 @@ async def get_meta_groups(guild_id: str) -> list[dict]:
 async def create_meta_group(guild_id: str, meta_name: str) -> int | None:
     """Create a new named meta group. Returns group_id or None if limit/duplicate."""
     await init_alliance_meta_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COUNT(*) FROM alliance_meta_groups WHERE guild_id = ?", (guild_id,)
         ) as cur:
@@ -5084,7 +5105,7 @@ async def create_meta_group(guild_id: str, meta_name: str) -> int | None:
 async def delete_meta_group(guild_id: str, group_id: int):
     """Delete a meta group (cascades to members)."""
     await init_alliance_meta_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("PRAGMA foreign_keys = ON")
         await db.execute(
             "DELETE FROM alliance_meta_groups WHERE id = ? AND guild_id = ?",
@@ -5096,7 +5117,7 @@ async def delete_meta_group(guild_id: str, group_id: int):
 async def add_alliance_to_meta(guild_id: str, group_id: int, alliance_name: str) -> bool:
     """Add alliance to a meta group. Returns False if 3-alliance limit reached."""
     await init_alliance_meta_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Verify group belongs to guild
         async with db.execute(
             "SELECT id FROM alliance_meta_groups WHERE id = ? AND guild_id = ?",
@@ -5124,7 +5145,7 @@ async def add_alliance_to_meta(guild_id: str, group_id: int, alliance_name: str)
 async def remove_alliance_from_meta(guild_id: str, group_id: int, alliance_name: str):
     """Remove an alliance from a meta group."""
     await init_alliance_meta_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             DELETE FROM alliance_meta_members
             WHERE group_id = (
@@ -5137,7 +5158,7 @@ async def remove_alliance_from_meta(guild_id: str, group_id: int, alliance_name:
 async def get_meta_group_stats(guild_id: str, group_id: int) -> list[dict]:
     """Return stats per alliance in a meta group from the latest snapshot."""
     await init_alliance_meta_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT alliance_name FROM alliance_meta_members WHERE group_id = "
@@ -5147,7 +5168,7 @@ async def get_meta_group_stats(guild_id: str, group_id: int) -> list[dict]:
             alliances = [r[0] for r in await cur.fetchall()]
     if not alliances:
         return []
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         placeholders = ",".join("?" * len(alliances))
         async with db.execute(f"""
@@ -5170,7 +5191,7 @@ async def get_meta_group_stats(guild_id: str, group_id: int) -> list[dict]:
 async def get_meta_alliances(guild_id: str) -> list[dict]:
     """Return extra tracked meta-alliances for this guild (beyond ally_group wings)."""
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM meta_alliances WHERE guild_id=? ORDER BY sort_order, id",
@@ -5183,7 +5204,7 @@ async def add_meta_alliance(guild_id: str, alliance_name: str, color: str = '#94
     """Add an extra meta-alliance. Returns True if inserted, False if duplicate."""
     await _init_ally_tables()
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
             await db.execute(
                 "INSERT INTO meta_alliances (guild_id, alliance_name, color) VALUES (?,?,?)",
                 (guild_id, alliance_name.strip(), color)
@@ -5196,7 +5217,7 @@ async def add_meta_alliance(guild_id: str, alliance_name: str, color: str = '#94
 
 async def remove_meta_alliance(guild_id: str, alliance_name: str):
     await _init_ally_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM meta_alliances WHERE guild_id=? AND alliance_name=?",
             (guild_id, alliance_name)
@@ -5209,7 +5230,7 @@ async def get_meta_stats(guild_id: str) -> list[dict]:
 
 
 async def set_request_hub(guild_id: str, channel_id: str, channel_name: str, message_id: str | None = None):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO request_hub (guild_id, channel_id, channel_name, message_id)
             VALUES (?, ?, ?, ?)
@@ -5222,7 +5243,7 @@ async def set_request_hub(guild_id: str, channel_id: str, channel_name: str, mes
 
 
 async def get_request_hub(guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM request_hub WHERE guild_id=?", (guild_id,)) as cur:
             row = await cur.fetchone()
@@ -5230,14 +5251,14 @@ async def get_request_hub(guild_id: str) -> dict | None:
 
 
 async def clear_request_hub(guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM request_hub WHERE guild_id=?", (guild_id,))
         await db.commit()
 
 
 async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
     """Remove DB references to Discord channels that no longer exist."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # report_channels table
         await db.execute(
             f"DELETE FROM report_channels WHERE guild_id=? AND channel_id IN ({','.join('?'*len(stale_ids))})",
@@ -5260,7 +5281,7 @@ async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
 
 
 async def get_defend_channels(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM defend_channels WHERE guild_id=? ORDER BY created_at DESC
@@ -5270,7 +5291,7 @@ async def get_defend_channels(guild_id: str) -> list[dict]:
 
 async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
     """Return {channel_id: [contribution_dicts]} for all channels in a guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT channel_id, user_name, user_id,
@@ -5292,7 +5313,7 @@ async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
 
 
 async def close_defend_channel(channel_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE defend_channels SET status='closed' WHERE channel_id=?", (channel_id,))
         await db.commit()
@@ -5303,7 +5324,7 @@ async def close_defend_channel(channel_id: str):
 # ---------------------------------------------------------------------------
 
 async def init_blueprint_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS blueprint_templates (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5349,7 +5370,7 @@ async def init_blueprint_tables():
 
 
 async def get_blueprint_templates(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT bt.*, COUNT(bs.id) as step_count
@@ -5363,7 +5384,7 @@ async def get_blueprint_templates(guild_id: str) -> list[dict]:
 
 
 async def get_blueprint_template(template_id: int, guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM blueprint_templates WHERE id=? AND guild_id=?",
@@ -5382,7 +5403,7 @@ async def get_blueprint_template(template_id: int, guild_id: str) -> dict | None
 
 
 async def create_blueprint_template(guild_id: str, tribe: str, name: str, description: str) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "INSERT INTO blueprint_templates (guild_id, tribe, name, description) VALUES (?,?,?,?)",
             (guild_id, tribe, name, description)
@@ -5392,7 +5413,7 @@ async def create_blueprint_template(guild_id: str, tribe: str, name: str, descri
 
 
 async def delete_blueprint_template(guild_id: str, template_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM blueprint_templates WHERE id=? AND guild_id=?",
             (template_id, guild_id)
@@ -5404,7 +5425,7 @@ async def add_blueprint_step(
     template_id: int, guild_id: str, step_type: str,
     title: str, description: str, target: str, order_num: int
 ) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Verify template belongs to guild
         async with db.execute(
             "SELECT id FROM blueprint_templates WHERE id=? AND guild_id=?",
@@ -5422,7 +5443,7 @@ async def add_blueprint_step(
 
 
 async def delete_blueprint_step(guild_id: str, step_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Verify template belongs to guild
         async with db.execute(
             """SELECT bs.id FROM blueprint_steps bs
@@ -5437,7 +5458,7 @@ async def delete_blueprint_step(guild_id: str, step_id: int):
 
 
 async def reorder_blueprint_steps(template_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT id FROM blueprint_steps WHERE template_id=? ORDER BY order_num, id",
             (template_id,)
@@ -5451,7 +5472,7 @@ async def reorder_blueprint_steps(template_id: int):
 
 
 async def get_player_blueprints(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT pb.id, pb.player_name, pb.village_name, pb.village_coords,
@@ -5471,7 +5492,7 @@ async def get_player_blueprints(guild_id: str) -> list[dict]:
 
 
 async def get_player_blueprint(blueprint_id: int, guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT pb.*, bt.name as template_name, bt.tribe as tribe,
@@ -5503,7 +5524,7 @@ async def create_player_blueprint(
     guild_id: str, player_name: str, village_name: str,
     village_coords: str, template_id: int
 ) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             """INSERT INTO player_blueprints
                (guild_id, player_name, village_name, village_coords, template_id)
@@ -5515,7 +5536,7 @@ async def create_player_blueprint(
 
 
 async def delete_player_blueprint(guild_id: str, blueprint_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM player_blueprints WHERE id=? AND guild_id=?",
             (blueprint_id, guild_id)
@@ -5524,7 +5545,7 @@ async def delete_player_blueprint(guild_id: str, blueprint_id: int):
 
 
 async def toggle_blueprint_step(blueprint_id: int, step_id: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT completed FROM blueprint_progress WHERE player_blueprint_id=? AND step_id=?",
             (blueprint_id, step_id)
@@ -5560,7 +5581,7 @@ async def toggle_blueprint_step(blueprint_id: int, step_id: int) -> int:
 # ---------------------------------------------------------------------------
 
 async def init_village_layout_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS village_layouts (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5596,7 +5617,7 @@ async def init_village_layout_tables():
 
 
 async def get_village_layouts(guild_id: str, is_template=None) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if is_template is None:
             async with db.execute(
@@ -5621,7 +5642,7 @@ async def get_village_layouts(guild_id: str, is_template=None) -> list[dict]:
 
 
 async def get_village_layout(layout_id: int, guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM village_layouts WHERE id = ? AND guild_id = ?",
@@ -5640,7 +5661,7 @@ async def get_village_layout(layout_id: int, guild_id: str) -> dict | None:
 
 
 async def create_village_layout(guild_id: str, name: str, tribe: str, created_by: str, is_template: int, description: str) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             """INSERT INTO village_layouts (guild_id, name, tribe, created_by, is_template, description)
                VALUES (?, ?, ?, ?, ?, ?)""",
@@ -5651,7 +5672,7 @@ async def create_village_layout(guild_id: str, name: str, tribe: str, created_by
 
 
 async def delete_village_layout(guild_id: str, layout_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM village_layouts WHERE id = ? AND guild_id = ?",
             (layout_id, guild_id)
@@ -5664,7 +5685,7 @@ async def set_village_slot(
     building_type: str, target_level: int, notes: str,
     pos_x: float = 50.0, pos_y: float = 50.0,
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
             if not await cur.fetchone():
                 return
@@ -5684,7 +5705,7 @@ async def set_village_slot(
 
 
 async def clear_village_slot(layout_id: int, guild_id: str, slot_num: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
             if not await cur.fetchone():
                 return
@@ -5696,7 +5717,7 @@ async def clear_village_slot(layout_id: int, guild_id: str, slot_num: int):
 
 
 async def delete_village_slot_by_id(slot_id: int, layout_id: int, guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("SELECT id FROM village_layouts WHERE id=? AND guild_id=?", (layout_id, guild_id)) as cur:
             if not await cur.fetchone():
                 return
@@ -5713,7 +5734,7 @@ async def delete_village_slot_by_id(slot_id: int, layout_id: int, guild_id: str)
 async def create_trial_link(code: str, created_by: str) -> str:
     """Insert a new one-time trial link. Returns the code."""
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "INSERT INTO trial_links (code, created_by, created_at) VALUES (?, ?, ?)",
             (code, created_by, _dt.utcnow().isoformat()),
@@ -5723,7 +5744,7 @@ async def create_trial_link(code: str, created_by: str) -> str:
 
 
 async def get_trial_link(code: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM trial_links WHERE code=?", (code,)) as cur:
             row = await cur.fetchone()
@@ -5733,7 +5754,7 @@ async def get_trial_link(code: str) -> dict | None:
 async def activate_trial_link(code: str, guild_id: str, days: int = 14) -> bool:
     """Mark the link used and set trial_expires_at (+days) on the guild. Returns False if already used."""
     from datetime import datetime as _dt, timedelta as _td
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM trial_links WHERE code=?", (code,)) as cur:
             link = await cur.fetchone()
@@ -5758,7 +5779,7 @@ async def activate_trial_link(code: str, guild_id: str, days: int = 14) -> bool:
 
 
 async def get_all_trial_links() -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM trial_links ORDER BY created_at DESC") as cur:
             return [dict(r) for r in await cur.fetchall()]
@@ -5768,7 +5789,7 @@ async def expire_overdue_trials():
     """Downgrade guilds whose trial has expired. Returns list of expired guild_ids."""
     from datetime import datetime as _dt
     now = _dt.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT guild_id FROM guild_configs
@@ -5795,7 +5816,7 @@ async def get_expiring_trials(days: int = 3) -> list[dict]:
     from datetime import datetime as _dt, timedelta as _td
     now = _dt.utcnow().isoformat()
     soon = (_dt.utcnow() + _td(days=days)).isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT guild_id, trial_expires_at FROM guild_configs
@@ -5815,7 +5836,7 @@ async def get_expiring_trials(days: int = 3) -> list[dict]:
 async def get_or_create_referral_code(discord_user_id: str) -> str:
     """Return existing ref code or create a new one (8-char hex)."""
     import secrets
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT code FROM referral_codes WHERE discord_user_id=?", (discord_user_id,)
@@ -5841,7 +5862,7 @@ async def get_or_create_referral_code(discord_user_id: str) -> str:
 
 async def get_referral_code_owner(code: str) -> str | None:
     """Return discord_user_id for a ref code, or None."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT discord_user_id FROM referral_codes WHERE code=?", (code,)
@@ -5853,7 +5874,7 @@ async def get_referral_code_owner(code: str) -> str | None:
 async def award_referral_point(referrer_discord_id: str, referred_discord_id: str) -> bool:
     """Award 1 TravOps-Point to referrer. Returns False if already awarded for this referred user."""
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Check if already awarded
         async with db.execute(
             "SELECT 1 FROM referral_events WHERE referred_discord_id=?", (referred_discord_id,)
@@ -5879,7 +5900,7 @@ async def award_referral_point(referrer_discord_id: str, referred_discord_id: st
 async def get_referral_stats(discord_user_id: str) -> dict:
     """Return {code, points, referred_count} for a user."""
     code = await get_or_create_referral_code(discord_user_id)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT COALESCE(travops_points,0) AS pts FROM user_subscriptions WHERE discord_user_id=?",
@@ -5899,7 +5920,7 @@ async def get_referral_stats(discord_user_id: str) -> dict:
 async def redeem_travops_points(discord_user_id: str) -> bool:
     """Deduct 10 points and extend user Pro by 1 month. Returns False if not enough points."""
     from datetime import datetime as _dt, timedelta as _td
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT COALESCE(travops_points,0) AS pts, subscription_status, expires_at FROM user_subscriptions WHERE discord_user_id=?",
@@ -5934,7 +5955,7 @@ async def redeem_travops_points(discord_user_id: str) -> bool:
 async def get_guild_ids_for_discord_user(discord_user_id: str) -> list[str]:
     """Return all guild_ids where this user is subscription owner or an ally member."""
     await init_db()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # As subscription/guild owner
         async with db.execute(
             "SELECT guild_id FROM guild_configs WHERE owner_discord_id=?",
@@ -5956,7 +5977,7 @@ async def get_or_create_dual_code(discord_user_id: str) -> str:
     """Return (or create) the dual invite code for a user."""
     import secrets as _sec
     await init_db()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT code FROM dual_codes WHERE discord_user_id=?", (discord_user_id,)
@@ -5984,7 +6005,7 @@ async def get_dual_info(discord_user_id: str) -> dict:
     """
     await init_db()
     code = await get_or_create_dual_code(discord_user_id)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Duals linked TO this user (they are the anchor)
         async with db.execute(
@@ -6011,7 +6032,7 @@ async def get_dual_info(discord_user_id: str) -> dict:
 async def link_dual(code: str, requester_discord_id: str) -> dict:
     """Link requester as a dual of the code owner. Returns {ok, error}."""
     await init_db()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Find anchor
         async with db.execute(
@@ -6057,7 +6078,7 @@ async def link_dual(code: str, requester_discord_id: str) -> dict:
 async def unlink_dual(discord_user_id: str, target_discord_id: str) -> bool:
     """Remove a dual link. Works whether called by anchor or dual."""
     await init_db()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             """DELETE FROM account_duals WHERE
                (anchor_discord_id=? AND dual_discord_id=?)
@@ -6071,7 +6092,7 @@ async def unlink_dual(discord_user_id: str, target_discord_id: str) -> bool:
 async def get_dual_anchor(discord_user_id: str) -> str | None:
     """If this user is a dual, return the anchor's discord_id. Else None."""
     await init_db()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT anchor_discord_id FROM account_duals WHERE dual_discord_id=?",
             (discord_user_id,)
@@ -6083,7 +6104,7 @@ async def get_dual_anchor(discord_user_id: str) -> str | None:
 async def get_dual_partners(discord_user_id: str) -> list[str]:
     """Return all discord_ids that share the same Travian account (excluding self)."""
     await init_db()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Is this user an anchor?
         async with db.execute(
             "SELECT dual_discord_id FROM account_duals WHERE anchor_discord_id=?",
@@ -6112,7 +6133,7 @@ async def get_dual_partners(discord_user_id: str) -> list[str]:
 
 async def get_scout_report_by_id(report_id: int, guild_id: str) -> dict | None:
     """Return a single scout report row, verified to belong to guild_id."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM scout_reports WHERE id=? AND guild_id=?",
@@ -6128,7 +6149,7 @@ async def get_scout_report_by_id(report_id: int, guild_id: str) -> dict | None:
 
 async def archive_workspace(guild_id: str) -> bool:
     """Mark a workspace as archived (data preserved, bot kicked)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET workspace_status='archived', bot_status='kicked' WHERE guild_id=?",
             (guild_id,),
@@ -6139,7 +6160,7 @@ async def archive_workspace(guild_id: str) -> bool:
 
 async def restore_workspace(guild_id: str) -> bool:
     """Restore an archived workspace to active."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE guild_configs SET workspace_status='active' WHERE guild_id=?",
             (guild_id,),
@@ -6150,7 +6171,7 @@ async def restore_workspace(guild_id: str) -> bool:
 
 async def get_archived_workspaces(owner_discord_id: str) -> list[dict]:
     """Return archived workspaces for a user (as owner or discord member)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM guild_configs
@@ -6165,7 +6186,7 @@ async def get_archived_workspaces(owner_discord_id: str) -> list[dict]:
 async def upsert_guild_name(guild_id: str, guild_name: str, owner_discord_id: str | None = None):
     """Register a guild without overwriting existing config.
     Only sets owner_discord_id when the column is currently NULL."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO guild_configs (guild_id, guild_name, owner_discord_id)
             VALUES (?, ?, ?)
@@ -6180,7 +6201,7 @@ async def upsert_guild_name(guild_id: str, guild_name: str, owner_discord_id: st
 
 async def get_private_channel(guild_id: str, owner_id: str) -> dict | None:
     """Return the private channel record for a user, or None."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM private_channels WHERE guild_id = ? AND owner_id = ?",
@@ -6192,7 +6213,7 @@ async def get_private_channel(guild_id: str, owner_id: str) -> dict | None:
 
 async def set_private_channel(guild_id: str, owner_id: str, channel_id: str):
     """Insert or replace a private channel record."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO private_channels (channel_id, guild_id, owner_id)
             VALUES (?, ?, ?)
@@ -6203,14 +6224,14 @@ async def set_private_channel(guild_id: str, owner_id: str, channel_id: str):
 
 async def delete_private_channel_by_id(channel_id: str):
     """Remove a private channel record when the channel is deleted."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM private_channels WHERE channel_id = ?", (channel_id,))
         await db.commit()
 
 
 async def get_private_channel_by_channel_id(channel_id: str) -> dict | None:
     """Return the private channel record by channel_id."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM private_channels WHERE channel_id = ?",
@@ -6222,7 +6243,7 @@ async def get_private_channel_by_channel_id(channel_id: str) -> dict | None:
 
 async def get_all_private_channels_for_guild(guild_id: str) -> list[dict]:
     """Return all private channel records for a guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM private_channels WHERE guild_id = ?",
@@ -6234,7 +6255,7 @@ async def get_all_private_channels_for_guild(guild_id: str) -> list[dict]:
 
 async def get_defend_stats(guild_id: str) -> dict:
     """Return aggregated defense statistics for a guild."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # Most annoying attackers
@@ -6426,7 +6447,7 @@ def _calc_travel_seconds(x1: int, y1: int, x2: int, y2: int,
 
 
 async def _init_op_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Operation plan header
         await db.execute("""
             CREATE TABLE IF NOT EXISTS op_plans (
@@ -6655,7 +6676,7 @@ async def _init_op_tables():
 async def create_op_plan(guild_id: str, name: str, landing_time: str,
                           server_speed: float, target_ally: str,
                           notes: str, created_by: str) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO op_plans (guild_id, name, status, landing_time, server_speed,
                                    target_ally, notes, created_by)
@@ -6667,7 +6688,7 @@ async def create_op_plan(guild_id: str, name: str, landing_time: str,
 
 
 async def get_op_plans(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT p.*, COUNT(DISTINCT t.id) as target_count,
@@ -6682,7 +6703,7 @@ async def get_op_plans(guild_id: str) -> list[dict]:
 
 
 async def get_op_plan(plan_id: int, guild_id: str) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id)
@@ -6697,7 +6718,7 @@ async def update_op_plan(plan_id: int, guild_id: str, **kwargs):
     if not sets:
         return
     cols = ", ".join(f"{k}=?" for k in sets)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             f"UPDATE op_plans SET {cols} WHERE id=? AND guild_id=?",
             (*sets.values(), plan_id, guild_id)
@@ -6706,7 +6727,7 @@ async def update_op_plan(plan_id: int, guild_id: str, **kwargs):
 
 
 async def delete_op_plan(plan_id: int, guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id))
         await db.commit()
 
@@ -6716,7 +6737,7 @@ async def delete_op_plan(plan_id: int, guild_id: str):
 async def add_op_target(plan_id: int, guild_id: str, player_name: str,
                          village_name: str, x: int, y: int,
                          population: int = 0, notes: str = "") -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COALESCE(MAX(order_idx)+1,0) FROM op_targets WHERE plan_id=?", (plan_id,)
         ) as cur:
@@ -6730,7 +6751,7 @@ async def add_op_target(plan_id: int, guild_id: str, player_name: str,
 
 
 async def delete_op_target(target_id: int, guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM op_targets WHERE id=? AND guild_id=?", (target_id, guild_id))
         await db.commit()
 
@@ -6752,7 +6773,7 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
     slowest_speed = base_speed * (1 + max(0, min(tournament_square, 20)) * 0.2)
 
     # Get target coords
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT x,y FROM op_targets WHERE id=?", (target_id,)) as cur:
             trow = await cur.fetchone()
@@ -6772,7 +6793,7 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
             except Exception:
                 pass
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COALESCE(MAX(order_idx)+1,0) FROM op_waves WHERE target_id=?", (target_id,)
         ) as cur:
@@ -6812,7 +6833,7 @@ async def update_op_wave(wave_id: int, guild_id: str, **kwargs):
     if "troop_json" in sets and isinstance(sets["troop_json"], dict):
         sets["troop_json"] = _json_op.dumps(sets["troop_json"])
     cols = ", ".join(f"{k}=?" for k in sets)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             f"UPDATE op_waves SET {cols} WHERE id=? AND guild_id=?",
             (*sets.values(), wave_id, guild_id)
@@ -6821,14 +6842,14 @@ async def update_op_wave(wave_id: int, guild_id: str, **kwargs):
 
 
 async def delete_op_wave(wave_id: int, guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM op_waves WHERE id=? AND guild_id=?", (wave_id, guild_id))
         await db.commit()
 
 
 async def get_all_op_waves(plan_id: int) -> list[dict]:
     """Return all waves for a plan (attacker_discord_id + send_time)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT id, attacker_discord_id, send_time, arrival_time, wave_type, order_idx "
@@ -6840,7 +6861,7 @@ async def get_all_op_waves(plan_id: int) -> list[dict]:
 
 async def backfill_op_wave_discord_ids():
     """One-time backfill: set attacker_discord_id on waves where it's missing but name matches member_troops."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Get all member_troops travian_name → discord_id mappings
         async with db.execute(
             "SELECT guild_id, travian_name, discord_id FROM member_troops WHERE travian_name != '' AND discord_id != ''"
@@ -6862,7 +6883,7 @@ async def backfill_op_wave_discord_ids():
 
 async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
     """Return all waves assigned to a user across all active/draft plans, with plan + target info."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Resolve travian name for fallback match
         travian_name = ""
@@ -6904,7 +6925,7 @@ async def get_op_plan_full(plan_id: int, guild_id: str) -> dict | None:
     plan = await get_op_plan(plan_id, guild_id)
     if not plan:
         return None
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM op_targets WHERE plan_id=? ORDER BY order_idx", (plan_id,)
@@ -6932,7 +6953,7 @@ async def get_op_plan_full(plan_id: int, guild_id: str) -> dict | None:
 # ── op_favorites ───────────────────────────────────────────────────────────────
 
 async def get_op_favorites(guild_id: str, discord_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM op_favorites WHERE guild_id=? AND discord_id=?
@@ -6943,7 +6964,7 @@ async def get_op_favorites(guild_id: str, discord_id: str) -> list[dict]:
 
 async def add_op_favorite(guild_id: str, discord_id: str, player_name: str,
                            village_name: str, x: int, y: int, label: str = "") -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT OR REPLACE INTO op_favorites
                 (guild_id, discord_id, player_name, village_name, x, y, label)
@@ -6954,7 +6975,7 @@ async def add_op_favorite(guild_id: str, discord_id: str, player_name: str,
 
 
 async def delete_op_favorite(fav_id: int, discord_id: str, guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM op_favorites WHERE id=? AND discord_id=? AND guild_id=?",
             (fav_id, discord_id, guild_id)
@@ -6965,7 +6986,7 @@ async def delete_op_favorite(fav_id: int, discord_id: str, guild_id: str):
 # ── member_troops ──────────────────────────────────────────────────────────────
 
 async def _migrate_member_troops():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for col, definition in [
             ("total_crop", "INTEGER DEFAULT 0"),
             ("total_units", "INTEGER DEFAULT 0"),
@@ -6983,7 +7004,7 @@ async def upsert_member_troops(guild_id: str, discord_id: str, discord_name: str
                                 tribe: str = "", total_off: int = 0, total_def: int = 0,
                                 total_crop: int = 0, total_units: int = 0, total_scouts: int = 0):
     await _migrate_member_troops()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO member_troops
                 (guild_id, discord_id, discord_name, travian_name, villages_json,
@@ -7007,7 +7028,7 @@ async def upsert_member_troops(guild_id: str, discord_id: str, discord_name: str
 
 
 async def get_member_troops(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM member_troops WHERE guild_id=? ORDER BY discord_name
@@ -7020,7 +7041,7 @@ async def get_member_troops(guild_id: str) -> list[dict]:
 
 async def get_member_troops_single(guild_id: str, discord_id: str) -> dict | None:
     """Return member troop data — prefers current guild, falls back to any guild (latest entry)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Try current guild first
         async with db.execute(
@@ -7047,7 +7068,7 @@ async def get_member_troops_for_discord_ids(discord_ids: list[str]) -> dict[str,
     Returns dict: discord_id -> row dict (with 'villages' list parsed)."""
     if not discord_ids:
         return {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         placeholders = ",".join("?" * len(discord_ids))
         # Pick the row with the latest updated_at per discord_id
@@ -7078,7 +7099,7 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
               total_crop, total_units, total_scouts, population, village_count,
               avg_population, tq (%)"""
     await _migrate_member_troops()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # Get population + village count per player_name from latest snapshot
         pop_rows = await db.execute_fetchall("""
@@ -7114,7 +7135,7 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
 
 async def get_active_ep_members(guild_id: str) -> set:
     """Return set of discord_ids that have waves in active plans."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         rows = await db.execute_fetchall("""
             SELECT DISTINCT w.attacker_discord_id
@@ -7132,7 +7153,7 @@ async def get_member_growth(guild_id: str, discord_ids: list) -> dict:
     Only last 14 entries per member."""
     if not discord_ids:
         return {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         placeholders = ",".join("?" * len(discord_ids))
         rows = await db.execute_fetchall(f"""
@@ -7165,7 +7186,7 @@ async def get_member_growth(guild_id: str, discord_ids: list) -> dict:
 
 async def get_personal_missions(guild_id: str, discord_id: str) -> list[dict]:
     """Return all waves assigned to a specific member across active/completed plans."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT w.*,
@@ -7317,7 +7338,7 @@ async def check_op_plausibility(plan_id: int, guild_id: str) -> dict:
         ok_items.append(f"{len(targets_good)} Ziel{'e' if len(targets_good)!=1 else ''} vollständig geplant ✅")
 
     # ── Cross-plan: double-booking ──────────────────────────────────────────
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT w.attacker_name, w.send_time, w.wave_type, t.x, t.y
@@ -7398,7 +7419,7 @@ async def save_op_notify_log(guild_id: str, plan_id: int, triggered_by: str,
                              trigger_type: str, entries: list[dict]):
     """Persist a notify-log entry for a plan. entries: [{discord_id, name, status, error?}]"""
     await _init_op_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO op_notify_log (guild_id, plan_id, triggered_by, trigger_type, entries_json)
             VALUES (?, ?, ?, ?, ?)
@@ -7408,7 +7429,7 @@ async def save_op_notify_log(guild_id: str, plan_id: int, triggered_by: str,
 
 async def get_hero_actions_for_player(guild_id: str, discord_id: str) -> list[dict]:
     """Return hero actions assigned to a specific player across active/draft plans."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT ha.*, p.name AS plan_name, p.landing_time, p.status AS plan_status,
@@ -7424,7 +7445,7 @@ async def get_hero_actions_for_player(guild_id: str, discord_id: str) -> list[di
 
 
 async def get_op_hero_actions(plan_id: int, guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM op_hero_actions WHERE plan_id=? AND guild_id=? ORDER BY id",
@@ -7438,7 +7459,7 @@ async def add_op_hero_action(plan_id: int, guild_id: str, action_type: str,
                               item_slot: str, item_name: str, notes: str,
                               send_time: str = "",
                               target_id: int | None = None) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO op_hero_actions
                 (plan_id, guild_id, action_type, player_discord_id, player_name,
@@ -7451,7 +7472,7 @@ async def add_op_hero_action(plan_id: int, guild_id: str, action_type: str,
 
 
 async def delete_op_hero_action(action_id: int, guild_id: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM op_hero_actions WHERE id=? AND guild_id=?",
             (action_id, guild_id)
@@ -7461,7 +7482,7 @@ async def delete_op_hero_action(action_id: int, guild_id: str):
 
 async def get_op_evaluation(plan_id: int, guild_id: str) -> dict:
     """Return full evaluation data for a plan: per-target impact times, wave status, stats."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id)
@@ -7509,7 +7530,7 @@ async def get_op_evaluation(plan_id: int, guild_id: str) -> dict:
 async def get_op_notify_logs(guild_id: str, plan_id: int) -> list[dict]:
     """Return all notify-log entries for a plan, newest first."""
     await _init_op_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         rows = await db.execute_fetchall("""
             SELECT * FROM op_notify_log
@@ -7534,7 +7555,7 @@ async def create_notifications(guild_id: str, ally_group_id: int | None,
     """Create a notification for each recipient_id."""
     if not recipient_ids:
         return
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for rid in recipient_ids:
             await db.execute("""
                 INSERT INTO notifications (guild_id, ally_group_id, recipient_id, type, title, message, plan_id)
@@ -7545,7 +7566,7 @@ async def create_notifications(guild_id: str, ally_group_id: int | None,
 
 async def get_ep_notify_members(guild_id: str) -> list[str]:
     """Return discord_ids of approved members whose role has 'ep_notify' permission."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT am.discord_id
@@ -7573,7 +7594,7 @@ async def get_ep_notify_members(guild_id: str) -> list[str]:
 
 
 async def get_notifications(guild_id: str, discord_id: str, unread_only: bool = False, limit: int = 50) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         q = "SELECT * FROM notifications WHERE guild_id=? AND recipient_id=?"
         params: list = [guild_id, discord_id]
@@ -7586,7 +7607,7 @@ async def get_notifications(guild_id: str, discord_id: str, unread_only: bool = 
 
 
 async def count_unread_notifications(guild_id: str, discord_id: str) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COUNT(*) FROM notifications WHERE guild_id=? AND recipient_id=? AND read=0",
             (guild_id, discord_id)
@@ -7597,7 +7618,7 @@ async def count_unread_notifications(guild_id: str, discord_id: str) -> int:
 
 async def mark_notifications_read(guild_id: str, discord_id: str, notif_ids: list[int] | None = None):
     """Mark specific notifications (or all) as read for this user."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         if notif_ids:
             placeholders = ",".join("?" * len(notif_ids))
             await db.execute(
@@ -7617,7 +7638,7 @@ async def mark_notifications_read(guild_id: str, discord_id: str, notif_ids: lis
 async def create_ep_poll(guild_id: str, plan_id: int, title: str, description: str, event_datetime: str) -> int:
     """Create a poll linked to an EP plan."""
     from datetime import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO availability_polls (guild_id, plan_id, title, description, event_datetime, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -7628,7 +7649,7 @@ async def create_ep_poll(guild_id: str, plan_id: int, title: str, description: s
 
 async def get_ep_poll(guild_id: str, plan_id: int) -> dict | None:
     """Return the most recent active poll for this EP plan."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM availability_polls WHERE guild_id=? AND plan_id=?
@@ -7643,7 +7664,7 @@ async def get_ep_poll_availability(guild_id: str, plan_id: int) -> dict[str, str
     poll = await get_ep_poll(guild_id, plan_id)
     if not poll:
         return {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT user_id, response FROM poll_responses WHERE poll_id=?", (poll["id"],)
@@ -7657,7 +7678,7 @@ async def get_ep_poll_availability(guild_id: str, plan_id: int) -> dict[str, str
 async def recalc_op_wave_times(plan_id: int, guild_id: str) -> int:
     """Recompute send_time for all waves in a plan from its current landing_time. Returns updated count."""
     import datetime as _dt
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT landing_time, server_speed FROM op_plans WHERE id=? AND guild_id=?",
                               (plan_id, guild_id)) as cur:
@@ -7698,7 +7719,7 @@ async def recalc_op_wave_times(plan_id: int, guild_id: str) -> int:
 # ── Admin Ideas ───────────────────────────────────────────────────────────────
 
 async def init_ideas_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS admin_ideas (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7729,7 +7750,7 @@ async def init_ideas_table():
 
 async def create_idea(title: str, description: str, category: str) -> int:
     await init_ideas_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "INSERT INTO admin_ideas (title, description, category) VALUES (?,?,?)",
             (title[:120], description[:600], category or "general")
@@ -7740,14 +7761,14 @@ async def create_idea(title: str, description: str, category: str) -> int:
 
 async def get_ideas() -> list[dict]:
     await init_ideas_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM admin_ideas ORDER BY created_at DESC") as cur:
             return [dict(r) for r in await cur.fetchall()]
 
 
 async def delete_idea(idea_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM admin_ideas WHERE id=?", (idea_id,))
         await db.commit()
 
@@ -7758,7 +7779,7 @@ async def delete_idea(idea_id: int):
 
 async def _init_attack_detection_tables():
     """Create incoming_attacks and enemy_artifacts tables if not yet present."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS incoming_attacks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7838,7 +7859,7 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
     await _init_attack_detection_tables()
     now = __import__('datetime').datetime.utcnow().isoformat()
     saved = 0
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for atk in attacks:
             try:
                 await db.execute("""
@@ -7881,7 +7902,7 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
 async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = None,
                                 limit: int = 200) -> list[dict]:
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if own_x is not None and own_y is not None:
             async with db.execute(
@@ -7903,7 +7924,7 @@ async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = No
 
 async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list[dict]:
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM incoming_attacks WHERE guild_id=? AND is_dismissed=0
@@ -7921,7 +7942,7 @@ async def label_attack(attack_id: int, guild_id: str, label: str, labeled_by: st
     valid = {"fake", "hard", "low", ""}
     if label not in valid:
         return False
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             """UPDATE incoming_attacks
                SET label=?, labeled_by=?, labeled_at=?
@@ -7934,7 +7955,7 @@ async def label_attack(attack_id: int, guild_id: str, label: str, labeled_by: st
 
 async def dismiss_attack(attack_id: int, guild_id: str):
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE incoming_attacks SET is_dismissed=1 WHERE id=? AND guild_id=?",
             (attack_id, guild_id)
@@ -7945,7 +7966,7 @@ async def dismiss_attack(attack_id: int, guild_id: str):
 async def archive_attack(attack_id: int, guild_id: str) -> bool:
     """Archive (soft-hide) an attack. Returns True if found."""
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "UPDATE incoming_attacks SET is_dismissed=1 WHERE id=? AND guild_id=?",
             (attack_id, guild_id)
@@ -7957,7 +7978,7 @@ async def archive_attack(attack_id: int, guild_id: str) -> bool:
 async def delete_attack(attack_id: int, guild_id: str) -> bool:
     """Hard-delete an attack. Returns True if found."""
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "DELETE FROM incoming_attacks WHERE id=? AND guild_id=?",
             (attack_id, guild_id)
@@ -7969,7 +7990,7 @@ async def delete_attack(attack_id: int, guild_id: str) -> bool:
 async def get_archived_attacks(guild_id: str, limit: int = 200) -> list[dict]:
     """Return dismissed/archived attacks."""
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM incoming_attacks
@@ -7982,7 +8003,7 @@ async def get_archived_attacks(guild_id: str, limit: int = 200) -> list[dict]:
 
 async def get_enemy_artifacts(guild_id: str, player_name: str) -> list[dict]:
     await _init_attack_detection_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM enemy_artifacts WHERE guild_id=? AND lower(player_name)=lower(?)
@@ -8002,7 +8023,7 @@ async def toggle_enemy_artifact(guild_id: str, player_name: str,
 
 async def _init_sector_monitor_tables():
     """Create sector_monitors and sector_alerts tables."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS sector_monitors (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8062,7 +8083,7 @@ async def _init_sector_monitor_tables():
 async def get_sector_monitor(guild_id: str) -> dict | None:
     """Return sector monitor config for a guild, or None."""
     await _init_sector_monitor_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM sector_monitors WHERE guild_id = ?", (guild_id,)
@@ -8084,7 +8105,7 @@ async def upsert_sector_monitor(guild_id: str, **fields) -> None:
         "monitored_alliances": "", "sectors": "",
     }
     existing.update(fields)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT OR REPLACE INTO sector_monitors
                 (guild_id, enabled, x1, y1, x2, y2,
@@ -8111,7 +8132,7 @@ async def upsert_sector_monitor(guild_id: str, **fields) -> None:
 async def get_sector_alerts(guild_id: str, include_dismissed: bool = False, limit: int = 100) -> list[dict]:
     """Return sector alerts for a guild."""
     await _init_sector_monitor_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if include_dismissed:
             q = "SELECT * FROM sector_alerts WHERE guild_id=? ORDER BY detected_at DESC LIMIT ?"
@@ -8126,7 +8147,7 @@ async def get_sector_alerts(guild_id: str, include_dismissed: bool = False, limi
 async def dismiss_sector_alert(guild_id: str, alert_id: int) -> None:
     """Dismiss a single sector alert."""
     await _init_sector_monitor_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE sector_alerts SET dismissed=1 WHERE id=? AND guild_id=?",
             (alert_id, guild_id)
@@ -8137,7 +8158,7 @@ async def dismiss_sector_alert(guild_id: str, alert_id: int) -> None:
 async def dismiss_all_sector_alerts(guild_id: str) -> None:
     """Dismiss all active sector alerts for a guild."""
     await _init_sector_monitor_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE sector_alerts SET dismissed=1 WHERE guild_id=? AND dismissed=0",
             (guild_id,)
@@ -8159,7 +8180,7 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
     nobling_thr = monitor.get("nobling_threshold", 500)
     growth_thr  = monitor.get("growth_threshold", 200)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # Get two most recent distinct fetched_at timestamps
@@ -8176,7 +8197,7 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
     ts_new = ts_rows[0]["fetched_at"]
     ts_old = ts_rows[1]["fetched_at"]
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # Load villages in bounding box for both snapshots (include is_capital)
@@ -8227,7 +8248,7 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
     import json as _json
 
     async def _insert_alert(nv, alert_type, pop_change=0, extra=None):
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT id FROM sector_alerts
@@ -8310,7 +8331,7 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
             pass
 
     return new_alerts
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         vx = village_x if village_x is not None else None
         vy = village_y if village_y is not None else None
         async with db.execute(
@@ -8342,7 +8363,7 @@ async def run_sector_scan(guild_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 async def _init_scout_incidents_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS scout_incidents (
                 id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8367,7 +8388,7 @@ async def add_scout_incident(
     victim_player: str, victim_village: str, victim_coords: str,
     enemy_player: str, enemy_village: str, scout_time: str, notes: str,
 ) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO scout_incidents
                 (guild_id, reported_by_id, reported_by_name,
@@ -8382,7 +8403,7 @@ async def add_scout_incident(
 
 
 async def get_scout_incidents(guild_id: str, enemy_filter: str = "", limit: int = 200) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         if enemy_filter:
             cur = await db.execute("""
@@ -8400,7 +8421,7 @@ async def get_scout_incidents(guild_id: str, enemy_filter: str = "", limit: int 
 
 async def get_scout_incident_stats(guild_id: str) -> list[dict]:
     """Return enemy players ranked by scout count (last 30 days)."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("""
             SELECT enemy_player, COUNT(*) as cnt,
@@ -8419,7 +8440,7 @@ async def get_scout_incident_stats(guild_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 async def _init_ally_bonus_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ally_bonuses (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8437,7 +8458,7 @@ async def _init_ally_bonus_table():
 
 async def get_ally_bonuses(ally_group_id: int) -> list[dict]:
     await _init_ally_bonus_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM ally_bonuses WHERE ally_group_id=? ORDER BY position, id",
@@ -8448,7 +8469,7 @@ async def get_ally_bonuses(ally_group_id: int) -> list[dict]:
 
 async def add_ally_bonus(ally_group_id: int, name: str, max_level: int, description: str) -> int:
     await _init_ally_bonus_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "SELECT COALESCE(MAX(position),0)+1 FROM ally_bonuses WHERE ally_group_id=?",
             (ally_group_id,)
@@ -8465,7 +8486,7 @@ async def add_ally_bonus(ally_group_id: int, name: str, max_level: int, descript
 async def update_ally_bonus(bonus_id: int, ally_group_id: int,
                              name: str, max_level: int, current_level: int, description: str):
     await _init_ally_bonus_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             UPDATE ally_bonuses SET name=?, max_level=?, current_level=?, description=?
             WHERE id=? AND ally_group_id=?
@@ -8475,7 +8496,7 @@ async def update_ally_bonus(bonus_id: int, ally_group_id: int,
 
 async def delete_ally_bonus(bonus_id: int, ally_group_id: int):
     await _init_ally_bonus_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM ally_bonuses WHERE id=? AND ally_group_id=?",
                          (bonus_id, ally_group_id))
         await db.commit()
@@ -8484,7 +8505,7 @@ async def delete_ally_bonus(bonus_id: int, ally_group_id: int):
 async def reorder_ally_bonuses(ally_group_id: int, ordered_ids: list[int]):
     """Set position = index for each bonus id in the given order."""
     await _init_ally_bonus_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for pos, bid in enumerate(ordered_ids):
             await db.execute(
                 "UPDATE ally_bonuses SET position=? WHERE id=? AND ally_group_id=?",
@@ -8498,7 +8519,7 @@ async def reorder_ally_bonuses(ally_group_id: int, ordered_ids: list[int]):
 # ---------------------------------------------------------------------------
 
 async def _init_enemy_troops_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS enemy_troop_entries (
                 id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8531,7 +8552,7 @@ async def add_enemy_troop_entry(
     troop_details: str = "", village_name: str = "",
 ) -> int:
     await _init_enemy_troops_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO enemy_troop_entries
                 (guild_id, player_name, off_troops, def_troops, total_troops,
@@ -8545,7 +8566,7 @@ async def add_enemy_troop_entry(
 
 async def get_enemy_troop_entries(guild_id: str, player_name: str) -> list[dict]:
     await _init_enemy_troops_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("""
             SELECT * FROM enemy_troop_entries
@@ -8557,7 +8578,7 @@ async def get_enemy_troop_entries(guild_id: str, player_name: str) -> list[dict]
 
 async def delete_enemy_troop_entry(entry_id: int, guild_id: str):
     await _init_enemy_troops_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM enemy_troop_entries WHERE id=? AND guild_id=?",
                          (entry_id, guild_id))
         await db.commit()
@@ -8568,7 +8589,7 @@ async def delete_enemy_troop_entry(entry_id: int, guild_id: str):
 # ---------------------------------------------------------------------------
 
 async def _init_travian_stats_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS travian_stats_snapshots (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8622,7 +8643,7 @@ async def save_stats_snapshot(guild_id: str, imported_by: str,
                                snapshot_at: str, raw_text: str,
                                entries: list[dict], stats_type: str = 'player') -> int:
     await _init_travian_stats_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO travian_stats_snapshots
                 (guild_id, imported_by, snapshot_at, raw_text, row_count, stats_type)
@@ -8650,7 +8671,7 @@ async def save_stats_snapshot(guild_id: str, imported_by: str,
 
 async def get_stats_snapshots(guild_id: str) -> list[dict]:
     await _init_travian_stats_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("""
             SELECT * FROM travian_stats_snapshots
@@ -8661,7 +8682,7 @@ async def get_stats_snapshots(guild_id: str) -> list[dict]:
 
 async def delete_stats_snapshot(snapshot_id: int, guild_id: str):
     await _init_travian_stats_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "DELETE FROM travian_stats_snapshots WHERE id=? AND guild_id=?",
             (snapshot_id, guild_id)
@@ -8679,7 +8700,7 @@ async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20,
     Rates are points-per-snapshot between this and the previous snapshot.
     """
     await _init_travian_stats_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("""
             SELECT id, snapshot_at FROM travian_stats_snapshots
@@ -8750,7 +8771,7 @@ async def get_stats_trend_data(guild_id: str, limit_snapshots: int = 20,
 # ---------------------------------------------------------------------------
 
 async def _init_enemy_villages_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS enemy_village_snapshots (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8820,7 +8841,7 @@ async def get_enemy_village_details(guild_id: str, player_name: str) -> dict:
     """Return {coords_key: detail_dict} for all villages of a player."""
     await _init_enemy_villages_tables()
     import json as _json
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT coords_key, detail_json FROM enemy_village_details WHERE guild_id=? AND player_name=?",
@@ -8842,7 +8863,7 @@ async def save_enemy_village_detail(
     import json as _json
     from datetime import datetime as _dt
     await _init_enemy_villages_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             INSERT INTO enemy_village_details (guild_id, player_name, coords_key, detail_json, updated_at)
             VALUES (?,?,?,?,?)
@@ -8866,7 +8887,7 @@ async def save_enemy_village_snapshot(
 
     total_pop = sum(v.get("population", 0) for v in villages)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         # Get previous snapshot villages for diff
@@ -8955,7 +8976,7 @@ async def save_enemy_village_snapshot(
 async def get_enemy_village_history(guild_id: str, player_name: str) -> dict:
     """Return snapshots, latest villages, and events for a player."""
     await _init_enemy_villages_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
         cur = await db.execute("""
@@ -8987,7 +9008,7 @@ async def get_enemy_village_history(guild_id: str, player_name: str) -> dict:
 async def get_enemy_village_all_snapshots(guild_id: str, player_name: str) -> list[dict]:
     """Return all village lists per snapshot for population trend."""
     await _init_enemy_villages_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("""
             SELECT s.snapshot_at, s.village_count, s.population,
@@ -9006,7 +9027,7 @@ async def get_enemy_village_all_snapshots(guild_id: str, player_name: str) -> li
 # ---------------------------------------------------------------------------
 
 async def _init_map_share_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS map_share_links (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -9030,7 +9051,7 @@ async def create_map_share(guild_id: str, state_json: str, created_by: str = "",
     import secrets
     await _init_map_share_table()
     short_id = secrets.token_urlsafe(6)   # ~8 chars, URL-safe
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for _ in range(5):
             try:
                 await db.execute("""
@@ -9046,7 +9067,7 @@ async def create_map_share(guild_id: str, state_json: str, created_by: str = "",
 
 async def get_map_share(short_id: str) -> dict | None:
     await _init_map_share_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM map_share_links WHERE short_id=?", (short_id,)
@@ -9060,7 +9081,7 @@ async def get_map_share(short_id: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 async def _init_map_preset_tables():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS map_presets (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -9076,7 +9097,7 @@ async def _init_map_preset_tables():
 
 async def save_map_preset(guild_id: str, name: str, created_by: str, preset_json_str: str) -> int:
     await _init_map_preset_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "INSERT INTO map_presets (guild_id, name, created_by, preset_json) VALUES (?,?,?,?)",
             (guild_id, name, created_by, preset_json_str)
@@ -9087,7 +9108,7 @@ async def save_map_preset(guild_id: str, name: str, created_by: str, preset_json
 
 async def get_map_presets(guild_id: str) -> list[dict]:
     await _init_map_preset_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM map_presets WHERE guild_id=? ORDER BY created_at DESC",
@@ -9099,7 +9120,7 @@ async def get_map_presets(guild_id: str) -> list[dict]:
 
 async def delete_map_preset(guild_id: str, preset_id: int) -> bool:
     await _init_map_preset_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "DELETE FROM map_presets WHERE id=? AND guild_id=?",
             (preset_id, guild_id)
@@ -9110,7 +9131,7 @@ async def delete_map_preset(guild_id: str, preset_id: int) -> bool:
 
 async def update_map_preset_name(guild_id: str, preset_id: int, name: str) -> bool:
     await _init_map_preset_tables()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "UPDATE map_presets SET name=? WHERE id=? AND guild_id=?",
             (name, preset_id, guild_id)
@@ -9148,7 +9169,7 @@ TROOP_ROLE_DEFAULTS: dict[str, str] = {
 }
 
 async def _init_troop_roles_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS troop_roles (
                 guild_id   TEXT NOT NULL,
@@ -9162,7 +9183,7 @@ async def _init_troop_roles_table():
 async def get_troop_roles(guild_id: str) -> dict[str, str]:
     await _init_troop_roles_table()
     result = dict(TROOP_ROLE_DEFAULTS)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT troop_name, role FROM troop_roles WHERE guild_id=?", (guild_id,)
@@ -9173,7 +9194,7 @@ async def get_troop_roles(guild_id: str) -> dict[str, str]:
 
 async def save_troop_roles(guild_id: str, roles: dict[str, str]):
     await _init_troop_roles_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for troop_name, role in roles.items():
             await db.execute(
                 "INSERT OR REPLACE INTO troop_roles (guild_id, troop_name, role) VALUES (?,?,?)",
@@ -9185,7 +9206,7 @@ async def save_troop_roles(guild_id: str, roles: dict[str, str]):
 async def get_player_tribe_from_map(guild_id: str, player_name: str) -> str:
     """Look up tribe from map_snapshots. Returns lowercase tribe name or empty string."""
     _TRIBE_ID_MAP = {1: "römer", 2: "teutonen", 3: "gallier", 5: "ägypter", 6: "hunnen", 7: "spartaner"}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT tribe FROM map_snapshots WHERE guild_id=? AND player_name=? AND tribe IS NOT NULL AND tribe != 0 LIMIT 1",
             (guild_id, player_name)
@@ -9201,7 +9222,7 @@ async def get_village_populations_by_coords(guild_id: str, coords: list[tuple]) 
     if not coords:
         return {}
     result = {}
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for x, y in coords:
             async with db.execute(
                 "SELECT population FROM map_snapshots WHERE guild_id=? AND x=? AND y=? ORDER BY fetched_at DESC LIMIT 1",
@@ -9218,7 +9239,7 @@ async def get_village_populations_by_coords(guild_id: str, coords: list[tuple]) 
 # ──────────────────────────────────────────────────────────────────────────────
 
 async def _init_def_crop_table():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS def_crop_sends (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -9244,9 +9265,9 @@ async def save_def_crop_send(guild_id: str, sender_discord_id: str, sender_name:
                               tribe: str, troops: dict, crop_per_hour: float,
                               notes: str = "") -> int:
     import json as _json
-    await _init_def_crop_table()
+    pass  # table created in init_db()
     now = __import__('datetime').datetime.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO def_crop_sends
               (guild_id, sender_discord_id, sender_name, recipient_name,
@@ -9262,8 +9283,8 @@ async def save_def_crop_send(guild_id: str, sender_discord_id: str, sender_name:
 
 async def get_def_crop_sends(guild_id: str, sender_discord_id: str) -> list[dict]:
     import json as _json
-    await _init_def_crop_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    pass  # table created in init_db()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM def_crop_sends
@@ -9285,8 +9306,8 @@ async def get_def_crop_sends(guild_id: str, sender_discord_id: str) -> list[dict
 async def get_all_def_crop_sends(guild_id: str) -> list[dict]:
     """All active sends for the guild (for overview)."""
     import json as _json
-    await _init_def_crop_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    pass  # table created in init_db()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM def_crop_sends
@@ -9306,8 +9327,8 @@ async def get_all_def_crop_sends(guild_id: str) -> list[dict]:
 
 
 async def deactivate_def_crop_send(send_id: int, guild_id: str) -> bool:
-    await _init_def_crop_table()
-    async with aiosqlite.connect(DB_PATH) as db:
+    pass  # table created in init_db()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "UPDATE def_crop_sends SET active=0 WHERE id=? AND guild_id=?",
             (send_id, guild_id)
