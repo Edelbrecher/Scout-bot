@@ -991,6 +991,32 @@ def _require_admin(session: dict):
 
 templates.env.globals["get_is_admin"] = _get_is_admin
 
+
+def _get_nav_guild(request: Request) -> dict | None:
+    """Extract guild_id from current URL path and return basic guild info for navbar."""
+    try:
+        path = request.url.path
+        # Match /guild/{guild_id}/...
+        m = re.match(r"^/guild/([^/]+)", path)
+        if not m:
+            return None
+        gid = m.group(1)
+        # Try to get from session's guild list (fast path, no DB)
+        session = get_session(request)
+        if not session:
+            return None
+        # Return minimal info — full guild data loaded async per route, not here
+        # Store guild info in request.state if already loaded by the route
+        guild = getattr(request.state, "_nav_guild", None)
+        if guild:
+            return guild
+        return {"guild_id": gid, "guild_name": gid, "tw_world": ""}
+    except Exception:
+        return None
+
+
+templates.env.globals["get_nav_guild"] = _get_nav_guild
+
 import json as _json
 import datetime as _dt_global
 templates.env.filters["from_json"] = lambda s: _json.loads(s) if s else []

@@ -37,6 +37,24 @@
       {% if _is_admin %}
       <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
       {% endif %}
+      {% if guild is defined and guild %}
+        {% set _world_url = guild.tw_world or '' %}
+        {% set _world_name = _world_url | replace('https://','') | replace('http://','') | replace('/','') if _world_url else '' %}
+        <div style="display:flex;align-items:center;gap:.35rem;padding:.2rem .7rem;
+                    background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);
+                    border-radius:20px;font-size:.78rem;color:#a5b4fc;white-space:nowrap;max-width:220px;">
+          <span style="font-size:.85rem;">🌍</span>
+          <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;" title="{{ guild.guild_name }}">
+            {{ guild.guild_name }}
+          </span>
+          {% if _world_name %}
+          <span style="color:rgba(165,180,252,.55);font-size:.7rem;">·</span>
+          <a href="{{ _world_url }}" target="_blank" rel="noopener"
+             style="color:#818cf8;text-decoration:none;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;"
+             title="{{ _world_url }}">{{ _world_name }}</a>
+          {% endif %}
+        </div>
+      {% endif %}
       <!-- Tour button: starts the appropriate tour for the current page -->
       <button id="nav-tour-btn" onclick="navStartTour()"
         title="Start guided tour"
