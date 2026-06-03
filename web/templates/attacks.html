@@ -322,20 +322,40 @@
   </div>
 
   <div id="ownAttacksSection">
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem; flex-wrap:wrap; gap:0.5rem;">
-        <h2 style="margin:0;">&#x2694;&#xFE0F; Incoming attacks (own villages)</h2>
-        <div style="display:flex;gap:.4rem;align-items:center;">
+    <div class="card" style="padding:0;overflow:hidden;">
+
+      <!-- ── Top bar ── -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.5rem;">
+        <div style="display:flex;align-items:center;gap:.6rem;">
+          <h2 style="margin:0;font-size:.95rem;">&#x2694;&#xFE0F; Incoming Attacks</h2>
+          <span id="atkTotalBadge" style="font-size:.72rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 9px;font-weight:700;"></span>
+        </div>
+        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
           {% if can_label %}
           <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--text-muted);cursor:pointer;user-select:none;">
             <input type="checkbox" id="selectAllCbx" onchange="toggleSelectAll(this.checked)" style="accent-color:#6366f1;"> Alle
           </label>
           {% endif %}
-          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.25rem 0.6rem;" onclick="loadOwnAttacks()">&#x21BB; Aktualisieren</button>
+          <!-- Filter: type -->
+          <select id="filterType" onchange="applyFilters()" style="font-size:.78rem;padding:.2rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            <option value="">All types</option>
+            <option value="attack">⚔️ Attacks</option>
+            <option value="raid">💰 Raids</option>
+            <option value="support">🛡️ Support</option>
+          </select>
+          <!-- Filter: label -->
+          <select id="filterLabel" onchange="applyFilters()" style="font-size:.78rem;padding:.2rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            <option value="">All labels</option>
+            <option value="hard">💀 Hard</option>
+            <option value="fake">👻 Fake</option>
+            <option value="low">⚠️ Low</option>
+            <option value="_unlabeled">Unlabeled</option>
+          </select>
+          <button class="btn btn-secondary" style="font-size:0.8rem;padding:0.25rem 0.6rem;" onclick="loadOwnAttacks()">&#x21BB;</button>
         </div>
       </div>
 
-      <!-- Bulk action bar -->
+      <!-- ── Bulk bar ── -->
       {% if can_label %}
       <div class="bulk-bar" id="bulkBar">
         <span id="bulkCount" style="font-size:.82rem;font-weight:700;color:#a5b4fc;">0 ausgewählt</span>
@@ -343,16 +363,32 @@
         <button onclick="bulkLabel('fake')" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;border-color:rgba(74,222,128,.3);color:#4ade80;">👻 Fake</button>
         <button onclick="bulkLabel('hard')" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;border-color:rgba(248,113,113,.3);color:#f87171;">💀 Hard</button>
         <button onclick="bulkLabel('low')"  class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;border-color:rgba(251,191,36,.3);color:#fbbf24;">⚠️ Low</button>
-        <button onclick="bulkLabel('')"     class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;">✕ Label weg</button>
+        <button onclick="bulkLabel('')"     class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;">✕ Label</button>
         <div style="height:16px;width:1px;background:var(--border);"></div>
-        <button onclick="bulkArchive()" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;">📁 Archivieren</button>
-        <button onclick="bulkDelete()"  class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;color:#f87171;">🗑 Löschen</button>
+        <button onclick="bulkArchive()" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;">📁</button>
+        <button onclick="bulkDelete()"  class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .65rem;color:#f87171;">🗑</button>
         <button onclick="clearSelection()" style="margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;line-height:1;">&times;</button>
       </div>
       {% endif %}
 
-      <div id="ownAttacksContent">
-        <div style="text-align:center; color:var(--text-muted); padding:2rem;">Lade...</div>
+      <!-- ── Two-column layout: sidebar + content ── -->
+      <div style="display:grid;grid-template-columns:220px 1fr;min-height:200px;">
+
+        <!-- LEFT: Village filter sidebar -->
+        <div id="villageSidebar" style="border-right:1px solid var(--border);display:flex;flex-direction:column;max-height:calc(100vh - 240px);position:sticky;top:72px;">
+          <div style="padding:.55rem .65rem;border-bottom:1px solid var(--border);">
+            <input id="villageSearchInput" type="search" placeholder="🔍 Dorf suchen…"
+              oninput="renderVillageList()"
+              style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.78rem;padding:.3rem .5rem;outline:none;">
+          </div>
+          <div id="villageList" style="overflow-y:auto;flex:1;padding:.3rem 0;"></div>
+        </div>
+
+        <!-- RIGHT: Attack content for selected village -->
+        <div id="ownAttacksContent" style="padding:.75rem;min-width:0;">
+          <div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -444,6 +480,23 @@
   border:1px solid rgba(99,102,241,0.2); border-radius:6px;
   display:flex; align-items:center; gap:0.5rem;
 }
+/* Sidebar village items */
+.vsb-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.4rem .65rem; cursor:pointer; font-size:.78rem;
+  border-left:3px solid transparent; transition:background .1s, border-color .1s;
+  user-select:none; gap:.4rem;
+}
+.vsb-item:hover { background:rgba(99,102,241,.07); }
+.vsb-item.active {
+  background:rgba(99,102,241,.13);
+  border-left-color:#6366f1;
+  color:var(--text);
+  font-weight:600;
+}
+.vsb-item .vsb-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vsb-item .vsb-cnt  { font-size:.7rem; font-weight:700; flex-shrink:0; }
+.vsb-item .vsb-real { font-size:.68rem; color:#f87171; flex-shrink:0; }
 .player-link {
   color:#60a5fa; text-decoration:none; cursor:pointer; font-weight:600;
 }
@@ -1233,17 +1286,107 @@
   // =========================================================
   // OWN ATTACKS
   // =========================================================
+  // ── Global attack state ───────────────────────────────────────────────────
+  let _allAttacks = [];           // full unfiltered dataset
+  let _selectedVillage = null;    // null = "All"
+
   window.loadOwnAttacks = async function() {
     const cont = document.getElementById('ownAttacksContent');
     cont.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>';
     try {
       const resp = await fetch('/guild/' + GUILD_ID + '/attacks/api/incoming');
       if (!resp.ok) { cont.innerHTML = '<p class="hint" style="text-align:center;">Error loading.</p>'; return; }
-      const attacks = await resp.json();
-      renderOwnAttacks(attacks, cont);
+      _allAttacks = await resp.json();
+      renderVillageList();
+      applyFilters();
     } catch(e) {
       cont.innerHTML = '<p class="hint" style="text-align:center;">Netzwerkfehler: ' + escHtml(e.message) + '</p>';
     }
+  };
+
+  // Build village groups from _allAttacks
+  function buildGroups(attacks) {
+    const groups = {};
+    for (const a of attacks) {
+      const key = (a.own_village_name||'?') + '|' + (a.own_village_x||'?') + '|' + (a.own_village_y||'?');
+      if (!groups[key]) groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, attacks: [] };
+      groups[key].attacks.push(a);
+    }
+    return groups;
+  }
+
+  // Render the left sidebar village list
+  window.renderVillageList = function() {
+    const q = (document.getElementById('villageSearchInput')?.value || '').toLowerCase();
+    const groups = buildGroups(_allAttacks);
+    const totalReal = _allAttacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60).length;
+    const totalSup  = _allAttacks.filter(a => a.attack_type === 'support').length;
+
+    let html = `<div class="vsb-item ${_selectedVillage===null?'active':''}" onclick="selectVillage(null)">
+      <span class="vsb-name">🌐 All villages</span>
+      <span class="vsb-cnt" style="color:var(--text-muted);">${_allAttacks.length}</span>
+      ${totalReal > 0 ? `<span class="vsb-real">⚠️${totalReal}</span>` : ''}
+    </div>
+    <div style="height:1px;background:var(--border);margin:.2rem 0;"></div>`;
+
+    const sortedKeys = Object.keys(groups).sort((a,b) => {
+      // Sort by real-attack count desc, then total desc
+      const ga = groups[a], gb = groups[b];
+      const ra = ga.attacks.filter(x => x.attack_type!=='support' && (x.fake_score||50)<60).length;
+      const rb = gb.attacks.filter(x => x.attack_type!=='support' && (x.fake_score||50)<60).length;
+      return rb - ra || gb.attacks.length - ga.attacks.length;
+    });
+
+    for (const key of sortedKeys) {
+      const g = groups[key];
+      if (q && !g.name.toLowerCase().includes(q)) continue;
+      const realCnt = g.attacks.filter(a => a.attack_type!=='support' && (a.fake_score||50)<60).length;
+      const supCnt  = g.attacks.filter(a => a.attack_type==='support').length;
+      const atkCnt  = g.attacks.length - supCnt;
+      const isActive = _selectedVillage === key;
+      const coords   = g.x != null ? ` (${g.x}|${g.y})` : '';
+      html += `<div class="vsb-item ${isActive?'active':''}" onclick="selectVillage('${key.replace(/'/g,"\\'")}')">
+        <span class="vsb-name" title="${escHtml(g.name+coords)}">🏰 ${escHtml(g.name)}</span>
+        <span class="vsb-cnt" style="color:${realCnt>0?'#f87171':'var(--text-muted)'};">${g.attacks.length}</span>
+        ${supCnt > 0 ? `<span class="vsb-real" style="color:#4ade80;">🛡${supCnt}</span>` : ''}
+        ${realCnt > 0 ? `<span class="vsb-real">⚠️${realCnt}</span>` : ''}
+      </div>`;
+    }
+    const el = document.getElementById('villageList');
+    if (el) el.innerHTML = html;
+
+    // Update total badge
+    const badge = document.getElementById('atkTotalBadge');
+    if (badge) badge.textContent = _allAttacks.length + ' total · ' + Object.keys(groups).length + ' villages';
+  };
+
+  window.selectVillage = function(key) {
+    _selectedVillage = key;
+    renderVillageList();
+    applyFilters();
+  };
+
+  window.applyFilters = function() {
+    const typeFilter  = document.getElementById('filterType')?.value  || '';
+    const labelFilter = document.getElementById('filterLabel')?.value || '';
+
+    // Filter by village
+    let filtered = _selectedVillage === null
+      ? [..._allAttacks]
+      : _allAttacks.filter(a => {
+          const key = (a.own_village_name||'?')+'|'+(a.own_village_x||'?')+'|'+(a.own_village_y||'?');
+          return key === _selectedVillage;
+        });
+
+    // Filter by type
+    if (typeFilter)  filtered = filtered.filter(a => a.attack_type === typeFilter);
+
+    // Filter by label
+    if (labelFilter === '_unlabeled') filtered = filtered.filter(a => !a.label);
+    else if (labelFilter)             filtered = filtered.filter(a => a.label === labelFilter);
+
+    const cont = document.getElementById('ownAttacksContent');
+    renderOwnAttacks(filtered, cont);
   };
 
   // ── Wave detection ────────────────────────────────────────────────────────
@@ -1298,19 +1441,18 @@
   };
 
   function renderOwnAttacks(attacks, cont) {
-    if (!attacks.length) {
-      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine eingehenden Attacke. Importiere deinen Rallyepunkt.</p>';
+    if (!_allAttacks.length) {
+      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine Angriffe. Importiere deinen Rallyepunkt.</p>';
       document.getElementById('attackChartsSection').style.display = 'none';
       return;
     }
-
-    // Group by own_village
-    const groups = {};
-    for (const a of attacks) {
-      const key = a.own_village_name + '|' + (a.own_village_x||'?') + '|' + (a.own_village_y||'?');
-      if (!groups[key]) groups[key] = {name: a.own_village_name, x: a.own_village_x, y: a.own_village_y, attacks: []};
-      groups[key].attacks.push(a);
+    if (!attacks.length) {
+      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;color:var(--text-muted);">Keine Einträge für diesen Filter.</p>';
+      return;
     }
+
+    // Group filtered attacks by village
+    const groups = buildGroups(attacks);
 
     let html = '';
     for (const key of Object.keys(groups)) {
@@ -1326,13 +1468,13 @@
         <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;">
           <span id="vc-arrow-${safeKey}" style="font-size:.7rem;margin-right:.4rem;color:var(--text-muted);">${isCollapsed?'▶':'▼'}</span>
           🏰 ${escHtml(g.name)}${escHtml(coords)}
-          <span style="margin-left:auto; font-size:0.8rem; color:var(--text-muted); font-weight:400; display:flex; gap:.5rem; align-items:center;">
+          <span style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);font-weight:400;display:flex;gap:.5rem;align-items:center;">
             ${waves.length} Welle(n) · ${g.attacks.length} Eintr.
-            ${supportCount > 0 ? '<span style="color:#4ade80;">🛡️ '+supportCount+' Support</span>' : ''}
-            ${realCount > 0 ? '<span style="color:#f87171;">⚠️ '+realCount+' real?</span>' : ''}
+            ${supportCount>0?'<span style="color:#4ade80;">🛡️ '+supportCount+'</span>':''}
+            ${realCount>0?'<span style="color:#f87171;">⚠️ '+realCount+' real?</span>':''}
           </span>
         </div>
-        <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'}; flex-direction:column; gap:0.4rem;">
+        <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0.4rem;">
           ${zwWarning}`;
       for (let wi = 0; wi < waves.length; wi++) {
         if (waves.length > 1) {
@@ -1340,16 +1482,14 @@
             ⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}
           </div>`;
         }
-        for (const a of waves[wi]) {
-          html += renderAttackRow(a);
-        }
+        for (const a of waves[wi]) html += renderAttackRow(a);
       }
       html += '</div></div>';
     }
     cont.innerHTML = html;
 
-    // Build charts
-    renderAttackCharts(attacks, groups);
+    // Charts always use full dataset (not filtered), shown after first load
+    if (_allAttacks.length) renderAttackCharts(_allAttacks, buildGroups(_allAttacks));
   }
 
   function renderAttackRow(a) {
