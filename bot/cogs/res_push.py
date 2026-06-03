@@ -185,7 +185,7 @@ def _disabled_push_view(label: str) -> discord.ui.View:
 class ResModal(discord.ui.Modal, title="Res-Push Request"):
     player_name = discord.ui.TextInput(label="Player Name", placeholder="Who needs the push?", max_length=100)
     coordinates = discord.ui.TextInput(label="Coordinates", placeholder="e.g. 500|500", max_length=50)
-    push_height = discord.ui.TextInput(label="Push Height (numbers + k/m only)", placeholder="e.g. 500k or 1m or 50000", max_length=20)
+    push_height = discord.ui.TextInput(label="How much do you need? (total)", placeholder="e.g. 500k or 1m or 50000", max_length=20)
     reason = discord.ui.TextInput(
         label="Reason", placeholder="Why is this push needed?",
         required=False, style=discord.TextStyle.paragraph, max_length=500,
