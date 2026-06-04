@@ -145,7 +145,7 @@
         💡 After installing the extension, refresh this page — this step will automatically mark as done.
       </div>
       <div style="margin-top:.6rem;">
-        <a href="/guild/{{ guild.guild_id }}/setup?skip2=1{% if request.query_params.get('new') %}&new=1{% endif %}" style="font-size:.78rem;color:var(--text-muted);text-decoration:underline;">
+        <a href="#" onclick="skipStep2(event)" style="font-size:.78rem;color:var(--text-muted);text-decoration:underline;">
           Skip for now (I'm managing an alliance without my own villages)
         </a>
       </div>
@@ -280,6 +280,12 @@ function openNextStep() {
       el.classList.add('open');
     }
   });
+}
+
+function skipStep2(e) {
+  e.preventDefault();
+  markStepDone('step2');
+  setTimeout(() => openNextStep(), 300);
 }
 
 async function triggerSnapshot() {
