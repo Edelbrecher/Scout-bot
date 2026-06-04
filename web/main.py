@@ -654,20 +654,33 @@ def _parse_map_sql(content: str) -> list[dict]:
 
 
 async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
-    url = tw_world.rstrip("/") + "/map.sql"
+    """Fetch map.sql for a world and save it — also writes to all other guilds on the same world."""
+    tw_world = tw_world.rstrip("/")
+    url = tw_world + "/map.sql"
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.get(url)
         r.raise_for_status()
     villages = _parse_map_sql(r.text)
-    if villages:
-        await database.save_map_snapshot(guild_id, villages)
-        # Auto-sync alliance members if alliance name is configured
-        try:
-            await database.sync_alliance_members_from_snapshot(guild_id)
-        except Exception:
-            pass
-        # Trigger sector monitor scan in background
-        asyncio.create_task(database.run_sector_scan(guild_id))
+    if not villages:
+        return
+    # Save for the requesting guild
+    await database.save_map_snapshot(guild_id, villages)
+    try:
+        await database.sync_alliance_members_from_snapshot(guild_id)
+    except Exception:
+        pass
+    asyncio.create_task(database.run_sector_scan(guild_id))
+    # Also save for all other guilds on the same world (so they stay in sync)
+    try:
+        all_guilds = await database.get_all_guilds()
+        for g in all_guilds:
+            if g["guild_id"] == guild_id:
+                continue
+            if (g.get("tw_world") or "").rstrip("/") == tw_world:
+                await database.save_map_snapshot(g["guild_id"], villages)
+                asyncio.create_task(database.run_sector_scan(g["guild_id"]))
+    except Exception:
+        pass
 
 
 @asynccontextmanager
@@ -681,27 +694,66 @@ async def lifespan(app: FastAPI):
         # Short delay to let app/DB fully boot
         await asyncio.sleep(15)
         while True:
-            guilds = await database.get_all_guilds()
-            for g in guilds:
-                tw_world = (g.get("tw_world") or "").strip()
-                if not tw_world:
-                    continue
-                try:
-                    latest = await database.get_latest_snapshot_time(g["guild_id"])
-                    if latest:
-                        age_min = (_datetime.datetime.utcnow() - _datetime.datetime.fromisoformat(latest)).total_seconds() / 60
-                        if age_min < 15:
-                            continue  # Travian updates map.sql every 15min — no point fetching sooner
-                    print(f"[scanner] fetching snapshot for guild {g['guild_id']} from {tw_world}", flush=True)
-                    await _fetch_and_save_snapshot(g["guild_id"], tw_world)
-                    await database.prune_old_snapshots(g["guild_id"], keep_days=30)
-                    print(f"[scanner] snapshot saved for guild {g['guild_id']}", flush=True)
-                except Exception as e:
-                    import traceback
-                    print(f"[scanner] ERROR guild {g['guild_id']}: {e}", flush=True)
-                    traceback.print_exc()
-            # Check every 30 minutes — actual fetching is gated by the 6h DB timestamp
-            await asyncio.sleep(30 * 60)
+            try:
+                guilds = await database.get_all_guilds()
+
+                # Group guilds by world URL — fetch each world once, write to all guilds on it
+                world_map: dict[str, list] = {}
+                for g in guilds:
+                    tw_world = (g.get("tw_world") or "").strip().rstrip("/")
+                    if tw_world:
+                        world_map.setdefault(tw_world, []).append(g)
+
+                for tw_world, world_guilds in world_map.items():
+                    try:
+                        # Check oldest snapshot across all guilds on this world
+                        oldest_age = None
+                        for g in world_guilds:
+                            latest = await database.get_latest_snapshot_time(g["guild_id"])
+                            if not latest:
+                                oldest_age = 9999  # never fetched
+                                break
+                            age_min = (_datetime.datetime.utcnow() - _datetime.datetime.fromisoformat(latest)).total_seconds() / 60
+                            if oldest_age is None or age_min > oldest_age:
+                                oldest_age = age_min
+
+                        if oldest_age is not None and oldest_age < 15:
+                            continue  # all guilds on this world are fresh
+
+                        # Fetch map.sql once for this world
+                        url = tw_world + "/map.sql"
+                        print(f"[scanner] fetching {tw_world} for {len(world_guilds)} guild(s)", flush=True)
+                        async with httpx.AsyncClient(timeout=30) as client:
+                            r = await client.get(url)
+                            r.raise_for_status()
+                        villages = _parse_map_sql(r.text)
+                        if not villages:
+                            continue
+
+                        # Write snapshot to every guild on this world
+                        for g in world_guilds:
+                            try:
+                                await database.save_map_snapshot(g["guild_id"], villages)
+                                await database.prune_old_snapshots(g["guild_id"], keep_days=30)
+                                try:
+                                    await database.sync_alliance_members_from_snapshot(g["guild_id"])
+                                except Exception:
+                                    pass
+                                asyncio.create_task(database.run_sector_scan(g["guild_id"]))
+                            except Exception as eg:
+                                print(f"[scanner] ERROR saving for guild {g['guild_id']}: {eg}", flush=True)
+
+                        print(f"[scanner] {tw_world} → saved for {len(world_guilds)} guild(s)", flush=True)
+
+                    except Exception as ew:
+                        import traceback
+                        print(f"[scanner] ERROR world {tw_world}: {ew}", flush=True)
+                        traceback.print_exc()
+
+            except Exception as e:
+                print(f"[scanner] loop ERROR: {e}", flush=True)
+
+            await asyncio.sleep(15 * 60)  # check every 15 min
 
     asyncio.create_task(_snapshot_loop())
 
