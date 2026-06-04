@@ -3597,9 +3597,10 @@ async def guild_setup_page(request: Request, guild_id: str):
 
     snapshot_count = await database.get_snapshot_count(guild_id)
     own_villages   = await database.get_own_villages(guild_id)
+    skip2 = request.query_params.get("skip2") == "1"
 
     step1_done = bool((guild.get("tw_world") or "").strip())
-    step2_done = bool(own_villages)
+    step2_done = bool(own_villages) or skip2
     step3_done = snapshot_count > 0
 
     return templates.TemplateResponse("setup_wizard.html", {
@@ -3611,6 +3612,7 @@ async def guild_setup_page(request: Request, guild_id: str):
         "step3_done":     step3_done,
         "snapshot_count": snapshot_count,
         "tw_world":       guild.get("tw_world") or "",
+        "skip2":          skip2,
     })
 
 

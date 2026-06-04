@@ -146,6 +146,11 @@
       <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.65rem .9rem;font-size:.8rem;color:var(--text-muted);">
         💡 After installing the extension, refresh this page — this step will automatically mark as done.
       </div>
+      <div style="margin-top:.6rem;">
+        <a href="/guild/{{ guild.guild_id }}/setup?skip2=1{% if request.query_params.get('new') %}&new=1{% endif %}" style="font-size:.78rem;color:var(--text-muted);text-decoration:underline;">
+          Skip for now (I'm managing an alliance without my own villages)
+        </a>
+      </div>
       {% endif %}
     </div>
   </div>
@@ -177,7 +182,7 @@
         </button>
       </form>
       <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem;">
-        Auto-refresh runs every few hours. Manual trigger fetches latest data instantly.
+        Auto-refresh runs every 15 minutes. Manual trigger fetches latest data instantly.
       </div>
       {% else %}
       <div style="font-size:.83rem;color:var(--text-muted);">Complete step 1 first to enable map loading.</div>
