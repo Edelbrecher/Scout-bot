@@ -63,7 +63,7 @@
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Saved.</div>
   {% endif %}
   {% if auto_fetched %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ First snapshot loaded automatically! Next auto-snapshot in 6 hours — or click <em>🔄 Fetch Snapshot</em>.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ First snapshot loaded automatically! Next auto-snapshot in 15 minutes — or click <em>🔄 Fetch Snapshot</em>.</div>
   {% elif auto_fetch_error %}
   <div class="alert alert-warn" style="margin-bottom:1rem;">⚠️ Snapshot could not be loaded automatically: <code>{{ auto_fetch_error }}</code><br>Check the Travian world URL under <a href="/guild/{{ guild.guild_id }}/map">⚙️ Map Settings</a>.</div>
   {% endif %}
@@ -131,7 +131,7 @@
     <strong style="display:block;margin-bottom:0.5rem;">🚀 How Farming Intelligence works</strong>
     <ol style="margin:0;padding-left:1.25rem;color:var(--text-muted);font-size:0.875rem;line-height:1.9;">
       <li>Click <strong style="color:var(--text);">🔄 Fetch Snapshot</strong> in the top right — loads the current map of your Travian world</li>
-      <li>Wait at least <strong style="color:var(--text);">6 hours</strong> (or manually fetch a second snapshot)</li>
+      <li>Wait at least <strong style="color:var(--text);">15 minutes</strong> (or manually fetch a second snapshot)</li>
       <li>TravOps compares both snapshots and automatically detects <strong style="color:var(--text);">which villages have not changed</strong></li>
     </ol>
   </div>
@@ -476,7 +476,7 @@
         {% else %}
         <strong>First snapshot available — waiting for the second</strong>
         <p style="color:var(--text-muted);margin:0.4rem 0 0;font-size:0.875rem;">
-          The system automatically fetches a new snapshot every <strong>6 hours</strong>.<br>
+          The system automatically fetches a new snapshot every <strong>15 minutes</strong>.<br>
           Or click <em>🔄 Fetch Snapshot</em> now to get the second snapshot.
         </p>
         {% endif %}
@@ -553,13 +553,14 @@
                 {% if farm.get('alliance_name') %}<div style="font-size:.7rem;color:var(--text-muted);">[{{ farm.alliance_name }}]</div>{% endif %}
                 {% else %}<span style="color:var(--text-muted);">Barbarian</span>{% endif %}
               </td>
-              <td style="font-size:.78rem;">
-                {% if farm.tribe == 1 %}🏛️
-                {% elif farm.tribe == 2 %}⚔️
-                {% elif farm.tribe == 3 %}🌿
-                {% elif farm.tribe == 4 %}👾
-                {% elif farm.tribe == 5 %}🏹
-                {% elif farm.tribe == 6 %}🏺
+              <td style="font-size:.75rem;color:var(--text-muted);">
+                {% if farm.tribe == 1 %}Romans
+                {% elif farm.tribe == 2 %}Teutons
+                {% elif farm.tribe == 3 %}Gauls
+                {% elif farm.tribe == 4 %}Natars
+                {% elif farm.tribe == 5 %}Huns
+                {% elif farm.tribe == 6 %}Egyptians
+                {% elif farm.tribe == 7 %}Spartans
                 {% else %}—{% endif %}
               </td>
               <td><strong>{{ farm.population }}</strong></td>
