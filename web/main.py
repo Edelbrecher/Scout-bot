@@ -3585,6 +3585,42 @@ def _stripe_client():
     return stripe
 
 
+@app.post("/guild/{guild_id}/setup/api/save-world")
+async def setup_save_world(request: Request, guild_id: str):
+    from fastapi.responses import JSONResponse
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    body = await request.json()
+    url = (body.get("server_url") or "").strip().rstrip("/")
+    if not url:
+        return JSONResponse({"ok": False, "error": "URL is required"})
+    if not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
+        return JSONResponse({"ok": False, "error": f"Invalid URL format: {url!r}. Use e.g. https://ts1.travian.com"})
+    await database.update_tw_world(guild_id, url)
+    return JSONResponse({"ok": True, "saved": url})
+
+
+@app.post("/guild/{guild_id}/setup/api/trigger-snapshot")
+async def setup_trigger_snapshot(request: Request, guild_id: str):
+    from fastapi.responses import JSONResponse
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    guild = await database.get_guild(guild_id)
+    tw_world = (guild.get("tw_world") or "").strip() if guild else ""
+    if not tw_world:
+        return JSONResponse({"ok": False, "error": "No world URL set — complete step 1 first"})
+    try:
+        await _fetch_and_save_snapshot(guild_id, tw_world)
+        count = await database.get_snapshot_count(guild_id)
+        return JSONResponse({"ok": True, "snapshot_count": count})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+
+
 @app.get("/guild/{guild_id}/setup", response_class=HTMLResponse)
 async def guild_setup_page(request: Request, guild_id: str):
     session, err = _require_session(request)

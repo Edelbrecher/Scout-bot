@@ -103,7 +103,8 @@
           </div>
         </div>
         <button type="submit" id="btn-save-world" class="btn btn-primary" style="align-self:flex-start;">Save & continue →</button>
-        <div id="world-feedback" style="display:none;font-size:.82rem;color:#4ade80;">✅ Saved!</div>
+        <div id="world-feedback" style="display:none;font-size:.82rem;color:#4ade80;"></div>
+        <div id="world-error" style="display:none;font-size:.82rem;color:#f87171;"></div>
       </form>
       {% if step1_done %}
       <div style="margin-top:.75rem;font-size:.8rem;color:var(--text-muted);">
@@ -216,31 +217,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Step 1 form — save world URL via fetch
+  // Step 1 form — save world URL via JSON API
   const formWorld = document.getElementById('form-world');
   if (formWorld) {
     formWorld.addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('btn-save-world');
+      const errEl = document.getElementById('world-error');
       const url = document.getElementById('input-world-url').value.trim();
       if (!url) return;
       btn.disabled = true;
       btn.textContent = 'Saving…';
+      errEl.style.display = 'none';
       try {
-        const fd = new FormData();
-        fd.append('server_url', url);
-        fd.append('next_url', '');
-        await fetch(`/guild/${GUILD_ID}/map/world`, { method: 'POST', body: fd });
-        // Mark step1 done without reload
+        const res = await fetch(`/guild/${GUILD_ID}/setup/api/save-world`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({server_url: url})
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          errEl.textContent = '⚠️ ' + data.error;
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Save & continue →';
+          return;
+        }
         markStepDone('step1');
         document.getElementById('world-feedback').style.display = 'block';
+        document.getElementById('world-feedback').textContent = '✅ Saved: ' + data.saved;
         btn.textContent = '✓ Saved';
-        // If step3 button exists, enable it
-        const btn3 = document.getElementById('btn-trigger-snap');
-        if (btn3) btn3.disabled = false;
-        // Advance to next open step after short delay
         setTimeout(() => openNextStep(), 600);
-      } catch {
+      } catch(err) {
+        errEl.textContent = '⚠️ Network error, please try again';
+        errEl.style.display = 'block';
         btn.disabled = false;
         btn.textContent = 'Save & continue →';
       }
@@ -294,21 +304,22 @@ async function triggerSnapshot() {
   btn.disabled = true;
   btn.textContent = '⏳ Loading…';
   try {
-    const fd = new FormData();
-    fd.append('next_url', '');
-    await fetch(`/guild/${GUILD_ID}/map/trigger-snapshot`, { method: 'POST', body: fd });
+    const res = await fetch(`/guild/${GUILD_ID}/setup/api/trigger-snapshot`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) {
+      alert('Error: ' + data.error);
+      btn.disabled = false;
+      btn.textContent = '📥 Load map now';
+      return;
+    }
     markStepDone('step3');
-    // Update button
     btn.className = 'btn btn-secondary';
     btn.textContent = '🔄 Refresh now';
     btn.disabled = false;
-    btn.onclick = triggerSnapshot;
-    // Update status text in step3
     const snap3status = document.querySelector('#step3 .sw-status');
-    if (snap3status) { snap3status.className = 'sw-status done'; snap3status.textContent = '✅ 1 snapshot'; }
-    // Show success box
+    if (snap3status) { snap3status.className = 'sw-status done'; snap3status.textContent = `✅ ${data.snapshot_count} snapshot${data.snapshot_count !== 1 ? 's' : ''}`; }
     const box = document.getElementById('snap-success-box');
-    if (box) box.style.display = 'block';
+    if (box) { box.style.display = 'block'; box.textContent = `✅ Map data loaded — ${data.snapshot_count} snapshot${data.snapshot_count !== 1 ? 's' : ''} available.`; }
   } catch {
     btn.disabled = false;
     btn.textContent = '📥 Load map now';
