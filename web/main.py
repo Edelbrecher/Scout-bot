@@ -9444,11 +9444,68 @@ async def alliance_tracking_page(request: Request, guild_id: str):
     if err: return err
     watched = await database.get_watched_alliances(guild_id)
     top_alliances = await database.get_top_alliances(guild_id, limit=10)
+    meta_groups = await database.get_meta_groups(guild_id)
+    meta_alliances = await database.get_meta_alliances(guild_id)
+    ally_group = await database.get_ally_group_for_guild(guild_id)
     saved = request.query_params.get("saved")
     return templates.TemplateResponse("alliance_tracking.html", {
         "request": request, "guild": guild,
         "watched": watched, "top_alliances": top_alliances,
+        "meta_groups": meta_groups, "meta_alliances": meta_alliances,
+        "ally_group": ally_group,
         "saved": saved,
+    })
+
+
+@app.get("/guild/{guild_id}/alliance-tracking/meta/own", response_class=HTMLResponse)
+async def alliance_tracking_meta_own(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    alliances = []
+    if ally_group:
+        for f in ("ally_name","wing1_name","wing2_name"):
+            v = ally_group.get(f,"") or ""
+            if v: alliances.append(v)
+    group = {"id": "own", "meta_name": "Eigene Meta", "alliances": alliances}
+    data = await database.get_meta_combined_tracking(guild_id, alliances)
+    meta_groups = await database.get_meta_groups(guild_id)
+    watched = await database.get_watched_alliances(guild_id)
+    return templates.TemplateResponse("alliance_tracking_meta.html", {
+        "request": request, "guild": guild,
+        "group": group, "data": data,
+        "meta_groups": meta_groups, "watched": watched,
+    })
+
+
+@app.get("/guild/{guild_id}/alliance-tracking/meta/{group_id}", response_class=HTMLResponse)
+async def alliance_tracking_meta(request: Request, guild_id: str, group_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    meta_groups = await database.get_meta_groups(guild_id)
+    group = next((g for g in meta_groups if g["id"] == group_id), None)
+    if not group:
+        return RedirectResponse(f"/guild/{guild_id}/alliance-tracking")
+    data = await database.get_meta_combined_tracking(guild_id, group["alliances"])
+    watched = await database.get_watched_alliances(guild_id)
+    return templates.TemplateResponse("alliance_tracking_meta.html", {
+        "request": request, "guild": guild,
+        "group": group, "data": data,
+        "meta_groups": meta_groups, "watched": watched,
     })
 
 
