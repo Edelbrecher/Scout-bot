@@ -357,7 +357,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Troops</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)">🔍 Check</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('hero',this);loadHeroActions()">🦸 Hero</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('live',this);startLive()">🔴 Live</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="openLivePopup()">🔴 Live ↗</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('report',this);loadReport()">📊 Report</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
               </div>
@@ -428,16 +428,6 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Confirmation status of all attackers after landing.</div>
                 <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Refresh</button>
                 <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">No data yet.</div></div>
-              </div>
-
-              <!-- 🔴 Live Board -->
-              <div class="op-panel-body" id="panel-live" style="display:none;padding:.5rem;">
-                <div id="liveAlerts"></div>
-                <div id="liveMeta" style="font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem;display:flex;justify-content:space-between;">
-                  <span id="liveTitle">—</span>
-                  <span id="liveUpdated">—</span>
-                </div>
-                <div id="liveBoard"><div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1.5rem;">Select an active plan to see live status.</div></div>
               </div>
 
               <!-- 📊 Report -->
@@ -3321,34 +3311,26 @@ function _drawOpMapContent(canvas, ctx) {
 })();
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 🔴 LIVE BOARD
+// 🔴 LIVE BOARD — opens as detachable popup window
 // ══════════════════════════════════════════════════════════════════════════════
-let _liveTimer = null;
-let _liveActive = false;
+let _liveWin = null;
 
-function startLive() {
-  _liveActive = true;
-  pollLive();
+function openLivePopup() {
+  if (!activePlanId) { showToast('Select a plan first.'); return; }
+  const gid = window._guildId || location.pathname.split('/')[2];
+  const url = `/guild/${gid}/operations/${activePlanId}/live`;
+  const w = Math.min(820, screen.availWidth);
+  const h = Math.min(700, screen.availHeight);
+  const left = Math.round((screen.availWidth - w) / 2);
+  const top  = Math.round((screen.availHeight - h) / 2);
+  if (_liveWin && !_liveWin.closed) { _liveWin.focus(); return; }
+  _liveWin = window.open(url, 'travops_live',
+    `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
 }
 
-function stopLive() {
-  _liveActive = false;
-  if (_liveTimer) { clearTimeout(_liveTimer); _liveTimer = null; }
-}
+function stopLive() {} // no-op, live runs in popup
 
-async function pollLive() {
-  if (!_liveActive || !activePlanId) return;
-  try {
-    const data = await apiFetch(`/plans/${activePlanId}/live`);
-    renderLiveBoard(data);
-  } catch(e) {
-    document.getElementById('liveBoard').innerHTML =
-      `<div style="color:#f87171;font-size:.82rem;">Error loading live data: ${e.message}</div>`;
-  }
-  if (_liveActive) _liveTimer = setTimeout(pollLive, 5000);
-}
-
-function renderLiveBoard(data) {
+function _renderLiveBoardUnused(data) {
   const now = Date.now();
   const targets = data.targets || [];
   const planStatus = data.status || '';

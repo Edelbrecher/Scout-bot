@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔴 Live · {{ plan.name }} · TravOps</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #1e1f22; --bg-card: #2b2d31; --border: #3f4147;
+      --text: #dbdee1; --text-muted: #949ba4;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+
+    #header {
+      position: sticky; top: 0; z-index: 10;
+      background: #111214; border-bottom: 1px solid var(--border);
+      padding: .55rem 1rem;
+      display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+    }
+    #header h1 { font-size: .95rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #liveStatus { font-size: .72rem; display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+    #liveDot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: blink 1.4s infinite; flex-shrink: 0; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    #liveUpdated { color: var(--text-muted); font-size: .7rem; }
+
+    #alerts { padding: .5rem .75rem 0; }
+
+    #board { padding: .5rem .75rem 1.5rem; display: flex; flex-direction: column; gap: .6rem; }
+
+    .target-block {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    }
+    .target-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .45rem .75rem; background: rgba(255,255,255,.04); border-bottom: 1px solid var(--border);
+    }
+    .target-name { font-weight: 700; font-size: .85rem; }
+    .target-coords { font-family: monospace; font-size: .72rem; color: var(--text-muted); margin-left: .4rem; }
+    .target-pct { font-size: .75rem; font-weight: 700; }
+
+    table.wave-tbl { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    table.wave-tbl td { padding: .3rem .75rem; border-bottom: 1px solid rgba(255,255,255,.04); }
+    table.wave-tbl tr:last-child td { border-bottom: none; }
+    .wt-type { font-size: .65rem; font-weight: 800; width: 20px; }
+    .wt-name { font-weight: 600; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wt-time { font-family: monospace; font-size: .72rem; color: var(--text-muted); }
+    .wt-status { text-align: right; white-space: nowrap; }
+
+    .alert-bar {
+      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.35);
+      border-radius: 8px; padding: .55rem .85rem; font-size: .8rem; margin-bottom: .4rem;
+    }
+    .alert-bar strong { color: #f87171; }
+    .alert-item { color: #fca5a5; margin-top: .2rem; }
+
+    #summary {
+      position: sticky; bottom: 0; background: #111214; border-top: 1px solid var(--border);
+      padding: .45rem 1rem; display: flex; gap: 1.25rem; align-items: center; font-size: .8rem;
+    }
+    .sum-kpi { display: flex; flex-direction: column; align-items: center; }
+    .sum-kpi .val { font-size: 1.1rem; font-weight: 800; line-height: 1.1; }
+    .sum-kpi .lbl { font-size: .62rem; color: var(--text-muted); }
+    #sumBar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    #sumBarFill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🔴 <span id="planName">{{ plan.name }}</span></h1>
+  <div id="liveStatus">
+    <div id="liveDot"></div>
+    <span id="liveUpdated">connecting…</span>
+  </div>
+</div>
+
+<div id="alerts"></div>
+<div id="board"></div>
+
+<div id="summary">
+  <div class="sum-kpi"><div class="val" id="sumSent" style="color:#4ade80;">—</div><div class="lbl">✅ Sent</div></div>
+  <div class="sum-kpi"><div class="val" id="sumFailed" style="color:#f87171;">—</div><div class="lbl">❌ Failed</div></div>
+  <div class="sum-kpi"><div class="val" id="sumPending" style="color:var(--text-muted);">—</div><div class="lbl">⏳ Pending</div></div>
+  <div id="sumBar"><div id="sumBarFill"></div></div>
+  <div class="sum-kpi"><div class="val" id="sumPct" style="color:#a5b4fc;">—</div><div class="lbl">rate</div></div>
+</div>
+
+<script>
+const GUILD_ID = {{ guild_id | tojson }};
+const PLAN_ID  = {{ plan_id }};
+const API      = `/guild/${GUILD_ID}/operations/api/plans/${PLAN_ID}/live`;
+const TYPE_COLOR = { real:'#f87171', fake:'#a78bfa', scout:'#60a5fa', siege:'#fb923c' };
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso+(iso.endsWith('Z')?'':'Z')).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  catch(e){ return iso; }
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return '0:00';
+  const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+  if (h > 0) return `${h}h ${String(m%60).padStart(2,'0')}m`;
+  return `${m}:${String(s%60).padStart(2,'0')}`;
+}
+
+function render(data) {
+  const now = Date.now();
+  const targets = data.targets || [];
+
+  // ── Overdue alerts ──
+  const overdue = [];
+  targets.forEach(t => t.waves.forEach(w => {
+    if (!w.confirm_status && w.send_time) {
+      const ms = new Date(w.send_time+'Z').getTime();
+      if (ms < now - 120000) overdue.push({target: t.name, attacker: w.attacker_name, t: w.send_time});
+    }
+  }));
+
+  const alertEl = document.getElementById('alerts');
+  alertEl.innerHTML = overdue.length
+    ? `<div class="alert-bar"><strong>⚠️ ${overdue.length} wave${overdue.length>1?'s':''} overdue — no confirmation!</strong>
+        ${overdue.map(o=>`<div class="alert-item">❌ <b>${esc(o.attacker)}</b> → ${esc(o.target)} (send: ${fmtTime(o.t)})</div>`).join('')}
+       </div>`
+    : '';
+
+  // ── Targets ──
+  let allSent=0, allFailed=0, allPending=0, allTotal=0;
+  let html = '';
+
+  targets.forEach(t => {
+    const waves = t.waves || [];
+    const sent   = waves.filter(w => w.confirm_status==='on_time'||w.confirm_status==='late').length;
+    const failed = waves.filter(w => w.confirm_status==='not_sent'||w.confirm_status==='cant_send').length;
+    allSent += sent; allFailed += failed; allTotal += waves.length;
+    allPending += waves.filter(w => !w.confirm_status).length;
+
+    const pctColor = failed > 0 ? '#f87171' : sent === waves.length && waves.length > 0 ? '#4ade80' : '#fbbf24';
+
+    html += `<div class="target-block">
+      <div class="target-header">
+        <div><span class="target-name">${esc(t.name)}</span><span class="target-coords">(${t.x}|${t.y})</span></div>
+        <span class="target-pct" style="color:${pctColor};">${sent}/${waves.length} sent${failed>0?' · '+failed+' ❌':''}</span>
+      </div>`;
+
+    if (!waves.length) {
+      html += `<div style="padding:.5rem .75rem;font-size:.78rem;color:var(--text-muted);">No waves assigned</div>`;
+    } else {
+      html += `<table class="wave-tbl">`;
+      waves.forEach(w => {
+        const sendMs = w.send_time ? new Date(w.send_time+'Z').getTime() : 0;
+        const diff   = sendMs - now;
+        const cs     = w.confirm_status;
+        let statusHtml = '', rowBg = '';
+
+        if (cs === 'on_time')   { statusHtml = `<span style="color:#4ade80;">✅ Sent</span>`; rowBg = 'rgba(74,222,128,.05)'; }
+        else if (cs === 'late') { statusHtml = `<span style="color:#fbbf24;">⏱ Late</span>`; rowBg = 'rgba(251,191,36,.05)'; }
+        else if (cs === 'not_sent' || cs === 'cant_send') { statusHtml = `<span style="color:#f87171;">❌ Not sent</span>`; rowBg = 'rgba(239,68,68,.07)'; }
+        else if (sendMs && diff < 0 && diff > -120000) { statusHtml = `<span style="color:#fb923c;animation:pulse 1s infinite;">🔶 Confirm?</span>`; rowBg = 'rgba(251,146,60,.07)'; }
+        else if (sendMs && diff < 0) { statusHtml = `<span style="color:#f87171;">🔴 Overdue</span>`; rowBg = 'rgba(239,68,68,.09)'; }
+        else if (sendMs && diff < 60000) { statusHtml = `<span style="color:#f87171;font-weight:800;animation:pulse .8s infinite;">⏰ ${fmtCountdown(diff)}</span>`; rowBg = 'rgba(239,68,68,.06)'; }
+        else if (sendMs && diff < 300000) { statusHtml = `<span style="color:#fbbf24;font-weight:700;">⏳ ${fmtCountdown(diff)}</span>`; }
+        else { statusHtml = `<span style="color:var(--text-muted);">${sendMs ? fmtCountdown(diff) : '—'}</span>`; }
+
+        const tc = TYPE_COLOR[w.wave_type] || '#9ca3af';
+        html += `<tr style="background:${rowBg};">
+          <td class="wt-type"><span style="color:${tc};">${(w.wave_type||'R').toUpperCase().slice(0,1)}</span></td>
+          <td class="wt-name">${esc(w.attacker_name)}</td>
+          <td class="wt-time">${fmtTime(w.send_time)}</td>
+          <td class="wt-status">${statusHtml}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+    }
+    html += `</div>`;
+  });
+
+  document.getElementById('board').innerHTML = html || '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No targets yet.</div>';
+
+  // ── Summary bar ──
+  const pct = allTotal ? Math.round(allSent/allTotal*100) : 0;
+  const barColor = allFailed > 0 ? '#f87171' : pct >= 80 ? '#4ade80' : '#fbbf24';
+  document.getElementById('sumSent').textContent    = allSent;
+  document.getElementById('sumFailed').textContent  = allFailed;
+  document.getElementById('sumPending').textContent = allPending;
+  document.getElementById('sumPct').textContent     = pct + '%';
+  document.getElementById('sumBarFill').style.width = pct + '%';
+  document.getElementById('sumBarFill').style.background = barColor;
+  document.getElementById('liveUpdated').textContent = new Date().toLocaleTimeString();
+}
+
+async function poll() {
+  try {
+    const r = await fetch(API, {credentials:'include'});
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    render(data);
+    document.getElementById('liveDot').style.background = '#4ade80';
+  } catch(e) {
+    document.getElementById('liveDot').style.background = '#f87171';
+    document.getElementById('liveUpdated').textContent = 'Error — retrying…';
+  }
+  setTimeout(poll, 5000);
+}
+
+poll();
+</script>
+</body>
+</html>

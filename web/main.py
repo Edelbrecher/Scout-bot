@@ -7344,24 +7344,22 @@ async def op_live_status(request: Request, guild_id: str, plan_id: int):
     plan = await database.get_op_plan(plan_id, guild_id)
     if not plan:
         return _JSONResponse({"error": "not found"}, status_code=404)
-    targets = await database.get_op_targets(plan_id, guild_id)
     now_utc = __import__('datetime').datetime.utcnow().isoformat()
     result = []
-    for t in targets:
-        waves = await database.get_op_waves(t["id"], guild_id)
+    for t in (plan.get("targets") or []):
         result.append({
-            "id":          t["id"],
-            "name":        t.get("target_name",""),
-            "x":           t.get("x"),
-            "y":           t.get("y"),
+            "id":   t.get("id"),
+            "name": t.get("player_name") or t.get("village_name") or t.get("target_name") or "",
+            "x":    t.get("x"),
+            "y":    t.get("y"),
             "waves": [{
-                "id":             w["id"],
+                "id":             w.get("id"),
                 "attacker_name":  w.get("attacker_name",""),
                 "send_time":      w.get("send_time",""),
                 "arrival_time":   w.get("arrival_time",""),
                 "wave_type":      w.get("wave_type","real"),
                 "confirm_status": w.get("confirm_status",""),
-            } for w in waves]
+            } for w in (t.get("waves") or [])]
         })
     return _JSONResponse({
         "plan_id":    plan_id,
@@ -7415,6 +7413,25 @@ async def op_save_default_ts(request: Request, guild_id: str):
         )
         await db.commit()
     return _JSONResponse({"ok": True, "ts": ts})
+
+
+@app.get("/guild/{guild_id}/operations/{plan_id}/live", response_class=HTMLResponse)
+async def op_live_popup(request: Request, guild_id: str, plan_id: int):
+    """Standalone live board popup — detachable window, auto-refreshes every 5s."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    plan = await database.get_op_plan(plan_id, guild_id)
+    if not plan:
+        return HTMLResponse("<h2>Plan not found</h2>", status_code=404)
+    return templates.TemplateResponse("op_live_popup.html", {
+        "request":  request,
+        "guild":    await database.get_guild(guild_id),
+        "plan":     plan,
+        "plan_id":  plan_id,
+        "guild_id": guild_id,
+    })
 
 
 @app.get("/guild/{guild_id}/operations/{plan_id}/map-popup", response_class=HTMLResponse)
