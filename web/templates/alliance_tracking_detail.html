@@ -76,7 +76,7 @@
     <div>
       <h1 style="margin:0;">🏰 {{ alliance_name }}</h1>
       <p class="subtitle" style="margin:.2rem 0 0;">
-        {% if data.snapshot_count %}{{ data.snapshot_count }} snapshots · latest: {{ data.latest[:10] if data.latest else '—' }}{% else %}No data{% endif %}
+        {% if data.snapshot_count %}{{ data.snapshot_count }} snapshots · latest: {{ data.latest[:16].replace('T',' ') if data.latest else '—' }}{% else %}No data{% endif %}
       </p>
     </div>
     <div style="display:flex;gap:.5rem;">

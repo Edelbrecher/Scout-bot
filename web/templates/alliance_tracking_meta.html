@@ -59,7 +59,7 @@
         {% for a in group.alliances %}<span class="ally-chip">{{ a }}</span>{% endfor %}
       </div>
     </div>
-    {% if data.latest %}<div style="font-size:.73rem;color:var(--text-muted);">Last snapshot: {{ data.latest[:10] }}</div>{% endif %}
+    {% if data.latest %}<div style="font-size:.73rem;color:var(--text-muted);">Last snapshot: {{ data.latest[:16].replace('T',' ') }}</div>{% endif %}
   </div>
 
   {% if not data.alliances or data.total_members == 0 %}
