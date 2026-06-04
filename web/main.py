@@ -8150,6 +8150,45 @@ async def admin_server(request: Request):
     return templates.TemplateResponse("admin_server.html", {"request": request, "session": session})
 
 
+@app.get("/admin/worlds", response_class=HTMLResponse)
+async def admin_worlds(request: Request):
+    session, err = _require_admin(request)
+    if err: return err
+    guilds = await database.get_all_guilds()
+    from datetime import datetime, timezone
+
+    world_map: dict[str, dict] = {}
+    for g in guilds:
+        world = (g.get("tw_world") or "").strip().rstrip("/")
+        if not world:
+            continue
+        if world not in world_map:
+            world_map[world] = {"guilds": [], "latest": None, "age_min": None}
+        world_map[world]["guilds"].append(g)
+        ts = await database.get_latest_snapshot_time(g["guild_id"])
+        if ts:
+            if world_map[world]["latest"] is None or ts > world_map[world]["latest"]:
+                world_map[world]["latest"] = ts
+
+    now = datetime.now(timezone.utc)
+    for w, info in world_map.items():
+        if info["latest"]:
+            try:
+                dt = datetime.fromisoformat(info["latest"].replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                info["age_min"] = round((now - dt).total_seconds() / 60)
+            except Exception:
+                pass
+
+    return templates.TemplateResponse("admin_worlds.html", {
+        "request": request,
+        "session": session,
+        "world_map": world_map,
+        "no_world": [g for g in guilds if not (g.get("tw_world") or "").strip()],
+    })
+
+
 @app.get("/api/admin/server-stats")
 async def api_server_stats(request: Request):
     session, err = _require_admin(request)
