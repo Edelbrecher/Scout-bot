@@ -760,14 +760,30 @@
         </button>`;
     }
     if (formDef.type === 'world-setup') {
+      // Kick off server fetch immediately so it's ready when user types
+      window._ttLoadServers && window._ttLoadServers();
       return `
         <div class="tt-form-row">
-          <label>${t('Server-URL','Server URL')}</label>
-          <input id="tt-world-url" type="url" placeholder="https://ts2.x1.europe.travian.com" style="font-family:monospace;font-size:.85rem;">
+          <label>${t('Travian Server','Travian Server')}</label>
+          <div style="position:relative;">
+            <input id="tt-world-url" type="text" autocomplete="off"
+              placeholder="https://ts2.x1.europe.travian.com"
+              style="font-family:monospace;font-size:.82rem;width:100%;box-sizing:border-box;"
+              oninput="window._ttFilterServers(this.value)"
+              onfocus="window._ttFilterServers(this.value)">
+            <div id="tt-server-dropdown" style="
+              display:none; position:absolute; top:100%; left:0; right:0; z-index:99999;
+              background:#1e293b; border:1px solid #334155; border-radius:8px;
+              max-height:180px; overflow-y:auto; margin-top:2px; box-shadow:0 8px 24px rgba(0,0,0,.5);">
+            </div>
+          </div>
+          <div id="tt-server-hint" style="font-size:.72rem;color:#64748b;margin-top:.3rem;">
+            ${t('Tippe um zu suchen oder URL direkt eingeben','Type to search or enter URL directly')}
+          </div>
         </div>
         <div class="tt-form-row">
           <label>${t('Allianzname (optional)','Alliance name (optional)')}</label>
-          <input id="tt-ally-name" type="text" placeholder="${t('z.B. TravOps Alliance','e.g. TravOps Alliance')}">
+          <input id="tt-ally-name" type="text" placeholder="${t('z.B. TD · TravOps Alliance','e.g. TD · TravOps Alliance')}">
         </div>
         <button class="tt-save-btn" id="tt-world-save" onclick="window._ttSaveWorld(this)">
           💾 ${t('Speichern & Karte laden','Save & load map')}
@@ -793,6 +809,58 @@
 
   // ── Inline form save handlers ─────────────────────────────────────────────
   const guildIdFromPath = () => (location.pathname.match(/\/guild\/(\d{17,20})/) || [])[1];
+
+  // ── Server autocomplete ───────────────────────────────────────────────────
+  let _ttServers = [];
+  window._ttLoadServers = async function() {
+    if (_ttServers.length) return;
+    try {
+      const res = await fetch('/api/travian-servers');
+      _ttServers = await res.json();
+    } catch(e) {}
+  };
+  window._ttLoadServers();
+
+  window._ttFilterServers = function(val) {
+    const dd = document.getElementById('tt-server-dropdown');
+    if (!dd) return;
+    const q = val.trim().toLowerCase();
+    const matches = q.length < 2
+      ? _ttServers.slice(0, 12)
+      : _ttServers.filter(s =>
+          s.url.toLowerCase().includes(q) || s.label.toLowerCase().includes(q)
+        ).slice(0, 12);
+
+    if (!matches.length) { dd.style.display = 'none'; return; }
+
+    dd.innerHTML = matches.map(s => `
+      <div onclick="window._ttPickServer('${s.url}')" style="
+        padding:.5rem .75rem; cursor:pointer; font-size:.8rem;
+        border-bottom:1px solid #1e293b; transition:background .1s;"
+        onmouseover="this.style.background='#334155'"
+        onmouseout="this.style.background=''">
+        <div style="color:#e2e8f0;font-family:monospace;">${s.url}</div>
+        <div style="color:#64748b;font-size:.72rem;">${s.label}</div>
+      </div>`).join('');
+    dd.style.display = 'block';
+  };
+
+  window._ttPickServer = function(url) {
+    const inp = document.getElementById('tt-world-url');
+    const dd  = document.getElementById('tt-server-dropdown');
+    if (inp) inp.value = url;
+    if (dd)  dd.style.display = 'none';
+    const hint = document.getElementById('tt-server-hint');
+    if (hint) { hint.style.color = '#4ade80'; hint.textContent = '✓ ' + url; }
+  };
+
+  // Close dropdown on outside click
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#tt-server-dropdown') && e.target.id !== 'tt-world-url') {
+      const dd = document.getElementById('tt-server-dropdown');
+      if (dd) dd.style.display = 'none';
+    }
+  });
 
   window._ttSaveWorld = async function(btn) {
     const url = (document.getElementById('tt-world-url')?.value || '').trim().replace(/\/$/, '');

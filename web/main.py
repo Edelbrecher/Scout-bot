@@ -8735,6 +8735,39 @@ async def admin_servers_discover(request: Request):
     return RedirectResponse(f"/admin/servers?discovered={len(found)}", status_code=303)
 
 
+@app.get("/api/travian-servers")
+async def api_travian_servers():
+    from fastapi.responses import JSONResponse
+    servers = await database.get_travian_servers()
+    # Also include worlds currently in use by any guild
+    guilds = await database.get_all_guilds()
+    known_urls = {s["url"] for s in servers}
+    for g in guilds:
+        w = (g.get("tw_world") or "").strip().rstrip("/")
+        if w and w not in known_urls:
+            servers.append({"url": w, "speed": None, "region": None, "players_count": None})
+            known_urls.add(w)
+    return JSONResponse([{
+        "url": s["url"],
+        "label": _server_label(s),
+    } for s in sorted(servers, key=lambda x: -(x.get("players_count") or 0))])
+
+
+def _server_label(s: dict) -> str:
+    url = s.get("url", "")
+    parts = url.replace("https://", "").split(".")
+    # ts2.x1.europe.travian.com → "Europe x1 #2"
+    try:
+        num    = parts[0].lstrip("ts")
+        speed  = parts[1].upper() if len(parts) > 1 else ""
+        region = parts[2].capitalize() if len(parts) > 2 else ""
+        pc     = s.get("players_count")
+        suffix = f" · {pc} players" if pc else ""
+        return f"{region} {speed} #{num}{suffix}" if region else url
+    except Exception:
+        return url
+
+
 @app.post("/admin/servers/travian/{url:path}/fetch-snapshot")
 async def admin_fetch_travian_snapshot(request: Request, url: str):
     session, err = _require_admin(request)
