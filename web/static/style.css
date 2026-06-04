@@ -583,12 +583,16 @@ input:focus { border-color: var(--primary); }
 /* ── Disable browser-native cross-document view transitions ── */
 @view-transition { navigation: none; }
 
-/* ── Page entry animation (fade + slide up, navigation only) ── */
+/* ── Page entry animation (fade + slide up) ── */
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .page-main-anim {
   animation: pageEnter 0.26s cubic-bezier(.22,1,.36,1) both;
+}
+/* On reload: skip animation entirely */
+html.is-reload .page-main-anim {
+  animation: none;
 }
 

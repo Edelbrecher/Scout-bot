@@ -17,10 +17,15 @@
   <!-- Discord accent colour -->
   <meta name="theme-color"         content="#5865f2" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260604a" />
-  <!-- Tour navigation shield: style tag injected in <head> before first paint -->
+  <link rel="stylesheet" href="/static/style.css?v=20260604b" />
+  <!-- Before-paint scripts -->
   <script>
-    (function(){try{var s=localStorage.getItem('travops_tour');if(!s)return;var st=JSON.parse(s);if(!st||!st.name)return;var style=document.createElement('style');style.id='tt-nav-shield';style.textContent='body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;}';document.head.appendChild(style);}catch(e){}})();
+    (function(){
+      // Tour navigation shield
+      try{var s=localStorage.getItem('travops_tour');if(s){var st=JSON.parse(s);if(st&&st.name){var style=document.createElement('style');style.id='tt-nav-shield';style.textContent='body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;}';document.head.appendChild(style);}}}catch(e){}
+      // Mark reloads so CSS can skip the page-enter animation
+      try{var nav=performance.getEntriesByType('navigation')[0];if(nav&&nav.type==='reload')document.documentElement.classList.add('is-reload');}catch(e){}
+    })();
   </script>
 </head>
 <body>
@@ -215,7 +220,7 @@ document.addEventListener('click', e => {
            color:#fff;font-size:1.2rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);
            align-items:center;justify-content:center;">☰</button>
 
-  <main id="page-main">
+  <main id="page-main" class="page-main-anim">
     {% block content %}{% endblock %}
   </main>
 
@@ -480,16 +485,6 @@ document.addEventListener('click', e => {
     © {{ current_year }} TravOps · All rights reserved
   </footer>
 
-  <script>
-  // Animate page entry only on actual navigation, not on reload (F5 / Ctrl+R)
-  (function(){
-    var nav = performance.getEntriesByType('navigation')[0];
-    var isReload = nav && nav.type === 'reload';
-    if (!isReload) {
-      var main = document.getElementById('page-main');
-      if (main) main.classList.add('page-main-anim');
-    }
-  })();
-  </script>
+
 </body>
 </html>
