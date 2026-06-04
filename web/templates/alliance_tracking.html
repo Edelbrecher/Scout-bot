@@ -80,6 +80,12 @@
   {% endif %}
 
   {% if has_own or meta_groups %}
+  <!-- Section label for metas -->
+  <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.7rem;">
+    <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">⭐ Meta Groups</span>
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+  </div>
+
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.85rem;margin-bottom:1.5rem;">
 
     {% if has_own %}
@@ -88,9 +94,12 @@
     {% if ally_group.wing1_name %}{% set _ = own_allies.append(ally_group.wing1_name) %}{% endif %}
     {% if ally_group.wing2_name %}{% set _ = own_allies.append(ally_group.wing2_name) %}{% endif %}
     <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/own" class="meta-card">
-      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;">
-        <span style="font-size:1.2rem;">⭐</span>
-        <span style="font-weight:800;font-size:.98rem;">Own Meta</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
+        <div style="display:flex;align-items:center;gap:.55rem;">
+          <span style="font-size:1.1rem;">⭐</span>
+          <span style="font-weight:800;font-size:.95rem;">Own Meta</span>
+        </div>
+        <span style="font-size:.63rem;font-weight:700;padding:.15rem .5rem;border-radius:8px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;text-transform:uppercase;letter-spacing:.04em;">Meta</span>
       </div>
       <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
         {% for a in own_allies %}<span class="meta-ally-tag">{{ a }}</span>{% endfor %}
@@ -101,9 +110,12 @@
 
     {% for g in meta_groups %}
     <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ g.id }}" class="meta-card">
-      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;">
-        <span style="font-size:1.2rem;">🏰</span>
-        <span style="font-weight:800;font-size:.98rem;">{{ g.meta_name }}</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
+        <div style="display:flex;align-items:center;gap:.55rem;">
+          <span style="font-size:1.1rem;">🏰</span>
+          <span style="font-weight:800;font-size:.95rem;">{{ g.meta_name }}</span>
+        </div>
+        <span style="font-size:.63rem;font-weight:700;padding:.15rem .5rem;border-radius:8px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;text-transform:uppercase;letter-spacing:.04em;">Meta</span>
       </div>
       <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
         {% for a in g.alliances %}<span class="meta-ally-tag">{{ a }}</span>{% endfor %}
@@ -116,13 +128,27 @@
   </div>
   {% endif %}
 
-  <!-- ── SINGLE WATCHED (quick links) ── -->
+  <!-- ── SINGLE WATCHED ── -->
   {% if watched %}
-  <div style="margin-bottom:.5rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);">📌 Individual Alliances</div>
-  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+  <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.7rem;">
+    <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">📌 Individual Alliances</span>
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.6rem;margin-bottom:1.5rem;">
     {% for w in watched %}
-    <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}" class="watch-chip">
-      🏰 {{ w.alliance_name }}
+    <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
+       style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.65rem .9rem;
+              background:var(--bg-card);border:1px solid var(--border);border-radius:11px;
+              text-decoration:none;color:inherit;transition:border-color .15s;"
+       onmouseover="this.style.borderColor='rgba(99,102,241,.4)'"
+       onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:.5rem;min-width:0;">
+        <span style="font-size:1rem;">🏰</span>
+        <span style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ w.alliance_name }}</span>
+      </div>
+      <span style="font-size:.63rem;font-weight:700;padding:.15rem .5rem;border-radius:8px;flex-shrink:0;
+                   background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.28);color:#a5b4fc;
+                   text-transform:uppercase;letter-spacing:.04em;">Single</span>
     </a>
     {% endfor %}
   </div>
