@@ -104,7 +104,7 @@
             Example: <code>https://ts1.travian.com</code> or <code>https://tx3.travian.de</code>
           </div>
         </div>
-        <input type="hidden" name="_next" value="/guild/{{ guild.guild_id }}/setup">
+        <input type="hidden" name="next_url" value="/guild/{{ guild.guild_id }}/setup">
         <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Save & continue →</button>
       </form>
       {% if step1_done %}
@@ -171,7 +171,7 @@
       {% endif %}
       {% if step1_done %}
       <form method="POST" action="/guild/{{ guild.guild_id }}/map/trigger-snapshot" style="display:inline;">
-        <input type="hidden" name="_next" value="/guild/{{ guild.guild_id }}/setup">
+        <input type="hidden" name="next_url" value="/guild/{{ guild.guild_id }}/setup">
         <button type="submit" class="btn {% if step3_done %}btn-secondary{% else %}btn-primary{% endif %}" style="align-self:flex-start;">
           {% if step3_done %}🔄 Refresh now{% else %}📥 Load map now{% endif %}
         </button>

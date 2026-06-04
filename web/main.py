@@ -3207,7 +3207,7 @@ async def guild_world_settings_page(request: Request, guild_id: str):
 
 
 @app.post("/guild/{guild_id}/map/world")
-async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form(""), _next: str = Form("")):
+async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form(""), next_url: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -3216,13 +3216,13 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
         return RedirectResponse(f"/guild/{guild_id}/map?error=invalid_url", status_code=303)
     await database.update_tw_world(guild_id, url)
-    if _next:
-        return RedirectResponse(_next, status_code=303)
+    if next_url:
+        return RedirectResponse(next_url, status_code=303)
     return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/map/trigger-snapshot")
-async def guild_map_trigger_snapshot(request: Request, guild_id: str, _next: str = Form("")):
+async def guild_map_trigger_snapshot(request: Request, guild_id: str, next_url: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -3234,7 +3234,7 @@ async def guild_map_trigger_snapshot(request: Request, guild_id: str, _next: str
             await _fetch_and_save_snapshot(guild_id, tw_world)
         except Exception:
             pass
-    redirect_to = _next or f"/guild/{guild_id}/map"
+    redirect_to = next_url or f"/guild/{guild_id}/map"
     return RedirectResponse(redirect_to, status_code=303)
 
 
