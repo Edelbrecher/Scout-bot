@@ -50,7 +50,7 @@
           next: t('Weiter', 'Next'),
         },
         {
-          page: `${base}/my-ally`, target: null,
+          page: null, target: null,
           title: t('👥 Allianz einrichten', '👥 Set up alliance'),
           body: t(
             'Richte hier deine Allianz ein: Allianz-Namen vergeben, Rollen anlegen und Mitglieder per Einladungslink einladen.\n\nNach dem Beitritt können Mitglieder ihre Dörfer und Truppenbestand hinterlegen — du siehst dann die gesamte Kampfkraft auf einen Blick.',
@@ -61,7 +61,7 @@
           next: t('Weiter', 'Next'),
         },
         {
-          page: `${base}/mein-account`, target: null,
+          page: null, target: null,
           title: t('🏘️ Eigene Dörfer hochladen', '🏘️ Upload your villages'),
           body: t(
             'Lade die Koordinaten deiner Dörfer hoch — das ist die Grundlage für präzise Marschzeit-Berechnungen.\n\nOhne Dörfer rechnet der Einsatzplaner trotzdem, aber mit Dorf-Daten wählt er automatisch das optimale Startdorf für jede Welle.',
@@ -71,7 +71,7 @@
           next: t('Weiter', 'Next'),
         },
         {
-          page: base, target: null,
+          page: null, target: null,
           title: t('🎉 Einrichtung abgeschlossen!', '🎉 Setup complete!'),
           body: t(
             'TravOps ist einsatzbereit. Alle Module stehen dir jetzt zur Verfügung:\n\n⚔️ Einsatzplanung — koordiniere Angriffe mit Marschzeit-Kalkulator\n🛡️ Angriffserkennung — Fakes von echten Angriffen trennen\n🦸 Helden-Scout — gegnerische Ausrüstung tracken\n📊 Farming — inaktive Farmen finden\n🏥 Hospital — verwundete Truppen verwalten\n\nJedes Modul hat eine eigene Tour — einfach auf ❓ Tour klicken.',
