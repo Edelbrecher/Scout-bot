@@ -6,20 +6,81 @@
 
 <!-- ══ LOADING OVERLAY ══════════════════════════════════════════════════════ -->
 <div id="loadingOverlay" style="display:none;position:fixed;inset:0;z-index:9999;
-     background:rgba(10,10,20,0.88);backdrop-filter:blur(6px);
-     flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;">
+     background:rgba(14,14,18,0.93);backdrop-filter:blur(8px);
+     flex-direction:column;align-items:center;justify-content:center;gap:1.75rem;">
+
+  <!-- Spinning cube grid -->
+  <div class="ld-cubes">
+    <div class="ld-cube" style="--i:0;--j:0"></div>
+    <div class="ld-cube" style="--i:1;--j:0"></div>
+    <div class="ld-cube" style="--i:2;--j:0"></div>
+    <div class="ld-cube" style="--i:0;--j:1"></div>
+    <div class="ld-cube" style="--i:1;--j:1"></div>
+    <div class="ld-cube" style="--i:2;--j:1"></div>
+    <div class="ld-cube" style="--i:0;--j:2"></div>
+    <div class="ld-cube" style="--i:1;--j:2"></div>
+    <div class="ld-cube" style="--i:2;--j:2"></div>
+  </div>
+
+  <!-- Text -->
   <div style="text-align:center;">
-    <div style="font-size:3rem;margin-bottom:0.5rem;animation:spin 2s linear infinite;display:inline-block;">⚔️</div>
-    <h2 style="color:#fff;margin:0 0 0.25rem;font-size:1.4rem;" id="loadingTitle">Scouting inactive targets…</h2>
-    <p style="color:#94a3b8;margin:0;font-size:0.9rem;" id="loadingQuote"></p>
+    <h2 style="color:var(--text);margin:0 0 0.35rem;font-size:1.25rem;font-weight:600;" id="loadingTitle">Scouting inactive targets…</h2>
+    <p style="color:var(--text-muted);margin:0;font-size:0.85rem;" id="loadingQuote"></p>
   </div>
-  <div style="width:320px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
-    <div id="loadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);
-         border-radius:3px;transition:width 0.4s ease;"></div>
+
+  <!-- Progress bar -->
+  <div style="width:280px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;">
+    <div id="loadingBar" style="height:100%;width:0%;background:var(--primary);
+         border-radius:2px;transition:width 0.5s ease;"></div>
   </div>
-  <p style="color:#475569;font-size:0.75rem;margin:0;">Analyzing snapshots — hang tight</p>
 </div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<style>
+/* ── Cube loader ── */
+.ld-cubes {
+  display: grid;
+  grid-template-columns: repeat(3, 18px);
+  grid-template-rows: repeat(3, 18px);
+  gap: 5px;
+}
+.ld-cube {
+  width: 18px; height: 18px;
+  border-radius: 3px;
+  background: var(--primary);
+  animation: ldPop 1.2s ease-in-out infinite;
+  animation-delay: calc((var(--i) + var(--j) * 3) * 0.1s);
+  opacity: 0.2;
+}
+@keyframes ldPop {
+  0%, 70%, 100% { opacity: 0.15; transform: scale(0.75); }
+  35%            { opacity: 1;    transform: scale(1);    background: #818cf8; }
+}
+
+/* ── Filter inputs matching site theme ── */
+.fi-label {
+  font-size: .72rem; font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .04em;
+  margin-bottom: .3rem; display: block;
+}
+.fi-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: .82rem;
+  padding: .45rem .65rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color .15s;
+  outline: none;
+}
+.fi-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(88,101,242,.18); }
+.fi-input::placeholder { color: var(--border); }
+.fi-section { border-top: 1px solid var(--border); padding-top: .75rem; margin-top: .75rem; }
+.fi-section-label { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: .55rem; }
+.fi-grid { display: grid; gap: .6rem; }
+</style>
 
   <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
@@ -240,18 +301,8 @@
       </div>
 
       {# ── Filter Panel ── #}
-      <style>
-        .fi-label { font-size:.72rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.3rem; display:block; }
-        .fi-input { background:#0f172a; border:1px solid #1e293b; border-radius:8px; color:#e2e8f0; font-size:.82rem;
-                    padding:.45rem .65rem; width:100%; box-sizing:border-box; transition:border-color .15s; outline:none; }
-        .fi-input:focus { border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,.15); }
-        .fi-input::placeholder { color:#334155; }
-        .fi-section { border-top:1px solid #1e293b; padding-top:.75rem; margin-top:.75rem; }
-        .fi-section-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#334155; margin-bottom:.55rem; }
-        .fi-grid { display:grid; gap:.6rem; }
-      </style>
       <div id="filterPanel" style="display:{% if _filter_active %}block{% else %}none{% endif %};margin-top:.25rem;">
-        <div style="background:#0b1120;border:1px solid #1e293b;border-radius:10px;padding:1.1rem 1.25rem;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;">
           <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="filterForm">
             <input type="hidden" name="tab" value="inactive" />
             <input type="hidden" name="advanced" value="1" />
@@ -350,9 +401,9 @@
                            onchange="updateTribeChips()">
                     <span class="tribe-chip {% if tid in tribes %}active{% endif %}" data-tid="{{ tid }}"
                           style="display:inline-block;padding:.25rem .6rem;border-radius:20px;font-size:.72rem;cursor:pointer;
-                                 border:1px solid {% if tid in tribes %}var(--accent){% else %}#1e293b{% endif %};
-                                 background:{% if tid in tribes %}rgba(99,102,241,.2){% else %}#0f172a{% endif %};
-                                 color:{% if tid in tribes %}#818cf8{% else %}#475569{% endif %};">
+                                 border:1px solid {% if tid in tribes %}var(--primary){% else %}var(--border){% endif %};
+                                 background:{% if tid in tribes %}rgba(88,101,242,.2){% else %}var(--bg-input){% endif %};
+                                 color:{% if tid in tribes %}#818cf8{% else %}var(--text-muted){% endif %};">
                       {{ tlabel }}
                     </span>
                   </label>
@@ -379,7 +430,7 @@
                   {% endif %}
                 </div>
                 {% if not has_farmlist %}
-                <div style="font-size:.7rem;color:#475569;margin-top:.35rem;">⚠ No farmlist imported yet</div>
+                <div style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem;">⚠ No farmlist imported yet</div>
                 {% endif %}
               </div>
               <div style="display:flex;align-items:center;gap:1rem;margin-top:1.2rem;">

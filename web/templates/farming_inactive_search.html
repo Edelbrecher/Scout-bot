@@ -4,20 +4,28 @@
 {% block content %}
 <!-- ══ LOADING OVERLAY ══════════════════════════════════════════════════════ -->
 <div id="loadingOverlay" style="display:none;position:fixed;inset:0;z-index:9999;
-     background:rgba(10,10,20,0.88);backdrop-filter:blur(6px);
-     flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;">
+     background:rgba(14,14,18,0.93);backdrop-filter:blur(8px);
+     flex-direction:column;align-items:center;justify-content:center;gap:1.75rem;">
+  <div class="ld-cubes">
+    <div class="ld-cube" style="--i:0;--j:0"></div><div class="ld-cube" style="--i:1;--j:0"></div><div class="ld-cube" style="--i:2;--j:0"></div>
+    <div class="ld-cube" style="--i:0;--j:1"></div><div class="ld-cube" style="--i:1;--j:1"></div><div class="ld-cube" style="--i:2;--j:1"></div>
+    <div class="ld-cube" style="--i:0;--j:2"></div><div class="ld-cube" style="--i:1;--j:2"></div><div class="ld-cube" style="--i:2;--j:2"></div>
+  </div>
   <div style="text-align:center;">
-    <div style="font-size:3rem;margin-bottom:0.5rem;animation:spin 2s linear infinite;display:inline-block;">🏚️</div>
-    <h2 style="color:#fff;margin:0 0 0.25rem;font-size:1.4rem;">Searching inactive villages…</h2>
-    <p style="color:#94a3b8;margin:0;font-size:0.9rem;" id="loadingQuote"></p>
+    <h2 style="color:var(--text);margin:0 0 0.35rem;font-size:1.25rem;font-weight:600;">Searching inactive villages…</h2>
+    <p style="color:var(--text-muted);margin:0;font-size:0.85rem;" id="loadingQuote"></p>
   </div>
-  <div style="width:320px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
-    <div id="loadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);
-         border-radius:3px;transition:width 0.4s ease;"></div>
+  <div style="width:280px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;">
+    <div id="loadingBar" style="height:100%;width:0%;background:var(--primary);border-radius:2px;transition:width 0.5s ease;"></div>
   </div>
-  <p style="color:#475569;font-size:0.75rem;margin:0;">Analyzing snapshots — hang tight</p>
 </div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<style>
+.ld-cubes { display:grid; grid-template-columns:repeat(3,18px); grid-template-rows:repeat(3,18px); gap:5px; }
+.ld-cube  { width:18px; height:18px; border-radius:3px; background:var(--primary);
+            animation:ldPop 1.2s ease-in-out infinite;
+            animation-delay:calc((var(--i) + var(--j) * 3) * 0.1s); opacity:.2; }
+@keyframes ldPop { 0%,70%,100%{opacity:.15;transform:scale(.75)} 35%{opacity:1;transform:scale(1);background:#818cf8} }
+</style>
 <div class="container" style="max-width:100%;">
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;">
