@@ -11627,7 +11627,7 @@ def _is_leader(session: dict, guild_id: str) -> bool:
     uid = session.get("discord_id", "")
     if uid in ADMIN_DISCORD_IDS:
         return True
-    for g in session.get("guilds", []):
+    for g in (session.get("guilds") or []):
         if str(g.get("id")) == guild_id:
             perms = g.get("permissions_new", 0)
             try:
