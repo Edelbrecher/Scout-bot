@@ -177,9 +177,9 @@
     </div>
 
     <!-- Player tooltip popup -->
-    <div id="flowTooltip" style="display:none;position:fixed;z-index:9999;background:#1e293b;border:1px solid rgba(99,102,241,.4);border-radius:10px;padding:.75rem 1rem;font-size:.8rem;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:none;"></div>
+    <div id="flowTooltip" style="display:none;position:fixed;z-index:9999;background:#1e293b;border:1px solid rgba(99,102,241,.4);border-radius:10px;padding:.75rem 1rem;font-size:.8rem;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:auto;"></div>
 
-    <div style="font-size:.72rem;color:var(--text-muted);margin-top:.5rem;text-align:center;">Hover over an alliance to see player names · Line thickness = player count</div>
+    <div style="font-size:.72rem;color:var(--text-muted);margin-top:.5rem;text-align:center;">Click an alliance to see players · Line thickness = player count</div>
   </div>
   {% endif %}
 
@@ -385,31 +385,63 @@ function drawFlows() {
   });
 }
 
-// Tooltip on node hover
+// Click on node → show player list with links
+const GUILD_ID_AT = "{{ guild.guild_id }}";
+let activeNode = null;
+
+function showFlowTooltip(el, f, side) {
+  const players = f.players || [];
+  const dir  = side === 'in' ? '➕ Joined from' : '➖ Left to';
+  const ally = side === 'in' ? f.from_alliance : f.to_alliance;
+  const color = side === 'in' ? '#4ade80' : '#f87171';
+
+  tooltip.innerHTML =
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;gap:.75rem;">
+       <div style="font-weight:700;">${dir} <span style="color:${color};">${ally}</span></div>
+       <span onclick="tooltip.style.display='none'" style="cursor:pointer;color:#64748b;font-size:1rem;line-height:1;">✕</span>
+     </div>`
+    + players.map(p => {
+        const url = `/guild/${GUILD_ID_AT}/intel?q=${encodeURIComponent(p)}`;
+        return `<div style="padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.06);">
+          <a href="${url}" target="_blank"
+             style="color:#a5b4fc;text-decoration:none;font-size:.82rem;display:block;"
+             onmouseover="this.style.color='#c4b5fd'" onmouseout="this.style.color='#a5b4fc'">
+            👤 ${p}
+          </a>
+        </div>`;
+      }).join('')
+    + `<div style="margin-top:.5rem;font-size:.7rem;color:#475569;">Click a name to open Player Intel</div>`;
+
+  // Position near the clicked node
+  const rect = el.getBoundingClientRect();
+  const left = side === 'in' ? rect.right + 10 : rect.left - 300;
+  tooltip.style.left = Math.max(8, left) + 'px';
+  tooltip.style.top  = (rect.top + window.scrollY - 10) + 'px';
+  tooltip.style.display = 'block';
+  activeNode = el;
+}
+
 document.querySelectorAll('.flow-node').forEach(el => {
   const side = el.dataset.side;
   const idx  = parseInt(el.dataset.idx);
   const f    = side === 'in' ? FLOWS.inflows[idx] : FLOWS.outflows[idx];
   if (!f) return;
 
-  const players = (side === 'in' ? f.players : f.players) || [];
-
-  el.addEventListener('mouseenter', e => {
-    const dir    = side === 'in' ? '➕ Inflow from' : '➖ Outflow to';
-    const ally   = side === 'in' ? f.from_alliance  : f.to_alliance;
-    tooltip.innerHTML = `<div style="font-weight:700;margin-bottom:.4rem;">${dir} <span style="color:${side==='in'?'#4ade80':'#f87171'};">${ally}</span></div>`
-      + players.map(p => `<div style="padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.07);">• ${p}</div>`).join('');
-    tooltip.style.display = 'block';
+  el.style.cursor = 'pointer';
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    if (activeNode === el && tooltip.style.display !== 'none') {
+      tooltip.style.display = 'none'; activeNode = null; return;
+    }
+    showFlowTooltip(el, f, side);
   });
+});
 
-  el.addEventListener('mousemove', e => {
-    tooltip.style.left = (e.clientX + 14) + 'px';
-    tooltip.style.top  = (e.clientY - 10) + 'px';
-  });
-
-  el.addEventListener('mouseleave', () => {
-    tooltip.style.display = 'none';
-  });
+// Close tooltip on outside click
+document.addEventListener('click', e => {
+  if (!tooltip.contains(e.target)) {
+    tooltip.style.display = 'none'; activeNode = null;
+  }
 });
 
 // Draw after layout, redraw on resize
