@@ -1759,6 +1759,114 @@ async def _init_farming_tables():
             pass
 
 
+async def _init_reports_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS battle_reports (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id         TEXT NOT NULL,
+                submitted_by     TEXT NOT NULL,
+                report_type      TEXT,        -- 'attack','defense','spy','farm','market','unknown'
+                report_date      TEXT,
+                attacker_name    TEXT,
+                attacker_village TEXT,
+                attacker_x       INTEGER,
+                attacker_y       INTEGER,
+                defender_name    TEXT,
+                defender_village TEXT,
+                defender_x       INTEGER,
+                defender_y       INTEGER,
+                troops_sent_json TEXT DEFAULT '{}',
+                troops_lost_json TEXT DEFAULT '{}',
+                def_troops_json  TEXT DEFAULT '{}',
+                spy_resources_json TEXT DEFAULT '{}',
+                plunder_json     TEXT DEFAULT '{}',
+                plunder_total    INTEGER DEFAULT 0,
+                luck             REAL,
+                hero_hp          INTEGER,
+                raw_text         TEXT,
+                created_at       TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_reports_guild ON battle_reports(guild_id, created_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_reports_attacker ON battle_reports(guild_id, attacker_name)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_reports_defender ON battle_reports(guild_id, defender_name)")
+        await db.commit()
+
+
+async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> int:
+    import json as _json
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute("""
+            INSERT INTO battle_reports
+              (guild_id, submitted_by, report_type, report_date,
+               attacker_name, attacker_village, attacker_x, attacker_y,
+               defender_name, defender_village, defender_x, defender_y,
+               troops_sent_json, troops_lost_json, def_troops_json,
+               spy_resources_json, plunder_json, plunder_total,
+               luck, hero_hp, raw_text)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            guild_id, submitted_by,
+            parsed.get("report_type"), parsed.get("report_date"),
+            parsed.get("attacker_name"), parsed.get("attacker_village"),
+            parsed.get("attacker_x"), parsed.get("attacker_y"),
+            parsed.get("defender_name"), parsed.get("defender_village"),
+            parsed.get("defender_x"), parsed.get("defender_y"),
+            _json.dumps(parsed.get("troops_sent", {})),
+            _json.dumps(parsed.get("troops_lost", {})),
+            _json.dumps(parsed.get("def_troops", {})),
+            _json.dumps(parsed.get("spy_resources", {})),
+            _json.dumps(parsed.get("plunder", {})),
+            parsed.get("plunder_total", 0),
+            parsed.get("luck"), parsed.get("hero_hp"),
+            parsed.get("raw_text", ""),
+        )) as cur:
+            new_id = cur.lastrowid
+        await db.commit()
+    return new_id
+
+
+async def get_battle_reports(guild_id: str, limit: int = 100,
+                              player_name: str = "", report_type: str = "") -> list[dict]:
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        conditions = ["guild_id=?"]
+        params: list = [guild_id]
+        if player_name:
+            conditions.append("(attacker_name LIKE ? OR defender_name LIKE ?)")
+            params += [f"%{player_name}%", f"%{player_name}%"]
+        if report_type:
+            conditions.append("report_type=?")
+            params.append(report_type)
+        where = " AND ".join(conditions)
+        async with db.execute(
+            f"SELECT * FROM battle_reports WHERE {where} ORDER BY created_at DESC LIMIT ?",
+            (*params, limit)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_battle_report(report_id: int, guild_id: str) -> dict | None:
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM battle_reports WHERE id=? AND guild_id=?", (report_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def delete_battle_report(report_id: int, guild_id: str):
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM battle_reports WHERE id=? AND guild_id=?", (report_id, guild_id))
+        await db.commit()
+
+
 async def save_map_snapshot(guild_id: str, villages: list[dict]):
     from datetime import datetime as _dt
     fetched_at = _dt.utcnow().isoformat()

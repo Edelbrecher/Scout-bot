@@ -6132,6 +6132,263 @@ async def ally_join_accept(request: Request, token: str, travian_name: str = For
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Battle Report Parser
+# ---------------------------------------------------------------------------
+
+# Unit name tables — maps various spellings → canonical English key
+_UNIT_MAP: dict[str, str] = {
+    # Romans
+    "legionär": "legionnaire", "legionäre": "legionnaire", "legionnaire": "legionnaire", "legionnaires": "legionnaire",
+    "prätorianer": "praetorian", "praetorian": "praetorian", "praetorians": "praetorian",
+    "imperianer": "imperian", "imperian": "imperian", "imperians": "imperian",
+    "equites legati": "equites_legati", "späher": "equites_legati",
+    "equites imperatoris": "equites_imperatoris",
+    "equites caesaris": "equites_caesaris",
+    "feuerkatapult": "fire_catapult", "fire catapult": "fire_catapult",
+    "rammbock": "battering_ram", "battering ram": "battering_ram",
+    "senator": "senator",
+    # Teutons
+    "keulenschwinger": "clubswinger", "clubswinger": "clubswinger", "clubswingers": "clubswinger",
+    "speerkämpfer": "spearman", "spearman": "spearman", "spearmen": "spearman",
+    "axtkämpfer": "axeman", "axeman": "axeman", "axemen": "axeman",
+    "aufklärerin": "scout", "scout": "scout", "scouts": "scout",
+    "paladin": "paladin", "paladine": "paladin",
+    "teutonischer ritter": "teutonic_knight", "teutonic knight": "teutonic_knight",
+    "katapult": "catapult", "catapult": "catapult",
+    "häuptling": "chief", "chief": "chief",
+    # Gauls
+    "phalanx": "phalanx",
+    "schwertkämpfer": "swordsman", "swordsman": "swordsman", "swordsmen": "swordsman",
+    "pfadfinder": "pathfinder", "pathfinder": "pathfinder",
+    "thureophor": "thureophor", "theurophor": "thureophor",
+    "druide": "druidrider", "druidenreiter": "druidrider", "druid rider": "druidrider",
+    "haeduer": "haeduan", "haeduan": "haeduan",
+    "trebuchet": "trebuchet", "trebusche": "trebuchet",
+    # Huns
+    "mercenary": "mercenary", "söldner": "mercenary",
+    "bowman": "bowman", "bogenschütze": "bowman",
+    "spotter": "spotter",
+    "steppe rider": "steppe_rider", "steppenreiter": "steppe_rider",
+    "marksman": "marksman", "heckenschütze": "marksman",
+    "marauder": "marauder",
+    "ram": "battering_ram",
+    # Egyptians
+    "slave militia": "slave_militia", "sklavenmiliz": "slave_militia",
+    "ash warden": "ash_warden",
+    "khopesh warrior": "khopesh_warrior",
+    "sopdu explorer": "sopdu_explorer",
+    "anhur guard": "anhur_guard",
+    "resheph chariot": "resheph_chariot",
+    # Spartans
+    "hoplite": "hoplite", "hoplit": "hoplite",
+    "sentinel": "sentinel",
+    "shieldsman": "shieldsman",
+    "twinsteel thureophoros": "thureophoros",
+    "elpida rider": "elpida_rider",
+    "corinthian crusher": "corinthian_crusher",
+    # Common
+    "siedler": "settler", "settler": "settler", "settlers": "settler",
+    "held": "hero", "hero": "hero",
+}
+
+_TROOP_TABLE_MARKERS = {
+    "de": ["gesendet", "verluste", "im dorf", "angreifer", "verteidiger"],
+    "en": ["sent", "losses", "in village", "attacker", "defender"],
+}
+
+def _parse_battle_report(text: str) -> dict:
+    """Parse a pasted Travian battle/spy/farm report text.
+    Returns a dict with all extracted fields. Missing fields are None/empty.
+    """
+    import json as _json
+    from datetime import datetime as _dt
+
+    result: dict = {
+        "report_type": "unknown",
+        "report_date": None,
+        "attacker_name": None, "attacker_village": None,
+        "attacker_x": None, "attacker_y": None,
+        "defender_name": None, "defender_village": None,
+        "defender_x": None, "defender_y": None,
+        "troops_sent": {}, "troops_lost": {}, "def_troops": {},
+        "spy_resources": {}, "plunder": {}, "plunder_total": 0,
+        "luck": None, "hero_hp": None,
+        "raw_text": text,
+        "parse_warnings": [],
+    }
+
+    lines = [l.strip() for l in text.splitlines()]
+    text_lower = text.lower()
+
+    # ── Report type ────────────────────────────────────────────────────────
+    for kw, rt in [
+        (["spionage", "espionage", "spy report", "spionbericht"], "spy"),
+        (["angriff", "attack", "raid report"], "attack"),
+        (["verteidigung", "defense", "defence", "defending"], "defense"),
+        (["marktbericht", "market report", "trade report"], "market"),
+    ]:
+        if any(k in text_lower for k in kw):
+            result["report_type"] = rt
+            break
+    # Fallback: if resources plundered and no type yet, it's likely a farm
+    if result["report_type"] == "unknown" and any(k in text_lower for k in ["beute", "plunder", "loot"]):
+        result["report_type"] = "attack"
+
+    # ── Date ───────────────────────────────────────────────────────────────
+    date_re = re.compile(r'(\d{1,2})[./](\d{1,2})[./](\d{4})\s+(\d{1,2}:\d{2}:\d{2})')
+    dm = date_re.search(text)
+    if dm:
+        try:
+            result["report_date"] = f"{dm.group(3)}-{dm.group(2):>02}-{dm.group(1):>02} {dm.group(4)}"
+        except Exception:
+            pass
+
+    # ── Coordinates ────────────────────────────────────────────────────────
+    coord_re = re.compile(r'\((-?\d+)\s*\|\s*(-?\d+)\)')
+    coords = coord_re.findall(text)
+    if len(coords) >= 1:
+        result["attacker_x"] = int(coords[0][0])
+        result["attacker_y"] = int(coords[0][1])
+    if len(coords) >= 2:
+        result["defender_x"] = int(coords[1][0])
+        result["defender_y"] = int(coords[1][1])
+
+    # ── Player and village names ────────────────────────────────────────────
+    # Pattern: "Label: Name" or "Label Name" on same line, before coords
+    name_patterns = [
+        # German
+        (r'(?:Angreifer|Attacker)\s*[:\-–]?\s*(.+)', "attacker_name"),
+        (r'(?:Verteidiger|Defender)\s*[:\-–]?\s*(.+)', "defender_name"),
+        (r'(?:Herkunft|Herkunftsdorf|Origin|From|Von)\s*[:\-–]?\s*(.+)', "attacker_village_line"),
+        (r'(?:Verteidigt mit|Defending village|Village|Dorf)\s*[:\-–]?\s*(.+)', "defender_village_line"),
+    ]
+    for pattern, field in name_patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if not m:
+            continue
+        raw = m.group(1).strip()
+        # Extract name (before coordinates if present)
+        vm = coord_re.search(raw)
+        if vm:
+            name_part = raw[:vm.start()].strip().rstrip(',').strip()
+            coord_part = (int(vm.group(1)), int(vm.group(2)))
+        else:
+            name_part = raw
+            coord_part = None
+
+        if field == "attacker_name":
+            result["attacker_name"] = name_part or None
+        elif field == "defender_name":
+            result["defender_name"] = name_part or None
+        elif field == "attacker_village_line":
+            result["attacker_village"] = name_part or None
+            if coord_part:
+                result["attacker_x"], result["attacker_y"] = coord_part
+        elif field == "defender_village_line":
+            result["defender_village"] = name_part or None
+            if coord_part:
+                result["defender_x"], result["defender_y"] = coord_part
+
+    # ── Resources / Plunder ────────────────────────────────────────────────
+    res_pattern = re.compile(
+        r'(?:Holz|Wood|Lumber)[:\s]+(\d[\d\.,]*)'
+        r'.*?(?:Lehm|Ton|Clay)[:\s]+(\d[\d\.,]*)'
+        r'.*?(?:Eisen|Iron)[:\s]+(\d[\d\.,]*)'
+        r'.*?(?:Getreide|Crop|Grain|Korn)[:\s]+(\d[\d\.,]*)',
+        re.IGNORECASE | re.DOTALL
+    )
+    # Also catch inline format: "1500 500 200 100" after resource header
+    for m in res_pattern.finditer(text):
+        def _ri(s): return int(s.replace('.', '').replace(',', ''))
+        w, c, i, g = _ri(m.group(1)), _ri(m.group(2)), _ri(m.group(3)), _ri(m.group(4))
+        ctx = text[max(0, m.start()-50):m.start()].lower()
+        if any(k in ctx for k in ["spion", "spy", "rohstoff", "resource", "im dorf", "in village", "lager", "warehouse"]):
+            result["spy_resources"] = {"wood": w, "clay": c, "iron": i, "crop": g, "total": w+c+i+g}
+            if result["report_type"] == "unknown":
+                result["report_type"] = "spy"
+        else:
+            result["plunder"] = {"wood": w, "clay": c, "iron": i, "crop": g}
+            result["plunder_total"] = w + c + i + g
+
+    # Fallback: single total plunder line  e.g. "Beute: 3500"
+    if not result["plunder"]:
+        m2 = re.search(r'(?:Beute|Plunder|Loot)\s*:?\s*(\d[\d\.]*)\b', text, re.IGNORECASE)
+        if m2:
+            result["plunder_total"] = int(m2.group(1).replace('.', ''))
+
+    # ── Luck ───────────────────────────────────────────────────────────────
+    luck_m = re.search(
+        r'(?:Glück|Luck)\s*[:\s]*(?:↑|↓|[+-])?\s*([+-]?\d+(?:[.,]\d+)?)\s*%',
+        text, re.IGNORECASE
+    )
+    if luck_m:
+        try:
+            result["luck"] = float(luck_m.group(1).replace(',', '.'))
+        except Exception:
+            pass
+
+    # ── Hero HP ────────────────────────────────────────────────────────────
+    hero_m = re.search(r'(?:Held|Hero)\s*.*?(\d+)\s*%', text, re.IGNORECASE)
+    if hero_m:
+        try:
+            result["hero_hp"] = int(hero_m.group(1))
+        except Exception:
+            pass
+
+    # ── Troop table parsing ────────────────────────────────────────────────
+    # Strategy: find header row with unit names, then parse values rows below it
+    def _parse_troop_table(text: str) -> dict[str, dict[str, int]]:
+        """Returns {"sent": {...}, "lost": {...}, "def": {...}}"""
+        out: dict[str, dict] = {"sent": {}, "lost": {}, "def": {}}
+        # Normalise: split into lines, collapse whitespace runs
+        lines = [re.sub(r'\s{2,}', '\t', l.strip()) for l in text.splitlines() if l.strip()]
+
+        unit_header: list[str] = []
+        for i, line in enumerate(lines):
+            parts = [p.strip() for p in re.split(r'\t+', line) if p.strip()]
+            # Detect header line: most parts match known unit names
+            mapped = [_UNIT_MAP.get(p.lower()) for p in parts]
+            hit_count = sum(1 for m in mapped if m)
+            if hit_count >= 2:
+                unit_header = [_UNIT_MAP.get(p.lower(), p.lower()) for p in parts]
+                # Next lines are value rows — read up to 4
+                for j in range(i + 1, min(i + 8, len(lines))):
+                    vline = lines[j]
+                    vparts = [p.strip() for p in re.split(r'\t+', vline) if p.strip()]
+                    if not vparts:
+                        continue
+                    row_label = vparts[0].lower()
+                    nums = []
+                    for p in vparts[1:]:
+                        try:
+                            nums.append(int(p.replace('.', '').replace(',', '').replace('−', '-')))
+                        except Exception:
+                            nums.append(None)
+
+                    dest = None
+                    if any(k in row_label for k in ["gesendet", "sent", "geschickt"]):
+                        dest = "sent"
+                    elif any(k in row_label for k in ["verluste", "losses", "loss"]):
+                        dest = "lost"
+                    elif any(k in row_label for k in ["im dorf", "in village", "verteidiger", "defender"]):
+                        dest = "def"
+
+                    if dest is not None:
+                        for ui, unit in enumerate(unit_header):
+                            if ui < len(nums) and nums[ui] is not None and nums[ui] > 0:
+                                out[dest][unit] = out[dest].get(unit, 0) + nums[ui]
+                break  # found first troop table, stop
+        return out
+
+    troop_data = _parse_troop_table(text)
+    result["troops_sent"] = troop_data["sent"]
+    result["troops_lost"] = troop_data["lost"]
+    result["def_troops"]  = troop_data["def"]
+
+    return result
+
+
 # Routes — Farmlist-Analyst (Feature 4)
 # ---------------------------------------------------------------------------
 
@@ -8945,6 +9202,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "list",      "label": "Farmlist Analyst","url_suffix": "/farmlist-analyst"},
     {"type": "group", "label": "Scouting"},
     {"type": "item",  "icon": "search",    "label": "Player Intel",       "url_suffix": "/intel"},
+    {"type": "item",  "icon": "scroll",    "label": "Battle Reports",     "url_suffix": "/reports"},
     {"type": "item",  "icon": "eye",       "label": "Scout Tracking",     "url_suffix": "/scout"},
     {"type": "item",  "icon": "shield",    "label": "Hero Scout",         "url_suffix": "/defense/hero-scout"},
     {"type": "item",  "icon": "alert",     "label": "Scout Incidents",    "url_suffix": "/scout-incidents"},
@@ -11882,6 +12140,90 @@ async def download_extension():
 # ---------------------------------------------------------------------------
 # Routes — Player Intelligence (enemy player lookup)
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Battle Reports
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/reports", response_class=HTMLResponse)
+async def reports_page(request: Request, guild_id: str,
+                       q: str = "", rtype: str = "", page: int = 1):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    reports = await database.get_battle_reports(guild_id, limit=100,
+                                                player_name=q, report_type=rtype)
+    import json as _json
+    for r in reports:
+        for jf in ("troops_sent_json", "troops_lost_json", "def_troops_json",
+                   "spy_resources_json", "plunder_json"):
+            try:
+                r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
+            except Exception:
+                r[jf.replace("_json", "")] = {}
+
+    return templates.TemplateResponse("reports.html", {
+        "request": request, "guild": guild,
+        "reports": reports, "q": q, "rtype": rtype,
+    })
+
+
+@app.post("/guild/{guild_id}/reports/submit", response_class=HTMLResponse)
+async def report_submit(request: Request, guild_id: str,
+                        report_text: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "") or session.get("discord_id", "")
+
+    text = report_text.strip()
+    if not text:
+        return RedirectResponse(f"/guild/{guild_id}/reports?error=empty", status_code=303)
+
+    parsed = _parse_battle_report(text)
+    report_id = await database.save_battle_report(guild_id, uid, parsed)
+    return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
+
+
+@app.get("/guild/{guild_id}/reports/{report_id}", response_class=HTMLResponse)
+async def report_detail(request: Request, guild_id: str, report_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    r = await database.get_battle_report(report_id, guild_id)
+    if not r:
+        return RedirectResponse(f"/guild/{guild_id}/reports", status_code=303)
+
+    import json as _json
+    for jf in ("troops_sent_json", "troops_lost_json", "def_troops_json",
+               "spy_resources_json", "plunder_json"):
+        try:
+            r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
+        except Exception:
+            r[jf.replace("_json", "")] = {}
+
+    return templates.TemplateResponse("report_detail.html", {
+        "request": request, "guild": guild, "report": r,
+    })
+
+
+@app.post("/guild/{guild_id}/reports/{report_id}/delete")
+async def report_delete(request: Request, guild_id: str, report_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    await database.delete_battle_report(report_id, guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/reports", status_code=303)
+
 
 @app.get("/guild/{guild_id}/intel", response_class=HTMLResponse)
 async def player_intel_page(request: Request, guild_id: str, q: str = ""):

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Battle Reports · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1200px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1 style="margin:.2rem 0 .15rem;">📋 Battle Reports</h1>
+      <p class="subtitle" style="margin:0;">Paste Travian reports · track fights, loot &amp; spy results</p>
+    </div>
+    <button onclick="togglePaste()"
+            style="background:var(--primary);color:#fff;border:none;border-radius:8px;
+                   padding:.55rem 1.1rem;font-size:.88rem;cursor:pointer;font-weight:600;">
+      + Add report
+    </button>
+  </div>
+
+  <!-- ── Paste panel ── -->
+  <div id="pastePanel" style="display:none;margin-bottom:1.25rem;">
+    <div class="card" style="padding:1.25rem;border-color:rgba(88,101,242,.4);">
+      <div style="font-size:.95rem;font-weight:600;margin-bottom:.5rem;">📋 Paste report text</div>
+      <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .85rem;">
+        Open the report in Travian, select all text (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.<br>
+        Works for battle reports, spy reports and farm reports — German &amp; English.
+      </p>
+      <form method="post" action="/guild/{{ guild.guild_id }}/reports/submit">
+        <textarea name="report_text" rows="10" autofocus
+                  style="width:100%;background:var(--bg-input);border:1px solid var(--border);
+                         border-radius:8px;padding:.65rem .85rem;color:var(--text);
+                         font-size:.8rem;font-family:monospace;resize:vertical;box-sizing:border-box;"
+                  placeholder="Paste Travian report here…"></textarea>
+        <div style="display:flex;gap:.6rem;margin-top:.75rem;">
+          <button type="submit" class="btn btn-primary">🔍 Parse &amp; save</button>
+          <button type="button" onclick="togglePaste()" class="btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Filter bar ── -->
+  <form method="get" action="/guild/{{ guild.guild_id }}/reports"
+        style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search player…"
+           style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;
+                  color:var(--text);font-size:.82rem;padding:.4rem .7rem;min-width:180px;">
+    <select name="rtype"
+            style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;
+                   color:var(--text);font-size:.82rem;padding:.4rem .7rem;">
+      <option value="" {% if not rtype %}selected{% endif %}>All types</option>
+      <option value="attack"  {% if rtype=='attack'  %}selected{% endif %}>⚔️ Attack</option>
+      <option value="defense" {% if rtype=='defense' %}selected{% endif %}>🛡️ Defense</option>
+      <option value="spy"     {% if rtype=='spy'     %}selected{% endif %}>👁️ Spy</option>
+      <option value="market"  {% if rtype=='market'  %}selected{% endif %}>🏪 Market</option>
+    </select>
+    <button type="submit" class="btn" style="font-size:.82rem;">Search</button>
+    {% if q or rtype %}
+    <a href="/guild/{{ guild.guild_id }}/reports" class="btn" style="font-size:.82rem;">✕ Clear</a>
+    {% endif %}
+  </form>
+
+  <!-- ── Reports list ── -->
+  {% if reports %}
+  <div style="display:flex;flex-direction:column;gap:.5rem;">
+    {% for r in reports %}
+    {% set rt_icon = {'attack':'⚔️','defense':'🛡️','spy':'👁️','farm':'🌾','market':'🏪'}.get(r.report_type, '📋') %}
+    {% set rt_color = {'attack':'#f87171','defense':'#60a5fa','spy':'#a78bfa','farm':'#86efac','market':'#fbbf24'}.get(r.report_type, 'var(--text-muted)') %}
+    <a href="/guild/{{ guild.guild_id }}/reports/{{ r.id }}"
+       style="text-decoration:none;display:block;">
+      <div class="card" style="padding:.75rem 1rem;display:flex;align-items:center;gap:1rem;
+                               transition:border-color .15s;"
+           onmouseover="this.style.borderColor='var(--primary)'"
+           onmouseout="this.style.borderColor='var(--border)'">
+
+        <!-- Type badge -->
+        <div style="width:42px;height:42px;border-radius:8px;display:flex;align-items:center;
+                    justify-content:center;font-size:1.3rem;flex-shrink:0;
+                    background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.2);">
+          {{ rt_icon }}
+        </div>
+
+        <!-- Main info -->
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;">
+            <span style="font-weight:600;font-size:.9rem;color:{{ rt_color }};">
+              {{ r.report_type | title if r.report_type else 'Report' }}
+            </span>
+            {% if r.attacker_name %}
+            <span style="font-size:.82rem;color:var(--text);">{{ r.attacker_name }}</span>
+            <span style="color:var(--text-muted);font-size:.78rem;">→</span>
+            {% endif %}
+            {% if r.defender_name %}
+            <span style="font-size:.82rem;color:var(--text);">{{ r.defender_name }}</span>
+            {% endif %}
+            {% if r.defender_x is not none %}
+            <span style="font-size:.75rem;color:var(--text-muted);font-family:monospace;">
+              ({{ r.defender_x }}|{{ r.defender_y }})
+            </span>
+            {% endif %}
+          </div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;display:flex;gap:1rem;flex-wrap:wrap;">
+            {% if r.report_date %}<span>🕐 {{ r.report_date[:16] }}</span>{% endif %}
+            {% if r.plunder_total and r.plunder_total > 0 %}
+            <span style="color:#86efac;">📦 +{{ "{:,}".format(r.plunder_total) }} res</span>
+            {% endif %}
+            {% if r.luck is not none %}
+            <span style="color:{% if r.luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
+              {{ '↑' if r.luck >= 0 else '↓' }} {{ r.luck | abs }}% luck
+            </span>
+            {% endif %}
+            {% if r.spy_resources %}
+            {% set sr = r.spy_resources %}
+            {% if sr.total %}<span>🔍 {{ "{:,}".format(sr.total) }} res in village</span>{% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Troops lost mini-display -->
+        {% set tl = r.troops_lost %}
+        {% if tl %}
+        <div style="font-size:.72rem;color:#f87171;text-align:right;flex-shrink:0;">
+          {% set total_lost = tl.values() | sum %}
+          <div style="font-weight:600;">-{{ total_lost }} troops</div>
+          <div style="color:var(--text-muted);">lost</div>
+        </div>
+        {% endif %}
+
+        <div style="color:var(--text-muted);font-size:.75rem;flex-shrink:0;">
+          {{ r.created_at[:10] if r.created_at else '' }}
+        </div>
+        <div style="color:var(--text-muted);">›</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="card" style="padding:3rem;text-align:center;">
+    <div style="font-size:3rem;margin-bottom:.75rem;">📋</div>
+    <div style="font-weight:600;font-size:1.1rem;margin-bottom:.4rem;">No reports yet</div>
+    <p style="color:var(--text-muted);font-size:.875rem;margin:0 0 1rem;">
+      Paste your first Travian battle or spy report to get started.
+    </p>
+    <button onclick="togglePaste()" class="btn btn-primary">+ Add first report</button>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function togglePaste() {
+  const p = document.getElementById('pastePanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display !== 'none') p.querySelector('textarea').focus();
+}
+{% if request.query_params.get('error') == 'empty' %}
+togglePaste();
+{% endif %}
+</script>
+{% endblock %}
