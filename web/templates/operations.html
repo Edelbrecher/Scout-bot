@@ -357,7 +357,8 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Troops</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)">🔍 Check</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('hero',this);loadHeroActions()">🦸 Hero</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('stats',this);loadStats()">📊 Evaluation</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('live',this);startLive()">🔴 Live</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('report',this);loadReport()">📊 Report</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
               </div>
 
@@ -422,11 +423,30 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div id="heroActionsContent"><div style="color:var(--text-muted);font-size:.82rem;">No hero tasks assigned.</div></div>
               </div>
 
-              <!-- Statistics / Evaluation -->
+              <!-- Statistics / Evaluation (kept for compat) -->
               <div class="op-panel-body" id="panel-stats" style="display:none;">
                 <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">Confirmation status of all attackers after landing.</div>
                 <button class="btn btn-primary" style="width:100%;margin-bottom:.75rem;" onclick="loadStats()">🔄 Refresh</button>
                 <div id="statsContent"><div style="color:var(--text-muted);font-size:.82rem;">No data yet.</div></div>
+              </div>
+
+              <!-- 🔴 Live Board -->
+              <div class="op-panel-body" id="panel-live" style="display:none;padding:.5rem;">
+                <div id="liveAlerts"></div>
+                <div id="liveMeta" style="font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem;display:flex;justify-content:space-between;">
+                  <span id="liveTitle">—</span>
+                  <span id="liveUpdated">—</span>
+                </div>
+                <div id="liveBoard"><div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1.5rem;">Select an active plan to see live status.</div></div>
+              </div>
+
+              <!-- 📊 Report -->
+              <div class="op-panel-body" id="panel-report" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
+                  <span style="font-size:.78rem;color:var(--text-muted);">Post-operation analysis</span>
+                  <button class="btn btn-secondary" style="font-size:.72rem;padding:.15rem .5rem;" onclick="loadReport()">🔄</button>
+                </div>
+                <div id="reportContent"><div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">No data yet.</div></div>
               </div>
 
               <!-- Msg Log -->
@@ -2753,10 +2773,12 @@ async function refreshPlanList() {
 
 function switchPanel(name, el) {
   document.querySelectorAll('.op-panel-tab').forEach(t=>t.classList.remove('active'));
-  ['info','favs','members','check','hero','stats','msglog'].forEach(n => {
-    document.getElementById('panel-'+n).style.display = n===name ? 'block' : 'none';
+  ['info','favs','members','check','hero','stats','live','report','msglog'].forEach(n => {
+    const p = document.getElementById('panel-'+n);
+    if (p) p.style.display = n===name ? 'block' : 'none';
   });
   if (el) el.classList.add('active');
+  if (name !== 'live') stopLive();
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -3297,6 +3319,273 @@ function _drawOpMapContent(canvas, ctx) {
   // ── Escape key ───────────────────────────────────────────────────────────
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeOpMap(); });
 })();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 🔴 LIVE BOARD
+// ══════════════════════════════════════════════════════════════════════════════
+let _liveTimer = null;
+let _liveActive = false;
+
+function startLive() {
+  _liveActive = true;
+  pollLive();
+}
+
+function stopLive() {
+  _liveActive = false;
+  if (_liveTimer) { clearTimeout(_liveTimer); _liveTimer = null; }
+}
+
+async function pollLive() {
+  if (!_liveActive || !activePlanId) return;
+  try {
+    const data = await apiFetch(`/plans/${activePlanId}/live`);
+    renderLiveBoard(data);
+  } catch(e) {
+    document.getElementById('liveBoard').innerHTML =
+      `<div style="color:#f87171;font-size:.82rem;">Error loading live data: ${e.message}</div>`;
+  }
+  if (_liveActive) _liveTimer = setTimeout(pollLive, 5000);
+}
+
+function renderLiveBoard(data) {
+  const now = Date.now();
+  const targets = data.targets || [];
+  const planStatus = data.status || '';
+
+  // ── Overdue alerts ──
+  const overdue = [];
+  targets.forEach(t => {
+    t.waves.forEach(w => {
+      if (!w.confirm_status && w.send_time) {
+        const sendMs = new Date(w.send_time + 'Z').getTime();
+        if (sendMs < now - 120000) { // 2 min past send time, no confirm
+          overdue.push({ target: t.name, attacker: w.attacker_name, send_time: w.send_time });
+        }
+      }
+    });
+  });
+
+  const alertEl = document.getElementById('liveAlerts');
+  if (overdue.length) {
+    alertEl.innerHTML = `<div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:.6rem .85rem;margin-bottom:.5rem;font-size:.8rem;">
+      <div style="font-weight:700;color:#f87171;margin-bottom:.35rem;">⚠️ ${overdue.length} wave${overdue.length>1?'s':''} overdue — no confirmation!</div>
+      ${overdue.map(o=>`<div style="color:#fca5a5;">❌ <strong>${escHtml(o.attacker)}</strong> → ${escHtml(o.target)} (was ${fmtSendTime(o.send_time)})</div>`).join('')}
+    </div>`;
+  } else {
+    alertEl.innerHTML = '';
+  }
+
+  // ── Meta ──
+  document.getElementById('liveTitle').textContent = data.plan_name || '';
+  document.getElementById('liveUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+  // ── Board ──
+  if (!targets.length) {
+    document.getElementById('liveBoard').innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1.5rem;">No targets in this plan.</div>';
+    return;
+  }
+
+  const waveTypeColor = { real:'#f87171', fake:'#a78bfa', scout:'#60a5fa', siege:'#fb923c' };
+
+  let html = '';
+  targets.forEach(t => {
+    const waves = t.waves || [];
+    const total = waves.length;
+    const confirmed = waves.filter(w => w.confirm_status === 'on_time' || w.confirm_status === 'late').length;
+    const failed = waves.filter(w => w.confirm_status === 'not_sent' || w.confirm_status === 'cant_send').length;
+    const pct = total ? Math.round(confirmed / total * 100) : 0;
+
+    html += `<div style="margin-bottom:.85rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem .75rem;background:rgba(255,255,255,.04);border-bottom:1px solid var(--border);">
+        <span style="font-weight:700;font-size:.85rem;">🎯 ${escHtml(t.name)} <span style="font-family:monospace;font-size:.73rem;color:var(--text-muted);">(${t.x}|${t.y})</span></span>
+        <span style="font-size:.72rem;color:${failed>0?'#f87171':confirmed===total&&total>0?'#4ade80':'#fbbf24'};">
+          ${confirmed}/${total} sent${failed>0?' · '+failed+' ❌':''}
+        </span>
+      </div>`;
+
+    if (!waves.length) {
+      html += `<div style="padding:.5rem .75rem;font-size:.78rem;color:var(--text-muted);">No waves assigned</div>`;
+    } else {
+      html += `<table style="width:100%;border-collapse:collapse;font-size:.78rem;">`;
+      waves.forEach(w => {
+        const sendMs = w.send_time ? new Date(w.send_time + 'Z').getTime() : 0;
+        const diffMs = sendMs - now;
+        const cs = w.confirm_status;
+        let statusHtml = '';
+        let rowBg = '';
+        if (cs === 'on_time')    { statusHtml = `<span style="color:#4ade80;">✅ Sent</span>`; rowBg = 'rgba(74,222,128,.04)'; }
+        else if (cs === 'late')  { statusHtml = `<span style="color:#fbbf24;">⏱ Late</span>`; rowBg = 'rgba(251,191,36,.05)'; }
+        else if (cs === 'not_sent' || cs === 'cant_send') {
+          statusHtml = `<span style="color:#f87171;">❌ Not sent</span>`; rowBg = 'rgba(239,68,68,.06)';
+        } else if (sendMs && diffMs < 0 && diffMs > -120000) {
+          statusHtml = `<span style="color:#fb923c;animation:pulse 1s infinite;">🔶 Confirm?</span>`; rowBg = 'rgba(251,146,60,.06)';
+        } else if (sendMs && diffMs < 0) {
+          statusHtml = `<span style="color:#f87171;">🔴 Overdue</span>`; rowBg = 'rgba(239,68,68,.08)';
+        } else if (sendMs && diffMs < 60000) {
+          statusHtml = `<span style="color:#f87171;font-weight:700;animation:pulse 1s infinite;">⏰ ${fmtCountdown(diffMs)}</span>`; rowBg = 'rgba(239,68,68,.05)';
+        } else if (sendMs && diffMs < 300000) {
+          statusHtml = `<span style="color:#fbbf24;font-weight:700;">⏳ ${fmtCountdown(diffMs)}</span>`; rowBg = 'rgba(251,191,36,.03)';
+        } else {
+          statusHtml = `<span style="color:var(--text-muted);">${sendMs ? fmtCountdown(diffMs) : '—'}</span>`;
+        }
+        const typeColor = waveTypeColor[w.wave_type] || '#9ca3af';
+        html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);background:${rowBg};">
+          <td style="padding:.3rem .75rem;width:36px;"><span style="font-size:.68rem;font-weight:700;color:${typeColor};">${w.wave_type.toUpperCase().slice(0,1)}</span></td>
+          <td style="padding:.3rem .4rem;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(w.attacker_name)}</td>
+          <td style="padding:.3rem .4rem;font-family:monospace;font-size:.73rem;color:var(--text-muted);">${fmtSendTime(w.send_time)}</td>
+          <td style="padding:.3rem .75rem;text-align:right;">${statusHtml}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+    }
+    html += `</div>`;
+  });
+
+  document.getElementById('liveBoard').innerHTML = html;
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return '0:00';
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${String(m%60).padStart(2,'0')}m`;
+  return `${m}:${String(s%60).padStart(2,'0')}`;
+}
+
+function fmtSendTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch(e) { return iso; }
+}
+
+// Stop live when switching away
+const _origSwitchPanel = typeof switchPanel === 'function' ? switchPanel : null;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📊 POST-OP REPORT
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadReport() {
+  if (!activePlanId) return;
+  const el = document.getElementById('reportContent');
+  el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">⏳ Loading…</div>';
+  try {
+    const data = await apiFetch(`/plans/${activePlanId}/live`);
+    el.innerHTML = buildReport(data);
+  } catch(e) {
+    el.innerHTML = `<div style="color:#f87171;font-size:.82rem;">Error: ${e.message}</div>`;
+  }
+}
+
+function buildReport(data) {
+  const targets = data.targets || [];
+  const allWaves = targets.flatMap(t => t.waves.map(w => ({...w, targetName: t.name})));
+  if (!allWaves.length) return '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">No waves in this plan yet.</div>';
+
+  const total      = allWaves.length;
+  const sent       = allWaves.filter(w => w.confirm_status === 'on_time' || w.confirm_status === 'late').length;
+  const onTime     = allWaves.filter(w => w.confirm_status === 'on_time').length;
+  const late       = allWaves.filter(w => w.confirm_status === 'late').length;
+  const notSent    = allWaves.filter(w => w.confirm_status === 'not_sent' || w.confirm_status === 'cant_send').length;
+  const pending    = allWaves.filter(w => !w.confirm_status).length;
+  const sentPct    = total ? Math.round(sent / total * 100) : 0;
+
+  // Per-player breakdown
+  const byPlayer = {};
+  allWaves.forEach(w => {
+    if (!byPlayer[w.attacker_name]) byPlayer[w.attacker_name] = { total:0, sent:0, late:0, not_sent:0, pending:0 };
+    const p = byPlayer[w.attacker_name];
+    p.total++;
+    if (w.confirm_status === 'on_time') { p.sent++; }
+    else if (w.confirm_status === 'late') { p.sent++; p.late++; }
+    else if (w.confirm_status === 'not_sent' || w.confirm_status === 'cant_send') { p.not_sent++; }
+    else { p.pending++; }
+  });
+
+  // Per-target coverage
+  const byTarget = targets.map(t => {
+    const tw = t.waves;
+    const ts = tw.filter(w => w.confirm_status === 'on_time' || w.confirm_status === 'late').length;
+    const tf = tw.filter(w => w.confirm_status === 'not_sent' || w.confirm_status === 'cant_send').length;
+    return { name: t.name, x: t.x, y: t.y, total: tw.length, sent: ts, failed: tf };
+  });
+
+  const barColor = sentPct >= 80 ? '#4ade80' : sentPct >= 50 ? '#fbbf24' : '#f87171';
+
+  let html = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.85rem;">
+    <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:.6rem .75rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:900;color:#4ade80;">${sent}</div>
+      <div style="font-size:.65rem;color:#4ade80;">✅ Sent</div>
+    </div>
+    <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:.6rem .75rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:900;color:#f87171;">${notSent}</div>
+      <div style="font-size:.65rem;color:#f87171;">❌ Not sent</div>
+    </div>
+    <div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:.6rem .75rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:900;color:#fbbf24;">${late}</div>
+      <div style="font-size:.65rem;color:#fbbf24;">⏱ Late</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:900;color:var(--text-muted);">${pending}</div>
+      <div style="font-size:.65rem;color:var(--text-muted);">⏳ Pending</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:.85rem;">
+    <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.25rem;">
+      <span>Send rate</span><span style="font-weight:700;color:${barColor};">${sentPct}%</span>
+    </div>
+    <div style="height:7px;background:var(--border);border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:${sentPct}%;background:${barColor};border-radius:4px;transition:width .4s;"></div>
+    </div>
+  </div>
+
+  <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:.75rem 0 .35rem;">👥 Per Player</div>
+  <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:.85rem;">`;
+
+  Object.entries(byPlayer).sort((a,b) => b[1].sent - a[1].sent).forEach(([name, p]) => {
+    const pPct = p.total ? Math.round(p.sent / p.total * 100) : 0;
+    const pColor = p.not_sent > 0 ? '#f87171' : p.late > 0 ? '#fbbf24' : '#4ade80';
+    html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem;background:rgba(255,255,255,.03);border-radius:5px;">
+      <span style="flex:1;font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span>
+      <span style="font-size:.72rem;color:var(--text-muted);">${p.sent}/${p.total}</span>
+      ${p.not_sent > 0 ? `<span style="font-size:.7rem;color:#f87171;">❌${p.not_sent}</span>` : ''}
+      ${p.pending > 0  ? `<span style="font-size:.7rem;color:var(--text-muted);">⏳${p.pending}</span>` : ''}
+      <div style="width:40px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0;">
+        <div style="height:100%;width:${pPct}%;background:${pColor};"></div>
+      </div>
+    </div>`;
+  });
+
+  html += `</div>
+  <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:.75rem 0 .35rem;">🎯 Per Target</div>
+  <div style="display:flex;flex-direction:column;gap:2px;">`;
+
+  byTarget.forEach(t => {
+    const tColor = t.failed > 0 ? '#f87171' : t.sent === t.total && t.total > 0 ? '#4ade80' : 'var(--text-muted)';
+    html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem;background:rgba(255,255,255,.03);border-radius:5px;">
+      <span style="flex:1;font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.name)}</span>
+      <span style="font-family:monospace;font-size:.68rem;color:var(--text-muted);">${t.x}|${t.y}</span>
+      <span style="font-size:.72rem;color:${tColor};">${t.sent}/${t.total}</span>
+      ${t.failed > 0 ? `<span style="font-size:.7rem;color:#f87171;">❌</span>` : t.sent === t.total && t.total > 0 ? `<span style="color:#4ade80;font-size:.7rem;">✅</span>` : ''}
+    </div>`;
+  });
+
+  html += `</div>`;
+  return html;
+}
+
+// Pulse animation for urgent waves
+if (!document.getElementById('_liveStyle')) {
+  const s = document.createElement('style');
+  s.id = '_liveStyle';
+  s.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}';
+  document.head.appendChild(s);
+}
 
 function opMapPopout(){
   if(!activePlan) return;

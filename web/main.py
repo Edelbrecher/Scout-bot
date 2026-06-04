@@ -7336,6 +7336,42 @@ async def op_confirm_wave(
     return _JSONResponse({"ok": True})
 
 
+@app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/live")
+async def op_live_status(request: Request, guild_id: str, plan_id: int):
+    """Lightweight live-status endpoint — returns wave statuses + send times only."""
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    plan = await database.get_op_plan(plan_id, guild_id)
+    if not plan:
+        return _JSONResponse({"error": "not found"}, status_code=404)
+    targets = await database.get_op_targets(plan_id, guild_id)
+    now_utc = __import__('datetime').datetime.utcnow().isoformat()
+    result = []
+    for t in targets:
+        waves = await database.get_op_waves(t["id"], guild_id)
+        result.append({
+            "id":          t["id"],
+            "name":        t.get("target_name",""),
+            "x":           t.get("x"),
+            "y":           t.get("y"),
+            "waves": [{
+                "id":             w["id"],
+                "attacker_name":  w.get("attacker_name",""),
+                "send_time":      w.get("send_time",""),
+                "arrival_time":   w.get("arrival_time",""),
+                "wave_type":      w.get("wave_type","real"),
+                "confirm_status": w.get("confirm_status",""),
+            } for w in waves]
+        })
+    return _JSONResponse({
+        "plan_id":    plan_id,
+        "plan_name":  plan.get("name",""),
+        "status":     plan.get("status",""),
+        "server_now": now_utc,
+        "targets":    result,
+    })
+
+
 @app.get("/guild/{guild_id}/operations/api/my-waves")
 async def op_my_waves(request: Request, guild_id: str):
     session, err = await _op_api_guard(request, guild_id)
