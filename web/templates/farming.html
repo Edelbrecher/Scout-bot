@@ -533,28 +533,41 @@
                 {% elif vt == 6 %}6
                 {% else %}—{% endif %}
               </td>
-              {# Account growth Δ7d #}
-              <td style="font-size:.78rem;text-align:right;">
+              {# Account growth Δ7d — arrow style #}
+              <td style="text-align:center;">
                 {% set pg = player_growth.get(farm.player_name, {}) %}
-                {% set delta = pg.get('delta', 0) %}
-                {% if delta > 0 %}<span style="color:#f87171;">+{{ delta }}</span>
-                {% elif delta < 0 %}<span style="color:#22c55e;">{{ delta }}</span>
-                {% elif pg %}<span style="color:var(--text-muted);">±0</span>
-                {% else %}—{% endif %}
+                {% set adelta = pg.get('delta', 0) %}
+                {% if not pg %}
+                  <span style="color:#1e293b;font-size:.8rem;">·</span>
+                {% elif adelta > 50 %}
+                  <span title="+{{ adelta }}" style="color:#ef4444;font-size:1rem;font-weight:700;">↑↑</span>
+                {% elif adelta > 0 %}
+                  <span title="+{{ adelta }}" style="color:#f87171;font-size:1rem;">↑</span>
+                {% elif adelta == 0 %}
+                  <span title="0" style="color:#475569;font-size:1rem;">→</span>
+                {% elif adelta >= -50 %}
+                  <span title="{{ adelta }}" style="color:#86efac;font-size:1rem;">↓</span>
+                {% else %}
+                  <span title="{{ adelta }}" style="color:#22c55e;font-size:1rem;font-weight:700;">↓↓</span>
+                {% endif %}
               </td>
-              {# Pop delta columns Δ1d … Δ14d #}
+              {# Pop delta columns Δ1d … Δ14d — arrow indicators #}
               {% set fd = pop_deltas.get((farm.x, farm.y), {}) %}
               {% for n in [1, 2, 3, 5, 7, 14] %}
               {% set dv = fd.get(n) %}
-              <td style="text-align:right;font-size:.75rem;padding:0 6px;">
+              <td style="text-align:center;padding:0 4px;">
                 {% if dv is none %}
-                  <span style="color:#334155;">—</span>
-                {% elif dv == 0 %}
-                  <span style="color:#64748b;">0</span>
+                  <span style="color:#1e293b;font-size:.8rem;">·</span>
+                {% elif dv > 20 %}
+                  <span title="+{{ dv }}" style="color:#ef4444;font-size:1rem;font-weight:700;line-height:1;">↑↑</span>
                 {% elif dv > 0 %}
-                  <span style="color:#f87171;background:rgba(248,113,113,.1);border-radius:3px;padding:1px 4px;">+{{ dv }}</span>
+                  <span title="+{{ dv }}" style="color:#f87171;font-size:1rem;line-height:1;">↑</span>
+                {% elif dv == 0 %}
+                  <span title="0" style="color:#475569;font-size:1rem;line-height:1;">→</span>
+                {% elif dv >= -20 %}
+                  <span title="{{ dv }}" style="color:#86efac;font-size:1rem;line-height:1;">↓</span>
                 {% else %}
-                  <span style="color:#22c55e;background:rgba(34,197,94,.1);border-radius:3px;padding:1px 4px;">{{ dv }}</span>
+                  <span title="{{ dv }}" style="color:#22c55e;font-size:1rem;font-weight:700;line-height:1;">↓↓</span>
                 {% endif %}
               </td>
               {% endfor %}
