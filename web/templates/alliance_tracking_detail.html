@@ -9,18 +9,42 @@
 .ev-join    { background:rgba(34,197,94,.07);  border-left:3px solid #4ade80; }
 .ev-leave   { background:rgba(239,68,68,.07);  border-left:3px solid #f87171; }
 .ev-deleted { background:rgba(100,116,139,.08);border-left:3px solid #64748b; }
-.ev-date { font-size:.7rem; color:var(--text-muted); min-width:75px; }
+.ev-date  { font-size:.7rem; color:var(--text-muted); min-width:75px; }
 .ev-badge { display:inline-block; font-size:.65rem; font-weight:700; padding:.15rem .45rem; border-radius:10px; }
 .badge-join    { background:rgba(34,197,94,.2);  color:#4ade80; }
 .badge-leave   { background:rgba(239,68,68,.2);  color:#f87171; }
 .badge-deleted { background:rgba(100,116,139,.2);color:#94a3b8; }
 .member-row { display:flex; align-items:center; gap:.65rem; padding:.5rem .6rem; border-radius:7px; }
 .member-row:hover { background:rgba(255,255,255,.03); }
-.pop-bar-bg { flex:1; height:7px; background:rgba(255,255,255,.07); border-radius:4px; overflow:hidden; min-width:60px; }
-.pop-bar { height:100%; background:linear-gradient(90deg,#6366f1,#8b5cf6); border-radius:4px; }
+.pop-bar-bg  { flex:1; height:7px; background:rgba(255,255,255,.07); border-radius:4px; overflow:hidden; min-width:60px; }
+.pop-bar     { height:100%; background:linear-gradient(90deg,#6366f1,#8b5cf6); border-radius:4px; }
+
+/* Flow diagram */
+#flowWrap { position:relative; width:100%; overflow:hidden; }
+#flowSvg  { position:absolute; top:0; left:0; pointer-events:none; }
+.flow-col  { display:flex; flex-direction:column; gap:.5rem; }
+.flow-node {
+  border-radius:10px; padding:.5rem .85rem;
+  font-size:.8rem; font-weight:700;
+  border:1px solid; cursor:default;
+  transition:opacity .15s;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:200px;
+}
+.flow-node-center {
+  border-radius:12px; padding:.75rem 1.25rem;
+  font-size:.95rem; font-weight:800;
+  text-align:center; min-width:140px;
+}
+.flow-node-in  { background:rgba(34,197,94,.1);  border-color:rgba(34,197,94,.35);  color:#4ade80; }
+.flow-node-out { background:rgba(239,68,68,.1);  border-color:rgba(239,68,68,.35);  color:#f87171; }
+.flow-node-center { background:rgba(99,102,241,.18); border:2px solid rgba(99,102,241,.6); color:#a5b4fc; }
+.flow-count { display:inline-block; font-size:.65rem; font-weight:600; padding:.1rem .35rem; border-radius:8px; margin-left:.4rem; vertical-align:middle; }
+.cnt-in  { background:rgba(34,197,94,.2);  color:#4ade80; }
+.cnt-out { background:rgba(239,68,68,.2);  color:#f87171; }
 </style>
 
-<div style="max-width:1040px;margin:0 auto;padding:0 1.25rem 3rem;">
+<div style="max-width:1100px;margin:0 auto;padding:0 1.25rem 3rem;">
   <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Allianz-Tracking</a>
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin:1rem 0 1.5rem;">
@@ -48,57 +72,97 @@
   <div style="text-align:center;padding:4rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;">🔭</div>
     <p style="margin-top:.75rem;">Keine Kartendaten für <strong>{{ alliance_name }}</strong> gefunden.</p>
-    <p style="font-size:.82rem;">Stelle sicher dass die Karte regelmäßig über den Bot importiert wird.</p>
   </div>
   {% else %}
 
-  <!-- KPI row -->
+  <!-- KPIs -->
   {% set cur = data.current %}
   {% set ph = data.pop_history %}
-  {% set latest_ph = ph[-1] if ph else none %}
-  {% set prev_ph   = ph[-2] if ph|length > 1 else none %}
+  {% set lph = ph[-1] if ph else none %}
+  {% set pph = ph[-2] if ph|length > 1 else none %}
+  {% set joins   = data.events | selectattr('type','equalto','join')    | list | length %}
+  {% set leaves  = data.events | selectattr('type','equalto','leave')   | list | length %}
+  {% set deleted = data.events | selectattr('type','equalto','deleted') | list | length %}
   <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
-    <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.6rem 1.1rem;">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#a5b4fc;letter-spacing:.05em;">Mitglieder</div>
-      <div style="font-size:1.2rem;font-weight:800;color:#a5b4fc;">{{ cur|length }}</div>
-      {% if prev_ph %}<div style="font-size:.7rem;color:var(--text-muted);">{{ (latest_ph.member_count - prev_ph.member_count)|abs }} {{ '▲' if latest_ph.member_count > prev_ph.member_count else '▼' }}</div>{% endif %}
-    </div>
-    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:.6rem 1.1rem;">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#fbbf24;letter-spacing:.05em;">Gesamt-Pop</div>
-      <div style="font-size:1.2rem;font-weight:800;color:#fbbf24;">{{ "{:,}".format(latest_ph.total_pop if latest_ph else 0).replace(",",".") }}</div>
-      {% if prev_ph %}
-      {% set dp = (latest_ph.total_pop - prev_ph.total_pop) %}
-      <div style="font-size:.7rem;color:{{ '#4ade80' if dp>0 else '#f87171' }};">{{ '▲' if dp>0 else '▼' }} {{ "{:,}".format(dp|abs).replace(",",".") }}</div>
+    {% for icon,label,val,delta,col,bg,bd in [
+      ('👥','Mitglieder', cur|length, (lph.member_count-pph.member_count) if pph else none, '#a5b4fc','rgba(99,102,241,.1)','rgba(99,102,241,.25)'),
+      ('🏘️','Dörfer', lph.village_count if lph else 0, none, '#4ade80','rgba(34,197,94,.08)','rgba(34,197,94,.2)'),
+      ('📊','Gesamt-Pop', lph.total_pop if lph else 0, (lph.total_pop-pph.total_pop) if pph else none, '#fbbf24','rgba(245,158,11,.08)','rgba(245,158,11,.2)'),
+      ('➕','Joins total', joins, none, '#4ade80','rgba(34,197,94,.08)','rgba(34,197,94,.2)'),
+      ('➖','Leaves total', leaves, none, '#f87171','rgba(239,68,68,.08)','rgba(239,68,68,.2)'),
+    ] %}
+    <div style="background:{{ bg }};border:1px solid {{ bd }};border-radius:10px;padding:.55rem 1rem;">
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:{{ col }};letter-spacing:.05em;">{{ icon }} {{ label }}</div>
+      <div style="font-size:1.1rem;font-weight:800;color:{{ col }};">{{ "{:,}".format(val).replace(",",".") }}</div>
+      {% if delta is not none and delta != 0 %}
+      <div style="font-size:.68rem;color:{{ '#4ade80' if delta>0 else '#f87171' }};">{{ '▲' if delta>0 else '▼' }} {{ "{:,}".format(delta|abs).replace(",",".") }}</div>
       {% endif %}
     </div>
-    <div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:.6rem 1.1rem;">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#4ade80;letter-spacing:.05em;">Dörfer</div>
-      <div style="font-size:1.2rem;font-weight:800;color:#4ade80;">{{ latest_ph.village_count if latest_ph else 0 }}</div>
-    </div>
-    {% set joins  = data.events | selectattr('type','equalto','join')    | list | length %}
-    {% set leaves = data.events | selectattr('type','equalto','leave')   | list | length %}
-    {% set deleted= data.events | selectattr('type','equalto','deleted') | list | length %}
-    <div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:.6rem 1.1rem;">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#4ade80;letter-spacing:.05em;">Joins</div>
-      <div style="font-size:1.2rem;font-weight:800;color:#4ade80;">{{ joins }}</div>
-    </div>
-    <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:.6rem 1.1rem;">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#f87171;letter-spacing:.05em;">Leaves</div>
-      <div style="font-size:1.2rem;font-weight:800;color:#f87171;">{{ leaves }}</div>
-    </div>
-    {% if deleted %}
-    <div style="background:rgba(100,116,139,.08);border:1px solid rgba(100,116,139,.2);border-radius:10px;padding:.6rem 1.1rem;">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#94a3b8;letter-spacing:.05em;">Gelöscht</div>
-      <div style="font-size:1.2rem;font-weight:800;color:#94a3b8;">{{ deleted }}</div>
-    </div>
-    {% endif %}
+    {% endfor %}
   </div>
 
-  <!-- Population chart -->
+  <!-- ── FLOW DIAGRAM ── -->
+  {% if flows.inflows or flows.outflows %}
+  <div class="section-card" style="margin-bottom:1.25rem;">
+    <div class="section-title">🔀 Spieler-Bewegungen — Woher &amp; Wohin</div>
+
+    <div id="flowWrap" style="display:flex;align-items:flex-start;justify-content:center;gap:0;min-height:120px;padding:1rem 0;">
+      <!-- SVG for bezier arrows (positioned absolute, sized by JS) -->
+      <svg id="flowSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+
+      <!-- Inflows column (left) -->
+      <div class="flow-col" id="colIn" style="flex:1;align-items:flex-end;padding-right:60px;">
+        {% if flows.inflows %}
+          {% for f in flows.inflows %}
+          <div class="flow-node flow-node-in"
+               data-side="in" data-idx="{{ loop.index0 }}"
+               title="{{ f.players | join(', ') }}">
+            {{ f.from_alliance }}
+            <span class="flow-count cnt-in">+{{ f.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="font-size:.78rem;color:var(--text-muted);padding:.5rem 0;">Keine Zugänge erkannt</div>
+        {% endif %}
+      </div>
+
+      <!-- Center node -->
+      <div style="display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0 10px;">
+        <div class="flow-node-center" id="centerNode">
+          🏰 {{ alliance_name }}
+          <div style="font-size:.72rem;font-weight:500;opacity:.7;margin-top:.15rem;">{{ cur|length }} Mitglieder</div>
+        </div>
+      </div>
+
+      <!-- Outflows column (right) -->
+      <div class="flow-col" id="colOut" style="flex:1;align-items:flex-start;padding-left:60px;">
+        {% if flows.outflows %}
+          {% for f in flows.outflows %}
+          <div class="flow-node flow-node-out"
+               data-side="out" data-idx="{{ loop.index0 }}"
+               title="{{ f.players | join(', ') }}">
+            {{ f.to_alliance }}
+            <span class="flow-count cnt-out">-{{ f.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="font-size:.78rem;color:var(--text-muted);padding:.5rem 0;">Keine Abgänge erkannt</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Player tooltip popup -->
+    <div id="flowTooltip" style="display:none;position:fixed;z-index:9999;background:#1e293b;border:1px solid rgba(99,102,241,.4);border-radius:10px;padding:.75rem 1rem;font-size:.8rem;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:none;"></div>
+
+    <div style="font-size:.72rem;color:var(--text-muted);margin-top:.5rem;text-align:center;">Hover über eine Allianz für die Spielernamen · Dicke der Linie = Anzahl Spieler</div>
+  </div>
+  {% endif %}
+
+  <!-- Pop chart + Events + Roster -->
   {% if ph|length > 1 %}
   <div class="section-card" style="margin-bottom:1.25rem;">
     <div class="section-title">📈 Population-Verlauf</div>
-    <canvas id="popChart" height="100"></canvas>
+    <canvas id="popChart" height="90"></canvas>
   </div>
   {% endif %}
 
@@ -108,14 +172,14 @@
     <div class="section-card">
       <div class="section-title">📋 Ereignisse ({{ data.events|length }})</div>
       {% if not data.events %}
-      <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">Keine Änderungen erkannt — mehr Snapshots nötig.</p>
+      <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">Keine Änderungen — mehr Snapshots nötig.</p>
       {% else %}
       <div style="max-height:480px;overflow-y:auto;padding-right:.25rem;">
         {% for ev in data.events %}
         <div class="event-row ev-{{ ev.type }}">
           <span class="ev-date">{{ ev.date }}</span>
           <span class="ev-badge badge-{{ ev.type }}">
-            {% if ev.type == 'join' %}➕ Beitritt{% elif ev.type == 'leave' %}➖ Verlassen{% else %}💀 Gelöscht{% endif %}
+            {% if ev.type=='join' %}➕ Beitritt{% elif ev.type=='leave' %}➖ Verlassen{% else %}💀 Gelöscht{% endif %}
           </span>
           <span style="font-weight:600;">{{ ev.player }}</span>
         </div>
@@ -124,7 +188,7 @@
       {% endif %}
     </div>
 
-    <!-- Current roster -->
+    <!-- Roster -->
     <div class="section-card">
       <div class="section-title">👥 Aktuelle Mitglieder ({{ cur|length }})</div>
       {% set max_pop = cur[0].total_pop if cur else 1 %}
@@ -133,70 +197,164 @@
         <div class="member-row">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:600;font-size:.87rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              <a href="/guild/{{ guild.guild_id }}/intel?q={{ m.player_name | urlencode }}" style="color:inherit;text-decoration:none;" target="_blank">{{ m.player_name }}</a>
+              <a href="/guild/{{ guild.guild_id }}/intel?q={{ m.player_name | urlencode }}"
+                 style="color:inherit;text-decoration:none;" target="_blank">{{ m.player_name }}</a>
             </div>
             <div style="font-size:.7rem;color:var(--text-muted);">{{ m.villages }} Dörfer</div>
           </div>
-          <div style="min-width:80px;text-align:right;font-size:.78rem;font-weight:700;color:#a5b4fc;">
+          <div style="min-width:78px;text-align:right;font-size:.78rem;font-weight:700;color:#a5b4fc;">
             {{ "{:,}".format(m.total_pop).replace(",",".") }}
           </div>
-          <div class="pop-bar-bg" style="min-width:60px;max-width:80px;">
-            <div class="pop-bar" style="width:{{ [(m.total_pop / max_pop * 100)|int, 2]|max }}%;"></div>
+          <div class="pop-bar-bg" style="min-width:55px;max-width:80px;">
+            <div class="pop-bar" style="width:{{ [(m.total_pop/(max_pop or 1)*100)|int,2]|max }}%;"></div>
           </div>
         </div>
         {% endfor %}
       </div>
     </div>
-
   </div>
   {% endif %}
+
 </div>
 
+<!-- Chart.js -->
 {% if data.pop_history|length > 1 %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const PH = {{ data.pop_history | tojson }};
-const labels = PH.map(r => r.fetched_at.slice(0,10));
 new Chart(document.getElementById('popChart'), {
   type: 'line',
   data: {
-    labels,
+    labels: PH.map(r => r.fetched_at.slice(0,10)),
     datasets: [
-      {
-        label: 'Gesamt-Population',
-        data: PH.map(r => r.total_pop),
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99,102,241,.15)',
-        fill: true,
-        tension: .3,
-        pointRadius: PH.length > 30 ? 0 : 3,
-        yAxisID: 'yPop',
-      },
-      {
-        label: 'Mitglieder',
-        data: PH.map(r => r.member_count),
-        borderColor: '#4ade80',
-        backgroundColor: 'transparent',
-        borderDash: [4,3],
-        tension: .3,
-        pointRadius: PH.length > 30 ? 0 : 3,
-        yAxisID: 'yMem',
-      }
+      { label:'Gesamt-Population', data:PH.map(r=>r.total_pop), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.15)', fill:true, tension:.3, pointRadius:PH.length>30?0:3, yAxisID:'yPop' },
+      { label:'Mitglieder', data:PH.map(r=>r.member_count), borderColor:'#4ade80', backgroundColor:'transparent', borderDash:[4,3], tension:.3, pointRadius:PH.length>30?0:3, yAxisID:'yMem' }
     ]
   },
   options: {
-    responsive: true,
-    interaction: { mode: 'index', intersect: false },
-    scales: {
-      x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,.05)' } },
-      yPop: { ticks: { color: '#6366f1' }, grid: { color: 'rgba(255,255,255,.05)' }, position: 'left' },
-      yMem: { ticks: { color: '#4ade80' }, grid: { display: false }, position: 'right' },
+    responsive:true, interaction:{mode:'index',intersect:false},
+    scales:{
+      x:{ticks:{color:'#64748b',maxTicksLimit:8},grid:{color:'rgba(255,255,255,.05)'}},
+      yPop:{ticks:{color:'#6366f1'},grid:{color:'rgba(255,255,255,.05)'},position:'left'},
+      yMem:{ticks:{color:'#4ade80'},grid:{display:false},position:'right'},
     },
-    plugins: {
-      legend: { labels: { color: '#94a3b8', boxWidth: 12 } },
-    }
+    plugins:{legend:{labels:{color:'#94a3b8',boxWidth:12}}}
   }
 });
 </script>
 {% endif %}
+
+<!-- Flow diagram bezier lines -->
+<script>
+const FLOWS = {{ flows | tojson }};
+const tooltip = document.getElementById('flowTooltip');
+
+function drawFlows() {
+  const wrap   = document.getElementById('flowWrap');
+  const svg    = document.getElementById('flowSvg');
+  const center = document.getElementById('centerNode');
+  if (!wrap || !svg || !center) return;
+
+  const wRect = wrap.getBoundingClientRect();
+  const cRect = center.getBoundingClientRect();
+
+  svg.setAttribute('width',  wRect.width);
+  svg.setAttribute('height', wRect.height);
+  svg.innerHTML = '';
+
+  function rel(el) {
+    const r = el.getBoundingClientRect();
+    return {
+      x:  r.left - wRect.left,
+      y:  r.top  - wRect.top,
+      w:  r.width,
+      h:  r.height,
+      mx: r.left - wRect.left + r.width / 2,
+      my: r.top  - wRect.top  + r.height / 2,
+    };
+  }
+
+  const C = rel(center);
+  const maxIn  = FLOWS.inflows.reduce( (m,f) => Math.max(m,f.count), 1);
+  const maxOut = FLOWS.outflows.reduce((m,f) => Math.max(m,f.count), 1);
+  const maxAll = Math.max(maxIn, maxOut);
+
+  // Draw inflow arrows (left nodes → center left edge)
+  document.querySelectorAll('[data-side="in"]').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    const f   = FLOWS.inflows[idx];
+    if (!f) return;
+    const N   = rel(el);
+    const sw  = Math.max(2, Math.round(f.count / maxAll * 14));
+
+    // From right edge of node → left edge of center
+    const x1 = N.x + N.w, y1 = N.my;
+    const x2 = C.x,        y2 = C.my;
+    const cx1 = x1 + (x2-x1)*0.55, cy1 = y1;
+    const cx2 = x1 + (x2-x1)*0.45, cy2 = y2;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','rgba(74,222,128,0.45)');
+    path.setAttribute('stroke-width', sw);
+    path.setAttribute('stroke-linecap','round');
+    svg.appendChild(path);
+  });
+
+  // Draw outflow arrows (center right edge → right nodes)
+  document.querySelectorAll('[data-side="out"]').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    const f   = FLOWS.outflows[idx];
+    if (!f) return;
+    const N   = rel(el);
+    const sw  = Math.max(2, Math.round(f.count / maxAll * 14));
+
+    const x1 = C.x + C.w, y1 = C.my;
+    const x2 = N.x,        y2 = N.my;
+    const cx1 = x1 + (x2-x1)*0.45, cy1 = y1;
+    const cx2 = x1 + (x2-x1)*0.55, cy2 = y2;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','rgba(248,113,113,0.45)');
+    path.setAttribute('stroke-width', sw);
+    path.setAttribute('stroke-linecap','round');
+    svg.appendChild(path);
+  });
+}
+
+// Tooltip on node hover
+document.querySelectorAll('.flow-node').forEach(el => {
+  const side = el.dataset.side;
+  const idx  = parseInt(el.dataset.idx);
+  const f    = side === 'in' ? FLOWS.inflows[idx] : FLOWS.outflows[idx];
+  if (!f) return;
+
+  const players = (side === 'in' ? f.players : f.players) || [];
+
+  el.addEventListener('mouseenter', e => {
+    const dir    = side === 'in' ? '➕ Zugänge von' : '➖ Abgänge zu';
+    const ally   = side === 'in' ? f.from_alliance  : f.to_alliance;
+    tooltip.innerHTML = `<div style="font-weight:700;margin-bottom:.4rem;">${dir} <span style="color:${side==='in'?'#4ade80':'#f87171'};">${ally}</span></div>`
+      + players.map(p => `<div style="padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.07);">• ${p}</div>`).join('');
+    tooltip.style.display = 'block';
+  });
+
+  el.addEventListener('mousemove', e => {
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+  });
+
+  el.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+  });
+});
+
+// Draw after layout, redraw on resize
+window.addEventListener('load',   () => setTimeout(drawFlows, 80));
+window.addEventListener('resize', drawFlows);
+setTimeout(drawFlows, 200);
+</script>
 {% endblock %}

@@ -9805,6 +9805,78 @@ async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
             return []
 
 
+async def get_alliance_player_flows(guild_id: str, alliance_name: str) -> dict:
+    """
+    For each player who joined/left alliance_name, find where they came from / went to.
+    Returns inflows (source→watched) and outflows (watched→target).
+    """
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+
+        # All snapshot dates
+        async with db.execute("""
+            SELECT DISTINCT fetched_at FROM map_snapshots
+            WHERE guild_id=? ORDER BY fetched_at
+        """, (guild_id,)) as cur:
+            all_dates = [r[0] for r in await cur.fetchall()]
+
+        if len(all_dates) < 2:
+            return {"inflows": [], "outflows": []}
+
+        inflows: dict[str, list[str]] = {}   # from_ally → [player,...]
+        outflows: dict[str, list[str]] = {}  # to_ally   → [player,...]
+
+        prev_members: set[str] = set()
+        for i, date in enumerate(all_dates):
+            async with db.execute("""
+                SELECT DISTINCT player_name FROM map_snapshots
+                WHERE guild_id=? AND fetched_at=? AND lower(alliance_name)=lower(?)
+            """, (guild_id, date, alliance_name)) as cur:
+                current_members = {r[0] for r in await cur.fetchall()}
+
+            if i > 0:
+                joined = current_members - prev_members
+                left   = prev_members - current_members
+
+                # Inflows: where did joiners come from (alliance in PREVIOUS snapshot)?
+                for p in joined:
+                    async with db.execute("""
+                        SELECT alliance_name FROM map_snapshots
+                        WHERE guild_id=? AND lower(player_name)=lower(?)
+                          AND fetched_at=?
+                        LIMIT 1
+                    """, (guild_id, p, all_dates[i-1])) as cur2:
+                        row = await cur2.fetchone()
+                    src = (row[0] or "").strip() if row else ""
+                    if src and src.lower() != alliance_name.lower():
+                        inflows.setdefault(src, []).append(p)
+
+                # Outflows: where did leavers go (alliance in NEXT snapshot or latest)?
+                next_date = all_dates[i] if i < len(all_dates) else all_dates[-1]
+                for p in left:
+                    async with db.execute("""
+                        SELECT alliance_name FROM map_snapshots
+                        WHERE guild_id=? AND lower(player_name)=lower(?)
+                          AND fetched_at=?
+                        LIMIT 1
+                    """, (guild_id, p, next_date)) as cur2:
+                        row = await cur2.fetchone()
+                    dst = (row[0] or "").strip() if row else ""
+                    if dst and dst.lower() != alliance_name.lower():
+                        outflows.setdefault(dst, []).append(p)
+                    elif not dst:
+                        # Deleted / no data
+                        outflows.setdefault("(gelöscht)", []).append(p)
+
+            prev_members = current_members
+
+        # Sort by count desc
+        inflow_list  = sorted([{"from_alliance": k, "players": v, "count": len(v)} for k,v in inflows.items()],  key=lambda x: -x["count"])
+        outflow_list = sorted([{"to_alliance":   k, "players": v, "count": len(v)} for k,v in outflows.items()], key=lambda x: -x["count"])
+
+        return {"inflows": inflow_list, "outflows": outflow_list}
+
+
 async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
     """Full tracking data for one alliance from map_snapshots."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

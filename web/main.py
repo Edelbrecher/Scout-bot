@@ -9489,12 +9489,13 @@ async def alliance_tracking_detail(request: Request, guild_id: str, alliance_nam
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     data = await database.get_alliance_tracking_data(guild_id, alliance_name)
+    flows = await database.get_alliance_player_flows(guild_id, alliance_name)
     watched = await database.get_watched_alliances(guild_id)
     is_watched = any(w["alliance_name"].lower() == alliance_name.lower() for w in watched)
     return templates.TemplateResponse("alliance_tracking_detail.html", {
         "request": request, "guild": guild,
         "alliance_name": alliance_name,
-        "data": data, "is_watched": is_watched,
+        "data": data, "flows": flows, "is_watched": is_watched,
     })
 
 
