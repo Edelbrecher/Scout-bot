@@ -589,19 +589,3 @@ input:focus { border-color: var(--primary); }
   animation: pageEnter 0.28s cubic-bezier(.22,1,.36,1) both;
 }
 
-/* Override browser's default slide-from-right view transition */
-@media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(root) {
-    animation: 180ms ease-out both fade-out-vt;
-  }
-  ::view-transition-new(root) {
-    animation: 260ms cubic-bezier(.22,1,.36,1) both slide-up-vt;
-  }
-}
-@keyframes fade-out-vt {
-  to { opacity: 0; }
-}
-@keyframes slide-up-vt {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}

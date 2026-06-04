@@ -215,7 +215,7 @@ document.addEventListener('click', e => {
            color:#fff;font-size:1.2rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);
            align-items:center;justify-content:center;">☰</button>
 
-  <main class="page-main-anim">
+  <main id="page-main">
     {% block content %}{% endblock %}
   </main>
 
@@ -465,5 +465,17 @@ document.addEventListener('click', e => {
     </div>
     © {{ current_year }} TravOps · All rights reserved
   </footer>
+
+  <script>
+  // Animate page entry only on actual navigation, not on reload (F5 / Ctrl+R)
+  (function(){
+    var nav = performance.getEntriesByType('navigation')[0];
+    var isReload = nav && nav.type === 'reload';
+    if (!isReload) {
+      var main = document.getElementById('page-main');
+      if (main) main.classList.add('page-main-anim');
+    }
+  })();
+  </script>
 </body>
 </html>
