@@ -47,6 +47,27 @@
 <div style="max-width:1100px;margin:0 auto;padding:0 1.25rem 3rem;">
   <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Allianz-Tracking</a>
 
+  {% if watched|length > 1 %}
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0 .2rem;">
+    {% for w in watched %}
+    {% if w.alliance_name != alliance_name %}
+    <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
+       style="display:inline-block;padding:.25rem .75rem;border-radius:20px;font-size:.78rem;font-weight:600;text-decoration:none;
+              background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#a5b4fc;transition:all .15s;"
+       onmouseover="this.style.background='rgba(99,102,241,.22)'"
+       onmouseout="this.style.background='rgba(99,102,241,.1)'">
+      🏰 {{ w.alliance_name }}
+    </a>
+    {% else %}
+    <span style="display:inline-block;padding:.25rem .75rem;border-radius:20px;font-size:.78rem;font-weight:600;
+                 background:rgba(99,102,241,.25);border:1px solid rgba(99,102,241,.5);color:#c4b5fd;">
+      🏰 {{ w.alliance_name }}
+    </span>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin:1rem 0 1.5rem;">
     <div>
       <h1 style="margin:0;">🏰 {{ alliance_name }}</h1>

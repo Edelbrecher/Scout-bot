@@ -9495,7 +9495,8 @@ async def alliance_tracking_detail(request: Request, guild_id: str, alliance_nam
     return templates.TemplateResponse("alliance_tracking_detail.html", {
         "request": request, "guild": guild,
         "alliance_name": alliance_name,
-        "data": data, "flows": flows, "is_watched": is_watched,
+        "data": data, "flows": flows,
+        "is_watched": is_watched, "watched": watched,
     })
 
 
