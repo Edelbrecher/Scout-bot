@@ -40,6 +40,17 @@
         },
         {
           page: null, target: null,
+          title: t('🌍 Deine Travian-Welt', '🌍 Your Travian world'),
+          body: t(
+            'Trag hier die URL deines Travian-Servers und deinen Allianznamen ein.\n\nDamit lädt TravOps automatisch die Weltkarte und erkennt eure Allianz.',
+            'Enter your Travian server URL and alliance name.\n\nTravOps will automatically load the world map and identify your alliance.'
+          ),
+          hint: t('URL-Beispiel: https://ts2.x1.europe.travian.com', 'URL example: https://ts2.x1.europe.travian.com'),
+          form: { type: 'world-setup' },
+          next: t('Weiter', 'Next'),
+        },
+        {
+          page: null, target: null,
           title: t('⏰ Serverzeit einstellen', '⏰ Set server time'),
           body: t(
             'Alle Marschzeiten, Einsatz-Countdowns und Angriffs-Warnungen basieren auf der Uhrzeit deines Travian-Servers.\n\nWähle hier die passende Zeitzone — du kannst sie später jederzeit unter Servereinstellungen ändern.',
@@ -748,6 +759,21 @@
           💾 ${t('Zeitzone speichern','Save timezone')}
         </button>`;
     }
+    if (formDef.type === 'world-setup') {
+      return `
+        <div class="tt-form-row">
+          <label>${t('Server-URL','Server URL')}</label>
+          <input id="tt-world-url" type="url" placeholder="https://ts2.x1.europe.travian.com" style="font-family:monospace;font-size:.85rem;">
+        </div>
+        <div class="tt-form-row">
+          <label>${t('Allianzname (optional)','Alliance name (optional)')}</label>
+          <input id="tt-ally-name" type="text" placeholder="${t('z.B. TravOps Alliance','e.g. TravOps Alliance')}">
+        </div>
+        <button class="tt-save-btn" id="tt-world-save" onclick="window._ttSaveWorld(this)">
+          💾 ${t('Speichern & Karte laden','Save & load map')}
+        </button>
+        <div id="tt-world-msg" style="margin-top:.5rem;font-size:.78rem;display:none;"></div>`;
+    }
     if (formDef.type === 'alliance-rules') {
       return `
         <div class="tt-form-row">
@@ -767,6 +793,46 @@
 
   // ── Inline form save handlers ─────────────────────────────────────────────
   const guildIdFromPath = () => (location.pathname.match(/\/guild\/(\d{17,20})/) || [])[1];
+
+  window._ttSaveWorld = async function(btn) {
+    const url = (document.getElementById('tt-world-url')?.value || '').trim().replace(/\/$/, '');
+    const ally = (document.getElementById('tt-ally-name')?.value || '').trim();
+    const msg  = document.getElementById('tt-world-msg');
+    const gId  = guildIdFromPath();
+    if (!gId) return;
+    if (!url) { if(msg){msg.style.display='block';msg.style.color='#f87171';msg.textContent=t('Bitte URL eingeben','Please enter a URL');} return; }
+    btn.disabled = true;
+    btn.textContent = '⏳ ' + t('Speichern…','Saving…');
+    if (msg) msg.style.display = 'none';
+    try {
+      const res = await fetch(`/guild/${gId}/setup/api/save-world`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ server_url: url })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        btn.disabled = false;
+        btn.textContent = '💾 ' + t('Speichern & Karte laden','Save & load map');
+        if (msg) { msg.style.display='block'; msg.style.color='#f87171'; msg.textContent='⚠️ ' + data.error; }
+        return;
+      }
+      // Optionally save alliance name
+      if (ally) {
+        await fetch(`/guild/${gId}/settings/tw-alliance`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ tw_alliance_name: ally })
+        }).catch(() => {});
+      }
+      // Trigger first snapshot in background
+      fetch(`/guild/${gId}/setup/api/trigger-snapshot`, { method: 'POST' }).catch(() => {});
+      btn.textContent = '✅ ' + t('Gespeichert!','Saved!');
+      btn.classList.add('saved');
+      if (msg) { msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent=t('✅ Karte wird geladen…','✅ Map loading in background…'); }
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = '💾 ' + t('Speichern & Karte laden','Save & load map');
+    }
+  };
 
   window._ttSaveTz = async function(btn) {
     const val = document.getElementById('tt-tz-sel')?.value;

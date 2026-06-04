@@ -10235,6 +10235,20 @@ async def alliance_members_page(request: Request, guild_id: str):
     })
 
 
+@app.post("/guild/{guild_id}/settings/tw-alliance")
+async def settings_set_tw_alliance(request: Request, guild_id: str):
+    from fastapi.responses import JSONResponse
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    body = await request.json()
+    name = (body.get("tw_alliance_name") or "").strip()
+    if name:
+        await database.set_tw_alliance_name(guild_id, name)
+    return JSONResponse({"ok": True})
+
+
 @app.post("/guild/{guild_id}/allianz/mitglieder/set-alliance")
 async def alliance_members_set_alliance(
     request: Request, guild_id: str,
