@@ -9548,12 +9548,15 @@ async def alliance_tracking_detail(request: Request, guild_id: str, alliance_nam
     data = await database.get_alliance_tracking_data(guild_id, alliance_name)
     flows = await database.get_alliance_player_flows(guild_id, alliance_name)
     watched = await database.get_watched_alliances(guild_id)
+    meta_groups = await database.get_meta_groups(guild_id)
+    ally_group = await database.get_ally_group_for_guild(guild_id)
     is_watched = any(w["alliance_name"].lower() == alliance_name.lower() for w in watched)
     return templates.TemplateResponse("alliance_tracking_detail.html", {
         "request": request, "guild": guild,
         "alliance_name": alliance_name,
         "data": data, "flows": flows,
         "is_watched": is_watched, "watched": watched,
+        "meta_groups": meta_groups, "ally_group": ally_group,
     })
 
 

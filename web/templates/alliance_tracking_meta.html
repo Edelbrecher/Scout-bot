@@ -26,28 +26,30 @@
 .chart-mini canvas { display:block; }
 </style>
 
-<div style="max-width:1400px;margin:0 auto;padding:0 1.25rem 3rem;">
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Alliance Tracking</a>
+<style>
+.nav-sidebar { display:flex; flex-direction:column; gap:.3rem; position:sticky; top:1rem; }
+.nav-sb-label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); padding:.4rem .6rem .2rem; }
+.nav-sb-item {
+  display:flex; align-items:center; justify-content:space-between; gap:.4rem;
+  padding:.45rem .7rem; border-radius:9px; font-size:.8rem; font-weight:600;
+  text-decoration:none; color:var(--text-muted);
+  border:1px solid transparent; transition:all .12s;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.nav-sb-item:hover { background:rgba(255,255,255,.05); color:var(--text); border-color:var(--border); }
+.nav-sb-item.active-meta   { background:rgba(245,158,11,.12); color:#fbbf24; border-color:rgba(245,158,11,.3); }
+.nav-sb-item.active-single { background:rgba(99,102,241,.15); color:#c4b5fd; border-color:rgba(99,102,241,.35); }
+.nav-sb-badge { font-size:.58rem; font-weight:700; padding:.08rem .38rem; border-radius:6px; flex-shrink:0; }
+.badge-meta   { background:rgba(245,158,11,.18); color:#fbbf24; border:1px solid rgba(245,158,11,.3); }
+.badge-single { background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.28); }
+.nav-sb-divider { height:1px; background:var(--border); margin:.35rem .6rem; }
+</style>
 
-  <!-- Quick-switch -->
-  {% if meta_groups|length > 1 or watched %}
-  <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin:.55rem 0 .1rem;">
-    {% for g in meta_groups %}
-    <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ g.id }}"
-       style="padding:.2rem .6rem;border-radius:14px;font-size:.73rem;font-weight:600;text-decoration:none;
-              {{ 'background:rgba(245,158,11,.22);border:1px solid rgba(245,158,11,.5);color:#fbbf24;' if g.id == group.id else 'background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#fbbf24;' }}">
-      🏰 {{ g.meta_name }}
-    </a>
-    {% endfor %}
-    {% for w in watched %}
-    <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
-       style="padding:.2rem .6rem;border-radius:14px;font-size:.73rem;font-weight:600;text-decoration:none;
-              background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;">
-      {{ w.alliance_name }}
-    </a>
-    {% endfor %}
-  </div>
-  {% endif %}
+<div style="max-width:1400px;margin:0 auto;padding:0 1.25rem 3rem;display:grid;grid-template-columns:1fr 192px;gap:1.5rem;align-items:start;">
+
+<!-- ── MAIN CONTENT ── -->
+<div>
+  <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Alliance Tracking</a>
 
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin:.85rem 0 1rem;">
@@ -229,7 +231,40 @@
 
   </div>
   {% endif %}
-</div>
+</div><!-- end main content -->
+
+<!-- ── RIGHT SIDEBAR ── -->
+<aside class="nav-sidebar" style="padding-top:2.75rem;">
+  {% if meta_groups %}
+  <div class="nav-sb-label">⭐ Meta Groups</div>
+  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/own"
+     class="nav-sb-item {% if group.id == 'own' %}active-meta{% endif %}">
+    <span style="overflow:hidden;text-overflow:ellipsis;">Own Meta</span>
+    <span class="nav-sb-badge badge-meta">Meta</span>
+  </a>
+  {% for g in meta_groups %}
+  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ g.id }}"
+     class="nav-sb-item {% if g.id == group.id %}active-meta{% endif %}">
+    <span style="overflow:hidden;text-overflow:ellipsis;">{{ g.meta_name }}</span>
+    <span class="nav-sb-badge badge-meta">Meta</span>
+  </a>
+  {% endfor %}
+  {% if watched %}<div class="nav-sb-divider"></div>{% endif %}
+  {% endif %}
+
+  {% if watched %}
+  <div class="nav-sb-label">📌 Alliances</div>
+  {% for w in watched %}
+  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
+     class="nav-sb-item">
+    <span style="overflow:hidden;text-overflow:ellipsis;">{{ w.alliance_name }}</span>
+    <span class="nav-sb-badge badge-single">Single</span>
+  </a>
+  {% endfor %}
+  {% endif %}
+</aside>
+
+</div><!-- end grid -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
