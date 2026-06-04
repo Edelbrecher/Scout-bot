@@ -17,7 +17,7 @@
   <!-- Discord accent colour -->
   <meta name="theme-color"         content="#5865f2" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260601e" />
+  <link rel="stylesheet" href="/static/style.css?v=20260604a" />
   <!-- Tour navigation shield: style tag injected in <head> before first paint -->
   <script>
     (function(){try{var s=localStorage.getItem('travops_tour');if(!s)return;var st=JSON.parse(s);if(!st||!st.name)return;var style=document.createElement('style');style.id='tt-nav-shield';style.textContent='body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;}';document.head.appendChild(style);}catch(e){}})();
@@ -281,11 +281,25 @@ document.addEventListener('click', e => {
     var body    = document.body;
     if (!sidebar) return;
 
-    // ── Load nav config from API, then build ──
+    // ── Show from cache immediately, then refresh in background ──
+    var cacheKey = 'gs_nav_' + gid;
+    var cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try { buildSidebar(gid, path, JSON.parse(cached), sidebar, body); } catch(e) {}
+    }
     fetch('/api/sidebar-config').then(function(r){ return r.json(); }).then(function(navData){
-      buildSidebar(gid, path, navData, sidebar, body);
+      sessionStorage.setItem(cacheKey, JSON.stringify(navData));
+      if (!cached) buildSidebar(gid, path, navData, sidebar, body);
+      else {
+        // silently update active state without reflowing
+        var items = sidebar.querySelectorAll('.gs-item');
+        items.forEach(function(a){
+          var active = path.startsWith(a.getAttribute('href'));
+          a.classList.toggle('active', active);
+        });
+      }
     }).catch(function(){
-      buildSidebar(gid, path, [], sidebar, body);
+      if (!cached) buildSidebar(gid, path, [], sidebar, body);
     });
   })();
 

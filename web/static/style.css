@@ -580,12 +580,15 @@ input:focus { border-color: var(--primary); }
 .role-toggle:hover { background: rgba(255,255,255,.05); }
 .role-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── Page entry animation (fade + slide up) ── */
+/* ── Disable browser-native cross-document view transitions ── */
+@view-transition { navigation: none; }
+
+/* ── Page entry animation (fade + slide up, navigation only) ── */
 @keyframes pageEnter {
-  from { opacity: 0; transform: translateY(18px); }
+  from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .page-main-anim {
-  animation: pageEnter 0.28s cubic-bezier(.22,1,.36,1) both;
+  animation: pageEnter 0.26s cubic-bezier(.22,1,.36,1) both;
 }
 
