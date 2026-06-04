@@ -3,43 +3,46 @@
 
 {% block content %}
 <style>
-.section-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.35rem; margin-bottom:1.1rem; }
-.section-title { font-size:.73rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); margin-bottom:.85rem; }
-.kpi { background:rgba(99,102,241,.08); border:1px solid rgba(99,102,241,.2); border-radius:10px; padding:.6rem 1rem; }
-.kpi-label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.15rem; }
-.kpi-val   { font-size:1.15rem; font-weight:800; line-height:1.1; }
-.kpi-delta { font-size:.68rem; margin-top:.1rem; }
-.ally-row { display:grid; align-items:center; gap:.75rem; padding:.65rem .75rem; border-radius:9px; transition:background .12s; }
-.ally-row:hover { background:rgba(255,255,255,.04); }
-.bar-bg { height:8px; background:rgba(255,255,255,.07); border-radius:4px; overflow:hidden; }
-.bar-fill { height:100%; border-radius:4px; transition:width .3s; }
-.ev-row { display:flex; align-items:center; gap:.6rem; padding:.45rem .6rem; border-radius:8px; margin-bottom:.3rem; font-size:.82rem; }
-.ev-join  { background:rgba(34,197,94,.07);  border-left:3px solid #4ade80; }
-.ev-leave { background:rgba(239,68,68,.07);  border-left:3px solid #f87171; }
-.ev-date  { font-size:.68rem; color:var(--text-muted); min-width:72px; }
-.ev-badge { display:inline-block; font-size:.63rem; font-weight:700; padding:.12rem .4rem; border-radius:8px; white-space:nowrap; }
-.badge-join  { background:rgba(34,197,94,.2);  color:#4ade80; }
-.badge-leave { background:rgba(239,68,68,.2);  color:#f87171; }
-.ally-chip { display:inline-block; padding:.2rem .6rem; border-radius:10px; font-size:.72rem; font-weight:600; background:rgba(255,255,255,.06); border:1px solid var(--border); color:var(--text-muted); white-space:nowrap; }
+.section-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.15rem 1.35rem; margin-bottom:1.1rem; }
+.section-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); margin-bottom:.85rem; }
+.kpi { border-radius:10px; padding:.6rem 1rem; min-width:0; flex:1; }
+.kpi-label { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.15rem; }
+.kpi-val   { font-size:1.1rem; font-weight:800; line-height:1.1; }
+.kpi-delta { font-size:.67rem; margin-top:.1rem; }
+.ally-row { display:grid; align-items:center; gap:.75rem; padding:.55rem .7rem; border-radius:9px; transition:background .12s; }
+.ally-row:hover { background:rgba(255,255,255,.035); }
+.bar-bg  { height:8px; background:rgba(255,255,255,.07); border-radius:4px; overflow:hidden; }
+.bar-fill{ height:100%; border-radius:4px; }
+.ev-row  { display:flex; align-items:center; gap:.55rem; padding:.42rem .55rem; border-radius:8px; margin-bottom:.28rem; font-size:.8rem; }
+.ev-join     { background:rgba(34,197,94,.07);  border-left:3px solid #4ade80; }
+.ev-leave    { background:rgba(239,68,68,.07);  border-left:3px solid #f87171; }
+.ev-internal { background:rgba(245,158,11,.07); border-left:3px solid #f59e0b; }
+.ev-date { font-size:.67rem; color:var(--text-muted); min-width:68px; flex-shrink:0; }
+.ev-badge { display:inline-block; font-size:.62rem; font-weight:700; padding:.1rem .38rem; border-radius:7px; white-space:nowrap; flex-shrink:0; }
+.badge-join     { background:rgba(34,197,94,.2);  color:#4ade80; }
+.badge-leave    { background:rgba(239,68,68,.2);  color:#f87171; }
+.badge-internal { background:rgba(245,158,11,.18);color:#fbbf24; }
+.ally-chip { display:inline-block; padding:.18rem .55rem; border-radius:9px; font-size:.7rem; font-weight:600; background:rgba(255,255,255,.06); border:1px solid var(--border); color:var(--text-muted); }
+.chart-mini canvas { display:block; }
 </style>
 
-<div style="max-width:1100px;margin:0 auto;padding:0 1.25rem 3rem;">
+<div style="max-width:100%;padding:0 1.25rem 3rem;">
   <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Allianz-Tracking</a>
 
-  <!-- Quick-switch between metas -->
+  <!-- Quick-switch -->
   {% if meta_groups|length > 1 or watched %}
-  <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin:.6rem 0 .2rem;">
+  <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin:.55rem 0 .1rem;">
     {% for g in meta_groups %}
     <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ g.id }}"
-       style="padding:.22rem .65rem;border-radius:16px;font-size:.75rem;font-weight:600;text-decoration:none;transition:all .15s;
+       style="padding:.2rem .6rem;border-radius:14px;font-size:.73rem;font-weight:600;text-decoration:none;
               {{ 'background:rgba(245,158,11,.22);border:1px solid rgba(245,158,11,.5);color:#fbbf24;' if g.id == group.id else 'background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#fbbf24;' }}">
       🏰 {{ g.meta_name }}
     </a>
     {% endfor %}
     {% for w in watched %}
     <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
-       style="padding:.22rem .65rem;border-radius:16px;font-size:.75rem;font-weight:600;text-decoration:none;
-              background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.22);color:#a5b4fc;">
+       style="padding:.2rem .6rem;border-radius:14px;font-size:.73rem;font-weight:600;text-decoration:none;
+              background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;">
       {{ w.alliance_name }}
     </a>
     {% endfor %}
@@ -47,178 +50,267 @@
   {% endif %}
 
   <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin:1rem 0 1.25rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin:.85rem 0 1rem;">
     <div>
-      <h1 style="margin:0;">⭐ {{ group.meta_name }}</h1>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem;">
-        {% for a in group.alliances %}
-        <span class="ally-chip">{{ a }}</span>
-        {% endfor %}
+      <h1 style="margin:0;font-size:1.5rem;">⭐ {{ group.meta_name }}</h1>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.35rem;">
+        {% for a in group.alliances %}<span class="ally-chip">{{ a }}</span>{% endfor %}
       </div>
     </div>
-    {% if data.latest %}
-    <div style="font-size:.75rem;color:var(--text-muted);align-self:flex-end;">Letzter Snapshot: {{ data.latest[:10] }}</div>
-    {% endif %}
+    {% if data.latest %}<div style="font-size:.73rem;color:var(--text-muted);">Letzter Snapshot: {{ data.latest[:10] }}</div>{% endif %}
   </div>
 
   {% if not data.alliances or data.total_members == 0 %}
   <div style="text-align:center;padding:4rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;">🔭</div>
     <p style="margin-top:.75rem;">Keine Kartendaten für diese Meta gefunden.</p>
-    <p style="font-size:.82rem;">Stelle sicher dass die Karte regelmäßig importiert wird.</p>
   </div>
   {% else %}
 
-  <!-- ── KPI ROW ── -->
-  {% set ph = data.pop_history %}
-  {% set lph = ph[-1] if ph else none %}
-  {% set pph = ph[-2] if ph|length > 1 else none %}
-  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.1rem;">
-    <div class="kpi" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.28);">
-      <div class="kpi-label" style="color:#a5b4fc;">👥 Mitglieder gesamt</div>
+  <!-- ── KPIs ── -->
+  {% set ph  = data.pop_history %}
+  {% set lph = ph[-1]  if ph         else none %}
+  {% set pph = ph[-2]  if ph|length > 1 else none %}
+  {% set joins    = data.events          | selectattr('type','equalto','join')  | list | length %}
+  {% set leaves   = data.events          | selectattr('type','equalto','leave') | list | length %}
+  {% set internals= data.internal_events | list | length %}
+
+  <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1.1rem;">
+    {% set dm = (lph.member_count - pph.member_count) if pph else 0 %}
+    {% set dp = (lph.total_pop   - pph.total_pop)    if pph else 0 %}
+    <div class="kpi" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.28);">
+      <div class="kpi-label" style="color:#a5b4fc;">👥 Mitglieder</div>
       <div class="kpi-val"   style="color:#a5b4fc;">{{ data.total_members }}</div>
-      {% if pph %}<div class="kpi-delta" style="color:{{ '#4ade80' if (lph.member_count-pph.member_count)>0 else '#f87171' }};">
-        {{ '▲' if (lph.member_count-pph.member_count)>0 else '▼' }} {{ (lph.member_count-pph.member_count)|abs }}</div>{% endif %}
+      {% if dm != 0 %}<div class="kpi-delta" style="color:{{ '#4ade80' if dm>0 else '#f87171' }};">{{ '▲' if dm>0 else '▼' }} {{ dm|abs }}</div>{% endif %}
     </div>
-    <div class="kpi" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.22);">
+    <div class="kpi" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);">
       <div class="kpi-label" style="color:#fbbf24;">📊 Population</div>
       <div class="kpi-val"   style="color:#fbbf24;">{{ "{:,}".format(data.total_pop).replace(",",".") }}</div>
-      {% if pph %}{% set dp = lph.total_pop - pph.total_pop %}
-      <div class="kpi-delta" style="color:{{ '#4ade80' if dp>0 else '#f87171' }};">{{ '▲' if dp>0 else '▼' }} {{ "{:,}".format(dp|abs).replace(",",".") }}</div>{% endif %}
+      {% if dp != 0 %}<div class="kpi-delta" style="color:{{ '#4ade80' if dp>0 else '#f87171' }};">{{ '▲' if dp>0 else '▼' }} {{ "{:,}".format(dp|abs).replace(",",".") }}</div>{% endif %}
     </div>
-    <div class="kpi" style="background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.2);">
+    <div class="kpi" style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);">
       <div class="kpi-label" style="color:#4ade80;">🏘️ Dörfer</div>
       <div class="kpi-val"   style="color:#4ade80;">{{ data.total_villages }}</div>
     </div>
-    {% set joins  = data.events | selectattr('type','equalto','join')  | list | length %}
-    {% set leaves = data.events | selectattr('type','equalto','leave') | list | length %}
-    <div class="kpi" style="background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.2);">
+    <div class="kpi" style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);">
       <div class="kpi-label" style="color:#4ade80;">➕ Zugänge</div>
       <div class="kpi-val"   style="color:#4ade80;">{{ joins }}</div>
     </div>
-    <div class="kpi" style="background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.2);">
+    <div class="kpi" style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);">
       <div class="kpi-label" style="color:#f87171;">➖ Abgänge</div>
       <div class="kpi-val"   style="color:#f87171;">{{ leaves }}</div>
     </div>
-  </div>
-
-  <!-- ── PER-ALLIANCE BREAKDOWN ── -->
-  <div class="section-card">
-    <div class="section-title">📐 Aufschlüsselung pro Allianz</div>
-    {% set max_pop = data.alliances | map(attribute='total_pop') | max %}
-    {% set colors = ['#6366f1','#f59e0b','#22c55e','#ec4899','#06b6d4','#f97316','#a78bfa','#84cc16'] %}
-    <div style="display:grid;gap:.5rem;">
-      <!-- Header -->
-      <div style="display:grid;grid-template-columns:160px 1fr 90px 70px 70px;gap:.75rem;padding:.3rem .75rem;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">
-        <span>Allianz</span><span>Population</span><span>Pop.</span><span>Mitgl.</span><span>Dörfer</span>
-      </div>
-      {% for a in data.alliances | sort(attribute='total_pop', reverse=true) %}
-      {% set color = colors[loop.index0 % colors|length] %}
-      <div class="ally-row" style="grid-template-columns:160px 1fr 90px 70px 70px;">
-        <div>
-          <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ a.name | urlencode }}"
-             style="font-weight:700;font-size:.88rem;color:{{ color }};text-decoration:none;">
-            {{ a.name }}
-          </a>
-        </div>
-        <div class="bar-bg">
-          <div class="bar-fill" style="width:{{ [(a.total_pop / (max_pop or 1) * 100)|int, 1]|max }}%; background:{{ color }};"></div>
-        </div>
-        <div style="font-size:.83rem;font-weight:700;color:{{ color }};">{{ "{:,}".format(a.total_pop).replace(",",".") }}</div>
-        <div style="font-size:.83rem;color:var(--text-muted);">{{ a.members }}</div>
-        <div style="font-size:.83rem;color:var(--text-muted);">{{ a.villages }}</div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- ── POP CHART ── -->
-  {% if ph|length > 1 %}
-  <div class="section-card">
-    <div class="section-title">📈 Population-Verlauf (kombiniert)</div>
-    <canvas id="popChart" height="85"></canvas>
-  </div>
-  {% endif %}
-
-  <!-- ── EVENTS ── -->
-  <div class="section-card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;">
-      <div class="section-title" style="margin:0;">📋 Ereignisse außerhalb der Meta ({{ data.events|length }})</div>
-      <div style="display:flex;gap:.5rem;">
-        <button onclick="filterEvt('all')"   id="btnAll"   class="btn btn-primary"   style="font-size:.72rem;padding:.2rem .6rem;">Alle</button>
-        <button onclick="filterEvt('join')"  id="btnJoin"  class="btn btn-secondary" style="font-size:.72rem;padding:.2rem .6rem;">➕ Zugänge</button>
-        <button onclick="filterEvt('leave')" id="btnLeave" class="btn btn-secondary" style="font-size:.72rem;padding:.2rem .6rem;">➖ Abgänge</button>
-      </div>
-    </div>
-    {% if not data.events %}
-    <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">Keine Bewegungen erkannt — mehr Snapshots nötig.</p>
-    {% else %}
-    <div style="max-height:460px;overflow-y:auto;padding-right:.2rem;" id="evtList">
-      {% for ev in data.events %}
-      <div class="ev-row ev-{{ ev.type }}" data-type="{{ ev.type }}">
-        <span class="ev-date">{{ ev.date }}</span>
-        <span class="ev-badge badge-{{ ev.type }}">
-          {% if ev.type=='join' %}➕ Zugang{% else %}➖ Abgang{% endif %}
-        </span>
-        <span style="font-weight:700;min-width:120px;">{{ ev.player }}</span>
-        {% if ev.type=='join' %}
-        <span style="font-size:.75rem;color:var(--text-muted);">
-          <span style="color:#64748b;">von</span> {{ ev.from_alliance }}
-          <span style="color:#64748b;">→</span>
-          <span style="color:#4ade80;">{{ ev.to_alliance }}</span>
-        </span>
-        {% else %}
-        <span style="font-size:.75rem;color:var(--text-muted);">
-          <span style="color:#64748b;">aus</span> {{ ev.from_alliance }}
-          <span style="color:#64748b;">→</span>
-          <span style="color:#f87171;">{{ ev.to_alliance }}</span>
-        </span>
-        {% endif %}
-      </div>
-      {% endfor %}
+    {% if internals %}
+    <div class="kpi" style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);">
+      <div class="kpi-label" style="color:#fbbf24;">🔀 Interne Wechsel</div>
+      <div class="kpi-val"   style="color:#fbbf24;">{{ internals }}</div>
     </div>
     {% endif %}
   </div>
 
+  <!-- ── BREAKDOWN + CHARTS (side by side) ── -->
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:1.1rem;margin-bottom:1.1rem;align-items:start;">
+
+    <!-- Breakdown table -->
+    <div class="section-card" style="margin:0;">
+      <div class="section-title">📐 Aufschlüsselung</div>
+      {% set colors = ['#6366f1','#f59e0b','#22c55e','#ec4899','#06b6d4','#f97316','#a78bfa','#84cc16'] %}
+      {% set max_pop = data.alliances | map(attribute='total_pop') | max %}
+      <div style="display:grid;gap:.45rem;">
+        <div style="display:grid;grid-template-columns:1fr 80px 50px 55px;gap:.5rem;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:.2rem .7rem;">
+          <span>Allianz</span><span style="text-align:right;">Pop.</span><span style="text-align:right;">M.</span><span style="text-align:right;">Dörfer</span>
+        </div>
+        {% for a in data.alliances | sort(attribute='total_pop', reverse=true) %}
+        {% set color = colors[loop.index0 % colors|length] %}
+        <div>
+          <div style="display:grid;grid-template-columns:1fr 80px 50px 55px;gap:.5rem;align-items:center;padding:.4rem .7rem;border-radius:8px;" class="ally-row">
+            <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ a.name | urlencode }}"
+               style="font-weight:700;font-size:.87rem;color:{{ color }};text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              {{ a.name }}
+            </a>
+            <div style="text-align:right;font-size:.82rem;font-weight:700;color:{{ color }};">{{ "{:,}".format(a.total_pop).replace(",",".") }}</div>
+            <div style="text-align:right;font-size:.8rem;color:var(--text-muted);">{{ a.members }}</div>
+            <div style="text-align:right;font-size:.8rem;color:var(--text-muted);">{{ a.villages }}</div>
+          </div>
+          <div style="padding:0 .7rem .25rem;">
+            <div class="bar-bg">
+              <div class="bar-fill" style="width:{{ [(a.total_pop / (max_pop or 1) * 100)|int,1]|max }}%;background:{{ color }};"></div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Charts: combined + per-alliance -->
+    <div style="display:flex;flex-direction:column;gap:.85rem;">
+
+      <!-- Combined chart -->
+      {% if ph|length > 1 %}
+      <div class="section-card" style="margin:0;padding:.9rem 1rem;">
+        <div class="section-title" style="margin-bottom:.6rem;">📈 Gesamt-Population</div>
+        <canvas id="popChartCombined" height="110"></canvas>
+      </div>
+      {% endif %}
+
+      <!-- Per-alliance mini charts -->
+      {% if data.ally_pop_history and ph|length > 1 %}
+      <div class="section-card" style="margin:0;padding:.9rem 1rem;">
+        <div class="section-title" style="margin-bottom:.65rem;">📊 Pro Allianz</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;">
+          {% for a in data.alliances %}
+          {% set color = colors[loop.index0 % colors|length] %}
+          <div>
+            <div style="font-size:.72rem;font-weight:700;color:{{ color }};margin-bottom:.3rem;">{{ a.name }}</div>
+            <canvas id="miniChart_{{ loop.index0 }}" height="70"
+                    data-ally="{{ a.name }}" data-color="{{ color }}"></canvas>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- ── EVENTS: two columns ── -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;">
+
+    <!-- External events -->
+    <div class="section-card" style="margin:0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+        <div class="section-title" style="margin:0;">🌍 Extern ({{ data.events|length }})</div>
+        <div style="display:flex;gap:.35rem;">
+          <button onclick="filterEvt('all','ext')"   id="extAll"   class="btn btn-primary"   style="font-size:.68rem;padding:.18rem .55rem;">Alle</button>
+          <button onclick="filterEvt('join','ext')"  id="extJoin"  class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .55rem;">➕</button>
+          <button onclick="filterEvt('leave','ext')" id="extLeave" class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .55rem;">➖</button>
+        </div>
+      </div>
+      {% if not data.events %}
+      <p style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:1.5rem 0;">Keine externen Bewegungen erkannt.</p>
+      {% else %}
+      <div style="max-height:520px;overflow-y:auto;padding-right:.15rem;" id="evtListExt">
+        {% for ev in data.events %}
+        <div class="ev-row ev-{{ ev.type }}" data-type="{{ ev.type }}">
+          <span class="ev-date">{{ ev.date }}</span>
+          <span class="ev-badge badge-{{ ev.type }}">{% if ev.type=='join' %}➕{% else %}➖{% endif %}</span>
+          <span style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;">{{ ev.player }}</span>
+          <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            {{ ev.from_alliance }} → {{ ev.to_alliance }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Internal transfers -->
+    <div class="section-card" style="margin:0;">
+      <div class="section-title">🔀 Interne Wechsel ({{ data.internal_events|length }})</div>
+      {% if not data.internal_events %}
+      <p style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:1.5rem 0;">Keine internen Transfers erkannt.</p>
+      {% else %}
+      <div style="max-height:520px;overflow-y:auto;padding-right:.15rem;">
+        {% for ev in data.internal_events %}
+        <div class="ev-row ev-internal">
+          <span class="ev-date">{{ ev.date }}</span>
+          <span class="ev-badge badge-internal">🔀</span>
+          <span style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;">{{ ev.player }}</span>
+          <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">
+            <span style="color:#f59e0b;">{{ ev.from_alliance }}</span>
+            →
+            <span style="color:#fbbf24;">{{ ev.to_alliance }}</span>
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
   {% endif %}
 </div>
 
-{% if data.pop_history|length > 1 %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const PH = {{ data.pop_history | tojson }};
-new Chart(document.getElementById('popChart'), {
-  type: 'line',
-  data: {
-    labels: PH.map(r => r.fetched_at.slice(0,10)),
-    datasets: [
-      { label:'Gesamt-Population', data:PH.map(r=>r.total_pop),     borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.12)', fill:true,   tension:.3, pointRadius:PH.length>30?0:3, yAxisID:'yPop' },
-      { label:'Mitglieder',        data:PH.map(r=>r.member_count),  borderColor:'#6366f1', backgroundColor:'transparent',           borderDash:[4,3], tension:.3, pointRadius:PH.length>30?0:3, yAxisID:'yMem' }
-    ]
-  },
-  options: {
-    responsive:true, interaction:{mode:'index',intersect:false},
-    scales:{
-      x:{ticks:{color:'#64748b',maxTicksLimit:8},grid:{color:'rgba(255,255,255,.05)'}},
-      yPop:{ticks:{color:'#f59e0b'},grid:{color:'rgba(255,255,255,.05)'},position:'left'},
-      yMem:{ticks:{color:'#6366f1'},grid:{display:false},position:'right'},
-    },
-    plugins:{legend:{labels:{color:'#94a3b8',boxWidth:12}}}
+const ALLY_PH = {{ data.ally_pop_history | tojson }};
+const COLORS = ['#6366f1','#f59e0b','#22c55e','#ec4899','#06b6d4','#f97316','#a78bfa','#84cc16'];
+
+const commonOpts = (yColor) => ({
+  responsive: true,
+  interaction: { mode:'index', intersect:false },
+  plugins: { legend:{ display:false } },
+  scales: {
+    x: { ticks:{ color:'#64748b', maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,.05)' } },
+    y: { ticks:{ color: yColor }, grid:{ color:'rgba(255,255,255,.04)' } }
   }
 });
-</script>
-{% endif %}
 
-<script>
-let _activeEvt = 'all';
-function filterEvt(type) {
-  _activeEvt = type;
-  document.getElementById('btnAll').className   = 'btn ' + (type==='all'   ? 'btn-primary' : 'btn-secondary');
-  document.getElementById('btnJoin').className  = 'btn ' + (type==='join'  ? 'btn-primary' : 'btn-secondary');
-  document.getElementById('btnLeave').className = 'btn ' + (type==='leave' ? 'btn-primary' : 'btn-secondary');
-  document.querySelectorAll('#evtList .ev-row').forEach(r => {
-    r.style.display = (type === 'all' || r.dataset.type === type) ? '' : 'none';
+// Combined chart
+if (PH.length > 1 && document.getElementById('popChartCombined')) {
+  new Chart(document.getElementById('popChartCombined'), {
+    type: 'line',
+    data: {
+      labels: PH.map(r => r.fetched_at.slice(0,10)),
+      datasets: [
+        { label:'Population', data:PH.map(r=>r.total_pop),    borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.12)', fill:true, tension:.3, pointRadius:PH.length>30?0:2, yAxisID:'yPop' },
+        { label:'Mitglieder', data:PH.map(r=>r.member_count), borderColor:'#6366f1', backgroundColor:'transparent', borderDash:[4,3], tension:.3, pointRadius:PH.length>30?0:2, yAxisID:'yMem' }
+      ]
+    },
+    options: {
+      responsive:true, interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{ ticks:{color:'#64748b',maxTicksLimit:7}, grid:{color:'rgba(255,255,255,.05)'} },
+        yPop:{ ticks:{color:'#f59e0b'}, grid:{color:'rgba(255,255,255,.04)'}, position:'left' },
+        yMem:{ ticks:{color:'#6366f1'}, grid:{display:false}, position:'right' }
+      },
+      plugins:{ legend:{ labels:{color:'#94a3b8',boxWidth:10,font:{size:11}} } }
+    }
   });
+}
+
+// Per-alliance mini charts
+document.querySelectorAll('[id^="miniChart_"]').forEach((canvas, idx) => {
+  const allyName = canvas.dataset.ally;
+  const color    = canvas.dataset.color;
+  const ph       = ALLY_PH[allyName] || [];
+  if (ph.length < 2) return;
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: ph.map(r => r.fetched_at.slice(5,10)),  // MM-DD only
+      datasets: [{
+        data: ph.map(r => r.total_pop),
+        borderColor: color,
+        backgroundColor: color + '22',
+        fill: true,
+        tension: .35,
+        pointRadius: ph.length > 20 ? 0 : 2,
+        borderWidth: 1.5,
+      }]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:v=>(v.raw||0).toLocaleString('de-DE')}} },
+      scales:{
+        x:{ ticks:{color:'#64748b',maxTicksLimit:4,font:{size:9}}, grid:{display:false} },
+        y:{ ticks:{color: color,   maxTicksLimit:3,font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} }
+      }
+    }
+  });
+});
+
+// Event filter
+function filterEvt(type, list) {
+  if (list === 'ext') {
+    document.getElementById('extAll').className   = 'btn ' + (type==='all'   ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('extJoin').className  = 'btn ' + (type==='join'  ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('extLeave').className = 'btn ' + (type==='leave' ? 'btn-primary' : 'btn-secondary');
+    document.querySelectorAll('#evtListExt .ev-row').forEach(r => {
+      r.style.display = (type==='all' || r.dataset.type===type) ? '' : 'none';
+    });
+  }
 }
 </script>
 {% endblock %}
