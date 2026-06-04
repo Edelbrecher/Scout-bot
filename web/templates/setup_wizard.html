@@ -73,13 +73,11 @@
     <div class="sw-progress-fill" style="width:{{ (steps_done / 3 * 100) | int }}%;"></div>
   </div>
 
-  {% if steps_done == 3 %}
-  <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1.5rem;">
+  <div id="all-set-banner" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1.5rem;{% if steps_done < 3 %}display:none;{% endif %}">
     <div style="font-size:2rem;margin-bottom:.4rem;">🎉</div>
     <div style="font-weight:700;font-size:1rem;color:#4ade80;margin-bottom:.3rem;">All set! You're ready to go.</div>
     <a href="/guild/{{ guild.guild_id }}/farming" class="btn btn-primary" style="margin-top:.5rem;">🌾 Go to Farming →</a>
   </div>
-  {% endif %}
 
   <!-- ── Step 1: Travian World ── -->
   {% set s1class = 'done' if step1_done else 'active' %}
@@ -95,17 +93,17 @@
       <p style="font-size:.88rem;color:var(--text-muted);margin:0 0 1rem;">
         Enter your Travian server URL. TravOps uses it to fetch the world map automatically every few hours.
       </p>
-      <form method="POST" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex;flex-direction:column;gap:.75rem;">
+      <form id="form-world" style="display:flex;flex-direction:column;gap:.75rem;">
         <div>
           <label style="font-size:.8rem;color:var(--text-muted);margin-bottom:.3rem;display:block;">Server URL</label>
-          <input name="server_url" class="form-control" placeholder="https://ts1.travian.com"
+          <input id="input-world-url" name="server_url" class="form-control" placeholder="https://ts1.travian.com"
                  value="{{ tw_world }}" style="font-family:monospace;font-size:.9rem;" required>
           <div style="font-size:.74rem;color:var(--text-muted);margin-top:.3rem;">
             Example: <code>https://ts1.travian.com</code> or <code>https://tx3.travian.de</code>
           </div>
         </div>
-        <input type="hidden" name="next_url" value="/guild/{{ guild.guild_id }}/setup">
-        <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Save & continue →</button>
+        <button type="submit" id="btn-save-world" class="btn btn-primary" style="align-self:flex-start;">Save & continue →</button>
+        <div id="world-feedback" style="display:none;font-size:.82rem;color:#4ade80;">✅ Saved!</div>
       </form>
       {% if step1_done %}
       <div style="margin-top:.75rem;font-size:.8rem;color:var(--text-muted);">
@@ -169,18 +167,13 @@
       <p style="font-size:.88rem;color:var(--text-muted);margin:0 0 1rem;">
         TravOps fetches the world map automatically — but you can trigger the first load right now to have data immediately.
       </p>
-      {% if step3_done %}
-      <div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:.65rem .9rem;font-size:.83rem;color:#4ade80;margin-bottom:.75rem;">
+      <div id="snap-success-box" style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:.65rem .9rem;font-size:.83rem;color:#4ade80;margin-bottom:.75rem;{% if not step3_done %}display:none;{% endif %}">
         ✅ Map data loaded — {{ snapshot_count }} snapshot{{ 's' if snapshot_count != 1 else '' }} available.
       </div>
-      {% endif %}
       {% if step1_done %}
-      <form method="POST" action="/guild/{{ guild.guild_id }}/map/trigger-snapshot" style="display:inline;">
-        <input type="hidden" name="next_url" value="/guild/{{ guild.guild_id }}/setup">
-        <button type="submit" class="btn {% if step3_done %}btn-secondary{% else %}btn-primary{% endif %}" style="align-self:flex-start;">
-          {% if step3_done %}🔄 Refresh now{% else %}📥 Load map now{% endif %}
-        </button>
-      </form>
+      <button id="btn-trigger-snap" onclick="triggerSnapshot()" class="btn {% if step3_done %}btn-secondary{% else %}btn-primary{% endif %}" style="align-self:flex-start;">
+        {% if step3_done %}🔄 Refresh now{% else %}📥 Load map now{% endif %}
+      </button>
       <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem;">
         Auto-refresh runs every 15 minutes. Manual trigger fetches latest data instantly.
       </div>
@@ -207,10 +200,13 @@
 </div>
 
 <script>
+const GUILD_ID = "{{ guild.guild_id }}";
+
 function toggleStep(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('open');
 }
+
 // Auto-open first incomplete step
 document.addEventListener('DOMContentLoaded', () => {
   ['step1','step2','step3'].forEach(id => {
@@ -219,6 +215,98 @@ document.addEventListener('DOMContentLoaded', () => {
       el.classList.add('open');
     }
   });
+
+  // Step 1 form — save world URL via fetch
+  const formWorld = document.getElementById('form-world');
+  if (formWorld) {
+    formWorld.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-save-world');
+      const url = document.getElementById('input-world-url').value.trim();
+      if (!url) return;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        const fd = new FormData();
+        fd.append('server_url', url);
+        fd.append('next_url', '');
+        await fetch(`/guild/${GUILD_ID}/map/world`, { method: 'POST', body: fd });
+        // Mark step1 done without reload
+        markStepDone('step1');
+        document.getElementById('world-feedback').style.display = 'block';
+        btn.textContent = '✓ Saved';
+        // If step3 button exists, enable it
+        const btn3 = document.getElementById('btn-trigger-snap');
+        if (btn3) btn3.disabled = false;
+        // Advance to next open step after short delay
+        setTimeout(() => openNextStep(), 600);
+      } catch {
+        btn.disabled = false;
+        btn.textContent = 'Save & continue →';
+      }
+    });
+  }
 });
+
+function markStepDone(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('active');
+  el.classList.add('done');
+  // Update num badge
+  const num = el.querySelector('.sw-num');
+  if (num) num.textContent = '✓';
+  // Update status badge
+  const badge = el.querySelector('.sw-status');
+  if (badge) { badge.className = 'sw-status done'; badge.textContent = '✅ Done'; }
+  // Update progress bar
+  updateProgress();
+}
+
+function updateProgress() {
+  const done = document.querySelectorAll('.sw-step.done').length;
+  const fill = document.querySelector('.sw-progress-fill');
+  if (fill) fill.style.width = (done / 3 * 100) + '%';
+  if (done === 3) {
+    const allSet = document.getElementById('all-set-banner');
+    if (allSet) allSet.style.display = 'block';
+  }
+}
+
+function openNextStep() {
+  ['step1','step2','step3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('active')) {
+      el.classList.add('open');
+    }
+  });
+}
+
+async function triggerSnapshot() {
+  const btn = document.getElementById('btn-trigger-snap');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading…';
+  try {
+    const fd = new FormData();
+    fd.append('next_url', '');
+    await fetch(`/guild/${GUILD_ID}/map/trigger-snapshot`, { method: 'POST', body: fd });
+    markStepDone('step3');
+    // Update button
+    btn.className = 'btn btn-secondary';
+    btn.textContent = '🔄 Refresh now';
+    btn.disabled = false;
+    btn.onclick = triggerSnapshot;
+    // Update status text in step3
+    const snap3status = document.querySelector('#step3 .sw-status');
+    if (snap3status) { snap3status.className = 'sw-status done'; snap3status.textContent = '✅ 1 snapshot'; }
+    // Show success box
+    const box = document.getElementById('snap-success-box');
+    if (box) box.style.display = 'block';
+  } catch {
+    btn.disabled = false;
+    btn.textContent = '📥 Load map now';
+  }
+}
 </script>
 {% endblock %}
