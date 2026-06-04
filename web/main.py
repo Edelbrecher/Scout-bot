@@ -689,10 +689,9 @@ async def lifespan(app: FastAPI):
                 try:
                     latest = await database.get_latest_snapshot_time(g["guild_id"])
                     if latest:
-                        age_h = (_datetime.datetime.utcnow() - _datetime.datetime.fromisoformat(latest)).total_seconds() / 3600
-                        if age_h < 6:
-                            print(f"[scanner] guild {g['guild_id']} snapshot {age_h:.1f}h ago — skip", flush=True)
-                            continue
+                        age_min = (_datetime.datetime.utcnow() - _datetime.datetime.fromisoformat(latest)).total_seconds() / 60
+                        if age_min < 15:
+                            continue  # Travian updates map.sql every 15min — no point fetching sooner
                     print(f"[scanner] fetching snapshot for guild {g['guild_id']} from {tw_world}", flush=True)
                     await _fetch_and_save_snapshot(g["guild_id"], tw_world)
                     await database.prune_old_snapshots(g["guild_id"], keep_days=30)
