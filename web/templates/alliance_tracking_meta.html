@@ -27,7 +27,7 @@
 </style>
 
 <div style="max-width:1400px;margin:0 auto;padding:0 1.25rem 3rem;">
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Allianz-Tracking</a>
+  <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Alliance Tracking</a>
 
   <!-- Quick-switch -->
   {% if meta_groups|length > 1 or watched %}
@@ -57,13 +57,13 @@
         {% for a in group.alliances %}<span class="ally-chip">{{ a }}</span>{% endfor %}
       </div>
     </div>
-    {% if data.latest %}<div style="font-size:.73rem;color:var(--text-muted);">Letzter Snapshot: {{ data.latest[:10] }}</div>{% endif %}
+    {% if data.latest %}<div style="font-size:.73rem;color:var(--text-muted);">Last snapshot: {{ data.latest[:10] }}</div>{% endif %}
   </div>
 
   {% if not data.alliances or data.total_members == 0 %}
   <div style="text-align:center;padding:4rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;">🔭</div>
-    <p style="margin-top:.75rem;">Keine Kartendaten für diese Meta gefunden.</p>
+    <p style="margin-top:.75rem;">No map data found for this meta.</p>
   </div>
   {% else %}
 
@@ -79,7 +79,7 @@
     {% set dm = (lph.member_count - pph.member_count) if pph else 0 %}
     {% set dp = (lph.total_pop   - pph.total_pop)    if pph else 0 %}
     <div class="kpi" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.28);">
-      <div class="kpi-label" style="color:#a5b4fc;">👥 Mitglieder</div>
+      <div class="kpi-label" style="color:#a5b4fc;">👥 Members</div>
       <div class="kpi-val"   style="color:#a5b4fc;">{{ data.total_members }}</div>
       {% if dm != 0 %}<div class="kpi-delta" style="color:{{ '#4ade80' if dm>0 else '#f87171' }};">{{ '▲' if dm>0 else '▼' }} {{ dm|abs }}</div>{% endif %}
     </div>
@@ -89,20 +89,20 @@
       {% if dp != 0 %}<div class="kpi-delta" style="color:{{ '#4ade80' if dp>0 else '#f87171' }};">{{ '▲' if dp>0 else '▼' }} {{ "{:,}".format(dp|abs).replace(",",".") }}</div>{% endif %}
     </div>
     <div class="kpi" style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);">
-      <div class="kpi-label" style="color:#4ade80;">🏘️ Dörfer</div>
+      <div class="kpi-label" style="color:#4ade80;">🏘️ Villages</div>
       <div class="kpi-val"   style="color:#4ade80;">{{ data.total_villages }}</div>
     </div>
     <div class="kpi" style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);">
-      <div class="kpi-label" style="color:#4ade80;">➕ Zugänge</div>
+      <div class="kpi-label" style="color:#4ade80;">➕ Joins</div>
       <div class="kpi-val"   style="color:#4ade80;">{{ joins }}</div>
     </div>
     <div class="kpi" style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);">
-      <div class="kpi-label" style="color:#f87171;">➖ Abgänge</div>
+      <div class="kpi-label" style="color:#f87171;">➖ Leaves</div>
       <div class="kpi-val"   style="color:#f87171;">{{ leaves }}</div>
     </div>
     {% if internals %}
     <div class="kpi" style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);">
-      <div class="kpi-label" style="color:#fbbf24;">🔀 Interne Wechsel</div>
+      <div class="kpi-label" style="color:#fbbf24;">🔀 Internal Transfers</div>
       <div class="kpi-val"   style="color:#fbbf24;">{{ internals }}</div>
     </div>
     {% endif %}
@@ -113,12 +113,12 @@
 
     <!-- Breakdown table -->
     <div class="section-card" style="margin:0;">
-      <div class="section-title">📐 Aufschlüsselung</div>
+      <div class="section-title">📐 Breakdown</div>
       {% set colors = ['#6366f1','#f59e0b','#22c55e','#ec4899','#06b6d4','#f97316','#a78bfa','#84cc16'] %}
       {% set max_pop = data.alliances | map(attribute='total_pop') | max %}
       <div style="display:grid;gap:.45rem;">
         <div style="display:grid;grid-template-columns:1fr 80px 50px 55px;gap:.5rem;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:.2rem .7rem;">
-          <span>Allianz</span><span style="text-align:right;">Pop.</span><span style="text-align:right;">M.</span><span style="text-align:right;">Dörfer</span>
+          <span>Alliance</span><span style="text-align:right;">Pop.</span><span style="text-align:right;">M.</span><span style="text-align:right;">Villages</span>
         </div>
         {% for a in data.alliances | sort(attribute='total_pop', reverse=true) %}
         {% set color = colors[loop.index0 % colors|length] %}
@@ -148,7 +148,7 @@
       <!-- Combined chart -->
       {% if ph|length > 1 %}
       <div class="section-card" style="margin:0;padding:.9rem 1rem;">
-        <div class="section-title" style="margin-bottom:.6rem;">📈 Gesamt-Population</div>
+        <div class="section-title" style="margin-bottom:.6rem;">📈 Total Population</div>
         <canvas id="popChartCombined" height="110"></canvas>
       </div>
       {% endif %}
@@ -156,7 +156,7 @@
       <!-- Per-alliance mini charts -->
       {% if data.ally_pop_history and ph|length > 1 %}
       <div class="section-card" style="margin:0;padding:.9rem 1rem;">
-        <div class="section-title" style="margin-bottom:.65rem;">📊 Pro Allianz</div>
+        <div class="section-title" style="margin-bottom:.65rem;">📊 Per Alliance</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;">
           {% for a in data.alliances %}
           {% set color = colors[loop.index0 % colors|length] %}
@@ -179,15 +179,15 @@
     <!-- External events -->
     <div class="section-card" style="margin:0;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
-        <div class="section-title" style="margin:0;">🌍 Extern ({{ data.events|length }})</div>
+        <div class="section-title" style="margin:0;">🌍 External ({{ data.events|length }})</div>
         <div style="display:flex;gap:.35rem;">
-          <button onclick="filterEvt('all','ext')"   id="extAll"   class="btn btn-primary"   style="font-size:.68rem;padding:.18rem .55rem;">Alle</button>
+          <button onclick="filterEvt('all','ext')"   id="extAll"   class="btn btn-primary"   style="font-size:.68rem;padding:.18rem .55rem;">All</button>
           <button onclick="filterEvt('join','ext')"  id="extJoin"  class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .55rem;">➕</button>
           <button onclick="filterEvt('leave','ext')" id="extLeave" class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .55rem;">➖</button>
         </div>
       </div>
       {% if not data.events %}
-      <p style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:1.5rem 0;">Keine externen Bewegungen erkannt.</p>
+      <p style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:1.5rem 0;">No external movements detected.</p>
       {% else %}
       <div style="max-height:520px;overflow-y:auto;padding-right:.15rem;" id="evtListExt">
         {% for ev in data.events %}
@@ -206,9 +206,9 @@
 
     <!-- Internal transfers -->
     <div class="section-card" style="margin:0;">
-      <div class="section-title">🔀 Interne Wechsel ({{ data.internal_events|length }})</div>
+      <div class="section-title">🔀 Internal Transfers ({{ data.internal_events|length }})</div>
       {% if not data.internal_events %}
-      <p style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:1.5rem 0;">Keine internen Transfers erkannt.</p>
+      <p style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:1.5rem 0;">No internal transfers detected.</p>
       {% else %}
       <div style="max-height:520px;overflow-y:auto;padding-right:.15rem;">
         {% for ev in data.internal_events %}
@@ -255,7 +255,7 @@ if (PH.length > 1 && document.getElementById('popChartCombined')) {
       labels: PH.map(r => r.fetched_at.slice(0,10)),
       datasets: [
         { label:'Population', data:PH.map(r=>r.total_pop),    borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.12)', fill:true, tension:.3, pointRadius:PH.length>30?0:2, yAxisID:'yPop' },
-        { label:'Mitglieder', data:PH.map(r=>r.member_count), borderColor:'#6366f1', backgroundColor:'transparent', borderDash:[4,3], tension:.3, pointRadius:PH.length>30?0:2, yAxisID:'yMem' }
+        { label:'Members', data:PH.map(r=>r.member_count), borderColor:'#6366f1', backgroundColor:'transparent', borderDash:[4,3], tension:.3, pointRadius:PH.length>30?0:2, yAxisID:'yMem' }
       ]
     },
     options: {

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Allianz-Tracking · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Alliance Tracking · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -55,16 +55,16 @@
 
 <div style="max-width:1400px;margin:0 auto;padding:0 1.25rem 3rem;">
 
-  <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link">← Enemy-Kartei</a>
+  <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link">← Enemies</a>
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin:1rem 0 1.4rem;">
     <div>
-      <h1 style="margin:0;">🔭 Allianz-Tracking</h1>
-      <p class="subtitle" style="margin:.2rem 0 0;">Joins, Leaves, Population-Wachstum — alles im Blick</p>
+      <h1 style="margin:0;">🔭 Alliance Tracking</h1>
+      <p class="subtitle" style="margin:.2rem 0 0;">Joins, leaves, population growth — all in one place</p>
     </div>
     <button onclick="document.getElementById('settingsModal').classList.add('open')"
             class="btn btn-secondary" style="gap:.4rem;display:flex;align-items:center;">
-      ⚙️ Einstellungen
+      ⚙️ Settings
       {% if watched %}<span style="background:rgba(99,102,241,.25);border-radius:10px;padding:.05rem .45rem;font-size:.7rem;">{{ watched|length }}</span>{% endif %}
     </button>
   </div>
@@ -75,7 +75,7 @@
   {% set has_own = ally_group and (ally_group.ally_name or ally_group.wing1_name) %}
   {% if not meta_groups and not has_own %}
   <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:.85rem;color:var(--text-muted);">
-    ⚠️ Noch keine Allianz-Metas konfiguriert. Erstelle Metas in den <a href="/guild/{{ guild.guild_id }}/map" style="color:#fbbf24;">Karteneinstellungen</a> oder beobachte einzelne Allianzen über ⚙️ Einstellungen.
+    ⚠️ No alliance metas configured yet. Create metas in the <a href="/guild/{{ guild.guild_id }}/map" style="color:#fbbf24;">Map settings</a> or watch individual alliances via ⚙️ Settings.
   </div>
   {% endif %}
 
@@ -90,12 +90,12 @@
     <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/own" class="meta-card">
       <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;">
         <span style="font-size:1.2rem;">⭐</span>
-        <span style="font-weight:800;font-size:.98rem;">Eigene Meta</span>
+        <span style="font-weight:800;font-size:.98rem;">Own Meta</span>
       </div>
       <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
         {% for a in own_allies %}<span class="meta-ally-tag">{{ a }}</span>{% endfor %}
       </div>
-      <div style="margin-top:.65rem;font-size:.72rem;color:var(--text-muted);">Klicken für Details →</div>
+      <div style="margin-top:.65rem;font-size:.72rem;color:var(--text-muted);">Click for details →</div>
     </a>
     {% endif %}
 
@@ -107,9 +107,9 @@
       </div>
       <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
         {% for a in g.alliances %}<span class="meta-ally-tag">{{ a }}</span>{% endfor %}
-        {% if not g.alliances %}<span style="font-size:.73rem;color:var(--text-muted);">Keine Allianzen</span>{% endif %}
+        {% if not g.alliances %}<span style="font-size:.73rem;color:var(--text-muted);">No alliances</span>{% endif %}
       </div>
-      <div style="margin-top:.65rem;font-size:.72rem;color:var(--text-muted);">Klicken für Details →</div>
+      <div style="margin-top:.65rem;font-size:.72rem;color:var(--text-muted);">Click for details →</div>
     </a>
     {% endfor %}
 
@@ -118,7 +118,7 @@
 
   <!-- ── SINGLE WATCHED (quick links) ── -->
   {% if watched %}
-  <div style="margin-bottom:.5rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);">📌 Einzelne Allianzen</div>
+  <div style="margin-bottom:.5rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);">📌 Individual Alliances</div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
     {% for w in watched %}
     <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}" class="watch-chip">
@@ -132,15 +132,15 @@
   {% if not meta_groups and not has_own and not watched %}
   <div style="text-align:center;padding:4rem 1rem;color:var(--text-muted);">
     <div style="font-size:3rem;margin-bottom:1rem;">🔭</div>
-    <p>Noch nichts eingerichtet.</p>
-    <button onclick="document.getElementById('settingsModal').classList.add('open')" class="btn btn-primary" style="margin-top:.5rem;">⚙️ Allianz beobachten</button>
+    <p>Nothing set up yet.</p>
+    <button onclick="document.getElementById('settingsModal').classList.add('open')" class="btn btn-primary" style="margin-top:.5rem;">⚙️ Watch Alliance</button>
   </div>
   {% endif %}
 
   <!-- ── TOP ALLIANCES (if no metas) ── -->
   {% if top_alliances and not meta_groups and not has_own %}
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;">
-    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.7rem;">⚡ Größte Allianzen aus Karten-Daten</div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.7rem;">⚡ Top Alliances from Map Data</div>
     <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
       {% for a in top_alliances %}
       <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ a.alliance_name | urlencode }}" class="watch-chip">
@@ -157,21 +157,21 @@
 <div id="settingsModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
-      <h2 style="margin:0;font-size:1.05rem;">⚙️ Einstellungen</h2>
+      <h2 style="margin:0;font-size:1.05rem;">⚙️ Settings</h2>
       <button onclick="document.getElementById('settingsModal').classList.remove('open')"
               style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .35rem;">&times;</button>
     </div>
 
     <!-- Add alliance -->
     <div style="margin-bottom:1.2rem;">
-      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">+ Allianz beobachten</div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">+ Watch Alliance</div>
       <form method="POST" action="/guild/{{ guild.guild_id }}/alliance-tracking/watch" style="display:flex;gap:.5rem;">
-        <input name="alliance_name" id="watchInput" class="form-control" placeholder="Allianzname" style="flex:1;" required>
-        <button type="submit" class="btn btn-primary" style="white-space:nowrap;">+ Hinzufügen</button>
+        <input name="alliance_name" id="watchInput" class="form-control" placeholder="Alliance name" style="flex:1;" required>
+        <button type="submit" class="btn btn-primary" style="white-space:nowrap;">+ Add</button>
       </form>
       {% if top_alliances %}
       <div style="margin-top:.7rem;">
-        <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.35rem;">Schnellauswahl:</div>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.35rem;">Quick select:</div>
         <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
           {% for a in top_alliances %}
           <span class="top-chip" onclick="document.getElementById('watchInput').value='{{ a.alliance_name|e }}'">
@@ -186,7 +186,7 @@
     <!-- Watched list -->
     {% if watched %}
     <div style="border-top:1px solid var(--border);padding-top:1rem;">
-      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">Beobachtete Allianzen</div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.6rem;">Watched Alliances</div>
       <div style="display:flex;flex-direction:column;gap:.4rem;">
         {% for w in watched %}
         <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;">
@@ -196,7 +196,7 @@
           </a>
           <span style="font-size:.7rem;color:var(--text-muted);">{{ w.added_at[:10] }}</span>
           <form method="POST" action="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}/unwatch" style="margin:0;">
-            <button type="submit" onclick="return confirm('Entfernen?')"
+            <button type="submit" onclick="return confirm('Remove?')"
                     style="background:none;border:none;color:#f87171;cursor:pointer;font-size:.85rem;padding:.15rem .3rem;">✕</button>
           </form>
         </div>
@@ -204,7 +204,7 @@
       </div>
     </div>
     {% else %}
-    <p style="font-size:.8rem;color:var(--text-muted);text-align:center;padding:.75rem 0;">Noch keine Allianzen beobachtet.</p>
+    <p style="font-size:.8rem;color:var(--text-muted);text-align:center;padding:.75rem 0;">No alliances watched yet.</p>
     {% endif %}
 
   </div>
