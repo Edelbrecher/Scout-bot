@@ -1816,6 +1816,58 @@ async def get_player_pop_growth(guild_id: str, player_name: str, days: int = 7) 
         return {"latest": latest, "old": old, "delta": latest - old}
 
 
+async def get_bulk_village_pop_deltas(guild_id: str, coords: list) -> dict:
+    """Return {(x,y): {1: Δ, 2: Δ, 3: Δ, 5: Δ, 7: Δ, 14: Δ}} for multiple villages.
+    Compares latest daily pop to pop from N days ago.
+    """
+    if not coords:
+        return {}
+    from datetime import date as _date, timedelta as _td
+    # Fetch 15 days of daily pop history for all coords in one query
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        or_clauses = " OR ".join("(x=? AND y=?)" for _ in coords)
+        flat = [val for (x, y) in coords for val in (x, y)]
+        async with db.execute(f"""
+            SELECT x, y, DATE(fetched_at) as snap_date, MAX(population) as pop
+            FROM map_snapshots
+            WHERE guild_id=? AND fetched_at >= datetime('now', '-15 days')
+              AND ({or_clauses})
+            GROUP BY x, y, DATE(fetched_at)
+            ORDER BY x, y, snap_date DESC
+        """, (guild_id, *flat)) as cur:
+            rows = await cur.fetchall()
+
+    # Build per-coord date→pop mapping
+    raw: dict = {}
+    for r in rows:
+        key = (r[0], r[1])
+        raw.setdefault(key, {})[r[2]] = r[3]
+
+    result = {}
+    today = _date.today()
+    for coords_key, date_map in raw.items():
+        if not date_map:
+            result[coords_key] = {}
+            continue
+        # Use latest available date as reference
+        latest_date = max(date_map.keys())
+        latest_pop = date_map[latest_date]
+        deltas = {}
+        for n in (1, 2, 3, 5, 7, 14):
+            target = (today - _td(days=n)).isoformat()
+            if target in date_map:
+                deltas[n] = latest_pop - date_map[target]
+            else:
+                # Try 1 day tolerance
+                for offset in (1, -1):
+                    alt = (today - _td(days=n + offset)).isoformat()
+                    if alt in date_map:
+                        deltas[n] = latest_pop - date_map[alt]
+                        break
+        result[coords_key] = deltas
+    return result
+
+
 async def get_bulk_village_pop_history(guild_id: str, coords: list, days: int = 7) -> dict:
     """Return {(x,y): [{"date":..., "pop":...}, ...]} for multiple villages."""
     if not coords:
@@ -1982,6 +2034,7 @@ async def get_inactive_farms(
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT village_id, x, y, village_name, player_name, tribe,
+                   MAX(alliance_name) as alliance_name,
                    MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
                    COUNT(DISTINCT fetched_at) as snapshot_count,
                    MIN(population) as min_pop_val, MAX(population) as max_pop_val,

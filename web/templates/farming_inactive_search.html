@@ -2,7 +2,23 @@
 {% block title %}Inaktive Search · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1300px;">
+<!-- ══ LOADING OVERLAY ══════════════════════════════════════════════════════ -->
+<div id="loadingOverlay" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(10,10,20,0.88);backdrop-filter:blur(6px);
+     flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;">
+  <div style="text-align:center;">
+    <div style="font-size:3rem;margin-bottom:0.5rem;animation:spin 2s linear infinite;display:inline-block;">🏚️</div>
+    <h2 style="color:#fff;margin:0 0 0.25rem;font-size:1.4rem;">Searching inactive villages…</h2>
+    <p style="color:#94a3b8;margin:0;font-size:0.9rem;" id="loadingQuote"></p>
+  </div>
+  <div style="width:320px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+    <div id="loadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);
+         border-radius:3px;transition:width 0.4s ease;"></div>
+  </div>
+  <p style="color:#475569;font-size:0.75rem;margin:0;">Analyzing snapshots — hang tight</p>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<div class="container" style="max-width:100%;">
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;">
     <div>
@@ -319,6 +335,32 @@
 </div>
 
 <script>
+// ── Loading overlay ─────────────────────────────────────────────────────────
+const _QUOTES = [
+  "Patience, commander. Even Rome wasn't scouted in a day.",
+  "Calculating the laziest players on the server…",
+  "Cross-referencing couch warriors with real warriors…",
+  "Sorting the inactive from the merely very slow.",
+  "Your next farm is about to be revealed. No pressure.",
+  "Fun fact: 73% of all Travian players are 'just taking a break'.",
+  "Checking if anyone logged off to touch grass…",
+  "Querying the database at the speed of a Natar village.",
+];
+document.addEventListener('DOMContentLoaded', () => {
+  const sf = document.getElementById('searchForm');
+  if (sf) sf.addEventListener('submit', () => {
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.style.display = 'flex';
+    document.getElementById('loadingQuote').textContent = _QUOTES[Math.floor(Math.random() * _QUOTES.length)];
+    let pct = 0;
+    const bar = document.getElementById('loadingBar');
+    setInterval(() => {
+      pct = Math.min(pct + (Math.random() * 8 + 2), 90);
+      bar.style.width = pct + '%';
+    }, 300);
+  });
+});
+
 // Auto-open extended filters if any extended filter is set
 (function() {
   const ext = {{ 'true' if (min_pop or max_pop < 9999 or min_player_pop or max_player_pop < 999999 or min_dist or max_dist < 9999 or player_filter or alliance_filter or exclude_players or exclude_alliances or include_natars) else 'false' }};

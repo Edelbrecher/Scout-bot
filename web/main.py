@@ -6721,7 +6721,8 @@ async def farming_page(
     _farm_slice = inactive_farms[:200]
     result_coords = [(f["x"], f["y"]) for f in _farm_slice]
     result_players = list({f["player_name"] for f in _farm_slice if f.get("player_name")})
-    pop_history = await database.get_bulk_village_pop_history(guild_id, result_coords)
+    pop_history = await database.get_bulk_village_pop_history(guild_id, result_coords, days=14)
+    pop_deltas = await database.get_bulk_village_pop_deltas(guild_id, result_coords)
     player_growth = await database.get_bulk_player_pop_growth(guild_id, result_players)
 
     # Alliance names for autocomplete
@@ -6752,6 +6753,7 @@ async def farming_page(
         "farm_stats": farm_stats,
         "inactive_farms": inactive_farms,
         "pop_history": pop_history,
+        "pop_deltas": pop_deltas,
         "player_growth": player_growth,
         "farm_list": farm_list,
         "cross_reference": cross_reference,

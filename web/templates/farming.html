@@ -2,7 +2,24 @@
 {% block title %}Farming Intelligence · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1300px;">
+<div class="container" style="max-width:100%;">
+
+<!-- ══ LOADING OVERLAY ══════════════════════════════════════════════════════ -->
+<div id="loadingOverlay" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(10,10,20,0.88);backdrop-filter:blur(6px);
+     flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;">
+  <div style="text-align:center;">
+    <div style="font-size:3rem;margin-bottom:0.5rem;animation:spin 2s linear infinite;display:inline-block;">⚔️</div>
+    <h2 style="color:#fff;margin:0 0 0.25rem;font-size:1.4rem;" id="loadingTitle">Scouting inactive targets…</h2>
+    <p style="color:#94a3b8;margin:0;font-size:0.9rem;" id="loadingQuote"></p>
+  </div>
+  <div style="width:320px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+    <div id="loadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);
+         border-radius:3px;transition:width 0.4s ease;"></div>
+  </div>
+  <p style="color:#475569;font-size:0.75rem;margin:0;">Analyzing snapshots — hang tight</p>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
   <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
@@ -426,16 +443,22 @@
           <thead>
             <tr>
               <th style="width:32px;">#</th>
-              <th>Coordinates</th>
-              <th>Village</th>
-              <th>Player</th>
-              <th>Tribe</th>
-              <th onclick="sortInactive('population')" style="cursor:pointer;">Pop. ↕</th>
-              <th onclick="sortInactive('days_tracked')" style="cursor:pointer;">Inactive ↕</th>
+              <th>Koordinaten</th>
+              <th>Dorf</th>
+              <th>Spieler / Allianz</th>
+              <th>Volk</th>
+              <th onclick="sortInactive('population')" style="cursor:pointer;" title="Village population">Pop ↕</th>
+              <th onclick="sortInactive('days_tracked')" style="cursor:pointer;" title="Days inactive">⏳ ↕</th>
               <th title="Capital village">★</th>
-              <th title="Crop field layout">Fields</th>
-              <th title="Account pop growth last 7 days">Acc. Δ7d</th>
-              <th title="Village pop last 7 days">Pop history</th>
+              <th title="Crop field layout">🌾</th>
+              <th title="Account pop delta last 7d">Acc.Δ7d</th>
+              <th title="Village pop change 1 day" style="color:#94a3b8;font-size:.72rem;">Δ1d</th>
+              <th title="Village pop change 2 days" style="color:#94a3b8;font-size:.72rem;">Δ2d</th>
+              <th title="Village pop change 3 days" style="color:#94a3b8;font-size:.72rem;">Δ3d</th>
+              <th title="Village pop change 5 days" style="color:#94a3b8;font-size:.72rem;">Δ5d</th>
+              <th title="Village pop change 7 days" style="color:#94a3b8;font-size:.72rem;">Δ7d</th>
+              <th title="Village pop change 14 days" style="color:#94a3b8;font-size:.72rem;">Δ14d</th>
+              <th title="Farm Score (inactivity + pop trend)" style="color:#fbbf24;font-size:.72rem;">Score</th>
               {% if has_farmlist %}<th>📋 Lists</th>{% endif %}
               <th style="white-space:nowrap;">🔭 📋</th>
             </tr>
@@ -473,15 +496,20 @@
                   {% endif %}
                 </div>
               </td>
-              <td>{{ farm.village_name or '—' }}</td>
-              <td>{{ farm.player_name or '<span style="color:var(--text-muted);">Barbarian village</span>' | safe }}</td>
-              <td style="font-size:0.85rem;">
-                {% if farm.tribe == 1 %}🏛️ Romans
-                {% elif farm.tribe == 2 %}⚔️ Teutons
-                {% elif farm.tribe == 3 %}🌿 Gauls
-                {% elif farm.tribe == 4 %}👾 Natars
-                {% elif farm.tribe == 5 %}🏹 Huns
-                {% elif farm.tribe == 6 %}🏺 Egyptians
+              <td style="font-size:.82rem;">{{ farm.village_name or '—' }}</td>
+              <td style="font-size:.82rem;">
+                {% if farm.player_name %}
+                <div style="font-weight:600;">{{ farm.player_name }}</div>
+                {% if farm.get('alliance_name') %}<div style="font-size:.7rem;color:var(--text-muted);">[{{ farm.alliance_name }}]</div>{% endif %}
+                {% else %}<span style="color:var(--text-muted);">Barbarian</span>{% endif %}
+              </td>
+              <td style="font-size:.78rem;">
+                {% if farm.tribe == 1 %}🏛️
+                {% elif farm.tribe == 2 %}⚔️
+                {% elif farm.tribe == 3 %}🌿
+                {% elif farm.tribe == 4 %}👾
+                {% elif farm.tribe == 5 %}🏹
+                {% elif farm.tribe == 6 %}🏺
                 {% else %}—{% endif %}
               </td>
               <td><strong>{{ farm.population }}</strong></td>
@@ -499,13 +527,13 @@
               {# Field type #}
               <td style="font-size:.75rem;text-align:center;">
                 {% set vt = farm.get('village_type', 0)|int %}
-                {% if vt == 15 %}🌾15
-                {% elif vt == 9 %}🌾9
-                {% elif vt == 7 %}🌾7
-                {% elif vt == 6 %}🌾6
+                {% if vt == 15 %}15
+                {% elif vt == 9 %}9
+                {% elif vt == 7 %}7
+                {% elif vt == 6 %}6
                 {% else %}—{% endif %}
               </td>
-              {# Account growth #}
+              {# Account growth Δ7d #}
               <td style="font-size:.78rem;text-align:right;">
                 {% set pg = player_growth.get(farm.player_name, {}) %}
                 {% set delta = pg.get('delta', 0) %}
@@ -514,23 +542,35 @@
                 {% elif pg %}<span style="color:var(--text-muted);">±0</span>
                 {% else %}—{% endif %}
               </td>
-              {# Pop history sparkline #}
-              <td style="font-size:.68rem;color:var(--text-muted);">
-                {% set hist = pop_history.get((farm.x, farm.y), []) %}
-                {% if hist|length >= 2 %}
-                <div style="display:flex;gap:2px;align-items:flex-end;height:20px;">
-                  {% set ns = namespace(max_p=1) %}
-                  {% for h in hist[:7] %}{% if h['pop'] > ns.max_p %}{% set ns.max_p = h['pop'] %}{% endif %}{% endfor %}
-                  {% for h in hist[:7]|reverse %}
-                  {% set bar_h = ((h['pop'] * 18) // ns.max_p) if ns.max_p > 0 else 2 %}
-                  {% set bar_h = bar_h if bar_h > 1 else 2 %}
-                  <div style="width:5px;height:{{ bar_h }}px;background:#6366f1;border-radius:1px;opacity:.7;"
-                       title="{{ h.date }}: {{ h['pop'] }}"></div>
-                  {% endfor %}
-                </div>
-                {% elif hist %}
-                {{ hist[0].pop }}
-                {% else %}—{% endif %}
+              {# Pop delta columns Δ1d … Δ14d #}
+              {% set fd = pop_deltas.get((farm.x, farm.y), {}) %}
+              {% for n in [1, 2, 3, 5, 7, 14] %}
+              {% set dv = fd.get(n) %}
+              <td style="text-align:right;font-size:.75rem;padding:0 6px;">
+                {% if dv is none %}
+                  <span style="color:#334155;">—</span>
+                {% elif dv == 0 %}
+                  <span style="color:#64748b;">0</span>
+                {% elif dv > 0 %}
+                  <span style="color:#f87171;background:rgba(248,113,113,.1);border-radius:3px;padding:1px 4px;">+{{ dv }}</span>
+                {% else %}
+                  <span style="color:#22c55e;background:rgba(34,197,94,.1);border-radius:3px;padding:1px 4px;">{{ dv }}</span>
+                {% endif %}
+              </td>
+              {% endfor %}
+              {# Farm Score #}
+              {% set fd7 = fd.get(7) %}
+              {% set days_score = [farm.days_tracked * 2, 40] | min %}
+              {% set trend_score = 30 if (fd7 is not none and fd7 <= 0) else (0 if fd7 is none else [30 - fd7, 0] | max) %}
+              {% set pop_score = 20 if (farm.population >= 50 and farm.population <= 600) else (10 if farm.population > 0 else 0) %}
+              {% set farm_score = days_score + trend_score + pop_score %}
+              {% if farm_score >= 75 %}{% set sc="#22c55e" %}{% set sb="rgba(34,197,94,.15)" %}
+              {% elif farm_score >= 50 %}{% set sc="#f59e0b" %}{% set sb="rgba(245,158,11,.15)" %}
+              {% else %}{% set sc="#ef4444" %}{% set sb="rgba(239,68,68,.1)" %}{% endif %}
+              <td style="text-align:center;">
+                <span style="background:{{ sb }};color:{{ sc }};border-radius:5px;padding:2px 6px;font-size:.75rem;font-weight:700;">
+                  {{ farm_score }}
+                </span>
               </td>
               {% if has_farmlist %}
               <td style="font-size:.72rem;">
@@ -1049,6 +1089,45 @@
 
 <!-- ══ SCRIPTS ════════════════════════════════════════════════════════════ -->
 <script>
+// ── Loading overlay ─────────────────────────────────────────────────────────
+const _QUOTES = [
+  "Patience, commander. Even Rome wasn't scouted in a day.",
+  "Calculating the laziest players on the server…",
+  "Cross-referencing couch warriors with real warriors…",
+  "Feeding our hamster-powered servers… almost done.",
+  "Sorting the inactive from the merely very slow.",
+  "Your next farm is about to be revealed. No pressure.",
+  "Querying the database at the speed of a Natar village.",
+  "Fun fact: 73% of all Travian players are 'just taking a break'.",
+  "Checking if anyone logged off to touch grass…",
+  "Deploying scouts. ETA: right now, actually.",
+];
+function _showLoading(title) {
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.style.display = 'flex';
+  document.getElementById('loadingTitle').textContent = title || 'Scouting inactive targets…';
+  document.getElementById('loadingQuote').textContent = _QUOTES[Math.floor(Math.random() * _QUOTES.length)];
+  // Animate progress bar
+  let pct = 0;
+  const bar = document.getElementById('loadingBar');
+  const iv = setInterval(() => {
+    pct = Math.min(pct + (Math.random() * 8 + 2), 90);
+    bar.style.width = pct + '%';
+  }, 300);
+  window._loadingIv = iv;
+}
+// Wire up filter form + search form
+document.addEventListener('DOMContentLoaded', () => {
+  const ff = document.getElementById('filterForm');
+  if (ff) ff.addEventListener('submit', () => _showLoading('Filtering farms…'));
+  const sf = document.getElementById('searchForm');
+  if (sf) sf.addEventListener('submit', () => _showLoading('Searching map…'));
+  // Also snapshot button
+  document.querySelectorAll('form[action*="/farming/snapshot"]').forEach(f =>
+    f.addEventListener('submit', () => _showLoading('Fetching snapshot…'))
+  );
+});
+
 // Tab switching
 function switchTab(id) {
   document.querySelectorAll('.fi-panel').forEach(p => p.style.display = 'none');
