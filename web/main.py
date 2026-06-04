@@ -6597,6 +6597,7 @@ async def farming_page(
     tribes: Optional[List[int]] = Query(default=None),
     in_farmlist: str = "",
     advanced: bool = False,
+    farmlist_id: Optional[int] = None,
 ):
     session, err = _require_session(request)
     if err: return err
@@ -6644,22 +6645,42 @@ async def farming_page(
             except Exception as e:
                 auto_fetch_error = str(e)
 
-    farm_stats     = await database.get_farm_stats(guild_id)
-    snap_pop_range = await database.get_snapshot_pop_range(guild_id)
-    farm_list      = await database.get_farm_list(guild_id)
-    scout_village  = await database.get_scout_village(guild_id, uid)
+    import asyncio as _asyncio
+
+    # ── Parallel batch 1: all independent metadata queries ──────────────────
+    (
+        farm_stats,
+        snap_pop_range,
+        farm_list,
+        scout_village,
+        own_village_ids,
+        cross_reference,
+        farmlist_analyses,
+        alliance_names,
+        growth_data,
+    ) = await _asyncio.gather(
+        database.get_farm_stats(guild_id),
+        database.get_snapshot_pop_range(guild_id),
+        database.get_farm_list(guild_id),
+        database.get_scout_village(guild_id, uid),
+        database.get_own_village_ids(guild_id, uid),
+        database.get_farming_cross_reference(guild_id, min_days=min_days_i),
+        database.get_farmlist_analyses(guild_id, uid, limit=20),
+        database.get_alliance_names_from_snapshot(guild_id),
+        database.get_player_growth(guild_id, limit=100),
+    )
+
     # Enrich scout village with Travian village_id for newdid= links
     if scout_village and scout_village.get("x") is not None:
         sv_id = await database.get_village_id_by_xy(guild_id, scout_village["x"], scout_village["y"])
         scout_village = {**scout_village, "travian_village_id": sv_id}
-    # Own villages with village_ids for farmlist dropdown
-    own_village_ids = await database.get_own_village_ids(guild_id, uid)
-    cross_reference  = await database.get_farming_cross_reference(guild_id, min_days=min_days_i)
+
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
     farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
 
-    # Farmlist cross-reference (from imported farmlist analysis)
-    farmlist_xy = await database.get_farmlist_xy_lookup(guild_id, uid)
+    # Farmlist cross-reference — use selected or most recent analysis
+    _fl_id = farmlist_id or (farmlist_analyses[0]["id"] if farmlist_analyses else None)
+    farmlist_xy = await database.get_farmlist_xy_lookup(guild_id, uid, analysis_id=_fl_id)
     has_farmlist = bool(farmlist_xy)
 
     # Detect if any advanced filter is active
@@ -6717,19 +6738,14 @@ async def farming_page(
         else:
             inactive_farms = inactive_farms_raw
 
-    # Bulk fetch pop history and player growth for results
+    # ── Parallel batch 2: per-village stats (depend on inactive_farms result) ─
     _farm_slice = inactive_farms[:200]
     result_coords = [(f["x"], f["y"]) for f in _farm_slice]
     result_players = list({f["player_name"] for f in _farm_slice if f.get("player_name")})
-    pop_history = await database.get_bulk_village_pop_history(guild_id, result_coords, days=14)
-    pop_deltas = await database.get_bulk_village_pop_deltas(guild_id, result_coords)
-    player_growth = await database.get_bulk_player_pop_growth(guild_id, result_players)
-
-    # Alliance names for autocomplete
-    alliance_names = await database.get_alliance_names_from_snapshot(guild_id)
-
-    # Growth analysis
-    growth_data = await database.get_player_growth(guild_id, limit=100)
+    pop_deltas, player_growth = await _asyncio.gather(
+        database.get_bulk_village_pop_deltas(guild_id, result_coords),
+        database.get_bulk_player_pop_growth(guild_id, result_players),
+    )
 
     # Map search
     search_results = []
@@ -6752,7 +6768,6 @@ async def farming_page(
         "saved": saved,
         "farm_stats": farm_stats,
         "inactive_farms": inactive_farms,
-        "pop_history": pop_history,
         "pop_deltas": pop_deltas,
         "player_growth": player_growth,
         "farm_list": farm_list,
@@ -6773,6 +6788,8 @@ async def farming_page(
         "snap_pop_range": snap_pop_range,
         "scout_village": scout_village,
         "own_village_ids": own_village_ids,
+        "farmlist_analyses": farmlist_analyses,
+        "farmlist_id": _fl_id,
         # Advanced filter values
         "ref_x": ref_x_i or 0, "ref_y": ref_y_i or 0,
         "min_dist": min_dist_f or 0, "max_dist": max_dist_f or "",

@@ -4475,20 +4475,28 @@ async def get_farmlist_analyses(guild_id: str, discord_user_id: str, limit: int 
             return [dict(r) for r in await cur.fetchall()]
 
 
-async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str) -> dict:
-    """Returns {(x,y): [list_name, ...]} from user's most recent farmlist analysis,
+async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str, analysis_id: int | None = None) -> dict:
+    """Returns {(x,y): [list_name, ...]} from user's most recent (or specified) farmlist analysis,
     cross-referenced with map_snapshots to get coordinates."""
     await _init_farmlist_analyses_table()
     import json as _json
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT farms_json FROM farmlist_analyses
-               WHERE guild_id = ? AND discord_user_id = ?
-               ORDER BY created_at DESC LIMIT 1""",
-            (guild_id, discord_user_id)
-        ) as cur:
-            row = await cur.fetchone()
+        if analysis_id:
+            async with db.execute(
+                """SELECT farms_json FROM farmlist_analyses
+                   WHERE guild_id = ? AND discord_user_id = ? AND id = ?""",
+                (guild_id, discord_user_id, analysis_id)
+            ) as cur:
+                row = await cur.fetchone()
+        else:
+            async with db.execute(
+                """SELECT farms_json FROM farmlist_analyses
+                   WHERE guild_id = ? AND discord_user_id = ?
+                   ORDER BY created_at DESC LIMIT 1""",
+                (guild_id, discord_user_id)
+            ) as cur:
+                row = await cur.fetchone()
         if not row or not row["farms_json"]:
             return {}
         farms = _json.loads(row["farms_json"])

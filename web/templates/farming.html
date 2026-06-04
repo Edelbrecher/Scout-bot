@@ -182,13 +182,34 @@
           {% endif %}
           <span id="filterArrow">{% if _filter_active %}▴{% else %}▾{% endif %}</span>
         </button>
-        <button onclick="toggleFarmlistImport()" id="flImportBtn"
-                style="background:var(--bg-card);border:1px solid {% if has_farmlist %}#22c55e{% else %}var(--border){% endif %};
-                       border-radius:7px;padding:.4rem .9rem;font-size:.82rem;cursor:pointer;color:var(--text);
-                       display:flex;align-items:center;gap:.5rem;">
-          📋 Import farmlist
-          {% if has_farmlist %}<span style="font-size:.7rem;color:#22c55e;">✓ active</span>{% endif %}
-        </button>
+        <div style="display:flex;align-items:center;gap:0;">
+          <button onclick="toggleFarmlistImport()" id="flImportBtn"
+                  style="background:var(--bg-card);border:1px solid {% if has_farmlist %}#22c55e{% else %}var(--border){% endif %};
+                         border-radius:7px 0 0 7px;padding:.4rem .9rem;font-size:.82rem;cursor:pointer;color:var(--text);
+                         display:flex;align-items:center;gap:.5rem;">
+            📋 Import farmlist
+            {% if has_farmlist %}<span style="font-size:.7rem;color:#22c55e;">✓ active</span>{% endif %}
+          </button>
+          {% if farmlist_analyses and farmlist_analyses|length > 1 %}
+          <form method="get" action="/guild/{{ guild.guild_id }}/farming" style="margin:0;display:flex;">
+            <input type="hidden" name="tab" value="inactive">
+            {% for k, v in request.query_params.items() %}
+              {% if k != 'farmlist_id' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}
+            {% endfor %}
+            <select name="farmlist_id" onchange="this.form.submit()"
+                    style="border:1px solid {% if has_farmlist %}#22c55e{% else %}var(--border){% endif %};
+                           border-left:none;border-radius:0 7px 7px 0;
+                           background:var(--bg-card);color:var(--text);font-size:.78rem;
+                           padding:.4rem .5rem;cursor:pointer;max-width:220px;">
+              {% for fa in farmlist_analyses %}
+              <option value="{{ fa.id }}" {% if fa.id == farmlist_id %}selected{% endif %}>
+                {{ fa.created_at[:10] if fa.created_at else 'Import' }} · {{ fa.total_farms or '?' }} farms
+              </option>
+              {% endfor %}
+            </select>
+          </form>
+          {% endif %}
+        </div>
         {% if _filter_active %}
         <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.78rem;padding:.3rem .7rem;">✕ Reset filters</a>
         {% endif %}
@@ -307,9 +328,9 @@
             {# Row 4: Tribes + Farmlist + Natars #}
             <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;margin-bottom:.85rem;">
               <div>
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">⚔️ Tribe</div>
+                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">Tribe</div>
                 <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
-                  {% set tribe_opts = [(1,'🏛️ Romans'),(2,'⚔️ Teutons'),(3,'🌿 Gauls'),(5,'🏹 Huns'),(6,'🏺 Egyptians'),(7,'🛡️ Spartans')] %}
+                  {% set tribe_opts = [(1,'Romans'),(2,'Teutons'),(3,'Gauls'),(5,'Huns'),(6,'Egyptians'),(7,'Spartans')] %}
                   {% for tid, tlabel in tribe_opts %}
                   <label style="cursor:pointer;">
                     <input type="checkbox" name="tribes" value="{{ tid }}" style="display:none;"
@@ -327,12 +348,24 @@
                 </div>
               </div>
               <div>
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">📋 Farmlist</div>
-                <select name="in_farmlist" class="form-control" style="min-width:160px;">
-                  <option value="" {% if not in_farmlist %}selected{% endif %}>All villages</option>
-                  <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>❌ Not in farmlist</option>
-                  <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>✅ In farmlist</option>
-                </select>
+                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">📋 Farmlist filter</div>
+                <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                  <select name="in_farmlist" class="form-control" style="min-width:160px;">
+                    <option value="" {% if not in_farmlist %}selected{% endif %}>All villages</option>
+                    <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>Not in farmlist</option>
+                    <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>In farmlist</option>
+                  </select>
+                  {% if farmlist_analyses %}
+                  <select name="farmlist_id" class="form-control" style="min-width:200px;"
+                          title="Which imported farmlist to use for the 'In farmlist' filter">
+                    {% for fa in farmlist_analyses %}
+                    <option value="{{ fa.id }}" {% if fa.id == farmlist_id %}selected{% endif %}>
+                      {{ fa.created_at[:10] if fa.created_at else 'Import' }} · {{ fa.total_farms or '?' }} farms
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% endif %}
+                </div>
                 {% if not has_farmlist %}
                 <div style="font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">⚠️ No farmlist imported</div>
                 {% endif %}
@@ -533,41 +566,41 @@
                 {% elif vt == 6 %}6
                 {% else %}—{% endif %}
               </td>
-              {# Account growth Δ7d — arrow style #}
-              <td style="text-align:center;">
+              {# Account growth Δ7d — arrow + number #}
+              <td style="text-align:right;white-space:nowrap;padding:0 5px;">
                 {% set pg = player_growth.get(farm.player_name, {}) %}
                 {% set adelta = pg.get('delta', 0) %}
                 {% if not pg %}
-                  <span style="color:#1e293b;font-size:.8rem;">·</span>
+                  <span style="color:#1e293b;font-size:.75rem;">—</span>
                 {% elif adelta > 50 %}
-                  <span title="+{{ adelta }}" style="color:#ef4444;font-size:1rem;font-weight:700;">↑↑</span>
+                  <span style="color:#ef4444;font-size:.82rem;font-weight:600;">↑↑ <span style="font-size:.72rem;">+{{ adelta }}</span></span>
                 {% elif adelta > 0 %}
-                  <span title="+{{ adelta }}" style="color:#f87171;font-size:1rem;">↑</span>
+                  <span style="color:#f87171;font-size:.82rem;">↑ <span style="font-size:.72rem;">+{{ adelta }}</span></span>
                 {% elif adelta == 0 %}
-                  <span title="0" style="color:#475569;font-size:1rem;">→</span>
+                  <span style="color:#475569;font-size:.82rem;">→ <span style="font-size:.72rem;">0</span></span>
                 {% elif adelta >= -50 %}
-                  <span title="{{ adelta }}" style="color:#86efac;font-size:1rem;">↓</span>
+                  <span style="color:#86efac;font-size:.82rem;">↓ <span style="font-size:.72rem;">{{ adelta }}</span></span>
                 {% else %}
-                  <span title="{{ adelta }}" style="color:#22c55e;font-size:1rem;font-weight:700;">↓↓</span>
+                  <span style="color:#22c55e;font-size:.82rem;font-weight:600;">↓↓ <span style="font-size:.72rem;">{{ adelta }}</span></span>
                 {% endif %}
               </td>
-              {# Pop delta columns Δ1d … Δ14d — arrow indicators #}
+              {# Pop delta columns Δ1d … Δ14d — arrow + number #}
               {% set fd = pop_deltas.get((farm.x, farm.y), {}) %}
               {% for n in [1, 2, 3, 5, 7, 14] %}
               {% set dv = fd.get(n) %}
-              <td style="text-align:center;padding:0 4px;">
+              <td style="text-align:right;padding:0 5px;white-space:nowrap;">
                 {% if dv is none %}
-                  <span style="color:#1e293b;font-size:.8rem;">·</span>
+                  <span style="color:#1e293b;font-size:.75rem;">—</span>
                 {% elif dv > 20 %}
-                  <span title="+{{ dv }}" style="color:#ef4444;font-size:1rem;font-weight:700;line-height:1;">↑↑</span>
+                  <span style="color:#ef4444;font-size:.82rem;font-weight:600;">↑↑ <span style="font-size:.72rem;">+{{ dv }}</span></span>
                 {% elif dv > 0 %}
-                  <span title="+{{ dv }}" style="color:#f87171;font-size:1rem;line-height:1;">↑</span>
+                  <span style="color:#f87171;font-size:.82rem;">↑ <span style="font-size:.72rem;">+{{ dv }}</span></span>
                 {% elif dv == 0 %}
-                  <span title="0" style="color:#475569;font-size:1rem;line-height:1;">→</span>
+                  <span style="color:#475569;font-size:.82rem;">→ <span style="font-size:.72rem;">0</span></span>
                 {% elif dv >= -20 %}
-                  <span title="{{ dv }}" style="color:#86efac;font-size:1rem;line-height:1;">↓</span>
+                  <span style="color:#86efac;font-size:.82rem;">↓ <span style="font-size:.72rem;">{{ dv }}</span></span>
                 {% else %}
-                  <span title="{{ dv }}" style="color:#22c55e;font-size:1rem;font-weight:700;line-height:1;">↓↓</span>
+                  <span style="color:#22c55e;font-size:.82rem;font-weight:600;">↓↓ <span style="font-size:.72rem;">{{ dv }}</span></span>
                 {% endif %}
               </td>
               {% endfor %}
