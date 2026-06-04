@@ -11670,9 +11670,17 @@ async def my_treasury_page(request: Request, guild_id: str):
     uid = session.get("discord_id", "")
     treasuries = await database.get_my_treasuries(guild_id, uid)
     saved = request.query_params.get("saved")
+    # Load own villages for village picker
+    own_villages = await database.get_own_villages(guild_id, uid)
+    # Derive player name from uploaded_by of first village
+    auto_player_name = ""
+    if own_villages:
+        auto_player_name = own_villages[0].get("uploaded_by", "") or ""
     return templates.TemplateResponse("my_treasury.html", {
         "request": request, "guild": guild,
         "treasuries": treasuries, "saved": saved,
+        "own_villages": own_villages,
+        "auto_player_name": auto_player_name,
     })
 
 
@@ -11690,8 +11698,8 @@ async def my_treasury_save(request: Request, guild_id: str):
     notes = form.get("notes", "").strip()
     level = int(form.get("level", "10"))
     try:
-        x = int(form.get("x", "0"))
-        y = int(form.get("y", "0"))
+        x = int(form.get("x", "0") or 0)
+        y = int(form.get("y", "0") or 0)
     except (ValueError, TypeError):
         x = y = 0
     await database.save_treasury(
