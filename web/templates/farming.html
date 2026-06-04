@@ -498,10 +498,10 @@
           {% endif %}
           {% if inactive_farms %}
           <button onclick="exportCSV()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">
-            📥 CSV Export
+            📥 CSV
           </button>
           <button onclick="copyAllCoords()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">
-            📋 Copy all coords
+            📋 All coords
           </button>
           {% endif %}
           {% if farm_stats.snapshot_count > 0 %}
@@ -538,24 +538,33 @@
         <table class="table" id="inactiveTable" style="margin:0;">
           <thead>
             <tr>
-              <th style="width:32px;">#</th>
-              <th>Koordinaten</th>
+              <th style="width:26px;">
+                <input type="checkbox" id="selectAllCb" title="Select all"
+                       onchange="toggleSelectAll(this)"
+                       style="width:14px;height:14px;cursor:pointer;accent-color:var(--primary);">
+              </th>
+              <th style="width:28px;color:var(--text-muted);font-size:.72rem;">#</th>
+              <th>Coordinates</th>
               <th>Village</th>
               <th>Player / Alliance</th>
               <th>Tribe</th>
-              <th onclick="sortInactive('population')" style="cursor:pointer;" title="Village population">Pop ↕</th>
-              <th onclick="sortInactive('days_tracked')" style="cursor:pointer;" title="Days inactive">⏳ ↕</th>
-              <th title="Capital village">★</th>
-              <th title="Crop field layout">🌾</th>
-              <th title="Account pop delta last 7d">Acc.Δ7d</th>
-              <th title="Village pop change 1 day" style="color:#94a3b8;font-size:.72rem;">Δ1d</th>
-              <th title="Village pop change 2 days" style="color:#94a3b8;font-size:.72rem;">Δ2d</th>
-              <th title="Village pop change 3 days" style="color:#94a3b8;font-size:.72rem;">Δ3d</th>
-              <th title="Village pop change 5 days" style="color:#94a3b8;font-size:.72rem;">Δ5d</th>
-              <th title="Village pop change 7 days" style="color:#94a3b8;font-size:.72rem;">Δ7d</th>
-              <th title="Village pop change 14 days" style="color:#94a3b8;font-size:.72rem;">Δ14d</th>
-              <th style="color:#fbbf24;font-size:.72rem;cursor:help;"
-                  title="Farm Score 0–100&#10;&#10;Up to 40 pts: days inactive (2 pts/day)&#10;Up to 30 pts: pop trend (↓ = good, ↑ = risky)&#10;Up to 20 pts: population sweet spot (50–600)&#10;&#10;🟢 75+ great farm  🟡 50–74 ok  🔴 &lt;50 risky">Score ⓘ</th>
+              <th class="sortable-th" onclick="sortInactive('population')" title="Sort by population">Pop <span class="sort-arrow" data-col="population">↕</span></th>
+              <th class="sortable-th" onclick="sortInactive('days_tracked')" title="Sort by days inactive">⏳ <span class="sort-arrow" data-col="days_tracked">↕</span></th>
+              <th title="Capital">★</th>
+              <th title="Crop fields">🌾</th>
+              <th class="sortable-th" onclick="sortInactive('acc_delta')" title="Sort by account growth Δ7d">Acc.Δ7d <span class="sort-arrow" data-col="acc_delta">↕</span></th>
+              <th style="color:var(--text-muted);font-size:.72rem;">Δ1d</th>
+              <th style="color:var(--text-muted);font-size:.72rem;">Δ2d</th>
+              <th style="color:var(--text-muted);font-size:.72rem;">Δ3d</th>
+              <th style="color:var(--text-muted);font-size:.72rem;">Δ5d</th>
+              <th class="sortable-th" onclick="sortInactive('d7')" style="color:var(--text-muted);font-size:.72rem;" title="Sort by Δ7d">Δ7d <span class="sort-arrow" data-col="d7">↕</span></th>
+              <th class="sortable-th" onclick="sortInactive('d14')" style="color:var(--text-muted);font-size:.72rem;" title="Sort by Δ14d">Δ14d <span class="sort-arrow" data-col="d14">↕</span></th>
+              <th class="sortable-th" onclick="sortInactive('score')"
+                  style="color:#fbbf24;font-size:.72rem;cursor:pointer;"
+                  title="Farm Score 0–100&#10;&#10;Up to 40 pts: days inactive (2 pts/day)&#10;Up to 30 pts: pop trend (↓ = good, ↑ = risky)&#10;Up to 20 pts: population sweet spot (50–600)&#10;&#10;🟢 75+ great farm  🟡 50–74 ok  🔴 &lt;50 risky">
+                Score ⓘ <span class="sort-arrow" data-col="score">↕</span>
+              </th>
+              <th style="color:var(--text-muted);font-size:.72rem;" title="Estimated troops for raiding this inactive village&#10;Assumes no wall / no defense&#10;Rule of thumb: pop × 0.15 to pop × 0.3">Troops est.</th>
               {% if has_farmlist %}<th>📋 Lists</th>{% endif %}
               <th style="white-space:nowrap;">🔭 📋</th>
             </tr>
@@ -564,10 +573,31 @@
             {% for farm in inactive_farms %}
             {% set is_cross = (farm.x, farm.y) in cross_ref_coords %}
             {% set is_on_list = farm_list_coords is defined and (farm.x, farm.y) in farm_list_coords %}
-            <tr data-population="{{ farm.population }}" data-days="{{ farm.days_tracked }}"
+            {# Pre-compute score for data attr #}
+            {% set _fd = pop_deltas.get((farm.x, farm.y), {}) %}
+            {% set _fd7 = _fd.get(7) %}
+            {% set _fd14 = _fd.get(14) %}
+            {% set _dscore = [farm.days_tracked * 2, 40] | min %}
+            {% set _tscore = 30 if (_fd7 is not none and _fd7 <= 0) else (0 if _fd7 is none else [30 - _fd7, 0] | max) %}
+            {% set _pscore = 20 if (farm.population >= 50 and farm.population <= 600) else (10 if farm.population > 0 else 0) %}
+            {% set _score = _dscore + _tscore + _pscore %}
+            {# Account delta for sorting #}
+            {% set _pg = player_growth.get(farm.player_name, {}) %}
+            {% set _adelta = _pg.get('delta', 0) %}
+            <tr data-population="{{ farm.population }}"
+                data-days="{{ farm.days_tracked }}"
+                data-score="{{ _score }}"
+                data-d7="{{ _fd7 if _fd7 is not none else 9999 }}"
+                data-d14="{{ _fd14 if _fd14 is not none else 9999 }}"
+                data-acc_delta="{{ _adelta }}"
                 data-coords="{{ farm.x }}|{{ farm.y }}"
                 data-on-list="{{ 'true' if is_on_list else 'false' }}"
                 {% if is_cross %}style="background:rgba(34,197,94,0.06);"{% endif %}>
+              <td style="text-align:center;padding:0 4px;">
+                <input type="checkbox" class="farm-cb" value="{{ farm.x }}|{{ farm.y }}"
+                       onchange="updateSelectionBar()"
+                       style="width:14px;height:14px;cursor:pointer;accent-color:var(--primary);">
+              </td>
               <td style="color:var(--text-muted);font-size:0.8rem;">{{ loop.index }}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:0.4rem;">
@@ -687,6 +717,17 @@
                   {{ farm_score }}
                 </span>
               </td>
+              {# Troop estimate — based on pop, assumes inactive/no wall #}
+              {% set pop = farm.population %}
+              {% if pop < 50 %}{% set tr_lo=3 %}{% set tr_hi=8 %}
+              {% elif pop < 150 %}{% set tr_lo=8 %}{% set tr_hi=20 %}
+              {% elif pop < 300 %}{% set tr_lo=20 %}{% set tr_hi=45 %}
+              {% elif pop < 500 %}{% set tr_lo=45 %}{% set tr_hi=80 %}
+              {% else %}{% set tr_lo=80 %}{% set tr_hi=150 %}{% endif %}
+              <td style="text-align:center;white-space:nowrap;"
+                  title="Estimate for inactive village (no wall assumed)&#10;Send {{ tr_lo }}–{{ tr_hi }} troops to raid safely&#10;Formula: pop × 0.15–0.3">
+                <span style="font-size:.72rem;color:var(--text-muted);">{{ tr_lo }}–{{ tr_hi }}</span>
+              </td>
               {% if has_farmlist %}
               <td style="font-size:.72rem;">
                 {% set fl_groups = farm.get('farmlist_groups', []) %}
@@ -795,6 +836,34 @@
       {% endif %}
     </div>
   </div><!-- /tab inactive -->
+
+  <!-- ══ SELECTION BAR ════════════════════════════════════════════════════════ -->
+  <div id="selectionBar" style="display:none;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);
+       background:var(--bg-card);border:1px solid var(--primary);border-radius:12px;
+       padding:.65rem 1.25rem;display:none;align-items:center;gap:1rem;
+       box-shadow:0 4px 24px rgba(88,101,242,.3);z-index:500;white-space:nowrap;
+       animation:slideUp .2s ease;">
+    <span style="font-size:.85rem;color:var(--text);">
+      <strong id="selCount">0</strong> farms selected
+    </span>
+    <div style="width:1px;height:20px;background:var(--border);"></div>
+    <button onclick="copySelectedCoords()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .8rem;">
+      📋 Copy coordinates
+    </button>
+    <button onclick="exportSelectedCSV()" class="btn" style="font-size:.78rem;padding:.3rem .8rem;">
+      📥 Export CSV
+    </button>
+    <button onclick="clearSelection()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:0 4px;" title="Clear selection">✕</button>
+  </div>
+  <style>
+  @keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+  .sortable-th { cursor:pointer; user-select:none; }
+  .sortable-th:hover { color:var(--primary); }
+  .sort-arrow { font-size:.65rem; opacity:.5; }
+  .sort-arrow.asc::after  { content:'▲'; }
+  .sort-arrow.desc::after { content:'▼'; }
+  .sort-arrow.asc, .sort-arrow.desc { opacity:1; color:var(--primary); }
+  </style>
 
 
   <!-- ══ TAB: MEINE FARMEN ══════════════════════════════════════════════════ -->
@@ -1375,19 +1444,83 @@ function showToast(msg) {
   setTimeout(() => t.style.display = 'none', 2200);
 }
 
-// Inline sort for inactive table
+// ── Sorting ──────────────────────────────────────────────────────────────────
 let _sCol = null, _sAsc = true;
 function sortInactive(col) {
   const tbody = document.getElementById('inactiveBody');
   if (!tbody) return;
   _sAsc = col === _sCol ? !_sAsc : false;
   _sCol = col;
+  // Update arrow indicators
+  document.querySelectorAll('.sort-arrow').forEach(el => {
+    el.className = 'sort-arrow';
+    el.textContent = '↕';
+  });
+  const arrow = document.querySelector(`.sort-arrow[data-col="${col}"]`);
+  if (arrow) { arrow.className = 'sort-arrow ' + (_sAsc ? 'asc' : 'desc'); arrow.textContent = ''; }
+  // Sort rows
   const rows = Array.from(tbody.querySelectorAll('tr'));
   rows.sort((a, b) => {
-    const va = parseFloat(a.dataset[col] || 0), vb = parseFloat(b.dataset[col] || 0);
+    let va = parseFloat(a.dataset[col] ?? 9999);
+    let vb = parseFloat(b.dataset[col] ?? 9999);
+    if (isNaN(va)) va = 9999; if (isNaN(vb)) vb = 9999;
     return _sAsc ? va - vb : vb - va;
   });
   rows.forEach(r => tbody.appendChild(r));
+  // Re-number rows
+  rows.forEach((r, i) => { const nc = r.querySelectorAll('td')[1]; if (nc) nc.textContent = i + 1; });
+}
+// Default sort by score desc on load
+document.addEventListener('DOMContentLoaded', () => {
+  const tbody = document.getElementById('inactiveBody');
+  if (tbody && tbody.querySelectorAll('tr').length > 1) {
+    _sCol = 'score'; _sAsc = false;
+    sortInactive('score');
+  }
+});
+
+// ── Checkbox selection ────────────────────────────────────────────────────────
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.farm-cb').forEach(el => { el.checked = cb.checked; });
+  updateSelectionBar();
+}
+function updateSelectionBar() {
+  const checked = document.querySelectorAll('.farm-cb:checked');
+  const bar = document.getElementById('selectionBar');
+  const cnt = document.getElementById('selCount');
+  if (checked.length > 0) {
+    bar.style.display = 'flex';
+    cnt.textContent = checked.length;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+function clearSelection() {
+  document.querySelectorAll('.farm-cb, #selectAllCb').forEach(el => el.checked = false);
+  document.getElementById('selectionBar').style.display = 'none';
+}
+function copySelectedCoords() {
+  const coords = Array.from(document.querySelectorAll('.farm-cb:checked')).map(el => el.value);
+  navigator.clipboard.writeText(coords.join('\n')).then(() => showToast(`✅ ${coords.length} coordinates copied`));
+}
+function exportSelectedCSV() {
+  const checked = Array.from(document.querySelectorAll('.farm-cb:checked'));
+  const allRows = document.querySelectorAll('#inactiveBody tr');
+  const selected = Array.from(allRows).filter(r => r.querySelector('.farm-cb:checked'));
+  const lines = ['Coords,Village,Player,Pop,Days,Score'];
+  selected.forEach(r => {
+    const tds = r.querySelectorAll('td');
+    const coord = r.dataset.coords || '';
+    const village = tds[3]?.textContent.trim() || '';
+    const player  = tds[4]?.textContent.trim().split('\n')[0] || '';
+    const pop     = r.dataset.population || '';
+    const days    = r.dataset.days || '';
+    const score   = r.dataset.score || '';
+    lines.push(`"${coord}","${village}","${player}",${pop},${days},${score}`);
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'farms_selected.csv'; a.click();
 }
 
 // Farmlist cross-reference: "Nur fehlende" toggle
