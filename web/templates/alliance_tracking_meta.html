@@ -196,7 +196,9 @@
         <div class="ev-row ev-{{ ev.type }}" data-type="{{ ev.type }}">
           <span class="ev-date">{{ ev.date }}</span>
           <span class="ev-badge badge-{{ ev.type }}">{% if ev.type=='join' %}➕{% else %}➖{% endif %}</span>
-          <span style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;">{{ ev.player }}</span>
+          <a href="/guild/{{ guild.guild_id }}/intel?q={{ ev.player | urlencode }}" target="_blank"
+             style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;color:inherit;text-decoration:none;"
+             onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='inherit'">{{ ev.player }}</a>
           <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             {{ ev.from_alliance }} → {{ ev.to_alliance }}
           </span>
@@ -217,7 +219,9 @@
         <div class="ev-row ev-internal">
           <span class="ev-date">{{ ev.date }}</span>
           <span class="ev-badge badge-internal">🔀</span>
-          <span style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;">{{ ev.player }}</span>
+          <a href="/guild/{{ guild.guild_id }}/intel?q={{ ev.player | urlencode }}" target="_blank"
+             style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;color:inherit;text-decoration:none;"
+             onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='inherit'">{{ ev.player }}</a>
           <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">
             <span style="color:#f59e0b;">{{ ev.from_alliance }}</span>
             →
