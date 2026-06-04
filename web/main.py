@@ -1294,7 +1294,7 @@ async def dashboard(request: Request, flash: str = ""):
 
     if not discord_guilds and not personal_workspaces and owner_discord_id:
         ws_id = await database.get_or_create_default_workspace(owner_discord_id, username)
-        personal_workspaces = await database.get_personal_workspaces(owner_discord_id)
+        return RedirectResponse(f"/guild/{ws_id}/setup?new=1", status_code=303)
 
     # Merge: personal workspaces first, then discord guilds
     guilds = personal_workspaces + discord_guilds
@@ -1361,7 +1361,7 @@ async def workspace_create(request: Request, name: str = Form(...)):
         return RedirectResponse("/dashboard", status_code=303)
     name = name.strip()[:64] or "Mein Workspace"
     ws_id = await database.create_personal_workspace(owner_discord_id, name)
-    return RedirectResponse(f"/guild/{ws_id}?saved=workspace_created", status_code=303)
+    return RedirectResponse(f"/guild/{ws_id}/setup?new=1", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -3207,17 +3207,35 @@ async def guild_world_settings_page(request: Request, guild_id: str):
 
 
 @app.post("/guild/{guild_id}/map/world")
-async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form("")):
+async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form(""), _next: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
-    # Validate: must be https://....travian.com or similar
     url = server_url.strip().rstrip("/")
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
         return RedirectResponse(f"/guild/{guild_id}/map?error=invalid_url", status_code=303)
     await database.update_tw_world(guild_id, url)
+    if _next:
+        return RedirectResponse(_next, status_code=303)
     return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/map/trigger-snapshot")
+async def guild_map_trigger_snapshot(request: Request, guild_id: str, _next: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    tw_world = (guild.get("tw_world") or "").strip() if guild else ""
+    if tw_world:
+        try:
+            await _fetch_and_save_snapshot(guild_id, tw_world)
+        except Exception:
+            pass
+    redirect_to = _next or f"/guild/{guild_id}/map"
+    return RedirectResponse(redirect_to, status_code=303)
 
 
 @app.post("/guild/{guild_id}/map/world-timezone")
@@ -3514,6 +3532,35 @@ def _stripe_client():
         return None
     stripe.api_key = STRIPE_SECRET_KEY
     return stripe
+
+
+@app.get("/guild/{guild_id}/setup", response_class=HTMLResponse)
+async def guild_setup_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    snapshot_count = await database.get_snapshot_count(guild_id)
+    own_villages   = await database.get_own_villages(guild_id)
+
+    step1_done = bool((guild.get("tw_world") or "").strip())
+    step2_done = bool(own_villages)
+    step3_done = snapshot_count > 0
+
+    return templates.TemplateResponse("setup_wizard.html", {
+        "request":        request,
+        "guild":          guild,
+        "session":        session,
+        "step1_done":     step1_done,
+        "step2_done":     step2_done,
+        "step3_done":     step3_done,
+        "snapshot_count": snapshot_count,
+        "tw_world":       guild.get("tw_world") or "",
+    })
 
 
 @app.get("/guild/{guild_id}/settings")

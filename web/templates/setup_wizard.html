@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Setup · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.sw-wrap { max-width: 680px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+.sw-step {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.sw-step.done   { border-color: rgba(34,197,94,.35); }
+.sw-step.active { border-color: rgba(99,102,241,.5); box-shadow: 0 0 0 1px rgba(99,102,241,.15); }
+
+.sw-step-header {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.25rem;
+  cursor: pointer; user-select: none;
+}
+.sw-num {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: .9rem;
+  background: rgba(255,255,255,.07); border: 2px solid var(--border);
+  color: var(--text-muted);
+  transition: all .2s;
+}
+.sw-step.done   .sw-num { background: rgba(34,197,94,.15);  border-color: rgba(34,197,94,.5);  color: #4ade80; }
+.sw-step.active .sw-num { background: rgba(99,102,241,.2);  border-color: rgba(99,102,241,.6); color: #a5b4fc; }
+
+.sw-title { font-weight: 700; font-size: 1rem; flex: 1; }
+.sw-status { font-size: .78rem; padding: .15rem .6rem; border-radius: 20px; flex-shrink: 0; }
+.sw-status.done    { background: rgba(34,197,94,.12);  color: #4ade80;  border: 1px solid rgba(34,197,94,.3); }
+.sw-status.pending { background: rgba(255,255,255,.05); color: var(--text-muted); border: 1px solid var(--border); }
+.sw-status.active  { background: rgba(99,102,241,.12); color: #a5b4fc;  border: 1px solid rgba(99,102,241,.3); }
+
+.sw-body { padding: 0 1.25rem 1.25rem; display: none; }
+.sw-step.active .sw-body,
+.sw-step.open   .sw-body { display: block; }
+
+.sw-progress-bar {
+  height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 2rem;
+}
+.sw-progress-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width .4s ease;
+}
+</style>
+
+<div class="sw-wrap">
+
+  {% if request.query_params.get('new') %}
+  <div style="text-align:center;margin-bottom:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:.5rem;">👋</div>
+    <h1 style="margin:0 0 .4rem;font-size:1.6rem;font-weight:800;">Welcome to TravOps!</h1>
+    <p style="color:var(--text-muted);font-size:.95rem;margin:0;">3 quick steps and you're ready to farm more efficiently than ever.</p>
+  </div>
+  {% else %}
+  <div style="margin-bottom:1.5rem;">
+    <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+    <h1 style="margin:.5rem 0 .25rem;font-size:1.4rem;font-weight:800;">⚙️ Setup</h1>
+    <p style="color:var(--text-muted);font-size:.88rem;margin:0;">Connect your Travian world to unlock all features.</p>
+  </div>
+  {% endif %}
+
+  {% set steps_done = (1 if step1_done else 0) + (1 if step2_done else 0) + (1 if step3_done else 0) %}
+  <div class="sw-progress-bar">
+    <div class="sw-progress-fill" style="width:{{ (steps_done / 3 * 100) | int }}%;"></div>
+  </div>
+
+  {% if steps_done == 3 %}
+  <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1.5rem;">
+    <div style="font-size:2rem;margin-bottom:.4rem;">🎉</div>
+    <div style="font-weight:700;font-size:1rem;color:#4ade80;margin-bottom:.3rem;">All set! You're ready to go.</div>
+    <a href="/guild/{{ guild.guild_id }}/farming" class="btn btn-primary" style="margin-top:.5rem;">🌾 Go to Farming →</a>
+  </div>
+  {% endif %}
+
+  <!-- ── Step 1: Travian World ── -->
+  {% set s1class = 'done' if step1_done else 'active' %}
+  <div class="sw-step {{ s1class }}" id="step1">
+    <div class="sw-step-header" onclick="toggleStep('step1')">
+      <div class="sw-num">{% if step1_done %}✓{% else %}1{% endif %}</div>
+      <div class="sw-title">Connect your Travian world</div>
+      <span class="sw-status {{ 'done' if step1_done else 'active' }}">
+        {% if step1_done %}✅ Done{% else %}Required{% endif %}
+      </span>
+    </div>
+    <div class="sw-body">
+      <p style="font-size:.88rem;color:var(--text-muted);margin:0 0 1rem;">
+        Enter your Travian server URL. TravOps uses it to fetch the world map automatically every few hours.
+      </p>
+      <form method="POST" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex;flex-direction:column;gap:.75rem;">
+        <div>
+          <label style="font-size:.8rem;color:var(--text-muted);margin-bottom:.3rem;display:block;">Server URL</label>
+          <input name="server_url" class="form-control" placeholder="https://ts1.travian.com"
+                 value="{{ tw_world }}" style="font-family:monospace;font-size:.9rem;" required>
+          <div style="font-size:.74rem;color:var(--text-muted);margin-top:.3rem;">
+            Example: <code>https://ts1.travian.com</code> or <code>https://tx3.travian.de</code>
+          </div>
+        </div>
+        <input type="hidden" name="_next" value="/guild/{{ guild.guild_id }}/setup">
+        <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Save & continue →</button>
+      </form>
+      {% if step1_done %}
+      <div style="margin-top:.75rem;font-size:.8rem;color:var(--text-muted);">
+        Current: <code style="color:#a5b4fc;">{{ tw_world }}</code>
+        — <a href="/guild/{{ guild.guild_id }}/map/world-settings" style="color:var(--text-muted);">Change in Map settings</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Step 2: Browser Extension / Village Import ── -->
+  {% set s2class = 'done' if step2_done else ('active' if step1_done else '') %}
+  <div class="sw-step {{ s2class }}" id="step2">
+    <div class="sw-step-header" onclick="toggleStep('step2')">
+      <div class="sw-num">{% if step2_done %}✓{% else %}2{% endif %}</div>
+      <div class="sw-title">Import your villages</div>
+      <span class="sw-status {{ 'done' if step2_done else ('active' if step1_done else 'pending') }}">
+        {% if step2_done %}✅ Done{% elif step1_done %}Next step{% else %}After step 1{% endif %}
+      </span>
+    </div>
+    <div class="sw-body">
+      <p style="font-size:.88rem;color:var(--text-muted);margin:0 0 1rem;">
+        Install the TravOps browser extension — it reads your village data directly from Travian and syncs it here automatically.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1rem;">
+        <a href="/extension" target="_blank" class="btn btn-primary" style="align-self:flex-start;gap:.5rem;display:inline-flex;align-items:center;">
+          🧩 Install Browser Extension
+        </a>
+        <div style="font-size:.78rem;color:var(--text-muted);">
+          Already installed? Open Travian, click the extension icon → your villages sync automatically.
+        </div>
+      </div>
+      {% if step2_done %}
+      <div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:.65rem .9rem;font-size:.83rem;color:#4ade80;">
+        ✅ Villages imported — you're connected!
+      </div>
+      {% else %}
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.65rem .9rem;font-size:.8rem;color:var(--text-muted);">
+        💡 After installing the extension, refresh this page — this step will automatically mark as done.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Step 3: First Map Snapshot ── -->
+  {% set s3class = 'done' if step3_done else ('active' if step1_done else '') %}
+  <div class="sw-step {{ s3class }}" id="step3">
+    <div class="sw-step-header" onclick="toggleStep('step3')">
+      <div class="sw-num">{% if step3_done %}✓{% else %}3{% endif %}</div>
+      <div class="sw-title">Load world map data</div>
+      <span class="sw-status {{ 'done' if step3_done else ('active' if step1_done else 'pending') }}">
+        {% if step3_done %}✅ {{ snapshot_count }} snapshot{{ 's' if snapshot_count != 1 else '' }}{% elif step1_done %}Ready{% else %}After step 1{% endif %}
+      </span>
+    </div>
+    <div class="sw-body">
+      <p style="font-size:.88rem;color:var(--text-muted);margin:0 0 1rem;">
+        TravOps fetches the world map automatically — but you can trigger the first load right now to have data immediately.
+      </p>
+      {% if step3_done %}
+      <div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:.65rem .9rem;font-size:.83rem;color:#4ade80;margin-bottom:.75rem;">
+        ✅ Map data loaded — {{ snapshot_count }} snapshot{{ 's' if snapshot_count != 1 else '' }} available.
+      </div>
+      {% endif %}
+      {% if step1_done %}
+      <form method="POST" action="/guild/{{ guild.guild_id }}/map/trigger-snapshot" style="display:inline;">
+        <input type="hidden" name="_next" value="/guild/{{ guild.guild_id }}/setup">
+        <button type="submit" class="btn {% if step3_done %}btn-secondary{% else %}btn-primary{% endif %}" style="align-self:flex-start;">
+          {% if step3_done %}🔄 Refresh now{% else %}📥 Load map now{% endif %}
+        </button>
+      </form>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem;">
+        Auto-refresh runs every few hours. Manual trigger fetches latest data instantly.
+      </div>
+      {% else %}
+      <div style="font-size:.83rem;color:var(--text-muted);">Complete step 1 first to enable map loading.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Footer CTA ── -->
+  <div style="margin-top:1.75rem;text-align:center;">
+    {% if steps_done >= 1 %}
+    <a href="/guild/{{ guild.guild_id }}/farming" class="btn btn-primary" style="font-size:1rem;padding:.7rem 2rem;">
+      🌾 Go to Farming
+    </a>
+    <div style="margin-top:.65rem;font-size:.8rem;color:var(--text-muted);">
+      You can always return to setup via <a href="/guild/{{ guild.guild_id }}/settings" style="color:var(--text-muted);">Settings</a>.
+    </div>
+    {% else %}
+    <div style="font-size:.85rem;color:var(--text-muted);">Complete step 1 to unlock all tools.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function toggleStep(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+// Auto-open first incomplete step
+document.addEventListener('DOMContentLoaded', () => {
+  ['step1','step2','step3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('active') && !el.classList.contains('open')) {
+      el.classList.add('open');
+    }
+  });
+});
+</script>
+{% endblock %}
