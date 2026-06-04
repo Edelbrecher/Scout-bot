@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+{% block title %}Artifact Run Map · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.arm-wrap { display:grid; grid-template-columns:320px 1fr; gap:0; height:calc(100vh - 56px); overflow:hidden; }
+.arm-sidebar { background:var(--bg-card); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.arm-sidebar-head { padding:.75rem 1rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.arm-run-list { flex:1; overflow-y:auto; padding:.5rem; display:flex; flex-direction:column; gap:.4rem; }
+.arm-run-card {
+  background:var(--bg); border:1px solid var(--border); border-radius:9px;
+  padding:.55rem .75rem; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.arm-run-card:hover { border-color:rgba(99,102,241,.4); background:rgba(99,102,241,.04); }
+.arm-run-card.selected { border-color:rgba(99,102,241,.6); background:rgba(99,102,241,.08); }
+.arm-run-card.is-test { border-style:dashed; border-color:rgba(251,191,36,.35); }
+.arm-role { display:flex; align-items:center; gap:.4rem; font-size:.75rem; margin-top:.3rem; }
+.arm-role-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* Map */
+#armCanvas { display:block; width:100%; height:100%; cursor:crosshair; }
+.arm-map-wrap { position:relative; flex:1; background:#0d1a0d; overflow:hidden; }
+.arm-map-controls { position:absolute; top:.75rem; right:.75rem; display:flex; flex-direction:column; gap:.35rem; z-index:5; }
+.arm-map-btn { width:32px; height:32px; background:rgba(0,0,0,.6); border:1px solid rgba(255,255,255,.15); border-radius:6px; color:#fff; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; transition:background .15s; }
+.arm-map-btn:hover { background:rgba(99,102,241,.4); }
+#armTooltip { position:absolute; pointer-events:none; background:rgba(15,20,15,.92); border:1px solid rgba(255,255,255,.15); border-radius:7px; padding:.45rem .7rem; font-size:.78rem; max-width:220px; display:none; z-index:20; }
+
+/* Form modal */
+.arm-modal-overlay { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.6); align-items:center; justify-content:center; }
+.arm-modal-overlay.open { display:flex; }
+.arm-modal { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.5rem; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
+.arm-field { display:flex; flex-direction:column; gap:.25rem; margin-bottom:.75rem; }
+.arm-field label { font-size:.75rem; color:var(--text-muted); font-weight:600; }
+.arm-field-row { display:grid; grid-template-columns:1fr 80px 80px; gap:.4rem; }
+</style>
+
+<div class="arm-wrap">
+
+  <!-- ── Sidebar ── -->
+  <div class="arm-sidebar">
+    <div class="arm-sidebar-head">
+      <div>
+        <div style="font-weight:800;font-size:.95rem;">🏺 Artifact Runs</div>
+        <div style="font-size:.7rem;color:var(--text-muted);">{{ runs|length }} planned</div>
+      </div>
+      <div style="display:flex;gap:.35rem;">
+        <button onclick="openAddModal()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .7rem;">+ Add</button>
+        <button onclick="openTestMenu()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .6rem;" title="Test data">🧪</button>
+      </div>
+    </div>
+
+    <!-- Test data controls -->
+    <div id="testMenu" style="display:none;background:rgba(251,191,36,.06);border-bottom:1px solid rgba(251,191,36,.2);padding:.6rem .75rem;font-size:.78rem;">
+      <div style="font-weight:700;color:#fbbf24;margin-bottom:.4rem;">🧪 Test Data</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+        <button onclick="seedTest()" class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">+ Add test runs</button>
+        <button onclick="clearTest()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:6px;padding:.25rem .6rem;cursor:pointer;font-size:.75rem;">🗑 Remove test runs</button>
+      </div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.3rem;">Test runs shown with dashed border</div>
+    </div>
+
+    <div class="arm-run-list" id="runList">
+      {% for r in runs %}
+      <div class="arm-run-card {% if r.is_test %}is-test{% endif %}" id="card-{{ r.id }}"
+           onclick="selectRun({{ r.id }})">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;">
+          <div style="font-weight:700;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ r.artifact_name or '?' }}
+          </div>
+          <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0;">
+            <span style="font-size:.63rem;padding:1px 6px;border-radius:8px;
+              {% if r.artifact_size == 'unique' %}background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3);
+              {% elif r.artifact_size == 'large' %}background:rgba(139,92,246,.15);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);
+              {% else %}background:rgba(255,255,255,.07);color:var(--text-muted);border:1px solid var(--border);{% endif %}">
+              {{ r.artifact_size }}
+            </span>
+            {% if r.is_test %}<span style="font-size:.6rem;color:#fbbf24;">TEST</span>{% endif %}
+          </div>
+        </div>
+        <div style="font-family:monospace;font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">
+          {{ r.artifact_x }}|{{ r.artifact_y }}
+        </div>
+        <div class="arm-role"><div class="arm-role-dot" style="background:#60a5fa;"></div><span style="color:var(--text-muted);">Clean:</span><strong>{{ r.cleaner_name or '—' }}</strong></div>
+        <div class="arm-role"><div class="arm-role-dot" style="background:#f87171;"></div><span style="color:var(--text-muted);">Destroy:</span><strong>{{ r.destroyer_name or '—' }}</strong></div>
+        <div class="arm-role" style="{% if not r.picker_has_treasury %}color:#fbbf24;{% endif %}">
+          <div class="arm-role-dot" style="background:{% if r.picker_has_treasury %}#4ade80{% else %}#fbbf24{% endif %};"></div>
+          <span style="color:var(--text-muted);">Pick:</span>
+          <strong>{{ r.picker_name or '—' }}</strong>
+          {% if not r.picker_has_treasury and r.picker_name %}
+          <span title="No treasury!" style="font-size:.7rem;">⚠️</span>
+          {% endif %}
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:.3rem;gap:.3rem;">
+          <button onclick="event.stopPropagation();editRun({{ r.id }})"
+                  style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.75rem;padding:.1rem .3rem;">✏️</button>
+          <button onclick="event.stopPropagation();deleteRun({{ r.id }})"
+                  style="background:none;border:none;color:#f87171;cursor:pointer;font-size:.75rem;padding:.1rem .3rem;">🗑</button>
+        </div>
+      </div>
+      {% else %}
+      <div id="emptyState" style="text-align:center;padding:2rem;color:var(--text-muted);font-size:.82rem;">
+        <div style="font-size:2rem;margin-bottom:.5rem;">🏺</div>
+        No runs planned yet.<br>
+        <button onclick="seedTest()" style="margin-top:.75rem;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:7px;padding:.35rem .8rem;cursor:pointer;font-size:.8rem;">🧪 Load test data</button>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Legend -->
+    <div style="padding:.6rem .75rem;border-top:1px solid var(--border);font-size:.72rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:.5rem .9rem;flex-shrink:0;">
+      <span><span style="color:#60a5fa;">●</span> Cleaner</span>
+      <span><span style="color:#f87171;">●</span> Destroyer</span>
+      <span><span style="color:#4ade80;">●</span> Picker ✓ Treasury</span>
+      <span><span style="color:#fbbf24;">●</span> Picker ✗ Treasury</span>
+    </div>
+  </div>
+
+  <!-- ── Map ── -->
+  <div class="arm-map-wrap">
+    <canvas id="armCanvas"></canvas>
+    <div class="arm-map-controls">
+      <button class="arm-map-btn" onclick="armZoom(1.3)" title="Zoom in">+</button>
+      <button class="arm-map-btn" onclick="armZoom(0.77)" title="Zoom out">−</button>
+      <button class="arm-map-btn" onclick="armFit()" title="Fit all">⊡</button>
+    </div>
+    <div id="armTooltip"></div>
+  </div>
+
+</div>
+
+<!-- ── Add/Edit Modal ── -->
+<div class="arm-modal-overlay" id="armModal" onclick="if(event.target===this)closeModal()">
+  <div class="arm-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <h2 style="margin:0;font-size:1rem;" id="modalTitle">➕ Add Artifact Run</h2>
+      <button onclick="closeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.3rem;">✕</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem;">
+      <div class="arm-field">
+        <label>Artifact Name</label>
+        <input id="f_name" class="form-control" placeholder="e.g. Boot of Warrior">
+      </div>
+      <div class="arm-field">
+        <label>Type</label>
+        <select id="f_type" class="form-control">
+          {% for key, label in artifact_types %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="arm-field">
+        <label>Size</label>
+        <select id="f_size" class="form-control">
+          <option value="small">Small</option>
+          <option value="large">Large</option>
+          <option value="unique">Unique</option>
+        </select>
+      </div>
+      <div class="arm-field">
+        <label>Artifact Coords (X | Y)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;">
+          <input id="f_x" class="form-control" type="number" placeholder="X">
+          <input id="f_y" class="form-control" type="number" placeholder="Y">
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-bottom:.75rem;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#60a5fa;margin-bottom:.5rem;">🛡️ Cleaner — clears the artifact village</div>
+      <div class="arm-field-row">
+        <div class="arm-field" style="margin:0;"><label>Player</label><input id="f_cleaner" class="form-control" placeholder="Player name"></div>
+        <div class="arm-field" style="margin:0;"><label>X</label><input id="f_cleaner_x" class="form-control" type="number" placeholder="X"></div>
+        <div class="arm-field" style="margin:0;"><label>Y</label><input id="f_cleaner_y" class="form-control" type="number" placeholder="Y"></div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-bottom:.75rem;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#f87171;margin-bottom:.5rem;">💥 Destroyer — destroys the treasury at artifact</div>
+      <div class="arm-field-row">
+        <div class="arm-field" style="margin:0;"><label>Player</label><input id="f_destroyer" class="form-control" placeholder="Player name"></div>
+        <div class="arm-field" style="margin:0;"><label>X</label><input id="f_destroyer_x" class="form-control" type="number" placeholder="X"></div>
+        <div class="arm-field" style="margin:0;"><label>Y</label><input id="f_destroyer_y" class="form-control" type="number" placeholder="Y"></div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-bottom:.75rem;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4ade80;margin-bottom:.5rem;">🏺 Picker — collects the artifact</div>
+      <div class="arm-field-row">
+        <div class="arm-field" style="margin:0;"><label>Player</label><input id="f_picker" class="form-control" placeholder="Player name"></div>
+        <div class="arm-field" style="margin:0;"><label>X</label><input id="f_picker_x" class="form-control" type="number" placeholder="X"></div>
+        <div class="arm-field" style="margin:0;"><label>Y</label><input id="f_picker_y" class="form-control" type="number" placeholder="Y"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:.82rem;cursor:pointer;">
+        <input type="checkbox" id="f_has_treasury"> Player has a valid treasury (Lvl 10 or 20)
+      </label>
+      <div id="treasuryWarning" style="display:none;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:.4rem .65rem;font-size:.75rem;color:#fbbf24;margin-top:.4rem;">
+        ⚠️ This player has no treasury registered — the artifact cannot be stored!
+      </div>
+    </div>
+
+    <div class="arm-field">
+      <label>Notes (optional)</label>
+      <input id="f_notes" class="form-control" placeholder="e.g. Timing: 12:00 server time">
+    </div>
+
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;">
+      <button onclick="closeModal()" class="btn btn-secondary">Cancel</button>
+      <button onclick="saveRun()" class="btn btn-primary" id="saveBtn">+ Add Run</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GUILD_ID = {{ guild.guild_id | tojson }};
+const API      = `/guild/${GUILD_ID}/artifacts/api/runs`;
+const TREASURY_PLAYERS = new Set({{ treasury_players | tojson }});
+
+// ── State ──────────────────────────────────────────────────────────────────
+let runs = {{ runs | tojson }};
+let selectedId = null;
+let editingId  = null;
+
+// ── Canvas state ───────────────────────────────────────────────────────────
+const S = { minX:-100, maxX:100, minY:-100, maxY:100, offX:0, offY:0, scale:1, bgV:[] };
+let isDragging=false, dragStart={x:0,y:0}, dragOff={x:0,y:0};
+
+// ── Coordinate helpers ──────────────────────────────────────────────────────
+function w2c(wx,wy){
+  const canvas=document.getElementById('armCanvas');
+  const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
+  const bs=Math.min(canvas.width/rx, canvas.height/ry)*S.scale;
+  const cx=canvas.width/2, cy=canvas.height/2;
+  const midX=(S.minX+S.maxX)/2, midY=(S.minY+S.maxY)/2;
+  return [cx+(wx-midX)*bs+S.offX, cy+(wy-midY)*bs+S.offY];
+}
+function c2w(cx,cy){
+  const canvas=document.getElementById('armCanvas');
+  const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
+  const bs=Math.min(canvas.width/rx, canvas.height/ry)*S.scale;
+  const ccx=canvas.width/2, ccy=canvas.height/2;
+  const midX=(S.minX+S.maxX)/2, midY=(S.minY+S.maxY)/2;
+  return [(cx-ccx-S.offX)/bs+midX, (cy-ccy-S.offY)/bs+midY];
+}
+
+// ── Fit all ────────────────────────────────────────────────────────────────
+function armFit(){
+  const pts=[];
+  runs.forEach(r=>{
+    [[r.artifact_x,r.artifact_y],[r.cleaner_x,r.cleaner_y],[r.destroyer_x,r.destroyer_y],[r.picker_x,r.picker_y]]
+      .forEach(([x,y])=>{ if(x||y) pts.push([x,y]); });
+  });
+  if(!pts.length){ S.minX=-100;S.maxX=100;S.minY=-100;S.maxY=100;S.scale=1;S.offX=0;S.offY=0; }
+  else {
+    const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+    const pad=30;
+    S.minX=Math.min(...xs)-pad; S.maxX=Math.max(...xs)+pad;
+    S.minY=Math.min(...ys)-pad; S.maxY=Math.max(...ys)+pad;
+    S.scale=1; S.offX=0; S.offY=0;
+  }
+  draw();
+}
+
+function armZoom(f){ S.scale*=f; draw(); }
+
+// ── Draw ───────────────────────────────────────────────────────────────────
+function draw(){
+  const canvas=document.getElementById('armCanvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#0d1a0d'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // grid
+  const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
+  const bs=Math.min(canvas.width/rx,canvas.height/ry)*S.scale;
+  const gs=Math.max(1,Math.round(20/bs));
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  for(let gx=Math.floor(S.minX/gs)*gs;gx<=S.maxX+gs;gx+=gs){
+    const[px]=w2c(gx,0); ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,canvas.height);ctx.stroke();
+  }
+  for(let gy=Math.floor(S.minY/gs)*gs;gy<=S.maxY+gs;gy+=gs){
+    const[,py]=w2c(0,gy); ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
+  }
+
+  // background villages
+  const vs=Math.max(1.5,Math.min(5,bs*0.3));
+  ctx.globalAlpha=0.3;
+  for(const v of S.bgV){
+    const[px,py]=w2c(v.x,v.y);
+    if(px<-vs||px>canvas.width+vs||py<-vs||py>canvas.height+vs) continue;
+    ctx.fillStyle=v.is_capital?'#ffe066':'#4a7c59';
+    ctx.fillRect(px-vs/2,py-vs/2,vs,vs);
+  }
+  ctx.globalAlpha=1;
+
+  const dot=Math.max(4,bs*0.35);
+  const fontSize=Math.max(9,Math.min(12,bs*0.9));
+  ctx.font=`600 ${fontSize}px sans-serif`;
+  ctx.textBaseline='bottom';
+
+  runs.forEach(r=>{
+    const isSelected = r.id===selectedId;
+    const alpha = selectedId===null||isSelected ? 1 : 0.35;
+    ctx.globalAlpha=alpha;
+
+    const[ax,ay]=w2c(r.artifact_x,r.artifact_y);
+    const hasCleaner  = r.cleaner_x||r.cleaner_y;
+    const hasDestroyer= r.destroyer_x||r.destroyer_y;
+    const hasPicker   = r.picker_x||r.picker_y;
+
+    // ── Lines ──
+    function drawLine(x1,y1,x2,y2,color,dash){
+      ctx.save();
+      ctx.strokeStyle=color; ctx.lineWidth=isSelected?2:1.2;
+      if(dash) ctx.setLineDash([5,4]); else ctx.setLineDash([]);
+      ctx.globalAlpha=alpha*(isSelected?0.85:0.55);
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      // arrowhead
+      const ang=Math.atan2(y2-y1,x2-x1);
+      const aw=isSelected?8:5;
+      ctx.setLineDash([]);
+      ctx.globalAlpha=alpha*(isSelected?1:0.7);
+      ctx.fillStyle=color;
+      ctx.beginPath();
+      ctx.moveTo(x2,y2);
+      ctx.lineTo(x2-aw*Math.cos(ang-0.4),y2-aw*Math.sin(ang-0.4));
+      ctx.lineTo(x2-aw*Math.cos(ang+0.4),y2-aw*Math.sin(ang+0.4));
+      ctx.closePath();ctx.fill();
+      ctx.restore();
+    }
+
+    if(hasCleaner){const[cx,cy]=w2c(r.cleaner_x,r.cleaner_y);drawLine(cx,cy,ax,ay,'#60a5fa',false);}
+    if(hasDestroyer){const[dx,dy]=w2c(r.destroyer_x,r.destroyer_y);drawLine(dx,dy,ax,ay,'#f87171',false);}
+    if(hasPicker){const[px2,py2]=w2c(r.picker_x,r.picker_y);drawLine(px2,py2,ax,ay,r.picker_has_treasury?'#4ade80':'#fbbf24',true);}
+
+    ctx.globalAlpha=alpha;
+
+    // ── Artifact target ──
+    const tSize=Math.max(6,bs*0.5);
+    ctx.fillStyle=isSelected?'#fbbf24':'#f59e0b';
+    ctx.strokeStyle='#fff'; ctx.lineWidth=isSelected?2:1;
+    // Diamond shape
+    ctx.beginPath();
+    ctx.moveTo(ax,ay-tSize);ctx.lineTo(ax+tSize,ay);ctx.lineTo(ax,ay+tSize);ctx.lineTo(ax-tSize,ay);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Artifact name
+    ctx.fillStyle='#fde68a';ctx.textAlign='center';
+    ctx.fillText(r.artifact_name||'?',ax,ay-tSize-3);
+
+    // ── Role dots ──
+    function roleDot(name,wx,wy,color,hasTreasury){
+      if(!wx&&!wy) return;
+      const[px2,py2]=w2c(wx,wy);
+      ctx.beginPath();ctx.arc(px2,py2,dot,0,Math.PI*2);
+      ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=isSelected?1.5:1;ctx.stroke();
+      // warning ring if no treasury for picker
+      if(hasTreasury===false){
+        ctx.beginPath();ctx.arc(px2,py2,dot+3,0,Math.PI*2);
+        ctx.strokeStyle='#fbbf24';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.stroke();ctx.setLineDash([]);
+      }
+      ctx.fillStyle='#fff'; ctx.textAlign='center';
+      ctx.fillText(name||'?',px2,py2-dot-2);
+    }
+    roleDot(r.cleaner_name,  r.cleaner_x,   r.cleaner_y,   '#60a5fa', null);
+    roleDot(r.destroyer_name,r.destroyer_x,  r.destroyer_y, '#f87171', null);
+    roleDot(r.picker_name,   r.picker_x,     r.picker_y,    r.picker_has_treasury?'#4ade80':'#fbbf24', r.picker_has_treasury?null:false);
+
+    ctx.globalAlpha=1;
+  });
+
+  // Legend
+  drawLegend(ctx,canvas);
+}
+
+function drawLegend(ctx,canvas){
+  const items=[['Cleaner →','#60a5fa'],['Destroyer →','#f87171'],['Picker (✓ treasury) →','#4ade80'],['Picker (✗ treasury) ···>','#fbbf24'],['Artifact','#f59e0b','◆']];
+  const PAD=8,ROW=16,pw=170,ph=items.length*ROW+PAD*2;
+  const px0=canvas.width-pw-PAD, py0=PAD;
+  ctx.save();ctx.globalAlpha=0.82;ctx.fillStyle='#0d1a0d';
+  ctx.fillRect(px0,py0,pw,ph);ctx.globalAlpha=1;
+  ctx.font='9px sans-serif';ctx.textBaseline='middle';
+  items.forEach(([l,c,sym],i)=>{
+    const ty=py0+PAD+i*ROW+ROW/2;
+    ctx.fillStyle=c;
+    if(sym){ctx.font='bold 10px sans-serif';ctx.fillText(sym,px0+PAD+3,ty);ctx.font='9px sans-serif';}
+    else{ctx.fillRect(px0+PAD,ty-1,12,2);}
+    ctx.fillStyle='#ccc';ctx.textAlign='left';ctx.fillText(l,px0+PAD+17,ty);
+  });
+  ctx.restore();
+}
+
+// ── Canvas events ──────────────────────────────────────────────────────────
+function setupCanvas(){
+  const canvas=document.getElementById('armCanvas');
+  const wrap=canvas.parentElement;
+
+  function resize(){
+    canvas.width=wrap.clientWidth;
+    canvas.height=wrap.clientHeight;
+    draw();
+  }
+  new ResizeObserver(resize).observe(wrap);
+  resize();
+
+  // Drag
+  canvas.addEventListener('mousedown',e=>{isDragging=true;dragStart={x:e.clientX,y:e.clientY};dragOff={x:S.offX,y:S.offY};});
+  canvas.addEventListener('mousemove',e=>{
+    if(isDragging){S.offX=dragOff.x+(e.clientX-dragStart.x);S.offY=dragOff.y+(e.clientY-dragStart.y);draw();return;}
+    showTooltip(e);
+  });
+  canvas.addEventListener('mouseup',()=>{isDragging=false;});
+  canvas.addEventListener('mouseleave',()=>{isDragging=false;document.getElementById('armTooltip').style.display='none';});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();armZoom(e.deltaY<0?1.12:0.89);},{passive:false});
+  canvas.addEventListener('click',e=>{
+    if(Math.abs(e.clientX-dragStart.x)<4&&Math.abs(e.clientY-dragStart.y)<4){
+      // click to select nearest artifact
+      const rect=canvas.getBoundingClientRect();
+      const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+      let best=null,bestD=25;
+      runs.forEach(r=>{
+        const[px,py]=w2c(r.artifact_x,r.artifact_y);
+        const d=Math.hypot(px-mx,py-my);
+        if(d<bestD){bestD=d;best=r.id;}
+      });
+      selectRun(best);
+    }
+  });
+}
+
+function showTooltip(e){
+  const canvas=document.getElementById('armCanvas');
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const tip=document.getElementById('armTooltip');
+  let best=null,bestD=28;
+  runs.forEach(r=>{
+    const pts=[[r.artifact_x,r.artifact_y,`🏺 ${r.artifact_name}`,null],
+               [r.cleaner_x,r.cleaner_y,`🛡️ Cleaner: ${r.cleaner_name}`,'#60a5fa'],
+               [r.destroyer_x,r.destroyer_y,`💥 Destroyer: ${r.destroyer_name}`,'#f87171'],
+               [r.picker_x,r.picker_y,`🏃 Picker: ${r.picker_name}`,'#4ade80']];
+    pts.forEach(([wx,wy,label,color])=>{
+      if(!wx&&!wy) return;
+      const[px,py]=w2c(wx,wy);
+      const d=Math.hypot(px-mx,py-my);
+      if(d<bestD){bestD=d;best={label,color,wx,wy,r};}
+    });
+  });
+  if(!best){tip.style.display='none';return;}
+  const{label,wx,wy,r}=best;
+  let html=`<div style="font-weight:700;margin-bottom:.2rem;">${label}</div>`;
+  html+=`<div style="font-family:monospace;font-size:.7rem;color:#9ca3af;">(${wx}|${wy})</div>`;
+  if(!r.picker_has_treasury&&r.picker_name){
+    html+=`<div style="color:#fbbf24;margin-top:.2rem;font-size:.72rem;">⚠️ No treasury registered!</div>`;
+  }
+  if(r.notes){html+=`<div style="margin-top:.25rem;font-size:.72rem;color:#9ca3af;">${r.notes}</div>`;}
+  tip.innerHTML=html;
+  tip.style.display='block';
+  tip.style.left=(mx+12)+'px';
+  tip.style.top=(my-10)+'px';
+}
+
+// ── Run selection ──────────────────────────────────────────────────────────
+function selectRun(id){
+  selectedId = selectedId===id ? null : id;
+  document.querySelectorAll('.arm-run-card').forEach(c=>{
+    c.classList.toggle('selected', parseInt(c.id.replace('card-',''))===selectedId);
+  });
+  if(selectedId!==null){
+    const el=document.getElementById('card-'+selectedId);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  draw();
+}
+
+// ── Test data ──────────────────────────────────────────────────────────────
+function openTestMenu(){ document.getElementById('testMenu').style.display=document.getElementById('testMenu').style.display==='none'?'block':'none'; }
+async function seedTest(){
+  await fetch(`${API}/seed-test`,{method:'POST',credentials:'include'});
+  location.reload();
+}
+async function clearTest(){
+  if(!confirm('Remove all test runs?')) return;
+  await fetch(`${API}/clear-test`,{method:'POST',credentials:'include'});
+  location.reload();
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+async function deleteRun(id){
+  if(!confirm('Delete this run?')) return;
+  await fetch(`${API}/${id}/delete`,{method:'POST',credentials:'include'});
+  runs=runs.filter(r=>r.id!==id);
+  if(selectedId===id) selectedId=null;
+  document.getElementById('card-'+id)?.remove();
+  draw();
+}
+
+// ── Add / Edit modal ───────────────────────────────────────────────────────
+function openAddModal(){
+  editingId=null;
+  document.getElementById('modalTitle').textContent='➕ Add Artifact Run';
+  document.getElementById('saveBtn').textContent='+ Add Run';
+  clearForm();
+  document.getElementById('armModal').classList.add('open');
+}
+
+function editRun(id){
+  const r=runs.find(x=>x.id===id);
+  if(!r) return;
+  editingId=id;
+  document.getElementById('modalTitle').textContent='✏️ Edit Run';
+  document.getElementById('saveBtn').textContent='Save';
+  document.getElementById('f_name').value=r.artifact_name||'';
+  document.getElementById('f_type').value=r.artifact_type||'other';
+  document.getElementById('f_size').value=r.artifact_size||'small';
+  document.getElementById('f_x').value=r.artifact_x||'';
+  document.getElementById('f_y').value=r.artifact_y||'';
+  document.getElementById('f_cleaner').value=r.cleaner_name||'';
+  document.getElementById('f_cleaner_x').value=r.cleaner_x||'';
+  document.getElementById('f_cleaner_y').value=r.cleaner_y||'';
+  document.getElementById('f_destroyer').value=r.destroyer_name||'';
+  document.getElementById('f_destroyer_x').value=r.destroyer_x||'';
+  document.getElementById('f_destroyer_y').value=r.destroyer_y||'';
+  document.getElementById('f_picker').value=r.picker_name||'';
+  document.getElementById('f_picker_x').value=r.picker_x||'';
+  document.getElementById('f_picker_y').value=r.picker_y||'';
+  document.getElementById('f_has_treasury').checked=!!r.picker_has_treasury;
+  document.getElementById('f_notes').value=r.notes||'';
+  checkTreasury();
+  document.getElementById('armModal').classList.add('open');
+}
+
+function clearForm(){
+  ['f_name','f_x','f_y','f_cleaner','f_cleaner_x','f_cleaner_y',
+   'f_destroyer','f_destroyer_x','f_destroyer_y','f_picker','f_picker_x','f_picker_y','f_notes']
+    .forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f_has_treasury').checked=false;
+  document.getElementById('treasuryWarning').style.display='none';
+}
+
+function checkTreasury(){
+  const name=document.getElementById('f_picker').value.trim();
+  const has=document.getElementById('f_has_treasury').checked;
+  const warn=document.getElementById('treasuryWarning');
+  warn.style.display = (name && !has && !TREASURY_PLAYERS.has(name)) ? 'block' : 'none';
+}
+document.getElementById('f_picker').addEventListener('input',checkTreasury);
+document.getElementById('f_has_treasury').addEventListener('change',checkTreasury);
+
+async function saveRun(){
+  const data={
+    artifact_name:    document.getElementById('f_name').value.trim(),
+    artifact_type:    document.getElementById('f_type').value,
+    artifact_size:    document.getElementById('f_size').value,
+    artifact_x:       parseInt(document.getElementById('f_x').value)||0,
+    artifact_y:       parseInt(document.getElementById('f_y').value)||0,
+    cleaner_name:     document.getElementById('f_cleaner').value.trim(),
+    cleaner_x:        parseInt(document.getElementById('f_cleaner_x').value)||0,
+    cleaner_y:        parseInt(document.getElementById('f_cleaner_y').value)||0,
+    destroyer_name:   document.getElementById('f_destroyer').value.trim(),
+    destroyer_x:      parseInt(document.getElementById('f_destroyer_x').value)||0,
+    destroyer_y:      parseInt(document.getElementById('f_destroyer_y').value)||0,
+    picker_name:      document.getElementById('f_picker').value.trim(),
+    picker_x:         parseInt(document.getElementById('f_picker_x').value)||0,
+    picker_y:         parseInt(document.getElementById('f_picker_y').value)||0,
+    picker_has_treasury: document.getElementById('f_has_treasury').checked,
+    notes:            document.getElementById('f_notes').value.trim(),
+  };
+  if(!data.artifact_name){alert('Artifact name required');return;}
+
+  if(editingId){
+    // delete + re-add (simple update)
+    await fetch(`${API}/${editingId}/delete`,{method:'POST',credentials:'include'});
+  }
+  const r=await fetch(`${API}/add`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  closeModal();
+  location.reload();
+}
+
+function closeModal(){ document.getElementById('armModal').classList.remove('open'); }
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  setupCanvas();
+  armFit();
+  // Load bg villages
+  fetch(`/guild/${GUILD_ID}/operations/api/villages`,{credentials:'include'})
+    .then(r=>r.ok?r.json():null).then(d=>{if(d){S.bgV=d.villages||[];draw();}}).catch(()=>{});
+});
+</script>
+{% endblock %}

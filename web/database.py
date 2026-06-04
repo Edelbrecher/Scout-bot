@@ -9478,6 +9478,31 @@ async def _init_artifact_tables():
                 created_at          TEXT DEFAULT (datetime('now'))
             )
         """)
+        # Artifact run plans (for map view)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_runs (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                artifact_name   TEXT NOT NULL DEFAULT '',
+                artifact_x      INTEGER DEFAULT 0,
+                artifact_y      INTEGER DEFAULT 0,
+                artifact_type   TEXT DEFAULT 'other',
+                artifact_size   TEXT DEFAULT 'small',
+                cleaner_name    TEXT DEFAULT '',
+                cleaner_x       INTEGER DEFAULT 0,
+                cleaner_y       INTEGER DEFAULT 0,
+                destroyer_name  TEXT DEFAULT '',
+                destroyer_x     INTEGER DEFAULT 0,
+                destroyer_y     INTEGER DEFAULT 0,
+                picker_name     TEXT DEFAULT '',
+                picker_x        INTEGER DEFAULT 0,
+                picker_y        INTEGER DEFAULT 0,
+                picker_has_treasury INTEGER DEFAULT 0,
+                notes           TEXT DEFAULT '',
+                is_test         INTEGER DEFAULT 0,
+                created_at      TEXT DEFAULT (datetime('now'))
+            )
+        """)
         await db.commit()
     # Migrations for existing DBs
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -9489,6 +9514,45 @@ async def _init_artifact_tables():
                 await db.commit()
             except Exception:
                 pass
+
+
+async def get_artifact_runs(guild_id: str) -> list[dict]:
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM artifact_runs WHERE guild_id=? ORDER BY created_at", (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+async def save_artifact_run(guild_id: str, data: dict) -> int:
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO artifact_runs
+            (guild_id,artifact_name,artifact_x,artifact_y,artifact_type,artifact_size,
+             cleaner_name,cleaner_x,cleaner_y,destroyer_name,destroyer_x,destroyer_y,
+             picker_name,picker_x,picker_y,picker_has_treasury,notes,is_test)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (guild_id, data.get("artifact_name",""), data.get("artifact_x",0), data.get("artifact_y",0),
+              data.get("artifact_type","other"), data.get("artifact_size","small"),
+              data.get("cleaner_name",""), data.get("cleaner_x",0), data.get("cleaner_y",0),
+              data.get("destroyer_name",""), data.get("destroyer_x",0), data.get("destroyer_y",0),
+              data.get("picker_name",""), data.get("picker_x",0), data.get("picker_y",0),
+              1 if data.get("picker_has_treasury") else 0,
+              data.get("notes",""), 1 if data.get("is_test") else 0))
+        await db.commit()
+        return cur.lastrowid
+
+async def delete_artifact_run(guild_id: str, run_id: int):
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM artifact_runs WHERE id=? AND guild_id=?", (run_id, guild_id))
+        await db.commit()
+
+async def delete_test_artifact_runs(guild_id: str):
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM artifact_runs WHERE guild_id=? AND is_test=1", (guild_id,))
+        await db.commit()
 
 
 # ── Treasury CRUD ──────────────────────────────────────────────────────────

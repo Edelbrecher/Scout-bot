@@ -11989,6 +11989,101 @@ async def api_treasuries(request: Request, guild_id: str):
 
 # ── Artifacts ───────────────────────────────────────────────────────────────
 
+@app.get("/guild/{guild_id}/artifacts/run-map", response_class=HTMLResponse)
+async def artifact_run_map_page(request: Request, guild_id: str):
+    """Artifact run planning map — who clears/destroys/picks each artifact."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    runs      = await database.get_artifact_runs(guild_id)
+    treasuries = await database.get_all_treasuries(guild_id)
+    treasury_players = {t["player_name"] for t in treasuries}
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    # Map background villages
+    bg_villages = await database.get_map_villages_for_guild(guild_id) if hasattr(database, "get_map_villages_for_guild") else []
+    return templates.TemplateResponse("artifact_run_map.html", {
+        "request": request, "guild": guild, "session": session,
+        "runs": runs, "treasury_players": list(treasury_players),
+        "is_leader": is_leader, "artifact_types": ARTIFACT_TYPES,
+        "bg_villages": bg_villages,
+    })
+
+
+@app.get("/guild/{guild_id}/artifacts/api/runs")
+async def artifact_runs_api(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    runs = await database.get_artifact_runs(guild_id)
+    treasuries = await database.get_all_treasuries(guild_id)
+    treasury_players = {t["player_name"] for t in treasuries}
+    return _JSONResponse({"runs": runs, "treasury_players": list(treasury_players)})
+
+
+@app.post("/guild/{guild_id}/artifacts/api/runs/add")
+async def artifact_run_add(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    data = await request.json()
+    data["guild_id"] = guild_id
+    run_id = await database.save_artifact_run(guild_id, data)
+    return _JSONResponse({"id": run_id})
+
+
+@app.post("/guild/{guild_id}/artifacts/api/runs/{run_id}/delete")
+async def artifact_run_delete(request: Request, guild_id: str, run_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    await database.delete_artifact_run(guild_id, run_id)
+    return _JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/artifacts/api/runs/seed-test")
+async def artifact_run_seed_test(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    TEST_RUNS = [
+        {"artifact_name":"Boot of Warrior","artifact_type":"boots","artifact_size":"small","artifact_x":-20,"artifact_y":30,
+         "cleaner_name":"Leonidas","cleaner_x":-35,"cleaner_y":45,
+         "destroyer_name":"Maximus","destroyer_x":-18,"destroyer_y":28,
+         "picker_name":"Achilles","picker_x":-22,"picker_y":32,"picker_has_treasury":True,"is_test":True},
+        {"artifact_name":"Eye of the Falcon","artifact_type":"eye","artifact_size":"large","artifact_x":55,"artifact_y":-10,
+         "cleaner_name":"Spartacus","cleaner_x":70,"cleaner_y":-5,
+         "destroyer_name":"Brutus","destroyer_x":53,"destroyer_y":-12,
+         "picker_name":"Julius","picker_x":58,"picker_y":-8,"picker_has_treasury":False,"is_test":True},
+        {"artifact_name":"Helmet of Confusion","artifact_type":"helmet","artifact_size":"unique","artifact_x":5,"artifact_y":80,
+         "cleaner_name":"Ragnar","cleaner_x":-10,"cleaner_y":95,
+         "destroyer_name":"Sigurd","destroyer_x":3,"destroyer_y":78,
+         "picker_name":"Ragnar","picker_x":-10,"picker_y":95,"picker_has_treasury":True,"is_test":True},
+        {"artifact_name":"Book of Wisdom","artifact_type":"book","artifact_size":"small","artifact_x":-70,"artifact_y":-45,
+         "cleaner_name":"Caesar","cleaner_x":-85,"cleaner_y":-30,
+         "destroyer_name":"Augustus","destroyer_x":-72,"destroyer_y":-47,
+         "picker_name":"Pompey","picker_x":-68,"picker_y":-50,"picker_has_treasury":True,"is_test":True},
+        {"artifact_name":"Architect Plans","artifact_type":"architect","artifact_size":"small","artifact_x":40,"artifact_y":60,
+         "cleaner_name":"Vercingetorix","cleaner_x":55,"cleaner_y":75,
+         "destroyer_name":"Ambiorix","destroyer_x":42,"destroyer_y":62,
+         "picker_name":"Dumnorix","picker_x":38,"picker_y":58,"picker_has_treasury":False,"is_test":True},
+    ]
+    for run in TEST_RUNS:
+        run["guild_id"] = guild_id
+        await database.save_artifact_run(guild_id, run)
+    return _JSONResponse({"ok": True, "count": len(TEST_RUNS)})
+
+
+@app.post("/guild/{guild_id}/artifacts/api/runs/clear-test")
+async def artifact_run_clear_test(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    await database.delete_test_artifact_runs(guild_id)
+    return _JSONResponse({"ok": True})
+
+
 @app.get("/guild/{guild_id}/artifacts", response_class=HTMLResponse)
 async def artifacts_page(request: Request, guild_id: str):
     session, err = _require_session(request)
