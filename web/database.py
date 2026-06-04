@@ -2355,7 +2355,7 @@ async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
         delta = pop_now - pop_before
         results.append({
             "player_id": pid,
-            "player_name": r["player_name"] or "(unbekannt)",
+            "player_name": r["player_name"] or "(unknown)",
             "pop_before": pop_before,
             "pop_now": pop_now,
             "delta": delta,
@@ -9901,7 +9901,7 @@ async def get_meta_combined_tracking(guild_id: str, alliance_names: list[str]) -
                         row2 = await cur2.fetchone()
                     dst_ally = row2[0] if row2 else "?"
                     events.append({"date": date[:10], "type": "join", "player": p,
-                                   "from_alliance": src or "(unbekannt)", "to_alliance": dst_ally})
+                                   "from_alliance": src or "(unknown)", "to_alliance": dst_ally})
 
                 for p in sorted(left_meta):
                     async with db.execute("""
@@ -9922,7 +9922,7 @@ async def get_meta_combined_tracking(guild_id: str, alliance_names: list[str]) -
                     src_ally = row2[0] if row2 else "?"
                     events.append({"date": date[:10], "type": "leave", "player": p,
                                    "from_alliance": src_ally,
-                                   "to_alliance": dst if dst and dst.lower() not in lower_names else "(gelöscht)"})
+                                   "to_alliance": dst if dst and dst.lower() not in lower_names else "(deleted)"})
 
             prev_meta_members = cur_meta
 
@@ -10058,7 +10058,7 @@ async def get_alliance_player_flows(guild_id: str, alliance_name: str) -> dict:
                         outflows.setdefault(dst, []).append(p)
                     elif not dst:
                         # Deleted / no data
-                        outflows.setdefault("(gelöscht)", []).append(p)
+                        outflows.setdefault("(deleted)", []).append(p)
 
             prev_members = current_members
 
