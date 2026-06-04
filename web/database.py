@@ -9718,4 +9718,172 @@ async def skip_handoff(handoff_id: int, artifact_id: int, guild_id: str) -> bool
         )
         await db.commit()
     return True
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ALLIANCE TRACKING (from map_snapshots data)
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def get_watched_alliances(guild_id: str) -> list[dict]:
+    """Return alliances being watched by this guild."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            async with db.execute(
+                "SELECT * FROM watched_alliances WHERE guild_id=? ORDER BY added_at DESC",
+                (guild_id,)
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            return []
+
+
+async def _ensure_watched_alliances_table(db):
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS watched_alliances (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id    TEXT NOT NULL,
+            alliance_name TEXT NOT NULL,
+            added_at    TEXT DEFAULT (datetime('now')),
+            notes       TEXT DEFAULT '',
+            UNIQUE(guild_id, alliance_name)
+        )
+    """)
+    await db.commit()
+
+
+async def watch_alliance(guild_id: str, alliance_name: str, notes: str = "") -> bool:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await _ensure_watched_alliances_table(db)
+        await db.execute(
+            "INSERT OR IGNORE INTO watched_alliances (guild_id, alliance_name, notes) VALUES (?,?,?)",
+            (guild_id, alliance_name, notes)
+        )
+        await db.commit()
     return True
+
+
+async def unwatch_alliance(guild_id: str, alliance_name: str) -> bool:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await _ensure_watched_alliances_table(db)
+        await db.execute(
+            "DELETE FROM watched_alliances WHERE guild_id=? AND alliance_name=?",
+            (guild_id, alliance_name)
+        )
+        await db.commit()
+    return True
+
+
+async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
+    """Top alliances by member count from latest map snapshot."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            # Get latest snapshot date
+            async with db.execute(
+                "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id=?",
+                (guild_id,)
+            ) as cur:
+                row = await cur.fetchone()
+                latest = row[0] if row else None
+            if not latest:
+                return []
+            async with db.execute("""
+                SELECT alliance_name,
+                       COUNT(DISTINCT player_name) as member_count,
+                       SUM(population) as total_pop,
+                       COUNT(*) as village_count
+                FROM map_snapshots
+                WHERE guild_id=? AND fetched_at=?
+                  AND alliance_name IS NOT NULL AND alliance_name != ''
+                GROUP BY alliance_name
+                ORDER BY member_count DESC, total_pop DESC
+                LIMIT ?
+            """, (guild_id, latest, limit)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            return []
+
+
+async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
+    """Full tracking data for one alliance from map_snapshots."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+
+        # All snapshot dates for this alliance
+        async with db.execute("""
+            SELECT DISTINCT fetched_at FROM map_snapshots
+            WHERE guild_id=? AND lower(alliance_name)=lower(?)
+            ORDER BY fetched_at
+        """, (guild_id, alliance_name)) as cur:
+            dates = [r[0] for r in await cur.fetchall()]
+
+        if not dates:
+            return {"dates": [], "members": {}, "events": [], "current": [], "pop_history": []}
+
+        latest = dates[-1]
+
+        # Current members (latest snapshot)
+        async with db.execute("""
+            SELECT player_name, SUM(population) as total_pop, COUNT(*) as villages,
+                   MAX(tribe) as tribe
+            FROM map_snapshots
+            WHERE guild_id=? AND fetched_at=? AND lower(alliance_name)=lower(?)
+            GROUP BY player_name
+            ORDER BY total_pop DESC
+        """, (guild_id, latest, alliance_name)) as cur:
+            current_members = [dict(r) for r in await cur.fetchall()]
+
+        # Population history per snapshot
+        async with db.execute("""
+            SELECT fetched_at,
+                   COUNT(DISTINCT player_name) as member_count,
+                   SUM(population) as total_pop,
+                   COUNT(*) as village_count
+            FROM map_snapshots
+            WHERE guild_id=? AND lower(alliance_name)=lower(?)
+            GROUP BY fetched_at
+            ORDER BY fetched_at
+        """, (guild_id, alliance_name)) as cur:
+            pop_history = [dict(r) for r in await cur.fetchall()]
+
+        # Detect join/leave events by comparing consecutive snapshots
+        # For each date, get set of player_names
+        events = []
+        prev_members = None
+        for i, date in enumerate(dates):
+            async with db.execute("""
+                SELECT DISTINCT player_name FROM map_snapshots
+                WHERE guild_id=? AND fetched_at=? AND lower(alliance_name)=lower(?)
+            """, (guild_id, date, alliance_name)) as cur:
+                current_set = {r[0] for r in await cur.fetchall()}
+
+            if prev_members is not None:
+                joined  = current_set - prev_members
+                left    = prev_members - current_set
+                for p in sorted(joined):
+                    events.append({"date": date[:10], "type": "join", "player": p})
+                for p in sorted(left):
+                    # Check if player still exists anywhere in this snapshot
+                    async with db.execute("""
+                        SELECT COUNT(*) FROM map_snapshots
+                        WHERE guild_id=? AND fetched_at=? AND lower(player_name)=lower(?)
+                    """, (guild_id, date, p)) as cur2:
+                        still_exists = (await cur2.fetchone())[0] > 0
+                    events.append({
+                        "date": date[:10],
+                        "type": "leave" if still_exists else "deleted",
+                        "player": p
+                    })
+            prev_members = current_set
+
+        events.reverse()  # newest first
+
+        return {
+            "dates": dates,
+            "current": current_members,
+            "pop_history": pop_history,
+            "events": events,
+            "snapshot_count": len(dates),
+            "latest": latest,
+        }

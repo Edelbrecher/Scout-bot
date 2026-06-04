@@ -9431,6 +9431,73 @@ def parse_alliance_members(text: str) -> list[dict]:
     return members
 
 
+@app.get("/guild/{guild_id}/alliance-tracking", response_class=HTMLResponse)
+async def alliance_tracking_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    watched = await database.get_watched_alliances(guild_id)
+    top_alliances = await database.get_top_alliances(guild_id, limit=10)
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("alliance_tracking.html", {
+        "request": request, "guild": guild,
+        "watched": watched, "top_alliances": top_alliances,
+        "saved": saved,
+    })
+
+
+@app.post("/guild/{guild_id}/alliance-tracking/watch")
+async def alliance_tracking_watch(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    form = await request.form()
+    name = form.get("alliance_name", "").strip()
+    if name:
+        await database.watch_alliance(guild_id, name)
+    return RedirectResponse(f"/guild/{guild_id}/alliance-tracking?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/alliance-tracking/{alliance_name}/unwatch")
+async def alliance_tracking_unwatch(request: Request, guild_id: str, alliance_name: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    await database.unwatch_alliance(guild_id, alliance_name)
+    return RedirectResponse(f"/guild/{guild_id}/alliance-tracking", status_code=303)
+
+
+@app.get("/guild/{guild_id}/alliance-tracking/{alliance_name}", response_class=HTMLResponse)
+async def alliance_tracking_detail(request: Request, guild_id: str, alliance_name: str):
+    from urllib.parse import unquote
+    alliance_name = unquote(alliance_name)
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    data = await database.get_alliance_tracking_data(guild_id, alliance_name)
+    watched = await database.get_watched_alliances(guild_id)
+    is_watched = any(w["alliance_name"].lower() == alliance_name.lower() for w in watched)
+    return templates.TemplateResponse("alliance_tracking_detail.html", {
+        "request": request, "guild": guild,
+        "alliance_name": alliance_name,
+        "data": data, "is_watched": is_watched,
+    })
+
+
 @app.get("/guild/{guild_id}/enemies", response_class=HTMLResponse)
 async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
@@ -9445,12 +9512,14 @@ async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     if err: return err
     enemies = await database.get_enemies(guild_id)
     report_channel = await database.get_report_channel(guild_id)
+    top_alliances = await database.get_top_alliances(guild_id, limit=5)
     return templates.TemplateResponse("enemies.html", {
         "request": request,
         "guild": guild,
         "enemies": enemies,
         "saved": saved,
         "report_channel": report_channel,
+        "top_alliances": top_alliances,
     })
 
 
@@ -11671,11 +11740,20 @@ async def my_treasury_page(request: Request, guild_id: str):
     treasuries = await database.get_my_treasuries(guild_id, uid)
     saved = request.query_params.get("saved")
     # Load own villages for village picker
-    own_villages = await database.get_own_villages(guild_id, uid)
+    own_villages_raw = await database.get_own_villages(guild_id, uid)
+    # Deduplicate by village_name, prefer entries with coordinates
+    _seen = {}
+    for v in own_villages_raw:
+        name = v.get("village_name") or ""
+        if not name:
+            continue
+        if name not in _seen or (not _seen[name].get("x") and v.get("x")):
+            _seen[name] = v
+    own_villages = list(_seen.values())
     # Derive player name from uploaded_by of first village
     auto_player_name = ""
-    if own_villages:
-        auto_player_name = own_villages[0].get("uploaded_by", "") or ""
+    if own_villages_raw:
+        auto_player_name = own_villages_raw[0].get("uploaded_by", "") or ""
     return templates.TemplateResponse("my_treasury.html", {
         "request": request, "guild": guild,
         "treasuries": treasuries, "saved": saved,

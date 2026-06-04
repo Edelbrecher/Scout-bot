@@ -12,7 +12,21 @@
         Automatically populated when scout reports arrive in Discord
       </p>
     </div>
-    <div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+      <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="btn btn-secondary" style="font-size:.85rem;">
+        🔭 Allianz-Tracking
+      </a>
+      {% if top_alliances %}
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:.72rem;color:var(--text-muted);">Top:</span>
+        {% for a in top_alliances[:5] %}
+        <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ a.alliance_name | urlencode }}"
+           style="font-size:.72rem;padding:.2rem .55rem;border-radius:12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#a5b4fc;text-decoration:none;white-space:nowrap;">
+          {{ a.alliance_name }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
       <button onclick="document.getElementById('add-enemy-panel').style.display='block';this.style.display='none';document.getElementById('aps-input').focus();"
               id="add-enemy-btn"
               style="padding:.4rem .9rem;border-radius:6px;background:rgba(99,102,241,.15);
