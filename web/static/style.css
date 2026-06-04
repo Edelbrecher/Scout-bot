@@ -582,6 +582,19 @@ input:focus { border-color: var(--primary); }
 
 /* ── Disable browser-native cross-document view transitions ── */
 @view-transition { navigation: none; }
+::view-transition-old(root),
+::view-transition-new(root) { animation: none !important; }
+
+/* ── Pre-paint sidebar layout (avoids layout shift before JS runs) ── */
+html.on-guild-page #guild-sidebar { display: flex !important; }
+html.on-guild-page body { margin-left: 0; }
+html.on-guild-page main { margin-left: 220px; }
+html.on-guild-page.gs-pre-collapsed #guild-sidebar { width: 58px; }
+html.on-guild-page.gs-pre-collapsed main { margin-left: 58px; }
+@media (max-width: 900px) {
+  html.on-guild-page main { margin-left: 0 !important; }
+  html.on-guild-page #guild-sidebar { display: none !important; }
+}
 
 /* ── Page entry animation (fade + slide up) ── */
 @keyframes pageEnter {
