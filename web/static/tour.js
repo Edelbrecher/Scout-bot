@@ -846,15 +846,7 @@
       cur++;
       if (cur >= steps.length) { closeTour(); return; }
       const step = steps[cur];
-      if (step.page) {
-        const target = new URL(step.page, location.origin).pathname;
-        if (location.pathname !== target) {
-          setState({ name, step: cur, guildId });
-          fadeOut(ui);
-          setTimeout(() => { window.location.href = step.page; }, 270);
-          return;
-        }
-      }
+      // page-based navigation disabled — all steps render in-place
       renderStep(step, cur, steps.length, ui);
     }
 
@@ -880,23 +872,15 @@
     const guildMatch = path.match(/\/guild\/(\d{17,20})/);
     const guildId = guildMatch ? guildMatch[1] : null;
 
-    // Resume after page navigation
+    // Resume saved tour state (page navigation disabled — always resume in-place)
     const state = getState();
     if (state) {
+      setState(null);
       const factory = TOURS[state.name];
       if (factory) {
-        const steps = factory(state.guildId || guildId);
-        const step  = steps[state.step];
-        if (step) {
-          const target = step.page ? new URL(step.page, location.origin).pathname : null;
-          if (!target || location.pathname === target) {
-            setState(null);
-            runTour(state.name, state.step, state.guildId || guildId);
-            return;
-          }
-        }
+        runTour(state.name, state.step, state.guildId || guildId);
+        return;
       }
-      setState(null);
     }
 
     removeNavShield(); // safety: clear shield if no tour resumes
