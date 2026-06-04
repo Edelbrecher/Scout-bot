@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Enemy-Kartei · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Enemy Records · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1100px;">
@@ -7,14 +7,14 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:0.25rem 0 0;" data-i18n="enemies.title">🎯 Enemy-Kartei</h1>
+      <h1 style="margin:0.25rem 0 0;" data-i18n="enemies.title">🎯 Enemy Records</h1>
       <p class="subtitle" style="margin:0;" data-i18n="enemies.subtitle">
         Automatically populated when scout reports arrive in Discord
       </p>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
       <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="btn btn-secondary" style="font-size:.85rem;">
-        🔭 Allianz-Tracking
+        🔭 Alliance Tracking
       </a>
       {% if top_alliances %}
       <div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;">
@@ -119,18 +119,18 @@
   {% if saved == 'deleted' %}
   <div class="alert alert-success">🗑️ Enemy deleted.</div>
   {% elif saved == 'report_channel' %}
-  <div class="alert alert-success">✅ Report-Channel gespeichert.</div>
+  <div class="alert alert-success">✅ Report channel saved.</div>
   {% elif saved == 'report_channel_cleared' %}
-  <div class="alert alert-success">🗑️ Report-Channel entfernt.</div>
+  <div class="alert alert-success">🗑️ Report channel removed.</div>
   {% elif saved == 'channel_create_error' %}
-  <div class="alert alert-danger">❌ Channel konnte nicht erstellt werden. Ist der Bot online und die Kategorie konfiguriert?</div>
+  <div class="alert alert-danger">❌ Channel could not be created. Is the bot online and the category configured?</div>
   {% endif %}
 
   <!-- Report Channel Card -->
   <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
       <span style="font-size:1.1rem;">📋</span>
-      <strong style="font-size:1rem;" data-i18n="enemies.report_channel">Bericht-Eingangskanal</strong>
+      <strong style="font-size:1rem;" data-i18n="enemies.report_channel">Battle Report Channel</strong>
     </div>
 
     {% if report_channel and report_channel.channel_id %}
@@ -142,31 +142,30 @@
       </span>
       <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/clear" style="margin:0;">
         <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.78rem;padding:0.2rem 0.65rem;" data-i18n="enemies.channel.remove">
-          Entfernen
+          Remove
         </button>
       </form>
     </div>
     <p style="font-size:0.78rem;color:var(--text-muted);margin:0;">
-      Der Bot analysiert alle Kampfberichte die in diesem Channel gepostet werden automatisch.
+      The bot automatically analyses all battle reports posted in this channel.
     </p>
 
     {% else %}
     <!-- No channel configured -->
     <p style="font-size:0.875rem;color:var(--text-muted);margin:0 0 0.9rem;">
-      Kein Channel konfiguriert. Erstelle ihn mit einem Klick — der Bot legt ihn automatisch
-      in der richtigen Kategorie an.
+      No channel configured. Create one with a single click — the bot sets it up automatically in the right category.
     </p>
     <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;">
       <!-- 1-click create -->
       <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/create" style="margin:0;">
         <button type="submit" class="btn btn-primary" style="font-size:0.875rem;" data-i18n="enemies.channel.create">
-          ➕ Channel erstellen
+          ➕ Create channel
         </button>
       </form>
       <!-- or manually link existing -->
       <form method="post" action="/guild/{{ guild.guild_id }}/enemies/report-channel/set"
             style="display:flex;gap:0.4rem;align-items:center;margin:0;">
-        <input type="text" name="channel_id" placeholder="Vorhandene Channel-ID"
+        <input type="text" name="channel_id" placeholder="Existing channel ID"
                style="padding:0.35rem 0.65rem;border-radius:6px;border:1px solid var(--border);
                       background:var(--bg-card);color:var(--text);font-size:0.875rem;width:185px;">
         <input type="hidden" name="channel_name" value="">
@@ -176,8 +175,7 @@
       </form>
     </div>
     <p style="font-size:0.75rem;color:var(--text-muted);margin:0.55rem 0 0;">
-      „Channel erstellen" legt automatisch einen <strong>#battle-reports</strong>-Channel
-      in the scout category. Alternatively you can link an existing channel ID.
+      "Create channel" automatically creates a <strong>#battle-reports</strong> channel in the scout category. Alternatively you can link an existing channel ID.
     </p>
     {% endif %}
   </div>
@@ -188,25 +186,25 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#f87171;">{{ enemies|length }}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.known">Enemy bekannt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.known">Enemies tracked</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">
         {{ enemies | sum(attribute='scout_count') | int }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.scouts">Scouts gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.scouts">Total scouts</div>
     </div>
     <div class="card" style="padding:0.85rem 1rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;">
         {{ enemies | sum(attribute='report_count') | int }}
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.reports">Berichte gesamt</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);" data-i18n="enemies.kpi.reports">Total reports</div>
     </div>
   </div>
 
   <!-- Search -->
   <div style="margin-bottom:0.75rem;">
-    <input type="text" id="enemySearch" placeholder="🔍 Enemy suchen…"
+    <input type="text" id="enemySearch" placeholder="🔍 Search enemy…"
            oninput="filterEnemies()"
            style="padding:0.4rem 0.75rem;border-radius:6px;border:1px solid var(--border);
                   background:var(--bg-card);color:var(--text);font-size:0.875rem;width:240px;">
@@ -218,12 +216,12 @@
       <thead>
         <tr>
           <th data-i18n="enemies.th.player">Player</th>
-          <th data-i18n="enemies.th.coords">Koordinaten</th>
-          <th data-i18n="enemies.th.village">Dorf</th>
+          <th data-i18n="enemies.th.coords">Coords</th>
+          <th data-i18n="enemies.th.village">Village</th>
           <th style="text-align:center;" data-i18n="enemies.th.scouts">Scouts</th>
-          <th style="text-align:center;" data-i18n="enemies.th.reports">Berichte</th>
-          <th data-i18n="enemies.th.last_seen">Zuletzt gesehen</th>
-          <th data-i18n="enemies.th.notes">Notizen</th>
+          <th style="text-align:center;" data-i18n="enemies.th.reports">Reports</th>
+          <th data-i18n="enemies.th.last_seen">Last seen</th>
+          <th data-i18n="enemies.th.notes">Notes</th>
           <th></th>
         </tr>
       </thead>

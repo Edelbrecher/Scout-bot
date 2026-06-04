@@ -6,7 +6,7 @@
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link"><span data-i18n="enemy.back">← Enemy-Kartei</span></a>
+      <a href="/guild/{{ guild.guild_id }}/enemies" class="back-link"><span data-i18n="enemy.back">← Enemy Records</span></a>
       <h1 style="margin:0.25rem 0 0;">🎯 {{ enemy.player_name }}</h1>
       <p class="subtitle" style="margin:0;">
         {% if enemy.coordinates %}{{ enemy.coordinates }}{% endif %}
@@ -33,7 +33,7 @@
   {% elif flash == 'village_parse_fail' %}
   <div class="alert alert-danger">❌ Profil konnte nicht geparst werden. Please direkt von der Travian-Player-Seite kopieren.</div>
   {% elif flash == 'troops_added' %}
-  <div class="alert alert-success">✅ Truppen-Eintrag gespeichert.</div>
+  <div class="alert alert-success">✅ Troop entry saved.</div>
   {% elif flash == 'troops_deleted' %}
   <div class="alert alert-success">🗑️ Entry deleted.</div>
   {% endif %}
@@ -129,7 +129,7 @@
     <button class="ed-tab active" onclick="edTab('uebersicht',this)">📋 Overview</button>
     <button class="ed-tab" onclick="edTab('doerfer',this)">🏘️ Villages{% if village_history.villages %} ({{ village_history.villages|length }}){% endif %}</button>
     <button class="ed-tab" onclick="edTab('truppen',this)">⚔️ Troops{% if troop_entries %} ({{ troop_entries|length }}){% endif %}</button>
-    <button class="ed-tab" onclick="edTab('scouts',this)">🔭 Scout-Berichte{% if history %} ({{ history|length }}){% endif %}</button>
+    <button class="ed-tab" onclick="edTab('scouts',this)">🔭 Scout Reports{% if history %} ({{ history|length }}){% endif %}</button>
   </div>
 
   <!-- ═══ TAB: OVERVIEW ═══ -->
@@ -140,7 +140,7 @@
     <h3 style="margin:0 0 0.6rem;font-size:0.95rem;" data-i18n="enemy.notes.title">📝 Notizen</h3>
     <form method="post" action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/notes">
       <textarea name="notes" rows="3"
-                placeholder="Eigene Notizen zu diesem Enemy…"
+                placeholder="Notes about this enemy…"
                 style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);
                        border:1px solid var(--border);border-radius:6px;padding:0.5rem;
                        font-size:0.875rem;box-sizing:border-box;">{{ enemy.notes or '' }}</textarea>
@@ -413,7 +413,7 @@
 
   <!-- ═══ TAB: SCOUT-BERICHTE ═══ -->
   <div id="ed-scouts" class="ed-panel" style="display:none;">
-  <h2 style="margin:0 0 0.75rem;font-size:1.05rem;" data-i18n="enemy.history.title">📜 Scout-Verlauf</h2>
+  <h2 style="margin:0 0 0.75rem;font-size:1.05rem;" data-i18n="enemy.history.title">📜 Scout History</h2>
 
   {% if history %}
   {% for report in history %}
@@ -592,11 +592,11 @@
   <div id="ed-truppen" class="ed-panel" style="display:none;">
   <div style="margin-top:0;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-      <h2 style="margin:0;font-size:1.05rem;">⚔️ Troops-Verlauf</h2>
+      <h2 style="margin:0;font-size:1.05rem;">⚔️ Troop History</h2>
       <button onclick="document.getElementById('troop-form').style.display=document.getElementById('troop-form').style.display==='none'?'block':'none'"
               style="padding:0.3rem 0.85rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;
                      background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);color:#818cf8;">
-        ➕ Eintragen
+        ➕ Add entry
       </button>
     </div>
 

@@ -258,6 +258,17 @@ body.sidebar-collapsed .gs-item::after {
 }
 body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
 
+/* ── Submenu ── */
+.gs-submenu-toggle { width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
+.gs-sm-arrow { margin-left: auto; font-size: .75rem; opacity: .55; transition: transform .2s; flex-shrink: 0; }
+.gs-submenu.open .gs-sm-arrow { transform: rotate(180deg); }
+.gs-submenu-items { overflow: hidden; max-height: 0; transition: max-height .22s ease; }
+.gs-submenu.open .gs-submenu-items { max-height: 400px; }
+.gs-sub-item { padding-left: 2.3rem; font-size: .88rem; }
+body.sidebar-collapsed .gs-sm-arrow { display: none; }
+body.sidebar-collapsed .gs-submenu-items { display: none; }
+body.sidebar-collapsed .gs-submenu-toggle { justify-content: center; }
+
 @media (max-width: 768px) {
   body.has-guild-sidebar main { margin-left: 0; }
   body.has-guild-sidebar.sidebar-collapsed main { margin-left: 0; }

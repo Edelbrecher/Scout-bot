@@ -17,7 +17,7 @@
   <!-- Discord accent colour -->
   <meta name="theme-color"         content="#5865f2" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260604c" />
+  <link rel="stylesheet" href="/static/style.css?v=20260604d" />
   <!-- Before-paint scripts -->
   <script>
     (function(){
@@ -352,11 +352,30 @@ document.addEventListener('click', e => {
     }
 
     // Build sidebar HTML from API navData
-    var html = '';
-    navData.forEach(function(item){
+    var smCounters = {};
+    function buildItem(item, gid, path, indent) {
       if (item.type === 'group') {
-        html += '<div class="gs-group-label">'+item.label+'</div>';
-        return;
+        return '<div class="gs-group-label">'+item.label+'</div>';
+      }
+      if (item.type === 'submenu') {
+        var smId = 'gsm-'+(Math.random().toString(36).slice(2));
+        var children = item.children || [];
+        var anyChildActive = children.some(function(c){
+          var cu = '/guild/'+gid+(c.url_suffix||'');
+          return c.url_suffix && path.startsWith(cu);
+        });
+        var smKey = item.label;
+        var stored = localStorage.getItem('gs_sm_'+smKey);
+        var open = stored !== null ? stored === '1' : anyChildActive;
+        var inner = children.map(function(c){ return buildItem(c, gid, path, true); }).join('');
+        return '<div class="gs-submenu'+(open?' open':'')+'" id="'+smId+'">'
+          +'<button class="gs-item gs-submenu-toggle'+(anyChildActive?' active':'')+'" onclick="gsmToggle(\''+smId+'\',\''+smKey+'\')" data-label="'+item.label+'">'
+          +ico(item.icon||'home')
+          +'<span class="gs-label">'+item.label+'</span>'
+          +'<span class="gs-sm-arrow gs-label">▾</span>'
+          +'</button>'
+          +'<div class="gs-submenu-items">'+inner+'</div>'
+          +'</div>';
       }
       var url = '/guild/'+gid+(item.url_suffix||'');
       var isActive = false;
@@ -365,12 +384,14 @@ document.addEventListener('click', e => {
       } else {
         isActive = path.startsWith(url);
       }
-      html += '<a class="gs-item'+(isActive?' active':'')
+      return '<a class="gs-item'+(indent?' gs-sub-item':'')+''+(isActive?' active':'')
         +'" href="'+url+'" data-label="'+item.label+'">'
         +ico(item.icon||'home')
         +'<span class="gs-label">'+item.label+'</span>'
         +'</a>';
-    });
+    }
+    var html = '';
+    navData.forEach(function(item){ html += buildItem(item, gid, path, false); });
     document.getElementById('gs-nav-items').innerHTML = html;
 
     // Show sidebar
@@ -400,6 +421,13 @@ document.addEventListener('click', e => {
 
   function gsMobileToggle() {
     document.body.classList.toggle('mobile-sidebar-open');
+  }
+
+  function gsmToggle(id, key) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var open = el.classList.toggle('open');
+    localStorage.setItem('gs_sm_'+key, open ? '1' : '0');
   }
 
   // Close mobile sidebar on outside click
