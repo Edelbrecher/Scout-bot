@@ -64,6 +64,9 @@
       <a href="/guild/{{ guild.guild_id }}/map/sector-monitor" class="btn btn-secondary" style="font-size:0.85rem;">
         📡 Sector-Monitoring
       </a>
+      <button id="treasuryToggleBtn" onclick="toggleTreasuries()" class="btn btn-secondary" style="font-size:0.85rem;" title="Schatzkammern einblenden">
+        🏛️ Schatzkammern
+      </button>
     </div>
     {% if is_admin %}
     <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.5rem;">
@@ -262,6 +265,8 @@
     <span><span class="legend-dot" style="background:#e67e22;"></span>Natars</span>
     <span><span class="legend-dot" style="background:#e05555; border-radius:50%;"></span>Scout</span>
     <span><span class="legend-dot" style="background:#f1c40f; border-radius:50%;"></span>Highlight</span>
+    <span id="treasuryLegend" style="display:none;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #818cf8;margin-right:3px;vertical-align:middle;"></span>Schatz 10</span>
+    <span id="treasuryLegend2" style="display:none;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #fbbf24;margin-right:3px;vertical-align:middle;"></span>Schatz 20</span>
   </div>
 
   <!-- Map canvas -->
@@ -296,6 +301,26 @@ const coordEl = document.getElementById('coordDisplay');
 
 let villages   = [];
 let scoutMap   = new Map();
+let _treasuries     = [];
+let _showTreasuries = false;
+async function loadTreasuries() {
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/api/treasuries`);
+    _treasuries = await r.json();
+  } catch(e) { _treasuries = []; }
+}
+loadTreasuries();
+function toggleTreasuries() {
+  _showTreasuries = !_showTreasuries;
+  const btn = document.getElementById('treasuryToggleBtn');
+  if (btn) btn.style.background = _showTreasuries ? 'rgba(99,102,241,.25)' : '';
+  const d = _showTreasuries ? '' : 'none';
+  const tl  = document.getElementById('treasuryLegend');
+  const tl2 = document.getElementById('treasuryLegend2');
+  if (tl)  tl.style.display  = d;
+  if (tl2) tl2.style.display = d;
+  draw();
+}
 let mapRadius  = 400;
 let scale      = 2;
 let camX = 0, camY = 0;
@@ -526,6 +551,31 @@ function draw() {
   }
 
   ctx.restore();
+
+  // ── Treasury overlays ──────────────────────────────────────────────────────
+  if (_showTreasuries && _treasuries.length && scale >= 2) {
+    for (const t of _treasuries) {
+      if (!t.x && !t.y) continue;
+      const [cx, cy] = worldToCanvas(t.x, t.y);
+      if (cx < -20 || cy < -20 || cx > canvas.width+20 || cy > canvas.height+20) continue;
+      const r = Math.max(4, scale * 1.2);
+      const isLvl20 = t.level === 20;
+      ctx.save();
+      ctx.shadowColor = isLvl20 ? '#fbbf24' : '#a5b4fc';
+      ctx.shadowBlur  = scale >= 4 ? 8 : 4;
+      ctx.strokeStyle = isLvl20 ? '#fbbf24' : '#818cf8';
+      ctx.lineWidth   = Math.max(1.5, scale * 0.3);
+      ctx.strokeRect(cx - r, cy - r, r*2, r*2);
+      ctx.shadowBlur  = 0;
+      if (scale >= 5) {
+        ctx.fillStyle = 'rgba(0,0,0,.65)';
+        ctx.font = `bold ${Math.max(8, scale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(t.level, cx, cy - r - 2);
+      }
+      ctx.restore();
+    }
+  }
 }
 
 // ── View mode ─────────────────────────────────────────────────────────────────

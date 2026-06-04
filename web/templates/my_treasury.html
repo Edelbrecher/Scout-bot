@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Meine Schatzkammer · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.treasury-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1rem 1.2rem; margin-bottom:.75rem; display:flex; align-items:center; gap:1rem; }
+.treasury-lvl { width:44px; height:44px; min-width:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:800; font-size:.75rem; line-height:1.2; }
+.lvl-10 { background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.35); color:#a5b4fc; }
+.lvl-20 { background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.35); color:#fbbf24; }
+.modal-overlay { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.7); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:1.75rem; width:100%; max-width:480px; }
+</style>
+
+<div style="max-width:760px;margin:0 auto;padding:0 1.25rem 3rem;">
+  <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin:1rem 0 1.5rem;">
+    <div>
+      <h1 style="margin:0;">🏛️ Meine Schatzkammer</h1>
+      <p class="subtitle" style="margin:.2rem 0 0;">Registriere deine Schatzkammern für Artefakt-Koordination</p>
+    </div>
+    <button onclick="openAddModal()" class="btn btn-primary">+ Schatzkammer hinzufügen</button>
+  </div>
+
+  {% if saved %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Gespeichert.</div>
+  {% endif %}
+
+  <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:.85rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:var(--text-muted);">
+    💡 <strong>Hinweis:</strong> Stufe 10 = kleine Artefakte. Stufe 20 = große &amp; Unique Artefakte. Die Schatzkammer muss sich in dem Dorf befinden, in dem das Artefakt liegt.
+  </div>
+
+  {% if not treasuries %}
+  <div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">🏛️</div>
+    <p>Du hast noch keine Schatzkammern registriert.</p>
+    <button onclick="openAddModal()" class="btn btn-primary" style="margin-top:.5rem;">+ Hinzufügen</button>
+  </div>
+  {% else %}
+  {% for t in treasuries %}
+  <div class="treasury-card">
+    <div class="treasury-lvl lvl-{{ t.level }}">Stufe<br>{{ t.level }}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;font-size:.95rem;">{{ t.village_name or 'Unbekanntes Dorf' }}</div>
+      <div style="font-size:.78rem;color:var(--text-muted);">
+        {% if t.x or t.y %}📍 ({{ t.x }}|{{ t.y }}){% endif %}
+        {% if t.player_name %} · 👤 {{ t.player_name }}{% endif %}
+      </div>
+      {% if t.notes %}<div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;">📝 {{ t.notes }}</div>{% endif %}
+    </div>
+    <div style="display:flex;gap:.4rem;">
+      <button onclick="openEditModal({{ t.id }}, '{{ t.player_name|replace("'","\\'")|e }}', '{{ t.village_name|replace("'","\\'")|e }}', {{ t.x }}, {{ t.y }}, {{ t.level }}, '{{ t.notes|replace("'","\\'")|e }}')"
+              class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .65rem;">✏️</button>
+      <form method="POST" action="/guild/{{ guild.guild_id }}/my-treasury/{{ t.id }}/delete" onsubmit="return confirm('Schatzkammer löschen?')">
+        <button type="submit" class="btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;font-size:.78rem;padding:.3rem .65rem;">🗑️</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<!-- Add/Edit modal -->
+<div id="treasuryModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+      <h2 id="modalTitle" style="margin:0;font-size:1.1rem;">🏛️ Schatzkammer hinzufügen</h2>
+      <button onclick="document.getElementById('treasuryModal').classList.remove('open')" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
+    </div>
+    <form id="treasuryForm" method="POST" action="/guild/{{ guild.guild_id }}/my-treasury/save">
+      <input type="hidden" name="treasury_id" id="formTid" value="">
+      <div style="display:grid;gap:.85rem;">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Dein Spielername</label>
+          <input name="player_name" id="formPlayerName" class="form-control" placeholder="Spielername">
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Dorfname</label>
+          <input name="village_name" id="formVillageName" class="form-control" placeholder="Dorfname" required>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;">
+          <div style="grid-column:span 1;">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">X</label>
+            <input name="x" id="formX" class="form-control" type="number" placeholder="0">
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Y</label>
+            <input name="y" id="formY" class="form-control" type="number" placeholder="0">
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Stufe</label>
+            <select name="level" id="formLevel" class="form-control">
+              <option value="10">10</option>
+              <option value="20">20</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notizen</label>
+          <input name="notes" id="formNotes" class="form-control" placeholder="Optionale Notizen...">
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAddModal() {
+  document.getElementById('modalTitle').textContent = '🏛️ Schatzkammer hinzufügen';
+  document.getElementById('formTid').value = '';
+  document.getElementById('formPlayerName').value = '';
+  document.getElementById('formVillageName').value = '';
+  document.getElementById('formX').value = '';
+  document.getElementById('formY').value = '';
+  document.getElementById('formLevel').value = '10';
+  document.getElementById('formNotes').value = '';
+  document.getElementById('treasuryModal').classList.add('open');
+}
+function openEditModal(tid, player, village, x, y, level, notes) {
+  document.getElementById('modalTitle').textContent = '✏️ Schatzkammer bearbeiten';
+  document.getElementById('formTid').value = tid;
+  document.getElementById('formPlayerName').value = player;
+  document.getElementById('formVillageName').value = village;
+  document.getElementById('formX').value = x;
+  document.getElementById('formY').value = y;
+  document.getElementById('formLevel').value = level;
+  document.getElementById('formNotes').value = notes;
+  document.getElementById('treasuryModal').classList.add('open');
+}
+</script>
+{% endblock %}

@@ -404,6 +404,7 @@ async def init_db():
     await _init_hospital_table()
     await _init_alliance_members_table()
     await _init_scout_incidents_table()
+    await _init_artifact_tables()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -9400,4 +9401,321 @@ async def deactivate_def_crop_send(send_id: int, guild_id: str) -> bool:
             (send_id, guild_id)
         )
         await db.commit()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ARTIFACT SYSTEM
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def _init_artifact_tables():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Player treasury registrations
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ally_treasuries (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                discord_id      TEXT NOT NULL,
+                player_name     TEXT DEFAULT '',
+                village_name    TEXT DEFAULT '',
+                x               INTEGER DEFAULT 0,
+                y               INTEGER DEFAULT 0,
+                level           INTEGER DEFAULT 10,
+                notes           TEXT DEFAULT '',
+                created_at      TEXT DEFAULT (datetime('now')),
+                updated_at      TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, discord_id, village_name)
+            )
+        """)
+        # Artifacts owned/tracked by the alliance
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifacts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                artifact_type   TEXT DEFAULT 'other',
+                artifact_size   TEXT DEFAULT 'small',
+                effect_scope    TEXT DEFAULT 'village',
+                conquered_at    TEXT DEFAULT '',
+                activated_at    TEXT DEFAULT '',
+                activation_override TEXT DEFAULT '',
+                current_holder  TEXT DEFAULT '',
+                current_village TEXT DEFAULT '',
+                status          TEXT DEFAULT 'active',
+                notes           TEXT DEFAULT '',
+                created_at      TEXT DEFAULT (datetime('now')),
+                updated_at      TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        # Rotation config: ordered list of players per artifact
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_rotation_players (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                artifact_id     INTEGER NOT NULL,
+                guild_id        TEXT NOT NULL,
+                position        INTEGER NOT NULL,
+                player_name     TEXT NOT NULL,
+                hold_hours      INTEGER DEFAULT 48,
+                notify_hours    INTEGER DEFAULT 6,
+                UNIQUE(artifact_id, position)
+            )
+        """)
+        # Timeline of handoffs
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_handoffs (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                artifact_id         INTEGER NOT NULL,
+                guild_id            TEXT NOT NULL,
+                from_player         TEXT NOT NULL,
+                to_player           TEXT NOT NULL,
+                scheduled_at        TEXT DEFAULT '',
+                picked_up_at        TEXT DEFAULT '',
+                confirmed_by_from   INTEGER DEFAULT 0,
+                confirmed_by_to     INTEGER DEFAULT 0,
+                confirmed_from_time TEXT DEFAULT '',
+                confirmed_to_time   TEXT DEFAULT '',
+                status              TEXT DEFAULT 'pending',
+                notes               TEXT DEFAULT '',
+                created_at          TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+    # Migrations for existing DBs
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        for col, default in [
+            ("activation_override", "''"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE artifacts ADD COLUMN activation_override TEXT DEFAULT {default}")
+                await db.commit()
+            except Exception:
+                pass
+
+
+# ── Treasury CRUD ──────────────────────────────────────────────────────────
+
+async def save_treasury(guild_id: str, discord_id: str, player_name: str,
+                         village_name: str, x: int, y: int, level: int,
+                         notes: str = "", treasury_id: int = None) -> int:
+    now = __import__('datetime').datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        if treasury_id:
+            await db.execute("""
+                UPDATE ally_treasuries SET player_name=?,village_name=?,x=?,y=?,level=?,notes=?,updated_at=?
+                WHERE id=? AND guild_id=? AND discord_id=?
+            """, (player_name, village_name, x, y, level, notes, now, treasury_id, guild_id, discord_id))
+            await db.commit()
+            return treasury_id
+        cur = await db.execute("""
+            INSERT OR REPLACE INTO ally_treasuries
+              (guild_id, discord_id, player_name, village_name, x, y, level, notes, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (guild_id, discord_id, player_name, village_name, x, y, level, notes, now, now))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_my_treasuries(guild_id: str, discord_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_treasuries WHERE guild_id=? AND discord_id=? ORDER BY level DESC, village_name",
+            (guild_id, discord_id)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_all_treasuries(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM ally_treasuries WHERE guild_id=? ORDER BY level DESC, player_name, village_name",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def delete_treasury(treasury_id: int, guild_id: str, discord_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "DELETE FROM ally_treasuries WHERE id=? AND guild_id=? AND discord_id=?",
+            (treasury_id, guild_id, discord_id)
+        )
+        await db.commit()
+    return True
+
+
+# ── Artifact CRUD ──────────────────────────────────────────────────────────
+
+async def get_artifacts(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifacts WHERE guild_id=? ORDER BY artifact_size DESC, artifact_type, name",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_artifact(artifact_id: int, guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifacts WHERE id=? AND guild_id=?",
+            (artifact_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def create_artifact(guild_id: str, name: str, artifact_type: str,
+                           artifact_size: str, effect_scope: str,
+                           conquered_at: str, activated_at: str,
+                           current_holder: str, current_village: str,
+                           notes: str) -> int:
+    now = __import__('datetime').datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO artifacts
+              (guild_id, name, artifact_type, artifact_size, effect_scope,
+               conquered_at, activated_at, current_holder, current_village,
+               status, notes, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,'active',?,?,?)
+        """, (guild_id, name, artifact_type, artifact_size, effect_scope,
+              conquered_at, activated_at, current_holder, current_village,
+              notes, now, now))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_artifact(artifact_id: int, guild_id: str, **kwargs) -> bool:
+    now = __import__('datetime').datetime.utcnow().isoformat()
+    allowed = {"name","artifact_type","artifact_size","effect_scope","conquered_at",
+               "activated_at","activation_override","current_holder","current_village",
+               "status","notes"}
+    sets = {k: v for k, v in kwargs.items() if k in allowed}
+    if not sets:
+        return False
+    sets["updated_at"] = now
+    cols = ", ".join(f"{k}=?" for k in sets)
+    vals = list(sets.values()) + [artifact_id, guild_id]
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(f"UPDATE artifacts SET {cols} WHERE id=? AND guild_id=?", vals)
+        await db.commit()
+    return True
+
+
+async def delete_artifact(artifact_id: int, guild_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM artifacts WHERE id=? AND guild_id=?", (artifact_id, guild_id))
+        await db.execute("DELETE FROM artifact_rotation_players WHERE artifact_id=? AND guild_id=?", (artifact_id, guild_id))
+        await db.execute("DELETE FROM artifact_handoffs WHERE artifact_id=? AND guild_id=?", (artifact_id, guild_id))
+        await db.commit()
+    return True
+
+
+# ── Rotation CRUD ──────────────────────────────────────────────────────────
+
+async def get_rotation(artifact_id: int, guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_rotation_players WHERE artifact_id=? AND guild_id=? ORDER BY position",
+            (artifact_id, guild_id)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def save_rotation(artifact_id: int, guild_id: str, players: list[dict]) -> bool:
+    """players = [{"player_name": str, "hold_hours": int, "notify_hours": int}, ...]"""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "DELETE FROM artifact_rotation_players WHERE artifact_id=? AND guild_id=?",
+            (artifact_id, guild_id)
+        )
+        for i, p in enumerate(players):
+            await db.execute("""
+                INSERT INTO artifact_rotation_players
+                  (artifact_id, guild_id, position, player_name, hold_hours, notify_hours)
+                VALUES (?,?,?,?,?,?)
+            """, (artifact_id, guild_id, i, p.get("player_name",""),
+                  int(p.get("hold_hours", 48)), int(p.get("notify_hours", 6))))
+        await db.commit()
+    return True
+
+
+# ── Handoff CRUD ──────────────────────────────────────────────────────────
+
+async def get_handoffs(artifact_id: int, guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_handoffs WHERE artifact_id=? AND guild_id=? ORDER BY created_at DESC",
+            (artifact_id, guild_id)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def create_handoff(artifact_id: int, guild_id: str, from_player: str,
+                          to_player: str, scheduled_at: str, notes: str = "") -> int:
+    now = __import__('datetime').datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO artifact_handoffs
+              (artifact_id, guild_id, from_player, to_player, scheduled_at, status, notes, created_at)
+            VALUES (?,?,?,?,?,'pending',?,?)
+        """, (artifact_id, guild_id, from_player, to_player, scheduled_at, notes, now))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def confirm_handoff(handoff_id: int, artifact_id: int, guild_id: str,
+                           side: str, server_time: str) -> bool:
+    """side = 'from' or 'to'"""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_handoffs WHERE id=? AND artifact_id=? AND guild_id=?",
+            (handoff_id, artifact_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return False
+        h = dict(row)
+        if side == "from":
+            await db.execute(
+                "UPDATE artifact_handoffs SET confirmed_by_from=1, confirmed_from_time=? WHERE id=?",
+                (server_time, handoff_id)
+            )
+        else:
+            await db.execute(
+                "UPDATE artifact_handoffs SET confirmed_by_to=1, confirmed_to_time=? WHERE id=?",
+                (server_time, handoff_id)
+            )
+        # Check if both confirmed
+        new_from = 1 if side == "from" else h["confirmed_by_from"]
+        new_to   = 1 if side == "to"   else h["confirmed_by_to"]
+        if new_from and new_to:
+            picked = server_time
+            await db.execute(
+                "UPDATE artifact_handoffs SET status='confirmed', picked_up_at=? WHERE id=?",
+                (picked, handoff_id)
+            )
+            # Update artifact current_holder
+            now = __import__('datetime').datetime.utcnow().isoformat()
+            await db.execute(
+                "UPDATE artifacts SET current_holder=?, updated_at=? WHERE id=? AND guild_id=?",
+                (h["to_player"], now, artifact_id, guild_id)
+            )
+        await db.commit()
+    return True
+
+
+async def skip_handoff(handoff_id: int, artifact_id: int, guild_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "UPDATE artifact_handoffs SET status='skipped' WHERE id=? AND artifact_id=? AND guild_id=?",
+            (handoff_id, artifact_id, guild_id)
+        )
+        await db.commit()
+    return True
     return True

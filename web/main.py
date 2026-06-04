@@ -11600,3 +11600,335 @@ async def alliance_bonuses_save(request: Request, guild_id: str):
             bonuses[b["key"]] = 0
     await database.save_alliance_bonuses(guild_id, bonuses)
     return RedirectResponse(f"/guild/{guild_id}/my-ally/bonuses?saved=1", status_code=303)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARTIFACT SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ARTIFACT_TYPES = [
+    ("builder",      "🏗️ Baumeister"),
+    ("troops",       "⚡ Schnellere Truppen"),
+    ("scout",        "🔭 Bessere Späher"),
+    ("crop",         "🌾 Weniger Getreideverbrauch"),
+    ("training",     "🪖 Schnellerer Truppenbau"),
+    ("storage_plan", "📐 Bauplan große Lager"),
+    ("hideout",      "🏚️ Großes Versteck"),
+    ("ww_blueprint", "🏛️ Weltwunder Bauplan"),
+    ("fool",         "🤡 Narrenartefakt"),
+    ("other",        "❓ Sonstiges"),
+]
+
+ARTIFACT_TYPE_LABELS = {k: v for k, v in ARTIFACT_TYPES}
+
+
+def _is_leader(session: dict, guild_id: str) -> bool:
+    """Quick check: is user an admin/guild owner. For artifact management."""
+    uid = session.get("discord_id", "")
+    if uid in ADMIN_DISCORD_IDS:
+        return True
+    for g in session.get("guilds", []):
+        if str(g.get("id")) == guild_id:
+            perms = g.get("permissions_new", 0)
+            try:
+                p = int(perms)
+                if p & PERM_ADMINISTRATOR or p & PERM_MANAGE_GUILD:
+                    return True
+            except Exception:
+                pass
+    return False
+
+
+async def _artifact_access(request: Request, guild_id: str):
+    """Returns (session, None) or (None, error_response)."""
+    session, err = _require_session(request)
+    if err:
+        return None, _JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err:
+        return None, _JSONResponse({"error": "forbidden"}, status_code=403)
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return None, _JSONResponse({"error": "not_found"}, status_code=404)
+    uid = session.get("discord_id", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err:
+        return None, err
+    return session, None
+
+
+# ── Treasury ────────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/my-treasury", response_class=HTMLResponse)
+async def my_treasury_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("discord_id", "")
+    treasuries = await database.get_my_treasuries(guild_id, uid)
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("my_treasury.html", {
+        "request": request, "guild": guild,
+        "treasuries": treasuries, "saved": saved,
+    })
+
+
+@app.post("/guild/{guild_id}/my-treasury/save")
+async def my_treasury_save(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    uid = session.get("discord_id", "")
+    form = await request.form()
+    tid = form.get("treasury_id", "").strip()
+    player_name = form.get("player_name", "").strip()
+    village_name = form.get("village_name", "").strip()
+    notes = form.get("notes", "").strip()
+    level = int(form.get("level", "10"))
+    try:
+        x = int(form.get("x", "0"))
+        y = int(form.get("y", "0"))
+    except (ValueError, TypeError):
+        x = y = 0
+    await database.save_treasury(
+        guild_id, uid, player_name, village_name, x, y, level, notes,
+        treasury_id=int(tid) if tid else None
+    )
+    return RedirectResponse(f"/guild/{guild_id}/my-treasury?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-treasury/{tid}/delete")
+async def my_treasury_delete(request: Request, guild_id: str, tid: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    uid = session.get("discord_id", "")
+    await database.delete_treasury(tid, guild_id, uid)
+    return RedirectResponse(f"/guild/{guild_id}/my-treasury?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/all-treasuries", response_class=HTMLResponse)
+async def all_treasuries_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("discord_id", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    treasuries = await database.get_all_treasuries(guild_id)
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    return templates.TemplateResponse("all_treasuries.html", {
+        "request": request, "guild": guild,
+        "treasuries": treasuries, "is_leader": is_leader,
+    })
+
+
+@app.get("/guild/{guild_id}/api/treasuries")
+async def api_treasuries(request: Request, guild_id: str):
+    session, err = await _artifact_access(request, guild_id)
+    if err: return err
+    rows = await database.get_all_treasuries(guild_id)
+    return _JSONResponse(rows)
+
+
+# ── Artifacts ───────────────────────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/artifacts", response_class=HTMLResponse)
+async def artifacts_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("discord_id", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    artifacts = await database.get_artifacts(guild_id)
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("artifacts.html", {
+        "request": request, "guild": guild,
+        "artifacts": artifacts, "is_leader": is_leader,
+        "artifact_types": ARTIFACT_TYPES,
+        "artifact_type_labels": ARTIFACT_TYPE_LABELS,
+        "saved": saved,
+    })
+
+
+@app.post("/guild/{guild_id}/artifacts/add")
+async def artifact_add(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    aid = await database.create_artifact(
+        guild_id=guild_id,
+        name=form.get("name","").strip(),
+        artifact_type=form.get("artifact_type","other"),
+        artifact_size=form.get("artifact_size","small"),
+        effect_scope=form.get("effect_scope","village"),
+        conquered_at=form.get("conquered_at","").strip(),
+        activated_at=form.get("activated_at","").strip(),
+        current_holder=form.get("current_holder","").strip(),
+        current_village=form.get("current_village","").strip(),
+        notes=form.get("notes","").strip(),
+    )
+    return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/artifacts/{artifact_id}", response_class=HTMLResponse)
+async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("discord_id", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    artifact = await database.get_artifact(artifact_id, guild_id)
+    if not artifact: return RedirectResponse(f"/guild/{guild_id}/artifacts")
+    rotation = await database.get_rotation(artifact_id, guild_id)
+    handoffs = await database.get_handoffs(artifact_id, guild_id)
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    player_name = session.get("player_name", session.get("username", ""))
+    saved = request.query_params.get("saved")
+    return templates.TemplateResponse("artifact_detail.html", {
+        "request": request, "guild": guild,
+        "artifact": artifact, "rotation": rotation,
+        "handoffs": handoffs, "is_leader": is_leader,
+        "artifact_types": ARTIFACT_TYPES,
+        "artifact_type_labels": ARTIFACT_TYPE_LABELS,
+        "player_name": player_name,
+        "saved": saved,
+    })
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/update")
+async def artifact_update(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    await database.update_artifact(artifact_id, guild_id,
+        name=form.get("name","").strip(),
+        artifact_type=form.get("artifact_type","other"),
+        artifact_size=form.get("artifact_size","small"),
+        effect_scope=form.get("effect_scope","village"),
+        conquered_at=form.get("conquered_at","").strip(),
+        activated_at=form.get("activated_at","").strip(),
+        activation_override=form.get("activation_override","").strip(),
+        current_holder=form.get("current_holder","").strip(),
+        current_village=form.get("current_village","").strip(),
+        status=form.get("status","active"),
+        notes=form.get("notes","").strip(),
+    )
+    return RedirectResponse(f"/guild/{guild_id}/artifacts/{artifact_id}?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/delete")
+async def artifact_delete(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    await database.delete_artifact(artifact_id, guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/artifacts?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/rotation/save")
+async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    import json as _json
+    # Expect JSON body with players array
+    body = await request.body()
+    try:
+        data = _json.loads(body)
+        players = data.get("players", [])
+    except Exception:
+        players = []
+        names = form.getlist("player_name")
+        hours = form.getlist("hold_hours")
+        notify = form.getlist("notify_hours")
+        for i, n in enumerate(names):
+            if n.strip():
+                players.append({
+                    "player_name": n.strip(),
+                    "hold_hours": int(hours[i]) if i < len(hours) else 48,
+                    "notify_hours": int(notify[i]) if i < len(notify) else 6,
+                })
+    await database.save_rotation(artifact_id, guild_id, players)
+    return _JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/handoff/create")
+async def artifact_handoff_create(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    hid = await database.create_handoff(
+        artifact_id=artifact_id,
+        guild_id=guild_id,
+        from_player=form.get("from_player","").strip(),
+        to_player=form.get("to_player","").strip(),
+        scheduled_at=form.get("scheduled_at","").strip(),
+        notes=form.get("notes","").strip(),
+    )
+    return _JSONResponse({"ok": True, "id": hid})
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/handoff/{handoff_id}/confirm")
+async def artifact_handoff_confirm(request: Request, guild_id: str,
+                                    artifact_id: int, handoff_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    form = await request.form()
+    side = form.get("side", "to")
+    server_time = form.get("server_time", "").strip()
+    ok = await database.confirm_handoff(handoff_id, artifact_id, guild_id, side, server_time)
+    if not ok:
+        return _JSONResponse({"error": "not_found"}, status_code=404)
+    return _JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/handoff/{handoff_id}/skip")
+async def artifact_handoff_skip(request: Request, guild_id: str,
+                                 artifact_id: int, handoff_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    await database.skip_handoff(handoff_id, artifact_id, guild_id)
+    return _JSONResponse({"ok": True})
