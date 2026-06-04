@@ -1,10 +1,30 @@
 import aiosqlite
 import bcrypt
 import os
+import time as _time
 import uuid
 from pathlib import Path
 
 DB_PATH = Path("/app/data/scouter.db")
+
+# ── Simple in-process TTL cache ──────────────────────────────────────────────
+_CACHE: dict = {}
+_CACHE_TTL = 270  # seconds (4.5 min — safe below the 5-min uvicorn worker cycle)
+
+def _cache_get(key: str):
+    entry = _CACHE.get(key)
+    if entry and (_time.monotonic() - entry[0]) < _CACHE_TTL:
+        return entry[1]
+    return None
+
+def _cache_set(key: str, value):
+    _CACHE[key] = (_time.monotonic(), value)
+
+def cache_invalidate_guild(guild_id: str):
+    """Call after saving a new snapshot — clears all cached results for this guild."""
+    stale = [k for k in _CACHE if guild_id in k]
+    for k in stale:
+        del _CACHE[k]
 
 
 async def init_db():
@@ -1761,6 +1781,8 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
             for v in villages
         ])
         await db.commit()
+    # Invalidate all cached results for this guild so next page load is fresh
+    cache_invalidate_guild(guild_id)
 
 
 async def get_latest_snapshot_time(guild_id: str) -> str | None:
@@ -1816,40 +1838,44 @@ async def get_player_pop_growth(guild_id: str, player_name: str, days: int = 7) 
         return {"latest": latest, "old": old, "delta": latest - old}
 
 
+async def _get_all_village_pop_15d(guild_id: str) -> dict:
+    """Returns {(x,y): {date_str: pop}} for ALL villages in guild for last 15 days.
+    Cached for _CACHE_TTL seconds — shared across all callers in the same process."""
+    cache_key = f"pop15d:{guild_id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+    result: dict = {}
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute("""
+            SELECT x, y, DATE(fetched_at) AS snap_date, MAX(population) AS pop
+            FROM map_snapshots
+            WHERE guild_id=? AND fetched_at >= datetime('now', '-15 days')
+            GROUP BY x, y, DATE(fetched_at)
+        """, (guild_id,)) as cur:
+            for r in await cur.fetchall():
+                key = (r[0], r[1])
+                result.setdefault(key, {})[r[2]] = r[3]
+    _cache_set(cache_key, result)
+    return result
+
+
 async def get_bulk_village_pop_deltas(guild_id: str, coords: list) -> dict:
-    """Return {(x,y): {1: Δ, 2: Δ, 3: Δ, 5: Δ, 7: Δ, 14: Δ}} for multiple villages.
-    Compares latest daily pop to pop from N days ago.
+    """Return {(x,y): {1: Δ, 2: Δ, 3: Δ, 5: Δ, 7: Δ, 14: Δ}} for the given coords.
+    Uses guild-wide 15-day cache — fast on repeat calls within the same TTL window.
     """
     if not coords:
         return {}
     from datetime import date as _date, timedelta as _td
-    # Fetch 15 days of daily pop history for all coords in one query
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        or_clauses = " OR ".join("(x=? AND y=?)" for _ in coords)
-        flat = [val for (x, y) in coords for val in (x, y)]
-        async with db.execute(f"""
-            SELECT x, y, DATE(fetched_at) as snap_date, MAX(population) as pop
-            FROM map_snapshots
-            WHERE guild_id=? AND fetched_at >= datetime('now', '-15 days')
-              AND ({or_clauses})
-            GROUP BY x, y, DATE(fetched_at)
-            ORDER BY x, y, snap_date DESC
-        """, (guild_id, *flat)) as cur:
-            rows = await cur.fetchall()
-
-    # Build per-coord date→pop mapping
-    raw: dict = {}
-    for r in rows:
-        key = (r[0], r[1])
-        raw.setdefault(key, {})[r[2]] = r[3]
-
-    result = {}
+    all_data = await _get_all_village_pop_15d(guild_id)
+    coord_set = set(coords)
     today = _date.today()
-    for coords_key, date_map in raw.items():
+    result = {}
+    for coords_key in coord_set:
+        date_map = all_data.get(coords_key, {})
         if not date_map:
             result[coords_key] = {}
             continue
-        # Use latest available date as reference
         latest_date = max(date_map.keys())
         latest_pop = date_map[latest_date]
         deltas = {}
@@ -1858,7 +1884,6 @@ async def get_bulk_village_pop_deltas(guild_id: str, coords: list) -> dict:
             if target in date_map:
                 deltas[n] = latest_pop - date_map[target]
             else:
-                # Try 1 day tolerance
                 for offset in (1, -1):
                     alt = (today - _td(days=n + offset)).isoformat()
                     if alt in date_map:
@@ -2030,6 +2055,10 @@ async def get_inactive_farms(
     max_pop: int = 9999,
     include_ww: bool = False,
 ) -> list[dict]:
+    cache_key = f"inactive_farms:{guild_id}:{min_days}:{min_pop}:{max_pop}:{include_ww}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
@@ -2064,6 +2093,7 @@ async def get_inactive_farms(
             except Exception:
                 d["days_tracked"] = 0
             result.append(d)
+        _cache_set(cache_key, result)
         return result
 
 

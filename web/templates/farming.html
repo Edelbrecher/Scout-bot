@@ -240,95 +240,107 @@
       </div>
 
       {# ── Filter Panel ── #}
+      <style>
+        .fi-label { font-size:.72rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.3rem; display:block; }
+        .fi-input { background:#0f172a; border:1px solid #1e293b; border-radius:8px; color:#e2e8f0; font-size:.82rem;
+                    padding:.45rem .65rem; width:100%; box-sizing:border-box; transition:border-color .15s; outline:none; }
+        .fi-input:focus { border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,.15); }
+        .fi-input::placeholder { color:#334155; }
+        .fi-section { border-top:1px solid #1e293b; padding-top:.75rem; margin-top:.75rem; }
+        .fi-section-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#334155; margin-bottom:.55rem; }
+        .fi-grid { display:grid; gap:.6rem; }
+      </style>
       <div id="filterPanel" style="display:{% if _filter_active %}block{% else %}none{% endif %};margin-top:.25rem;">
-        <div class="card" style="padding:1rem;">
+        <div style="background:#0b1120;border:1px solid #1e293b;border-radius:10px;padding:1.1rem 1.25rem;">
           <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="filterForm">
             <input type="hidden" name="tab" value="inactive" />
             <input type="hidden" name="advanced" value="1" />
 
-            {# Row 1: Basic #}
-            <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.85rem;">
-              <div class="form-group" style="margin:0;min-width:130px;">
-                <label style="font-size:.78rem;">Days inactive</label>
-                <input type="number" name="min_days" value="{{ min_days }}" min="0" max="365" class="form-control"/>
+            {# Row 1: Core filters #}
+            <div class="fi-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));">
+              <div>
+                <label class="fi-label">Days inactive</label>
+                <input type="number" name="min_days" value="{{ min_days }}" min="0" max="365" class="fi-input" placeholder="1"/>
               </div>
-              <div class="form-group" style="margin:0;min-width:110px;">
-                <label style="font-size:.78rem;">Min. Pop.
-                  {% if snap_pop_range %}<span style="font-size:.68rem;color:var(--text-muted);">(max {{ snap_pop_range.max_pop }})</span>{% endif %}
-                </label>
-                <input type="number" name="min_pop" value="{{ min_pop }}" min="0" class="form-control"
+              <div>
+                <label class="fi-label">Min pop{% if snap_pop_range %} <span style="font-weight:400;color:#475569;">/ {{ snap_pop_range.max_pop }} max</span>{% endif %}</label>
+                <input type="number" name="min_pop" value="{{ min_pop }}" min="0" class="fi-input" placeholder="0"
                        {% if snap_pop_range %}max="{{ snap_pop_range.max_pop }}"{% endif %}/>
               </div>
-              <div class="form-group" style="margin:0;min-width:110px;">
-                <label style="font-size:.78rem;">Max. Pop.</label>
+              <div>
+                <label class="fi-label">Max pop</label>
                 <input type="number" name="max_pop" value="{{ max_pop if max_pop < 9999 else '' }}" min="0"
-                       placeholder="{{ snap_pop_range.max_pop if snap_pop_range else '9999' }}" class="form-control"
+                       placeholder="any" class="fi-input"
                        {% if snap_pop_range %}max="{{ snap_pop_range.max_pop }}"{% endif %}/>
               </div>
-              <div class="form-group" style="margin:0;min-width:110px;">
-                <label style="font-size:.78rem;">Max. pop increase</label>
-                <input type="number" name="max_pop_increase" value="{{ max_pop_increase }}" min="0" class="form-control" placeholder="unlimited"/>
+              <div>
+                <label class="fi-label">Max pop growth</label>
+                <input type="number" name="max_pop_increase" value="{{ max_pop_increase }}" min="0" class="fi-input" placeholder="unlimited"/>
               </div>
             </div>
 
             {# Row 2: Radius #}
-            <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.85rem;">
-              <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);width:100%;margin-bottom:-.5rem;">📍 Radius-Filter</div>
-              <div class="form-group" style="margin:0;min-width:80px;">
-                <label style="font-size:.78rem;">Ref X</label>
-                <input type="number" name="ref_x" value="{{ ref_x or '' }}" class="form-control" placeholder="0"/>
-              </div>
-              <div class="form-group" style="margin:0;min-width:80px;">
-                <label style="font-size:.78rem;">Ref Y</label>
-                <input type="number" name="ref_y" value="{{ ref_y or '' }}" class="form-control" placeholder="0"/>
-              </div>
-              <div class="form-group" style="margin:0;min-width:90px;">
-                <label style="font-size:.78rem;">Min. Distance</label>
-                <input type="number" name="min_dist" value="{{ min_dist or '' }}" class="form-control" placeholder="0" step="0.1"/>
-              </div>
-              <div class="form-group" style="margin:0;min-width:90px;">
-                <label style="font-size:.78rem;">Max. Distance</label>
-                <input type="number" name="max_dist" value="{{ max_dist or '' }}" class="form-control" placeholder="∞" step="0.1"/>
-              </div>
-              <div class="form-group" style="margin:0;min-width:100px;">
-                <label style="font-size:.78rem;">Min. player pop.</label>
-                <input type="number" name="min_player_pop" value="{{ min_player_pop or '' }}" class="form-control" placeholder="0"/>
-              </div>
-              <div class="form-group" style="margin:0;min-width:100px;">
-                <label style="font-size:.78rem;">Max. player pop.</label>
-                <input type="number" name="max_player_pop" value="{{ max_player_pop or '' }}" class="form-control" placeholder="∞"/>
+            <div class="fi-section">
+              <div class="fi-section-label">📍 Radius filter</div>
+              <div class="fi-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr));">
+                <div>
+                  <label class="fi-label">Center X</label>
+                  <input type="number" name="ref_x" value="{{ ref_x or '' }}" class="fi-input" placeholder="0"/>
+                </div>
+                <div>
+                  <label class="fi-label">Center Y</label>
+                  <input type="number" name="ref_y" value="{{ ref_y or '' }}" class="fi-input" placeholder="0"/>
+                </div>
+                <div>
+                  <label class="fi-label">Min distance</label>
+                  <input type="number" name="min_dist" value="{{ min_dist or '' }}" class="fi-input" placeholder="0" step="0.1"/>
+                </div>
+                <div>
+                  <label class="fi-label">Max distance</label>
+                  <input type="number" name="max_dist" value="{{ max_dist or '' }}" class="fi-input" placeholder="∞" step="0.1"/>
+                </div>
+                <div>
+                  <label class="fi-label">Min player pop</label>
+                  <input type="number" name="min_player_pop" value="{{ min_player_pop or '' }}" class="fi-input" placeholder="0"/>
+                </div>
+                <div>
+                  <label class="fi-label">Max player pop</label>
+                  <input type="number" name="max_player_pop" value="{{ max_player_pop or '' }}" class="fi-input" placeholder="∞"/>
+                </div>
               </div>
             </div>
 
             {# Row 3: Text filters #}
-            <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.85rem;">
-              <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);width:100%;margin-bottom:-.5rem;">🔍 Player / Alliance</div>
-              <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Player (contains)</label>
-                <input type="text" name="player_filter" value="{{ player_filter }}" class="form-control" placeholder="Player name…"/>
-              </div>
-              <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Alliance (contains)</label>
-                <input type="text" name="alliance_filter" value="{{ alliance_filter }}" class="form-control"
-                       list="allianceListFarming" placeholder="Alliance name…"/>
-                <datalist id="allianceListFarming">
-                  {% for an in alliance_names %}<option value="{{ an }}">{% endfor %}
-                </datalist>
-              </div>
-              <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Exclude players</label>
-                <input type="text" name="exclude_players" value="{{ exclude_players }}" class="form-control" placeholder="Player1, Player2…"/>
-              </div>
-              <div class="form-group" style="margin:0;flex:1;min-width:150px;">
-                <label style="font-size:.78rem;">Exclude alliances</label>
-                <input type="text" name="exclude_alliances" value="{{ exclude_alliances }}" class="form-control" placeholder="Ally1, Ally2…"/>
+            <div class="fi-section">
+              <div class="fi-section-label">🔍 Player / Alliance</div>
+              <div class="fi-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));">
+                <div>
+                  <label class="fi-label">Player name contains</label>
+                  <input type="text" name="player_filter" value="{{ player_filter }}" class="fi-input" placeholder="Search player…"/>
+                </div>
+                <div>
+                  <label class="fi-label">Alliance contains</label>
+                  <input type="text" name="alliance_filter" value="{{ alliance_filter }}" class="fi-input"
+                         list="allianceListFarming" placeholder="Search alliance…"/>
+                  <datalist id="allianceListFarming">
+                    {% for an in alliance_names %}<option value="{{ an }}">{% endfor %}
+                  </datalist>
+                </div>
+                <div>
+                  <label class="fi-label">Exclude players</label>
+                  <input type="text" name="exclude_players" value="{{ exclude_players }}" class="fi-input" placeholder="Player1, Player2…"/>
+                </div>
+                <div>
+                  <label class="fi-label">Exclude alliances</label>
+                  <input type="text" name="exclude_alliances" value="{{ exclude_alliances }}" class="fi-input" placeholder="Ally1, Ally2…"/>
+                </div>
               </div>
             </div>
 
             {# Row 4: Tribes + Farmlist + Natars #}
-            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;margin-bottom:.85rem;">
+            <div class="fi-section" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start;">
               <div>
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">Tribe</div>
+                <div class="fi-section-label" style="margin-bottom:.4rem;">Tribe</div>
                 <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
                   {% set tribe_opts = [(1,'Romans'),(2,'Teutons'),(3,'Gauls'),(5,'Huns'),(6,'Egyptians'),(7,'Spartans')] %}
                   {% for tid, tlabel in tribe_opts %}
@@ -337,10 +349,10 @@
                            {% if tid in tribes %}checked{% endif %}
                            onchange="updateTribeChips()">
                     <span class="tribe-chip {% if tid in tribes %}active{% endif %}" data-tid="{{ tid }}"
-                          style="display:inline-block;padding:.2rem .55rem;border-radius:20px;font-size:.72rem;cursor:pointer;
-                                 border:1px solid {% if tid in tribes %}var(--accent){% else %}var(--border){% endif %};
-                                 background:{% if tid in tribes %}rgba(99,102,241,.2){% else %}var(--bg-main){% endif %};
-                                 color:{% if tid in tribes %}#818cf8{% else %}var(--text-muted){% endif %};">
+                          style="display:inline-block;padding:.25rem .6rem;border-radius:20px;font-size:.72rem;cursor:pointer;
+                                 border:1px solid {% if tid in tribes %}var(--accent){% else %}#1e293b{% endif %};
+                                 background:{% if tid in tribes %}rgba(99,102,241,.2){% else %}#0f172a{% endif %};
+                                 color:{% if tid in tribes %}#818cf8{% else %}#475569{% endif %};">
                       {{ tlabel }}
                     </span>
                   </label>
@@ -348,16 +360,16 @@
                 </div>
               </div>
               <div>
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;">📋 Farmlist filter</div>
+                <div class="fi-section-label" style="margin-bottom:.4rem;">Farmlist</div>
                 <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-                  <select name="in_farmlist" class="form-control" style="min-width:160px;">
+                  <select name="in_farmlist" class="fi-input" style="width:auto;min-width:150px;">
                     <option value="" {% if not in_farmlist %}selected{% endif %}>All villages</option>
                     <option value="no" {% if in_farmlist == 'no' %}selected{% endif %}>Not in farmlist</option>
                     <option value="yes" {% if in_farmlist == 'yes' %}selected{% endif %}>In farmlist</option>
                   </select>
                   {% if farmlist_analyses %}
-                  <select name="farmlist_id" class="form-control" style="min-width:200px;"
-                          title="Which imported farmlist to use for the 'In farmlist' filter">
+                  <select name="farmlist_id" class="fi-input" style="width:auto;min-width:180px;"
+                          title="Which imported farmlist to use">
                     {% for fa in farmlist_analyses %}
                     <option value="{{ fa.id }}" {% if fa.id == farmlist_id %}selected{% endif %}>
                       {{ fa.created_at[:10] if fa.created_at else 'Import' }} · {{ fa.total_farms or '?' }} farms
@@ -367,24 +379,24 @@
                   {% endif %}
                 </div>
                 {% if not has_farmlist %}
-                <div style="font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">⚠️ No farmlist imported</div>
+                <div style="font-size:.7rem;color:#475569;margin-top:.35rem;">⚠ No farmlist imported yet</div>
                 {% endif %}
               </div>
               <div style="display:flex;align-items:center;gap:1rem;margin-top:1.2rem;">
-                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;">
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
                   <input type="checkbox" name="include_natars" value="1" {% if include_natars %}checked{% endif %}>
                   Include Natars
                 </label>
-                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;">
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
                   <input type="checkbox" name="include_ww" value="1" {% if include_ww %}checked{% endif %}>
                   Include WW villages
                 </label>
               </div>
             </div>
 
-            <div style="display:flex;gap:.5rem;">
-              <button type="submit" class="btn btn-primary" style="font-size:.85rem;">🔍 Search</button>
-              <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.85rem;">Reset</a>
+            <div style="display:flex;gap:.5rem;padding-top:.75rem;border-top:1px solid #1e293b;margin-top:.75rem;">
+              <button type="submit" class="btn btn-primary" style="font-size:.82rem;">🔍 Apply filters</button>
+              <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.82rem;color:#475569;">✕ Clear all</a>
             </div>
           </form>
         </div>
@@ -477,9 +489,9 @@
             <tr>
               <th style="width:32px;">#</th>
               <th>Koordinaten</th>
-              <th>Dorf</th>
-              <th>Spieler / Allianz</th>
-              <th>Volk</th>
+              <th>Village</th>
+              <th>Player / Alliance</th>
+              <th>Tribe</th>
               <th onclick="sortInactive('population')" style="cursor:pointer;" title="Village population">Pop ↕</th>
               <th onclick="sortInactive('days_tracked')" style="cursor:pointer;" title="Days inactive">⏳ ↕</th>
               <th title="Capital village">★</th>
@@ -491,7 +503,8 @@
               <th title="Village pop change 5 days" style="color:#94a3b8;font-size:.72rem;">Δ5d</th>
               <th title="Village pop change 7 days" style="color:#94a3b8;font-size:.72rem;">Δ7d</th>
               <th title="Village pop change 14 days" style="color:#94a3b8;font-size:.72rem;">Δ14d</th>
-              <th title="Farm Score (inactivity + pop trend)" style="color:#fbbf24;font-size:.72rem;">Score</th>
+              <th style="color:#fbbf24;font-size:.72rem;cursor:help;"
+                  title="Farm Score 0–100&#10;&#10;Up to 40 pts: days inactive (2 pts/day)&#10;Up to 30 pts: pop trend (↓ = good, ↑ = risky)&#10;Up to 20 pts: population sweet spot (50–600)&#10;&#10;🟢 75+ great farm  🟡 50–74 ok  🔴 &lt;50 risky">Score ⓘ</th>
               {% if has_farmlist %}<th>📋 Lists</th>{% endif %}
               <th style="white-space:nowrap;">🔭 📋</th>
             </tr>
@@ -524,7 +537,7 @@
                   {% if is_on_list %}
                   <span style="font-size:0.68rem;background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">✅ Farm list</span>
                   {% else %}
-                  <span style="font-size:0.68rem;background:rgba(251,146,60,0.12);color:#fb923c;border:1px solid rgba(251,146,60,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">➕ Fehlt</span>
+                  <span style="font-size:0.68rem;background:rgba(251,146,60,0.12);color:#fb923c;border:1px solid rgba(251,146,60,0.3);border-radius:4px;padding:1px 5px;white-space:nowrap;">➕ Missing</span>
                   {% endif %}
                   {% endif %}
                 </div>
@@ -532,7 +545,11 @@
               <td style="font-size:.82rem;">{{ farm.village_name or '—' }}</td>
               <td style="font-size:.82rem;">
                 {% if farm.player_name %}
-                <div style="font-weight:600;">{{ farm.player_name }}</div>
+                <div style="font-weight:600;">
+                  <a href="/guild/{{ guild.guild_id }}/intel?q={{ farm.player_name | urlencode }}"
+                     target="_blank" style="color:inherit;text-decoration:none;"
+                     onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='inherit'">{{ farm.player_name }}</a>
+                </div>
                 {% if farm.get('alliance_name') %}<div style="font-size:.7rem;color:var(--text-muted);">[{{ farm.alliance_name }}]</div>{% endif %}
                 {% else %}<span style="color:var(--text-muted);">Barbarian</span>{% endif %}
               </td>
