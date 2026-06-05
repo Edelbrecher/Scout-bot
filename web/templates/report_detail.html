@@ -130,13 +130,15 @@
   {% endif %}
   {% endmacro %}
 
-  {% if report.troops_sent or report.troops_lost or report.def_troops or report.def_troops_lost %}
+  {% if report.troops_sent or report.troops_lost or report.troops_hospital or report.def_troops or report.def_troops_lost or report.def_troops_hospital %}
   <div class="card" style="padding:1rem 1.25rem;margin-bottom:1rem;">
     <div style="font-size:.85rem;font-weight:600;margin-bottom:.75rem;">⚔️ Troops</div>
     {{ troop_table('Attacker — sent', report.troops_sent, 'var(--text)') }}
-    {{ troop_table('Attacker — losses', report.troops_lost, '#f87171') }}
+    {{ troop_table('Attacker — dead ☠️', report.troops_lost, '#f87171') }}
+    {{ troop_table('Attacker — hospital 🏥', report.troops_hospital, '#fbbf24') }}
     {{ troop_table('Defender — in village', report.def_troops, '#60a5fa') }}
-    {{ troop_table('Defender — losses', report.def_troops_lost, '#f87171') }}
+    {{ troop_table('Defender — dead ☠️', report.def_troops_lost, '#f87171') }}
+    {{ troop_table('Defender — hospital 🏥', report.def_troops_hospital, '#fbbf24') }}
   </div>
   {% endif %}
 

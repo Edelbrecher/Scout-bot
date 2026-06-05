@@ -6495,12 +6495,12 @@ def _parse_battle_report(text: str) -> dict:
                 if len(unlabeled) == 1:
                     labeled = [("troops", unlabeled[0][1])]
                 elif len(unlabeled) == 2:
+                    # Row 0=sent, Row 1=dead losses (no hospital)
                     labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[1][1])]
                 elif len(unlabeled) >= 3:
-                    # Row 0=sent, Row 1=survivors (skip), Row 2=dead losses
-                    # Hospital is a separate game mechanic — NOT shown in the report rows.
-                    # Some of the dead will recover via hospital, but the report only shows total dead.
-                    labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[-1][1])]
+                    # Row 0=sent, Row 1=dead (permanent), Row 2=hospital (healable wounded)
+                    # Survivors = sent - dead - hospital (return home implicitly)
+                    labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[1][1]), ("hospital", unlabeled[2][1])]
 
             for dest, nums in labeled:
                 if is_defender_table:
