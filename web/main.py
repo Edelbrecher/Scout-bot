@@ -6255,20 +6255,18 @@ def _parse_battle_report(text: str) -> dict:
         result["defender_y"] = int(coords[1][1])
 
     # ── Player and village names ────────────────────────────────────────────
-    # Pattern: "Label: Name" or "Label Name" on same line, before coords
-    name_patterns = [
-        # German
-        (r'(?:Angreifer|Attacker)\s*[:\-–]?\s*(.+)', "attacker_name"),
-        (r'(?:Verteidiger|Defender)\s*[:\-–]?\s*(.+)', "defender_name"),
-        (r'(?:Herkunft|Herkunftsdorf|Origin|From|Von)\s*[:\-–]?\s*(.+)', "attacker_village_line"),
-        (r'(?:Verteidigt mit|Defending village|Village|Dorf)\s*[:\-–]?\s*(.+)', "defender_village_line"),
-    ]
-    for pattern, field in name_patterns:
-        m = re.search(pattern, text, re.IGNORECASE)
-        if not m:
-            continue
-        raw = m.group(1).strip()
-        # Extract name (before coordinates if present)
+    # Suffixes that indicate village info appended to player name on same line
+    # e.g. "[NWU_F] Cappuccino from village FH (100|200)"
+    _VILLAGE_SUFFIX_RE = re.compile(
+        r'\s+(?:from village|aus Dorf|von Dorf|from|aus|von)\s+.+$',
+        re.IGNORECASE
+    )
+
+    def _extract_name_and_coord(raw: str):
+        """Strip coords and village-suffix from a raw name string."""
+        # Remove BBCode tags: [player]Name[/player] → Name
+        raw = re.sub(r'\[/?(?:player|village|ally)\]', '', raw, flags=re.IGNORECASE).strip()
+        # Coords first
         vm = coord_re.search(raw)
         if vm:
             name_part = raw[:vm.start()].strip().rstrip(',').strip()
@@ -6276,19 +6274,52 @@ def _parse_battle_report(text: str) -> dict:
         else:
             name_part = raw
             coord_part = None
+        # Strip "from village X" / "aus Dorf X" suffix
+        name_part = _VILLAGE_SUFFIX_RE.sub('', name_part).strip()
+        return name_part or None, coord_part
+
+    name_patterns = [
+        (r'(?:Angreifer|Attacker)\s*[:\-–]\s*(.+)',         "attacker_name"),
+        (r'(?:Verteidiger|Defender)\s*[:\-–]\s*(.+)',        "defender_name"),
+        (r'(?:Herkunft|Herkunftsdorf|Origin)\s*[:\-–]\s*(.+)', "attacker_village_line"),
+        (r'(?:Verteidigt mit|Defending village)\s*[:\-–]\s*(.+)', "defender_village_line"),
+    ]
+    for pattern, field in name_patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if not m:
+            continue
+        name_part, coord_part = _extract_name_and_coord(m.group(1).strip())
 
         if field == "attacker_name":
-            result["attacker_name"] = name_part or None
+            result["attacker_name"] = name_part
         elif field == "defender_name":
-            result["defender_name"] = name_part or None
+            result["defender_name"] = name_part
         elif field == "attacker_village_line":
-            result["attacker_village"] = name_part or None
+            result["attacker_village"] = name_part
             if coord_part:
                 result["attacker_x"], result["attacker_y"] = coord_part
         elif field == "defender_village_line":
-            result["defender_village"] = name_part or None
+            result["defender_village"] = name_part
             if coord_part:
                 result["defender_x"], result["defender_y"] = coord_part
+
+    # ── Fallback: title-line format  ──────────────────────────────────────
+    # e.g. "[NWU_F] Cappuccino from village FH (100|200) attacked PlayerB"
+    # or   "Attack report: PlayerA from FH → PlayerB in VillageB (x|y)"
+    if not result["attacker_name"] and not result["defender_name"]:
+        # Try to find "PlayerA from village X (coords) attacked/on PlayerB"
+        title_m = re.search(
+            r'^(.+?)\s+(?:from village|aus Dorf)\s+(.+?)\s*(?:\((-?\d+)\|(-?\d+)\))?'
+            r'\s+(?:attacked?|angreift?|→|->|on)\s+(.+)',
+            text, re.IGNORECASE | re.MULTILINE
+        )
+        if title_m:
+            result["attacker_name"] = title_m.group(1).strip() or None
+            result["attacker_village"] = title_m.group(2).strip() or None
+            if title_m.group(3):
+                result["attacker_x"] = int(title_m.group(3))
+                result["attacker_y"] = int(title_m.group(4))
+            result["defender_name"] = _extract_name_and_coord(title_m.group(5).strip())[0]
 
     # ── Resources / Plunder ────────────────────────────────────────────────
     res_pattern = re.compile(
