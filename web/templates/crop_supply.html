@@ -165,7 +165,7 @@
       placeholder="Paste full marketplace content here (Ctrl+V) …&#10;&#10;The system automatically detects all incoming and outgoing deliveries&#10;including arrival times and resource amounts."></textarea>
 
     <div style="margin-top:.75rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;">
-      <button class="cs-btn-primary" onclick="parseAndSimulate()">🌾 Analysieren &amp; Simulieren</button>
+      <button id="simBtn" class="cs-btn-primary" onclick="parseAndSimulate()">🌾 Analysieren &amp; Simulieren</button>
       <button class="cs-btn-secondary" onclick="loadExample()">📄 Beispiel-Daten laden</button>
       <span id="parseStatus" style="font-size:.82rem;color:var(--text-muted);"></span>
     </div>
@@ -686,9 +686,11 @@ function buildChart(simResult, granaryCapacity, durationH, nowMs) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function parseAndSimulate() {
-  // Debug: confirm function is being called
+  // Debug: confirm function is being called - very visible
   const _dbg = document.getElementById('parseStatus');
   if (_dbg) { _dbg.textContent = '⏳ Wird gestartet…'; _dbg.style.color = '#fbbf24'; }
+  document.getElementById('simBtn').textContent = '⏳ Läuft…';
+  document.getElementById('simBtn').style.opacity = '0.7';
 
   let rawText, currentGrain, netPerH;
   try {
@@ -765,9 +767,17 @@ function parseAndSimulate() {
 
     statusEl.textContent = '✅ Simulation abgeschlossen';
     statusEl.style.color = '#4ade80';
+    document.getElementById('simBtn').textContent = '🌾 Analysieren & Simulieren';
+    document.getElementById('simBtn').style.opacity = '1';
+    // Force scroll to results — use getBoundingClientRect for reliable positioning
+    const res = document.getElementById('resultsSection');
+    const top = res.getBoundingClientRect().top + window.pageYOffset - 20;
+    window.scrollTo({ top, behavior: 'smooth' });
   } catch(e) {
     statusEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:.4rem .8rem;font-size:.82rem;color:#f87171;">⚠️ Fehler: ' + e.message + '</span>';
     console.error('Simulation error:', e);
+    document.getElementById('simBtn').textContent = '🌾 Analysieren & Simulieren';
+    document.getElementById('simBtn').style.opacity = '1';
   }
 }
 
@@ -777,7 +787,6 @@ function renderResults(sim, params) {
   const nowMs = Date.now();
 
   document.getElementById('resultsSection').style.display = 'block';
-  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // ── Alerts ─────────────────────────────────────────────────────────────────
   const alerts = [];
