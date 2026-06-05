@@ -261,6 +261,12 @@ document.addEventListener('click', e => {
     document.getElementById('navProfileMenu')?.classList.remove('open');
   }
 });
+
+// ── Global utility functions (available on every page) ────────────────────
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 
   <!-- Page loading overlay -->

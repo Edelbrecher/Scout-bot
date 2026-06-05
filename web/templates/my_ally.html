@@ -1560,9 +1560,6 @@ function confirmRemoveMember(id) {
   document.body.appendChild(f);
   f.submit();
 }
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 // ── Shuffle rows for non-editor members ──────────────────────────────────────
 {% if not is_editor %}

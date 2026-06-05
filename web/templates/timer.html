@@ -377,9 +377,6 @@ function renderReminders() {
   }
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 function removeReminder(id) {
   reminders = reminders.filter(r => r.id !== id);
   saveReminders();

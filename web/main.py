@@ -19,7 +19,6 @@ import stripe
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Query, Request
-from fastapi import Request as StarletteRequest
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -787,7 +786,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     # API paths always get JSON error responses
     if "/api/" in request.url.path or request.url.path.endswith("/api"):
-        return _JSONResponse({"error": str(exc.detail) if exc.detail else str(exc.status_code)}, status_code=exc.status_code)
+        return JSONResponse({"error": str(exc.detail) if exc.detail else str(exc.status_code)}, status_code=exc.status_code)
     if exc.status_code == 404:
         ctx = {"emoji": "🗺️", "code": "404", "message": "Diese Seite existiert nicht.", "detail": None}
     elif exc.status_code == 403:
@@ -2533,7 +2532,6 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
     # Return JSON so the frontend can start a countdown
     accept = request.headers.get("accept", "")
     if "application/json" in accept:
-        from fastapi.responses import JSONResponse
         return JSONResponse({"ok": True, "delete_in": DELAY})
     return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
 
@@ -3106,14 +3104,14 @@ async def guild_map(request: Request, guild_id: str):
 async def map_create_share(request: Request, guild_id: str):
     """Save map state and return a short share ID (member-only or public)."""
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     import json as _json
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     is_public = bool(body.pop("_public", False))
     state_json = _json.dumps(body)
     short_id = await database.create_map_share(
@@ -3124,66 +3122,66 @@ async def map_create_share(request: Request, guild_id: str):
         url = f"{base}/map/open/{short_id}"
     else:
         url = f"{base}/guild/{guild_id}/map/s/{short_id}"
-    return _JSONResponse({"short_id": short_id, "url": url, "is_public": is_public})
+    return JSONResponse({"short_id": short_id, "url": url, "is_public": is_public})
 
 
 @app.get("/guild/{guild_id}/map/presets")
 async def map_presets_list(request: Request, guild_id: str):
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     presets = await database.get_map_presets(guild_id)
-    return _JSONResponse({"presets": presets})
+    return JSONResponse({"presets": presets})
 
 
 @app.post("/guild/{guild_id}/map/presets")
 async def map_presets_save(request: Request, guild_id: str):
     import json as _json
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     name = str(body.get("name", "")).strip()
     if not name:
-        return _JSONResponse({"error": "name required"}, status_code=400)
+        return JSONResponse({"error": "name required"}, status_code=400)
     state = body.get("state", {})
     preset_json_str = _json.dumps(state)
     new_id = await database.save_map_preset(
         guild_id, name, session.get("username", ""), preset_json_str
     )
-    return _JSONResponse({"id": new_id, "name": name})
+    return JSONResponse({"id": new_id, "name": name})
 
 
 @app.post("/guild/{guild_id}/map/presets/{preset_id}/delete")
 async def map_presets_delete(request: Request, guild_id: str, preset_id: int):
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     ok = await database.delete_map_preset(guild_id, preset_id)
-    return _JSONResponse({"ok": ok})
+    return JSONResponse({"ok": ok})
 
 
 @app.post("/guild/{guild_id}/map/presets/{preset_id}/rename")
 async def map_presets_rename(request: Request, guild_id: str, preset_id: int):
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     name = str(body.get("name", "")).strip()
     if not name:
-        return _JSONResponse({"error": "name required"}, status_code=400)
+        return JSONResponse({"error": "name required"}, status_code=400)
     ok = await database.update_map_preset_name(guild_id, preset_id, name)
-    return _JSONResponse({"ok": ok})
+    return JSONResponse({"ok": ok})
 
 
 @app.get("/guild/{guild_id}/map/s/{short_id}", response_class=HTMLResponse)
@@ -3461,14 +3459,14 @@ _MAP_PLAYER_CACHE_TTL = 600   # 10 minutes
 async def map_player_search(request: Request, guild_id: str, q: str = ""):
     """Return players + villages matching query, parsed from map.sql (cached 10 min)."""
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = await _require_guild_async(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
 
     import time as _time
     q = q.strip().lower()
     if not q or len(q) < 2:
-        return _JSONResponse({"players": []})
+        return JSONResponse({"players": []})
 
     cache = _map_player_cache.get(guild_id)
     if not cache or (_time.time() - cache["ts"]) > _MAP_PLAYER_CACHE_TTL:
@@ -3476,15 +3474,15 @@ async def map_player_search(request: Request, guild_id: str, q: str = ""):
         guild = await database.get_guild(guild_id)
         server_url = (guild or {}).get("tw_world", "")
         if not server_url:
-            return _JSONResponse({"error": "no server configured"}, status_code=400)
+            return JSONResponse({"error": "no server configured"}, status_code=400)
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 r = await client.get(f"{server_url}/map.sql")
                 if r.status_code != 200:
-                    return _JSONResponse({"error": "map unavailable"}, status_code=502)
+                    return JSONResponse({"error": "map unavailable"}, status_code=502)
                 raw = r.text
         except Exception as e:
-            return _JSONResponse({"error": str(e)}, status_code=502)
+            return JSONResponse({"error": str(e)}, status_code=502)
 
         # Parse map.sql — build player → {alliance, villages} index
         import re as _re2
@@ -3540,7 +3538,7 @@ async def map_player_search(request: Request, guild_id: str, q: str = ""):
     ]
     # Sort: exact prefix match first
     results.sort(key=lambda p: (0 if p["name"].lower().startswith(q) else 1, p["name"].lower()))
-    return _JSONResponse({"players": results[:15]})
+    return JSONResponse({"players": results[:15]})
 
 
 @app.get("/guild/{guild_id}/map/heatmap-data")
@@ -3591,7 +3589,6 @@ def _stripe_client():
 
 @app.post("/guild/{guild_id}/setup/api/save-world")
 async def setup_save_world(request: Request, guild_id: str):
-    from fastapi.responses import JSONResponse
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
     err = _require_guild(session, guild_id)
@@ -3608,7 +3605,6 @@ async def setup_save_world(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/setup/api/trigger-snapshot")
 async def setup_trigger_snapshot(request: Request, guild_id: str):
-    from fastapi.responses import JSONResponse
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
     err = _require_guild(session, guild_id)
@@ -4934,7 +4930,7 @@ async def attacks_delete_report(request: Request, guild_id: str, report_id: int)
     guild = await database.get_guild(guild_id)
     is_admin = session.get("type") == "admin" or session.get("uid") == (guild or {}).get("owner_discord_id")
     if not is_admin:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.delete_attack_report(report_id)
     return RedirectResponse(f"/guild/{guild_id}/attacks", status_code=303)
 
@@ -4952,17 +4948,17 @@ async def _attack_access(request, guild_id):
     """Shared access check for attack API routes: session + async guild + ally-or-plan."""
     session, err = _require_session(request)
     if err:
-        return None, _JSONResponse({"error": "unauthorized"}, status_code=401)
+        return None, JSONResponse({"error": "unauthorized"}, status_code=401)
     err = await _require_guild_async(session, guild_id)
     if err:
-        return None, _JSONResponse({"error": "forbidden"}, status_code=403)
+        return None, JSONResponse({"error": "forbidden"}, status_code=403)
     guild = await database.get_guild(guild_id)
     if not guild:
-        return None, _JSONResponse({"error": "not_found"}, status_code=404)
+        return None, JSONResponse({"error": "not_found"}, status_code=404)
     uid = session.get("uid", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err:
-        return None, _JSONResponse({"error": "alliance_required"}, status_code=403)
+        return None, JSONResponse({"error": "alliance_required"}, status_code=403)
     return session, None
 
 
@@ -4974,10 +4970,10 @@ async def attacks_import_rally(request: Request, guild_id: str):
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     attacks = body.get("attacks", [])
     if not isinstance(attacks, list):
-        return _JSONResponse({"error": "attacks must be a list"}, status_code=400)
+        return JSONResponse({"error": "attacks must be a list"}, status_code=400)
 
     # Re-compute fake scores server-side using enemy artifacts from DB
     for atk in attacks:
@@ -4990,7 +4986,7 @@ async def attacks_import_rally(request: Request, guild_id: str):
     discord_id = session.get("uid", "")
     discord_name = session.get("username", "")
     saved, skipped = await database.save_incoming_attacks(guild_id, attacks, discord_id, discord_name)
-    return _JSONResponse({"saved": saved, "skipped": skipped})
+    return JSONResponse({"saved": saved, "skipped": skipped})
 
 
 def _compute_fake_score_server(atk: dict, artifacts: list) -> dict:
@@ -5036,7 +5032,7 @@ async def attacks_api_incoming(request: Request, guild_id: str,
     session, err = await _attack_access(request, guild_id)
     if err: return err
     attacks = await database.get_incoming_attacks(guild_id, x, y)
-    return _JSONResponse(attacks)
+    return JSONResponse(attacks)
 
 
 @app.get("/guild/{guild_id}/attacks/api/alliance")
@@ -5044,7 +5040,7 @@ async def attacks_api_alliance(request: Request, guild_id: str):
     session, err = await _attack_access(request, guild_id)
     if err: return err
     attacks = await database.get_incoming_attacks_alliance(guild_id)
-    return _JSONResponse(attacks)
+    return JSONResponse(attacks)
 
 
 @app.post("/guild/{guild_id}/attacks/dismiss/{attack_id}")
@@ -5052,7 +5048,7 @@ async def attacks_dismiss(request: Request, guild_id: str, attack_id: int):
     session, err = await _attack_access(request, guild_id)
     if err: return err
     await database.dismiss_attack(attack_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 def _attacks_can_manage(session: dict, guild: dict, perms: list) -> bool:
@@ -5070,9 +5066,9 @@ async def attacks_archive(request: Request, guild_id: str, attack_id: int):
     guild = await database.get_guild(guild_id)
     perms = await database.get_member_permissions(guild_id, uid)
     if not _attacks_can_manage(session, guild, perms):
-        return _JSONResponse({"error": "no_permission"}, status_code=403)
+        return JSONResponse({"error": "no_permission"}, status_code=403)
     ok = await database.archive_attack(attack_id, guild_id)
-    return _JSONResponse({"ok": ok})
+    return JSONResponse({"ok": ok})
 
 
 @app.post("/guild/{guild_id}/attacks/delete/{attack_id}")
@@ -5083,9 +5079,9 @@ async def attacks_delete(request: Request, guild_id: str, attack_id: int):
     guild = await database.get_guild(guild_id)
     perms = await database.get_member_permissions(guild_id, uid)
     if not _attacks_can_manage(session, guild, perms):
-        return _JSONResponse({"error": "no_permission"}, status_code=403)
+        return JSONResponse({"error": "no_permission"}, status_code=403)
     ok = await database.delete_attack(attack_id, guild_id)
-    return _JSONResponse({"ok": ok})
+    return JSONResponse({"ok": ok})
 
 
 @app.get("/guild/{guild_id}/attacks/api/archived")
@@ -5096,9 +5092,9 @@ async def attacks_api_archived(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     perms = await database.get_member_permissions(guild_id, uid)
     if not _attacks_can_manage(session, guild, perms):
-        return _JSONResponse({"error": "no_permission"}, status_code=403)
+        return JSONResponse({"error": "no_permission"}, status_code=403)
     attacks = await database.get_archived_attacks(guild_id)
-    return _JSONResponse({"attacks": attacks})
+    return JSONResponse({"attacks": attacks})
 
 
 @app.post("/guild/{guild_id}/attacks/label/{attack_id}")
@@ -5112,12 +5108,12 @@ async def attacks_label(request: Request, guild_id: str, attack_id: int):
     perms     = await database.get_member_permissions(guild_id, uid)
     has_right = "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
     if not (is_admin or is_owner or has_right):
-        return _JSONResponse({"error": "no_permission"}, status_code=403)
+        return JSONResponse({"error": "no_permission"}, status_code=403)
     body = await request.json()
     label = body.get("label", "")
     username = session.get("username", uid)
     ok = await database.label_attack(attack_id, guild_id, label, username)
-    return _JSONResponse({"ok": ok, "label": label})
+    return JSONResponse({"ok": ok, "label": label})
 
 
 @app.post("/guild/{guild_id}/attacks/note/{attack_id}")
@@ -5127,26 +5123,26 @@ async def attacks_save_note(request: Request, guild_id: str, attack_id: int):
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     notes = body.get("notes", "")
     ok = await database.save_attack_note(attack_id, guild_id, notes)
-    return _JSONResponse({"ok": ok})
+    return JSONResponse({"ok": ok})
 
 
 @app.get("/guild/{guild_id}/api/player-info")
 async def guild_api_player_info(request: Request, guild_id: str, player: str = ""):
     session, err = _require_session(request)
     if err:
-        return _JSONResponse({"error": "unauthorized"}, status_code=401)
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
     if err:
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     if not player:
-        return _JSONResponse({"error": "player param required"}, status_code=400)
+        return JSONResponse({"error": "player param required"}, status_code=400)
     data = await database.get_player_from_snapshot(guild_id, player)
     if not data:
-        return _JSONResponse(None)
-    return _JSONResponse(data)
+        return JSONResponse(None)
+    return JSONResponse(data)
 
 
 @app.get("/guild/{guild_id}/attacks/api/enemy-artifacts/{player_name}")
@@ -5154,7 +5150,7 @@ async def attacks_api_get_enemy_artifacts(request: Request, guild_id: str, playe
     session, err = await _attack_access(request, guild_id)
     if err: return err
     artifacts = await database.get_enemy_artifacts(guild_id, player_name)
-    return _JSONResponse(artifacts)
+    return JSONResponse(artifacts)
 
 
 @app.post("/guild/{guild_id}/attacks/api/enemy-artifacts/{player_name}/toggle")
@@ -5164,17 +5160,17 @@ async def attacks_api_toggle_enemy_artifact(request: Request, guild_id: str, pla
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     vx = body.get("village_x")
     vy = body.get("village_y")
     art_type = body.get("artifact_type", "")
     art_size = body.get("artifact_size", "")
     if not art_type or not art_size:
-        return _JSONResponse({"error": "artifact_type and artifact_size required"}, status_code=400)
+        return JSONResponse({"error": "artifact_type and artifact_size required"}, status_code=400)
     now_active = await database.toggle_enemy_artifact(
         guild_id, player_name, vx, vy, art_type, art_size
     )
-    return _JSONResponse({"active": now_active})
+    return JSONResponse({"active": now_active})
 
 
 # ---------------------------------------------------------------------------
@@ -5595,21 +5591,21 @@ async def my_ally_regen_token(request: Request, guild_id: str, which: str = Form
 async def my_ally_roles_reorder(request: Request, guild_id: str):
     """AJAX endpoint: reorder roles via drag & drop."""
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
-        return _JSONResponse({"error": "not owner"}, status_code=403)
+        return JSONResponse({"error": "not owner"}, status_code=403)
     import json as _json
     try:
         body = await request.json()
         ordered_ids = [int(x) for x in body.get("ids", [])]
     except Exception:
-        return _JSONResponse({"error": "invalid"}, status_code=400)
+        return JSONResponse({"error": "invalid"}, status_code=400)
     await database.reorder_ally_roles(ally_group["id"], ordered_ids)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/my-ally/roles/create")
@@ -5919,7 +5915,7 @@ async def my_ally_bonus_reorder(request: Request, guild_id: str):
     body = await request.json()
     ordered_ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     await database.reorder_ally_bonuses(ally_group["id"], ordered_ids)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 # ---------------------------------------------------------------------------
@@ -7648,23 +7644,22 @@ async def einsatz_delete(request: Request, guild_id: str, plan_id: int):
 # ---------------------------------------------------------------------------
 
 import json as _op_json
-from fastapi.responses import JSONResponse as _JSONResponse
 
 async def _op_api_guard(request: Request, guild_id: str, check_alliance: bool = False):
     """Auth guard for operations JSON API endpoints.
-    Returns (session, error_JSONResponse). error is None if access granted."""
+    Returns (session, errorJSONResponse). error is None if access granted."""
     session, err = _require_session(request)
     if err:
-        return None, _JSONResponse({"error": "not_logged_in"}, status_code=401)
+        return None, JSONResponse({"error": "not_logged_in"}, status_code=401)
     err = _require_guild(session, guild_id)
     if err:
-        return None, _JSONResponse({"error": "no_access"}, status_code=403)
+        return None, JSONResponse({"error": "no_access"}, status_code=403)
     if check_alliance:
         guild = await database.get_guild(guild_id)
         if guild:
             guild = await _enrich_guild_subscription(guild)
         if not guild or not _has_alliance_pro(guild):
-            return None, _JSONResponse({"error": "alliance_plan_required"}, status_code=403)
+            return None, JSONResponse({"error": "alliance_plan_required"}, status_code=403)
     return session, None
 
 @app.get("/guild/{guild_id}/operations", response_class=HTMLResponse)
@@ -7712,7 +7707,7 @@ async def op_create_plan(
         target_ally.strip(), notes.strip(),
         session.get("uid",""),
     )
-    return _JSONResponse({"ok": True, "id": plan_id})
+    return JSONResponse({"ok": True, "id": plan_id})
 
 
 @app.get("/guild/{guild_id}/operations/api/plan-list")
@@ -7720,7 +7715,7 @@ async def op_plan_list(request: Request, guild_id: str):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     plans = await database.get_op_plans(guild_id)
-    return _JSONResponse(plans)
+    return JSONResponse(plans)
 
 
 @app.get("/guild/{guild_id}/operations/api/plans/{plan_id}")
@@ -7729,8 +7724,8 @@ async def op_get_plan(request: Request, guild_id: str, plan_id: int):
     if err: return err
     plan = await database.get_op_plan_full(plan_id, guild_id)
     if not plan:
-        return _JSONResponse({"error": "not found"}, status_code=404)
-    return _JSONResponse(plan)
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse(plan)
 
 
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/update")
@@ -7762,7 +7757,7 @@ async def op_update_plan(
         elif new_status == "cancelled" and old_status == "active":
             # Plan cancelled → notify members
             await _announce_plan_cancelled_via_bot(guild_id, plan_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 async def _announce_plan_via_bot(guild_id: str, plan_id: int):
@@ -7893,7 +7888,7 @@ async def op_delete_plan(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     await database.delete_op_plan(plan_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 # ── Targets ───────────────────────────────────────────────────────────────────
@@ -7909,13 +7904,13 @@ async def op_add_target(
     if err: return err
     plan = await database.get_op_plan(plan_id, guild_id)
     if not plan:
-        return _JSONResponse({"error": "plan not found"}, status_code=404)
+        return JSONResponse({"error": "plan not found"}, status_code=404)
     tid = await database.add_op_target(
         plan_id, guild_id,
         player_name.strip(), village_name.strip(),
         x, y, population, notes.strip()
     )
-    return _JSONResponse({"ok": True, "id": tid})
+    return JSONResponse({"ok": True, "id": tid})
 
 
 @app.post("/guild/{guild_id}/operations/api/targets/{target_id}/delete")
@@ -7923,7 +7918,7 @@ async def op_delete_target(request: Request, guild_id: str, target_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     await database.delete_op_target(target_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 # ── Waves ─────────────────────────────────────────────────────────────────────
@@ -7982,7 +7977,7 @@ async def op_add_wave(
             except Exception:
                 pass
         asyncio.create_task(_auto_notify_wave())
-    return _JSONResponse({"ok": True, **result})
+    return JSONResponse({"ok": True, **result})
 
 
 @app.post("/guild/{guild_id}/operations/api/waves/{wave_id}/update")
@@ -7992,7 +7987,7 @@ async def op_update_wave(request: Request, guild_id: str, wave_id: int):
     try:
         data = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     # Recompute times if origin/target changed
     plan = None
     if "origin_x" in data or "tribe" in data or "troop_json" in data:
@@ -8038,7 +8033,7 @@ async def op_update_wave(request: Request, guild_id: str, wave_id: int):
             if isinstance(data.get("troop_json"), dict):
                 data["troop_json"] = _op_json.dumps(data["troop_json"])
     await database.update_op_wave(wave_id, guild_id, **data)
-    return _JSONResponse({"ok": True, "send_time": data.get("send_time",""), "travel_seconds": data.get("travel_seconds",0)})
+    return JSONResponse({"ok": True, "send_time": data.get("send_time",""), "travel_seconds": data.get("travel_seconds",0)})
 
 
 @app.post("/guild/{guild_id}/operations/api/waves/{wave_id}/delete")
@@ -8046,7 +8041,7 @@ async def op_delete_wave(request: Request, guild_id: str, wave_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     await database.delete_op_wave(wave_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 # ── Wave confirmation ─────────────────────────────────────────────────────────
@@ -8062,7 +8057,7 @@ async def op_confirm_wave(
     uid = session.get("uid","")
     valid = {"on_time","late","not_sent","cant_send",""}
     if confirm_status not in valid:
-        return _JSONResponse({"error": "invalid status"}, status_code=400)
+        return JSONResponse({"error": "invalid status"}, status_code=400)
     # Only the assigned attacker may confirm (by discord_id)
     import aiosqlite as _aiosqlite_c
     async with _aiosqlite_c.connect(database.DB_PATH) as _db_c:
@@ -8073,13 +8068,13 @@ async def op_confirm_wave(
         ) as _cur_c:
             wrow = await _cur_c.fetchone()
     if not wrow:
-        return _JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({"error": "not found"}, status_code=404)
     if wrow["attacker_discord_id"] and wrow["attacker_discord_id"] != uid:
-        return _JSONResponse({"error": "not your wave"}, status_code=403)
+        return JSONResponse({"error": "not your wave"}, status_code=403)
     await database.update_op_wave(wave_id, guild_id,
         confirm_status=confirm_status,
         confirm_delta_seconds=confirm_delta_seconds)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/live")
@@ -8089,7 +8084,7 @@ async def op_live_status(request: Request, guild_id: str, plan_id: int):
     if err: return err
     plan = await database.get_op_plan(plan_id, guild_id)
     if not plan:
-        return _JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({"error": "not found"}, status_code=404)
     now_utc = __import__('datetime').datetime.utcnow().isoformat()
     result = []
     for t in (plan.get("targets") or []):
@@ -8107,7 +8102,7 @@ async def op_live_status(request: Request, guild_id: str, plan_id: int):
                 "confirm_status": w.get("confirm_status",""),
             } for w in (t.get("waves") or [])]
         })
-    return _JSONResponse({
+    return JSONResponse({
         "plan_id":    plan_id,
         "plan_name":  plan.get("name",""),
         "status":     plan.get("status",""),
@@ -8123,7 +8118,7 @@ async def op_my_waves(request: Request, guild_id: str):
     uid = session.get("uid","")
     waves = await database.get_my_op_waves(guild_id, uid)
     hero_actions = await database.get_hero_actions_for_player(guild_id, uid)
-    return _JSONResponse({"waves": waves, "hero_actions": hero_actions})
+    return JSONResponse({"waves": waves, "hero_actions": hero_actions})
 
 
 @app.get("/guild/{guild_id}/my-operations", response_class=HTMLResponse)
@@ -8158,7 +8153,7 @@ async def op_save_default_ts(request: Request, guild_id: str):
             "UPDATE guild_configs SET default_tournament_square=? WHERE guild_id=?", (ts, guild_id)
         )
         await db.commit()
-    return _JSONResponse({"ok": True, "ts": ts})
+    return JSONResponse({"ok": True, "ts": ts})
 
 
 @app.get("/guild/{guild_id}/operations/{plan_id}/live", response_class=HTMLResponse)
@@ -8204,7 +8199,7 @@ async def op_recalc_times(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     updated = await database.recalc_op_wave_times(plan_id, guild_id)
-    return _JSONResponse({"ok": True, "updated": updated})
+    return JSONResponse({"ok": True, "updated": updated})
 
 
 # ── EP Poll ───────────────────────────────────────────────────────────────────
@@ -8215,10 +8210,10 @@ async def op_launch_poll(request: Request, guild_id: str, plan_id: int):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("poll_channel_id"):
-        return _JSONResponse({"error": "Kein Poll-Kanal konfiguriert. Bitte zuerst unter Umfragen einrichten."}, status_code=400)
+        return JSONResponse({"error": "Kein Poll-Kanal konfiguriert. Bitte zuerst unter Umfragen einrichten."}, status_code=400)
     plan = await database.get_op_plan(plan_id, guild_id)
     if not plan:
-        return _JSONResponse({"error": "Plan nicht gefunden."}, status_code=404)
+        return JSONResponse({"error": "Plan nicht gefunden."}, status_code=404)
     title = f"⚔️ EP: {plan['name']}"
     landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
     description = f"Bist du für diesen Einsatz verfügbar?\n🕐 Einschlag: **{landing}**" if landing else "Bist du für diesen Einsatz verfügbar?"
@@ -8247,8 +8242,8 @@ async def op_launch_poll(request: Request, guild_id: str, plan_id: int):
         )
     if resp.status_code in (200, 201):
         await database.set_poll_message_id(poll_id, resp.json()["id"])
-        return _JSONResponse({"ok": True, "poll_id": poll_id})
-    return _JSONResponse({"error": f"Discord-Fehler {resp.status_code}"}, status_code=502)
+        return JSONResponse({"ok": True, "poll_id": poll_id})
+    return JSONResponse({"error": f"Discord-Fehler {resp.status_code}"}, status_code=502)
 
 
 @app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/poll-availability")
@@ -8257,7 +8252,7 @@ async def op_poll_availability(request: Request, guild_id: str, plan_id: int):
     if err: return err
     availability = await database.get_ep_poll_availability(guild_id, plan_id)
     poll = await database.get_ep_poll(guild_id, plan_id)
-    return _JSONResponse({"availability": availability, "poll": poll})
+    return JSONResponse({"availability": availability, "poll": poll})
 
 
 # ── Plausibility ──────────────────────────────────────────────────────────────
@@ -8267,7 +8262,7 @@ async def op_plausibility(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     result = await database.check_op_plausibility(plan_id, guild_id)
-    return _JSONResponse(result)
+    return JSONResponse(result)
 
 
 # ── Favourites ────────────────────────────────────────────────────────────────
@@ -8284,7 +8279,7 @@ async def op_add_favorite(
         guild_id, session.get("uid",""),
         player_name.strip(), village_name.strip(), x, y, label.strip()
     )
-    return _JSONResponse({"ok": True, "id": fid})
+    return JSONResponse({"ok": True, "id": fid})
 
 
 @app.post("/guild/{guild_id}/operations/api/favorites/{fav_id}/delete")
@@ -8292,7 +8287,7 @@ async def op_delete_favorite(request: Request, guild_id: str, fav_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     await database.delete_op_favorite(fav_id, session.get("uid",""), guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 # ── Village / player search ───────────────────────────────────────────────────
@@ -8322,7 +8317,7 @@ async def op_list_alliances(request: Request, guild_id: str):
             alliances = [{"name": r["alliance_name"], "players": r["player_count"], "pop": r["total_pop"]} for r in await cur.fetchall()]
     # Meta groups
     meta_groups = await database.get_meta_groups(guild_id)
-    return _JSONResponse({"alliances": alliances, "meta_groups": meta_groups})
+    return JSONResponse({"alliances": alliances, "meta_groups": meta_groups})
 
 
 @app.get("/guild/{guild_id}/operations/api/villages")
@@ -8358,7 +8353,7 @@ async def op_search_villages(request: Request, guild_id: str, q: str = "", allia
                 rows = [dict(r) for r in await cur.fetchall()]
         else:
             rows = []
-    return _JSONResponse({"results": rows})
+    return JSONResponse({"results": rows})
 
 
 @app.get("/guild/{guild_id}/operations/api/attacker-list")
@@ -8518,7 +8513,7 @@ async def op_attacker_list(request: Request, guild_id: str):
             "villages": villages,
         })
     result.sort(key=lambda x: x["rank"])
-    return _JSONResponse({"attackers": result})
+    return JSONResponse({"attackers": result})
 
 
 @app.get("/guild/{guild_id}/operations/api/players-by-alliance")
@@ -8559,7 +8554,7 @@ async def op_players_by_alliance(request: Request, guild_id: str, alliances: str
         players[key]["villages"].append({"name": r["village_name"], "x": r["x"], "y": r["y"], "pop": r["population"]})
         players[key]["total_pop"] += (r["population"] or 0)
     result = sorted(players.values(), key=lambda p: -p["total_pop"])
-    return _JSONResponse({"players": result})
+    return JSONResponse({"players": result})
 
 
 # ── Member troops ─────────────────────────────────────────────────────────────
@@ -8569,7 +8564,7 @@ async def op_get_members(request: Request, guild_id: str):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     members = await database.get_member_troops(guild_id)
-    return _JSONResponse({"members": members})
+    return JSONResponse({"members": members})
 
 
 # ── Discord notification ───────────────────────────────────────────────────────
@@ -8580,7 +8575,7 @@ async def op_send_notification(request: Request, guild_id: str, plan_id: int):
     if err: return err
     plan = await database.get_op_plan_full(plan_id, guild_id)
     if not plan:
-        return _JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({"error": "not found"}, status_code=404)
     results = []
     ok = False
     try:
@@ -8597,7 +8592,7 @@ async def op_send_notification(request: Request, guild_id: str, plan_id: int):
         results = [{"discord_id": "", "name": "Bot", "status": "error", "error": str(e)[:120]}]
     triggered_by = session.get("uid", "") if session else ""
     await database.save_op_notify_log(guild_id, plan_id, triggered_by, "manual", results)
-    return _JSONResponse({"ok": ok, "results": results})
+    return JSONResponse({"ok": ok, "results": results})
 
 
 @app.get("/guild/{guild_id}/operations/api/map-villages")
@@ -8619,7 +8614,7 @@ async def op_map_villages(
             row = await cur.fetchone()
             latest = row[0] if row else None
         if not latest:
-            return _JSONResponse({"villages": []})
+            return JSONResponse({"villages": []})
         async with db.execute("""
             SELECT x, y, village_name, player_name, alliance_name, tribe,
                    population, is_capital
@@ -8628,7 +8623,7 @@ async def op_map_villages(
             LIMIT 4000
         """, (guild_id, latest, x1, x2, y1, y2)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
-    return _JSONResponse({"villages": rows})
+    return JSONResponse({"villages": rows})
 
 
 @app.get("/guild/{guild_id}/operations/api/plans/{plan_id}/notify-log")
@@ -8636,7 +8631,7 @@ async def op_get_notify_log(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     logs = await database.get_op_notify_logs(guild_id, plan_id)
-    return _JSONResponse({"logs": logs})
+    return JSONResponse({"logs": logs})
 
 
 # ── OP Evaluation ────────────────────────────────────────────────────────────
@@ -8646,7 +8641,7 @@ async def op_evaluation(request: Request, guild_id: str, plan_id: int):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     data = await database.get_op_evaluation(plan_id, guild_id)
-    return _JSONResponse(data)
+    return JSONResponse(data)
 
 
 # ── Hero Actions ──────────────────────────────────────────────────────────────
@@ -8658,7 +8653,7 @@ async def op_add_hero_action(request: Request, guild_id: str, plan_id: int):
     try:
         data = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     action_id = await database.add_op_hero_action(
         plan_id, guild_id,
         action_type=data.get("action_type", "gear_switch"),
@@ -8691,7 +8686,7 @@ async def op_add_hero_action(request: Request, guild_id: str, plan_id: int):
             except Exception:
                 pass
         asyncio.create_task(_notify_hero())
-    return _JSONResponse({"ok": True, "id": action_id})
+    return JSONResponse({"ok": True, "id": action_id})
 
 
 @app.post("/guild/{guild_id}/operations/api/hero-actions/{action_id}/delete")
@@ -8699,7 +8694,7 @@ async def op_delete_hero_action(request: Request, guild_id: str, action_id: int)
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     await database.delete_op_hero_action(action_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 # ── Personal missions (used by my-account tab) ──────────────────────────────
@@ -8709,7 +8704,7 @@ async def op_my_missions(request: Request, guild_id: str):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     missions = await database.get_personal_missions(guild_id, session.get("uid",""))
-    return _JSONResponse({"missions": missions})
+    return JSONResponse({"missions": missions})
 
 
 # ── Notifications ─────────────────────────────────────────────────────────────
@@ -8765,19 +8760,19 @@ async def op_wave_notify_leads(request: Request, guild_id: str, wave_id: int):
     try:
         data = await request.json()
     except Exception:
-        return _JSONResponse({"ok": False})
+        return JSONResponse({"ok": False})
     status = data.get("confirm_status", "")
     attacker = data.get("attacker_name", "")
     plan_name = data.get("plan_name", "")
     plan_id = data.get("plan_id")
     target = data.get("target", "")
     if status not in ("cant_send", "not_sent"):
-        return _JSONResponse({"ok": True})
+        return JSONResponse({"ok": True})
     lead_ids = await database.get_ep_notify_members(guild_id)
     sender_id = session.get("uid", "")
     recipients = [lid for lid in lead_ids if lid != sender_id]
     if not recipients:
-        return _JSONResponse({"ok": True})
+        return JSONResponse({"ok": True})
     title_map = {"cant_send": "⚠️ Angreifer kann nicht abschicken", "not_sent": "❌ Welle nicht abgeschickt"}
     msg_map = {
         "cant_send": f"{attacker} hat gemeldet, dass er die Welle zu '{target}' nicht abschicken kann.\nPlan: {plan_name}",
@@ -8790,7 +8785,7 @@ async def op_wave_notify_leads(request: Request, guild_id: str, wave_id: int):
         recipients, status,
         title_map[status], msg_map[status], plan_id=plan_id
     )
-    return _JSONResponse({"ok": True, "notified": len(recipients)})
+    return JSONResponse({"ok": True, "notified": len(recipients)})
 
 
 # ---------------------------------------------------------------------------
@@ -8887,7 +8882,7 @@ async def admin_worlds(request: Request):
 @app.get("/api/admin/server-stats")
 async def api_server_stats(request: Request):
     session, err = _require_admin(request)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     import os, time
     stats: dict = {}
     # ── CPU ──────────────────────────────────────────────────────────────────
@@ -8948,7 +8943,7 @@ async def api_server_stats(request: Request):
     except Exception:
         stats["db_size_kb"] = 0
     stats["ts"] = int(time.time())
-    return _JSONResponse(stats)
+    return JSONResponse(stats)
 
 
 @app.get("/admin/customers", response_class=HTMLResponse)
@@ -9394,7 +9389,6 @@ async def admin_servers_discover(request: Request):
 
 @app.get("/api/travian-servers")
 async def api_travian_servers():
-    from fastapi.responses import JSONResponse
     servers = await database.get_travian_servers()
     # Also include worlds currently in use by any guild
     guilds = await database.get_all_guilds()
@@ -9826,11 +9820,11 @@ async def api_def_crop_save(request: Request):
     try:
         body = await request.json()
     except Exception:
-        return _JSONResponse({"error": "invalid json"}, status_code=400)
+        return JSONResponse({"error": "invalid json"}, status_code=400)
     guild_id          = body.get("guild_id", "")
     sender_discord_id = body.get("sender_discord_id", "")
     if not guild_id or not sender_discord_id:
-        return _JSONResponse({"error": "missing fields"}, status_code=400)
+        return JSONResponse({"error": "missing fields"}, status_code=400)
     send_id = await database.save_def_crop_send(
         guild_id          = guild_id,
         sender_discord_id = sender_discord_id,
@@ -9842,28 +9836,28 @@ async def api_def_crop_save(request: Request):
         crop_per_hour     = float(body.get("crop_per_hour", 0)),
         notes             = body.get("notes", ""),
     )
-    return _JSONResponse({"ok": True, "id": send_id})
+    return JSONResponse({"ok": True, "id": send_id})
 
 
 @app.get("/guild/{guild_id}/api/def-crop/my")
 async def api_def_crop_my(request: Request, guild_id: str):
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     discord_id = session.get("uid", "")
     sends = await database.get_def_crop_sends(guild_id, discord_id)
-    return _JSONResponse(sends)
+    return JSONResponse(sends)
 
 
 @app.post("/guild/{guild_id}/api/def-crop/{send_id}/deactivate")
 async def api_def_crop_deactivate(request: Request, guild_id: str, send_id: int):
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.deactivate_def_crop_send(send_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.get("/api/me")
@@ -10824,11 +10818,11 @@ async def enemy_village_detail_save(request: Request, guild_id: str, player_name
         coords_key = str(body.get("coords_key", "")).strip()
         detail     = body.get("detail", {})
         if not coords_key:
-            return _JSONResponse({"error": "missing coords_key"}, status_code=400)
+            return JSONResponse({"error": "missing coords_key"}, status_code=400)
         await database.save_enemy_village_detail(guild_id, player_name, coords_key, detail)
-        return _JSONResponse({"ok": True})
+        return JSONResponse({"ok": True})
     except Exception as e:
-        return _JSONResponse({"error": str(e)}, status_code=400)
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.post("/guild/{guild_id}/enemies/{player_name}/meta")
@@ -10929,7 +10923,6 @@ async def alliance_members_page(request: Request, guild_id: str):
 
 @app.post("/guild/{guild_id}/settings/tw-alliance")
 async def settings_set_tw_alliance(request: Request, guild_id: str):
-    from fastapi.responses import JSONResponse
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False}, status_code=401)
     err = _require_guild(session, guild_id)
@@ -12485,12 +12478,12 @@ async def travian_stats_delete(request: Request, guild_id: str, snap_id: int):
 @app.get("/guild/{guild_id}/travian-stats/api/trends")
 async def travian_stats_trends_api(request: Request, guild_id: str):
     session, err = _require_session(request)
-    if err: return _JSONResponse({"error": "unauthorized"}, status_code=401)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
     err = _require_guild(session, guild_id)
-    if err: return _JSONResponse({"error": "forbidden"}, status_code=403)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     stats_type = request.query_params.get("type", "player")
     data = await database.get_stats_trend_data(guild_id, stats_type=stats_type)
-    return _JSONResponse(data)
+    return JSONResponse(data)
 
 
 # ---------------------------------------------------------------------------
@@ -12917,13 +12910,13 @@ async def _artifact_access(request: Request, guild_id: str):
     """Returns (session, None) or (None, error_response)."""
     session, err = _require_session(request)
     if err:
-        return None, _JSONResponse({"error": "unauthorized"}, status_code=401)
+        return None, JSONResponse({"error": "unauthorized"}, status_code=401)
     err = await _require_guild_async(session, guild_id)
     if err:
-        return None, _JSONResponse({"error": "forbidden"}, status_code=403)
+        return None, JSONResponse({"error": "forbidden"}, status_code=403)
     guild = await database.get_guild(guild_id)
     if not guild:
-        return None, _JSONResponse({"error": "not_found"}, status_code=404)
+        return None, JSONResponse({"error": "not_found"}, status_code=404)
     uid = session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err:
@@ -13027,7 +13020,7 @@ async def api_treasuries(request: Request, guild_id: str):
     session, err = await _artifact_access(request, guild_id)
     if err: return err
     rows = await database.get_all_treasuries(guild_id)
-    return _JSONResponse(rows)
+    return JSONResponse(rows)
 
 
 @app.post("/guild/{guild_id}/all-treasuries/bulk-delete")
@@ -13036,11 +13029,11 @@ async def treasuries_bulk_delete(request: Request, guild_id: str):
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     if not is_leader:
-        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
     body = await request.json()
     ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     n = await database.bulk_delete_treasuries(guild_id, ids)
-    return _JSONResponse({"deleted": n})
+    return JSONResponse({"deleted": n})
 
 
 @app.post("/guild/{guild_id}/all-treasuries/bulk-set-level")
@@ -13049,14 +13042,14 @@ async def treasuries_bulk_set_level(request: Request, guild_id: str):
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     if not is_leader:
-        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
     body = await request.json()
     ids   = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     level = int(body.get("level", 10))
     if level not in (10, 20):
-        return _JSONResponse({"error": "Invalid level"}, status_code=400)
+        return JSONResponse({"error": "Invalid level"}, status_code=400)
     n = await database.bulk_set_treasury_level(guild_id, ids, level)
-    return _JSONResponse({"updated": n})
+    return JSONResponse({"updated": n})
 
 
 @app.post("/guild/{guild_id}/all-treasuries/seed-test")
@@ -13065,7 +13058,7 @@ async def treasuries_seed_test(request: Request, guild_id: str):
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     if not is_leader:
-        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
     n = await database.seed_test_treasuries(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/all-treasuries?msg=test_added&n={n}", status_code=303)
 
@@ -13076,7 +13069,7 @@ async def treasuries_clear_test(request: Request, guild_id: str):
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     if not is_leader:
-        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
     n = await database.clear_test_treasuries(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/all-treasuries?msg=test_cleared&n={n}", status_code=303)
 
@@ -13239,7 +13232,7 @@ async def world_artifacts_api(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     data = await database.get_world_artifacts(guild_id)
-    return _JSONResponse(data)
+    return JSONResponse(data)
 
 
 @app.post("/guild/{guild_id}/artifacts/api/world-artifact/{artifact_id}/set-coords")
@@ -13254,7 +13247,7 @@ async def set_world_artifact_coords(request: Request, guild_id: str, artifact_id
             (x, y, artifact_id, guild_id)
         )
         await db.commit()
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.get("/guild/{guild_id}/artifacts/run-map", response_class=HTMLResponse)
@@ -13300,7 +13293,7 @@ async def artifact_runs_api(request: Request, guild_id: str):
     runs = await database.get_artifact_runs(guild_id)
     treasuries = await database.get_all_treasuries(guild_id)
     treasury_players = {t["player_name"] for t in treasuries}
-    return _JSONResponse({"runs": runs, "treasury_players": list(treasury_players)})
+    return JSONResponse({"runs": runs, "treasury_players": list(treasury_players)})
 
 
 @app.post("/guild/{guild_id}/artifacts/api/runs/add")
@@ -13312,7 +13305,7 @@ async def artifact_run_add(request: Request, guild_id: str):
     data = await request.json()
     data["guild_id"] = guild_id
     run_id = await database.save_artifact_run(guild_id, data)
-    return _JSONResponse({"id": run_id})
+    return JSONResponse({"id": run_id})
 
 
 @app.post("/guild/{guild_id}/artifacts/api/runs/{run_id}/delete")
@@ -13320,7 +13313,7 @@ async def artifact_run_delete(request: Request, guild_id: str, run_id: int):
     session, err = _require_session(request)
     if err: return err
     await database.delete_artifact_run(guild_id, run_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/artifacts/api/runs/seed-test")
@@ -13354,7 +13347,7 @@ async def artifact_run_seed_test(request: Request, guild_id: str):
     for run in TEST_RUNS:
         run["guild_id"] = guild_id
         await database.save_artifact_run(guild_id, run)
-    return _JSONResponse({"ok": True, "count": len(TEST_RUNS)})
+    return JSONResponse({"ok": True, "count": len(TEST_RUNS)})
 
 
 @app.post("/guild/{guild_id}/artifacts/api/runs/clear-test")
@@ -13362,7 +13355,7 @@ async def artifact_run_clear_test(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     await database.delete_test_artifact_runs(guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.get("/guild/{guild_id}/artifacts", response_class=HTMLResponse)
@@ -13395,8 +13388,8 @@ async def artifact_village_lookup(request: Request, guild_id: str, x: int = 0, y
     if err: return err
     result = await database.get_village_by_coords(guild_id, x, y)
     if not result:
-        return _JSONResponse({"found": False})
-    return _JSONResponse({"found": True, **result})
+        return JSONResponse({"found": False})
+    return JSONResponse({"found": True, **result})
 
 
 @app.post("/guild/{guild_id}/artifacts/add")
@@ -13406,7 +13399,7 @@ async def artifact_add(request: Request, guild_id: str):
     err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
     aid = await database.create_artifact(
         guild_id=guild_id,
@@ -13461,7 +13454,7 @@ async def artifact_update(request: Request, guild_id: str, artifact_id: int):
     err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
     await database.update_artifact(artifact_id, guild_id,
         name=form.get("name","").strip(),
@@ -13488,7 +13481,7 @@ async def artifact_delete(request: Request, guild_id: str, artifact_id: int):
     err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.delete_artifact(artifact_id, guild_id)
     return RedirectResponse(f"/guild/{guild_id}/artifacts?saved=1", status_code=303)
 
@@ -13498,14 +13491,14 @@ async def artifacts_bulk_delete(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     n = 0
     for aid in ids:
         await database.delete_artifact(aid, guild_id)
         n += 1
-    return _JSONResponse({"deleted": n})
+    return JSONResponse({"deleted": n})
 
 
 @app.post("/guild/{guild_id}/artifacts/bulk-set-status")
@@ -13513,13 +13506,13 @@ async def artifacts_bulk_set_status(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     ids    = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     status = body.get("status", "active")
     if status not in ("active", "inactive", "lost"):
-        return _JSONResponse({"error": "invalid status"}, status_code=400)
-    if not ids: return _JSONResponse({"updated": 0})
+        return JSONResponse({"error": "invalid status"}, status_code=400)
+    if not ids: return JSONResponse({"updated": 0})
     ph = ",".join("?" * len(ids))
     import aiosqlite as _aio
     async with _aio.connect(database.DB_PATH, timeout=30) as db:
@@ -13528,7 +13521,7 @@ async def artifacts_bulk_set_status(request: Request, guild_id: str):
             [status, guild_id] + ids
         )
         await db.commit()
-    return _JSONResponse({"updated": cur.rowcount})
+    return JSONResponse({"updated": cur.rowcount})
 
 
 @app.post("/guild/{guild_id}/artifacts/bulk-set-size")
@@ -13536,13 +13529,13 @@ async def artifacts_bulk_set_size(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     ids  = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     size = body.get("size", "small")
     if size not in ("small", "large", "unique"):
-        return _JSONResponse({"error": "invalid size"}, status_code=400)
-    if not ids: return _JSONResponse({"updated": 0})
+        return JSONResponse({"error": "invalid size"}, status_code=400)
+    if not ids: return JSONResponse({"updated": 0})
     ph = ",".join("?" * len(ids))
     import aiosqlite as _aio
     async with _aio.connect(database.DB_PATH, timeout=30) as db:
@@ -13551,7 +13544,7 @@ async def artifacts_bulk_set_size(request: Request, guild_id: str):
             [size, guild_id] + ids
         )
         await db.commit()
-    return _JSONResponse({"updated": cur.rowcount})
+    return JSONResponse({"updated": cur.rowcount})
 
 
 @app.post("/guild/{guild_id}/artifacts/{artifact_id}/rotation/save")
@@ -13561,7 +13554,7 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
     err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
     import json as _json
     # Expect JSON body with players array
@@ -13582,7 +13575,7 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
                     "notify_hours": int(notify[i]) if i < len(notify) else 6,
                 })
     await database.save_rotation(artifact_id, guild_id, players)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/artifacts/{artifact_id}/handoff/create")
@@ -13592,7 +13585,7 @@ async def artifact_handoff_create(request: Request, guild_id: str, artifact_id: 
     err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
     hid = await database.create_handoff(
         artifact_id=artifact_id,
@@ -13602,7 +13595,7 @@ async def artifact_handoff_create(request: Request, guild_id: str, artifact_id: 
         scheduled_at=form.get("scheduled_at","").strip(),
         notes=form.get("notes","").strip(),
     )
-    return _JSONResponse({"ok": True, "id": hid})
+    return JSONResponse({"ok": True, "id": hid})
 
 
 @app.post("/guild/{guild_id}/artifacts/{artifact_id}/handoff/{handoff_id}/confirm")
@@ -13617,8 +13610,8 @@ async def artifact_handoff_confirm(request: Request, guild_id: str,
     server_time = form.get("server_time", "").strip()
     ok = await database.confirm_handoff(handoff_id, artifact_id, guild_id, side, server_time)
     if not ok:
-        return _JSONResponse({"error": "not_found"}, status_code=404)
-    return _JSONResponse({"ok": True})
+        return JSONResponse({"error": "not_found"}, status_code=404)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/artifacts/{artifact_id}/handoff/{handoff_id}/skip")
@@ -13629,6 +13622,6 @@ async def artifact_handoff_skip(request: Request, guild_id: str,
     err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
-        return _JSONResponse({"error": "forbidden"}, status_code=403)
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.skip_handoff(handoff_id, artifact_id, guild_id)
-    return _JSONResponse({"ok": True})
+    return JSONResponse({"ok": True})

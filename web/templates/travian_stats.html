@@ -372,9 +372,6 @@ function fmtDelta(v) {
   const s = fmtNum(Math.abs(v));
   return (v >= 0 ? '+' : '−') + s;
 }
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 // ── Sparkline ────────────────────────────────────────────────────────────────
 function drawSpark(canvas, values, color) {

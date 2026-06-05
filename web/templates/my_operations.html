@@ -224,9 +224,6 @@ function groupByPlan(waves) {
 }
 
 // ── Countdown string ─────────────────────────────────────────────
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 function cdStr(sendTime) {
   if (!sendTime) return {text:'—', cls:'mop-cd-past', secsLeft: null};
