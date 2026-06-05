@@ -6640,6 +6640,45 @@ def _parse_battle_report(text: str) -> dict:
     result["def_troops_lost"] = troop_data.get("def_lost", {})
     result["def_troops_hospital"] = troop_data.get("def_hospital", {})
 
+    # ── Building damage ────────────────────────────────────────────────────────
+    # Matches lines like:
+    #   "Cropland level 10 destroyed"          (EN)
+    #   "City Wall level 5 destroyed"
+    #   "Getreidefeld Stufe 10 zerstört"       (DE)
+    #   "Stadtmauer Stufe 5 zerstört"
+    #   "Earth Wall level 3 damaged to level 1"
+    #   "Erdwall Stufe 3 auf Stufe 1 beschädigt"
+    _BLDG_RE = re.compile(
+        r'([A-ZÄÖÜa-zäöü][A-Za-zäöüÄÖÜ\s]+?)'   # building name
+        r'\s+(?:level|stufe|Stufe|Level)\s+(\d+)'  # "level N"
+        r'(?:'
+            r'\s+(?:destroyed|zerstört)'           # destroyed
+            r'|'
+            r'\s+(?:damaged(?:\s+to\s+level\s+(\d+))?'  # damaged [to level M]
+            r'|(?:auf\s+Stufe\s+(\d+)\s+)?beschädigt)'  # DE: beschädigt
+        r')',
+        re.IGNORECASE
+    )
+    buildings_hit: list[dict] = []
+    for line in text_clean.splitlines():
+        m = _BLDG_RE.search(line.strip())
+        if not m:
+            continue
+        bname = m.group(1).strip()
+        lvl_before = int(m.group(2))
+        # destroyed or damaged?
+        line_l = line.lower()
+        destroyed = any(k in line_l for k in ("destroyed", "zerstört"))
+        lvl_after_str = m.group(3) or m.group(4)
+        lvl_after = int(lvl_after_str) if lvl_after_str else (0 if destroyed else lvl_before - 1)
+        buildings_hit.append({
+            "building": bname,
+            "level_before": lvl_before,
+            "level_after": lvl_after,
+            "destroyed": destroyed,
+        })
+    result["buildings_hit"] = buildings_hit
+
     return result
 
 
@@ -12548,6 +12587,10 @@ async def report_detail(request: Request, guild_id: str, report_id: int):
             r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
         except Exception:
             r[jf.replace("_json", "")] = {}
+    try:
+        r["buildings_hit"] = _json.loads(r.get("buildings_hit_json") or "[]")
+    except Exception:
+        r["buildings_hit"] = []
 
     return templates.TemplateResponse("report_detail.html", {
         "request": request, "guild": guild, "report": r,

@@ -1849,9 +1849,10 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Migrate: add missing columns
         for col, default in [
-            ("def_troops_lost_json",  "'{}'"),
-            ("troops_hospital_json",  "'{}'"),
-            ("def_troops_hospital_json", "'{}'"),
+            ("def_troops_lost_json",      "'{}'"),
+            ("troops_hospital_json",      "'{}'"),
+            ("def_troops_hospital_json",  "'{}'"),
+            ("buildings_hit_json",        "'[]'"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
@@ -1866,9 +1867,10 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
                defender_name, defender_village, defender_x, defender_y,
                troops_sent_json, troops_lost_json, troops_hospital_json,
                def_troops_json, def_troops_lost_json, def_troops_hospital_json,
+               buildings_hit_json,
                spy_resources_json, plunder_json, plunder_total,
                luck, hero_hp, raw_text)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             guild_id, submitted_by,
             parsed.get("report_type"), parsed.get("report_date"),
@@ -1882,6 +1884,7 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             _json.dumps(parsed.get("def_troops", {})),
             _json.dumps(parsed.get("def_troops_lost", {})),
             _json.dumps(parsed.get("def_troops_hospital", {})),
+            _json.dumps(parsed.get("buildings_hit", [])),
             _json.dumps(parsed.get("spy_resources", {})),
             _json.dumps(parsed.get("plunder", {})),
             parsed.get("plunder_total", 0),

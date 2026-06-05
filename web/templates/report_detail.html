@@ -289,6 +289,34 @@
     </div>
   </div>
 
+  <!-- ── Building damage ── -->
+  {% if report.buildings_hit %}
+  <div class="card" style="padding:.85rem 1.25rem;margin-bottom:1rem;">
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:.65rem;">🏚️ Building damage</div>
+    <div style="display:flex;flex-direction:column;gap:.35rem;">
+      {% for b in report.buildings_hit %}
+      <div style="display:flex;align-items:center;gap:.75rem;font-size:.82rem;
+                  padding:.35rem .6rem;border-radius:7px;
+                  background:{% if b.destroyed %}rgba(248,113,113,.08){% else %}rgba(251,191,36,.07){% endif %};
+                  border:1px solid {% if b.destroyed %}rgba(248,113,113,.25){% else %}rgba(251,191,36,.2){% endif %};">
+        <span style="font-size:1rem;">{% if b.destroyed %}💥{% else %}🔨{% endif %}</span>
+        <span style="font-weight:600;color:{% if b.destroyed %}#f87171{% else %}#fbbf24{% endif %};">
+          {{ b.building }}
+        </span>
+        <span style="color:var(--text-muted);">
+          {% if b.destroyed %}
+            Level {{ b.level_before }} → <strong style="color:#f87171;">destroyed</strong>
+          {% else %}
+            Level {{ b.level_before }} → {{ b.level_after }}
+            <span style="font-size:.72rem;">(−{{ b.level_before - b.level_after }})</span>
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ── Plunder detail ── -->
   {% if report.plunder and (report.plunder.get('wood') or report.plunder.get('clay') or report.plunder.get('iron') or report.plunder.get('crop')) %}
   <div class="card" style="padding:.85rem 1.25rem;margin-bottom:1rem;">
