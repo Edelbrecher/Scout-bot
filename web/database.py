@@ -2317,12 +2317,19 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
 
 
 async def get_latest_snapshot_time(guild_id: str) -> str | None:
+    ck = f"latest_snap:{guild_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT MAX(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,)
         ) as cur:
             row = await cur.fetchone()
-            return row[0] if row else None
+            result = row[0] if row else None
+    if result:
+        _cache_set(ck, result)
+    return result
 
 
 async def clear_all_snapshots(guild_id: str):
@@ -2600,12 +2607,18 @@ async def prune_old_snapshots(guild_id: str, keep_days: int = 14):
 
 
 async def get_snapshot_count(guild_id: str) -> int:
+    ck = f"snap_count:{guild_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT COUNT(DISTINCT fetched_at) as cnt FROM map_snapshots WHERE guild_id = ?", (guild_id,)
         ) as cur:
             row = await cur.fetchone()
-            return row[0] if row else 0
+            result = row[0] if row else 0
+    _cache_set(ck, result)
+    return result
 
 
 async def get_inactive_farms(
@@ -2701,13 +2714,19 @@ async def get_own_village_ids(guild_id: str, discord_id: str, tw_player_name: st
 
 async def get_snapshot_pop_range(guild_id: str) -> dict:
     """Return min/max population seen in snapshots for this guild."""
+    ck = f"pop_range:{guild_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT MIN(population), MAX(population) FROM map_snapshots WHERE guild_id=? AND population > 0",
             (guild_id,)
         ) as cur:
             row = await cur.fetchone()
-            return {"min_pop": row[0] or 0, "max_pop": row[1] or 9999} if row else {"min_pop": 0, "max_pop": 9999}
+            result = {"min_pop": row[0] or 0, "max_pop": row[1] or 9999} if row else {"min_pop": 0, "max_pop": 9999}
+    _cache_set(ck, result)
+    return result
 
 
 async def search_inactive_advanced(
@@ -2937,15 +2956,22 @@ async def delete_farm_list_entry(guild_id: str, entry_id: int):
 
 
 async def get_farm_stats(guild_id: str) -> dict:
-    snapshot_count = await get_snapshot_count(guild_id)
-    latest_snapshot = await get_latest_snapshot_time(guild_id)
-    inactive = await get_inactive_farms(guild_id)
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        async with db.execute(
-            "SELECT COUNT(*) as cnt FROM farm_list_entries WHERE guild_id = ?", (guild_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            farm_list_count = row[0] if row else 0
+    import asyncio as _aio
+
+    async def _farm_list_count():
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+            async with db.execute(
+                "SELECT COUNT(*) as cnt FROM farm_list_entries WHERE guild_id = ?", (guild_id,)
+            ) as cur:
+                row = await cur.fetchone()
+                return row[0] if row else 0
+
+    snapshot_count, latest_snapshot, inactive, farm_list_count = await _aio.gather(
+        get_snapshot_count(guild_id),
+        get_latest_snapshot_time(guild_id),
+        get_inactive_farms(guild_id),
+        _farm_list_count(),
+    )
     return {
         "snapshot_count": snapshot_count,
         "latest_snapshot": latest_snapshot,
@@ -2956,6 +2982,10 @@ async def get_farm_stats(guild_id: str) -> dict:
 
 async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
     """Return top growing / shrinking players between first and last snapshot."""
+    ck = f"player_growth:{guild_id}:{limit}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # We need first and last snapshot times
@@ -3008,7 +3038,9 @@ async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
         })
 
     results.sort(key=lambda x: x["delta"], reverse=True)
-    return results[:limit]
+    result = results[:limit]
+    _cache_set(ck, result)
+    return result
 
 
 async def search_map_snapshot(guild_id: str, query: str) -> list[dict]:
@@ -5638,6 +5670,10 @@ async def get_players_from_snapshot(guild_id: str, player_names: list[str]) -> l
 
 async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
     """Return all distinct alliances from the latest snapshot, sorted by village count."""
+    ck = f"alliances:{guild_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
@@ -5660,7 +5696,9 @@ async def get_alliance_names_from_snapshot(guild_id: str) -> list[dict]:
                LIMIT 200""",
             (guild_id, latest)
         )
-        return [dict(r) for r in await cur.fetchall()]
+        result = [dict(r) for r in await cur.fetchall()]
+    _cache_set(ck, result)
+    return result
 
 
 async def set_alliance_member_note(guild_id: str, player_name: str, notes: str) -> bool:
