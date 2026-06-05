@@ -1689,6 +1689,10 @@ async def get_village_from_snapshot(guild_id: str, x: int, y: int) -> dict | Non
             "x": r["x"], "y": r["y"],
         }
 
+# Alias for backwards-compatibility
+async def get_village_by_coords(guild_id: str, x: int, y: int) -> dict | None:
+    return await get_village_from_snapshot(guild_id, x, y)
+
 
 async def get_reports_by_attackers(guild_id: str, attacker_names: list[str]) -> list[dict]:
     """Return all reports where any of the given attacker names appear in attacks_json."""
