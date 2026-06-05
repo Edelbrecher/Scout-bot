@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Combat Intel · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}/reports" class="back-link">← Battle Reports</a>
+      <h1 style="margin:.2rem 0 .15rem;">🎯 Combat Intel</h1>
+      <p class="subtitle" style="margin:0;">All players tracked from battle reports — troops, losses &amp; activity</p>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <form method="get" action="/guild/{{ guild.guild_id }}/reports/intel"
+        style="display:flex;gap:.5rem;margin-bottom:1.25rem;">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search player…"
+           autofocus
+           style="flex:1;max-width:320px;background:var(--bg-input);border:1px solid var(--border);
+                  border-radius:8px;color:var(--text);font-size:.85rem;padding:.45rem .75rem;">
+    <button type="submit" class="btn btn-primary" style="font-size:.85rem;">View profile</button>
+  </form>
+
+  {% if players %}
+  <!-- Stats summary -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.25rem;">
+    <div class="card" style="padding:.85rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;">{{ players | length }}</div>
+      <div style="font-size:.72rem;color:var(--text-muted);">Players tracked</div>
+    </div>
+    <div class="card" style="padding:.85rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;">{{ players | sum(attribute='report_count') }}</div>
+      <div style="font-size:.72rem;color:var(--text-muted);">Total reports</div>
+    </div>
+    <div class="card" style="padding:.85rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#86efac;">
+        {{ "{:,.0f}".format(players | sum(attribute='total_plunder') or 0) }}
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);">Total plundered</div>
+    </div>
+    <div class="card" style="padding:.85rem;text-align:center;">
+      <div style="font-size:1.6rem;font-weight:800;color:#f87171;">
+        {{ "{:,.0f}".format(players | sum(attribute='total_losses') or 0) }}
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);">Total troops lost</div>
+    </div>
+  </div>
+
+  <!-- Player table -->
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div style="padding:.85rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.9rem;">
+      📋 All tracked players
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table" style="margin:0;font-size:.82rem;">
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th style="text-align:center;">Reports</th>
+            <th style="text-align:center;">⚔️ Attacker</th>
+            <th style="text-align:center;">🛡️ Defender</th>
+            <th style="text-align:right;color:#86efac;">Plunder</th>
+            <th style="text-align:right;color:#f87171;">Troops lost</th>
+            <th>Villages seen</th>
+            <th>Last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in players %}
+          <tr>
+            <td>
+              <a href="/guild/{{ guild.guild_id }}/reports/intel?q={{ p.player_name | urlencode }}"
+                 style="font-weight:600;color:var(--text);text-decoration:none;"
+                 onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='var(--text)'">
+                {{ p.player_name }}
+              </a>
+            </td>
+            <td style="text-align:center;">
+              <span style="background:rgba(88,101,242,.15);color:#818cf8;border-radius:5px;padding:1px 8px;font-size:.75rem;font-weight:600;">
+                {{ p.report_count }}
+              </span>
+            </td>
+            <td style="text-align:center;color:{% if p.att_count %}#f87171{% else %}var(--text-muted){% endif %};">
+              {{ p.att_count or '—' }}
+            </td>
+            <td style="text-align:center;color:{% if p.def_count %}#60a5fa{% else %}var(--text-muted){% endif %};">
+              {{ p.def_count or '—' }}
+            </td>
+            <td style="text-align:right;">
+              {% if p.total_plunder %}
+              <span style="color:#86efac;">+{{ "{:,}".format(p.total_plunder) }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="text-align:right;">
+              {% if p.total_losses %}
+              <span style="color:#f87171;">{{ "{:,}".format(p.total_losses) }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="font-size:.75rem;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ p.villages | join(', ') if p.villages else '—' }}
+            </td>
+            <td style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">
+              {{ p.last_seen[:10] if p.last_seen else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="card" style="padding:3rem;text-align:center;">
+    <div style="font-size:3rem;margin-bottom:.75rem;">🎯</div>
+    <div style="font-weight:600;font-size:1.1rem;margin-bottom:.4rem;">No combat data yet</div>
+    <p style="color:var(--text-muted);font-size:.875rem;margin:0 0 1rem;">
+      Add battle reports to start building player intelligence.
+    </p>
+    <a href="/guild/{{ guild.guild_id }}/reports" class="btn btn-primary">+ Add reports</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1762,6 +1762,33 @@ async def _init_farming_tables():
 async def _init_reports_table():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS player_combat_log (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id     TEXT NOT NULL,
+                report_id    INTEGER NOT NULL,
+                player_name  TEXT NOT NULL,
+                role         TEXT NOT NULL,        -- 'attacker' | 'defender'
+                village_name TEXT,
+                x            INTEGER,
+                y            INTEGER,
+                report_date  TEXT,
+                report_type  TEXT,
+                troops_json  TEXT DEFAULT '{}',    -- troops present/sent
+                losses_json  TEXT DEFAULT '{}',    -- troops lost
+                plunder_total INTEGER DEFAULT 0,
+                luck         REAL,
+                created_at   TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_combat_log_guild_player
+            ON player_combat_log(guild_id, player_name)
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_combat_log_guild_date
+            ON player_combat_log(guild_id, report_date DESC)
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS battle_reports (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
                 guild_id         TEXT NOT NULL,
@@ -1824,6 +1851,44 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             parsed.get("raw_text", ""),
         )) as cur:
             new_id = cur.lastrowid
+
+        # ── Write player_combat_log entries ───────────────────────────────
+        rtype = parsed.get("report_type")
+        rdate = parsed.get("report_date")
+        luck  = parsed.get("luck")
+        log_rows = []
+
+        # Attacker entry
+        if parsed.get("attacker_name"):
+            log_rows.append((
+                guild_id, new_id, parsed["attacker_name"], "attacker",
+                parsed.get("attacker_village"),
+                parsed.get("attacker_x"), parsed.get("attacker_y"),
+                rdate, rtype,
+                _json.dumps(parsed.get("troops_sent", {})),
+                _json.dumps(parsed.get("troops_lost", {})),
+                parsed.get("plunder_total", 0), luck,
+            ))
+        # Defender entry
+        if parsed.get("defender_name"):
+            log_rows.append((
+                guild_id, new_id, parsed["defender_name"], "defender",
+                parsed.get("defender_village"),
+                parsed.get("defender_x"), parsed.get("defender_y"),
+                rdate, rtype,
+                _json.dumps(parsed.get("def_troops", {})),
+                _json.dumps({}),   # defender losses not separately tracked yet
+                0, luck,
+            ))
+        if log_rows:
+            await db.executemany("""
+                INSERT INTO player_combat_log
+                  (guild_id, report_id, player_name, role,
+                   village_name, x, y, report_date, report_type,
+                   troops_json, losses_json, plunder_total, luck)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, log_rows)
+
         await db.commit()
     return new_id
 
@@ -1864,7 +1929,139 @@ async def delete_battle_report(report_id: int, guild_id: str):
     await _init_reports_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM battle_reports WHERE id=? AND guild_id=?", (report_id, guild_id))
+        await db.execute("DELETE FROM player_combat_log WHERE report_id=? AND guild_id=?", (report_id, guild_id))
         await db.commit()
+
+
+async def get_player_combat_profile(guild_id: str, player_name: str) -> dict:
+    """Full combat profile for a player — aggregated from all their reports."""
+    import json as _json
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT cl.*, br.attacker_name, br.defender_name,
+                   br.troops_lost_json as att_losses_json
+            FROM player_combat_log cl
+            JOIN battle_reports br ON cl.report_id = br.id
+            WHERE cl.guild_id=? AND cl.player_name=?
+            ORDER BY cl.report_date DESC
+        """, (guild_id, player_name)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    if not rows:
+        return {}
+
+    # Aggregate troops and losses
+    agg_troops: dict = {}
+    agg_losses: dict = {}
+    total_plunder = 0
+    reports_as_attacker = 0
+    reports_as_defender = 0
+    luck_vals = []
+    villages_seen: set = set()
+
+    for r in rows:
+        role = r.get("role", "")
+        if role == "attacker":
+            reports_as_attacker += 1
+        else:
+            reports_as_defender += 1
+
+        total_plunder += r.get("plunder_total") or 0
+        if r.get("luck") is not None:
+            luck_vals.append(r["luck"])
+        if r.get("village_name"):
+            villages_seen.add(r["village_name"])
+
+        try:
+            troops = _json.loads(r.get("troops_json") or "{}")
+            for unit, cnt in troops.items():
+                if cnt and cnt > 0:
+                    agg_troops[unit] = agg_troops.get(unit, 0) + cnt
+        except Exception:
+            pass
+
+        try:
+            losses = _json.loads(r.get("losses_json") or "{}")
+            for unit, cnt in losses.items():
+                if cnt and cnt > 0:
+                    agg_losses[unit] = agg_losses.get(unit, 0) + cnt
+        except Exception:
+            pass
+
+    # Loss rate per unit type
+    loss_rates: dict = {}
+    for unit, sent in agg_troops.items():
+        lost = agg_losses.get(unit, 0)
+        loss_rates[unit] = round(lost / sent * 100, 1) if sent > 0 else 0.0
+
+    return {
+        "player_name": player_name,
+        "reports": rows,
+        "report_count": len(rows),
+        "reports_as_attacker": reports_as_attacker,
+        "reports_as_defender": reports_as_defender,
+        "total_plunder": total_plunder,
+        "avg_luck": round(sum(luck_vals) / len(luck_vals), 1) if luck_vals else None,
+        "agg_troops": agg_troops,
+        "agg_losses": agg_losses,
+        "loss_rates": loss_rates,
+        "villages": list(villages_seen),
+        "last_seen": rows[0].get("report_date") if rows else None,
+    }
+
+
+async def get_combat_intel_overview(guild_id: str, limit: int = 100) -> list[dict]:
+    """All players seen in reports, sorted by total activity."""
+    import json as _json
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT
+                player_name,
+                COUNT(*) as report_count,
+                SUM(CASE WHEN role='attacker' THEN 1 ELSE 0 END) as att_count,
+                SUM(CASE WHEN role='defender' THEN 1 ELSE 0 END) as def_count,
+                SUM(plunder_total) as total_plunder,
+                MAX(report_date) as last_seen,
+                MIN(report_date) as first_seen,
+                GROUP_CONCAT(DISTINCT role) as roles,
+                GROUP_CONCAT(DISTINCT village_name) as villages_raw
+            FROM player_combat_log
+            WHERE guild_id=?
+            GROUP BY player_name
+            ORDER BY report_count DESC
+            LIMIT ?
+        """, (guild_id, limit)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    # Aggregate losses across all reports per player in Python
+    # (avoid heavy JSON parsing in SQL)
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute("""
+            SELECT player_name, losses_json
+            FROM player_combat_log
+            WHERE guild_id=? AND losses_json != '{}'
+        """, (guild_id,)) as cur:
+            loss_rows = await cur.fetchall()
+
+    player_losses: dict = {}
+    for pname, lj in loss_rows:
+        try:
+            ldata = _json.loads(lj or "{}")
+            total = sum(v for v in ldata.values() if isinstance(v, (int, float)))
+            player_losses[pname] = player_losses.get(pname, 0) + total
+        except Exception:
+            pass
+
+    for r in rows:
+        r["total_losses"] = player_losses.get(r["player_name"], 0)
+        vraw = r.pop("villages_raw", "") or ""
+        r["villages"] = list(set(v.strip() for v in vraw.split(",") if v.strip()))
+
+    return rows
 
 
 async def save_map_snapshot(guild_id: str, villages: list[dict]):
