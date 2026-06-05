@@ -6386,7 +6386,7 @@ def _parse_battle_report(text: str) -> dict:
              row 0 = sent, row 1 = survivors (if 3 rows), last row = losses
         Supports tab-separated AND space-separated (multi-space) columns.
         """
-        out: dict[str, dict] = {"sent": {}, "lost": {}, "def": {}}
+        out: dict[str, dict] = {"sent": {}, "lost": {}, "hospital": {}, "def": {}, "def_lost": {}, "def_hospital": {}}
 
         def _parse_nums(line: str) -> list[int | None]:
             """Parse a row of numbers, skip '?' marks."""
@@ -6432,7 +6432,8 @@ def _parse_battle_report(text: str) -> dict:
 
                 # Check for labeled row
                 label_m = re.match(
-                    r'(gesendet|sent|verluste|losses?|im dorf|in village|überlebende|survivors?)'
+                    r'(gesendet|sent|verluste|losses?|im dorf|in village|überlebende|survivors?'
+                    r'|im hospital|in hospital|hospital)'
                     r'\s*[:\-–]?\s*(.*)',
                     vline, re.IGNORECASE
                 )
@@ -6440,9 +6441,10 @@ def _parse_battle_report(text: str) -> dict:
                     label = label_m.group(1).lower()
                     nums_str = label_m.group(2).strip() or clean_lines[j + 1].strip() if j + 1 < len(clean_lines) else ""
                     nums = _parse_nums(nums_str)
-                    lbl_dest = ("sent" if any(k in label for k in ["gesendet","sent"]) else
-                                "lost" if any(k in label for k in ["verluste","loss"]) else
-                                "def"  if any(k in label for k in ["im dorf","in village"]) else None)
+                    lbl_dest = ("sent"     if any(k in label for k in ["gesendet","sent"]) else
+                                "lost"     if any(k in label for k in ["verluste","loss"]) else
+                                "hospital" if any(k in label for k in ["hospital"]) else
+                                "def"      if any(k in label for k in ["im dorf","in village"]) else None)
                     if lbl_dest:
                         value_rows.append((lbl_dest, nums))
                     j += 1
@@ -6494,15 +6496,24 @@ def _parse_battle_report(text: str) -> dict:
                     labeled = [("troops", unlabeled[0][1])]
                 elif len(unlabeled) == 2:
                     labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[1][1])]
-                elif len(unlabeled) >= 3:
-                    # Row 0=sent, Row 1=survivors, Row -1=losses
-                    labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[-1][1])]
+                elif len(unlabeled) == 3:
+                    # Row 0=sent, Row 1=survived, Row 2=hospital (no perm losses if hospital present)
+                    # OR Row 0=sent, Row 1=survived, Row 2=dead (no hospital)
+                    # We store last row as "hospital" — caller can interpret
+                    labeled = [("troops", unlabeled[0][1]), ("hospital", unlabeled[2][1])]
+                elif len(unlabeled) >= 4:
+                    # Row 0=sent, Row 1=survived, Row 2=hospital, Row 3=dead (perm losses)
+                    labeled = [("troops", unlabeled[0][1]), ("hospital", unlabeled[2][1]), ("losses", unlabeled[3][1])]
 
             for dest, nums in labeled:
                 if is_defender_table:
-                    actual_dest = "def" if dest == "troops" else "def_lost"
+                    actual_dest = ("def"          if dest == "troops"   else
+                                   "def_hospital" if dest == "hospital" else
+                                   "def_lost")
                 else:
-                    actual_dest = "sent" if dest == "troops" else "lost"
+                    actual_dest = ("sent"     if dest == "troops"   else
+                                   "hospital" if dest == "hospital" else
+                                   "lost")
 
                 if actual_dest not in out:
                     out[actual_dest] = {}
@@ -6516,10 +6527,12 @@ def _parse_battle_report(text: str) -> dict:
         return out
 
     troop_data = _parse_troop_table(text_clean)
-    result["troops_sent"]  = troop_data.get("sent", {})
-    result["troops_lost"]  = troop_data.get("lost", {})
-    result["def_troops"]   = troop_data.get("def", {})
+    result["troops_sent"]     = troop_data.get("sent", {})
+    result["troops_lost"]     = troop_data.get("lost", {})
+    result["troops_hospital"] = troop_data.get("hospital", {})
+    result["def_troops"]      = troop_data.get("def", {})
     result["def_troops_lost"] = troop_data.get("def_lost", {})
+    result["def_troops_hospital"] = troop_data.get("def_hospital", {})
 
     return result
 
@@ -12338,8 +12351,9 @@ async def report_detail(request: Request, guild_id: str, report_id: int):
         return RedirectResponse(f"/guild/{guild_id}/reports", status_code=303)
 
     import json as _json
-    for jf in ("troops_sent_json", "troops_lost_json", "def_troops_json",
-               "def_troops_lost_json", "spy_resources_json", "plunder_json"):
+    for jf in ("troops_sent_json", "troops_lost_json", "troops_hospital_json",
+               "def_troops_json", "def_troops_lost_json", "def_troops_hospital_json",
+               "spy_resources_json", "plunder_json"):
         try:
             r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
         except Exception:

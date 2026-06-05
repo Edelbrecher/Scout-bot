@@ -1826,22 +1826,28 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
     import json as _json
     await _init_reports_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        # Migrate: add def_troops_lost_json column if missing
-        try:
-            await db.execute("ALTER TABLE battle_reports ADD COLUMN def_troops_lost_json TEXT DEFAULT '{}'")
-            await db.commit()
-        except Exception:
-            pass
+        # Migrate: add missing columns
+        for col, default in [
+            ("def_troops_lost_json",  "'{}'"),
+            ("troops_hospital_json",  "'{}'"),
+            ("def_troops_hospital_json", "'{}'"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
+                await db.commit()
+            except Exception:
+                pass
 
         async with db.execute("""
             INSERT INTO battle_reports
               (guild_id, submitted_by, report_type, report_date,
                attacker_name, attacker_village, attacker_x, attacker_y,
                defender_name, defender_village, defender_x, defender_y,
-               troops_sent_json, troops_lost_json, def_troops_json, def_troops_lost_json,
+               troops_sent_json, troops_lost_json, troops_hospital_json,
+               def_troops_json, def_troops_lost_json, def_troops_hospital_json,
                spy_resources_json, plunder_json, plunder_total,
                luck, hero_hp, raw_text)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             guild_id, submitted_by,
             parsed.get("report_type"), parsed.get("report_date"),
@@ -1851,8 +1857,10 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             parsed.get("defender_x"), parsed.get("defender_y"),
             _json.dumps(parsed.get("troops_sent", {})),
             _json.dumps(parsed.get("troops_lost", {})),
+            _json.dumps(parsed.get("troops_hospital", {})),
             _json.dumps(parsed.get("def_troops", {})),
             _json.dumps(parsed.get("def_troops_lost", {})),
+            _json.dumps(parsed.get("def_troops_hospital", {})),
             _json.dumps(parsed.get("spy_resources", {})),
             _json.dumps(parsed.get("plunder", {})),
             parsed.get("plunder_total", 0),
