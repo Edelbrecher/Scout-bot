@@ -12342,10 +12342,10 @@ async def report_submit(request: Request, guild_id: str,
     def_name = parsed.get("defender_name")
     if att_name:
         if not await database.player_exists_in_world(guild_id, att_name):
-            warnings.append(f"Attacker "{att_name}" was not found in this world's latest map snapshot.")
+            warnings.append(f'Attacker "{att_name}" was not found in this world\'s latest map snapshot.')
     if def_name:
         if not await database.player_exists_in_world(guild_id, def_name):
-            warnings.append(f"Defender "{def_name}" was not found in this world's latest map snapshot.")
+            warnings.append(f'Defender "{def_name}" was not found in this world\'s latest map snapshot.')
 
     if warnings:
         # Show a confirmation page — user can force-save or cancel
