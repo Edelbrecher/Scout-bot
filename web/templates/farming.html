@@ -478,11 +478,9 @@
         <div style="font-weight:600;font-size:0.95rem;">
           🏚️ Inactive Farms
           {% if inactive_farms %}
-          {% set missing_count = inactive_farms | selectattr('x') | list | selectattr('y') | list | length %}
-          {% set on_list_count  = inactive_farms | selectattr('x') | list | length %}
           {# count missing via JS — badge updated dynamically #}
           <span style="font-size:0.8rem;font-weight:400;color:var(--text-muted);margin-left:0.4rem;">
-            {{ inactive_farms | length }} results · min. {{ min_days }} days · Pop. {{ min_pop }}–{{ max_pop }}
+            {{ inactive_farms_total }} results · min. {{ min_days }} days · Pop. {{ min_pop }}–{{ max_pop }}
           </span>
           {% if farm_list %}
           <span id="missingBadge" style="font-size:0.75rem;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.35);border-radius:5px;padding:1px 7px;margin-left:0.4rem;"></span>
@@ -821,6 +819,134 @@
           </tbody>
         </table>
       </div>
+
+      {% if inactive_farms_total > 100 %}
+      <div id="loadMoreWrap" style="padding:1rem;text-align:center;border-top:1px solid var(--border);">
+        <button id="loadMoreBtn" onclick="loadMoreFarms()"
+                style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;
+                       padding:0.5rem 1.5rem;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">
+          ⬇ Weitere <span id="loadMoreCount">{{ inactive_farms_total - 100 }}</span> laden
+        </button>
+      </div>
+      <script>
+      var _farmRest = {{ inactive_farms_rest_json | safe }};
+      var _farmRestIdx = 0;
+      var _farmBatchSize = 100;
+      var _twWorld = {{ ('"' + guild.tw_world.rstrip('/') + '"') if guild.tw_world else 'null' }};
+      var _hasFarmlist = {{ 'true' if has_farmlist else 'false' }};
+      var _scoutVillageId = {{ ('"' + scout_village.travian_village_id|string + '"') if scout_village and scout_village.travian_village_id else 'null' }};
+      var _scoutLabel = {{ ('"' + scout_village.village_name|e + ' (' + scout_village.x|string + '|' + scout_village.y|string + ')"') if scout_village else '"no scout village"' }};
+      var _guildId = '{{ guild.guild_id }}';
+
+      function _deltaHtml(dv) {
+        if (dv === null || dv === undefined) return '<span style="color:#1e293b;font-size:.75rem;">—</span>';
+        if (dv > 20)  return '<span style="color:#ef4444;font-size:.82rem;font-weight:600;">↑↑ <span style="font-size:.72rem;">+'+dv+'</span></span>';
+        if (dv > 0)   return '<span style="color:#f87171;font-size:.82rem;">↑ <span style="font-size:.72rem;">+'+dv+'</span></span>';
+        if (dv === 0) return '<span style="color:#475569;font-size:.82rem;">→ <span style="font-size:.72rem;">0</span></span>';
+        if (dv >= -20)return '<span style="color:#86efac;font-size:.82rem;">↓ <span style="font-size:.72rem;">'+dv+'</span></span>';
+        return '<span style="color:#22c55e;font-size:.82rem;font-weight:600;">↓↓ <span style="font-size:.72rem;">'+dv+'</span></span>';
+      }
+      function _accDeltaHtml(dv) {
+        if (dv === null || dv === undefined) return '<span style="color:#1e293b;font-size:.75rem;">—</span>';
+        if (dv > 50)  return '<span style="color:#ef4444;font-size:.82rem;font-weight:600;">↑↑ <span style="font-size:.72rem;">+'+dv+'</span></span>';
+        if (dv > 0)   return '<span style="color:#f87171;font-size:.82rem;">↑ <span style="font-size:.72rem;">+'+dv+'</span></span>';
+        if (dv === 0) return '<span style="color:#475569;font-size:.82rem;">→ <span style="font-size:.72rem;">0</span></span>';
+        if (dv >= -50)return '<span style="color:#86efac;font-size:.82rem;">↓ <span style="font-size:.72rem;">'+dv+'</span></span>';
+        return '<span style="color:#22c55e;font-size:.82rem;font-weight:600;">↓↓ <span style="font-size:.72rem;">'+dv+'</span></span>';
+      }
+      function _scoreHtml(sc) {
+        var bg = sc>=75?'rgba(34,197,94,.15)':sc>=50?'rgba(245,158,11,.15)':'rgba(239,68,68,.1)';
+        var col = sc>=75?'#22c55e':sc>=50?'#f59e0b':'#ef4444';
+        return '<span style="background:'+bg+';color:'+col+';border-radius:5px;padding:2px 6px;font-size:.75rem;font-weight:700;">'+sc+'</span>';
+      }
+      function _troopsHtml(pop) {
+        var lo,hi;
+        if(pop<50){lo=3;hi=8;}else if(pop<150){lo=8;hi=20;}else if(pop<300){lo=20;hi=45;}else if(pop<500){lo=45;hi=80;}else{lo=80;hi=150;}
+        return '<span style="font-size:.72rem;color:var(--text-muted);">'+lo+'–'+hi+'</span>';
+      }
+      function _tribeLabel(t){return{1:'Romans',2:'Teutons',3:'Gauls',4:'Natars',5:'Huns',6:'Egyptians',7:'Spartans'}[t]||'—';}
+      function _vtLabel(vt){return vt===15?'15':vt===9?'9':vt===7?'7':vt===6?'6':'—';}
+
+      function _buildFarmRow(f, rowIdx) {
+        var coords = f.x+'|'+f.y;
+        var dscore = Math.min(f.days_tracked*2, 40);
+        var tscore = (f.d7!==null&&f.d7!==undefined) ? (f.d7<=0?30:Math.max(30-f.d7,0)) : 0;
+        var pscore = (f.population>=50&&f.population<=600)?20:(f.population>0?10:0);
+        var score = dscore+tscore+pscore;
+        var crossBadge = f.is_cross ? '<span style="font-size:.7rem;background:rgba(34,197,94,.15);color:#22c55e;border-radius:4px;padding:1px 5px;">🎯 My Farm</span>' : '';
+        var listBadge = f.is_on_list
+          ? '<span style="font-size:.68rem;background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 5px;">✅ Farm list</span>'
+          : '<span style="font-size:.68rem;background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.3);border-radius:4px;padding:1px 5px;">➕ Missing</span>';
+        var coordCell = _twWorld
+          ? '<a href="'+_twWorld+'/karte.php?x='+f.x+'&y='+f.y+'" target="_blank" rel="noopener" style="font-family:monospace;font-weight:600;color:#93c5fd;">'+coords+'</a>'
+          : '<span style="font-family:monospace;font-weight:600;">'+coords+'</span>';
+        var flGroupsHtml = '';
+        if (_hasFarmlist) {
+          if (f.farmlist_groups && f.farmlist_groups.length) {
+            f.farmlist_groups.forEach(function(ln){ flGroupsHtml += '<span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 5px;display:inline-block;margin:1px;font-size:.72rem;">'+ln+'</span>'; });
+          } else { flGroupsHtml = '<span style="color:var(--text-muted);">—</span>'; }
+        }
+        var scoutHref = _twWorld ? (_scoutVillageId
+          ? _twWorld+'/build.php?newdid='+_scoutVillageId+'&gid=16&tt=2&x='+f.x+'&y='+f.y+'&t4=1'
+          : _twWorld+'/build.php?gid=16&tt=2&x='+f.x+'&y='+f.y+'&t4=1') : '#';
+        var scoutStyle = _scoutVillageId ? 'background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.5);' : 'background:rgba(255,255,255,.05);border:1px solid var(--border);';
+
+        var vname = (f.village_name||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var pname = (f.player_name||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var aname = (f.alliance_name||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        return '<tr data-population="'+f.population+'" data-days="'+f.days_tracked+'" data-score="'+score+'"'+
+          ' data-d7="'+(f.d7!==null&&f.d7!==undefined?f.d7:9999)+'" data-d14="'+(f.d14!==null&&f.d14!==undefined?f.d14:9999)+'"'+
+          ' data-acc_delta="'+(f.acc_delta||0)+'" data-coords="'+coords+'" data-on-list="'+(f.is_on_list?'true':'false')+'"'+
+          (f.is_cross?' style="background:rgba(34,197,94,0.06);"':'')+'>'+
+          '<td style="text-align:center;padding:0 4px;"><input type="checkbox" class="farm-cb" value="'+coords+'" onchange="updateSelectionBar()" style="width:14px;height:14px;cursor:pointer;accent-color:var(--primary);"></td>'+
+          '<td style="color:var(--text-muted);font-size:.8rem;">'+rowIdx+'</td>'+
+          '<td><div style="display:flex;align-items:center;gap:.4rem;">'+coordCell+
+            '<button onclick="copyCoord(\''+coords+'\',this)" style="background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--text-muted);padding:0 2px;" title="Copy">📋</button>'+
+            crossBadge+listBadge+
+          '</div></td>'+
+          '<td style="font-size:.82rem;">'+(vname||'—')+'</td>'+
+          '<td style="font-size:.82rem;">'+(pname?'<div style="font-weight:600;"><a href="/guild/'+_guildId+'/intel?q='+encodeURIComponent(f.player_name||'')+'" target="_blank" style="color:inherit;text-decoration:none;">'+pname+'</a></div>'+(aname?'<div style="font-size:.7rem;color:var(--text-muted);">['+aname+']</div>':''):'<span style="color:var(--text-muted);">Barbarian</span>')+'</td>'+
+          '<td style="font-size:.75rem;color:var(--text-muted);">'+_tribeLabel(f.tribe)+'</td>'+
+          '<td><strong>'+f.population+'</strong></td>'+
+          '<td><span style="background:rgba(245,158,11,.12);color:#f59e0b;border-radius:5px;padding:2px 7px;font-size:.8rem;font-weight:600;">'+f.days_tracked+'d</span></td>'+
+          '<td style="text-align:center;">'+(f.is_capital?'<span style="color:#f59e0b;">★</span>':'—')+'</td>'+
+          '<td style="font-size:.75rem;text-align:center;">'+_vtLabel(f.village_type)+'</td>'+
+          '<td style="text-align:right;white-space:nowrap;padding:0 5px;">'+_accDeltaHtml(f.acc_delta)+'</td>'+
+          '<td style="text-align:right;padding:0 5px;white-space:nowrap;">'+_deltaHtml(f.d1)+'</td>'+
+          '<td style="text-align:right;padding:0 5px;white-space:nowrap;">'+_deltaHtml(f.d2)+'</td>'+
+          '<td style="text-align:right;padding:0 5px;white-space:nowrap;">'+_deltaHtml(f.d3)+'</td>'+
+          '<td style="text-align:right;padding:0 5px;white-space:nowrap;">'+_deltaHtml(f.d5)+'</td>'+
+          '<td style="text-align:right;padding:0 5px;white-space:nowrap;">'+_deltaHtml(f.d7)+'</td>'+
+          '<td style="text-align:right;padding:0 5px;white-space:nowrap;">'+_deltaHtml(f.d14)+'</td>'+
+          '<td style="text-align:center;">'+_scoreHtml(score)+'</td>'+
+          '<td style="text-align:center;white-space:nowrap;">'+_troopsHtml(f.population)+'</td>'+
+          (_hasFarmlist?'<td style="font-size:.72rem;">'+flGroupsHtml+'</td>':'')+
+          '<td style="white-space:nowrap;"><div style="display:flex;gap:3px;align-items:center;">'+
+            '<button onclick="addToMyFarms('+f.x+','+f.y+',\''+vname.replace(/'/g,"\\'")+'\''+',\''+pname.replace(/'/g,"\\'")+'\','+f.population+')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:.75rem;padding:2px 6px;color:var(--text-muted);" title="Add to TravOps farmlist">＋</button>'+
+            (_twWorld?'<a href="'+scoutHref+'" target="_blank" rel="noopener" title="'+'Send scout'+'" style="display:inline-flex;align-items:center;'+scoutStyle+'border-radius:5px;font-size:.75rem;padding:2px 6px;color:#818cf8;text-decoration:none;">🔭</a>':'')+
+          '</div></td>'+
+          '</tr>';
+      }
+
+      function loadMoreFarms() {
+        var tbody = document.getElementById('inactiveBody');
+        var btn = document.getElementById('loadMoreBtn');
+        var startRow = 101 + _farmRestIdx;
+        var batch = _farmRest.slice(_farmRestIdx, _farmRestIdx + _farmBatchSize);
+        var html = '';
+        batch.forEach(function(f, i){ html += _buildFarmRow(f, startRow+i); });
+        tbody.insertAdjacentHTML('beforeend', html);
+        _farmRestIdx += batch.length;
+        var remaining = _farmRest.length - _farmRestIdx;
+        if (remaining <= 0) {
+          document.getElementById('loadMoreWrap').style.display = 'none';
+        } else {
+          document.getElementById('loadMoreCount').textContent = remaining;
+        }
+      }
+      </script>
+      {% endif %}
 
       <!-- Population Histogram -->
       <div style="padding:1rem 1rem 0.5rem;border-top:1px solid var(--border);">
