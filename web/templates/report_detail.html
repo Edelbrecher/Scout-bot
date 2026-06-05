@@ -2,8 +2,33 @@
 {% block title %}Report #{{ report.id }} · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:900px;">
+{# ── Precompute stats ── #}
+{% set att_sent  = report.troops_sent.values()  | sum if report.troops_sent  else 0 %}
+{% set att_dead  = report.troops_lost.values()  | sum if report.troops_lost  else 0 %}
+{% set att_hosp  = report.troops_hospital.values() | sum if report.troops_hospital else 0 %}
+{% set def_in    = report.def_troops.values()   | sum if report.def_troops   else 0 %}
+{% set def_dead  = report.def_troops_lost.values() | sum if report.def_troops_lost else 0 %}
+{% set def_hosp  = report.def_troops_hospital.values() | sum if report.def_troops_hospital else 0 %}
+{% set att_loss_rate = ((att_dead + att_hosp) / att_sent * 100) | round(1) if att_sent > 0 else 0 %}
+{% set def_loss_rate = ((def_dead + def_hosp) / def_in * 100)  | round(1) if def_in  > 0 else 0 %}
+{# Winner: attacker wins if defender lost more % OR plunder > 0 with low att losses #}
+{% set att_wiped = (att_sent > 0 and (att_dead + att_hosp) >= att_sent) %}
+{% set def_wiped = (def_in > 0 and (def_dead + def_hosp) >= def_in) %}
+{% if def_wiped and not att_wiped %}
+  {% set winner = 'attacker' %}
+{% elif att_wiped and not def_wiped %}
+  {% set winner = 'defender' %}
+{% elif att_loss_rate < def_loss_rate %}
+  {% set winner = 'attacker' %}
+{% elif def_loss_rate < att_loss_rate %}
+  {% set winner = 'defender' %}
+{% else %}
+  {% set winner = 'draw' %}
+{% endif %}
 
+<div class="container" style="max-width:1100px;">
+
+  <!-- ── Top bar ── -->
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/reports" class="back-link">← Reports</a>
@@ -16,183 +41,302 @@
     </form>
   </div>
 
-  <!-- ── Header card ── -->
-  <div class="card" style="padding:1.1rem 1.25rem;margin-bottom:1rem;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
-
-      <!-- Attacker -->
-      <div>
-        <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.3rem;">Attacker</div>
-        {% if report.attacker_name %}
-        <div style="font-weight:700;font-size:1rem;">
-          <a href="/guild/{{ guild.guild_id }}/intel?q={{ report.attacker_name | urlencode }}"
-             target="_blank" style="color:inherit;text-decoration:none;"
-             onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='inherit'">
-            {{ report.attacker_name }}
-          </a>
-        </div>
-        {% if report.attacker_village %}
-        <div style="font-size:.8rem;color:var(--text-muted);">{{ report.attacker_village }}</div>
-        {% endif %}
-        {% if report.attacker_x is not none %}
-        <div style="font-size:.75rem;font-family:monospace;color:#93c5fd;">
-          {% if guild.tw_world %}
-          <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ report.attacker_x }}&y={{ report.attacker_y }}"
-             target="_blank" style="color:#93c5fd;">({{ report.attacker_x }}|{{ report.attacker_y }})</a>
-          {% else %}({{ report.attacker_x }}|{{ report.attacker_y }}){% endif %}
-        </div>
-        {% endif %}
-        {% else %}
-        <div style="color:var(--text-muted);">—</div>
-        {% endif %}
-      </div>
-
-      <!-- Arrow -->
-      <div style="display:flex;align-items:center;justify-content:center;font-size:1.75rem;color:var(--text-muted);">
-        {% if report.report_type == 'defense' %}🛡️{% else %}⚔️{% endif %}
-      </div>
-
-      <!-- Defender -->
-      <div>
-        <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.3rem;">Defender</div>
-        {% if report.defender_name %}
-        <div style="font-weight:700;font-size:1rem;">
-          <a href="/guild/{{ guild.guild_id }}/intel?q={{ report.defender_name | urlencode }}"
-             target="_blank" style="color:inherit;text-decoration:none;"
-             onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='inherit'">
-            {{ report.defender_name }}
-          </a>
-        </div>
-        {% if report.defender_village %}
-        <div style="font-size:.8rem;color:var(--text-muted);">{{ report.defender_village }}</div>
-        {% endif %}
-        {% if report.defender_x is not none %}
-        <div style="font-size:.75rem;font-family:monospace;color:#93c5fd;">
-          {% if guild.tw_world %}
-          <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ report.defender_x }}&y={{ report.defender_y }}"
-             target="_blank" style="color:#93c5fd;">({{ report.defender_x }}|{{ report.defender_y }})</a>
-          {% else %}({{ report.defender_x }}|{{ report.defender_y }}){% endif %}
-        </div>
-        {% endif %}
-        {% else %}
-        <div style="color:var(--text-muted);">—</div>
-        {% endif %}
-      </div>
-
-      <!-- Meta -->
-      <div>
-        <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.3rem;">Details</div>
-        {% if report.report_date %}
-        <div style="font-size:.82rem;">🕐 {{ report.report_date[:16] }}</div>
-        {% endif %}
-        {% if report.luck is not none %}
-        <div style="font-size:.82rem;color:{% if report.luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
-          {{ '↑ +' if report.luck >= 0 else '↓ ' }}{{ report.luck | abs }}% luck
-        </div>
-        {% endif %}
-        {% if report.hero_hp is not none %}
-        <div style="font-size:.82rem;">🦸 Hero {{ report.hero_hp }}% HP</div>
-        {% endif %}
+  <!-- ── Winner banner ── -->
+  {% if winner == 'attacker' %}
+  <div style="background:linear-gradient(135deg,rgba(248,113,113,.15),rgba(248,113,113,.05));
+              border:1px solid rgba(248,113,113,.4);border-radius:12px;
+              padding:.85rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;">
+    <span style="font-size:1.6rem;">⚔️</span>
+    <div>
+      <div style="font-weight:700;color:#f87171;font-size:1rem;">Attacker wins</div>
+      <div style="font-size:.78rem;color:var(--text-muted);">
+        Defender wiped{{ ' · ' + "{:,}".format(report.plunder_total) + ' res plundered' if report.plunder_total else '' }}
       </div>
     </div>
-  </div>
-
-  <!-- ── Troop tables ── -->
-  {% macro troop_table(label, troops, color) %}
-  {% if troops %}
-  <div style="margin-bottom:.75rem;">
-    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-                color:{{ color }};margin-bottom:.4rem;">{{ label }}</div>
-    <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;font-size:.8rem;width:100%;">
-        <thead>
-          <tr>
-            {% for unit in troops.keys() %}
-            <th style="padding:.3rem .5rem;text-align:center;color:var(--text-muted);
-                       font-size:.7rem;white-space:nowrap;border-bottom:1px solid var(--border);">
-              {{ unit | replace('_',' ') | title }}
-            </th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            {% for cnt in troops.values() %}
-            <td style="padding:.35rem .5rem;text-align:center;font-weight:600;color:{{ color }};">
-              {{ "{:,}".format(cnt) }}
-            </td>
-            {% endfor %}
-          </tr>
-        </tbody>
-      </table>
+    {% if report.luck is not none %}
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-size:.75rem;color:var(--text-muted);">Luck</div>
+      <div style="font-weight:700;color:{% if report.luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
+        {{ '+' if report.luck >= 0 else '' }}{{ report.luck }}%
+      </div>
     </div>
+    {% endif %}
   </div>
-  {% endif %}
-  {% endmacro %}
-
-  {% if report.troops_sent or report.troops_lost or report.troops_hospital or report.def_troops or report.def_troops_lost or report.def_troops_hospital %}
-  <div class="card" style="padding:1rem 1.25rem;margin-bottom:1rem;">
-    <div style="font-size:.85rem;font-weight:600;margin-bottom:.75rem;">⚔️ Troops</div>
-    {{ troop_table('Attacker — sent', report.troops_sent, 'var(--text)') }}
-    {{ troop_table('Attacker — dead ☠️', report.troops_lost, '#f87171') }}
-    {{ troop_table('Attacker — hospital 🏥', report.troops_hospital, '#fbbf24') }}
-    {{ troop_table('Defender — in village', report.def_troops, '#60a5fa') }}
-    {{ troop_table('Defender — dead ☠️', report.def_troops_lost, '#f87171') }}
-    {{ troop_table('Defender — hospital 🏥', report.def_troops_hospital, '#fbbf24') }}
+  {% elif winner == 'defender' %}
+  <div style="background:linear-gradient(135deg,rgba(96,165,250,.15),rgba(96,165,250,.05));
+              border:1px solid rgba(96,165,250,.4);border-radius:12px;
+              padding:.85rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;">
+    <span style="font-size:1.6rem;">🛡️</span>
+    <div>
+      <div style="font-weight:700;color:#60a5fa;font-size:1rem;">Defender wins</div>
+      <div style="font-size:.78rem;color:var(--text-muted);">Attacker wiped · no plunder</div>
+    </div>
+    {% if report.luck is not none %}
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-size:.75rem;color:var(--text-muted);">Luck</div>
+      <div style="font-weight:700;color:{% if report.luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
+        {{ '+' if report.luck >= 0 else '' }}{{ report.luck }}%
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div style="background:rgba(148,155,164,.08);border:1px solid var(--border);border-radius:12px;
+              padding:.85rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;">
+    <span style="font-size:1.6rem;">🤝</span>
+    <div>
+      <div style="font-weight:700;color:var(--text-muted);font-size:1rem;">Inconclusive</div>
+      <div style="font-size:.78rem;color:var(--text-muted);">Both sides took losses</div>
+    </div>
+    {% if report.luck is not none %}
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-size:.75rem;color:var(--text-muted);">Luck</div>
+      <div style="font-weight:700;color:{% if report.luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
+        {{ '+' if report.luck >= 0 else '' }}{{ report.luck }}%
+      </div>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
-  <!-- ── Resources ── -->
-  {% if report.plunder or report.plunder_total or report.spy_resources %}
-  <div class="card" style="padding:1rem 1.25rem;margin-bottom:1rem;">
-    {% if report.plunder and report.plunder.wood is defined %}
-    <div style="font-size:.85rem;font-weight:600;margin-bottom:.65rem;">📦 Plunder</div>
-    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.5rem;">
+  <!-- ── Attacker / Defender side-by-side ── -->
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;margin-bottom:1rem;align-items:start;">
+
+    <!-- LEFT: Attacker -->
+    <div class="card" style="padding:1rem 1.25rem;border-color:rgba(248,113,113,.3);">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;padding-bottom:.6rem;border-bottom:1px solid var(--border);">
+        <span style="font-size:1.1rem;">⚔️</span>
+        <div>
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:#f87171;font-weight:700;">Attacker</div>
+          {% if report.attacker_name %}
+          <div style="font-weight:700;font-size:.95rem;line-height:1.2;">
+            <a href="/guild/{{ guild.guild_id }}/intel?q={{ report.attacker_name | urlencode }}"
+               target="_blank" style="color:inherit;text-decoration:none;"
+               onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='inherit'">
+              {{ report.attacker_name }}
+            </a>
+          </div>
+          {% if report.attacker_village %}
+          <div style="font-size:.75rem;color:var(--text-muted);">{{ report.attacker_village }}
+            {% if report.attacker_x is not none %}
+            <a href="{% if guild.tw_world %}{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ report.attacker_x }}&y={{ report.attacker_y }}{% else %}#{% endif %}"
+               target="_blank" style="color:#93c5fd;font-family:monospace;">({{ report.attacker_x }}|{{ report.attacker_y }})</a>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Attacker troop rows -->
+      {% macro att_row(label, count, color, sub='') %}
+      {% if count > 0 %}
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  padding:.3rem 0;border-bottom:1px solid rgba(63,65,71,.4);">
+        <span style="font-size:.78rem;color:var(--text-muted);">{{ label }}</span>
+        <div style="text-align:right;">
+          <span style="font-weight:700;color:{{ color }};">{{ "{:,}".format(count) }}</span>
+          {% if sub %}<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;">{{ sub }}</span>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endmacro %}
+
+      {{ att_row('Troops sent', att_sent, 'var(--text)') }}
+      {{ att_row('Dead ☠️', att_dead, '#f87171') }}
+      {{ att_row('Hospital 🏥', att_hosp, '#fbbf24', 'healable') }}
+      {% if att_sent > 0 %}
+      {% set att_survived = att_sent - att_dead - att_hosp %}
+      {{ att_row('Returned home', att_survived, '#86efac') }}
+      {% endif %}
+
+      {% if att_sent > 0 %}
+      <div style="margin-top:.6rem;padding:.4rem .6rem;background:rgba(248,113,113,.08);border-radius:6px;
+                  display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:.75rem;color:var(--text-muted);">Loss rate</span>
+        <span style="font-weight:700;font-size:.9rem;color:{% if att_loss_rate > 50 %}#ef4444{% elif att_loss_rate > 20 %}#f87171{% else %}#86efac{% endif %};">
+          {{ att_loss_rate }}%
+        </span>
+      </div>
+      {% endif %}
+
+      <!-- Attacker troop breakdown -->
+      {% if report.troops_sent %}
+      <div style="margin-top:.85rem;">
+        <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.4rem;">Troop detail</div>
+        {% for unit, cnt in report.troops_sent.items() %}
+        {% set dead_cnt = report.troops_lost.get(unit, 0) if report.troops_lost else 0 %}
+        {% set hosp_cnt = report.troops_hospital.get(unit, 0) if report.troops_hospital else 0 %}
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    padding:.2rem 0;font-size:.78rem;border-bottom:1px solid rgba(63,65,71,.3);">
+          <span style="color:var(--text-muted);">{{ unit | replace('_',' ') | title }}</span>
+          <div style="display:flex;gap:.75rem;font-weight:600;">
+            <span>{{ "{:,}".format(cnt) }}</span>
+            {% if dead_cnt > 0 %}<span style="color:#f87171;">-{{ "{:,}".format(dead_cnt) }}</span>{% endif %}
+            {% if hosp_cnt > 0 %}<span style="color:#fbbf24;">🏥{{ "{:,}".format(hosp_cnt) }}</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if report.plunder_total %}
+      <div style="margin-top:.75rem;padding:.5rem .6rem;background:rgba(134,239,172,.08);border-radius:6px;
+                  display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:.78rem;color:var(--text-muted);">📦 Plunder</span>
+        <span style="font-weight:700;color:#86efac;">+{{ "{:,}".format(report.plunder_total) }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- CENTER: VS -->
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                padding:.5rem;gap:.35rem;padding-top:3rem;">
+      <div style="font-size:1.4rem;">⚔️</div>
+      <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);letter-spacing:.08em;">VS</div>
+      {% if report.report_date %}
+      <div style="font-size:.65rem;color:var(--text-muted);writing-mode:vertical-lr;transform:rotate(180deg);
+                  margin-top:.5rem;letter-spacing:.04em;">
+        {{ report.report_date[:16] }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT: Defender -->
+    <div class="card" style="padding:1rem 1.25rem;border-color:rgba(96,165,250,.3);">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;padding-bottom:.6rem;border-bottom:1px solid var(--border);">
+        <span style="font-size:1.1rem;">🛡️</span>
+        <div>
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:#60a5fa;font-weight:700;">Defender</div>
+          {% if report.defender_name %}
+          <div style="font-weight:700;font-size:.95rem;line-height:1.2;">
+            <a href="/guild/{{ guild.guild_id }}/intel?q={{ report.defender_name | urlencode }}"
+               target="_blank" style="color:inherit;text-decoration:none;"
+               onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='inherit'">
+              {{ report.defender_name }}
+            </a>
+          </div>
+          {% if report.defender_village %}
+          <div style="font-size:.75rem;color:var(--text-muted);">{{ report.defender_village }}
+            {% if report.defender_x is not none %}
+            <a href="{% if guild.tw_world %}{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ report.defender_x }}&y={{ report.defender_y }}{% else %}#{% endif %}"
+               target="_blank" style="color:#93c5fd;font-family:monospace;">({{ report.defender_x }}|{{ report.defender_y }})</a>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      {% macro def_row(label, count, color, sub='') %}
+      {% if count > 0 %}
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  padding:.3rem 0;border-bottom:1px solid rgba(63,65,71,.4);">
+        <span style="font-size:.78rem;color:var(--text-muted);">{{ label }}</span>
+        <div style="text-align:right;">
+          <span style="font-weight:700;color:{{ color }};">{{ "{:,}".format(count) }}</span>
+          {% if sub %}<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;">{{ sub }}</span>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endmacro %}
+
+      {{ def_row('Troops in village', def_in, '#60a5fa') }}
+      {{ def_row('Dead ☠️', def_dead, '#f87171') }}
+      {{ def_row('Hospital 🏥', def_hosp, '#fbbf24', 'healable') }}
+      {% if def_in > 0 %}
+      {% set def_survived = def_in - def_dead - def_hosp %}
+      {{ def_row('Survived', def_survived, '#86efac') }}
+      {% endif %}
+
+      {% if def_in > 0 %}
+      <div style="margin-top:.6rem;padding:.4rem .6rem;background:rgba(96,165,250,.08);border-radius:6px;
+                  display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:.75rem;color:var(--text-muted);">Loss rate</span>
+        <span style="font-weight:700;font-size:.9rem;color:{% if def_loss_rate > 50 %}#ef4444{% elif def_loss_rate > 20 %}#f87171{% else %}#86efac{% endif %};">
+          {{ def_loss_rate }}%
+        </span>
+      </div>
+      {% endif %}
+
+      <!-- Defender troop breakdown -->
+      {% if report.def_troops %}
+      <div style="margin-top:.85rem;">
+        <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.4rem;">Troop detail</div>
+        {% for unit, cnt in report.def_troops.items() %}
+        {% set dead_cnt = report.def_troops_lost.get(unit, 0) if report.def_troops_lost else 0 %}
+        {% set hosp_cnt = report.def_troops_hospital.get(unit, 0) if report.def_troops_hospital else 0 %}
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    padding:.2rem 0;font-size:.78rem;border-bottom:1px solid rgba(63,65,71,.3);">
+          <span style="color:var(--text-muted);">{{ unit | replace('_',' ') | title }}</span>
+          <div style="display:flex;gap:.75rem;font-weight:600;">
+            <span>{{ "{:,}".format(cnt) }}</span>
+            {% if dead_cnt > 0 %}<span style="color:#f87171;">-{{ "{:,}".format(dead_cnt) }}</span>{% endif %}
+            {% if hosp_cnt > 0 %}<span style="color:#fbbf24;">🏥{{ "{:,}".format(hosp_cnt) }}</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if report.spy_resources and report.spy_resources.get('total') %}
+      <div style="margin-top:.75rem;padding:.5rem .6rem;background:rgba(96,165,250,.08);border-radius:6px;
+                  display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:.78rem;color:var(--text-muted);">🔍 Resources in village</span>
+        <span style="font-weight:700;color:#60a5fa;">{{ "{:,}".format(report.spy_resources.total) }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Plunder detail ── -->
+  {% if report.plunder and (report.plunder.get('wood') or report.plunder.get('clay') or report.plunder.get('iron') or report.plunder.get('crop')) %}
+  <div class="card" style="padding:.85rem 1.25rem;margin-bottom:1rem;">
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:.6rem;">📦 Plunder breakdown</div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;">
       {% for res, icon in [('wood','🪵'),('clay','🏺'),('iron','⚙️'),('crop','🌾')] %}
       {% if report.plunder.get(res) %}
       <div style="text-align:center;">
-        <div style="font-size:1.1rem;">{{ icon }}</div>
-        <div style="font-size:.82rem;font-weight:600;color:#86efac;">{{ "{:,}".format(report.plunder[res]) }}</div>
-        <div style="font-size:.68rem;color:var(--text-muted);">{{ res | title }}</div>
+        <div style="font-size:1rem;">{{ icon }}</div>
+        <div style="font-size:.85rem;font-weight:700;color:#86efac;">{{ "{:,}".format(report.plunder[res]) }}</div>
+        <div style="font-size:.65rem;color:var(--text-muted);">{{ res | title }}</div>
       </div>
       {% endif %}
       {% endfor %}
       {% if report.plunder_total %}
-      <div style="text-align:center;padding-left:.75rem;border-left:1px solid var(--border);">
-        <div style="font-size:1.1rem;">💰</div>
-        <div style="font-size:.9rem;font-weight:700;color:#86efac;">{{ "{:,}".format(report.plunder_total) }}</div>
-        <div style="font-size:.68rem;color:var(--text-muted);">Total</div>
+      <div style="text-align:center;padding-left:1rem;border-left:1px solid var(--border);">
+        <div style="font-size:1rem;">💰</div>
+        <div style="font-size:1rem;font-weight:800;color:#86efac;">{{ "{:,}".format(report.plunder_total) }}</div>
+        <div style="font-size:.65rem;color:var(--text-muted);">Total</div>
       </div>
       {% endif %}
     </div>
-    {% elif report.plunder_total %}
-    <div style="font-size:.85rem;font-weight:600;color:#86efac;">📦 Plunder: {{ "{:,}".format(report.plunder_total) }}</div>
-    {% endif %}
+  </div>
+  {% endif %}
 
-    {% if report.spy_resources and report.spy_resources.get('total') %}
-    <div style="font-size:.85rem;font-weight:600;margin-bottom:.65rem;{% if report.plunder %}margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border);{% endif %}">
-      👁️ Resources in village
-    </div>
-    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+  <!-- ── Spy resources detail ── -->
+  {% if report.spy_resources and report.spy_resources.get('total') %}
+  <div class="card" style="padding:.85rem 1.25rem;margin-bottom:1rem;">
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:.6rem;">👁️ Resources scouted in village</div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;">
       {% set sr = report.spy_resources %}
       {% for res, icon in [('wood','🪵'),('clay','🏺'),('iron','⚙️'),('crop','🌾')] %}
       {% if sr.get(res) %}
       <div style="text-align:center;">
-        <div style="font-size:1.1rem;">{{ icon }}</div>
-        <div style="font-size:.82rem;font-weight:600;">{{ "{:,}".format(sr[res]) }}</div>
-        <div style="font-size:.68rem;color:var(--text-muted);">{{ res | title }}</div>
+        <div style="font-size:1rem;">{{ icon }}</div>
+        <div style="font-size:.85rem;font-weight:700;">{{ "{:,}".format(sr[res]) }}</div>
+        <div style="font-size:.65rem;color:var(--text-muted);">{{ res | title }}</div>
       </div>
       {% endif %}
       {% endfor %}
       {% if sr.get('total') %}
-      <div style="text-align:center;padding-left:.75rem;border-left:1px solid var(--border);">
-        <div style="font-size:1.1rem;">💰</div>
-        <div style="font-size:.9rem;font-weight:700;">{{ "{:,}".format(sr.total) }}</div>
-        <div style="font-size:.68rem;color:var(--text-muted);">Total</div>
+      <div style="text-align:center;padding-left:1rem;border-left:1px solid var(--border);">
+        <div style="font-size:1rem;">💰</div>
+        <div style="font-size:1rem;font-weight:800;">{{ "{:,}".format(sr.total) }}</div>
+        <div style="font-size:.65rem;color:var(--text-muted);">Total</div>
       </div>
       {% endif %}
     </div>
-    {% endif %}
   </div>
   {% endif %}
 
