@@ -1840,6 +1840,18 @@ async def _init_reports_table():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_reports_guild ON battle_reports(guild_id, created_at DESC)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_reports_attacker ON battle_reports(guild_id, attacker_name)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_reports_defender ON battle_reports(guild_id, defender_name)")
+        # Migrate optional columns (safe to run on every startup)
+        for col, default in [
+            ("def_troops_lost_json",     "'{}'"),
+            ("troops_hospital_json",     "'{}'"),
+            ("def_troops_hospital_json", "'{}'"),
+            ("buildings_hit_json",       "'[]'"),
+            ("fake_override",            "NULL"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
+            except Exception:
+                pass
         await db.commit()
 
 
