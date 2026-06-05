@@ -86,7 +86,22 @@
     <div class="section-card" style="padding:.9rem 1rem;margin:0;">
       <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Aktueller Halter</div>
       <div style="font-size:1rem;font-weight:700;">{{ artifact.current_holder or '—' }}</div>
-      {% if artifact.current_village %}<div style="font-size:.75rem;color:var(--text-muted);">📍 {{ artifact.current_village }}</div>{% endif %}
+      {% if artifact.current_village %}
+      <div style="font-size:.75rem;color:var(--text-muted);display:flex;align-items:center;gap:.4rem;margin-top:.15rem;flex-wrap:wrap;">
+        <span>📍 {{ artifact.current_village }}</span>
+        {% if artifact.x or artifact.y %}
+        <span style="font-family:monospace;">({{ artifact.x }}|{{ artifact.y }})</span>
+        <a href="/guild/{{ guild.guild_id }}/map?cx={{ artifact.x }}&cy={{ artifact.y }}&z=8"
+           style="color:#a5b4fc;text-decoration:none;font-size:.73rem;">🗺️ Karte</a>
+        {% endif %}
+      </div>
+      {% elif artifact.x or artifact.y %}
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;display:flex;gap:.4rem;align-items:center;">
+        <span style="font-family:monospace;">({{ artifact.x }}|{{ artifact.y }})</span>
+        <a href="/guild/{{ guild.guild_id }}/map?cx={{ artifact.x }}&cy={{ artifact.y }}&z=8"
+           style="color:#a5b4fc;text-decoration:none;">🗺️ Karte</a>
+      </div>
+      {% endif %}
     </div>
     <div class="section-card" style="padding:.9rem 1rem;margin:0;">
       <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Erobert</div>
@@ -289,14 +304,31 @@
           <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktivierungszeit überschreiben</label>
           <input name="activation_override" class="form-control" value="{{ artifact.activation_override }}" placeholder="Manuelle Aktivierungszeit">
         </div>
+        <!-- Koordinaten -->
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">📍 Koordinaten des Artefakt-Dorfes</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
+            <div>
+              <label style="font-size:.72rem;color:var(--text-muted);">X</label>
+              <input id="edit_x" name="x" type="number" class="form-control" value="{{ artifact.x or '' }}" placeholder="X" oninput="debounceEditLookup()">
+            </div>
+            <div>
+              <label style="font-size:.72rem;color:var(--text-muted);">Y</label>
+              <input id="edit_y" name="y" type="number" class="form-control" value="{{ artifact.y or '' }}" placeholder="Y" oninput="debounceEditLookup()">
+            </div>
+            <button type="button" onclick="lookupEditVillage()" class="btn btn-secondary" style="font-size:.78rem;padding:.38rem .6rem;">🔍</button>
+          </div>
+          <div id="editVillageInfo" style="display:none;margin-top:.4rem;padding:.4rem .6rem;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:6px;font-size:.78rem;"></div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
             <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktueller Halter</label>
-            <input name="current_holder" class="form-control" value="{{ artifact.current_holder }}">
+            <input id="edit_holder" name="current_holder" class="form-control" value="{{ artifact.current_holder }}">
           </div>
           <div>
             <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktuelles Dorf</label>
-            <input name="current_village" class="form-control" value="{{ artifact.current_village }}">
+            <input id="edit_village" name="current_village" class="form-control" value="{{ artifact.current_village }}">
           </div>
         </div>
         <div>
@@ -494,5 +526,49 @@ function showToast(msg, type='success') {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3000);
 }
+
+// ── Village coordinate lookup (edit modal) ────────────────────────────────
+{% if is_leader %}
+let _editLookupTimer = null;
+function debounceEditLookup() {
+  clearTimeout(_editLookupTimer);
+  _editLookupTimer = setTimeout(lookupEditVillage, 600);
+}
+
+async function lookupEditVillage() {
+  const x = parseInt(document.getElementById('edit_x')?.value);
+  const y = parseInt(document.getElementById('edit_y')?.value);
+  const info = document.getElementById('editVillageInfo');
+  if (isNaN(x) || isNaN(y) || !info) return;
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/artifacts/api/village-lookup?x=${x}&y=${y}`);
+    const d = await r.json();
+    if (!d.found) {
+      info.style.display = 'block';
+      info.style.borderColor = 'rgba(239,68,68,.3)';
+      info.innerHTML = `<span style="color:#f87171;">⚠️ Kein Dorf bei (${x}|${y}) gefunden.</span>`;
+      return;
+    }
+    const holderEl  = document.getElementById('edit_holder');
+    const villageEl = document.getElementById('edit_village');
+    if (holderEl  && !holderEl.value)  holderEl.value  = d.player_name  || '';
+    if (villageEl && !villageEl.value) villageEl.value = d.village_name || '';
+    const mapUrl = `/guild/${GUILD_ID}/map?cx=${x}&cy=${y}&z=8`;
+    info.style.display = 'block';
+    info.style.borderColor = 'rgba(99,102,241,.25)';
+    info.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+        <div>
+          <strong>${d.village_name||'?'}</strong>
+          <span style="color:var(--text-muted);font-size:.73rem;margin-left:.3rem;">(${x}|${y})</span><br>
+          <span style="color:var(--text-muted);">👤 ${d.player_name||'?'}</span>
+          ${d.alliance_name ? `<span style="color:var(--text-muted);"> · [${d.alliance_name}]</span>` : ''}
+          ${d.population    ? `<span style="color:var(--text-muted);"> · 🏘️ ${d.population}</span>` : ''}
+        </div>
+        <a href="${mapUrl}" target="_blank" style="font-size:.75rem;color:#a5b4fc;white-space:nowrap;text-decoration:none;flex-shrink:0;">🗺️ Karte</a>
+      </div>`;
+  } catch(e) { console.warn('edit lookup failed', e); }
+}
+{% endif %}
 </script>
 {% endblock %}

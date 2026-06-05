@@ -13355,6 +13355,17 @@ async def artifacts_page(request: Request, guild_id: str):
     })
 
 
+@app.get("/guild/{guild_id}/artifacts/api/village-lookup")
+async def artifact_village_lookup(request: Request, guild_id: str, x: int = 0, y: int = 0):
+    """Return village/player info for given coords from latest map snapshot."""
+    session, err = _require_session(request)
+    if err: return err
+    result = await database.get_village_by_coords(guild_id, x, y)
+    if not result:
+        return _JSONResponse({"found": False})
+    return _JSONResponse({"found": True, **result})
+
+
 @app.post("/guild/{guild_id}/artifacts/add")
 async def artifact_add(request: Request, guild_id: str):
     session, err = _require_session(request)
@@ -13375,6 +13386,8 @@ async def artifact_add(request: Request, guild_id: str):
         current_holder=form.get("current_holder","").strip(),
         current_village=form.get("current_village","").strip(),
         notes=form.get("notes","").strip(),
+        x=int(form.get("x") or 0),
+        y=int(form.get("y") or 0),
     )
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
 
@@ -13429,6 +13442,8 @@ async def artifact_update(request: Request, guild_id: str, artifact_id: int):
         current_village=form.get("current_village","").strip(),
         status=form.get("status","active"),
         notes=form.get("notes","").strip(),
+        x=int(form.get("x") or 0),
+        y=int(form.get("y") or 0),
     )
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{artifact_id}?saved=1", status_code=303)
 

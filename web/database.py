@@ -10425,18 +10425,18 @@ async def create_artifact(guild_id: str, name: str, artifact_type: str,
                            artifact_size: str, effect_scope: str,
                            conquered_at: str, activated_at: str,
                            current_holder: str, current_village: str,
-                           notes: str) -> int:
+                           notes: str, x: int = 0, y: int = 0) -> int:
     now = __import__('datetime').datetime.utcnow().isoformat()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO artifacts
               (guild_id, name, artifact_type, artifact_size, effect_scope,
                conquered_at, activated_at, current_holder, current_village,
-               status, notes, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,'active',?,?,?)
+               status, notes, x, y, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,'active',?,?,?,?,?)
         """, (guild_id, name, artifact_type, artifact_size, effect_scope,
               conquered_at, activated_at, current_holder, current_village,
-              notes, now, now))
+              notes, x, y, now, now))
         await db.commit()
         return cur.lastrowid
 
@@ -10445,7 +10445,7 @@ async def update_artifact(artifact_id: int, guild_id: str, **kwargs) -> bool:
     now = __import__('datetime').datetime.utcnow().isoformat()
     allowed = {"name","artifact_type","artifact_size","effect_scope","conquered_at",
                "activated_at","activation_override","current_holder","current_village",
-               "status","notes"}
+               "status","notes","x","y"}
     sets = {k: v for k, v in kwargs.items() if k in allowed}
     if not sets:
         return False

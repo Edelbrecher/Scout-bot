@@ -233,6 +233,34 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
             </select>
           </div>
         </div>
+
+        <!-- Koordinaten mit Auto-Fill -->
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">📍 Koordinaten des Artefakt-Dorfes</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
+            <div>
+              <label style="font-size:.72rem;color:var(--text-muted);">X</label>
+              <input id="add_x" name="x" type="number" class="form-control" placeholder="X" oninput="debounceLookup()">
+            </div>
+            <div>
+              <label style="font-size:.72rem;color:var(--text-muted);">Y</label>
+              <input id="add_y" name="y" type="number" class="form-control" placeholder="Y" oninput="debounceLookup()">
+            </div>
+            <button type="button" onclick="lookupVillage()" class="btn btn-secondary" style="font-size:.78rem;padding:.38rem .6rem;white-space:nowrap;">🔍</button>
+          </div>
+          <div id="villageInfo" style="display:none;margin-top:.4rem;padding:.4rem .6rem;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:6px;font-size:.78rem;"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktueller Halter</label>
+            <input id="add_holder" name="current_holder" class="form-control" placeholder="Auto aus Koordinaten">
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktuelles Dorf</label>
+            <input id="add_village" name="current_village" class="form-control" placeholder="Auto aus Koordinaten">
+          </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
             <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Erobert am</label>
@@ -241,16 +269,6 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
           <div>
             <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktiviert am</label>
             <input name="activated_at" class="form-control" placeholder="06.06.2026 14:32">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-          <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktueller Halter</label>
-            <input name="current_holder" class="form-control" placeholder="Spielername">
-          </div>
-          <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktuelles Dorf</label>
-            <input name="current_village" class="form-control" placeholder="Dorfname">
           </div>
         </div>
         <div>
@@ -357,6 +375,52 @@ async function bulkSetSize(size) {
     body: JSON.stringify({ids:[...selectedIds], size})
   });
   if (r.ok) location.reload();
+}
+
+// ── Village coordinate lookup ──────────────────────────────────────────────
+let _lookupTimer = null;
+function debounceLookup() {
+  clearTimeout(_lookupTimer);
+  _lookupTimer = setTimeout(lookupVillage, 600);
+}
+
+async function lookupVillage() {
+  const x = parseInt(document.getElementById('add_x')?.value);
+  const y = parseInt(document.getElementById('add_y')?.value);
+  const info = document.getElementById('villageInfo');
+  if (isNaN(x) || isNaN(y) || !info) return;
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/artifacts/api/village-lookup?x=${x}&y=${y}`);
+    const d = await r.json();
+    if (!d.found) {
+      info.style.display = 'block';
+      info.style.borderColor = 'rgba(239,68,68,.3)';
+      info.innerHTML = `<span style="color:#f87171;">⚠️ Kein Dorf bei (${x}|${y}) gefunden.</span>`;
+      return;
+    }
+    // Auto-fill fields
+    const holderEl  = document.getElementById('add_holder');
+    const villageEl = document.getElementById('add_village');
+    if (holderEl  && !holderEl.value)  holderEl.value  = d.player_name  || '';
+    if (villageEl && !villageEl.value) villageEl.value = d.village_name || '';
+    // Show info card
+    info.style.display = 'block';
+    info.style.borderColor = 'rgba(99,102,241,.25)';
+    const mapUrl = `/guild/${GUILD_ID}/map?cx=${x}&cy=${y}&z=8`;
+    info.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+        <div>
+          <strong>${d.village_name||'?'}</strong>
+          <span style="color:var(--text-muted);font-size:.73rem;margin-left:.3rem;">(${x}|${y})</span><br>
+          <span style="color:var(--text-muted);">👤 ${d.player_name||'?'}</span>
+          ${d.alliance_name ? `<span style="color:var(--text-muted);"> · [${d.alliance_name}]</span>` : ''}
+          ${d.population    ? `<span style="color:var(--text-muted);"> · 🏘️ ${d.population}</span>` : ''}
+        </div>
+        <a href="${mapUrl}" target="_blank" style="font-size:.75rem;color:#a5b4fc;white-space:nowrap;text-decoration:none;flex-shrink:0;">🗺️ Karte</a>
+      </div>`;
+  } catch(e) {
+    console.warn('lookup failed', e);
+  }
 }
 </script>
 {% endif %}
