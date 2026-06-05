@@ -3,22 +3,47 @@
 
 {% block content %}
 <style>
-.art-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; margin-top:1.25rem; }
-.art-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.3rem; position:relative; transition:border-color .15s; }
+.art-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:1rem; margin-top:1.25rem; }
+.art-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:14px;
+  padding:1.1rem 1.2rem; position:relative; transition:border-color .15s, background .15s;
+  text-decoration:none; color:inherit; display:block;
+}
 .art-card:hover { border-color:rgba(139,92,246,.4); }
+.art-card.selected { border-color:rgba(99,102,241,.7) !important; background:rgba(99,102,241,.08); }
 .art-card .size-badge { display:inline-block; font-size:.7rem; font-weight:700; padding:.2rem .6rem; border-radius:20px; margin-bottom:.5rem; }
 .size-small  { background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.35); color:#a5b4fc; }
 .size-large  { background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.35); color:#fbbf24; }
 .size-unique { background:rgba(239,68,68,.15);  border:1px solid rgba(239,68,68,.4);   color:#f87171; }
-.art-name { font-size:1rem; font-weight:700; margin:.2rem 0 .15rem; }
+.art-name { font-size:.95rem; font-weight:700; margin:.2rem 0 .15rem; }
 .art-meta { font-size:.78rem; color:var(--text-muted); }
-.art-holder { margin-top:.7rem; padding:.5rem .75rem; background:rgba(34,197,94,.08); border:1px solid rgba(34,197,94,.2); border-radius:8px; font-size:.82rem; }
+.art-holder { margin-top:.65rem; padding:.45rem .7rem; background:rgba(34,197,94,.08); border:1px solid rgba(34,197,94,.2); border-radius:8px; font-size:.82rem; }
 .art-holder .label { font-size:.68rem; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
 .art-status-lost { opacity:.5; }
 .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:.3rem; }
-.dot-active { background:#4ade80; box-shadow:0 0 6px rgba(74,222,128,.5); }
+.dot-active   { background:#4ade80; box-shadow:0 0 6px rgba(74,222,128,.5); }
 .dot-inactive { background:#94a3b8; }
-.dot-lost { background:#f87171; }
+.dot-lost     { background:#f87171; }
+
+/* Checkbox in top-left of card */
+.art-cb-wrap {
+  position:absolute; top:.65rem; left:.65rem; z-index:2;
+  display:none;
+}
+.art-cb-wrap input { accent-color:var(--primary); width:16px; height:16px; cursor:pointer; }
+body.bulk-mode .art-cb-wrap { display:block; }
+body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
+
+/* Bulk toolbar */
+#bulkBar {
+  display:none; position:sticky; top:57px; z-index:50;
+  background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.35);
+  border-radius:10px; padding:.55rem .9rem;
+  align-items:center; gap:.5rem; flex-wrap:wrap;
+  margin-bottom:.75rem; backdrop-filter:blur(8px);
+}
+#bulkBar.visible { display:flex; }
+
 .modal-overlay { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.7); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
 .modal-overlay.open { display:flex; }
 .modal-box { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:1.75rem; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; }
@@ -38,7 +63,8 @@
       <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary">🏛️ Meine Schatzkammer</a>
       {% if is_leader %}
       <a href="/guild/{{ guild.guild_id }}/all-treasuries" class="btn btn-secondary">👥 Alle Schatzkammern</a>
-      <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary">+ Artefakt hinzufügen</button>
+      <button id="bulkToggleBtn" onclick="toggleBulkMode()" class="btn btn-secondary">☑️ Auswahl</button>
+      <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary">+ Artefakt</button>
       {% endif %}
     </div>
   </div>
@@ -60,51 +86,91 @@
   <!-- Stats bar -->
   {% set active_arts = artifacts | selectattr('status','equalto','active') | list %}
   {% set unique_arts = artifacts | selectattr('artifact_size','equalto','unique') | list %}
-  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
-    <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.5rem 1rem;font-size:.82rem;">
-      🏺 <strong>{{ artifacts|length }}</strong> Artefakte gesamt
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.45rem .9rem;font-size:.82rem;">
+      🏺 <strong>{{ artifacts|length }}</strong> gesamt
     </div>
-    <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:.5rem 1rem;font-size:.82rem;">
+    <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:.45rem .9rem;font-size:.82rem;">
       <span class="status-dot dot-active"></span><strong>{{ active_arts|length }}</strong> aktiv
     </div>
     {% if unique_arts %}
-    <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:.5rem 1rem;font-size:.82rem;">
+    <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:.45rem .9rem;font-size:.82rem;">
       ⭐ <strong>{{ unique_arts|length }}</strong> Unique
     </div>
     {% endif %}
   </div>
 
-  <div class="art-grid">
+  <!-- Bulk toolbar (only for leaders) -->
+  {% if is_leader %}
+  <div id="bulkBar">
+    <span id="bulkCount" style="font-size:.82rem;font-weight:700;color:#a5b4fc;"></span>
+
+    <span style="color:var(--border);font-size:1rem;">|</span>
+
+    <!-- Status -->
+    <span style="font-size:.75rem;color:var(--text-muted);">Status:</span>
+    <button onclick="bulkSetStatus('active')"   class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-active"  ></span>Aktiv</button>
+    <button onclick="bulkSetStatus('inactive')" class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-inactive"></span>Inaktiv</button>
+    <button onclick="bulkSetStatus('lost')"     class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-lost"    ></span>Lost</button>
+
+    <span style="color:var(--border);font-size:1rem;">|</span>
+
+    <!-- Size -->
+    <span style="font-size:.75rem;color:var(--text-muted);">Größe:</span>
+    <button onclick="bulkSetSize('small')"  class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">🔵 Klein</button>
+    <button onclick="bulkSetSize('large')"  class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">🟡 Groß</button>
+    <button onclick="bulkSetSize('unique')" class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">⭐ Unique</button>
+
+    <span style="color:var(--border);font-size:1rem;">|</span>
+
+    <button onclick="bulkDelete()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.75rem;font-weight:600;">🗑 Löschen</button>
+    <button onclick="clearSelection()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:.28rem .6rem;cursor:pointer;font-size:.75rem;">✕</button>
+  </div>
+  {% endif %}
+
+  <div class="art-grid" id="artGrid">
   {% for a in artifacts %}
-  <a href="/guild/{{ guild.guild_id }}/artifacts/{{ a.id }}" style="text-decoration:none;color:inherit;" class="art-card {% if a.status == 'lost' %}art-status-lost{% endif %}">
-    <div>
-      <span class="size-badge size-{{ a.artifact_size }}">
-        {% if a.artifact_size == 'unique' %}⭐ Unique{% elif a.artifact_size == 'large' %}🟡 Groß{% else %}🔵 Klein{% endif %}
-      </span>
-      <span style="float:right;font-size:.75rem;color:var(--text-muted);">
-        <span class="status-dot dot-{{ a.status }}"></span>{{ a.status }}
-      </span>
-    </div>
-    <div class="art-name">{{ artifact_type_labels.get(a.artifact_type, a.artifact_type) }}</div>
-    <div class="art-meta">{{ a.name }}</div>
-    {% if a.effect_scope == 'all' %}
-    <div style="font-size:.72rem;color:#f59e0b;margin-top:.2rem;">Wirkung: alle Dörfer</div>
-    {% else %}
-    <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;">Wirkung: Dorf</div>
-    {% endif %}
-    {% if a.current_holder %}
-    <div class="art-holder">
-      <div class="label">Aktueller Halter</div>
-      <div style="font-weight:700;">{{ a.current_holder }}</div>
-      {% if a.current_village %}<div style="color:var(--text-muted);font-size:.75rem;">📍 {{ a.current_village }}</div>{% endif %}
+  <div style="position:relative;" id="wrap-{{ a.id }}">
+    {% if is_leader %}
+    <div class="art-cb-wrap">
+      <input type="checkbox" class="art-cb" data-id="{{ a.id }}"
+             onclick="event.stopPropagation();handleCb(this)">
     </div>
     {% endif %}
-    {% if a.activated_at or a.activation_override %}
-    <div style="margin-top:.5rem;font-size:.72rem;color:var(--text-muted);">
-      {% if a.activation_override %}⏰ Aktiviert: {{ a.activation_override }}{% elif a.activated_at %}⏰ Aktiviert: {{ a.activated_at }}{% endif %}
-    </div>
-    {% endif %}
-  </a>
+    <a href="/guild/{{ guild.guild_id }}/artifacts/{{ a.id }}"
+       id="card-{{ a.id }}"
+       class="art-card {% if a.status == 'lost' %}art-status-lost{% endif %}"
+       data-id="{{ a.id }}"
+       onclick="return cardClick(event, {{ a.id }}, this)">
+      <div>
+        <span class="size-badge size-{{ a.artifact_size }}">
+          {% if a.artifact_size == 'unique' %}⭐ Unique{% elif a.artifact_size == 'large' %}🟡 Groß{% else %}🔵 Klein{% endif %}
+        </span>
+        <span style="float:right;font-size:.75rem;color:var(--text-muted);">
+          <span class="status-dot dot-{{ a.status }}"></span>{{ a.status }}
+        </span>
+      </div>
+      <div class="art-name">{{ artifact_type_labels.get(a.artifact_type, a.artifact_type) }}</div>
+      <div class="art-meta">{{ a.name }}</div>
+      {% if a.effect_scope == 'all' %}
+      <div style="font-size:.72rem;color:#f59e0b;margin-top:.2rem;">Wirkung: alle Dörfer</div>
+      {% else %}
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;">Wirkung: Dorf</div>
+      {% endif %}
+      {% if a.current_holder %}
+      <div class="art-holder">
+        <div class="label">Aktueller Halter</div>
+        <div style="font-weight:700;">{{ a.current_holder }}</div>
+        {% if a.current_village %}<div style="color:var(--text-muted);font-size:.75rem;">📍 {{ a.current_village }}</div>{% endif %}
+      </div>
+      {% endif %}
+      {% if a.activated_at or a.activation_override %}
+      <div style="margin-top:.5rem;font-size:.72rem;color:var(--text-muted);">
+        {% if a.activation_override %}⏰ {{ a.activation_override }}{% elif a.activated_at %}⏰ {{ a.activated_at }}{% endif %}
+      </div>
+      {% endif %}
+    </a>
+  </div>
   {% endfor %}
   </div>
   {% endif %}
@@ -129,8 +195,8 @@
           </select>
         </div>
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Name (z.B. "Baumeister VIII (4×)")</label>
-          <input name="name" class="form-control" placeholder="Baumeister VIII (4×)" required>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Name</label>
+          <input name="name" class="form-control" placeholder="z.B. Baumeister VIII (4×)" required>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
@@ -151,12 +217,12 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Erobert am (Serverzeit)</label>
-            <input name="conquered_at" class="form-control" placeholder="z.B. 05.06.2026 14:32">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Erobert am</label>
+            <input name="conquered_at" class="form-control" placeholder="05.06.2026 14:32">
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktiviert am (Serverzeit)</label>
-            <input name="activated_at" class="form-control" placeholder="z.B. 06.06.2026 14:32">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktiviert am</label>
+            <input name="activated_at" class="form-control" placeholder="06.06.2026 14:32">
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
@@ -171,13 +237,110 @@
         </div>
         <div>
           <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notizen</label>
-          <textarea name="notes" class="form-control" rows="2" placeholder="Optionale Notizen..."></textarea>
+          <textarea name="notes" class="form-control" rows="2"></textarea>
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%;">✅ Artefakt speichern</button>
       </div>
     </form>
   </div>
 </div>
+
+<script>
+const GUILD_ID  = {{ guild.guild_id | tojson }};
+let selectedIds = new Set();
+let bulkMode    = false;
+
+// ── Bulk mode toggle ───────────────────────────────────────────────────────
+function toggleBulkMode() {
+  bulkMode = !bulkMode;
+  document.body.classList.toggle('bulk-mode', bulkMode);
+  const btn = document.getElementById('bulkToggleBtn');
+  btn.className = 'btn ' + (bulkMode ? 'btn-primary' : 'btn-secondary');
+  btn.textContent = bulkMode ? '✕ Auswahl beenden' : '☑️ Auswahl';
+  if (!bulkMode) clearSelection();
+}
+
+// ── Card click — navigate OR select ───────────────────────────────────────
+function cardClick(e, id, el) {
+  if (!bulkMode) return true; // normal navigation
+  e.preventDefault();
+  toggleCard(id, el);
+  return false;
+}
+
+function toggleCard(id, el) {
+  const cb = document.querySelector(`.art-cb[data-id="${id}"]`);
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+    el.classList.remove('selected');
+    if (cb) cb.checked = false;
+  } else {
+    selectedIds.add(id);
+    el.classList.add('selected');
+    if (cb) cb.checked = true;
+  }
+  updateBulkBar();
+}
+
+function handleCb(cb) {
+  const id = parseInt(cb.dataset.id);
+  const card = document.getElementById('card-' + id);
+  if (cb.checked) { selectedIds.add(id); card?.classList.add('selected'); }
+  else            { selectedIds.delete(id); card?.classList.remove('selected'); }
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.art-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.art-cb').forEach(cb => cb.checked = false);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  const cnt = document.getElementById('bulkCount');
+  if (!bar) return;
+  if (selectedIds.size > 0) {
+    bar.classList.add('visible');
+    cnt.textContent = selectedIds.size + ' ausgewählt';
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+// ── Bulk actions ───────────────────────────────────────────────────────────
+async function bulkDelete() {
+  if (!selectedIds.size) return;
+  if (!confirm(`${selectedIds.size} Artefakt(e) wirklich löschen?`)) return;
+  const r = await fetch(`/guild/${GUILD_ID}/artifacts/bulk-delete`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ids:[...selectedIds]})
+  });
+  if (r.ok) {
+    selectedIds.forEach(id => document.getElementById('wrap-'+id)?.remove());
+    clearSelection();
+  }
+}
+
+async function bulkSetStatus(status) {
+  if (!selectedIds.size) return;
+  const r = await fetch(`/guild/${GUILD_ID}/artifacts/bulk-set-status`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ids:[...selectedIds], status})
+  });
+  if (r.ok) location.reload();
+}
+
+async function bulkSetSize(size) {
+  if (!selectedIds.size) return;
+  const r = await fetch(`/guild/${GUILD_ID}/artifacts/bulk-set-size`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ids:[...selectedIds], size})
+  });
+  if (r.ok) location.reload();
+}
+</script>
 {% endif %}
 
 {% endblock %}

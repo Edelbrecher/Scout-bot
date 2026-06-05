@@ -13445,6 +13445,67 @@ async def artifact_delete(request: Request, guild_id: str, artifact_id: int):
     return RedirectResponse(f"/guild/{guild_id}/artifacts?saved=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/artifacts/bulk-delete")
+async def artifacts_bulk_delete(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
+    n = 0
+    for aid in ids:
+        await database.delete_artifact(aid, guild_id)
+        n += 1
+    return _JSONResponse({"deleted": n})
+
+
+@app.post("/guild/{guild_id}/artifacts/bulk-set-status")
+async def artifacts_bulk_set_status(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    ids    = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
+    status = body.get("status", "active")
+    if status not in ("active", "inactive", "lost"):
+        return _JSONResponse({"error": "invalid status"}, status_code=400)
+    if not ids: return _JSONResponse({"updated": 0})
+    ph = ",".join("?" * len(ids))
+    import aiosqlite as _aio
+    async with _aio.connect(database.DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            f"UPDATE artifacts SET status=?,updated_at=datetime('now') WHERE guild_id=? AND id IN ({ph})",
+            [status, guild_id] + ids
+        )
+        await db.commit()
+    return _JSONResponse({"updated": cur.rowcount})
+
+
+@app.post("/guild/{guild_id}/artifacts/bulk-set-size")
+async def artifacts_bulk_set_size(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return _JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    ids  = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
+    size = body.get("size", "small")
+    if size not in ("small", "large", "unique"):
+        return _JSONResponse({"error": "invalid size"}, status_code=400)
+    if not ids: return _JSONResponse({"updated": 0})
+    ph = ",".join("?" * len(ids))
+    import aiosqlite as _aio
+    async with _aio.connect(database.DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            f"UPDATE artifacts SET artifact_size=?,updated_at=datetime('now') WHERE guild_id=? AND id IN ({ph})",
+            [size, guild_id] + ids
+        )
+        await db.commit()
+    return _JSONResponse({"updated": cur.rowcount})
+
+
 @app.post("/guild/{guild_id}/artifacts/{artifact_id}/rotation/save")
 async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: int):
     session, err = _require_session(request)
