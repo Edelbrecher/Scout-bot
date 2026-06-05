@@ -474,21 +474,33 @@ async def verify_password(username: str, password: str) -> bool:
 
 
 async def get_all_guilds() -> list[dict]:
+    cached = _cache_get("all_guilds")
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM guild_configs WHERE COALESCE(workspace_status,'active') != 'archived' ORDER BY guild_name") as cursor:
             rows = await cursor.fetchall()
-            return [dict(r) for r in rows]
+            result = [dict(r) for r in rows]
+    _cache_set("all_guilds", result)
+    return result
 
 
 async def get_guild(guild_id: str) -> dict | None:
+    cache_key = f"guild:{guild_id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM guild_configs WHERE guild_id = ?", (guild_id,)
         ) as cursor:
             row = await cursor.fetchone()
-            return dict(row) if row else None
+            result = dict(row) if row else None
+    if result:
+        _cache_set(cache_key, result)
+    return result
 
 
 async def update_guild_config(
@@ -509,6 +521,9 @@ async def update_guild_config(
         """, (category_id or None, archive_channel_id or None, allowed_role_ids or None,
               scout_channel_id, bot_language, guild_id))
         await db.commit()
+    # Invalidate cache
+    _CACHE.pop(f"guild:{guild_id}", None)
+    _CACHE.pop("all_guilds", None)
 
 
 async def update_guild_config_fields(guild_id: str, **fields):
@@ -525,6 +540,8 @@ async def update_guild_config_fields(guild_id: str, **fields):
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(f"UPDATE guild_configs SET {set_clause} WHERE guild_id = ?", vals)
         await db.commit()
+    _CACHE.pop(f"guild:{guild_id}", None)
+    _CACHE.pop("all_guilds", None)
 
 
 async def create_personal_workspace(owner_discord_id: str, name: str) -> str:
@@ -2543,13 +2560,42 @@ async def get_servers_overview() -> list[dict]:
         return result
 
 
-async def prune_old_snapshots(guild_id: str, keep_days: int = 30):
+async def prune_old_snapshots(guild_id: str, keep_days: int = 14):
+    """Smart retention: keep all snapshots from last 48h, one-per-day for days 3-14, delete rest."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # 1. Delete everything older than keep_days
         await db.execute("""
             DELETE FROM map_snapshots
             WHERE guild_id = ?
               AND fetched_at < datetime('now', ? || ' days')
         """, (guild_id, f"-{keep_days}"))
+
+        # 2. Thin out snapshots older than 48h: keep only the latest per calendar day
+        #    Get all unique (date, fetched_at) for this guild older than 48h
+        async with db.execute("""
+            SELECT fetched_at
+            FROM map_snapshots
+            WHERE guild_id = ?
+              AND fetched_at < datetime('now', '-2 days')
+            GROUP BY guild_id, date(fetched_at), x, y
+            HAVING fetched_at != MAX(fetched_at)
+        """, (guild_id,)) as cur:
+            pass  # just a placeholder — use simpler approach below
+
+        # Simpler: find all fetched_at timestamps older than 48h
+        # then keep only the MAX(fetched_at) per date, delete the rest
+        await db.execute("""
+            DELETE FROM map_snapshots
+            WHERE guild_id = ?
+              AND fetched_at < datetime('now', '-2 days')
+              AND fetched_at NOT IN (
+                  SELECT MAX(fetched_at)
+                  FROM map_snapshots
+                  WHERE guild_id = ?
+                    AND fetched_at < datetime('now', '-2 days')
+                  GROUP BY date(fetched_at)
+              )
+        """, (guild_id, guild_id))
         await db.commit()
 
 
@@ -10185,7 +10231,6 @@ async def _init_artifact_tables():
 
 
 async def bulk_delete_treasuries(guild_id: str, ids: list[int]) -> int:
-    await _init_artifact_tables()
     if not ids: return 0
     ph = ",".join("?" * len(ids))
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -10198,7 +10243,6 @@ async def bulk_delete_treasuries(guild_id: str, ids: list[int]) -> int:
 
 
 async def bulk_set_treasury_level(guild_id: str, ids: list[int], level: int) -> int:
-    await _init_artifact_tables()
     if not ids: return 0
     ph = ",".join("?" * len(ids))
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -10212,7 +10256,6 @@ async def bulk_set_treasury_level(guild_id: str, ids: list[int], level: int) -> 
 
 async def seed_test_treasuries(guild_id: str) -> int:
     """Insert a set of clearly-labelled test treasuries for training purposes."""
-    await _init_artifact_tables()
     test_entries = [
         ("TEST_SPIELER_1", "Testvilla Alpha",    42,  77, 10),
         ("TEST_SPIELER_1", "Testvilla Beta",     -88,  12, 20),
@@ -10237,7 +10280,6 @@ async def seed_test_treasuries(guild_id: str) -> int:
 
 
 async def clear_test_treasuries(guild_id: str) -> int:
-    await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute(
             "DELETE FROM ally_treasuries WHERE guild_id=? AND is_test=1", (guild_id,)
@@ -10252,7 +10294,6 @@ async def upsert_world_artifacts(guild_id: str, entries: list[dict]) -> int:
     - If x/y present: match on (guild_id, x, y)
     - If only distance: match on (guild_id, name, artifact_size) — no-coord import
     Returns number of upserted rows."""
-    await _init_artifact_tables()
     count = 0
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for e in entries:
@@ -10299,7 +10340,6 @@ async def upsert_world_artifacts(guild_id: str, entries: list[dict]) -> int:
 
 async def get_world_artifacts(guild_id: str) -> list[dict]:
     """Return all world artifacts (with OR without coordinates)."""
-    await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
@@ -10311,14 +10351,12 @@ async def get_world_artifacts(guild_id: str) -> list[dict]:
 
 
 async def get_artifact_runs(guild_id: str) -> list[dict]:
-    await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM artifact_runs WHERE guild_id=? ORDER BY created_at", (guild_id,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
 async def save_artifact_run(guild_id: str, data: dict) -> int:
-    await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO artifact_runs
@@ -10337,13 +10375,11 @@ async def save_artifact_run(guild_id: str, data: dict) -> int:
         return cur.lastrowid
 
 async def delete_artifact_run(guild_id: str, run_id: int):
-    await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM artifact_runs WHERE id=? AND guild_id=?", (run_id, guild_id))
         await db.commit()
 
 async def delete_test_artifact_runs(guild_id: str):
-    await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM artifact_runs WHERE guild_id=? AND is_test=1", (guild_id,))
         await db.commit()
