@@ -1803,10 +1803,11 @@ async def _init_reports_table():
                 defender_village TEXT,
                 defender_x       INTEGER,
                 defender_y       INTEGER,
-                troops_sent_json TEXT DEFAULT '{}',
-                troops_lost_json TEXT DEFAULT '{}',
-                def_troops_json  TEXT DEFAULT '{}',
-                spy_resources_json TEXT DEFAULT '{}',
+                troops_sent_json     TEXT DEFAULT '{}',
+                troops_lost_json     TEXT DEFAULT '{}',
+                def_troops_json      TEXT DEFAULT '{}',
+                def_troops_lost_json TEXT DEFAULT '{}',
+                spy_resources_json   TEXT DEFAULT '{}',
                 plunder_json     TEXT DEFAULT '{}',
                 plunder_total    INTEGER DEFAULT 0,
                 luck             REAL,
@@ -1825,15 +1826,22 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
     import json as _json
     await _init_reports_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Migrate: add def_troops_lost_json column if missing
+        try:
+            await db.execute("ALTER TABLE battle_reports ADD COLUMN def_troops_lost_json TEXT DEFAULT '{}'")
+            await db.commit()
+        except Exception:
+            pass
+
         async with db.execute("""
             INSERT INTO battle_reports
               (guild_id, submitted_by, report_type, report_date,
                attacker_name, attacker_village, attacker_x, attacker_y,
                defender_name, defender_village, defender_x, defender_y,
-               troops_sent_json, troops_lost_json, def_troops_json,
+               troops_sent_json, troops_lost_json, def_troops_json, def_troops_lost_json,
                spy_resources_json, plunder_json, plunder_total,
                luck, hero_hp, raw_text)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             guild_id, submitted_by,
             parsed.get("report_type"), parsed.get("report_date"),
@@ -1844,6 +1852,7 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             _json.dumps(parsed.get("troops_sent", {})),
             _json.dumps(parsed.get("troops_lost", {})),
             _json.dumps(parsed.get("def_troops", {})),
+            _json.dumps(parsed.get("def_troops_lost", {})),
             _json.dumps(parsed.get("spy_resources", {})),
             _json.dumps(parsed.get("plunder", {})),
             parsed.get("plunder_total", 0),
@@ -1877,7 +1886,7 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
                 parsed.get("defender_x"), parsed.get("defender_y"),
                 rdate, rtype,
                 _json.dumps(parsed.get("def_troops", {})),
-                _json.dumps({}),   # defender losses not separately tracked yet
+                _json.dumps(parsed.get("def_troops_lost", {})),
                 0, luck,
             ))
         if log_rows:

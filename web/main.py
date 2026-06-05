@@ -6448,43 +6448,64 @@ def _parse_battle_report(text: str) -> dict:
                     j += 1
                     continue
 
-                # Unlabeled: try to parse as numbers
-                nums = _parse_nums(vline)
-                valid_nums = [n for n in nums if n is not None]
-                if len(valid_nums) == 0 and len(nums) == 0:
-                    break  # empty line ends table
-                if len(valid_nums) == 0 and all(n is None for n in nums):
-                    # All '?' — defender troops unknown
-                    value_rows.append((None, nums))
+                # Unlabeled: strict numeric-only check
+                # CRITICAL: text lines (Information, Bounty, etc.) MUST end the table.
+                # Only real "?" markers (spy-blocked troops) are kept as None placeholders.
+                vparts = re.split(r'\s{2,}|\t', vline)
+                vparts = [p.strip() for p in vparts if p.strip()]
+
+                if not vparts:
+                    break  # blank line
+
+                # Pure "?" row — spy-blocked defender troops
+                if all(p == '?' for p in vparts):
+                    value_rows.append((None, [None] * len(vparts)))
                     j += 1
                     continue
-                # Check it's mostly numeric (not another text header)
-                if len(valid_nums) >= len(nums) * 0.5:
-                    value_rows.append((None, nums))
-                    j += 1
-                else:
-                    break
+
+                # Try parsing every part as integer — if ANY part fails, stop the table
+                nums = []
+                row_ok = True
+                for p in vparts:
+                    try:
+                        nums.append(int(p.replace('.', '').replace(',', '').replace('−', '-')))
+                    except ValueError:
+                        row_ok = False
+                        break
+
+                if not row_ok or not nums:
+                    break  # text line — end of troop table
+
+                value_rows.append((None, nums))
+                j += 1
 
             # Assign unlabeled rows by position:
-            # 1 row  → sent
+            # Travian always shows: Sent / [Survivors] / Losses
+            # 1 row  → sent only (can't compute losses)
             # 2 rows → sent, losses
-            # 3 rows → sent, survivors (ignored), losses
+            # 3 rows → sent, survivors (skip), losses
             unlabeled = [(dest, nums) for dest, nums in value_rows if dest is None]
             labeled   = [(dest, nums) for dest, nums in value_rows if dest is not None]
 
+            is_defender_table = tables_found > 0
+
             if unlabeled and not labeled:
                 if len(unlabeled) == 1:
-                    labeled = [("sent", unlabeled[0][1])]
+                    labeled = [("troops", unlabeled[0][1])]
                 elif len(unlabeled) == 2:
-                    labeled = [("sent", unlabeled[0][1]), ("lost", unlabeled[1][1])]
+                    labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[1][1])]
                 elif len(unlabeled) >= 3:
-                    labeled = [("sent", unlabeled[0][1]), ("lost", unlabeled[-1][1])]
+                    # Row 0=sent, Row 1=survivors, Row -1=losses
+                    labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[-1][1])]
 
             for dest, nums in labeled:
-                actual_dest = dest
-                # Second table → defender troops
-                if tables_found > 0 and dest == "sent":
-                    actual_dest = "def"
+                if is_defender_table:
+                    actual_dest = "def" if dest == "troops" else "def_lost"
+                else:
+                    actual_dest = "sent" if dest == "troops" else "lost"
+
+                if actual_dest not in out:
+                    out[actual_dest] = {}
                 for ui, unit in enumerate(unit_header):
                     if ui < len(nums) and nums[ui] is not None and nums[ui] > 0:
                         out[actual_dest][unit] = out[actual_dest].get(unit, 0) + nums[ui]
@@ -6495,9 +6516,10 @@ def _parse_battle_report(text: str) -> dict:
         return out
 
     troop_data = _parse_troop_table(text_clean)
-    result["troops_sent"] = troop_data["sent"]
-    result["troops_lost"] = troop_data["lost"]
-    result["def_troops"]  = troop_data["def"]
+    result["troops_sent"]  = troop_data.get("sent", {})
+    result["troops_lost"]  = troop_data.get("lost", {})
+    result["def_troops"]   = troop_data.get("def", {})
+    result["def_troops_lost"] = troop_data.get("def_lost", {})
 
     return result
 
@@ -12317,7 +12339,7 @@ async def report_detail(request: Request, guild_id: str, report_id: int):
 
     import json as _json
     for jf in ("troops_sent_json", "troops_lost_json", "def_troops_json",
-               "spy_resources_json", "plunder_json"):
+               "def_troops_lost_json", "spy_resources_json", "plunder_json"):
         try:
             r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
         except Exception:
