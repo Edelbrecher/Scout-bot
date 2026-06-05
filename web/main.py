@@ -4627,6 +4627,7 @@ async def my_account_page(request: Request, guild_id: str):
     hospital_cleared  = request.query_params.get("hospital_cleared")
 
     my_waves = await database.get_my_op_waves(guild_id, discord_id)
+    march_settings = await database.get_march_settings(guild_id, discord_id)
 
     return templates.TemplateResponse("my_account.html", {
         "request":            request,
@@ -4651,6 +4652,8 @@ async def my_account_page(request: Request, guild_id: str):
         "tq_min":             tq_min,
         "lock_travian_name":  lock_travian_name and not _is_account_editor,
         "scout_village":      scout_village,
+        "march_settings":     march_settings,
+        "march_saved":        request.query_params.get("march_saved"),
     })
 
 
@@ -4749,6 +4752,30 @@ async def my_account_set_scout_village(
     discord_id = session.get("uid", "") or session.get("discord_id", "")
     await database.set_scout_village(guild_id, discord_id, x, y)
     return RedirectResponse(f"/guild/{guild_id}/my-account?saved=scout_village", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-account/march-settings")
+async def save_march_settings(
+    request: Request, guild_id: str,
+    tournament_square: int = Form(0),
+    boots: str = Form("none:0"),
+    server_speed: float = Form(1.0),
+    home_x: float = Form(0.0),
+    home_y: float = Form(0.0),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    discord_id = session.get("uid", "")
+    await database.save_march_settings(
+        guild_id, discord_id,
+        tournament_square=int(tournament_square),
+        boots=boots.strip() or "none:0",
+        server_speed=float(server_speed),
+        home_x=float(home_x), home_y=float(home_y),
+    )
+    return RedirectResponse(f"/guild/{guild_id}/my-account?march_saved=1#march-settings", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-account/clear")
@@ -7430,12 +7457,15 @@ async def einsatz_page(request: Request, guild_id: str):
     err = await _require_premium(guild, guild_id)
     if err: return err
     plans = await database.get_attack_plans(guild_id)
+    discord_id = session.get("uid", "")
+    march_settings = await database.get_march_settings(guild_id, discord_id)
     return templates.TemplateResponse("einsatz.html", {
         "request": request,
         "guild": guild,
         "plans": plans,
         "session": session,
         "saved": request.query_params.get("saved"),
+        "march_settings": march_settings,
     })
 
 

@@ -17,80 +17,38 @@
   </div>
   {% endif %}
 
-  <!-- ── Mein Profil (lokal) ── -->
-  <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin-top:0;"><span data-i18n="personal.profile.title">🏰 Mein Travian-Profil</span> <small style="font-size:0.7rem; color:var(--text-muted); font-weight:400;" data-i18n="personal.profile.local">(lokal gespeichert)</small></h2>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.75rem; align-items:end;">
-      <div class="form-group" style="margin:0;">
-        <label>Server URL</label>
-        <input type="url" id="profileServer" placeholder="https://ts2.x1.europe.travian.com"
-          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>Servergeschwindigkeit</label>
-        <select id="profileServerSpeed"
-          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;"
-          onchange="updateSendTime(); renderAllMarchTimes();">
-          <option value="1">1x (Standard)</option>
-          <option value="2">2x</option>
-          <option value="3">3x</option>
-          <option value="5">5x</option>
-          <option value="10">10x</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>Eigene X-Koordinate</label>
-        <input type="number" id="profileX" placeholder="0" min="-400" max="400"
-          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>Eigene Y-Koordinate</label>
-        <input type="number" id="profileY" placeholder="0" min="-400" max="400"
-          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;" />
-      </div>
-
-      <div class="form-group" style="margin:0;">
-        <label>🥾 Held-Stiefel</label>
-        <select id="profileBoots" onchange="updateSendTime(); renderAllMarchTimes();"
-          style="width:100%; padding:0.5rem; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:6px;">
-          <optgroup label="Keine">
-            <option value="none:0">Keine Stiefel</option>
-          </optgroup>
-          <optgroup label="Pferdesporen (flacher F/h-Bonus, ganzer Marsch)">
-            <option value="spurs:3">Kleine Pferdesporen (+3/6/9 F/h · je Servergeschw.)</option>
-            <option value="spurs:4">Pferdesporen (+4/8/12 F/h · je Servergeschw.)</option>
-            <option value="spurs:5">Large horseshoes (+5/10/15 F/h · per server speed)</option>
-          </optgroup>
-          <optgroup label="Soldier/commander boots (% after 20 squares)">
-            <option value="pct:25">Soldatenstiefel Tier 1 (+25% nach 20 Feldern)</option>
-            <option value="pct:50">Soldatenstiefel Tier 2 (+50% nach 20 Feldern)</option>
-            <option value="pct:75">Commander boots (+75% after 20 squares)</option>
-          </optgroup>
-        </select>
-        <div id="bootsHint" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;"></div>
-      </div>
-
-      <div class="form-group" style="margin:0;">
-        <label>🏟️ Turnierplatz Level <span id="tpLevelDisplay" style="color:#93c5fd; font-weight:700;">0</span>
-          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">(nach 20 Feldern)</span>
-        </label>
-        <input type="range" id="profileTP" min="0" max="20" value="0" step="1"
-          style="width:100%; accent-color:#3b82f6; margin-top:0.4rem;"
-          oninput="document.getElementById('tpLevelDisplay').textContent=this.value; updateTpBonus(); updateSendTime(); renderAllMarchTimes();" />
-        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
-          <span>0</span><span>5</span><span>10</span><span>15</span><span>20</span>
-        </div>
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;">
-          TP-Bonus: <span id="tpBonusDisplay" style="color:#93c5fd; font-weight:600;">+0%</span>
-        </div>
-      </div>
-
-      <div>
-        <button id="btnSaveProfile" class="btn btn-primary" style="width:100%;">💾 Speichern</button>
-      </div>
-    </div>
-    <p id="profileSaved" style="color:#4caf82; font-size:0.85rem; margin-top:0.5rem; display:none;">✅ Profil gespeichert</p>
+  <!-- March settings banner (from my-account) -->
+  {% set ms = march_settings or {} %}
+  {% set ms_tp = ms.tournament_square or 0 %}
+  {% set ms_boots = ms.boots or 'none:0' %}
+  {% set ms_speed = (ms.server_speed or 1)|int %}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+              padding:.6rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+              font-size:.82rem;color:var(--text-muted);">
+    <span>⚙️ <strong style="color:var(--text);">March settings</strong> from your account:</span>
+    <span>🚀 {{ ms_speed }}x speed</span>
+    {% if ms_tp > 0 %}<span>🏟️ TP level {{ ms_tp }} (+{{ ms_tp * 20 }}%)</span>{% endif %}
+    {% if ms_boots != 'none:0' %}<span>🥾 Boots: {{ ms_boots }}</span>{% endif %}
+    <a href="/guild/{{ guild.guild_id }}/my-account#march-settings"
+       style="margin-left:auto;color:var(--primary);text-decoration:none;font-size:.75rem;">Edit ›</a>
   </div>
+
+  <!-- Inject server-side profile into JS (replaces localStorage) -->
+  <script>
+  // Profile from server — overrides any stale localStorage values
+  const _SERVER_PROFILE = {
+    server:      "{{ guild.tw_world or '' }}",
+    serverSpeed: {{ ms_speed }},
+    x:           {{ ms.home_x or 0 }},
+    y:           {{ ms.home_y or 0 }},
+    boots:       "{{ ms_boots }}",
+    tp:          {{ ms_tp }},
+  };
+  // Merge into localStorage so existing JS code keeps working unchanged
+  const _stored = JSON.parse(localStorage.getItem('travian_profile_einsatz') || '{}');
+  const _merged = Object.assign(_stored, _SERVER_PROFILE);
+  localStorage.setItem('travian_profile_einsatz', JSON.stringify(_merged));
+  </script>
 
   <!-- ── Neuen Operation erstellen ── -->
   <div class="card" style="margin-bottom:1rem;">

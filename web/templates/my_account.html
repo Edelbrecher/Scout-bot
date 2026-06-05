@@ -458,6 +458,96 @@
 
 </div>
 
+<!-- ══ March Settings ═══════════════════════════════════════════════ -->
+<div id="march-settings" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:.75rem;">
+  <h2 style="margin:0 0 .85rem;font-size:1rem;display:flex;align-items:center;gap:.5rem;">
+    🏹 March Settings
+    <span style="font-size:.72rem;font-weight:400;color:var(--text-muted);">Used for operation planning &amp; march time calculation</span>
+  </h2>
+
+  {% if march_saved %}
+  <div style="background:rgba(134,239,172,.1);border:1px solid rgba(134,239,172,.3);border-radius:8px;
+              padding:.5rem .85rem;font-size:.82rem;color:#86efac;margin-bottom:.75rem;">
+    ✅ March settings saved.
+  </div>
+  {% endif %}
+
+  <form method="post" action="/guild/{{ guild.guild_id }}/my-account/march-settings">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;align-items:end;">
+
+      <div>
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Server speed</label>
+        <select name="server_speed"
+                style="width:100%;padding:.45rem .7rem;background:var(--bg-input);border:1px solid var(--border);
+                       border-radius:8px;color:var(--text);font-size:.85rem;">
+          {% for spd in [1,2,3,5,10] %}
+          <option value="{{ spd }}" {% if (march_settings.server_speed or 1)|int == spd %}selected{% endif %}>{{ spd }}x{% if spd==1 %} (Standard){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Home X-coordinate</label>
+        <input type="number" name="home_x" value="{{ march_settings.home_x or 0 }}"
+               min="-400" max="400" placeholder="0"
+               style="width:100%;padding:.45rem .7rem;background:var(--bg-input);border:1px solid var(--border);
+                      border-radius:8px;color:var(--text);font-size:.85rem;box-sizing:border-box;">
+      </div>
+
+      <div>
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Home Y-coordinate</label>
+        <input type="number" name="home_y" value="{{ march_settings.home_y or 0 }}"
+               min="-400" max="400" placeholder="0"
+               style="width:100%;padding:.45rem .7rem;background:var(--bg-input);border:1px solid var(--border);
+                      border-radius:8px;color:var(--text);font-size:.85rem;box-sizing:border-box;">
+      </div>
+
+      <div>
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">
+          🥾 Hero boots
+        </label>
+        <select name="boots"
+                style="width:100%;padding:.45rem .7rem;background:var(--bg-input);border:1px solid var(--border);
+                       border-radius:8px;color:var(--text);font-size:.82rem;">
+          <option value="none:0" {% if (march_settings.boots or 'none:0') == 'none:0' %}selected{% endif %}>No boots</option>
+          <optgroup label="Horseshoes (flat F/h bonus, whole march)">
+            <option value="spurs:3" {% if march_settings.boots == 'spurs:3' %}selected{% endif %}>Small horseshoes (+3/6/9 F/h)</option>
+            <option value="spurs:4" {% if march_settings.boots == 'spurs:4' %}selected{% endif %}>Horseshoes (+4/8/12 F/h)</option>
+            <option value="spurs:5" {% if march_settings.boots == 'spurs:5' %}selected{% endif %}>Large horseshoes (+5/10/15 F/h)</option>
+          </optgroup>
+          <optgroup label="Soldier/Commander boots (% after 20 squares)">
+            <option value="pct:25" {% if march_settings.boots == 'pct:25' %}selected{% endif %}>Soldier boots Tier 1 (+25%)</option>
+            <option value="pct:50" {% if march_settings.boots == 'pct:50' %}selected{% endif %}>Soldier boots Tier 2 (+50%)</option>
+            <option value="pct:75" {% if march_settings.boots == 'pct:75' %}selected{% endif %}>Commander boots (+75%)</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">
+          🏟️ Tournament Square level
+          <span style="color:#93c5fd;font-weight:700;" id="tpDisplayMA">{{ march_settings.tournament_square or 0 }}</span>
+          <span style="font-weight:400;">(+<span id="tpBonusMA">{{ ((march_settings.tournament_square or 0) * 20) }}</span>% after 20 sq.)</span>
+        </label>
+        <input type="range" name="tournament_square"
+               id="tpSliderMA" min="0" max="20" step="1"
+               value="{{ march_settings.tournament_square or 0 }}"
+               style="width:100%;accent-color:var(--primary);"
+               oninput="document.getElementById('tpDisplayMA').textContent=this.value;
+                        document.getElementById('tpBonusMA').textContent=(this.value*20);">
+        <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-muted);margin-top:2px;">
+          <span>0</span><span>5</span><span>10</span><span>15</span><span>20</span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-end;">
+        <button type="submit" class="btn btn-primary" style="width:100%;">💾 Save march settings</button>
+      </div>
+
+    </div>
+  </form>
+</div>
+
 <!-- ══ Lazarett Modal ════════════════════════════════════════════════ -->
 <div id="hospitalModal"
      style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.65);

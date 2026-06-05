@@ -7636,6 +7636,59 @@ async def get_member_troops_single(guild_id: str, discord_id: str) -> dict | Non
     return r
 
 
+async def save_march_settings(guild_id: str, discord_id: str, *,
+                              tournament_square: int = 0, boots: str = "none:0",
+                              server_speed: float = 1.0,
+                              home_x: float = 0, home_y: float = 0) -> None:
+    """Persist per-user march settings (tournament square, boots, server speed, home coords)."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_march_settings (
+                guild_id    TEXT NOT NULL,
+                discord_id  TEXT NOT NULL,
+                tournament_square INTEGER DEFAULT 0,
+                boots       TEXT DEFAULT 'none:0',
+                server_speed REAL DEFAULT 1.0,
+                home_x      REAL DEFAULT 0,
+                home_y      REAL DEFAULT 0,
+                updated_at  TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (guild_id, discord_id)
+            )
+        """)
+        await db.execute("""
+            INSERT INTO user_march_settings
+                (guild_id, discord_id, tournament_square, boots, server_speed, home_x, home_y, updated_at)
+            VALUES (?,?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(guild_id, discord_id) DO UPDATE SET
+                tournament_square = excluded.tournament_square,
+                boots             = excluded.boots,
+                server_speed      = excluded.server_speed,
+                home_x            = excluded.home_x,
+                home_y            = excluded.home_y,
+                updated_at        = excluded.updated_at
+        """, (guild_id, discord_id, max(0, min(tournament_square, 20)),
+              boots, server_speed, home_x, home_y))
+        await db.commit()
+
+
+async def get_march_settings(guild_id: str, discord_id: str) -> dict:
+    """Return march settings for a user, with defaults if not set."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        try:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM user_march_settings WHERE guild_id=? AND discord_id=?",
+                (guild_id, discord_id)
+            ) as cur:
+                row = await cur.fetchone()
+                if row:
+                    return dict(row)
+        except Exception:
+            pass
+    return {"tournament_square": 0, "boots": "none:0", "server_speed": 1.0,
+            "home_x": 0.0, "home_y": 0.0}
+
+
 async def get_member_troops_for_discord_ids(discord_ids: list[str]) -> dict[str, dict]:
     """Return most recent troop entry per discord_id, across all guilds.
     Returns dict: discord_id -> row dict (with 'villages' list parsed)."""
