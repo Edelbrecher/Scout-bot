@@ -184,7 +184,7 @@
     <div class="arm-map-controls">
       <button class="arm-map-btn" onclick="armZoom(1.3)" title="Zoom in" style="font-size:1.3rem;line-height:1;">＋</button>
       <button class="arm-map-btn" onclick="armZoom(0.77)" title="Zoom out" style="font-size:1.5rem;line-height:1;padding-bottom:2px;">－</button>
-      <button class="arm-map-btn" onclick="armFit()" title="Fit to screen" style="font-size:.8rem;font-weight:600;letter-spacing:-.5px;">⤢</button>
+      <button class="arm-map-btn" onclick="armFitRuns()" title="Fit to artifacts" style="font-size:.8rem;font-weight:600;letter-spacing:-.5px;">⤢</button>
     </div>
     <div id="armTooltip"></div>
   </div>
@@ -286,10 +286,57 @@ let selectedId = null;
 let editingId  = null;
 
 // ── Canvas state — same model as map.html ──────────────────────────────────
-// camX/camY = world-coords at canvas centre; scale = pixels per world-tile
-let camX=0, camY=0, scale=4;
+let camX=0, camY=0, scale=2;
+let mapRadius=400;
 const S = { bgV:[] };
 let isDragging=false, dragStart={x:0,y:0}, camStart={x:0,y:0};
+
+const TRIBE_COLOR = { 1:'#c0392b', 2:'#85929e', 3:'#58d68d', 4:'#d4ac0d', 5:'#9b59b6', 6:'#1abc9c' };
+const NATAR_COLOR = '#e67e22';
+
+// ── parseSql (copied from map.html) ───────────────────────────────────────
+function parseTuple(s){
+  const vals=[]; let i=0,L=s.length;
+  while(i<L){
+    while(i<L&&(s[i]===' '||s[i]==='\t'))i++;
+    if(i>=L)break;
+    if(s[i]==="'"){
+      i++; let str='';
+      while(i<L){ if(s[i]==="'"&&s[i-1]!=='\\')break; if(s[i]==='\\'&&s[i+1]==="'"){str+="'";i+=2;continue;} str+=s[i++]; }
+      i++;
+      vals.push(str.replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&quot;/g,'"'));
+    } else {
+      let j=i; while(j<L&&s[j]!==',')j++;
+      vals.push(s.slice(i,j).trim()); i=j;
+    }
+    while(i<L&&(s[i]===' '||s[i]==='\t'))i++;
+    if(i<L&&s[i]===',')i++;
+  }
+  return vals;
+}
+function parseSql(text){
+  const isNum=s=>/^-?\d+(\.\d+)?$/.test((s||'').trim());
+  const rows=[]; let maxC=0;
+  for(const line of text.split('\n')){
+    const m=line.match(/VALUES\s*\((.+)\);?\s*$/i);
+    if(!m)continue;
+    const v=parseTuple(m[1]);
+    if(v.length<7)continue;
+    const f0=parseFloat(v[0]);
+    if(isNaN(f0))continue;
+    let x,y,tribe,pop,pname,aname,isCapital;
+    const v7num=isNum(v[7]);
+    if(!v7num&&f0>=0&&v.length>10){x=+v[1];y=+v[2];tribe=+v[3]||0;pname=(v[7]&&v[7]!=='NULL')?v[7]:null;aname=(v[9]&&v[9]!=='NULL')?v[9]:null;pop=+v[10]||0;isCapital=v[12]==='TRUE'||v[12]==='1';}
+    else if(!v7num&&Math.abs(f0)<=800){x=+v[0];y=+v[1];tribe=+v[3]||0;pop=+v[6]||0;pname=(v[7]&&v[7]!=='NULL')?v[7]:null;aname=(v[9]&&v[9]!=='NULL')?v[9]:null;isCapital=v[12]==='TRUE'||v[12]==='1';}
+    else{x=+v[1];y=+v[2];tribe=+v[4]||0;pop=+v[7]||0;pname=(v[8]&&v[8]!=='NULL')?v[8]:null;aname=(v[10]&&v[10]!=='NULL')?v[10]:null;isCapital=v[13]==='TRUE'||v[13]==='1';}
+    if(isNaN(x)||isNaN(y))continue;
+    const isNatar=pname==='Natars'||(pname===null&&tribe>0&&pop<=2);
+    const c=Math.max(Math.abs(x),Math.abs(y));
+    if(c>maxC&&c<=800)maxC=c;
+    rows.push({x,y,tribe,pop,player:pname,alliance:aname,isCapital,isNatar});
+  }
+  return{rows,maxCoord:maxC||400};
+}
 
 // ── Coordinate helpers (identical to map.html) ─────────────────────────────
 function w2c(wx,wy){
@@ -303,8 +350,16 @@ function c2w(cx,cy){
           camY - (cy-canvas.height/2)/scale];
 }
 
-// ── Fit all ────────────────────────────────────────────────────────────────
+// ── Fit: show full world (like map.html default) ───────────────────────────
 function armFit(){
+  const canvas=document.getElementById('armCanvas');
+  camX=0; camY=0;
+  scale=Math.min(canvas.width, canvas.height)/(mapRadius*2+4);
+  draw();
+}
+
+// ── Fit to artifacts/runs only ─────────────────────────────────────────────
+function armFitRuns(){
   const canvas=document.getElementById('armCanvas');
   const pts=[];
   runs.forEach(r=>{
@@ -316,16 +371,13 @@ function armFit(){
     const x=parseInt(a.x)||0, y=parseInt(a.y)||0;
     if(x||y) pts.push([x,y]);
   });
-  if(!pts.length){ camX=0;camY=0;scale=4; }
-  else {
-    const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
-    const midX=(Math.min(...xs)+Math.max(...xs))/2;
-    const midY=(Math.min(...ys)+Math.max(...ys))/2;
-    camX=midX; camY=midY;
-    const rangeX=Math.max(...xs)-Math.min(...xs)+60;
-    const rangeY=Math.max(...ys)-Math.min(...ys)+60;
-    scale=Math.min(canvas.width/rangeX, canvas.height/rangeY);
-  }
+  if(!pts.length){ armFit(); return; }
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  camX=(Math.min(...xs)+Math.max(...xs))/2;
+  camY=(Math.min(...ys)+Math.max(...ys))/2;
+  const rangeX=Math.max(...xs)-Math.min(...xs)+120;
+  const rangeY=Math.max(...ys)-Math.min(...ys)+120;
+  scale=Math.min(canvas.width/rangeX, canvas.height/rangeY, 12);
   draw();
 }
 
@@ -351,16 +403,20 @@ function draw(){
     const[,py]=w2c(0,gy); ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
   }
 
-  // background villages
-  const vs=Math.max(1.5,Math.min(5,scale*0.3));
-  ctx.globalAlpha=0.3;
-  for(const v of S.bgV){
-    const[px,py]=w2c(v.x,v.y);
-    if(px<-vs||px>canvas.width+vs||py<-vs||py>canvas.height+vs) continue;
-    ctx.fillStyle=v.is_capital?'#ffe066':'#4a7c59';
-    ctx.fillRect(px-vs/2,py-vs/2,vs,vs);
+  // background villages (same rendering as map.html)
+  {
+    const tS=Math.max(1,scale);
+    const[vx0,vy1]=c2w(-scale,canvas.height+scale);
+    const[vx1,vy0]=c2w(canvas.width+scale,-scale);
+    for(const v of S.bgV){
+      if(v.x<vx0||v.x>vx1||v.y<vy1||v.y>vy0) continue;
+      const[px,py]=w2c(v.x,v.y);
+      const color=v.isNatar?NATAR_COLOR:(TRIBE_COLOR[v.tribe]||'#aaaaaa');
+      const r=Math.max(1.2,tS*0.82);
+      ctx.fillStyle=color;
+      ctx.fillRect(px-r/2,py-r/2,r,r);
+    }
   }
-  ctx.globalAlpha=1;
 
   const dot=Math.max(4,scale*0.35);
   const fontSize=Math.max(9,Math.min(12,scale*0.9));
@@ -755,10 +811,20 @@ function closeModal(){ document.getElementById('armModal').classList.remove('ope
 // ── Init ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
   setupCanvas();
-  armFit();
-  // Load bg villages
-  fetch(`/guild/${GUILD_ID}/operations/api/villages`,{credentials:'include'})
-    .then(r=>r.ok?r.json():null).then(d=>{if(d){S.bgV=d.villages||[];draw();}}).catch(()=>{});
+  // Load world map data (same as map.html)
+  fetch(`/guild/${GUILD_ID}/map/data`)
+    .then(r=>r.ok?r.json():null)
+    .then(json=>{
+      if(!json||!json.data) return;
+      const {rows, maxCoord} = parseSql(json.data);
+      S.bgV = rows;
+      mapRadius = maxCoord;
+      // Set initial scale to show full world
+      const canvas=document.getElementById('armCanvas');
+      scale=Math.min(canvas.width,canvas.height)/(mapRadius*2+4);
+      camX=0; camY=0;
+      draw();
+    }).catch(()=>{});
 });
 </script>
 {% endblock %}
