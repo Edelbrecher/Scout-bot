@@ -1300,9 +1300,9 @@ calcTradeRoutes();
 
 function csCleanUnicode(s) {
   return s
-    .replace(/ | /g, '\n')
-    .replace(/ /g, ' ')
-    .replace(/[​‌‍‎‏‪‫‬‭‮⁠⁦⁧⁨⁩؜﻿­]/g, '');
+    .replace(/\u2028|\u2029/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2060\u2066\u2067\u2068\u2069\u061C\uFEFF\u00AD]/g, '');
 }
 function csParseGermanNum(s) {
   if (!s) return 0;
