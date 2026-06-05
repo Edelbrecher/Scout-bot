@@ -727,10 +727,14 @@ function parseAndSimulate() {
   const hasDeliveries    = parsed.incoming.length > 0 || parsed.outgoing.length > 0;
 
   if (!hasVillageParams && !hasDeliveries) {
-    statusEl.textContent = '⚠️ Please enter village parameters or paste marketplace data.';
-    statusEl.style.color = '#f87171';
+    // Show prominent inline error — the small status span is too easy to miss
+    statusEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:.4rem .8rem;font-size:.82rem;color:#f87171;">⚠️ Bitte Grain-Vorrat oder Netto G/h eingeben, dann Simulieren klicken.</span>';
+    statusEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
+
+  statusEl.textContent = '⏳ Simuliere…';
+  statusEl.style.color = 'var(--text-muted)';
 
   try {
     const simResult = simulate({
@@ -747,9 +751,11 @@ function parseAndSimulate() {
       currentGrain, productionPerH, consumptionPerH, granaryCapacity, durationH,
       incoming: parsed.incoming, outgoing: parsed.outgoing,
     });
+
+    statusEl.textContent = '✅ Simulation abgeschlossen';
+    statusEl.style.color = '#4ade80';
   } catch(e) {
-    statusEl.textContent = '⚠️ Simulations-Fehler: ' + e.message;
-    statusEl.style.color = '#f87171';
+    statusEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:.4rem .8rem;font-size:.82rem;color:#f87171;">⚠️ Fehler: ' + e.message + '</span>';
     console.error('Simulation error:', e);
   }
 }
@@ -891,7 +897,13 @@ function renderResults(sim, params) {
   }
 
   // ── Build chart ────────────────────────────────────────────────────────────
-  buildChart(sim, granaryCapacity, durationH, nowMs);
+  try {
+    buildChart(sim, granaryCapacity, durationH, nowMs);
+  } catch(e) {
+    console.error('Chart error:', e);
+    document.getElementById('grainChart').parentElement.innerHTML =
+      '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.82rem;">📊 Chart konnte nicht geladen werden (Chart.js fehlt?)</div>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
