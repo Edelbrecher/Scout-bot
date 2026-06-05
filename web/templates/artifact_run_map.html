@@ -285,48 +285,51 @@ let runs = {{ runs | tojson }};
 let selectedId = null;
 let editingId  = null;
 
-// ── Canvas state ───────────────────────────────────────────────────────────
-const S = { minX:-100, maxX:100, minY:-100, maxY:100, offX:0, offY:0, scale:1, bgV:[] };
-let isDragging=false, dragStart={x:0,y:0}, dragOff={x:0,y:0};
+// ── Canvas state — same model as map.html ──────────────────────────────────
+// camX/camY = world-coords at canvas centre; scale = pixels per world-tile
+let camX=0, camY=0, scale=4;
+const S = { bgV:[] };
+let isDragging=false, dragStart={x:0,y:0}, camStart={x:0,y:0};
 
-// ── Coordinate helpers ──────────────────────────────────────────────────────
+// ── Coordinate helpers (identical to map.html) ─────────────────────────────
 function w2c(wx,wy){
   const canvas=document.getElementById('armCanvas');
-  // Travian: positive Y = north = UP on screen → invert Y axis
-  const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
-  const bs=Math.min(canvas.width/rx, canvas.height/ry)*S.scale;
-  const cx=canvas.width/2, cy=canvas.height/2;
-  const midX=(S.minX+S.maxX)/2, midY=(S.minY+S.maxY)/2;
-  return [cx+(wx-midX)*bs+S.offX, cy-(wy-midY)*bs+S.offY];
+  return [canvas.width/2  + (wx-camX)*scale,
+          canvas.height/2 - (wy-camY)*scale];
 }
 function c2w(cx,cy){
   const canvas=document.getElementById('armCanvas');
-  const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
-  const bs=Math.min(canvas.width/rx, canvas.height/ry)*S.scale;
-  const ccx=canvas.width/2, ccy=canvas.height/2;
-  const midX=(S.minX+S.maxX)/2, midY=(S.minY+S.maxY)/2;
-  return [(cx-ccx-S.offX)/bs+midX, -((cy-ccy-S.offY)/bs)+midY];
+  return [camX + (cx-canvas.width/2)/scale,
+          camY - (cy-canvas.height/2)/scale];
 }
 
 // ── Fit all ────────────────────────────────────────────────────────────────
 function armFit(){
+  const canvas=document.getElementById('armCanvas');
   const pts=[];
   runs.forEach(r=>{
-    [[r.artifact_x,r.artifact_y],[r.cleaner_x,r.cleaner_y],[r.destroyer_x,r.destroyer_y],[r.picker_x,r.picker_y]]
-      .forEach(([x,y])=>{ if(x||y) pts.push([x,y]); });
+    [[r.artifact_x,r.artifact_y],[r.cleaner_x,r.cleaner_y],
+     [r.destroyer_x,r.destroyer_y],[r.picker_x,r.picker_y]]
+      .forEach(([x,y])=>{ if(x||y) pts.push([+x,+y]); });
   });
-  if(!pts.length){ S.minX=-100;S.maxX=100;S.minY=-100;S.maxY=100;S.scale=1;S.offX=0;S.offY=0; }
+  WORLD_ARTIFACTS.forEach(a=>{
+    const x=parseInt(a.x)||0, y=parseInt(a.y)||0;
+    if(x||y) pts.push([x,y]);
+  });
+  if(!pts.length){ camX=0;camY=0;scale=4; }
   else {
     const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
-    const pad=30;
-    S.minX=Math.min(...xs)-pad; S.maxX=Math.max(...xs)+pad;
-    S.minY=Math.min(...ys)-pad; S.maxY=Math.max(...ys)+pad;
-    S.scale=1; S.offX=0; S.offY=0;
+    const midX=(Math.min(...xs)+Math.max(...xs))/2;
+    const midY=(Math.min(...ys)+Math.max(...ys))/2;
+    camX=midX; camY=midY;
+    const rangeX=Math.max(...xs)-Math.min(...xs)+60;
+    const rangeY=Math.max(...ys)-Math.min(...ys)+60;
+    scale=Math.min(canvas.width/rangeX, canvas.height/rangeY);
   }
   draw();
 }
 
-function armZoom(f){ S.scale*=f; draw(); }
+function armZoom(f){ scale*=f; draw(); }
 
 // ── Draw ───────────────────────────────────────────────────────────────────
 function draw(){
@@ -335,20 +338,21 @@ function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#0d1a0d'; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // grid
-  const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
-  const bs=Math.min(canvas.width/rx,canvas.height/ry)*S.scale;
-  const gs=Math.max(1,Math.round(20/bs));
+  // grid — derive visible world range from camX/camY/scale
+  const visHalfX=canvas.width/(2*scale), visHalfY=canvas.height/(2*scale);
+  const visMinX=camX-visHalfX, visMaxX=camX+visHalfX;
+  const visMinY=camY-visHalfY, visMaxY=camY+visHalfY;
+  const gs=Math.max(1,Math.round(20/scale));
   ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
-  for(let gx=Math.floor(S.minX/gs)*gs;gx<=S.maxX+gs;gx+=gs){
+  for(let gx=Math.floor(visMinX/gs)*gs;gx<=visMaxX+gs;gx+=gs){
     const[px]=w2c(gx,0); ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,canvas.height);ctx.stroke();
   }
-  for(let gy=Math.floor(S.minY/gs)*gs;gy<=S.maxY+gs;gy+=gs){
+  for(let gy=Math.floor(visMinY/gs)*gs;gy<=visMaxY+gs;gy+=gs){
     const[,py]=w2c(0,gy); ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
   }
 
   // background villages
-  const vs=Math.max(1.5,Math.min(5,bs*0.3));
+  const vs=Math.max(1.5,Math.min(5,scale*0.3));
   ctx.globalAlpha=0.3;
   for(const v of S.bgV){
     const[px,py]=w2c(v.x,v.y);
@@ -358,8 +362,8 @@ function draw(){
   }
   ctx.globalAlpha=1;
 
-  const dot=Math.max(4,bs*0.35);
-  const fontSize=Math.max(9,Math.min(12,bs*0.9));
+  const dot=Math.max(4,scale*0.35);
+  const fontSize=Math.max(9,Math.min(12,scale*0.9));
   ctx.font=`600 ${fontSize}px sans-serif`;
   ctx.textBaseline='bottom';
 
@@ -401,7 +405,7 @@ function draw(){
     ctx.globalAlpha=alpha;
 
     // ── Artifact target ──
-    const tSize=Math.max(6,bs*0.5);
+    const tSize=Math.max(6,scale*0.5);
     ctx.fillStyle=isSelected?'#fbbf24':'#f59e0b';
     ctx.strokeStyle='#fff'; ctx.lineWidth=isSelected?2:1;
     // Diamond shape
@@ -505,14 +509,29 @@ function setupCanvas(){
   resize();
 
   // Drag
-  canvas.addEventListener('mousedown',e=>{isDragging=true;dragStart={x:e.clientX,y:e.clientY};dragOff={x:S.offX,y:S.offY};});
+  canvas.addEventListener('mousedown',e=>{isDragging=true;dragStart={x:e.clientX,y:e.clientY};camStart={x:camX,y:camY};});
   canvas.addEventListener('mousemove',e=>{
-    if(isDragging){S.offX=dragOff.x+(e.clientX-dragStart.x);S.offY=dragOff.y+(e.clientY-dragStart.y);draw();return;}
+    if(isDragging){
+      camX=camStart.x-(e.clientX-dragStart.x)/scale;
+      camY=camStart.y+(e.clientY-dragStart.y)/scale;
+      draw();return;
+    }
     showTooltip(e);
   });
   canvas.addEventListener('mouseup',()=>{isDragging=false;});
   canvas.addEventListener('mouseleave',()=>{isDragging=false;document.getElementById('armTooltip').style.display='none';});
-  canvas.addEventListener('wheel',e=>{e.preventDefault();armZoom(e.deltaY<0?1.12:0.89);},{passive:false});
+  canvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const [wx,wy]=c2w(mx,my);
+    const f=e.deltaY<0?1.15:0.87;
+    scale*=f;
+    // Keep world point under cursor fixed
+    camX=wx-(mx-canvas.width/2)/scale;
+    camY=wy+(my-canvas.height/2)/scale;
+    draw();
+  },{passive:false});
   canvas.addEventListener('click',e=>{
     if(Math.abs(e.clientX-dragStart.x)<4&&Math.abs(e.clientY-dragStart.y)<4){
       const rect=canvas.getBoundingClientRect();
