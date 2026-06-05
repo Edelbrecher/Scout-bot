@@ -6497,15 +6497,24 @@ def _parse_battle_report(text: str) -> dict:
                 elif len(unlabeled) == 2:
                     labeled = [("troops", unlabeled[0][1]), ("losses", unlabeled[1][1])]
                 elif len(unlabeled) == 3:
-                    # Row 0=sent, Row 1=survived, Row 2=hospital (no perm losses if hospital present)
-                    # OR Row 0=sent, Row 1=survived, Row 2=dead (no hospital)
-                    # We store last row as "hospital" — caller can interpret
-                    labeled = [("troops", unlabeled[0][1]), ("hospital", unlabeled[2][1])]
+                    # Row 0=sent, Row 1=survivors, Row 2=hospital
+                    # dead = sent - survivors - hospital  (computed below)
+                    labeled = [("troops", unlabeled[0][1]),
+                               ("survivors", unlabeled[1][1]),
+                               ("hospital",  unlabeled[2][1])]
                 elif len(unlabeled) >= 4:
-                    # Row 0=sent, Row 1=survived, Row 2=hospital, Row 3=dead (perm losses)
-                    labeled = [("troops", unlabeled[0][1]), ("hospital", unlabeled[2][1]), ("losses", unlabeled[3][1])]
+                    # Row 0=sent, Row 1=survived, Row 2=hospital, Row 3=dead
+                    labeled = [("troops",    unlabeled[0][1]),
+                               ("survivors", unlabeled[1][1]),
+                               ("hospital",  unlabeled[2][1]),
+                               ("losses",    unlabeled[3][1])]
 
+            # First pass: fill out dict
+            survivors_row: list | None = None
             for dest, nums in labeled:
+                if dest == "survivors":
+                    survivors_row = nums
+                    continue  # don't store survivors directly
                 if is_defender_table:
                     actual_dest = ("def"          if dest == "troops"   else
                                    "def_hospital" if dest == "hospital" else
@@ -6520,6 +6529,21 @@ def _parse_battle_report(text: str) -> dict:
                 for ui, unit in enumerate(unit_header):
                     if ui < len(nums) and nums[ui] is not None and nums[ui] > 0:
                         out[actual_dest][unit] = out[actual_dest].get(unit, 0) + nums[ui]
+
+            # Second pass: compute dead = sent - survivors - hospital (if no explicit losses row)
+            loss_dest = "def_lost" if is_defender_table else "lost"
+            hosp_dest = "def_hospital" if is_defender_table else "hospital"
+            sent_dest = "def" if is_defender_table else "sent"
+            if survivors_row is not None and not out.get(loss_dest):
+                for ui, unit in enumerate(unit_header):
+                    sent_n = out.get(sent_dest, {}).get(unit, 0)
+                    surv_n = survivors_row[ui] if ui < len(survivors_row) and survivors_row[ui] is not None else 0
+                    hosp_n = out.get(hosp_dest, {}).get(unit, 0)
+                    dead   = sent_n - surv_n - hosp_n
+                    if dead > 0:
+                        if loss_dest not in out:
+                            out[loss_dest] = {}
+                        out[loss_dest][unit] = dead
 
             tables_found += 1
             i = j
