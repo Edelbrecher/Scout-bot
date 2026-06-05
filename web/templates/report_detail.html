@@ -81,17 +81,38 @@
   <div style="background:rgba(251,191,36,{% if report.fake_confidence == 'high' %}.12{% elif report.fake_confidence == 'medium' %}.08{% else %}.05{% endif %});
               border:1px solid rgba(251,191,36,{% if report.fake_confidence == 'high' %}.45{% elif report.fake_confidence == 'medium' %}.3{% else %}.2{% endif %});
               border-radius:12px;padding:.75rem 1.25rem;margin-bottom:1rem;
-              display:flex;align-items:center;gap:.75rem;">
+              display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
     <span style="font-size:1.5rem;">🎭</span>
-    <div>
+    <div style="flex:1;">
       <div style="font-weight:700;color:#fbbf24;font-size:.95rem;">
-        {% if report.fake_confidence == 'high' %}Fake attack detected
+        {% if report.fake_override == 'fake' %}Manually marked as fake
+        {% elif report.fake_confidence == 'high' %}Fake attack detected
         {% elif report.fake_confidence == 'medium' %}Likely fake attack
         {% else %}Possibly fake attack
         {% endif %}
       </div>
       <div style="font-size:.78rem;color:var(--text-muted);">{{ report.fake_reason }}</div>
     </div>
+    <form method="post" action="/guild/{{ guild.guild_id }}/reports/{{ report.id }}/set-fake" style="margin:0;">
+      <input type="hidden" name="override" value="real">
+      <button type="submit" style="font-size:.75rem;padding:.3rem .8rem;border-radius:7px;
+              background:rgba(134,239,172,.15);border:1px solid rgba(134,239,172,.3);
+              color:#86efac;cursor:pointer;white-space:nowrap;">
+        ✓ Mark as real attack
+      </button>
+    </form>
+  </div>
+  {% else %}
+  {# No fake detected — show small toggle to manually mark as fake #}
+  <div style="text-align:right;margin-bottom:.5rem;">
+    <form method="post" action="/guild/{{ guild.guild_id }}/reports/{{ report.id }}/set-fake" style="display:inline;">
+      <input type="hidden" name="override" value="{% if report.fake_override == 'real' %}{% else %}fake{% endif %}">
+      <button type="submit" style="font-size:.72rem;padding:.25rem .7rem;border-radius:6px;
+              background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);
+              color:#fbbf24;cursor:pointer;opacity:.7;">
+        {% if report.fake_override == 'real' %}✓ Marked as real (click to undo){% else %}🎭 Mark as fake{% endif %}
+      </button>
+    </form>
   </div>
   {% endif %}
 

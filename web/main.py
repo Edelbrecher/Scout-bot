@@ -6315,6 +6315,8 @@ _STRONG_OFF  = {
     "resheph_chariot", "corinthian_crusher", "elpida_rider",
 }
 
+_SIEGE_REAL_THRESHOLD = 20  # ≥ this many siege → never auto-fake
+
 def _detect_fake(troops_sent: dict) -> dict:
     """Analyse troop composition and return fake likelihood."""
     if not troops_sent:
@@ -6322,39 +6324,30 @@ def _detect_fake(troops_sent: dict) -> dict:
 
     total      = sum(v for v in troops_sent.values() if v)
     siege      = sum(v for k, v in troops_sent.items() if k in _SIEGE_UNITS and v)
-    cheap      = sum(v for k, v in troops_sent.items() if k in _CHEAP_UNITS and v)
     strong_off = sum(v for k, v in troops_sent.items() if k in _STRONG_OFF and v)
 
     if total == 0:
         return {"fake_confidence": "none", "fake_reason": ""}
 
-    siege_ratio = siege / total
+    # ≥ 20 siege → definitely real attack, never flag as fake
+    if siege >= _SIEGE_REAL_THRESHOLD:
+        return {"fake_confidence": "none", "fake_reason": ""}
+
+    siege_ratio  = siege / total
     strong_ratio = strong_off / total
 
-    # Classic fake: tiny army + 1 siege
     if siege >= 1 and total <= 60:
-        return {
-            "fake_confidence": "high",
-            "fake_reason": f"{total} troops · {siege} siege — classic fake",
-        }
-    # Suspicious: still very small with siege
+        return {"fake_confidence": "high",
+                "fake_reason": f"{total} troops · {siege} siege — classic fake"}
     if siege >= 1 and total <= 200 and strong_ratio < 0.05:
-        return {
-            "fake_confidence": "medium",
-            "fake_reason": f"{total} troops · {siege} siege · no strong off — likely fake",
-        }
-    # Tiny attack without siege
+        return {"fake_confidence": "medium",
+                "fake_reason": f"{total} troops · {siege} siege · no strong off — likely fake"}
     if total <= 30 and siege == 0:
-        return {
-            "fake_confidence": "medium",
-            "fake_reason": f"Only {total} troops sent — possible fake/distraction",
-        }
-    # Large siege ratio relative to army (real attacks have many troops per siege)
+        return {"fake_confidence": "medium",
+                "fake_reason": f"Only {total} troops sent — possible fake/distraction"}
     if siege >= 1 and siege_ratio > 0.05 and strong_ratio < 0.1:
-        return {
-            "fake_confidence": "low",
-            "fake_reason": f"{siege} siege in {total} troops ({siege_ratio:.0%}) — fake-like ratio",
-        }
+        return {"fake_confidence": "low",
+                "fake_reason": f"{siege} siege in {total} troops ({siege_ratio:.0%}) — fake-like ratio"}
 
     return {"fake_confidence": "none", "fake_reason": ""}
 
@@ -12522,9 +12515,17 @@ async def reports_page(request: Request, guild_id: str,
                 r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
             except Exception:
                 r[jf.replace("_json", "")] = {}
-        fake = _detect_fake(r.get("troops_sent") or {})
-        r["fake_confidence"] = fake["fake_confidence"]
-        r["fake_reason"]     = fake["fake_reason"]
+        override = r.get("fake_override")
+        if override == "fake":
+            r["fake_confidence"] = "high"
+            r["fake_reason"]     = "Manually marked as fake"
+        elif override == "real":
+            r["fake_confidence"] = "none"
+            r["fake_reason"]     = ""
+        else:
+            fake = _detect_fake(r.get("troops_sent") or {})
+            r["fake_confidence"] = fake["fake_confidence"]
+            r["fake_reason"]     = fake["fake_reason"]
 
     return templates.TemplateResponse("reports.html", {
         "request": request, "guild": guild,
@@ -12654,13 +12655,37 @@ async def report_detail(request: Request, guild_id: str, report_id: int):
         r["buildings_hit"] = _json.loads(r.get("buildings_hit_json") or "[]")
     except Exception:
         r["buildings_hit"] = []
-    fake = _detect_fake(r.get("troops_sent") or {})
-    r["fake_confidence"] = fake["fake_confidence"]
-    r["fake_reason"]     = fake["fake_reason"]
+    override = r.get("fake_override")  # 'fake', 'real', or None
+    if override == "fake":
+        r["fake_confidence"] = "high"
+        r["fake_reason"]     = "Manually marked as fake"
+        r["fake_override"]   = "fake"
+    elif override == "real":
+        r["fake_confidence"] = "none"
+        r["fake_reason"]     = ""
+        r["fake_override"]   = "real"
+    else:
+        fake = _detect_fake(r.get("troops_sent") or {})
+        r["fake_confidence"] = fake["fake_confidence"]
+        r["fake_reason"]     = fake["fake_reason"]
+        r["fake_override"]   = None
 
     return templates.TemplateResponse("report_detail.html", {
         "request": request, "guild": guild, "report": r,
     })
+
+
+@app.post("/guild/{guild_id}/reports/{report_id}/set-fake")
+async def report_set_fake(request: Request, guild_id: str, report_id: int,
+                          override: str = Form("")):
+    """Toggle fake override: 'fake', 'real', or '' (auto)."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    val = override.strip() if override.strip() in ("fake", "real") else None
+    await database.set_fake_override(report_id, guild_id, val)
+    return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/reports/{report_id}/delete")

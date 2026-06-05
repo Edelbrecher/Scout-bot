@@ -1853,6 +1853,7 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             ("troops_hospital_json",      "'{}'"),
             ("def_troops_hospital_json",  "'{}'"),
             ("buildings_hit_json",        "'[]'"),
+            ("fake_override",             "NULL"),   # NULL=auto, 'fake', 'real'
         ]:
             try:
                 await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
@@ -1964,6 +1965,17 @@ async def get_battle_report(report_id: int, guild_id: str) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def set_fake_override(report_id: int, guild_id: str, override: str | None) -> None:
+    """Set fake_override: 'fake', 'real', or None (back to auto-detect)."""
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "UPDATE battle_reports SET fake_override=? WHERE id=? AND guild_id=?",
+            (override, report_id, guild_id)
+        )
+        await db.commit()
 
 
 async def delete_battle_report(report_id: int, guild_id: str):
