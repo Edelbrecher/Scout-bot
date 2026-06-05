@@ -2,29 +2,29 @@
 {% block title %}Combat Intel · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:1100px;">
+<div class="container" style="max-width:1200px;">
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/reports" class="back-link">← Battle Reports</a>
       <h1 style="margin:.2rem 0 .15rem;">🎯 Combat Intel</h1>
-      <p class="subtitle" style="margin:0;">All players tracked from battle reports — troops, losses &amp; activity</p>
+      <p class="subtitle" style="margin:0;">Player profiling · damage dealt &amp; received · build-time analysis</p>
     </div>
+    <form method="get" action="/guild/{{ guild.guild_id }}/reports/intel"
+          style="display:flex;gap:.5rem;">
+      <input type="text" name="q" value="{{ q }}" placeholder="Jump to player…"
+             style="width:220px;background:var(--bg-input);border:1px solid var(--border);
+                    border-radius:8px;color:var(--text);font-size:.85rem;padding:.42rem .75rem;">
+      <button type="submit" class="btn btn-primary" style="font-size:.85rem;">View profile</button>
+    </form>
   </div>
 
-  <!-- Search -->
-  <form method="get" action="/guild/{{ guild.guild_id }}/reports/intel"
-        style="display:flex;gap:.5rem;margin-bottom:1.25rem;">
-    <input type="text" name="q" value="{{ q }}" placeholder="Search player…"
-           autofocus
-           style="flex:1;max-width:320px;background:var(--bg-input);border:1px solid var(--border);
-                  border-radius:8px;color:var(--text);font-size:.85rem;padding:.45rem .75rem;">
-    <button type="submit" class="btn btn-primary" style="font-size:.85rem;">View profile</button>
-  </form>
-
   {% if players %}
-  <!-- Stats summary -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.25rem;">
+
+  {# ── KPI summary ── #}
+  {% set total_loss_bt   = players | sum(attribute='loss_build_time')   | int %}
+  {% set total_damage_bt = players | sum(attribute='damage_build_time') | int %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.5rem;">
     <div class="card" style="padding:.85rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;">{{ players | length }}</div>
       <div style="font-size:.72rem;color:var(--text-muted);">Players tracked</div>
@@ -37,38 +37,60 @@
       <div style="font-size:1.6rem;font-weight:800;color:#86efac;">
         {{ "{:,.0f}".format(players | sum(attribute='total_plunder') or 0) }}
       </div>
-      <div style="font-size:.72rem;color:var(--text-muted);">Total plundered</div>
+      <div style="font-size:.72rem;color:var(--text-muted);">📦 Total plundered</div>
     </div>
     <div class="card" style="padding:.85rem;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:800;color:#f87171;">
-        {{ "{:,.0f}".format(players | sum(attribute='total_losses') or 0) }}
+      <div style="font-size:1.4rem;font-weight:800;color:#f87171;">
+        {{ total_loss_bt | fmt_duration }}
       </div>
-      <div style="font-size:.72rem;color:var(--text-muted);">Total troops lost</div>
+      <div style="font-size:.72rem;color:var(--text-muted);">☠️ Build-time lost</div>
+    </div>
+    <div class="card" style="padding:.85rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:800;color:#86efac;">
+        {{ total_damage_bt | fmt_duration }}
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);">💥 Build-time dealt</div>
     </div>
   </div>
 
-  <!-- Player table -->
+  {# ── Sort tabs ── #}
+  <div style="display:flex;gap:.4rem;margin-bottom:.75rem;flex-wrap:wrap;">
+    {% for sort_key, label in [('damage_build_time','💥 Damage dealt'),('loss_build_time','☠️ Losses'),('net_build_time','📊 Net result'),('report_count','📋 Reports'),('wins','🏆 Wins')] %}
+    <button onclick="sortTable('{{ sort_key }}')"
+            id="sort-{{ sort_key }}"
+            style="font-size:.78rem;padding:.3rem .75rem;border-radius:6px;border:1px solid var(--border);
+                   background:var(--bg-card);color:var(--text-muted);cursor:pointer;transition:all .15s;">
+      {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# ── Player table ── #}
   <div class="card" style="padding:0;overflow:hidden;">
-    <div style="padding:.85rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.9rem;">
-      📋 All tracked players
-    </div>
     <div style="overflow-x:auto;">
-      <table class="table" style="margin:0;font-size:.82rem;">
+      <table class="table" style="margin:0;font-size:.8rem;" id="intel-table">
         <thead>
           <tr>
+            <th>#</th>
             <th>Player</th>
+            <th style="text-align:center;">W / D / L</th>
+            <th style="text-align:right;color:#86efac;">💥 Damage dealt</th>
+            <th style="text-align:right;color:#f87171;">☠️ Losses</th>
+            <th style="text-align:right;">📊 Net</th>
+            <th style="text-align:right;color:#86efac;">📦 Plunder</th>
             <th style="text-align:center;">Reports</th>
-            <th style="text-align:center;">⚔️ Attacker</th>
-            <th style="text-align:center;">🛡️ Defender</th>
-            <th style="text-align:right;color:#86efac;">Plunder</th>
-            <th style="text-align:right;color:#f87171;">Troops lost</th>
-            <th>Villages seen</th>
             <th>Last seen</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="intel-tbody">
           {% for p in players %}
-          <tr>
+          {% set net = (p.net_build_time or 0) | int %}
+          <tr data-damage="{{ p.damage_build_time or 0 }}"
+              data-loss="{{ p.loss_build_time or 0 }}"
+              data-net="{{ net }}"
+              data-reports="{{ p.report_count }}"
+              data-wins="{{ p.wins or 0 }}">
+            <td style="color:var(--text-muted);font-size:.72rem;width:28px;">{{ loop.index }}</td>
             <td>
               <a href="/guild/{{ guild.guild_id }}/reports/intel?q={{ p.player_name | urlencode }}"
                  style="font-weight:600;color:var(--text);text-decoration:none;"
@@ -76,31 +98,40 @@
                 {{ p.player_name }}
               </a>
             </td>
-            <td style="text-align:center;">
-              <span style="background:rgba(88,101,242,.15);color:#818cf8;border-radius:5px;padding:1px 8px;font-size:.75rem;font-weight:600;">
-                {{ p.report_count }}
-              </span>
+            <td style="text-align:center;white-space:nowrap;">
+              <span style="color:#86efac;font-weight:700;">{{ p.wins or 0 }}</span>
+              <span style="color:var(--text-muted);margin:0 .2rem;">/</span>
+              <span style="color:var(--text-muted);">{{ p.draws or 0 }}</span>
+              <span style="color:var(--text-muted);margin:0 .2rem;">/</span>
+              <span style="color:#f87171;font-weight:700;">{{ p.losses_count or 0 }}</span>
             </td>
-            <td style="text-align:center;color:{% if p.att_count %}#f87171{% else %}var(--text-muted){% endif %};">
-              {{ p.att_count or '—' }}
+            <td style="text-align:right;">
+              {% if p.damage_build_time %}
+              <div style="font-weight:700;color:#86efac;">{{ p.damage_build_time | fmt_duration }}</div>
+              <div style="font-size:.68rem;color:var(--text-muted);">{{ "{:,}".format(p.total_damage or 0) }} troops</div>
+              {% else %}—{% endif %}
             </td>
-            <td style="text-align:center;color:{% if p.def_count %}#60a5fa{% else %}var(--text-muted){% endif %};">
-              {{ p.def_count or '—' }}
+            <td style="text-align:right;">
+              {% if p.loss_build_time %}
+              <div style="font-weight:700;color:#f87171;">{{ p.loss_build_time | fmt_duration }}</div>
+              <div style="font-size:.68rem;color:var(--text-muted);">{{ "{:,}".format(p.total_losses or 0) }} troops</div>
+              {% else %}—{% endif %}
+            </td>
+            <td style="text-align:right;font-weight:700;
+                       color:{% if net > 0 %}#86efac{% elif net < 0 %}#f87171{% else %}var(--text-muted){% endif %};">
+              {{ '+' if net > 0 else '' }}{{ net | fmt_duration if net != 0 else '—' }}
             </td>
             <td style="text-align:right;">
               {% if p.total_plunder %}
-              <span style="color:#86efac;">+{{ "{:,}".format(p.total_plunder) }}</span>
+              <span style="color:#86efac;font-size:.78rem;">+{{ "{:,}".format(p.total_plunder) }}</span>
               {% else %}—{% endif %}
             </td>
-            <td style="text-align:right;">
-              {% if p.total_losses %}
-              <span style="color:#f87171;">{{ "{:,}".format(p.total_losses) }}</span>
-              {% else %}—{% endif %}
+            <td style="text-align:center;">
+              <span style="background:rgba(88,101,242,.15);color:#818cf8;border-radius:5px;padding:1px 8px;font-size:.72rem;font-weight:600;">
+                {{ p.report_count }}
+              </span>
             </td>
-            <td style="font-size:.75rem;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-              {{ p.villages | join(', ') if p.villages else '—' }}
-            </td>
-            <td style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">
+            <td style="font-size:.73rem;color:var(--text-muted);white-space:nowrap;">
               {{ p.last_seen[:10] if p.last_seen else '—' }}
             </td>
           </tr>
@@ -122,4 +153,50 @@
   {% endif %}
 
 </div>
+
+<script>
+let _currentSort = 'damage_build_time';
+let _sortDesc = true;
+
+function sortTable(key) {
+  if (_currentSort === key) { _sortDesc = !_sortDesc; }
+  else { _currentSort = key; _sortDesc = true; }
+
+  document.querySelectorAll('[id^="sort-"]').forEach(b => {
+    b.style.background = 'var(--bg-card)';
+    b.style.color = 'var(--text-muted)';
+    b.style.borderColor = 'var(--border)';
+  });
+  const active = document.getElementById('sort-' + key);
+  if (active) {
+    active.style.background = 'var(--primary)';
+    active.style.color = '#fff';
+    active.style.borderColor = 'var(--primary)';
+  }
+
+  const tbody = document.getElementById('intel-tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const attr = {
+    'damage_build_time': 'damage',
+    'loss_build_time': 'loss',
+    'net_build_time': 'net',
+    'report_count': 'reports',
+    'wins': 'wins',
+  }[key] || 'damage';
+
+  rows.sort((a, b) => {
+    const av = parseFloat(a.dataset[attr]) || 0;
+    const bv = parseFloat(b.dataset[attr]) || 0;
+    return _sortDesc ? bv - av : av - bv;
+  });
+
+  rows.forEach((r, i) => {
+    r.querySelector('td:first-child').textContent = i + 1;
+    tbody.appendChild(r);
+  });
+}
+
+// Default sort on load
+sortTable('damage_build_time');
+</script>
 {% endblock %}

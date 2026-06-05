@@ -25,29 +25,75 @@
   <div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">No combat data found for this player.</div>
   {% else %}
 
+  {# Build-time stats computed in template #}
+  {% set loss_bt   = profile.agg_losses  | build_seconds %}
+  {% set damage_bt = profile.agg_damage  | build_seconds %}
+  {% set net_bt    = damage_bt - loss_bt %}
+
+  <!-- ── Win / Draw / Loss banner ── -->
+  <div class="card" style="padding:.85rem 1.25rem;margin-bottom:.75rem;
+       display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">
+    <div style="text-align:center;min-width:56px;">
+      <div style="font-size:1.8rem;font-weight:900;color:#86efac;">{{ profile.wins or 0 }}</div>
+      <div style="font-size:.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Wins</div>
+    </div>
+    <div style="font-size:1.4rem;color:var(--border);">/</div>
+    <div style="text-align:center;min-width:56px;">
+      <div style="font-size:1.8rem;font-weight:900;color:var(--text-muted);">{{ profile.draws or 0 }}</div>
+      <div style="font-size:.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Draws</div>
+    </div>
+    <div style="font-size:1.4rem;color:var(--border);">/</div>
+    <div style="text-align:center;min-width:56px;">
+      <div style="font-size:1.8rem;font-weight:900;color:#f87171;">{{ profile.losses or 0 }}</div>
+      <div style="font-size:.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Losses</div>
+    </div>
+    <div style="flex:1;"></div>
+    <div style="text-align:right;">
+      <div style="font-size:.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.15rem;">Net build-time</div>
+      <div style="font-size:1.1rem;font-weight:800;
+                  color:{% if net_bt > 0 %}#86efac{% elif net_bt < 0 %}#f87171{% else %}var(--text-muted){% endif %};">
+        {{ '+' if net_bt > 0 else '' }}{{ net_bt | fmt_duration if net_bt != 0 else '±0' }}
+      </div>
+    </div>
+  </div>
+
   <!-- ── KPI cards ── -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.25rem;">
     <div class="card" style="padding:.85rem;text-align:center;">
-      <div style="font-size:1.5rem;font-weight:800;">{{ profile.report_count }}</div>
+      <div style="font-size:1.4rem;font-weight:800;">{{ profile.report_count }}</div>
       <div style="font-size:.72rem;color:var(--text-muted);">Reports</div>
     </div>
+    <div class="card" style="padding:.85rem;text-align:center;border-color:rgba(134,239,172,.3);">
+      <div style="font-size:1.3rem;font-weight:800;color:#86efac;">{{ damage_bt | fmt_duration }}</div>
+      <div style="font-size:.72rem;color:var(--text-muted);">💥 Damage dealt</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">
+        {{ "{:,}".format(profile.agg_damage.values() | sum | int) }} troops
+      </div>
+    </div>
+    <div class="card" style="padding:.85rem;text-align:center;border-color:rgba(248,113,113,.3);">
+      <div style="font-size:1.3rem;font-weight:800;color:#f87171;">{{ loss_bt | fmt_duration }}</div>
+      <div style="font-size:.72rem;color:var(--text-muted);">☠️ Losses suffered</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">
+        {{ "{:,}".format(profile.agg_losses.values() | sum | int) }} troops
+      </div>
+    </div>
     <div class="card" style="padding:.85rem;text-align:center;">
-      <div style="font-size:1.5rem;font-weight:800;color:#f87171;">{{ profile.reports_as_attacker }}</div>
+      <div style="font-size:1.3rem;font-weight:800;color:#86efac;">
+        {{ "{:,}".format(profile.total_plunder) if profile.total_plunder else '0' }}
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);">📦 Plunder</div>
+    </div>
+    <div class="card" style="padding:.85rem;text-align:center;">
+      <div style="font-size:1.3rem;font-weight:800;color:#f87171;">{{ profile.reports_as_attacker }}</div>
       <div style="font-size:.72rem;color:var(--text-muted);">⚔️ As attacker</div>
     </div>
     <div class="card" style="padding:.85rem;text-align:center;">
-      <div style="font-size:1.5rem;font-weight:800;color:#60a5fa;">{{ profile.reports_as_defender }}</div>
+      <div style="font-size:1.3rem;font-weight:800;color:#60a5fa;">{{ profile.reports_as_defender }}</div>
       <div style="font-size:.72rem;color:var(--text-muted);">🛡️ As defender</div>
-    </div>
-    <div class="card" style="padding:.85rem;text-align:center;">
-      <div style="font-size:1.5rem;font-weight:800;color:#86efac;">
-        {{ "{:,}".format(profile.total_plunder) if profile.total_plunder else '0' }}
-      </div>
-      <div style="font-size:.72rem;color:var(--text-muted);">📦 Total plunder</div>
     </div>
     {% if profile.avg_luck is not none %}
     <div class="card" style="padding:.85rem;text-align:center;">
-      <div style="font-size:1.5rem;font-weight:800;color:{% if profile.avg_luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
+      <div style="font-size:1.3rem;font-weight:800;color:{% if profile.avg_luck >= 0 %}#86efac{% else %}#f87171{% endif %};">
         {{ profile.avg_luck }}%
       </div>
       <div style="font-size:.72rem;color:var(--text-muted);">Avg luck</div>
@@ -64,24 +110,29 @@
         <thead>
           <tr style="border-bottom:1px solid var(--border);">
             <th style="padding:.3rem .6rem;text-align:left;color:var(--text-muted);font-weight:500;">Unit</th>
-            <th style="padding:.3rem .6rem;text-align:right;color:var(--text-muted);font-weight:500;">Times sent</th>
-            <th style="padding:.3rem .6rem;text-align:right;color:#f87171;font-weight:500;">Lost</th>
-            <th style="padding:.3rem .6rem;text-align:right;color:var(--text-muted);font-weight:500;">Loss rate</th>
+            <th style="padding:.3rem .6rem;text-align:right;color:var(--text-muted);font-weight:500;">Sent</th>
+            <th style="padding:.3rem .6rem;text-align:right;color:#f87171;font-weight:500;">Lost ☠️</th>
+            <th style="padding:.3rem .6rem;text-align:right;color:#86efac;font-weight:500;">Dealt 💥</th>
+            <th style="padding:.3rem .6rem;text-align:right;color:var(--text-muted);font-weight:500;">Loss %</th>
             <th style="padding:.3rem .6rem;text-align:left;font-weight:500;">Bar</th>
           </tr>
         </thead>
         <tbody>
-          {% set all_units = (profile.agg_troops.keys() | list + profile.agg_losses.keys() | list) | unique | list %}
+          {% set all_units = (profile.agg_troops.keys() | list + profile.agg_losses.keys() | list + profile.agg_damage.keys() | list) | unique | list %}
           {% for unit in all_units | sort %}
-          {% set sent = profile.agg_troops.get(unit, 0) %}
-          {% set lost = profile.agg_losses.get(unit, 0) %}
-          {% set rate = profile.loss_rates.get(unit, 0) %}
-          {% if sent > 0 or lost > 0 %}
+          {% set sent   = profile.agg_troops.get(unit, 0) %}
+          {% set lost   = profile.agg_losses.get(unit, 0) %}
+          {% set dealt  = profile.agg_damage.get(unit, 0) %}
+          {% set rate   = profile.loss_rates.get(unit, 0) %}
+          {% if sent > 0 or lost > 0 or dealt > 0 %}
           <tr style="border-top:1px solid var(--border);">
             <td style="padding:.4rem .6rem;font-weight:500;">{{ unit | replace('_',' ') | title }}</td>
             <td style="padding:.4rem .6rem;text-align:right;">{{ "{:,}".format(sent) if sent else '—' }}</td>
             <td style="padding:.4rem .6rem;text-align:right;color:{% if lost > 0 %}#f87171{% else %}var(--text-muted){% endif %};">
               {{ "{:,}".format(lost) if lost else '—' }}
+            </td>
+            <td style="padding:.4rem .6rem;text-align:right;color:{% if dealt > 0 %}#86efac{% else %}var(--text-muted){% endif %};">
+              {{ "{:,}".format(dealt) if dealt else '—' }}
             </td>
             <td style="padding:.4rem .6rem;text-align:right;font-size:.75rem;">
               {% if rate > 0 %}

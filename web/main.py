@@ -1071,6 +1071,8 @@ templates.env.globals["get_nav_guild"] = _get_nav_guild
 import json as _json
 import datetime as _dt_global
 templates.env.filters["from_json"] = lambda s: _json.loads(s) if s else []
+templates.env.filters["fmt_duration"] = lambda s: _fmt_duration(int(s or 0))
+templates.env.filters["build_seconds"] = lambda troops: _build_seconds(troops or {})
 templates.env.globals["current_year"] = _dt_global.datetime.utcnow().year
 
 
@@ -6191,6 +6193,84 @@ _UNIT_MAP: dict[str, str] = {
     "siedler": "settler", "settler": "settler", "settlers": "settler",
     "held": "hero", "hero": "hero",
 }
+
+# Base training time in seconds per unit (Travian T4, level 1 barracks/stable/workshop).
+# Used for "production value" of lost/destroyed troops.
+_TROOP_BUILD_SECONDS: dict[str, int] = {
+    # Romans
+    "legionnaire":         1600,
+    "praetorian":          1800,
+    "imperian":            2000,
+    "equites_legati":      2200,
+    "equites_imperatoris": 3200,
+    "equites_caesaris":    4000,
+    "battering_ram":       4800,
+    "fire_catapult":       9000,
+    "senator":             90700,
+    # Teutons
+    "clubswinger":         1000,
+    "spearman":            1600,
+    "axeman":              1933,
+    "scout":               2200,
+    "paladin":             3200,
+    "teutonic_knight":     4000,
+    "catapult":            7200,
+    "chief":               70400,
+    # Gauls
+    "phalanx":             1600,
+    "swordsman":           2000,
+    "pathfinder":          2400,
+    "thureophor":          2000,
+    "druidrider":          2800,
+    "haeduan":             4000,
+    "trebuchet":           9000,
+    "chieftain":           70400,
+    # Huns
+    "mercenary":           900,
+    "bowman":              1400,
+    "spotter":             2000,
+    "steppe_rider":        2800,
+    "marksman":            3600,
+    "marauder":            4400,
+    # Egyptians
+    "slave_militia":       900,
+    "ash_warden":          1600,
+    "khopesh_warrior":     2000,
+    "sopdu_explorer":      2200,
+    "anhur_guard":         3200,
+    "resheph_chariot":     4000,
+    # Spartans
+    "hoplite":             1600,
+    "sentinel":            1800,
+    "shieldsman":          2000,
+    "thureophoros":        2200,
+    "elpida_rider":        3200,
+    "corinthian_crusher":  4000,
+    # Generic
+    "settler":             26667,
+    "hero":                0,
+}
+
+
+def _build_seconds(troops: dict) -> int:
+    """Total training time in seconds to rebuild the given troop dict."""
+    return sum(_TROOP_BUILD_SECONDS.get(unit, 1800) * cnt
+               for unit, cnt in (troops or {}).items() if cnt and cnt > 0)
+
+
+def _fmt_duration(seconds: int) -> str:
+    """Format seconds as human-readable duration (e.g. '3d 14h 22m')."""
+    if seconds <= 0:
+        return "—"
+    d = seconds // 86400
+    h = (seconds % 86400) // 3600
+    m = (seconds % 3600) // 60
+    parts = []
+    if d: parts.append(f"{d}d")
+    if h: parts.append(f"{h}h")
+    if m and not d: parts.append(f"{m}m")
+    return " ".join(parts) or "<1m"
+
 
 _TROOP_TABLE_MARKERS = {
     "de": ["gesendet", "verluste", "im dorf", "angreifer", "verteidiger"],

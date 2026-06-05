@@ -1972,9 +1972,16 @@ async def get_player_combat_profile(guild_id: str, player_name: str) -> dict:
     await _init_reports_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        # Join battle_reports to get the OTHER side's losses (= damage this player dealt)
         async with db.execute("""
-            SELECT cl.*, br.attacker_name, br.defender_name,
-                   br.troops_lost_json as att_losses_json
+            SELECT cl.*,
+                   br.attacker_name, br.defender_name,
+                   br.troops_lost_json      as br_att_losses_json,
+                   br.def_troops_lost_json  as br_def_losses_json,
+                   br.troops_sent_json      as br_att_sent_json,
+                   br.def_troops_json       as br_def_sent_json,
+                   br.troops_hospital_json      as br_att_hosp_json,
+                   br.def_troops_hospital_json  as br_def_hosp_json
             FROM player_combat_log cl
             JOIN battle_reports br ON cl.report_id = br.id
             WHERE cl.guild_id=? AND cl.player_name=?
@@ -1985,18 +1992,27 @@ async def get_player_combat_profile(guild_id: str, player_name: str) -> dict:
     if not rows:
         return {}
 
-    # Aggregate troops and losses
     agg_troops: dict = {}
     agg_losses: dict = {}
+    agg_damage: dict = {}   # enemy troops killed by this player
     total_plunder = 0
     reports_as_attacker = 0
     reports_as_defender = 0
+    wins = losses_count = draws = 0
     luck_vals = []
     villages_seen: set = set()
 
+    def _sum_json(s):
+        try:
+            d = _json.loads(s or "{}")
+            return {k: v for k, v in d.items() if v and v > 0}
+        except Exception:
+            return {}
+
     for r in rows:
         role = r.get("role", "")
-        if role == "attacker":
+        is_attacker = role == "attacker"
+        if is_attacker:
             reports_as_attacker += 1
         else:
             reports_as_defender += 1
@@ -2007,23 +2023,56 @@ async def get_player_combat_profile(guild_id: str, player_name: str) -> dict:
         if r.get("village_name"):
             villages_seen.add(r["village_name"])
 
-        try:
-            troops = _json.loads(r.get("troops_json") or "{}")
-            for unit, cnt in troops.items():
-                if cnt and cnt > 0:
-                    agg_troops[unit] = agg_troops.get(unit, 0) + cnt
-        except Exception:
-            pass
+        # Own troops & losses
+        own_troops  = _sum_json(r.get("troops_json"))
+        own_losses  = _sum_json(r.get("losses_json"))
+        own_hosp    = _sum_json(r.get("br_att_hosp_json") if is_attacker else r.get("br_def_hosp_json"))
+        for unit, cnt in own_troops.items():
+            agg_troops[unit] = agg_troops.get(unit, 0) + cnt
+        for unit, cnt in {**own_losses, **own_hosp}.items():
+            agg_losses[unit] = agg_losses.get(unit, 0) + cnt
 
-        try:
-            losses = _json.loads(r.get("losses_json") or "{}")
-            for unit, cnt in losses.items():
-                if cnt and cnt > 0:
-                    agg_losses[unit] = agg_losses.get(unit, 0) + cnt
-        except Exception:
-            pass
+        # Damage dealt = other side's casualties
+        if is_attacker:
+            enemy_cas = {**_sum_json(r.get("br_def_losses_json")),
+                         **_sum_json(r.get("br_def_hosp_json"))}
+        else:
+            enemy_cas = {**_sum_json(r.get("br_att_losses_json")),
+                         **_sum_json(r.get("br_att_hosp_json"))}
+        for unit, cnt in enemy_cas.items():
+            agg_damage[unit] = agg_damage.get(unit, 0) + cnt
 
-    # Loss rate per unit type
+        # Win/Loss/Draw per report
+        own_total_cas    = sum(own_losses.values()) + sum(own_hosp.values())
+        enemy_total_cas  = sum(enemy_cas.values())
+        own_total_troops = sum(own_troops.values())
+        if is_attacker:
+            enemy_total_troops = sum(_sum_json(r.get("br_def_sent_json")).values())
+        else:
+            enemy_total_troops = sum(_sum_json(r.get("br_att_sent_json")).values())
+
+        own_rate   = own_total_cas / own_total_troops     if own_total_troops   > 0 else 0
+        enemy_rate = enemy_total_cas / enemy_total_troops if enemy_total_troops > 0 else 0
+
+        own_wiped   = own_total_troops > 0   and own_total_cas   >= own_total_troops
+        enemy_wiped = enemy_total_troops > 0 and enemy_total_cas >= enemy_total_troops
+
+        if enemy_wiped and not own_wiped:
+            wins += 1
+        elif own_wiped and not enemy_wiped:
+            losses_count += 1
+        elif own_rate < enemy_rate - 0.05:
+            wins += 1
+        elif enemy_rate < own_rate - 0.05:
+            losses_count += 1
+        else:
+            draws += 1
+
+        # Store parsed troops back for template use
+        r["troops"]  = own_troops
+        r["losses"]  = own_losses
+        r["damage"]  = enemy_cas
+
     loss_rates: dict = {}
     for unit, sent in agg_troops.items():
         lost = agg_losses.get(unit, 0)
@@ -2035,11 +2084,15 @@ async def get_player_combat_profile(guild_id: str, player_name: str) -> dict:
         "report_count": len(rows),
         "reports_as_attacker": reports_as_attacker,
         "reports_as_defender": reports_as_defender,
+        "wins": wins,
+        "losses": losses_count,
+        "draws": draws,
         "total_plunder": total_plunder,
         "avg_luck": round(sum(luck_vals) / len(luck_vals), 1) if luck_vals else None,
-        "agg_troops": agg_troops,
-        "agg_losses": agg_losses,
-        "loss_rates": loss_rates,
+        "agg_troops":  agg_troops,
+        "agg_losses":  agg_losses,
+        "agg_damage":  agg_damage,
+        "loss_rates":  loss_rates,
         "villages": list(villages_seen),
         "last_seen": rows[0].get("report_date") if rows else None,
     }
@@ -2070,27 +2123,114 @@ async def get_combat_intel_overview(guild_id: str, limit: int = 100) -> list[dic
         """, (guild_id, limit)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
 
-    # Aggregate losses across all reports per player in Python
-    # (avoid heavy JSON parsing in SQL)
+    # Aggregate losses + damage + build-time per player
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute("""
-            SELECT player_name, losses_json
-            FROM player_combat_log
-            WHERE guild_id=? AND losses_json != '{}'
+            SELECT cl.player_name, cl.role,
+                   cl.losses_json,
+                   br.troops_lost_json     as br_att_losses,
+                   br.def_troops_lost_json as br_def_losses,
+                   br.troops_hospital_json     as br_att_hosp,
+                   br.def_troops_hospital_json as br_def_hosp,
+                   br.troops_sent_json     as br_att_sent,
+                   br.def_troops_json      as br_def_sent
+            FROM player_combat_log cl
+            JOIN battle_reports br ON cl.report_id = br.id
+            WHERE cl.guild_id=?
         """, (guild_id,)) as cur:
-            loss_rows = await cur.fetchall()
+            detail_rows = await cur.fetchall()
 
-    player_losses: dict = {}
-    for pname, lj in loss_rows:
+    # Build-time constants (seconds per unit, base values)
+    _BT: dict[str, int] = {
+        "legionnaire":1600,"praetorian":1800,"imperian":2000,
+        "equites_legati":2200,"equites_imperatoris":3200,"equites_caesaris":4000,
+        "battering_ram":4800,"fire_catapult":9000,"senator":90700,
+        "clubswinger":1000,"spearman":1600,"axeman":1933,"scout":2200,
+        "paladin":3200,"teutonic_knight":4000,"catapult":7200,"chief":70400,
+        "phalanx":1600,"swordsman":2000,"pathfinder":2400,"thureophor":2000,
+        "druidrider":2800,"haeduan":4000,"trebuchet":9000,"chieftain":70400,
+        "mercenary":900,"bowman":1400,"spotter":2000,"steppe_rider":2800,
+        "marksman":3600,"marauder":4400,"slave_militia":900,"ash_warden":1600,
+        "khopesh_warrior":2000,"sopdu_explorer":2200,"anhur_guard":3200,"resheph_chariot":4000,
+        "hoplite":1600,"sentinel":1800,"shieldsman":2000,"thureophoros":2200,
+        "elpida_rider":3200,"corinthian_crusher":4000,"settler":26667,
+    }
+
+    def _bt_sum(jstr):
         try:
-            ldata = _json.loads(lj or "{}")
-            total = sum(v for v in ldata.values() if isinstance(v, (int, float)))
-            player_losses[pname] = player_losses.get(pname, 0) + total
+            d = _json.loads(jstr or "{}")
+            return sum(_BT.get(u, 1800) * max(0, v) for u, v in d.items() if v)
         except Exception:
-            pass
+            return 0
+
+    def _troop_sum(jstr):
+        try:
+            d = _json.loads(jstr or "{}")
+            return sum(max(0, v) for v in d.values() if v)
+        except Exception:
+            return 0
+
+    p_loss_troops:  dict[str, int] = {}
+    p_loss_bt:      dict[str, int] = {}
+    p_damage_troops:dict[str, int] = {}
+    p_damage_bt:    dict[str, int] = {}
+    p_wins:  dict[str, int] = {}
+    p_draws: dict[str, int] = {}
+    p_losses_cnt: dict[str, int] = {}
+
+    for row in detail_rows:
+        pname = row[0]; role = row[1]
+        is_att = role == "attacker"
+
+        own_loss_bt = _bt_sum(row[2])  # losses_json from log
+        own_loss_cnt = _troop_sum(row[2])
+
+        if is_att:
+            dmg_bt  = _bt_sum(row[3]) + _bt_sum(row[4] or '{}')   # def lost + def hosp? no: att losses + def losses
+            # damage dealt = defender casualties
+            dmg_bt  = _bt_sum(row[4]) + _bt_sum(row[6])  # br_def_losses + br_def_hosp
+            dmg_cnt = _troop_sum(row[4]) + _troop_sum(row[6])
+            # win/loss: compare loss rates
+            own_sent  = _troop_sum(row[7])  # br_att_sent
+            enemy_sent= _troop_sum(row[8])  # br_def_sent
+            enemy_cas = _troop_sum(row[4]) + _troop_sum(row[6])
+        else:
+            dmg_bt  = _bt_sum(row[3]) + _bt_sum(row[5])  # br_att_losses + br_att_hosp
+            dmg_cnt = _troop_sum(row[3]) + _troop_sum(row[5])
+            own_sent  = _troop_sum(row[8])
+            enemy_sent= _troop_sum(row[7])
+            enemy_cas = _troop_sum(row[3]) + _troop_sum(row[5])
+
+        p_loss_bt[pname]      = p_loss_bt.get(pname, 0)      + own_loss_bt
+        p_loss_troops[pname]  = p_loss_troops.get(pname, 0)  + own_loss_cnt
+        p_damage_bt[pname]    = p_damage_bt.get(pname, 0)    + dmg_bt
+        p_damage_troops[pname]= p_damage_troops.get(pname,0) + dmg_cnt
+
+        own_rate   = own_loss_cnt / own_sent   if own_sent   > 0 else 0
+        enemy_rate = enemy_cas    / enemy_sent if enemy_sent > 0 else 0
+        own_wiped  = own_sent > 0 and own_loss_cnt >= own_sent
+        enemy_wiped= enemy_sent > 0 and enemy_cas >= enemy_sent
+        if enemy_wiped and not own_wiped:
+            p_wins[pname] = p_wins.get(pname, 0) + 1
+        elif own_wiped and not enemy_wiped:
+            p_losses_cnt[pname] = p_losses_cnt.get(pname, 0) + 1
+        elif own_rate < enemy_rate - 0.05:
+            p_wins[pname] = p_wins.get(pname, 0) + 1
+        elif enemy_rate < own_rate - 0.05:
+            p_losses_cnt[pname] = p_losses_cnt.get(pname, 0) + 1
+        else:
+            p_draws[pname] = p_draws.get(pname, 0) + 1
 
     for r in rows:
-        r["total_losses"] = player_losses.get(r["player_name"], 0)
+        pname = r["player_name"]
+        r["total_losses"]      = p_loss_troops.get(pname, 0)
+        r["total_damage"]      = p_damage_troops.get(pname, 0)
+        r["loss_build_time"]   = p_loss_bt.get(pname, 0)
+        r["damage_build_time"] = p_damage_bt.get(pname, 0)
+        r["net_build_time"]    = p_damage_bt.get(pname, 0) - p_loss_bt.get(pname, 0)
+        r["wins"]   = p_wins.get(pname, 0)
+        r["losses_count"] = p_losses_cnt.get(pname, 0)
+        r["draws"]  = p_draws.get(pname, 0)
         vraw = r.pop("villages_raw", "") or ""
         r["villages"] = list(set(v.strip() for v in vraw.split(",") if v.strip()))
 
