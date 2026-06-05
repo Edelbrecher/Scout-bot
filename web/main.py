@@ -12997,6 +12997,57 @@ async def api_treasuries(request: Request, guild_id: str):
     return _JSONResponse(rows)
 
 
+@app.post("/guild/{guild_id}/all-treasuries/bulk-delete")
+async def treasuries_bulk_delete(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+    body = await request.json()
+    ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
+    n = await database.bulk_delete_treasuries(guild_id, ids)
+    return _JSONResponse({"deleted": n})
+
+
+@app.post("/guild/{guild_id}/all-treasuries/bulk-set-level")
+async def treasuries_bulk_set_level(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+    body = await request.json()
+    ids   = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
+    level = int(body.get("level", 10))
+    if level not in (10, 20):
+        return _JSONResponse({"error": "Invalid level"}, status_code=400)
+    n = await database.bulk_set_treasury_level(guild_id, ids, level)
+    return _JSONResponse({"updated": n})
+
+
+@app.post("/guild/{guild_id}/all-treasuries/seed-test")
+async def treasuries_seed_test(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+    n = await database.seed_test_treasuries(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/all-treasuries?msg=test_added&n={n}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/all-treasuries/clear-test")
+async def treasuries_clear_test(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return _JSONResponse({"error": "Not authorized"}, status_code=403)
+    n = await database.clear_test_treasuries(guild_id)
+    return RedirectResponse(f"/guild/{guild_id}/all-treasuries?msg=test_cleared&n={n}", status_code=303)
+
+
 # ── Artifacts ───────────────────────────────────────────────────────────────
 
 def _parse_world_artifacts(text: str) -> list[dict]:

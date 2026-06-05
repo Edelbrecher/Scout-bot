@@ -10164,14 +10164,82 @@ async def _init_artifact_tables():
             ("activation_override", "''"),
             ("x",     "0"),
             ("y",     "0"),
-            ("owner", "''"),   # current holder (empty / 'Nataren' / player name)
-            ("distance", "NULL"),  # distance in tiles (if coords unknown)
+            ("owner", "''"),
+            ("distance", "NULL"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col} TEXT DEFAULT {default}")
                 await db.commit()
             except Exception:
                 pass
+        # Migration: is_test column for ally_treasuries
+        try:
+            await db.execute("ALTER TABLE ally_treasuries ADD COLUMN is_test INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
+
+
+async def bulk_delete_treasuries(guild_id: str, ids: list[int]) -> int:
+    await _init_artifact_tables()
+    if not ids: return 0
+    ph = ",".join("?" * len(ids))
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            f"DELETE FROM ally_treasuries WHERE guild_id=? AND id IN ({ph})",
+            [guild_id] + list(ids)
+        )
+        await db.commit()
+        return cur.rowcount
+
+
+async def bulk_set_treasury_level(guild_id: str, ids: list[int], level: int) -> int:
+    await _init_artifact_tables()
+    if not ids: return 0
+    ph = ",".join("?" * len(ids))
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            f"UPDATE ally_treasuries SET level=? WHERE guild_id=? AND id IN ({ph})",
+            [level, guild_id] + list(ids)
+        )
+        await db.commit()
+        return cur.rowcount
+
+
+async def seed_test_treasuries(guild_id: str) -> int:
+    """Insert a set of clearly-labelled test treasuries for training purposes."""
+    await _init_artifact_tables()
+    test_entries = [
+        ("TEST_SPIELER_1", "Testvilla Alpha",    42,  77, 10),
+        ("TEST_SPIELER_1", "Testvilla Beta",     -88,  12, 20),
+        ("TEST_SPIELER_2", "Schatzkammer Gamma",  15, -63, 10),
+        ("TEST_SPIELER_2", "Schatzkammer Delta", -30, 120, 20),
+        ("TEST_SPIELER_3", "Übungsort Omega",    200, -55, 10),
+    ]
+    count = 0
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        for (pname, vname, x, y, lvl) in test_entries:
+            try:
+                await db.execute("""
+                    INSERT OR IGNORE INTO ally_treasuries
+                        (guild_id, discord_id, player_name, village_name, x, y, level, notes, is_test)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, '🧪 Testdaten', 1)
+                """, (guild_id, f"test_{pname}", pname, vname, x, y, lvl))
+                count += 1
+            except Exception:
+                pass
+        await db.commit()
+    return count
+
+
+async def clear_test_treasuries(guild_id: str) -> int:
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            "DELETE FROM ally_treasuries WHERE guild_id=? AND is_test=1", (guild_id,)
+        )
+        await db.commit()
+        return cur.rowcount
 
 
 async def upsert_world_artifacts(guild_id: str, entries: list[dict]) -> int:

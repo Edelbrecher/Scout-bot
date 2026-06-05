@@ -3,75 +3,176 @@
 
 {% block content %}
 <style>
-.trow { display:flex; align-items:center; gap:.75rem; padding:.7rem .85rem; border-radius:9px; border:1px solid var(--border); margin-bottom:.45rem; background:var(--bg-card); }
-.trow:hover { border-color:rgba(99,102,241,.35); }
-.lvl-badge { display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; min-width:38px; border-radius:8px; font-weight:800; font-size:.78rem; }
+.trow {
+  display:flex; align-items:center; gap:.75rem;
+  padding:.65rem .85rem; border-radius:9px;
+  border:1px solid var(--border); margin-bottom:.4rem;
+  background:var(--bg-card); transition:border-color .15s, background .15s;
+  cursor:default;
+}
+.trow:hover { border-color:rgba(99,102,241,.3); }
+.trow.selected { border-color:rgba(99,102,241,.6); background:rgba(99,102,241,.07); }
+.trow.is-test { border-style:dashed; border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.03); }
+.trow.is-test.selected { border-color:rgba(251,191,36,.7); background:rgba(251,191,36,.09); }
+.lvl-badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:36px; min-width:36px; border-radius:8px;
+  font-weight:800; font-size:.78rem;
+}
 .lvl-10 { background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); color:#a5b4fc; }
 .lvl-20 { background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.3); color:#fbbf24; }
+
+/* Bulk toolbar */
+#bulkBar {
+  display:none; position:sticky; top:57px; z-index:50;
+  background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.35);
+  border-radius:10px; padding:.55rem .85rem;
+  align-items:center; gap:.6rem; flex-wrap:wrap;
+  margin-bottom:.75rem;
+  backdrop-filter:blur(8px);
+}
+#bulkBar.visible { display:flex; }
 </style>
 
-<div style="max-width:900px;margin:0 auto;padding:0 1.25rem 3rem;">
+<div style="max-width:960px;margin:0 auto;padding:0 1.25rem 3rem;">
   <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artefakte</a>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin:1rem 0 1.5rem;">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin:1rem 0 1.25rem;">
     <div>
       <h1 style="margin:0;">🏛️ Allianz-Schatzkammern</h1>
       <p class="subtitle" style="margin:.2rem 0 0;">Alle registrierten Schatzkammern der Allianz</p>
     </div>
-    <div style="display:flex;gap:.5rem;">
-      <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary">Meine Schatzkammern</a>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+      {% if is_leader %}
+      <button onclick="toggleTestMenu()" class="btn btn-secondary" style="font-size:.8rem;">🧪 Testdaten</button>
+      {% endif %}
+      <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary" style="font-size:.8rem;">Meine Kammern</a>
     </div>
   </div>
 
+  <!-- Msg banner -->
+  {% set msg = request.query_params.get('msg') %}
+  {% if msg == 'test_added' %}
+  <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:.6rem 1rem;font-size:.82rem;color:#fbbf24;margin-bottom:1rem;">
+    🧪 {{ request.query_params.get('n','?') }} Testkammern hinzugefügt. Werden mit gestricheltem Rahmen angezeigt.
+  </div>
+  {% elif msg == 'test_cleared' %}
+  <div style="background:rgba(134,239,172,.08);border:1px solid rgba(134,239,172,.3);border-radius:9px;padding:.6rem 1rem;font-size:.82rem;color:#86efac;margin-bottom:1rem;">
+    ✅ {{ request.query_params.get('n','?') }} Testkammern entfernt.
+  </div>
+  {% endif %}
+
+  <!-- Test data panel -->
+  <div id="testMenu" style="display:none;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;">
+    <div style="font-weight:700;color:#fbbf24;margin-bottom:.5rem;">🧪 Testdaten für Training</div>
+    <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .65rem;">
+      Fügt 5 Testkammern (mit gestricheltem Rahmen) hinzu, um den Ablauf zu üben — ohne echte Daten zu verändern.
+    </p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <form method="post" action="/guild/{{ guild.guild_id }}/all-treasuries/seed-test" style="display:inline;">
+        <button type="submit" class="btn btn-primary" style="font-size:.8rem;">+ Testkammern hinzufügen</button>
+      </form>
+      <form method="post" action="/guild/{{ guild.guild_id }}/all-treasuries/clear-test" style="display:inline;">
+        <button type="submit" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:7px;padding:.35rem .8rem;cursor:pointer;font-size:.8rem;">🗑 Alle Testkammern löschen</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- KPI chips -->
   {% set t10 = treasuries | selectattr('level','equalto',10) | list %}
   {% set t20 = treasuries | selectattr('level','equalto',20) | list %}
-  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
-    <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.5rem 1rem;font-size:.82rem;">
-      🔵 <strong>{{ t10|length }}</strong> Stufe-10 (klein)
+  {% set t_test = treasuries | selectattr('is_test') | list %}
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;">
+      🔵 <strong>{{ t10|length }}</strong> Stufe 10
     </div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:.5rem 1rem;font-size:.82rem;">
-      🟡 <strong>{{ t20|length }}</strong> Stufe-20 (groß/unique)
+    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;">
+      🟡 <strong>{{ t20|length }}</strong> Stufe 20
     </div>
-    <div style="background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;padding:.5rem 1rem;font-size:.82rem;">
+    <div style="background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;">
       📦 Gesamt: <strong>{{ treasuries|length }}</strong>
     </div>
+    {% if t_test %}
+    <div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;color:#fbbf24;">
+      🧪 <strong>{{ t_test|length }}</strong> Testkammern
+    </div>
+    {% endif %}
   </div>
 
-  <!-- Filter -->
-  <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
-    <button onclick="filterLevel(0)" id="fAll" class="btn btn-primary" style="font-size:.8rem;padding:.3rem .8rem;">Alle</button>
-    <button onclick="filterLevel(10)" id="f10" class="btn btn-secondary" style="font-size:.8rem;padding:.3rem .8rem;">🔵 Stufe 10</button>
-    <button onclick="filterLevel(20)" id="f20" class="btn btn-secondary" style="font-size:.8rem;padding:.3rem .8rem;">🟡 Stufe 20</button>
-    <input id="searchInput" class="form-control" placeholder="Spieler oder Dorf suchen..." oninput="filterSearch()" style="max-width:260px;">
+  <!-- Filter bar -->
+  <div style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
+    {% if is_leader %}
+    <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer;padding:.3rem .55rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);">
+      <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)" style="accent-color:var(--primary);width:14px;height:14px;">
+      Alle
+    </label>
+    {% endif %}
+    <button onclick="filterLevel(0)"  id="fAll" class="btn btn-primary"    style="font-size:.8rem;padding:.3rem .8rem;">Alle</button>
+    <button onclick="filterLevel(10)" id="f10"  class="btn btn-secondary"  style="font-size:.8rem;padding:.3rem .8rem;">🔵 Stufe 10</button>
+    <button onclick="filterLevel(20)" id="f20"  class="btn btn-secondary"  style="font-size:.8rem;padding:.3rem .8rem;">🟡 Stufe 20</button>
+    <input id="searchInput" class="form-control" placeholder="Spieler oder Dorf…" oninput="filterSearch()" style="max-width:220px;font-size:.82rem;">
   </div>
+
+  <!-- Bulk action toolbar -->
+  {% if is_leader %}
+  <div id="bulkBar">
+    <span id="bulkCount" style="font-size:.82rem;font-weight:700;color:#a5b4fc;margin-right:.25rem;"></span>
+    <button onclick="bulkSetLevel(10)" class="btn btn-secondary" style="font-size:.78rem;padding:.28rem .65rem;">→ Stufe 10</button>
+    <button onclick="bulkSetLevel(20)" class="btn btn-secondary" style="font-size:.78rem;padding:.28rem .65rem;">→ Stufe 20</button>
+    <button onclick="bulkDelete()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.78rem;font-weight:600;">🗑 Löschen</button>
+    <button onclick="clearSelection()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.78rem;">✕ Auswahl aufheben</button>
+  </div>
+  {% endif %}
 
   {% if not treasuries %}
   <div style="text-align:center;padding:3rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;margin-bottom:.75rem;">🏛️</div>
     <p>Noch keine Schatzkammern registriert.</p>
-    <p style="font-size:.82rem;">Spieler können ihre Schatzkammern unter "Meine Schatzkammern" eintragen.</p>
+    <p style="font-size:.82rem;">Spieler können ihre Kammern unter „Meine Schatzkammern" eintragen.</p>
   </div>
   {% else %}
   <div id="tList">
   {% for t in treasuries %}
-  <div class="trow" data-level="{{ t.level }}" data-search="{{ (t.player_name ~ ' ' ~ t.village_name)|lower }}">
-    <div class="lvl-badge lvl-{{ t.level }}">{{ t.level }}</div>
-    <div style="flex:1;min-width:0;">
-      <div style="font-weight:700;font-size:.9rem;">{{ t.village_name or '—' }}</div>
-      <div style="font-size:.76rem;color:var(--text-muted);">
-        👤 {{ t.player_name or '—' }}
-        {% if t.x or t.y %} · 📍 ({{ t.x }}|{{ t.y }}){% endif %}
-      </div>
-      {% if t.notes %}<div style="font-size:.73rem;color:var(--text-muted);margin-top:.15rem;">📝 {{ t.notes }}</div>{% endif %}
-    </div>
-    {% if t.x or t.y %}
-    <a href="/guild/{{ guild.guild_id }}/map?cx={{ t.x }}&cy={{ t.y }}&z=4"
-       style="font-size:.75rem;color:#a5b4fc;white-space:nowrap;text-decoration:none;">
-      🗺️ Karte
-    </a>
+  <div class="trow {% if t.is_test %}is-test{% endif %}"
+       id="trow-{{ t.id }}"
+       data-id="{{ t.id }}"
+       data-level="{{ t.level }}"
+       data-search="{{ (t.player_name ~ ' ' ~ t.village_name)|lower }}"
+       onclick="{% if is_leader %}toggleRow({{ t.id }}, this){% endif %}">
+
+    {% if is_leader %}
+    <input type="checkbox" class="trow-cb" data-id="{{ t.id }}"
+           onclick="event.stopPropagation();handleCb(this)"
+           style="accent-color:var(--primary);width:15px;height:15px;cursor:pointer;flex-shrink:0;">
     {% endif %}
-    <div style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">
+
+    <div class="lvl-badge lvl-{{ t.level }}">{{ t.level }}</div>
+
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+        <span style="font-weight:700;font-size:.88rem;">{{ t.village_name or '—' }}</span>
+        {% if t.is_test %}
+        <span style="font-size:.63rem;padding:1px 6px;border-radius:6px;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">🧪 TEST</span>
+        {% endif %}
+      </div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;display:flex;gap:.6rem;flex-wrap:wrap;">
+        <span>👤 {{ t.player_name or '—' }}</span>
+        {% if t.x or t.y %}<span>📍 ({{ t.x }}|{{ t.y }})</span>{% endif %}
+        {% if t.notes %}<span>📝 {{ t.notes }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div style="font-size:.73rem;color:var(--text-muted);white-space:nowrap;">
       {{ 'Klein' if t.level==10 else 'Groß/Unique' }}
     </div>
+
+    {% if t.x or t.y %}
+    <a href="/guild/{{ guild.guild_id }}/map?cx={{ t.x }}&cy={{ t.y }}&z=6"
+       onclick="event.stopPropagation()"
+       style="font-size:.75rem;color:#a5b4fc;white-space:nowrap;text-decoration:none;flex-shrink:0;">
+      🗺️
+    </a>
+    {% endif %}
   </div>
   {% endfor %}
   </div>
@@ -79,22 +180,109 @@
 </div>
 
 <script>
+const GUILD_ID = {{ guild.guild_id | tojson }};
+let selectedIds = new Set();
+
+// ── Selection ──────────────────────────────────────────────────────────────
+function toggleRow(id, el) {
+  const cb = el.querySelector('.trow-cb');
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+    el.classList.remove('selected');
+    if (cb) cb.checked = false;
+  } else {
+    selectedIds.add(id);
+    el.classList.add('selected');
+    if (cb) cb.checked = true;
+  }
+  updateBulkBar();
+}
+
+function handleCb(cb) {
+  const id = parseInt(cb.dataset.id);
+  const row = document.getElementById('trow-' + id);
+  if (cb.checked) { selectedIds.add(id); row?.classList.add('selected'); }
+  else { selectedIds.delete(id); row?.classList.remove('selected'); }
+  updateBulkBar();
+}
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('#tList .trow').forEach(row => {
+    if (row.style.display === 'none') return;
+    const id = parseInt(row.dataset.id);
+    const cb = row.querySelector('.trow-cb');
+    if (checked) { selectedIds.add(id); row.classList.add('selected'); if(cb) cb.checked=true; }
+    else { selectedIds.delete(id); row.classList.remove('selected'); if(cb) cb.checked=false; }
+  });
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('#tList .trow').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.trow-cb').forEach(cb => cb.checked = false);
+  const sa = document.getElementById('selectAll');
+  if (sa) sa.checked = false;
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  const cnt = document.getElementById('bulkCount');
+  if (!bar) return;
+  if (selectedIds.size > 0) {
+    bar.classList.add('visible');
+    cnt.textContent = selectedIds.size + ' ausgewählt';
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+// ── Bulk actions ───────────────────────────────────────────────────────────
+async function bulkDelete() {
+  if (!selectedIds.size) return;
+  if (!confirm(`${selectedIds.size} Schatzkammer(n) wirklich löschen?`)) return;
+  const r = await fetch(`/guild/${GUILD_ID}/all-treasuries/bulk-delete`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ids: [...selectedIds]})
+  });
+  if (r.ok) {
+    selectedIds.forEach(id => document.getElementById('trow-'+id)?.remove());
+    clearSelection();
+  }
+}
+
+async function bulkSetLevel(level) {
+  if (!selectedIds.size) return;
+  const r = await fetch(`/guild/${GUILD_ID}/all-treasuries/bulk-set-level`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ids: [...selectedIds], level})
+  });
+  if (r.ok) location.reload();
+}
+
+// ── Filter ─────────────────────────────────────────────────────────────────
 let _activeLevel = 0;
 function filterLevel(lvl) {
   _activeLevel = lvl;
-  document.getElementById('fAll').className = 'btn ' + (lvl===0 ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('fAll').className = 'btn ' + (lvl===0  ? 'btn-primary' : 'btn-secondary');
   document.getElementById('f10').className  = 'btn ' + (lvl===10 ? 'btn-primary' : 'btn-secondary');
   document.getElementById('f20').className  = 'btn ' + (lvl===20 ? 'btn-primary' : 'btn-secondary');
   applyFilter();
 }
 function filterSearch() { applyFilter(); }
 function applyFilter() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
   document.querySelectorAll('#tList .trow').forEach(r => {
     const lvlOk = _activeLevel === 0 || parseInt(r.dataset.level) === _activeLevel;
-    const qOk   = !q || r.dataset.search.includes(q);
+    const qOk   = !q || (r.dataset.search||'').includes(q);
     r.style.display = (lvlOk && qOk) ? '' : 'none';
   });
+}
+
+function toggleTestMenu() {
+  const m = document.getElementById('testMenu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
 }
 </script>
 {% endblock %}
