@@ -30,8 +30,27 @@
 .arm-modal-overlay.open { display:flex; }
 .arm-modal { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.5rem; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
 .arm-field { display:flex; flex-direction:column; gap:.25rem; margin-bottom:.75rem; }
-.arm-field label { font-size:.75rem; color:var(--text-muted); font-weight:600; }
+.arm-field label { font-size:.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
 .arm-field-row { display:grid; grid-template-columns:1fr 80px 80px; gap:.4rem; }
+.arm-modal .form-control {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-input, #1e1f22);
+  border: 1px solid var(--border, #3f4147);
+  border-radius: 7px;
+  color: var(--text, #dbdee1);
+  font-size: .83rem;
+  padding: .42rem .65rem;
+  outline: none;
+  transition: border-color .15s;
+}
+.arm-modal .form-control:focus {
+  border-color: var(--primary, #5865f2);
+  box-shadow: 0 0 0 3px rgba(88,101,242,.15);
+}
+.arm-modal .form-control::placeholder { color: var(--text-muted, #949ba4); opacity: .7; }
+.arm-modal select.form-control { appearance: auto; cursor: pointer; }
+.arm-modal input[type="checkbox"] { accent-color: var(--primary, #5865f2); width:15px; height:15px; cursor:pointer; }
 </style>
 
 <div class="arm-wrap">
