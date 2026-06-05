@@ -12495,6 +12495,38 @@ async def report_submit_force(request: Request, guild_id: str,
     return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
+@app.get("/guild/{guild_id}/reports/intel", response_class=HTMLResponse)
+async def combat_intel_page(request: Request, guild_id: str, q: str = ""):
+    # NOTE: must be defined BEFORE /reports/{report_id} to avoid "intel" being parsed as int
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+
+    if q.strip():
+        profile = await database.get_player_combat_profile(guild_id, q.strip())
+        import json as _json
+        for r in profile.get("reports", []):
+            for jf in ("troops_json", "losses_json"):
+                try:
+                    r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
+                except Exception:
+                    r[jf.replace("_json", "")] = {}
+        return templates.TemplateResponse("combat_intel_player.html", {
+            "request": request, "guild": guild,
+            "profile": profile, "q": q,
+        })
+
+    overview = await database.get_combat_intel_overview(guild_id)
+    return templates.TemplateResponse("combat_intel.html", {
+        "request": request, "guild": guild,
+        "players": overview, "q": q,
+    })
+
+
 @app.get("/guild/{guild_id}/reports/{report_id}", response_class=HTMLResponse)
 async def report_detail(request: Request, guild_id: str, report_id: int):
     session, err = _require_session(request)
@@ -12528,37 +12560,6 @@ async def report_delete(request: Request, guild_id: str, report_id: int):
     if err: return err
     await database.delete_battle_report(report_id, guild_id)
     return RedirectResponse(f"/guild/{guild_id}/reports", status_code=303)
-
-
-@app.get("/guild/{guild_id}/reports/intel", response_class=HTMLResponse)
-async def combat_intel_page(request: Request, guild_id: str, q: str = ""):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard", status_code=303)
-
-    if q.strip():
-        profile = await database.get_player_combat_profile(guild_id, q.strip())
-        import json as _json
-        for r in profile.get("reports", []):
-            for jf in ("troops_json", "losses_json"):
-                try:
-                    r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
-                except Exception:
-                    r[jf.replace("_json", "")] = {}
-        return templates.TemplateResponse("combat_intel_player.html", {
-            "request": request, "guild": guild,
-            "profile": profile, "q": q,
-        })
-
-    overview = await database.get_combat_intel_overview(guild_id)
-    return templates.TemplateResponse("combat_intel.html", {
-        "request": request, "guild": guild,
-        "players": overview, "q": q,
-    })
 
 
 @app.get("/guild/{guild_id}/intel", response_class=HTMLResponse)
