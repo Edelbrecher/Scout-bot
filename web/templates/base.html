@@ -184,6 +184,31 @@
   text-decoration:none; transition:background 0.1s, color 0.1s;
 }
 .nav-profile-item:hover { background:var(--bg-main); color:var(--text); }
+
+/* ── Page loading overlay ───────────────────────────────────────────────── */
+#page-loader {
+  position: fixed; inset: 0; z-index: 99999;
+  background: rgba(10,11,13,0.7);
+  backdrop-filter: blur(2px);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 1rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+#page-loader.visible { opacity: 1; pointer-events: all; }
+.pl-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid rgba(88,101,242,0.2);
+  border-top-color: #5865f2;
+  border-radius: 50%;
+  animation: pl-spin 0.7s linear infinite;
+}
+@keyframes pl-spin { to { transform: rotate(360deg); } }
+.pl-label {
+  font-size: 0.82rem; color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
 </style>
 <script>
 (function() {
@@ -237,6 +262,56 @@ document.addEventListener('click', e => {
   }
 });
 </script>
+
+  <!-- Page loading overlay -->
+  <div id="page-loader">
+    <div class="pl-spinner"></div>
+    <div class="pl-label">Laden…</div>
+  </div>
+  <script>
+  (function(){
+    var loader = document.getElementById('page-loader');
+    var hideTimer = null;
+
+    function showLoader() {
+      clearTimeout(hideTimer);
+      loader.classList.add('visible');
+    }
+    function hideLoader() {
+      loader.classList.remove('visible');
+    }
+
+    // Show on navigation clicks (links that go to same origin, not modals/anchors/external)
+    document.addEventListener('click', function(e) {
+      var a = e.target.closest('a');
+      if (!a) return;
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      var href = a.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript') || href.startsWith('mailto')) return;
+      if (a.target && a.target !== '_self') return;
+      if (a.getAttribute('data-no-loader')) return;
+      // Only same-origin
+      try {
+        var url = new URL(href, location.origin);
+        if (url.origin !== location.origin) return;
+      } catch(e) { return; }
+      showLoader();
+    });
+
+    // Show on form submits
+    document.addEventListener('submit', function(e) {
+      if (e.target.getAttribute('data-no-loader')) return;
+      showLoader();
+    });
+
+    // Hide when page becomes visible again (back/forward navigation)
+    window.addEventListener('pageshow', hideLoader);
+    // Hide on load (safety net)
+    window.addEventListener('load', hideLoader);
+    // Hide immediately when page is already loaded
+    if (document.readyState === 'complete') hideLoader();
+  })();
+  </script>
 
   <!-- Guild Sidebar (injected via JS if on a /guild/... page) -->
   <div id="guild-sidebar" style="display:none;" aria-label="Guild navigation">
