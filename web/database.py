@@ -10165,6 +10165,7 @@ async def _init_artifact_tables():
             ("x",     "0"),
             ("y",     "0"),
             ("owner", "''"),   # current holder (empty / 'Nataren' / player name)
+            ("distance", "NULL"),  # distance in tiles (if coords unknown)
         ]:
             try:
                 await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col} TEXT DEFAULT {default}")
@@ -10175,48 +10176,63 @@ async def _init_artifact_tables():
 
 async def upsert_world_artifacts(guild_id: str, entries: list[dict]) -> int:
     """Bulk-upsert artifacts imported from the Travian world map / treasury page.
-    Each entry: {name, artifact_type, artifact_size, x, y, owner}
-    Matches on (guild_id, x, y) — updates if coords already known.
+    Each entry: {name, artifact_type, artifact_size, owner, x?, y?, distance?}
+    - If x/y present: match on (guild_id, x, y)
+    - If only distance: match on (guild_id, name, artifact_size) — no-coord import
     Returns number of upserted rows."""
     await _init_artifact_tables()
     count = 0
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for e in entries:
-            x, y = int(e.get("x") or 0), int(e.get("y") or 0)
-            # Check if already exists by coords
-            async with db.execute(
-                "SELECT id FROM artifacts WHERE guild_id=? AND x=? AND y=?",
-                (guild_id, x, y)
-            ) as cur:
-                row = await cur.fetchone()
+            x = int(e.get("x") or 0)
+            y = int(e.get("y") or 0)
+            distance = e.get("distance")  # None if coords known
+            has_coords = (x != 0 or y != 0)
+
+            row = None
+            if has_coords:
+                async with db.execute(
+                    "SELECT id FROM artifacts WHERE guild_id=? AND x=? AND y=?",
+                    (guild_id, x, y)
+                ) as cur:
+                    row = await cur.fetchone()
+            else:
+                # Match by name+size for distance-only entries
+                async with db.execute(
+                    "SELECT id FROM artifacts WHERE guild_id=? AND name=? AND artifact_size=?",
+                    (guild_id, e.get("name",""), e.get("artifact_size","small"))
+                ) as cur:
+                    row = await cur.fetchone()
+
             if row:
                 await db.execute("""
                     UPDATE artifacts SET name=?, artifact_type=?, artifact_size=?,
-                        owner=?, updated_at=datetime('now')
+                        owner=?, distance=?, updated_at=datetime('now')
                     WHERE id=?
                 """, (e.get("name",""), e.get("artifact_type","other"),
-                      e.get("artifact_size","small"), e.get("owner",""), row[0]))
+                      e.get("artifact_size","small"), e.get("owner",""),
+                      distance, row[0]))
             else:
                 await db.execute("""
                     INSERT INTO artifacts
                         (guild_id, name, artifact_type, artifact_size, x, y, owner,
-                         status, created_at, updated_at)
-                    VALUES (?,?,?,?,?,?,?,'world',datetime('now'),datetime('now'))
+                         distance, status, created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,'world',datetime('now'),datetime('now'))
                 """, (guild_id, e.get("name",""), e.get("artifact_type","other"),
-                      e.get("artifact_size","small"), x, y, e.get("owner","")))
+                      e.get("artifact_size","small"), x, y, e.get("owner",""), distance))
             count += 1
         await db.commit()
     return count
 
 
 async def get_world_artifacts(guild_id: str) -> list[dict]:
-    """Return all artifacts that have coordinates (x != 0 or y != 0)."""
+    """Return all world artifacts (with OR without coordinates)."""
     await _init_artifact_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT * FROM artifacts
-            WHERE guild_id=? AND (CAST(x AS INTEGER) != 0 OR CAST(y AS INTEGER) != 0)
+            WHERE guild_id=? AND status='world'
             ORDER BY artifact_size, name
         """, (guild_id,)) as cur:
             return [dict(r) for r in await cur.fetchall()]

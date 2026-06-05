@@ -13001,17 +13001,21 @@ async def api_treasuries(request: Request, guild_id: str):
 
 def _parse_world_artifacts(text: str) -> list[dict]:
     """
-    Parse Travian Schatzkammer / treasure-chamber copy-paste.
-    Handles lines like:
-      Boot of the Warrior  Small  Baumeister  (−44|32)  [CC] Hitamtoni
-      Helmet of Mercenary  Large  Trainer     (12|−55)  Nataren
-    Also handles tab-separated exports or one-artifact-per-block formats.
-    Returns list of dicts: {name, artifact_type, artifact_size, x, y, owner}
+    Parse Travian Schatzkammer copy-paste.
+
+    Two supported formats:
+    A) With coordinates:
+       Stiefel des Kriegers  Klein  Baumeister  (−44|32)   [CC] Hitamtoni
+    B) Distance-only (Schatzkammer default — no coords shown):
+       Stiefel des Kriegers  Klein  Baumeister  234  Nataren
+       Boot of the Warrior   Small  Builder     1234 km  Nataren
+
+    Returns list of dicts: {name, artifact_type, artifact_size, owner, x, y, distance}
+    x/y are 0 when unknown; distance is None when coords are known.
     """
     import re as _re
 
-    # Known artifact type keywords → canonical key
-    _TYPE_HINTS = {
+    _TYPE_MAP = {
         "baumeister": "builder", "builder": "builder", "master builder": "builder",
         "ausbilder": "trainer", "trainer": "trainer",
         "versorger": "diet", "diet": "diet",
@@ -13028,70 +13032,104 @@ def _parse_world_artifacts(text: str) -> list[dict]:
         "legion": "legion",
         "shield": "shield", "schild": "shield",
         "sword": "sword", "schwert": "sword",
-        "unique": "unique",
     }
-    _SIZE_HINTS = {
+    _SIZE_MAP = {
         "small": "small", "klein": "small",
-        "large": "large", "groß": "large", "gross": "large",
-        "unique": "unique",
+        "large": "large", "groß": "large", "gross": "large", "großes": "large",
+        "unique": "unique", "einzigartig": "unique",
     }
     _NATAR = {"nataren", "natars", "natar"}
+    # All known keywords to skip when extracting the artifact name
+    _SKIP = set(_TYPE_MAP) | set(_SIZE_MAP) | {"km", "felder", "fields", "tiles"}
 
-    coord_re = _re.compile(r'\(?\s*([−\-]?\d+)\s*[|│]\s*([−\-]?\d+)\s*\)?')
+    coord_re    = _re.compile(r'\(?\s*([−–\-]?\d+)\s*[|│]\s*([−–\-]?\d+)\s*\)?')
+    dist_re     = _re.compile(r'\b(\d{1,5})\s*(?:km|felder|fields|tiles)?\b')
+    alliance_re = _re.compile(r'^\s*\[[^\]]{1,12}\]\s*')
+
     results: list[dict] = []
-
-    clean = _re.sub(r'[‎‏‪-‮⁦-⁩­]', '', text)
-    lines = [l.strip() for l in clean.splitlines()]
+    clean = _re.sub(r'[‎‏‪-‮⁦-⁩­​‌‍]', '', text)
+    lines = [l.strip() for l in clean.splitlines() if l.strip()]
 
     for line in lines:
-        if not line:
+        low = line.lower()
+
+        # Skip pure header/separator lines
+        if not any(c.isalpha() for c in line):
             continue
+        # Skip lines with no artifact size indicator at all (likely headers)
+        if not any(s in low for s in _SIZE_MAP):
+            continue
+
+        x = y = 0
+        distance = None
+
+        # ── Format A: has coordinates ──────────────────────────────────────────
         cm = coord_re.search(line)
-        if not cm:
-            continue
-        try:
-            x = int(cm.group(1).replace('−', '-'))
-            y = int(cm.group(2).replace('−', '-'))
-        except Exception:
-            continue
+        if cm:
+            try:
+                x = int(cm.group(1).replace('−', '-').replace('–', '-'))
+                y = int(cm.group(2).replace('−', '-').replace('–', '-'))
+            except Exception:
+                continue
+            before = line[:cm.start()].strip()
+            after  = line[cm.end():].strip()
+        # ── Format B: distance only ────────────────────────────────────────────
+        else:
+            # Find the distance number — typically a standalone integer (100-9999)
+            # We look for a number that is NOT part of a coordinate
+            dm = dist_re.search(line)
+            if dm:
+                distance = int(dm.group(1))
+                before = line[:dm.start()].strip()
+                after  = line[dm.end():].strip()
+            else:
+                # No coords and no distance → try to parse name/size at minimum
+                before = line
+                after  = ""
 
-        # Text before coords = name + type/size info
-        before = line[:cm.start()].strip()
-        after  = line[cm.end():].strip()
+        # ── Owner ──────────────────────────────────────────────────────────────
+        owner_raw = alliance_re.sub('', after).strip()
+        owner = owner_raw if owner_raw else "Nataren"
 
-        # Determine size
+        # ── Size ──────────────────────────────────────────────────────────────
         size = "small"
-        for kw, val in _SIZE_HINTS.items():
-            if kw in before.lower() or kw in after.lower():
+        for kw, val in _SIZE_MAP.items():
+            if kw in low:
                 size = val
                 break
 
-        # Determine type
+        # ── Type ──────────────────────────────────────────────────────────────
         atype = "other"
-        for kw, val in _TYPE_HINTS.items():
-            if kw in before.lower() or kw in after.lower():
+        for kw, val in _TYPE_MAP.items():
+            if kw in low:
                 atype = val
                 break
 
-        # Owner: text after coords, strip alliance tag
-        owner_raw = _re.sub(r'^\s*\[[^\]]{1,10}\]\s*', '', after).strip()
-        owner = owner_raw if owner_raw else "Nataren"
-
-        # Name: first meaningful token(s) before size/type keywords
+        # ── Name: tokens before first skip-keyword ────────────────────────────
+        tokens = _re.split(r'[\t]+|\s{2,}|\s*–\s*', before)
+        # Fall back to splitting on any whitespace if no multi-space found
+        if len(tokens) == 1:
+            tokens = before.split()
         name_parts = []
-        for tok in _re.split(r'\s+', before):
-            tl = tok.lower()
-            if tl in _SIZE_HINTS or tl in _TYPE_HINTS:
+        for tok in tokens:
+            tl = tok.lower().rstrip('s')  # strip trailing 's' for plurals
+            if tl in _SKIP or tok.lower() in _SKIP:
                 break
             if tok:
                 name_parts.append(tok)
-        name = " ".join(name_parts).strip() or before.split()[0] if before.split() else "Artifact"
+        name = " ".join(name_parts).strip()
+        if not name and before.split():
+            name = before.split()[0]
+        if not name:
+            name = "Artifact"
 
         results.append({
             "name": name[:80],
             "artifact_type": atype,
             "artifact_size": size,
-            "x": x, "y": y,
+            "x": x,
+            "y": y,
+            "distance": distance,
             "owner": owner,
             "natar": owner_raw.lower() in _NATAR or not owner_raw,
         })
@@ -13120,6 +13158,21 @@ async def world_artifacts_api(request: Request, guild_id: str):
     return _JSONResponse(data)
 
 
+@app.post("/guild/{guild_id}/artifacts/api/world-artifact/{artifact_id}/set-coords")
+async def set_world_artifact_coords(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    body = await request.json()
+    x, y = int(body.get("x",0)), int(body.get("y",0))
+    async with __import__("aiosqlite").connect(database.DB_PATH, timeout=30) as db:
+        await db.execute(
+            "UPDATE artifacts SET x=?, y=?, distance=NULL, updated_at=datetime('now') WHERE id=? AND guild_id=?",
+            (x, y, artifact_id, guild_id)
+        )
+        await db.commit()
+    return _JSONResponse({"ok": True})
+
+
 @app.get("/guild/{guild_id}/artifacts/run-map", response_class=HTMLResponse)
 async def artifact_run_map_page(request: Request, guild_id: str):
     """Artifact run planning map — who clears/destroys/picks each artifact."""
@@ -13136,6 +13189,13 @@ async def artifact_run_map_page(request: Request, guild_id: str):
     bg_villages    = await database.get_map_villages_for_guild(guild_id) if hasattr(database, "get_map_villages_for_guild") else []
     world_artifacts = await database.get_world_artifacts(guild_id)
     imported       = request.query_params.get("imported")
+    # Home coords for distance circles
+    ms = await database.get_march_settings(guild_id, session.get("user_id",""))
+    home_x = ms.get("home_x", 0) if ms else 0
+    home_y = ms.get("home_y", 0) if ms else 0
+    # Alliance name for filter
+    ally_group = await database.get_ally_group(guild_id) if hasattr(database, "get_ally_group") else None
+    ally_name  = ally_group.get("ally_name","") if ally_group else ""
     return templates.TemplateResponse("artifact_run_map.html", {
         "request": request, "guild": guild, "session": session,
         "runs": runs, "treasury_players": list(treasury_players),
@@ -13143,6 +13203,9 @@ async def artifact_run_map_page(request: Request, guild_id: str):
         "bg_villages": bg_villages,
         "world_artifacts": world_artifacts,
         "imported": imported,
+        "home_x": home_x or 0,
+        "home_y": home_y or 0,
+        "ally_name": ally_name or "",
     })
 
 
