@@ -1480,12 +1480,22 @@ function csParsAndSimulate() {
     statusEl.style.color='var(--text-muted)';
   }
   if (!currentGrain&&netPerH===0&&!parsed.incoming.length&&!parsed.outgoing.length) {
-    statusEl.textContent='⚠️ Please enter village parameters or paste marketplace data.';
-    statusEl.style.color='#f87171';
+    statusEl.innerHTML='<span style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:.35rem .75rem;color:#f87171;">⚠️ Bitte Grain-Vorrat oder Netto G/h eingeben.</span>';
+    statusEl.scrollIntoView({behavior:'smooth',block:'nearest'});
     return;
   }
-  const simResult=csSimulate({currentGrain,productionPerH,consumptionPerH,granaryCapacity,incoming:parsed.incoming,outgoing:parsed.outgoing,durationH});
-  csRenderResults(simResult,{currentGrain,productionPerH,consumptionPerH,granaryCapacity,durationH,incoming:parsed.incoming,outgoing:parsed.outgoing});
+  statusEl.textContent='⏳ Simuliere…'; statusEl.style.color='var(--text-muted)';
+  try {
+    const simResult=csSimulate({currentGrain,productionPerH,consumptionPerH,granaryCapacity,incoming:parsed.incoming,outgoing:parsed.outgoing,durationH});
+    csRenderResults(simResult,{currentGrain,productionPerH,consumptionPerH,granaryCapacity,durationH,incoming:parsed.incoming,outgoing:parsed.outgoing});
+    statusEl.textContent='✅ Simulation abgeschlossen'; statusEl.style.color='#4ade80';
+    const res=document.getElementById('cs-resultsSection');
+    const top=res.getBoundingClientRect().top+window.pageYOffset-20;
+    window.scrollTo({top,behavior:'smooth'});
+  } catch(e) {
+    statusEl.innerHTML='<span style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:.35rem .75rem;color:#f87171;">⚠️ Fehler: '+e.message+'</span>';
+    console.error('Simulation error:',e);
+  }
 }
 
 function csRenderResults(sim,params) {
@@ -1571,7 +1581,13 @@ function csRenderResults(sim,params) {
     }).join('');
   }
 
-  csBuildChart(sim,granaryCapacity,durationH,nowMs);
+  try {
+    csBuildChart(sim,granaryCapacity,durationH,nowMs);
+  } catch(e) {
+    console.error('Chart error:',e);
+    const c=document.getElementById('cs-grainChart');
+    if(c) c.parentElement.innerHTML='<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.82rem;">📊 Chart konnte nicht geladen werden</div>';
+  }
 }
 
 function csLoadExample() {
