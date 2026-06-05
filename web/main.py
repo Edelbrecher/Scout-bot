@@ -6304,6 +6304,61 @@ _TROOP_TABLE_MARKERS = {
     "en": ["sent", "losses", "in village", "attacker", "defender"],
 }
 
+_SIEGE_UNITS = {"catapult", "trebuchet", "battering_ram", "fire_catapult"}
+_CHEAP_UNITS = {
+    "clubswinger", "legionnaire", "phalanx", "spearman", "axeman",
+    "mercenary", "slave_militia", "hoplite", "sentinel", "shieldsman",
+}
+_STRONG_OFF  = {
+    "teutonic_knight", "equites_imperatoris", "equites_caesaris",
+    "haeduan", "steppe_rider", "marksman", "marauder",
+    "resheph_chariot", "corinthian_crusher", "elpida_rider",
+}
+
+def _detect_fake(troops_sent: dict) -> dict:
+    """Analyse troop composition and return fake likelihood."""
+    if not troops_sent:
+        return {"fake_confidence": "none", "fake_reason": ""}
+
+    total      = sum(v for v in troops_sent.values() if v)
+    siege      = sum(v for k, v in troops_sent.items() if k in _SIEGE_UNITS and v)
+    cheap      = sum(v for k, v in troops_sent.items() if k in _CHEAP_UNITS and v)
+    strong_off = sum(v for k, v in troops_sent.items() if k in _STRONG_OFF and v)
+
+    if total == 0:
+        return {"fake_confidence": "none", "fake_reason": ""}
+
+    siege_ratio = siege / total
+    strong_ratio = strong_off / total
+
+    # Classic fake: tiny army + 1 siege
+    if siege >= 1 and total <= 60:
+        return {
+            "fake_confidence": "high",
+            "fake_reason": f"{total} troops · {siege} siege — classic fake",
+        }
+    # Suspicious: still very small with siege
+    if siege >= 1 and total <= 200 and strong_ratio < 0.05:
+        return {
+            "fake_confidence": "medium",
+            "fake_reason": f"{total} troops · {siege} siege · no strong off — likely fake",
+        }
+    # Tiny attack without siege
+    if total <= 30 and siege == 0:
+        return {
+            "fake_confidence": "medium",
+            "fake_reason": f"Only {total} troops sent — possible fake/distraction",
+        }
+    # Large siege ratio relative to army (real attacks have many troops per siege)
+    if siege >= 1 and siege_ratio > 0.05 and strong_ratio < 0.1:
+        return {
+            "fake_confidence": "low",
+            "fake_reason": f"{siege} siege in {total} troops ({siege_ratio:.0%}) — fake-like ratio",
+        }
+
+    return {"fake_confidence": "none", "fake_reason": ""}
+
+
 def _parse_battle_report(text: str) -> dict:
     """Parse a pasted Travian battle/spy/farm report text.
     Returns a dict with all extracted fields. Missing fields are None/empty.
@@ -6678,6 +6733,11 @@ def _parse_battle_report(text: str) -> dict:
             "destroyed": destroyed,
         })
     result["buildings_hit"] = buildings_hit
+
+    # ── Fake detection ─────────────────────────────────────────────────────────
+    fake_info = _detect_fake(result.get("troops_sent", {}))
+    result["fake_confidence"] = fake_info["fake_confidence"]
+    result["fake_reason"]     = fake_info["fake_reason"]
 
     return result
 
@@ -12462,6 +12522,9 @@ async def reports_page(request: Request, guild_id: str,
                 r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
             except Exception:
                 r[jf.replace("_json", "")] = {}
+        fake = _detect_fake(r.get("troops_sent") or {})
+        r["fake_confidence"] = fake["fake_confidence"]
+        r["fake_reason"]     = fake["fake_reason"]
 
     return templates.TemplateResponse("reports.html", {
         "request": request, "guild": guild,
@@ -12591,6 +12654,9 @@ async def report_detail(request: Request, guild_id: str, report_id: int):
         r["buildings_hit"] = _json.loads(r.get("buildings_hit_json") or "[]")
     except Exception:
         r["buildings_hit"] = []
+    fake = _detect_fake(r.get("troops_sent") or {})
+    r["fake_confidence"] = fake["fake_confidence"]
+    r["fake_reason"]     = fake["fake_reason"]
 
     return templates.TemplateResponse("report_detail.html", {
         "request": request, "guild": guild, "report": r,

@@ -41,6 +41,25 @@
     </form>
   </div>
 
+  <!-- ── Fake banner ── -->
+  {% if report.fake_confidence in ('high', 'medium', 'low') %}
+  <div style="background:rgba(251,191,36,{% if report.fake_confidence == 'high' %}.12{% elif report.fake_confidence == 'medium' %}.08{% else %}.05{% endif %});
+              border:1px solid rgba(251,191,36,{% if report.fake_confidence == 'high' %}.45{% elif report.fake_confidence == 'medium' %}.3{% else %}.2{% endif %});
+              border-radius:12px;padding:.75rem 1.25rem;margin-bottom:1rem;
+              display:flex;align-items:center;gap:.75rem;">
+    <span style="font-size:1.5rem;">🎭</span>
+    <div>
+      <div style="font-weight:700;color:#fbbf24;font-size:.95rem;">
+        {% if report.fake_confidence == 'high' %}Fake attack detected
+        {% elif report.fake_confidence == 'medium' %}Likely fake attack
+        {% else %}Possibly fake attack
+        {% endif %}
+      </div>
+      <div style="font-size:.78rem;color:var(--text-muted);">{{ report.fake_reason }}</div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ── Winner banner ── -->
   {% if winner == 'attacker' %}
   <div style="background:linear-gradient(135deg,rgba(248,113,113,.15),rgba(248,113,113,.05));

@@ -90,6 +90,22 @@
             <span style="font-weight:600;font-size:.9rem;color:{{ rt_color }};">
               {{ r.report_type | title if r.report_type else 'Report' }}
             </span>
+            {% if r.fake_confidence == 'high' %}
+            <span title="{{ r.fake_reason }}" style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:5px;
+                         background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);color:#fbbf24;cursor:help;">
+              🎭 FAKE
+            </span>
+            {% elif r.fake_confidence == 'medium' %}
+            <span title="{{ r.fake_reason }}" style="font-size:.68rem;font-weight:600;padding:1px 7px;border-radius:5px;
+                         background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fbbf24;opacity:.85;cursor:help;">
+              🎭 likely fake
+            </span>
+            {% elif r.fake_confidence == 'low' %}
+            <span title="{{ r.fake_reason }}" style="font-size:.68rem;padding:1px 7px;border-radius:5px;
+                         background:rgba(148,155,164,.08);border:1px solid var(--border);color:var(--text-muted);cursor:help;">
+              🎭 fake?
+            </span>
+            {% endif %}
             {% if r.attacker_name %}
             <span style="font-size:.82rem;color:var(--text);">{{ r.attacker_name }}</span>
             <span style="color:var(--text-muted);font-size:.78rem;">→</span>
