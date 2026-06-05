@@ -9585,6 +9585,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "radar",     "label": "Alliance Tracking",  "url_suffix": "/alliance-tracking"},
     {"type": "group", "label": "Alliance"},
     {"type": "item",  "icon": "castle",    "label": "My Alliance",     "url_suffix": "/my-ally"},
+    {"type": "item",  "icon": "sword",     "label": "Troop Roles",     "url_suffix": "/my-ally/troop-roles"},
     {"type": "item",  "icon": "users",     "label": "Members",         "url_suffix": "/allianz/mitglieder"},
     {"type": "item",  "icon": "shield",    "label": "Defense",         "url_suffix": "/verteidigung"},
     {"type": "item",  "icon": "skull",     "label": "Enemies",         "url_suffix": "/enemies"},
