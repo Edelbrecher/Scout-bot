@@ -10162,12 +10162,64 @@ async def _init_artifact_tables():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for col, default in [
             ("activation_override", "''"),
+            ("x",     "0"),
+            ("y",     "0"),
+            ("owner", "''"),   # current holder (empty / 'Nataren' / player name)
         ]:
             try:
-                await db.execute(f"ALTER TABLE artifacts ADD COLUMN activation_override TEXT DEFAULT {default}")
+                await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col} TEXT DEFAULT {default}")
                 await db.commit()
             except Exception:
                 pass
+
+
+async def upsert_world_artifacts(guild_id: str, entries: list[dict]) -> int:
+    """Bulk-upsert artifacts imported from the Travian world map / treasury page.
+    Each entry: {name, artifact_type, artifact_size, x, y, owner}
+    Matches on (guild_id, x, y) — updates if coords already known.
+    Returns number of upserted rows."""
+    await _init_artifact_tables()
+    count = 0
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        for e in entries:
+            x, y = int(e.get("x") or 0), int(e.get("y") or 0)
+            # Check if already exists by coords
+            async with db.execute(
+                "SELECT id FROM artifacts WHERE guild_id=? AND x=? AND y=?",
+                (guild_id, x, y)
+            ) as cur:
+                row = await cur.fetchone()
+            if row:
+                await db.execute("""
+                    UPDATE artifacts SET name=?, artifact_type=?, artifact_size=?,
+                        owner=?, updated_at=datetime('now')
+                    WHERE id=?
+                """, (e.get("name",""), e.get("artifact_type","other"),
+                      e.get("artifact_size","small"), e.get("owner",""), row[0]))
+            else:
+                await db.execute("""
+                    INSERT INTO artifacts
+                        (guild_id, name, artifact_type, artifact_size, x, y, owner,
+                         status, created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,'world',datetime('now'),datetime('now'))
+                """, (guild_id, e.get("name",""), e.get("artifact_type","other"),
+                      e.get("artifact_size","small"), x, y, e.get("owner","")))
+            count += 1
+        await db.commit()
+    return count
+
+
+async def get_world_artifacts(guild_id: str) -> list[dict]:
+    """Return all artifacts that have coordinates (x != 0 or y != 0)."""
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM artifacts
+            WHERE guild_id=? AND (CAST(x AS INTEGER) != 0 OR CAST(y AS INTEGER) != 0)
+            ORDER BY artifact_size, name
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_artifact_runs(guild_id: str) -> list[dict]:

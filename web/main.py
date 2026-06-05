@@ -12999,6 +12999,127 @@ async def api_treasuries(request: Request, guild_id: str):
 
 # ── Artifacts ───────────────────────────────────────────────────────────────
 
+def _parse_world_artifacts(text: str) -> list[dict]:
+    """
+    Parse Travian Schatzkammer / treasure-chamber copy-paste.
+    Handles lines like:
+      Boot of the Warrior  Small  Baumeister  (−44|32)  [CC] Hitamtoni
+      Helmet of Mercenary  Large  Trainer     (12|−55)  Nataren
+    Also handles tab-separated exports or one-artifact-per-block formats.
+    Returns list of dicts: {name, artifact_type, artifact_size, x, y, owner}
+    """
+    import re as _re
+
+    # Known artifact type keywords → canonical key
+    _TYPE_HINTS = {
+        "baumeister": "builder", "builder": "builder", "master builder": "builder",
+        "ausbilder": "trainer", "trainer": "trainer",
+        "versorger": "diet", "diet": "diet",
+        "späher": "scout", "scout": "scout",
+        "architect": "architect", "architekt": "architect",
+        "fool": "fool", "narr": "fool",
+        "storage": "storage", "lager": "storage",
+        "confuser": "confuser", "verwirrer": "confuser",
+        "artisan": "artisan",
+        "boots": "boots", "stiefel": "boots",
+        "eyes": "eyes", "augen": "eyes",
+        "helmet": "helmet", "helm": "helmet",
+        "horse": "horse", "pferd": "horse",
+        "legion": "legion",
+        "shield": "shield", "schild": "shield",
+        "sword": "sword", "schwert": "sword",
+        "unique": "unique",
+    }
+    _SIZE_HINTS = {
+        "small": "small", "klein": "small",
+        "large": "large", "groß": "large", "gross": "large",
+        "unique": "unique",
+    }
+    _NATAR = {"nataren", "natars", "natar"}
+
+    coord_re = _re.compile(r'\(?\s*([−\-]?\d+)\s*[|│]\s*([−\-]?\d+)\s*\)?')
+    results: list[dict] = []
+
+    clean = _re.sub(r'[‎‏‪-‮⁦-⁩­]', '', text)
+    lines = [l.strip() for l in clean.splitlines()]
+
+    for line in lines:
+        if not line:
+            continue
+        cm = coord_re.search(line)
+        if not cm:
+            continue
+        try:
+            x = int(cm.group(1).replace('−', '-'))
+            y = int(cm.group(2).replace('−', '-'))
+        except Exception:
+            continue
+
+        # Text before coords = name + type/size info
+        before = line[:cm.start()].strip()
+        after  = line[cm.end():].strip()
+
+        # Determine size
+        size = "small"
+        for kw, val in _SIZE_HINTS.items():
+            if kw in before.lower() or kw in after.lower():
+                size = val
+                break
+
+        # Determine type
+        atype = "other"
+        for kw, val in _TYPE_HINTS.items():
+            if kw in before.lower() or kw in after.lower():
+                atype = val
+                break
+
+        # Owner: text after coords, strip alliance tag
+        owner_raw = _re.sub(r'^\s*\[[^\]]{1,10}\]\s*', '', after).strip()
+        owner = owner_raw if owner_raw else "Nataren"
+
+        # Name: first meaningful token(s) before size/type keywords
+        name_parts = []
+        for tok in _re.split(r'\s+', before):
+            tl = tok.lower()
+            if tl in _SIZE_HINTS or tl in _TYPE_HINTS:
+                break
+            if tok:
+                name_parts.append(tok)
+        name = " ".join(name_parts).strip() or before.split()[0] if before.split() else "Artifact"
+
+        results.append({
+            "name": name[:80],
+            "artifact_type": atype,
+            "artifact_size": size,
+            "x": x, "y": y,
+            "owner": owner,
+            "natar": owner_raw.lower() in _NATAR or not owner_raw,
+        })
+
+    return results
+
+
+@app.post("/guild/{guild_id}/artifacts/import-world")
+async def artifact_import_world(request: Request, guild_id: str,
+                                artifact_text: str = Form("")):
+    """Parse and import artifacts from Travian Schatzkammer copy-paste."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    entries = _parse_world_artifacts(artifact_text.strip())
+    count   = await database.upsert_world_artifacts(guild_id, entries)
+    return RedirectResponse(f"/guild/{guild_id}/artifacts/run-map?imported={count}", status_code=303)
+
+
+@app.get("/guild/{guild_id}/artifacts/api/world-artifacts")
+async def world_artifacts_api(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    data = await database.get_world_artifacts(guild_id)
+    return _JSONResponse(data)
+
+
 @app.get("/guild/{guild_id}/artifacts/run-map", response_class=HTMLResponse)
 async def artifact_run_map_page(request: Request, guild_id: str):
     """Artifact run planning map — who clears/destroys/picks each artifact."""
@@ -13008,17 +13129,20 @@ async def artifact_run_map_page(request: Request, guild_id: str):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    runs      = await database.get_artifact_runs(guild_id)
-    treasuries = await database.get_all_treasuries(guild_id)
+    runs           = await database.get_artifact_runs(guild_id)
+    treasuries     = await database.get_all_treasuries(guild_id)
     treasury_players = {t["player_name"] for t in treasuries}
-    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
-    # Map background villages
-    bg_villages = await database.get_map_villages_for_guild(guild_id) if hasattr(database, "get_map_villages_for_guild") else []
+    is_leader      = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    bg_villages    = await database.get_map_villages_for_guild(guild_id) if hasattr(database, "get_map_villages_for_guild") else []
+    world_artifacts = await database.get_world_artifacts(guild_id)
+    imported       = request.query_params.get("imported")
     return templates.TemplateResponse("artifact_run_map.html", {
         "request": request, "guild": guild, "session": session,
         "runs": runs, "treasury_players": list(treasury_players),
         "is_leader": is_leader, "artifact_types": ARTIFACT_TYPES,
         "bg_villages": bg_villages,
+        "world_artifacts": world_artifacts,
+        "imported": imported,
     })
 
 
