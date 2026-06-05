@@ -6235,184 +6235,266 @@ def _parse_battle_report(text: str) -> dict:
     if result["report_type"] == "unknown" and any(k in text_lower for k in ["beute", "plunder", "loot"]):
         result["report_type"] = "attack"
 
+    # ── Clean text: strip Unicode direction marks, normalise whitespace ───────
+    text_clean = re.sub(r'[‎‏‪-‮⁦-⁩­]', '', text)
+
     # ── Date ───────────────────────────────────────────────────────────────
-    date_re = re.compile(r'(\d{1,2})[./](\d{1,2})[./](\d{4})\s+(\d{1,2}:\d{2}:\d{2})')
-    dm = date_re.search(text)
+    # Handles: 04.06.2026 23:04:02  and  04.06.26, 23:04:02
+    date_re = re.compile(
+        r'(\d{1,2})[./](\d{1,2})[./](\d{2,4})[,\s]+(\d{1,2}:\d{2}:\d{2})'
+    )
+    dm = date_re.search(text_clean)
     if dm:
         try:
-            result["report_date"] = f"{dm.group(3)}-{dm.group(2):>02}-{dm.group(1):>02} {dm.group(4)}"
+            yr = dm.group(3)
+            if len(yr) == 2:
+                yr = "20" + yr
+            result["report_date"] = f"{yr}-{int(dm.group(2)):02d}-{int(dm.group(1)):02d} {dm.group(4)}"
         except Exception:
             pass
 
     # ── Coordinates ────────────────────────────────────────────────────────
-    coord_re = re.compile(r'\((-?\d+)\s*\|\s*(-?\d+)\)')
-    coords = coord_re.findall(text)
-    if len(coords) >= 1:
-        result["attacker_x"] = int(coords[0][0])
-        result["attacker_y"] = int(coords[0][1])
-    if len(coords) >= 2:
-        result["defender_x"] = int(coords[1][0])
-        result["defender_y"] = int(coords[1][1])
+    coord_re = re.compile(r'\(\s*(-?\d+)\s*\|\s*(-?\d+)\s*\)')
 
-    # ── Player and village names ────────────────────────────────────────────
-    # Suffixes that indicate village info appended to player name on same line
-    # e.g. "[NWU_F] Cappuccino from village FH (100|200)"
+    # ── Helper: extract player name and optional village from a raw string ──
     _VILLAGE_SUFFIX_RE = re.compile(
-        r'\s+(?:from village|aus Dorf|von Dorf|from|aus|von)\s+.+$',
+        r'\s+(?:from village|aus Dorf|von Dorf)\s+(.+?)(?:\s*\(|$)',
         re.IGNORECASE
     )
 
-    def _extract_name_and_coord(raw: str):
-        """Strip coords and village-suffix from a raw name string."""
-        # Remove BBCode tags: [player]Name[/player] → Name
+    def _clean_name(raw: str):
+        """Return (player_name, village_name, (x, y)|None) from a raw line."""
         raw = re.sub(r'\[/?(?:player|village|ally)\]', '', raw, flags=re.IGNORECASE).strip()
-        # Coords first
+        # Extract coordinates
         vm = coord_re.search(raw)
-        if vm:
-            name_part = raw[:vm.start()].strip().rstrip(',').strip()
-            coord_part = (int(vm.group(1)), int(vm.group(2)))
+        coord = (int(vm.group(1)), int(vm.group(2))) if vm else None
+        base = raw[:vm.start()].strip() if vm else raw
+
+        # Extract village suffix: "... from village VillageName"
+        vsm = _VILLAGE_SUFFIX_RE.search(base)
+        if vsm:
+            village = vsm.group(1).strip().rstrip(',').strip()
+            player = base[:vsm.start()].strip()
         else:
-            name_part = raw
-            coord_part = None
-        # Strip "from village X" / "aus Dorf X" suffix
-        name_part = _VILLAGE_SUFFIX_RE.sub('', name_part).strip()
-        return name_part or None, coord_part
+            village = None
+            player = base
 
-    name_patterns = [
-        (r'(?:Angreifer|Attacker)\s*[:\-–]\s*(.+)',         "attacker_name"),
-        (r'(?:Verteidiger|Defender)\s*[:\-–]\s*(.+)',        "defender_name"),
-        (r'(?:Herkunft|Herkunftsdorf|Origin)\s*[:\-–]\s*(.+)', "attacker_village_line"),
-        (r'(?:Verteidigt mit|Defending village)\s*[:\-–]\s*(.+)', "defender_village_line"),
-    ]
-    for pattern, field in name_patterns:
-        m = re.search(pattern, text, re.IGNORECASE)
-        if not m:
-            continue
-        name_part, coord_part = _extract_name_and_coord(m.group(1).strip())
+        player = player.rstrip(',').strip() or None
+        return player, village, coord
 
-        if field == "attacker_name":
-            result["attacker_name"] = name_part
-        elif field == "defender_name":
-            result["defender_name"] = name_part
-        elif field == "attacker_village_line":
-            result["attacker_village"] = name_part
-            if coord_part:
-                result["attacker_x"], result["attacker_y"] = coord_part
-        elif field == "defender_village_line":
-            result["defender_village"] = name_part
-            if coord_part:
-                result["defender_x"], result["defender_y"] = coord_part
+    # ── Player / village extraction ────────────────────────────────────────
+    # Two formats:
+    #   A) "Attacker: [TAG] Name from village X (x|y)"
+    #   B) "Attacker\n[TAG] Name from village X"   (next line)
+    lines = text_clean.splitlines()
+    stripped = [l.strip() for l in lines]
 
-    # ── Fallback: title-line format  ──────────────────────────────────────
-    # e.g. "[NWU_F] Cappuccino from village FH (100|200) attacked PlayerB"
-    # or   "Attack report: PlayerA from FH → PlayerB in VillageB (x|y)"
-    if not result["attacker_name"] and not result["defender_name"]:
-        # Try to find "PlayerA from village X (coords) attacked/on PlayerB"
-        title_m = re.search(
-            r'^(.+?)\s+(?:from village|aus Dorf)\s+(.+?)\s*(?:\((-?\d+)\|(-?\d+)\))?'
-            r'\s+(?:attacked?|angreift?|→|->|on)\s+(.+)',
-            text, re.IGNORECASE | re.MULTILINE
-        )
-        if title_m:
-            result["attacker_name"] = title_m.group(1).strip() or None
-            result["attacker_village"] = title_m.group(2).strip() or None
-            if title_m.group(3):
-                result["attacker_x"] = int(title_m.group(3))
-                result["attacker_y"] = int(title_m.group(4))
-            result["defender_name"] = _extract_name_and_coord(title_m.group(5).strip())[0]
+    def _find_block(keyword_re: str) -> str | None:
+        """Return the content on the keyword line (after ':') or the next non-empty line."""
+        for idx, line in enumerate(stripped):
+            m = re.match(keyword_re + r'\s*[:\-–]?\s*(.*)', line, re.IGNORECASE)
+            if not m:
+                continue
+            inline = m.group(1).strip()
+            if inline:
+                return inline
+            # Try next non-empty line
+            for nxt in stripped[idx + 1: idx + 3]:
+                if nxt:
+                    return nxt
+        return None
+
+    att_raw = _find_block(r'(?:Angreifer|Attacker)')
+    def_raw = _find_block(r'(?:Verteidiger|Defender)')
+    att_origin = _find_block(r'(?:Herkunft(?:sdorf)?|Origin)')
+    def_village = _find_block(r'(?:Verteidigt mit|Defending village)')
+
+    if att_raw:
+        pname, vname, coord = _clean_name(att_raw)
+        result["attacker_name"] = pname
+        if vname: result["attacker_village"] = vname
+        if coord: result["attacker_x"], result["attacker_y"] = coord
+    if att_origin:
+        _, vname, coord = _clean_name(att_origin)
+        if vname and not result.get("attacker_village"): result["attacker_village"] = vname
+        if coord: result["attacker_x"], result["attacker_y"] = coord
+    if def_raw:
+        pname, vname, coord = _clean_name(def_raw)
+        result["defender_name"] = pname
+        if vname: result["defender_village"] = vname
+        if coord: result["defender_x"], result["defender_y"] = coord
+    if def_village:
+        _, vname, coord = _clean_name(def_village)
+        if vname and not result.get("defender_village"): result["defender_village"] = vname
+        if coord: result["defender_x"], result["defender_y"] = coord
 
     # ── Resources / Plunder ────────────────────────────────────────────────
-    res_pattern = re.compile(
+    # Format A: "Wood: 1500  Clay: 800  Iron: 600  Crop: 200"
+    res_inline = re.compile(
         r'(?:Holz|Wood|Lumber)[:\s]+(\d[\d\.,]*)'
         r'.*?(?:Lehm|Ton|Clay)[:\s]+(\d[\d\.,]*)'
         r'.*?(?:Eisen|Iron)[:\s]+(\d[\d\.,]*)'
         r'.*?(?:Getreide|Crop|Grain|Korn)[:\s]+(\d[\d\.,]*)',
         re.IGNORECASE | re.DOTALL
     )
-    # Also catch inline format: "1500 500 200 100" after resource header
-    for m in res_pattern.finditer(text):
-        def _ri(s): return int(s.replace('.', '').replace(',', ''))
+    def _ri(s): return int(re.sub(r'[.,\s]', '', s))
+
+    for m in res_inline.finditer(text_clean):
         w, c, i, g = _ri(m.group(1)), _ri(m.group(2)), _ri(m.group(3)), _ri(m.group(4))
-        ctx = text[max(0, m.start()-50):m.start()].lower()
-        if any(k in ctx for k in ["spion", "spy", "rohstoff", "resource", "im dorf", "in village", "lager", "warehouse"]):
+        ctx = text_clean[max(0, m.start()-80):m.start()].lower()
+        is_spy = any(k in ctx for k in ["spion", "spy", "rohstoff", "resource", "im dorf", "in village"])
+        if is_spy:
             result["spy_resources"] = {"wood": w, "clay": c, "iron": i, "crop": g, "total": w+c+i+g}
-            if result["report_type"] == "unknown":
-                result["report_type"] = "spy"
+            if result["report_type"] == "unknown": result["report_type"] = "spy"
         else:
             result["plunder"] = {"wood": w, "clay": c, "iron": i, "crop": g}
             result["plunder_total"] = w + c + i + g
 
-    # Fallback: single total plunder line  e.g. "Beute: 3500"
+    # Format B: "Bounty\nW\nC\nI\nG\n(capacity)" — 4 consecutive numbers after Bounty/Beute
     if not result["plunder"]:
-        m2 = re.search(r'(?:Beute|Plunder|Loot)\s*:?\s*(\d[\d\.]*)\b', text, re.IGNORECASE)
-        if m2:
-            result["plunder_total"] = int(m2.group(1).replace('.', ''))
+        bounty_m = re.search(
+            r'(?:Bounty|Beute)\s*\n\s*(\d+)\s*\n\s*(\d+)\s*\n\s*(\d+)\s*\n\s*(\d+)',
+            text_clean, re.IGNORECASE
+        )
+        if bounty_m:
+            w, c, i, g = (int(bounty_m.group(k)) for k in (1,2,3,4))
+            result["plunder"] = {"wood": w, "clay": c, "iron": i, "crop": g}
+            result["plunder_total"] = w + c + i + g
 
     # ── Luck ───────────────────────────────────────────────────────────────
     luck_m = re.search(
-        r'(?:Glück|Luck)\s*[:\s]*(?:↑|↓|[+-])?\s*([+-]?\d+(?:[.,]\d+)?)\s*%',
-        text, re.IGNORECASE
+        r'(?:Glück|Luck)[:\s]*(?:↑|↓|[+-])?\s*([+-]?\d+(?:[.,]\d+)?)\s*%',
+        text_clean, re.IGNORECASE
     )
     if luck_m:
-        try:
-            result["luck"] = float(luck_m.group(1).replace(',', '.'))
-        except Exception:
-            pass
+        try: result["luck"] = float(luck_m.group(1).replace(',', '.'))
+        except Exception: pass
 
     # ── Hero HP ────────────────────────────────────────────────────────────
-    hero_m = re.search(r'(?:Held|Hero)\s*.*?(\d+)\s*%', text, re.IGNORECASE)
+    hero_m = re.search(r'Hero\s*\d*\s*\n?\s*(\d+)\s*%', text_clean, re.IGNORECASE)
     if hero_m:
-        try:
-            result["hero_hp"] = int(hero_m.group(1))
-        except Exception:
-            pass
+        try: result["hero_hp"] = int(hero_m.group(1))
+        except Exception: pass
 
     # ── Troop table parsing ────────────────────────────────────────────────
-    # Strategy: find header row with unit names, then parse values rows below it
-    def _parse_troop_table(text: str) -> dict[str, dict[str, int]]:
-        """Returns {"sent": {...}, "lost": {...}, "def": {...}}"""
+    def _parse_troop_table(txt: str) -> dict[str, dict[str, int]]:
+        """
+        Handles two formats:
+        A) Labeled rows:  "Sent:\t19\t0..."  /  "Losses:\t7\t0..."
+        B) Unlabeled rows: header line + 1-3 numeric lines
+           Convention (Travian browser copy):
+             row 0 = sent, row 1 = survivors (if 3 rows), last row = losses
+        Supports tab-separated AND space-separated (multi-space) columns.
+        """
         out: dict[str, dict] = {"sent": {}, "lost": {}, "def": {}}
-        # Normalise: split into lines, collapse whitespace runs
-        lines = [re.sub(r'\s{2,}', '\t', l.strip()) for l in text.splitlines() if l.strip()]
 
-        unit_header: list[str] = []
-        for i, line in enumerate(lines):
-            parts = [p.strip() for p in re.split(r'\t+', line) if p.strip()]
-            # Detect header line: most parts match known unit names
+        def _parse_nums(line: str) -> list[int | None]:
+            """Parse a row of numbers, skip '?' marks."""
+            parts = re.split(r'\s{2,}|\t', line.strip())
+            result_nums = []
+            for p in parts:
+                p = p.strip()
+                if p == '?' or p == '':
+                    result_nums.append(None)
+                else:
+                    try:
+                        result_nums.append(int(p.replace('.','').replace(',','').replace('−','-')))
+                    except Exception:
+                        result_nums.append(None)
+            return result_nums
+
+        clean_lines = [l.rstrip() for l in txt.splitlines()]
+        i = 0
+        tables_found = 0
+        while i < len(clean_lines):
+            line = clean_lines[i].strip()
+            parts = re.split(r'\s{2,}|\t', line)
+            parts = [p.strip() for p in parts if p.strip()]
+
+            # Detect unit header: ≥2 parts matching known unit names
             mapped = [_UNIT_MAP.get(p.lower()) for p in parts]
-            hit_count = sum(1 for m in mapped if m)
-            if hit_count >= 2:
-                unit_header = [_UNIT_MAP.get(p.lower(), p.lower()) for p in parts]
-                # Next lines are value rows — read up to 4
-                for j in range(i + 1, min(i + 8, len(lines))):
-                    vline = lines[j]
-                    vparts = [p.strip() for p in re.split(r'\t+', vline) if p.strip()]
-                    if not vparts:
-                        continue
-                    row_label = vparts[0].lower()
-                    nums = []
-                    for p in vparts[1:]:
-                        try:
-                            nums.append(int(p.replace('.', '').replace(',', '').replace('−', '-')))
-                        except Exception:
-                            nums.append(None)
+            hits = sum(1 for m in mapped if m)
+            if hits < 2:
+                i += 1
+                continue
 
-                    dest = None
-                    if any(k in row_label for k in ["gesendet", "sent", "geschickt"]):
-                        dest = "sent"
-                    elif any(k in row_label for k in ["verluste", "losses", "loss"]):
-                        dest = "lost"
-                    elif any(k in row_label for k in ["im dorf", "in village", "verteidiger", "defender"]):
-                        dest = "def"
+            unit_header = [_UNIT_MAP.get(p.lower(), p.lower()) for p in parts]
+            dest_key = "def" if tables_found > 0 else "sent"
 
-                    if dest is not None:
-                        for ui, unit in enumerate(unit_header):
-                            if ui < len(nums) and nums[ui] is not None and nums[ui] > 0:
-                                out[dest][unit] = out[dest].get(unit, 0) + nums[ui]
-                break  # found first troop table, stop
+            # Collect value rows
+            value_rows: list[tuple[str | None, list]] = []
+            j = i + 1
+            while j < min(i + 10, len(clean_lines)):
+                vline = clean_lines[j].strip()
+                if not vline:
+                    j += 1
+                    break
+
+                # Check for labeled row
+                label_m = re.match(
+                    r'(gesendet|sent|verluste|losses?|im dorf|in village|überlebende|survivors?)'
+                    r'\s*[:\-–]?\s*(.*)',
+                    vline, re.IGNORECASE
+                )
+                if label_m:
+                    label = label_m.group(1).lower()
+                    nums_str = label_m.group(2).strip() or clean_lines[j + 1].strip() if j + 1 < len(clean_lines) else ""
+                    nums = _parse_nums(nums_str)
+                    lbl_dest = ("sent" if any(k in label for k in ["gesendet","sent"]) else
+                                "lost" if any(k in label for k in ["verluste","loss"]) else
+                                "def"  if any(k in label for k in ["im dorf","in village"]) else None)
+                    if lbl_dest:
+                        value_rows.append((lbl_dest, nums))
+                    j += 1
+                    continue
+
+                # Unlabeled: try to parse as numbers
+                nums = _parse_nums(vline)
+                valid_nums = [n for n in nums if n is not None]
+                if len(valid_nums) == 0 and len(nums) == 0:
+                    break  # empty line ends table
+                if len(valid_nums) == 0 and all(n is None for n in nums):
+                    # All '?' — defender troops unknown
+                    value_rows.append((None, nums))
+                    j += 1
+                    continue
+                # Check it's mostly numeric (not another text header)
+                if len(valid_nums) >= len(nums) * 0.5:
+                    value_rows.append((None, nums))
+                    j += 1
+                else:
+                    break
+
+            # Assign unlabeled rows by position:
+            # 1 row  → sent
+            # 2 rows → sent, losses
+            # 3 rows → sent, survivors (ignored), losses
+            unlabeled = [(dest, nums) for dest, nums in value_rows if dest is None]
+            labeled   = [(dest, nums) for dest, nums in value_rows if dest is not None]
+
+            if unlabeled and not labeled:
+                if len(unlabeled) == 1:
+                    labeled = [("sent", unlabeled[0][1])]
+                elif len(unlabeled) == 2:
+                    labeled = [("sent", unlabeled[0][1]), ("lost", unlabeled[1][1])]
+                elif len(unlabeled) >= 3:
+                    labeled = [("sent", unlabeled[0][1]), ("lost", unlabeled[-1][1])]
+
+            for dest, nums in labeled:
+                actual_dest = dest
+                # Second table → defender troops
+                if tables_found > 0 and dest == "sent":
+                    actual_dest = "def"
+                for ui, unit in enumerate(unit_header):
+                    if ui < len(nums) and nums[ui] is not None and nums[ui] > 0:
+                        out[actual_dest][unit] = out[actual_dest].get(unit, 0) + nums[ui]
+
+            tables_found += 1
+            i = j
+
         return out
 
-    troop_data = _parse_troop_table(text)
+    troop_data = _parse_troop_table(text_clean)
     result["troops_sent"] = troop_data["sent"]
     result["troops_lost"] = troop_data["lost"]
     result["def_troops"]  = troop_data["def"]
