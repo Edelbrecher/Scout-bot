@@ -32,6 +32,20 @@
 .modal-overlay { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.7); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
 .modal-overlay.open { display:flex; }
 .modal-box { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:1.75rem; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
+.modal-box input, .modal-box select, .modal-box textarea {
+  width:100%; box-sizing:border-box;
+  background:var(--bg-input,#1e1f22);
+  border:1px solid var(--border,#3f4147);
+  border-radius:7px; color:var(--text,#dbdee1);
+  font-size:.83rem; padding:.42rem .65rem;
+  outline:none; transition:border-color .15s; font-family:inherit;
+}
+.modal-box input:focus, .modal-box select:focus, .modal-box textarea:focus {
+  border-color:var(--primary,#5865f2);
+  box-shadow:0 0 0 3px rgba(88,101,242,.15);
+}
+.modal-box input::placeholder, .modal-box textarea::placeholder { color:var(--text-muted,#949ba4); opacity:.7; }
+.modal-box select { appearance:auto; cursor:pointer; }
 </style>
 
 <div style="max-width:960px;margin:0 auto;padding:0 1.25rem 3rem;">

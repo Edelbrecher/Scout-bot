@@ -18,6 +18,33 @@
   <meta name="theme-color"         content="#5865f2" />
 
   <link rel="stylesheet" href="/static/style.css?v=20260604d" />
+  <style>
+  /* Global modal input fix — applies dark theme to ALL .modal-box inputs site-wide */
+  .modal-box input:not([type=checkbox]):not([type=radio]),
+  .modal-box select,
+  .modal-box textarea {
+    background: var(--bg-input, #1e1f22) !important;
+    border: 1px solid var(--border, #3f4147) !important;
+    border-radius: 7px;
+    color: var(--text, #dbdee1) !important;
+    font-size: .83rem;
+    padding: .42rem .65rem;
+    outline: none;
+    transition: border-color .15s;
+    font-family: inherit;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .modal-box input:not([type=checkbox]):not([type=radio]):focus,
+  .modal-box select:focus,
+  .modal-box textarea:focus {
+    border-color: var(--primary, #5865f2) !important;
+    box-shadow: 0 0 0 3px rgba(88,101,242,.15);
+  }
+  .modal-box input::placeholder,
+  .modal-box textarea::placeholder { color: var(--text-muted, #949ba4); opacity: .7; }
+  .modal-box select { appearance: auto; cursor: pointer; }
+  </style>
   <!-- Before-paint scripts -->
   <script>
     (function(){
