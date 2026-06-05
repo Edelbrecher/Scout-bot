@@ -292,11 +292,12 @@ let isDragging=false, dragStart={x:0,y:0}, dragOff={x:0,y:0};
 // ── Coordinate helpers ──────────────────────────────────────────────────────
 function w2c(wx,wy){
   const canvas=document.getElementById('armCanvas');
+  // Travian: positive Y = north = UP on screen → invert Y axis
   const rx=S.maxX-S.minX||1, ry=S.maxY-S.minY||1;
   const bs=Math.min(canvas.width/rx, canvas.height/ry)*S.scale;
   const cx=canvas.width/2, cy=canvas.height/2;
   const midX=(S.minX+S.maxX)/2, midY=(S.minY+S.maxY)/2;
-  return [cx+(wx-midX)*bs+S.offX, cy+(wy-midY)*bs+S.offY];
+  return [cx+(wx-midX)*bs+S.offX, cy-(wy-midY)*bs+S.offY];
 }
 function c2w(cx,cy){
   const canvas=document.getElementById('armCanvas');
@@ -304,7 +305,7 @@ function c2w(cx,cy){
   const bs=Math.min(canvas.width/rx, canvas.height/ry)*S.scale;
   const ccx=canvas.width/2, ccy=canvas.height/2;
   const midX=(S.minX+S.maxX)/2, midY=(S.minY+S.maxY)/2;
-  return [(cx-ccx-S.offX)/bs+midX, (cy-ccy-S.offY)/bs+midY];
+  return [(cx-ccx-S.offX)/bs+midX, -((cy-ccy-S.offY)/bs)+midY];
 }
 
 // ── Fit all ────────────────────────────────────────────────────────────────
