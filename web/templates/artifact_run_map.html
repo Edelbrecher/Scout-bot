@@ -21,8 +21,22 @@
 #armCanvas { display:block; width:100%; height:100%; cursor:crosshair; }
 .arm-map-wrap { position:relative; flex:1; background:#0d1a0d; overflow:hidden; }
 .arm-map-controls { position:absolute; top:.75rem; right:.75rem; display:flex; flex-direction:column; gap:.35rem; z-index:5; }
-.arm-map-btn { width:32px; height:32px; background:rgba(0,0,0,.6); border:1px solid rgba(255,255,255,.15); border-radius:6px; color:#fff; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; transition:background .15s; }
-.arm-map-btn:hover { background:rgba(99,102,241,.4); }
+.arm-map-btn {
+  width: 36px; height: 36px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s, transform .1s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  user-select: none;
+}
+.arm-map-btn:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
+.arm-map-btn:active { transform: scale(.93); }
 #armTooltip { position:absolute; pointer-events:none; background:rgba(15,20,15,.92); border:1px solid rgba(255,255,255,.15); border-radius:7px; padding:.45rem .7rem; font-size:.78rem; max-width:220px; display:none; z-index:20; }
 
 /* Form modal */
@@ -138,9 +152,9 @@
   <div class="arm-map-wrap">
     <canvas id="armCanvas"></canvas>
     <div class="arm-map-controls">
-      <button class="arm-map-btn" onclick="armZoom(1.3)" title="Zoom in">+</button>
-      <button class="arm-map-btn" onclick="armZoom(0.77)" title="Zoom out">−</button>
-      <button class="arm-map-btn" onclick="armFit()" title="Fit all">⊡</button>
+      <button class="arm-map-btn" onclick="armZoom(1.3)" title="Zoom in" style="font-size:1.3rem;line-height:1;">＋</button>
+      <button class="arm-map-btn" onclick="armZoom(0.77)" title="Zoom out" style="font-size:1.5rem;line-height:1;padding-bottom:2px;">－</button>
+      <button class="arm-map-btn" onclick="armFit()" title="Fit to screen" style="font-size:.8rem;font-weight:600;letter-spacing:-.5px;">⤢</button>
     </div>
     <div id="armTooltip"></div>
   </div>
