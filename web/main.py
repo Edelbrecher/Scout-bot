@@ -6372,6 +6372,8 @@ def _parse_battle_report(text: str) -> dict:
     def _clean_name(raw: str):
         """Return (player_name, village_name, (x, y)|None) from a raw line."""
         raw = re.sub(r'\[/?(?:player|village|ally)\]', '', raw, flags=re.IGNORECASE).strip()
+        # Strip alliance tag: "[TAG] PlayerName" → "PlayerName"
+        raw = re.sub(r'^\s*\[[^\]]{1,10}\]\s*', '', raw).strip()
         # Extract coordinates
         vm = coord_re.search(raw)
         coord = (int(vm.group(1)), int(vm.group(2))) if vm else None

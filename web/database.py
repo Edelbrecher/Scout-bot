@@ -1596,6 +1596,11 @@ async def get_attack_report(guild_id: str, report_id: int) -> dict | None:
 
 async def player_exists_in_world(guild_id: str, player_name: str) -> bool:
     """Return True if player_name appears in the latest map snapshot for this guild."""
+    import re as _re
+    if not player_name:
+        return False
+    # Strip alliance tag: "[CC] PlayerName" → "PlayerName"
+    player_name = _re.sub(r'^\s*\[[^\]]{1,10}\]\s*', '', player_name).strip()
     if not player_name:
         return False
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
