@@ -660,7 +660,8 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.get(url)
         r.raise_for_status()
-    villages = _parse_map_sql(r.text)
+    loop = asyncio.get_event_loop()
+    villages = await loop.run_in_executor(None, _parse_map_sql, r.text)
     if not villages:
         return
     # Save for the requesting guild
@@ -726,7 +727,8 @@ async def lifespan(app: FastAPI):
                         async with httpx.AsyncClient(timeout=30) as client:
                             r = await client.get(url)
                             r.raise_for_status()
-                        villages = _parse_map_sql(r.text)
+                        loop = asyncio.get_event_loop()
+                        villages = await loop.run_in_executor(None, _parse_map_sql, r.text)
                         if not villages:
                             continue
 
@@ -9403,7 +9405,8 @@ async def admin_fetch_travian_snapshot(request: Request, url: str):
         async with httpx.AsyncClient(timeout=60) as c:
             r = await c.get(full_url.rstrip("/") + "/map.sql")
             r.raise_for_status()
-        villages = _parse_map_sql(r.text)
+        loop = asyncio.get_event_loop()
+        villages = await loop.run_in_executor(None, _parse_map_sql, r.text)
         await database.mark_travian_server_snapshot(full_url, len(villages))
         return RedirectResponse(f"/admin/servers?discovered=0&snap_ok={len(villages)}", status_code=303)
     except Exception as e:
