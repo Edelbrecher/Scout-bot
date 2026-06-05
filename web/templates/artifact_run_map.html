@@ -439,7 +439,7 @@ function draw(){
 
   // ── World artifact markers ──────────────────────────────────────────────
   if(WORLD_ARTIFACTS.length){
-    const aSize = Math.max(8, Math.min(18, bs * 0.6));
+    const aSize = Math.max(8, Math.min(18, scale * 0.6));
     ctx.textBaseline = 'middle';
     WORLD_ARTIFACTS.forEach(a => {
       const [px, py] = w2c(parseInt(a.x)||0, parseInt(a.y)||0);
