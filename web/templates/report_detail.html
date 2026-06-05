@@ -11,10 +11,45 @@
 {% set def_hosp  = report.def_troops_hospital.values() | sum if report.def_troops_hospital else 0 %}
 {% set att_loss_rate = ((att_dead + att_hosp) / att_sent * 100) | round(1) if att_sent > 0 else 0 %}
 {% set def_loss_rate = ((def_dead + def_hosp) / def_in * 100)  | round(1) if def_in  > 0 else 0 %}
-{# Winner: attacker wins if defender lost more % OR plunder > 0 with low att losses #}
+{% set has_buildings_hit = report.buildings_hit and report.buildings_hit | length > 0 %}
+
+{# Building destruction cost estimate (resources, simplified per building+level) #}
+{% set bldg_res_cost = namespace(v=0) %}
+{% if has_buildings_hit %}
+  {% for b in report.buildings_hit %}
+    {# Rough cost per level destroyed for common buildings #}
+    {% set cost_map = {
+      'cropland':4000, 'getreidefeld':4000, 'grain field':4000,
+      'city wall':18000, 'stadtmauer':18000, 'earth wall':8000, 'erdwall':8000,
+      'palisade':6000, 'stone wall':12000, 'steinmauer':12000,
+      'barracks':15000, 'kaserne':15000, 'stable':18000, 'stall':18000,
+      'workshop':20000, 'werkstatt':20000,
+      'granary':8000, 'kornspeicher':8000, 'warehouse':8000, 'lager':8000,
+      'main building':12000, 'hauptgebäude':12000,
+      'residence':20000, 'residenz':20000, 'palace':25000, 'palast':25000,
+      'rally point':10000, 'versammlungsplatz':10000,
+      'marketplace':12000, 'markt':12000,
+    } %}
+    {% set bname_low = b.building | lower %}
+    {% set unit_cost = cost_map.get(bname_low, 10000) %}
+    {% set lvl_destroyed = b.level_before - b.level_after %}
+    {% set bldg_res_cost.v = bldg_res_cost.v + unit_cost * lvl_destroyed %}
+  {% endfor %}
+{% endif %}
+
+{# Winner logic — priority order:
+   1. Empty defender village → attacker wins (hit empty, possibly plundered/destroyed buildings)
+   2. Both sides wiped
+   3. Loss rate comparison
+#}
 {% set att_wiped = (att_sent > 0 and (att_dead + att_hosp) >= att_sent) %}
 {% set def_wiped = (def_in > 0 and (def_dead + def_hosp) >= def_in) %}
-{% if def_wiped and not att_wiped %}
+{% set att_cas   = att_dead + att_hosp %}
+
+{% if def_in == 0 and att_sent > 0 %}
+  {# Empty village — attacker always wins if they sent troops #}
+  {% set winner = 'attacker' %}
+{% elif def_wiped and not att_wiped %}
   {% set winner = 'attacker' %}
 {% elif att_wiped and not def_wiped %}
   {% set winner = 'defender' %}
@@ -69,7 +104,14 @@
     <div>
       <div style="font-weight:700;color:#f87171;font-size:1rem;">Attacker wins</div>
       <div style="font-size:.78rem;color:var(--text-muted);">
-        Defender wiped{{ ' · ' + "{:,}".format(report.plunder_total) + ' res plundered' if report.plunder_total else '' }}
+        {% if def_in == 0 %}
+          Undefended village
+          {%- if report.plunder_total %} · {{ "{:,}".format(report.plunder_total) }} res plundered{% endif %}
+          {%- if has_buildings_hit %} · {{ report.buildings_hit | length }} building(s) hit{% endif %}
+        {% else %}
+          Defender wiped{{ ' · ' + "{:,}".format(report.plunder_total) + ' res plundered' if report.plunder_total else '' }}
+        {% endif %}
+        {%- if bldg_res_cost.v > 0 %} · ~{{ "{:,}".format(bldg_res_cost.v) }} res building damage{% endif %}
       </div>
     </div>
     {% if report.luck is not none %}
@@ -303,6 +345,25 @@
                   display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:.78rem;color:var(--text-muted);">🔍 Resources in village</span>
         <span style="font-weight:700;color:#60a5fa;">{{ "{:,}".format(report.spy_resources.total) }}</span>
+      </div>
+      {% endif %}
+
+      {% if has_buildings_hit %}
+      <div style="margin-top:.75rem;border-top:1px solid var(--border);padding-top:.65rem;">
+        <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:#f87171;margin-bottom:.35rem;">🏚️ Buildings hit</div>
+        {% for b in report.buildings_hit %}
+        <div style="font-size:.76rem;display:flex;justify-content:space-between;padding:.15rem 0;">
+          <span style="color:var(--text-muted);">{{ b.building }}</span>
+          <span style="color:{% if b.destroyed %}#f87171{% else %}#fbbf24{% endif %};font-weight:600;">
+            {{ 'destroyed' if b.destroyed else 'Lv ' ~ b.level_before ~ '→' ~ b.level_after }}
+          </span>
+        </div>
+        {% endfor %}
+        {% if bldg_res_cost.v > 0 %}
+        <div style="margin-top:.35rem;font-size:.72rem;color:var(--text-muted);">
+          ~{{ "{:,}".format(bldg_res_cost.v) }} res to rebuild
+        </div>
+        {% endif %}
       </div>
       {% endif %}
     </div>
