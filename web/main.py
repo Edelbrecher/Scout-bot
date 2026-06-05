@@ -12332,6 +12332,55 @@ async def report_submit(request: Request, guild_id: str,
         return RedirectResponse(f"/guild/{guild_id}/reports?error=empty", status_code=303)
 
     parsed = _parse_battle_report(text)
+
+    # ── World validation ──────────────────────────────────────────────────────
+    # Check that attacker / defender are known in this guild's map snapshots.
+    # We warn but don't hard-block in case the snapshot is stale.
+    guild = await database.get_guild(guild_id)
+    warnings: list[str] = []
+    att_name = parsed.get("attacker_name")
+    def_name = parsed.get("defender_name")
+    if att_name:
+        if not await database.player_exists_in_world(guild_id, att_name):
+            warnings.append(f"Attacker "{att_name}" was not found in this world's latest map snapshot.")
+    if def_name:
+        if not await database.player_exists_in_world(guild_id, def_name):
+            warnings.append(f"Defender "{def_name}" was not found in this world's latest map snapshot.")
+
+    if warnings:
+        # Show a confirmation page — user can force-save or cancel
+        import json as _json
+        return templates.TemplateResponse("report_world_check.html", {
+            "request": request, "guild": guild,
+            "warnings": warnings,
+            "parsed_preview": {
+                "report_type": parsed.get("report_type"),
+                "attacker_name": att_name,
+                "defender_name": def_name,
+                "attacker_village": parsed.get("attacker_village"),
+                "defender_village": parsed.get("defender_village"),
+                "plunder_total": parsed.get("plunder_total", 0),
+            },
+            "raw_text": text,
+        })
+
+    report_id = await database.save_battle_report(guild_id, uid, parsed)
+    return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/reports/submit-force", response_class=HTMLResponse)
+async def report_submit_force(request: Request, guild_id: str,
+                              report_text: str = Form("")):
+    """Force-save a report even when world-check warnings were raised."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    text = report_text.strip()
+    if not text:
+        return RedirectResponse(f"/guild/{guild_id}/reports?error=empty", status_code=303)
+    parsed = _parse_battle_report(text)
     report_id = await database.save_battle_report(guild_id, uid, parsed)
     return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 

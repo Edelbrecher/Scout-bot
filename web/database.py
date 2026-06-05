@@ -1594,6 +1594,22 @@ async def get_attack_report(guild_id: str, report_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def player_exists_in_world(guild_id: str, player_name: str) -> bool:
+    """Return True if player_name appears in the latest map snapshot for this guild."""
+    if not player_name:
+        return False
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            """SELECT 1 FROM map_snapshots
+               WHERE guild_id = ?
+                 AND fetched_at = (SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?)
+                 AND lower(player_name) = lower(?)
+               LIMIT 1""",
+            (guild_id, guild_id, player_name),
+        ) as cur:
+            return await cur.fetchone() is not None
+
+
 async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | None:
     """Look up a player by name in the latest map snapshot."""
     if not player_name:
