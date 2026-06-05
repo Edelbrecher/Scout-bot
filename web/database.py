@@ -2140,20 +2140,20 @@ async def get_combat_intel_overview(guild_id: str, limit: int = 100) -> list[dic
         """, (guild_id,)) as cur:
             detail_rows = await cur.fetchall()
 
-    # Build-time constants (seconds per unit, base values)
+    # Training time in seconds per unit at level 20 barracks/stable/workshop (Travian T4, 1× server).
     _BT: dict[str, int] = {
-        "legionnaire":1600,"praetorian":1800,"imperian":2000,
-        "equites_legati":2200,"equites_imperatoris":3200,"equites_caesaris":4000,
-        "battering_ram":4800,"fire_catapult":9000,"senator":90700,
-        "clubswinger":1000,"spearman":1600,"axeman":1933,"scout":2200,
-        "paladin":3200,"teutonic_knight":4000,"catapult":7200,"chief":70400,
-        "phalanx":1600,"swordsman":2000,"pathfinder":2400,"thureophor":2000,
-        "druidrider":2800,"haeduan":4000,"trebuchet":9000,"chieftain":70400,
-        "mercenary":900,"bowman":1400,"spotter":2000,"steppe_rider":2800,
-        "marksman":3600,"marauder":4400,"slave_militia":900,"ash_warden":1600,
-        "khopesh_warrior":2000,"sopdu_explorer":2200,"anhur_guard":3200,"resheph_chariot":4000,
-        "hoplite":1600,"sentinel":1800,"shieldsman":2000,"thureophoros":2200,
-        "elpida_rider":3200,"corinthian_crusher":4000,"settler":26667,
+        "legionnaire":576,"praetorian":648,"imperian":720,
+        "equites_legati":792,"equites_imperatoris":1152,"equites_caesaris":1440,
+        "battering_ram":1728,"fire_catapult":3240,"senator":32652,
+        "clubswinger":360,"spearman":576,"axeman":696,"scout":792,
+        "paladin":1152,"teutonic_knight":1440,"catapult":2592,"chief":25344,
+        "phalanx":576,"swordsman":720,"pathfinder":864,"thureophor":720,
+        "druidrider":1008,"haeduan":1440,"trebuchet":3240,"chieftain":25344,
+        "mercenary":324,"bowman":504,"spotter":720,"steppe_rider":1008,
+        "marksman":1296,"marauder":1584,"slave_militia":324,"ash_warden":576,
+        "khopesh_warrior":720,"sopdu_explorer":792,"anhur_guard":1152,"resheph_chariot":1440,
+        "hoplite":576,"sentinel":648,"shieldsman":720,"thureophoros":792,
+        "elpida_rider":1152,"corinthian_crusher":1440,"settler":9600,
     }
 
     def _bt_sum(jstr):
