@@ -686,9 +686,20 @@ function buildChart(simResult, granaryCapacity, durationH, nowMs) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function parseAndSimulate() {
-  const rawText        = document.getElementById('marketPaste').value;
-  const currentGrain   = readNum('currentGrain');
-  const netPerH        = readSignedNum('netGrainPerH');
+  // Debug: confirm function is being called
+  const _dbg = document.getElementById('parseStatus');
+  if (_dbg) { _dbg.textContent = '⏳ Wird gestartet…'; _dbg.style.color = '#fbbf24'; }
+
+  let rawText, currentGrain, netPerH;
+  try {
+    rawText      = document.getElementById('marketPaste').value;
+    currentGrain = readNum('currentGrain');
+    netPerH      = readSignedNum('netGrainPerH');
+  } catch(initErr) {
+    if (_dbg) { _dbg.innerHTML = '<span style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:6px;padding:.3rem .7rem;color:#f87171;">⚠️ Init-Fehler: ' + initErr.message + '</span>'; }
+    console.error('Init error:', initErr);
+    return;
+  }
   // Expose as production/consumption so simulate() works unchanged:
   // positive net → production > 0, consumption = 0
   // negative net → production = 0, consumption = abs(net)
