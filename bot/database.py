@@ -1352,3 +1352,103 @@ async def update_poll_channel(guild_id: str, poll_channel_id: str, poll_public_c
                 (poll_public_channel_id, guild_id),
             )
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Battle Reports
+# ---------------------------------------------------------------------------
+
+async def _ensure_battle_reports_table():
+    """Create battle_reports table if it doesn't exist (mirrors web/database.py schema)."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS battle_reports (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id         TEXT NOT NULL,
+                submitted_by     TEXT,
+                created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+                report_type      TEXT,
+                report_date      TEXT,
+                attacker_name    TEXT,
+                attacker_village TEXT,
+                attacker_x       INTEGER,
+                attacker_y       INTEGER,
+                defender_name    TEXT,
+                defender_village TEXT,
+                defender_x       INTEGER,
+                defender_y       INTEGER,
+                troops_sent_json          TEXT DEFAULT '{}',
+                troops_lost_json          TEXT DEFAULT '{}',
+                troops_hospital_json      TEXT DEFAULT '{}',
+                def_troops_json           TEXT DEFAULT '{}',
+                def_troops_lost_json      TEXT DEFAULT '{}',
+                def_troops_hospital_json  TEXT DEFAULT '{}',
+                buildings_hit_json        TEXT DEFAULT '[]',
+                spy_resources_json TEXT DEFAULT '{}',
+                plunder_json       TEXT DEFAULT '{}',
+                plunder_total      INTEGER DEFAULT 0,
+                luck               REAL,
+                hero_hp            INTEGER,
+                fake_confidence    TEXT,
+                fake_reason        TEXT,
+                raw_text           TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> int:
+    """Save a parsed battle report to the DB. Returns the new report ID."""
+    import json as _json
+    await _ensure_battle_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Migrate: add columns that may be missing in older DBs
+        for col, default in [
+            ("def_troops_lost_json",      "'{}'"),
+            ("troops_hospital_json",      "'{}'"),
+            ("def_troops_hospital_json",  "'{}'"),
+            ("buildings_hit_json",        "'[]'"),
+            ("fake_override",             "NULL"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
+                await db.commit()
+            except Exception:
+                pass
+
+        async with db.execute("""
+            INSERT INTO battle_reports
+              (guild_id, submitted_by, report_type, report_date,
+               attacker_name, attacker_village, attacker_x, attacker_y,
+               defender_name, defender_village, defender_x, defender_y,
+               troops_sent_json, troops_lost_json, troops_hospital_json,
+               def_troops_json, def_troops_lost_json, def_troops_hospital_json,
+               buildings_hit_json,
+               spy_resources_json, plunder_json, plunder_total,
+               luck, hero_hp, fake_confidence, fake_reason, raw_text)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            guild_id, submitted_by,
+            parsed.get("report_type"), parsed.get("report_date"),
+            parsed.get("attacker_name"), parsed.get("attacker_village"),
+            parsed.get("attacker_x"), parsed.get("attacker_y"),
+            parsed.get("defender_name"), parsed.get("defender_village"),
+            parsed.get("defender_x"), parsed.get("defender_y"),
+            _json.dumps(parsed.get("troops_sent", {})),
+            _json.dumps(parsed.get("troops_lost", {})),
+            _json.dumps(parsed.get("troops_hospital", {})),
+            _json.dumps(parsed.get("def_troops", {})),
+            _json.dumps(parsed.get("def_troops_lost", {})),
+            _json.dumps(parsed.get("def_troops_hospital", {})),
+            _json.dumps(parsed.get("buildings_hit", [])),
+            _json.dumps(parsed.get("spy_resources", {})),
+            _json.dumps(parsed.get("plunder", {})),
+            parsed.get("plunder_total", 0),
+            parsed.get("luck"), parsed.get("hero_hp"),
+            parsed.get("fake_confidence"), parsed.get("fake_reason"),
+            parsed.get("raw_text", ""),
+        )) as cur:
+            new_id = cur.lastrowid
+
+        await db.commit()
+        return new_id
