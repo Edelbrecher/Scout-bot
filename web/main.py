@@ -5826,8 +5826,10 @@ async def my_ally_set_entry_role(request: Request, guild_id: str):
 async def my_ally_troop_roles_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    guild, err = await _require_guild(request, guild_id)
+    err = _require_guild(session, guild_id)
     if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard", status_code=303)
     if not await has_perm(request, guild_id, "ally_manage"):
         return HTMLResponse("Forbidden", status_code=403)
     roles = await database.get_troop_roles(guild_id)
