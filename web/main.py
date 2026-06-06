@@ -4661,6 +4661,7 @@ async def my_account_page(request: Request, guild_id: str):
         "scout_village":      scout_village,
         "march_settings":     march_settings,
         "march_saved":        request.query_params.get("march_saved"),
+        "troop_roles":        troop_roles,
     })
 
 

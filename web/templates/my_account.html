@@ -740,8 +740,11 @@ const TQ_MIN          = {{ tq_min | tojson }};
 const INFANTRY_MA = new Set(['Legionär','Prätorianer','Imperianer','Senator','Siedler','Keulenschwinger','Speerkämpfer','Axtkämpfer','Häuptling','Phalanx','Schwertkämpfer','Stammesältester','Schleuderer','Khopesh-Krieger','Soldat','Lanzenkämpfer','Hoplite','Sentinel']);
 const CAVALRY_MA  = new Set(['Equites Legati','Equites Imperatoris','Equites Caesaris','Paladin','Teut. Ritter','Pathfinder','Theutates-Blitz','Druidentreiter','Haeduer','Ägyptischer Reiter','Resheph-Streitwagen','Hunnischer Reiter','Boyar','Ammende Nomadin','Späher','Sopdu-Erkunder']);
 const SIEGE_MA    = new Set(['Rammbock','Feuerkatapult','Teutonen-Rammbock','Kriegsmaschine','Gallier-Rammbock','Gallier-Kata']);
-const OFF_MA      = new Set(['Imperianer','Equites Imperatoris','Equites Caesaris','Axtkämpfer','Teut. Ritter','Keulenschwinger','Theutates-Blitz','Haeduer','Druidentreiter','Khopesh-Krieger','Ägyptischer Reiter','Resheph-Streitwagen','Soldat','Lanzenkämpfer','Hunnischer Reiter','Boyar']);
-const SCOUT_MA    = new Set(['Equites Legati','Späher','Pathfinder','Sopdu-Erkunder']);
+// Troop roles from DB — overrides hardcoded defaults
+const TROOP_ROLES_MA = {{ troop_roles | tojson }};
+const OFF_MA   = new Set(Object.entries(TROOP_ROLES_MA).filter(([,r])=>r==='off').map(([t])=>t));
+const SCOUT_MA = new Set(Object.entries(TROOP_ROLES_MA).filter(([,r])=>r==='scout').map(([t])=>t));
+const SIEGE_ROLE_MA = new Set(Object.entries(TROOP_ROLES_MA).filter(([,r])=>r==='siege').map(([t])=>t));
 const CROP_MA     = {'Legionär':1,'Prätorianer':1,'Imperianer':1,'Equites Legati':2,'Equites Imperatoris':3,'Equites Caesaris':4,'Rammbock':5,'Feuerkatapult':6,'Senator':5,'Keulenschwinger':1,'Speerkämpfer':1,'Axtkämpfer':1,'Späher':1,'Paladin':2,'Teut. Ritter':3,'Teutonen-Rammbock':5,'Kriegsmaschine':6,'Häuptling':4,'Phalanx':1,'Schwertkämpfer':1,'Pathfinder':2,'Theutates-Blitz':2,'Druidentreiter':2,'Haeduer':3,'Gallier-Rammbock':5,'Gallier-Kata':6,'Stammesältester':5,'Siedler':1,'Held':0};
 
 function openArmyModal() {
@@ -763,7 +766,8 @@ function openArmyModal() {
     if(!Object.keys(data).length)return'';
     const rows=Object.entries(data).sort((a,b)=>b[1]-a[1]).map(([name,cnt])=>{
       const pct=Math.round(cnt/maxC*100);
-      const tag=SCOUT_MA.has(name)?'<span style="font-size:.65rem;color:#a78bfa;margin-left:4px;">scout</span>':OFF_MA.has(name)?'<span style="font-size:.65rem;color:#ef4444;margin-left:4px;">off</span>':'<span style="font-size:.65rem;color:#22c55e;margin-left:4px;">def</span>';
+      const role=TROOP_ROLES_MA[name]||'def';
+      const tag=role==='scout'?'<span style="font-size:.65rem;color:#a78bfa;margin-left:4px;">scout</span>':role==='off'?'<span style="font-size:.65rem;color:#ef4444;margin-left:4px;">off</span>':role==='siege'?'<span style="font-size:.65rem;color:#f97316;margin-left:4px;">siege</span>':role==='ignore'?'<span style="font-size:.65rem;color:#64748b;margin-left:4px;">ignore</span>':'<span style="font-size:.65rem;color:#22c55e;margin-left:4px;">def</span>';
       return`<div class="army-row"><span class="army-label">${name}${tag}</span><div class="army-bar-bg"><div class="army-bar-fill" style="width:${pct}%;background:${color};"></div></div><span class="army-count" style="color:${color};">${cnt.toLocaleString('de-DE')}</span><span style="min-width:48px;text-align:right;font-size:.72rem;color:var(--text-muted);">🌾×${CROP_MA[name]||1}</span></div>`;
     }).join('');
     const sub=Object.values(data).reduce((s,c)=>s+c,0);
