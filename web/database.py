@@ -425,6 +425,7 @@ async def init_db():
     await _init_alliance_members_table()
     await _init_scout_incidents_table()
     await _init_artifact_tables()
+    await _init_grain_sim_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -4917,6 +4918,7 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
         "res_push_view", "res_push_manage",
         "hero_scout_view", "stats_view", "blueprint_view",
         "poll_view", "poll_manage", "defend_view", "defend_manage",
+        "grain_sim_view",
     }
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
@@ -11083,3 +11085,85 @@ async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
             "snapshot_count": len(dates),
             "latest": latest,
         }
+
+
+# ── Grain Supply Simulations ──────────────────────────────────────────────────
+
+async def _init_grain_sim_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS grain_simulations (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                village_label   TEXT DEFAULT '',
+                created_by_id   TEXT NOT NULL,
+                created_by_name TEXT NOT NULL,
+                created_at      TEXT DEFAULT (datetime('now')),
+                current_grain   INTEGER DEFAULT 0,
+                net_per_h       INTEGER DEFAULT 0,
+                granary_capacity INTEGER DEFAULT 0,
+                duration_h      INTEGER DEFAULT 48,
+                marketplace_text TEXT DEFAULT '',
+                notes           TEXT DEFAULT ''
+            )
+        """)
+        await db.commit()
+
+
+async def save_grain_simulation(guild_id: str, name: str, village_label: str,
+                                 created_by_id: str, created_by_name: str,
+                                 current_grain: int, net_per_h: int,
+                                 granary_capacity: int, duration_h: int,
+                                 marketplace_text: str, notes: str) -> int:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO grain_simulations
+                (guild_id, name, village_label, created_by_id, created_by_name,
+                 current_grain, net_per_h, granary_capacity, duration_h,
+                 marketplace_text, notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, (guild_id, name, village_label, created_by_id, created_by_name,
+              current_grain, net_per_h, granary_capacity, duration_h,
+              marketplace_text, notes))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_grain_simulations(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM grain_simulations
+            WHERE guild_id = ?
+            ORDER BY created_at DESC
+        """, (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_grain_simulation(guild_id: str, sim_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM grain_simulations WHERE id=? AND guild_id=?",
+            (sim_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def delete_grain_simulation(guild_id: str, sim_id: int, discord_id: str,
+                                   is_manager: bool = False) -> bool:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        if is_manager:
+            cur = await db.execute(
+                "DELETE FROM grain_simulations WHERE id=? AND guild_id=?",
+                (sim_id, guild_id)
+            )
+        else:
+            cur = await db.execute(
+                "DELETE FROM grain_simulations WHERE id=? AND guild_id=? AND created_by_id=?",
+                (sim_id, guild_id, discord_id)
+            )
+        await db.commit()
+        return cur.rowcount > 0

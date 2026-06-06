@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Grain Simulationen · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.gs-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: .85rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.2rem;
+  transition: border-color .15s;
+}
+.gs-card:hover { border-color: rgba(34,197,94,.35); }
+.gs-icon { font-size: 1.7rem; flex-shrink: 0; margin-top: .1rem; }
+.gs-body { flex: 1; min-width: 0; }
+.gs-name { font-size: .95rem; font-weight: 700; color: var(--text); }
+.gs-meta { font-size: .75rem; color: var(--text-muted); margin-top: .2rem; }
+.gs-params { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+.gs-param { background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px; padding: .2rem .6rem; font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
+.gs-param span { color: var(--text); font-weight: 600; }
+.gs-actions { display: flex; flex-direction: column; gap: .4rem; flex-shrink: 0; }
+.btn-load { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); border-radius: 7px; color: #4ade80; padding: .35rem .85rem; font-size: .82rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.btn-load:hover { background: rgba(34,197,94,.2); }
+.btn-del { background: none; border: 1px solid rgba(239,68,68,.3); border-radius: 7px; color: #f87171; padding: .3rem .7rem; font-size: .78rem; cursor: pointer; }
+.btn-del:hover { background: rgba(239,68,68,.1); }
+.flash-ok  { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.3);  color: #4ade80;  border-radius: 8px; padding: .6rem 1rem; font-size: .85rem; margin-bottom: 1rem; }
+.flash-del { background: rgba(239,68,68,.1);  border: 1px solid rgba(239,68,68,.3);  color: #f87171;  border-radius: 8px; padding: .6rem 1rem; font-size: .85rem; margin-bottom: 1rem; }
+</style>
+
+<div style="max-width:860px;margin:0 auto;padding:2rem 1rem;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
+    <div>
+      <h1 style="margin:0;font-size:1.3rem;">🌾 Grain Simulationen</h1>
+      <p style="margin:.25rem 0 0;font-size:.82rem;color:var(--text-muted);">Gespeicherte Grain-Versorgungs-Simulationen der Allianz</p>
+    </div>
+    <a href="/guild/{{ guild.guild_id }}/tools/crop-calculator#grain-supply-section"
+       style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;color:#4ade80;padding:.5rem 1rem;text-decoration:none;font-size:.85rem;">
+      ➕ Neue Simulation
+    </a>
+  </div>
+
+  {% if flash == 'saved' %}
+  <div class="flash-ok">✅ Simulation gespeichert.</div>
+  {% elif flash == 'deleted' %}
+  <div class="flash-del">🗑 Simulation gelöscht.</div>
+  {% endif %}
+
+  {% if not sims %}
+  <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">📭</div>
+    <div style="font-size:.95rem;">Noch keine Simulationen gespeichert.</div>
+    <div style="font-size:.82rem;margin-top:.4rem;">Im <a href="/guild/{{ guild.guild_id }}/tools/crop-calculator#grain-supply-section" style="color:#4ade80;">Grain Rechner</a> eine Simulation erstellen und speichern.</div>
+  </div>
+  {% else %}
+  <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem;">{{ sims|length }} Simulation{{ 'en' if sims|length != 1 else '' }}</div>
+
+  {% for sim in sims %}
+  <div class="gs-card">
+    <div class="gs-icon">🌾</div>
+    <div class="gs-body">
+      <div class="gs-name">{{ sim.name }}</div>
+      <div class="gs-meta">
+        {% if sim.village_label %}<strong>{{ sim.village_label }}</strong> · {% endif %}
+        {{ sim.created_by_name }} · {{ sim.created_at[:16].replace('T',' ') }} Uhr
+      </div>
+      <div class="gs-params">
+        <div class="gs-param">🌾 Vorrat <span>{{ "{:,}".format(sim.current_grain).replace(",",".") }}</span></div>
+        <div class="gs-param">⚖️ Netto <span>{{ "{:,}".format(sim.net_per_h).replace(",",".") }}/h</span></div>
+        {% if sim.granary_capacity %}<div class="gs-param">🏚️ Speicher <span>{{ "{:,}".format(sim.granary_capacity).replace(",",".") }}</span></div>{% endif %}
+        <div class="gs-param">⏱ <span>{{ sim.duration_h }}h</span></div>
+        {% if sim.marketplace_text %}<div class="gs-param">📋 <span>Marktdaten</span></div>{% endif %}
+      </div>
+      {% if sim.notes %}<div style="margin-top:.5rem;font-size:.8rem;color:var(--text-muted);font-style:italic;">{{ sim.notes }}</div>{% endif %}
+    </div>
+    <div class="gs-actions">
+      <a href="/guild/{{ guild.guild_id }}/tools/grain-simulations/{{ sim.id }}" class="btn-load">▶ Laden</a>
+      {% if is_manager or sim.created_by_id == uid %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/tools/grain-simulations/{{ sim.id }}/delete"
+            onsubmit="return confirm('Simulation löschen?');" style="margin:0;">
+        <button type="submit" class="btn-del">🗑 Löschen</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1234,7 +1234,43 @@ calcTradeRoutes();
   <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;">
     <button class="cs-btn-primary" onclick="csParsAndSimulate()">📈 Analyse &amp; Simulate</button>
     <button class="cs-btn-secondary" onclick="csLoadExample()">📄 Load example</button>
+    <button class="cs-btn-secondary" onclick="openSaveSimModal()" id="csSaveBtn" style="display:none;">💾 Speichern</button>
     <span id="cs-parseStatus" style="font-size:.82rem;color:var(--text-muted);"></span>
+  </div>
+
+  <!-- Save Simulation Modal -->
+  <div id="saveSimModal" onclick="if(event.target===this)closeSaveSimModal()" style="display:none;position:fixed;inset:0;z-index:10200;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;width:100%;max-width:480px;padding:1.5rem;position:relative;">
+      <h3 style="margin:0 0 1rem;font-size:1rem;">💾 Simulation speichern</h3>
+      <form method="post" action="/guild/{{ guild.guild_id }}/tools/grain-simulations/save">
+        <input type="hidden" name="current_grain" id="save_current_grain">
+        <input type="hidden" name="net_per_h" id="save_net_per_h">
+        <input type="hidden" name="granary_capacity" id="save_granary_capacity">
+        <input type="hidden" name="duration_h" id="save_duration_h">
+        <input type="hidden" name="marketplace_text" id="save_marketplace_text">
+        <div style="margin-bottom:.85rem;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">NAME DER SIMULATION *</label>
+          <input type="text" name="name" required maxlength="80" placeholder="z.B. Main Off — 06.06.2026"
+                 style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:.85rem;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">DORF / LABEL (optional)</label>
+          <input type="text" name="village_label" maxlength="60" placeholder="z.B. 03 Rev oder Currax"
+                 style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:1.1rem;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">NOTIZ (optional)</label>
+          <textarea name="notes" rows="2" maxlength="500" placeholder="Kontext, Anmerkungen..."
+                    style="width:100%;box-sizing:border-box;resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+          <button type="button" onclick="closeSaveSimModal()"
+                  style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--text-muted);padding:.4rem .9rem;cursor:pointer;">Abbrechen</button>
+          <button type="submit"
+                  style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);border-radius:7px;color:#4ade80;padding:.4rem 1.1rem;cursor:pointer;font-weight:600;">💾 Speichern</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- Results (hidden until calc) -->
@@ -1489,6 +1525,7 @@ function csParsAndSimulate() {
     const simResult=csSimulate({currentGrain,productionPerH,consumptionPerH,granaryCapacity,incoming:parsed.incoming,outgoing:parsed.outgoing,durationH});
     csRenderResults(simResult,{currentGrain,productionPerH,consumptionPerH,granaryCapacity,durationH,incoming:parsed.incoming,outgoing:parsed.outgoing});
     statusEl.textContent='✅ Simulation abgeschlossen'; statusEl.style.color='#4ade80';
+    document.getElementById('csSaveBtn').style.display = 'inline-flex';
     const res=document.getElementById('cs-resultsSection');
     const top=res.getBoundingClientRect().top+window.pageYOffset-20;
     window.scrollTo({top,behavior:'smooth'});
@@ -1645,5 +1682,56 @@ document.getElementById('cs-marketPaste').addEventListener('input', () => {
     statusEl.style.color = total===0 ? '#f59e0b' : '#4ade80';
   } catch(e) { statusEl.textContent='⚠️ '+e.message; statusEl.style.color='#f87171'; }
 });
+
+// ── Save Simulation Modal ─────────────────────────────────────────────────
+function openSaveSimModal() {
+  // Pre-fill hidden fields with current simulation inputs
+  document.getElementById('save_current_grain').value = csReadNum('cs-currentGrain');
+  document.getElementById('save_net_per_h').value = csReadSignedNum('cs-netGrainPerH');
+  document.getElementById('save_granary_capacity').value = csReadNum('cs-granaryCapacity');
+  document.getElementById('save_duration_h').value = parseInt(document.getElementById('cs-simHours').value)||48;
+  document.getElementById('save_marketplace_text').value = document.getElementById('cs-marketPaste').value;
+  document.getElementById('saveSimModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeSaveSimModal() {
+  document.getElementById('saveSimModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeSaveSimModal(); });
+
+// Show save button after simulation runs
+(function() {
+  const orig = window.csParsAndSimulate;
+  // Hook: show save button after successful simulation
+  window._csShowSaveBtn = function() {
+    document.getElementById('csSaveBtn').style.display = 'inline-flex';
+  };
+})();
+
+// ── Load simulation from URL params ──────────────────────────────────────
+(function() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('load_sim') !== '1') return;
+  const grain = p.get('grain'), net = p.get('net'),
+        granary = p.get('granary'), hours = p.get('hours'),
+        label = p.get('label'), name = p.get('sim_name');
+  if (grain !== null) document.getElementById('cs-currentGrain').value = parseInt(grain).toLocaleString('de-DE');
+  if (net !== null) {
+    const netEl = document.getElementById('cs-netGrainPerH');
+    netEl.value = parseInt(net).toLocaleString('de-DE');
+    csUpdateNetStyle(netEl);
+  }
+  if (granary !== null && granary !== '0') document.getElementById('cs-granaryCapacity').value = parseInt(granary).toLocaleString('de-DE');
+  if (hours !== null) document.getElementById('cs-simHours').value = hours;
+  // Show hint
+  const statusEl = document.getElementById('cs-parseStatus');
+  if (statusEl) {
+    const lbl = name ? `„${name}"` : (label || 'Simulation');
+    statusEl.innerHTML = `<span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:.25rem .65rem;color:#4ade80;font-size:.78rem;">📂 ${lbl} geladen — Klick auf Analyse &amp; Simulate</span>`;
+  }
+  // Scroll to grain supply section
+  document.getElementById('grain-supply-section')?.scrollIntoView({behavior:'smooth'});
+})();
 </script>
 {% endblock %}

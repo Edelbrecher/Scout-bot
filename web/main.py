@@ -9643,6 +9643,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "blueprint", "label": "Blueprints",      "url_suffix": "/blueprints"},
     {"type": "item",  "icon": "fist",      "label": "Combat Power",    "url_suffix": "/my-account/kampfkraft"},
     {"type": "item",  "icon": "crop",      "label": "Crop Calculator", "url_suffix": "/tools/crop-calculator"},
+    {"type": "item",  "icon": "wheat",     "label": "Grain Simulations", "url_suffix": "/tools/grain-simulations"},
     {"type": "group", "label": "Account"},
     {"type": "item",  "icon": "person",    "label": "My Account",      "url_suffix": "/my-account"},
     {"type": "item",  "icon": "bell",      "label": "Notifications",   "url_suffix": "/notifications"},
@@ -12399,6 +12400,100 @@ async def crop_supply_page(request: Request, guild_id: str):
         "guild": guild,
         "guild_id": guild_id,
     })
+
+
+# ---------------------------------------------------------------------------
+# Routes — Grain Supply Simulations
+# ---------------------------------------------------------------------------
+
+@app.get("/guild/{guild_id}/tools/grain-simulations", response_class=HTMLResponse)
+async def grain_simulations_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if not await has_perm(request, guild_id, "grain_sim_view"):
+        return HTMLResponse("Kein Zugriff — Rolle 'grain_sim_view' erforderlich.", status_code=403)
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    sims = await database.get_grain_simulations(guild_id)
+    is_manager = await has_perm(request, guild_id, "ally_manage")
+    uid = session.get("uid", "")
+    flash = request.query_params.get("flash", "")
+    return templates.TemplateResponse("grain_simulations.html", {
+        "request": request, "guild": guild, "guild_id": guild_id,
+        "sims": sims, "is_manager": is_manager, "uid": uid, "flash": flash,
+    })
+
+
+@app.post("/guild/{guild_id}/tools/grain-simulations/save")
+async def grain_simulation_save(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    username = session.get("username", "") or session.get("global_name", "") or uid
+    form = await request.form()
+    name = (form.get("name") or "").strip() or "Simulation"
+    await database.save_grain_simulation(
+        guild_id=guild_id,
+        name=name[:80],
+        village_label=(form.get("village_label") or "").strip()[:60],
+        created_by_id=uid,
+        created_by_name=username,
+        current_grain=int(form.get("current_grain") or 0),
+        net_per_h=int(form.get("net_per_h") or 0),
+        granary_capacity=int(form.get("granary_capacity") or 0),
+        duration_h=int(form.get("duration_h") or 48),
+        marketplace_text=(form.get("marketplace_text") or ""),
+        notes=(form.get("notes") or "").strip()[:500],
+    )
+    return RedirectResponse(f"/guild/{guild_id}/tools/grain-simulations?flash=saved", status_code=303)
+
+
+@app.post("/guild/{guild_id}/tools/grain-simulations/{sim_id}/delete")
+async def grain_simulation_delete(request: Request, guild_id: str, sim_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    is_manager = await has_perm(request, guild_id, "ally_manage")
+    deleted = await database.delete_grain_simulation(guild_id, sim_id, uid, is_manager)
+    if not deleted:
+        return JSONResponse({"error": "not found or no permission"}, status_code=403)
+    return RedirectResponse(f"/guild/{guild_id}/tools/grain-simulations?flash=deleted", status_code=303)
+
+
+@app.get("/guild/{guild_id}/tools/grain-simulations/{sim_id}", response_class=HTMLResponse)
+async def grain_simulation_load(request: Request, guild_id: str, sim_id: int):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    if not await has_perm(request, guild_id, "grain_sim_view"):
+        return HTMLResponse("Kein Zugriff.", status_code=403)
+    sim = await database.get_grain_simulation(guild_id, sim_id)
+    if not sim:
+        return RedirectResponse(f"/guild/{guild_id}/tools/grain-simulations", status_code=303)
+    guild = await database.get_guild(guild_id)
+    # Redirect to crop calculator with sim data encoded as query params
+    import urllib.parse as _up
+    params = _up.urlencode({
+        "grain": sim["current_grain"],
+        "net": sim["net_per_h"],
+        "granary": sim["granary_capacity"],
+        "hours": sim["duration_h"],
+        "label": sim["village_label"] or "",
+        "sim_id": sim_id,
+        "sim_name": sim["name"],
+    })
+    return RedirectResponse(
+        f"/guild/{guild_id}/tools/crop-calculator?load_sim=1&{params}",
+        status_code=303
+    )
 
 
 # ---------------------------------------------------------------------------
