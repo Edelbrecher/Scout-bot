@@ -1768,9 +1768,21 @@ class RequestHubView(discord.ui.View):
         custom_id="persistent:hub_battle_report", row=3,
     )
     async def hub_battle_report(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await require_premium(interaction):
-            return
-        await interaction.response.send_modal(BattleReportModal())
+        try:
+            if not await require_premium(interaction):
+                return
+            await interaction.response.send_modal(BattleReportModal())
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[hub] battle_report button error: {e}", flush=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(f"❌ Fehler: {e}", ephemeral=True)
+                else:
+                    await interaction.followup.send(f"❌ Fehler: {e}", ephemeral=True)
+            except Exception:
+                pass
 
     async def _create_private_channel(self, interaction: discord.Interaction, channel_label: str):
         await _do_create_private_channel(interaction, channel_label)
