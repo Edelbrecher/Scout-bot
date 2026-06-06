@@ -4595,6 +4595,15 @@ async def my_account_page(request: Request, guild_id: str):
     cleared      = request.query_params.get("cleared")
     saved        = request.query_params.get("saved")
 
+    # Re-classify villages with CURRENT troop roles (so role changes take effect immediately)
+    troop_roles = await database.get_troop_roles(guild_id)
+    for v in own_villages:
+        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
+        v["village_type"] = vtype
+        v["off_score"]    = off_s
+        v["def_score"]    = def_s
+        v["priority"]     = prio
+
     # Totals for KPI strip
     total_off  = sum(v.get("off_score", 0) for v in own_villages)
     total_def  = sum(v.get("def_score", 0) for v in own_villages)
@@ -4833,6 +4842,10 @@ async def kampfkraft_page(request: Request, guild_id: str):
         return RedirectResponse("/dashboard")
     # Pass own villages so the calculator can pre-fill troop counts
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, session.get("uid","")))
+    troop_roles = await database.get_troop_roles(guild_id)
+    for v in own_villages:
+        vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
+        v["village_type"] = vtype; v["off_score"] = off_s; v["def_score"] = def_s
     return templates.TemplateResponse("kampfkraft.html", {
         "request": request, "guild": guild, "own_villages": own_villages,
     })
