@@ -4244,19 +4244,45 @@ def classify_own_village(troops: dict, troop_roles: dict | None = None) -> tuple
     """
     roles = troop_roles if troop_roles is not None else database.TROOP_ROLE_DEFAULTS
 
-    # Build scoring dicts from role config (weight = 1 per troop, scaled by count)
+    # Attack and defense values from Travian T4.4 game data
+    # Off weight = attack value; Def weight = avg(defI, defC)
     _OFF_WEIGHT = {
-        "Imperianer": 70, "Equites Imperatoris": 120, "Equites Caesaris": 180,
-        "Axtkämpfer": 55, "Teut. Ritter": 150, "Keulenschwinger": 40,
-        "Theutates-Blitz": 90, "Haeduer": 200, "Schwertkämpfer": 65,
-        "Ägyptischer Reiter": 100, "Khopesh-Krieger": 60, "Resheph-Streitwagen": 180,
-        "Soldat": 40, "Marauder": 80, "Hunnischer Reiter": 160,
+        # Römer
+        "Legionär": 40, "Prätorianer": 30, "Imperianer": 70,
+        "Equites Imperatoris": 120, "Equites Caesaris": 180,
+        "Rammbock": 60, "Feuerkatapult": 75, "Senator": 50,
+        # Gallier
+        "Phalanx": 15, "Schwertkämpfer": 65,
+        "Theutates-Blitz": 90, "Druidentreiter": 45, "Haeduer": 140,
+        "Gallier-Rammbock": 50, "Gallier-Kata": 70, "Häuptling": 40,
+        # Teutonen
+        "Keulenschwinger": 40, "Speerkämpfer": 10, "Axtkämpfer": 55,
+        "Paladin": 55, "Teut. Ritter": 150,
+        "Teutonen-Rammbock": 65, "Kriegsmaschine": 50,
+        # Ägypter
+        "Schleuderer": 30, "Ägyptischer Reiter": 100,
+        "Khopesh-Krieger": 60, "Anhur-Wächter": 10, "Resheph-Streitwagen": 180,
+        # Hunnen
+        "Soldat": 40, "Lanzenkämpfer": 10, "Marauder": 80,
+        "Boyar": 45, "Hunnischer Reiter": 160,
+        # Spartaner
+        "Hoplite": 35, "Sentinel": 0,
     }
     _DEF_WEIGHT = {
-        "Prätorianer": 65, "Legionär": 35, "Equites Legati": 20,
-        "Speerkämpfer": 60, "Paladin": 100, "Phalanx": 40, "Druidentreiter": 115,
-        "Schleuderer": 50, "Anhur-Wächter": 120,
-        "Lanzenkämpfer": 55, "Boyar": 110, "Hoplite": 80,
+        # Römer — avg(defI, defC)
+        "Legionär": 43, "Prätorianer": 50, "Imperianer": 33,
+        "Equites Legati": 15, "Equites Imperatoris": 58, "Equites Caesaris": 93,
+        # Gallier
+        "Phalanx": 45, "Schwertkämpfer": 28,
+        "Pathfinder": 15, "Druidentreiter": 85, "Haeduer": 113,
+        # Teutonen
+        "Speerkämpfer": 48, "Paladin": 70,
+        # Ägypter
+        "Schleuderer": 48, "Anhur-Wächter": 155,
+        # Hunnen
+        "Lanzenkämpfer": 80, "Boyar": 128,
+        # Spartaner
+        "Hoplite": 100,
     }
 
     off_score = 0
