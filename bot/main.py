@@ -50,6 +50,10 @@ class ScouterBot(commands.Bot):
         except Exception:
             pass
 
+    async def on_interaction(self, interaction: discord.Interaction):
+        cid = getattr(interaction, 'custom_id', None) or (interaction.data or {}).get('custom_id', '')
+        print(f"[interaction] type={interaction.type} custom_id={cid!r} user={interaction.user}", flush=True)
+
     async def on_ready(self):
         print(f"Logged in as {self.user} ({self.user.id})")
         # Sync all current guilds to DB — include owner so slots_used is accurate
