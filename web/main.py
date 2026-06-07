@@ -13137,7 +13137,7 @@ async def alliance_bonuses_page(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{real_guild_id}/my-ally/bonuses", status_code=302)
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     ally_group = await database.get_ally_group_for_guild(guild_id)
     if not ally_group:
         return RedirectResponse(f"/guild/{guild_id}/my-ally")
@@ -13157,7 +13157,7 @@ async def alliance_bonuses_save(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     if not await has_perm(request, guild_id, "ally_manage"):
-        uid = session.get("discord_id", "")
+        uid = session.get("uid", "") or session.get("discord_id", "")
         ally_group = await database.get_ally_group_for_guild(guild_id)
         if not ally_group or ally_group.get("owner_discord_id") != uid:
             return JSONResponse({"error": "forbidden"}, status_code=403)
@@ -13195,7 +13195,7 @@ ARTIFACT_TYPE_LABELS = {k: v for k, v in ARTIFACT_TYPES}
 
 def _is_leader(session: dict, guild_id: str) -> bool:
     """Quick check: is user an admin/guild owner. For artifact management."""
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     if uid in ADMIN_DISCORD_IDS:
         return True
     for g in (session.get("guilds") or []):
@@ -13221,7 +13221,7 @@ async def _artifact_access(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild:
         return None, JSONResponse({"error": "not_found"}, status_code=404)
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err:
         return None, err
@@ -13238,7 +13238,7 @@ async def my_treasury_page(request: Request, guild_id: str):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     treasuries = await database.get_my_treasuries(guild_id, uid)
     saved = request.query_params.get("saved")
     # Load own villages for village picker
@@ -13270,7 +13270,7 @@ async def my_treasury_save(request: Request, guild_id: str):
     if err: return err
     err = await _require_guild_async(session, guild_id)
     if err: return err
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     form = await request.form()
     tid = form.get("treasury_id", "").strip()
     player_name = form.get("player_name", "").strip()
@@ -13295,7 +13295,7 @@ async def my_treasury_delete(request: Request, guild_id: str, tid: int):
     if err: return err
     err = await _require_guild_async(session, guild_id)
     if err: return err
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     await database.delete_treasury(tid, guild_id, uid)
     return RedirectResponse(f"/guild/{guild_id}/my-treasury?saved=1", status_code=303)
 
@@ -13308,7 +13308,7 @@ async def all_treasuries_page(request: Request, guild_id: str):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     treasuries = await database.get_all_treasuries(guild_id)
@@ -13670,7 +13670,7 @@ async def artifact_planning_page(request: Request, guild_id: str):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
@@ -13900,7 +13900,7 @@ async def artifacts_page(request: Request, guild_id: str):
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     artifacts = await database.get_artifacts(guild_id)
@@ -14136,7 +14136,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    uid = session.get("discord_id", "")
+    uid = session.get("uid", "") or session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid)
     if err: return err
     artifact = await database.get_artifact(artifact_id, guild_id)
