@@ -2314,9 +2314,11 @@ async def get_combat_intel_overview(guild_id: str, limit: int = 100) -> list[dic
 
 
 async def save_map_snapshot(guild_id: str, villages: list[dict]):
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timedelta as _td
     fetched_at = _dt.utcnow().isoformat()
+    cutoff = (_dt.utcnow() - _td(days=7)).isoformat()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Insert new snapshot
         await db.executemany("""
             INSERT INTO map_snapshots
                 (guild_id, fetched_at, village_id, x, y, village_name, player_id, player_name,
@@ -2334,6 +2336,16 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
             )
             for v in villages
         ])
+        # Retention: keep only last 30 snapshots per guild (~2-3 days of history)
+        await db.execute("""
+            DELETE FROM map_snapshots
+            WHERE guild_id = ? AND fetched_at NOT IN (
+                SELECT DISTINCT fetched_at FROM map_snapshots
+                WHERE guild_id = ?
+                ORDER BY fetched_at DESC
+                LIMIT 30
+            )
+        """, (guild_id, guild_id))
         await db.commit()
     # Invalidate all cached results for this guild so next page load is fresh
     cache_invalidate_guild(guild_id)
