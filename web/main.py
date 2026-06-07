@@ -13797,7 +13797,9 @@ async def artifact_planning_analyze(request: Request, guild_id: str):
             best_village = None
             best_time = 9999
             for v in villages:
-                vx, vy = v.get("x", 0), v.get("y", 0)
+                vx, vy = v.get("x"), v.get("y")
+                if vx is None or vy is None:
+                    continue
                 d = dist(vx, vy, sx, sy)
                 ts_key = f"{vx}_{vy}"
                 ts_lvl = ts_map.get(ts_key, 0)
