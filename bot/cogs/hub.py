@@ -1608,14 +1608,13 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
                     f"⚠️ **Dieser Bericht wurde bereits importiert** (Report #{existing_id}).\n"
                     f"Kein doppelter Eintrag erstellt.",
                     ephemeral=True,
+                    delete_after=10,
                 )
                 return
-            await interaction.followup.send(f"❌ Fehler beim Speichern: {e}", ephemeral=True)
+            await interaction.followup.send(f"❌ Fehler beim Speichern: {e}", ephemeral=True, delete_after=10)
             return
         except Exception as e:
-            await interaction.followup.send(
-                f"❌ Fehler beim Speichern: {e}", ephemeral=True
-            )
+            await interaction.followup.send(f"❌ Fehler beim Speichern: {e}", ephemeral=True, delete_after=10)
             return
 
         # Build summary embed
@@ -1679,6 +1678,7 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
             f"✅ Bericht #{report_id} gespeichert!",
             embed=embed,
             ephemeral=True,
+            delete_after=10,
         )
 
 
