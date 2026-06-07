@@ -171,7 +171,6 @@
       {% endif %}
 
       {# ── Laufzeit-Kalkulator ── #}
-      {% if my_villages %}
       <button
         data-coords="{{ ch.coords or '' }}"
         data-arrival="{{ ch.arrival_time or '' }}"
@@ -179,7 +178,6 @@
         style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.35rem;background:none;border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:0.25rem 0.65rem;color:var(--text-muted);font-size:0.76rem;cursor:pointer;">
         Laufzeiten berechnen
       </button>
-      {% endif %}
 
       {# ── Request bearbeiten (can_close = Lead/HC/Admin) ── #}
       {% if can_close %}
@@ -463,7 +461,7 @@ function closeTravelModal() {
 function buildTable() {
   const wrap = document.getElementById('tm-table');
   if (!MY_VILLAGES.length) {
-    wrap.innerHTML = '<p style="font-size:0.8rem;color:var(--text-muted);">Keine eigenen Dörfer gefunden.</p>';
+    wrap.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);">Keine Dörfer gefunden. Bitte zuerst deine Truppen im Dashboard importieren.</p>';
     return;
   }
   const selStyle = 'background:#12141f;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:0.2rem 0.35rem;color:var(--text);font-size:0.78rem;width:100%;';
