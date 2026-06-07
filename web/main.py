@@ -13569,6 +13569,120 @@ async def artifact_add(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
 
 
+def _compute_artifact_stats(artifact: dict, handoffs: list[dict]) -> dict:
+    """Compute per-player and overall statistics from handoff history."""
+    from datetime import datetime as _dt, timezone as _tz
+    import math
+
+    def _parse_dt(s: str):
+        if not s:
+            return None
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M"):
+            try:
+                return _dt.strptime(s, fmt)
+            except Exception:
+                pass
+        return None
+
+    now = _dt.utcnow()
+
+    # Only include confirmed + skipped handoffs for history stats
+    confirmed = [h for h in handoffs if h.get("status") == "confirmed"]
+    pending   = [h for h in handoffs if h.get("status") == "pending"]
+
+    # ── Per-player stats ─────────────────────────────────────────────────────
+    # Build timeline: list of (player, received_at, gave_away_at)
+    # Each "confirmed" handoff: to_player received at confirmed_to_time (or picked_up_at)
+    # They gave it away when the NEXT confirmed handoff's from_player confirmed
+    player_stats: dict[str, dict] = {}
+
+    def _get_or_create(name: str) -> dict:
+        if name not in player_stats:
+            player_stats[name] = {
+                "player": name,
+                "times_held": 0,
+                "total_hours": 0.0,
+                "on_time": 0,
+                "late": 0,
+                "avg_delay_h": 0.0,
+                "delays": [],
+            }
+        return player_stats[name]
+
+    for i, h in enumerate(confirmed):
+        to_p = h.get("to_player", "")
+        if not to_p:
+            continue
+        ps = _get_or_create(to_p)
+        ps["times_held"] += 1
+
+        # When did they receive it?
+        recv_dt = _parse_dt(h.get("confirmed_to_time") or h.get("picked_up_at") or "")
+        # When did they give it away? (next confirmed handoff where from_player == to_p)
+        gave_dt = None
+        for j in range(i + 1, len(handoffs)):
+            nxt = handoffs[j]
+            if nxt.get("from_player") == to_p and nxt.get("status") in ("confirmed", "pending"):
+                gave_dt = _parse_dt(nxt.get("confirmed_from_time") or nxt.get("picked_up_at") or "")
+                if gave_dt is None and nxt.get("status") == "pending":
+                    gave_dt = now  # still holding
+                break
+
+        if recv_dt:
+            end = gave_dt or now
+            hold_h = max(0.0, (end - recv_dt).total_seconds() / 3600)
+            ps["total_hours"] += hold_h
+
+        # On-time check: was it handed off before or after scheduled_at?
+        sched = _parse_dt(h.get("scheduled_at") or "")
+        actual = _parse_dt(h.get("confirmed_from_time") or h.get("picked_up_at") or "")
+        from_p = h.get("from_player", "")
+        if from_p and sched and actual:
+            fps = _get_or_create(from_p)
+            delay_h = (actual - sched).total_seconds() / 3600
+            fps["delays"].append(delay_h)
+            if delay_h <= 1.0:
+                fps["on_time"] += 1
+            else:
+                fps["late"] += 1
+
+    # ── Current holder duration ───────────────────────────────────────────────
+    current_holder = artifact.get("current_holder", "")
+    current_since_dt = None
+    # Find the most recent confirmed handoff to current_holder
+    for h in reversed(confirmed):
+        if h.get("to_player") == current_holder:
+            current_since_dt = _parse_dt(h.get("confirmed_to_time") or h.get("picked_up_at") or "")
+            break
+    current_hold_h = None
+    if current_since_dt and current_holder:
+        current_hold_h = round((now - current_since_dt).total_seconds() / 3600, 1)
+
+    # Finalize per-player averages
+    for ps in player_stats.values():
+        if ps["times_held"] > 0:
+            ps["avg_hold_h"] = round(ps["total_hours"] / ps["times_held"], 1)
+        else:
+            ps["avg_hold_h"] = 0.0
+        ps["total_hours"] = round(ps["total_hours"], 1)
+        handoff_count = ps["on_time"] + ps["late"]
+        ps["reliability_pct"] = round(ps["on_time"] / handoff_count * 100) if handoff_count else None
+        ps["avg_delay_h"] = round(sum(ps["delays"]) / len(ps["delays"]), 1) if ps["delays"] else None
+        del ps["delays"]
+
+    # Sort by times held desc
+    players_list = sorted(player_stats.values(), key=lambda x: x["times_held"], reverse=True)
+
+    return {
+        "players": players_list,
+        "total_confirmed": len(confirmed),
+        "total_pending": len(pending),
+        "total_skipped": len([h for h in handoffs if h.get("status") == "skipped"]),
+        "current_holder": current_holder,
+        "current_hold_h": current_hold_h,
+    }
+
+
 @app.get("/guild/{guild_id}/artifacts/{artifact_id}", response_class=HTMLResponse)
 async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int):
     session, err = _require_session(request)
@@ -13587,6 +13701,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     player_name = session.get("player_name", session.get("username", ""))
     saved = request.query_params.get("saved")
+    stats = _compute_artifact_stats(artifact, handoffs)
     return templates.TemplateResponse("artifact_detail.html", {
         "request": request, "guild": guild,
         "artifact": artifact, "rotation": rotation,
@@ -13595,6 +13710,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
         "artifact_type_labels": ARTIFACT_TYPE_LABELS,
         "player_name": player_name,
         "saved": saved,
+        "stats": stats,
     })
 
 
