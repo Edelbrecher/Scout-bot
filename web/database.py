@@ -6061,35 +6061,7 @@ async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dic
             except Exception:
                 pass
 
-        # 2. Fallback: look up travian_name from ally_members, then get villages from world_snapshots
-        async with db.execute("""
-            SELECT am.travian_name FROM ally_members am
-            JOIN ally_groups ag ON ag.id = am.ally_group_id
-            JOIN guild_configs gc ON gc.guild_id = ?
-            WHERE am.discord_id = ? AND am.status = 'approved'
-            LIMIT 1
-        """, (guild_id, discord_id)) as cur:
-            name_row = await cur.fetchone()
-        if not name_row or not name_row["travian_name"]:
-            return []
-
-        travian_name = name_row["travian_name"]
-        async with db.execute("""
-            SELECT village_name, x, y FROM world_snapshots
-            WHERE world_url = (SELECT tw_world FROM guild_configs WHERE guild_id = ?)
-              AND player_name = ?
-              AND fetched_at = (
-                SELECT MAX(fetched_at) FROM world_snapshots
-                WHERE world_url = (SELECT tw_world FROM guild_configs WHERE guild_id = ?)
-              )
-            ORDER BY village_name
-        """, (guild_id, travian_name, guild_id)) as cur:
-            rows = await cur.fetchall()
-
-        return [
-            {"name": r["village_name"] or "?", "x": r["x"], "y": r["y"], "troops": {}}
-            for r in rows
-        ]
+        return []
 
 
 async def get_defend_channels(guild_id: str) -> list[dict]:

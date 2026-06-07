@@ -378,14 +378,8 @@
     </div>
 
     <details style="margin-bottom:0.85rem;">
-      <summary style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;user-select:none;">Modifikatoren</summary>
+      <summary style="font-size:0.72rem;color:var(--text-muted);cursor:pointer;user-select:none;">Globale Modifikatoren</summary>
       <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.55rem;">
-        <div>
-          <label style="font-size:0.67rem;color:var(--text-muted);display:block;margin-bottom:0.15rem;">Turnierplatz</label>
-          <select id="tm-ts" onchange="calcAllTravel()" style="background:#12141f;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;">
-            {% for i in range(21) %}<option value="{{ i }}">Level {{ i }}</option>{% endfor %}
-          </select>
-        </div>
         <div>
           <label style="font-size:0.67rem;color:var(--text-muted);display:block;margin-bottom:0.15rem;">Held-Schuhe</label>
           <select id="tm-boots" onchange="calcAllTravel()" style="background:#12141f;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;">
@@ -469,6 +463,7 @@ function buildTable() {
     <thead><tr style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);">
       <th style="text-align:left;padding:0.3rem 0.4rem;font-weight:500;">Dorf</th>
       <th style="text-align:left;padding:0.3rem 0.4rem;font-weight:500;">Einheit</th>
+      <th style="text-align:center;padding:0.3rem 0.4rem;font-weight:500;">TS</th>
       <th style="text-align:right;padding:0.3rem 0.4rem;font-weight:500;">Dist.</th>
       <th style="text-align:right;padding:0.3rem 0.4rem;font-weight:500;">Laufzeit</th>
       <th style="text-align:right;padding:0.3rem 0.4rem;font-weight:500;">Abschicken</th>
@@ -483,11 +478,17 @@ function buildTable() {
       ? troopEntries.map(([n, c]) => `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`).join('')
       : allTroops.map(n => `<option value="${n}">${n}</option>`).join('');
     const mapLink = WORLD_URL ? `${WORLD_URL}/karte.php?x=${v.x}&y=${v.y}` : '';
+    const tsInput = `<input type="number" min="0" max="20" value="0" data-vi="${i}"
+      onchange="calcRow(this.closest('tr').querySelector('select[data-vi]'))"
+      oninput="calcRow(this.closest('tr').querySelector('select[data-vi]'))"
+      id="tm-ts-${i}"
+      style="width:42px;background:#12141f;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.2rem 0.3rem;color:var(--text);font-size:0.8rem;text-align:center;">`;
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
       <td style="padding:0.3rem 0.4rem;color:var(--text-muted);white-space:nowrap;">${v.name}<br><span style="font-size:0.7rem;font-family:monospace;">(${v.x}|${v.y})</span></td>
       <td style="padding:0.3rem 0.4rem;">
         <select data-vi="${i}" onchange="calcRow(this)" style="${selStyle}">${opts}</select>
       </td>
+      <td style="padding:0.3rem 0.4rem;text-align:center;">${tsInput}</td>
       <td id="tm-dist-${i}" style="padding:0.3rem 0.4rem;text-align:right;color:var(--text-muted);font-family:monospace;"></td>
       <td id="tm-dur-${i}"  style="padding:0.3rem 0.4rem;text-align:right;font-family:monospace;"></td>
       <td id="tm-send-${i}" style="padding:0.3rem 0.4rem;text-align:right;font-family:monospace;font-weight:600;"></td>
@@ -503,7 +504,7 @@ function calcRow(sel) {
   const i     = parseInt(sel.dataset.vi);
   const v     = MY_VILLAGES[i];
   const troop = sel.value;
-  const ts     = parseInt(document.getElementById('tm-ts').value)    || 0;
+  const ts     = parseInt(document.getElementById(`tm-ts-${i}`)?.value) || 0;
   const boots  = parseInt(document.getElementById('tm-boots').value) || 0;
   const art    = parseInt(document.getElementById('tm-art').value)   || 0;
   const banner = parseInt(document.getElementById('tm-banner').value)|| 0;
