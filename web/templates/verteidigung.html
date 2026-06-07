@@ -201,19 +201,19 @@
         <div style="display:flex;flex-direction:column;gap:0.3rem;">
           {% for c in ch_contribs %}
           {% set bar_w = ((c.total_troops / total_troops) * 100)|int if total_troops > 0 else 0 %}
+          {% set ns = namespace(edit_id=None, edit_raw='', edit_type='', is_other=false) %}
           {% if can_edit_all %}
-            {% set edit_id = c.latest_sent_id %}
-            {% set edit_raw = c.latest_amount_raw %}
-            {% set edit_type = c.latest_troop_type %}
+            {% set ns.edit_id = c.latest_sent_id %}
+            {% set ns.edit_raw = c.latest_amount_raw or '' %}
+            {% set ns.edit_type = c.latest_troop_type or '' %}
+            {% set ns.is_other = c.user_id != uid %}
           {% elif c.user_id == uid %}
-            {% set my_entry = my_sent.get(ch.channel_id) %}
-            {% set edit_id = my_entry.id if my_entry else None %}
-            {% set edit_raw = my_entry.amount_raw if my_entry else '' %}
-            {% set edit_type = my_entry.troop_type if my_entry else '' %}
-          {% else %}
-            {% set edit_id = None %}
-            {% set edit_raw = '' %}
-            {% set edit_type = '' %}
+            {% set _me = my_sent.get(ch.channel_id) %}
+            {% if _me %}
+              {% set ns.edit_id = _me.id %}
+              {% set ns.edit_raw = _me.amount_raw or '' %}
+              {% set ns.edit_type = _me.troop_type or '' %}
+            {% endif %}
           {% endif %}
           <div>
             <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
@@ -229,34 +229,34 @@
               <span style="color:#86efac;font-size:0.72rem;white-space:nowrap;min-width:60px;text-align:right;">
                 {{ "{:,}".format(c.total_grain|int).replace(",",".") }}/h
               </span>
-              {% if edit_id %}
-              <button onclick="toggleDefEdit('edit-{{ edit_id }}')"
+              {% if ns.edit_id %}
+              <button onclick="toggleDefEdit('edit-{{ ns.edit_id }}')"
                 style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.1rem 0.4rem;font-size:0.68rem;color:var(--text-muted);cursor:pointer;flex-shrink:0;"
-                title="{% if can_edit_all and c.user_id != uid %}Eintrag von {{ c.user_name }} bearbeiten{% else %}Deinen Eintrag bearbeiten{% endif %}">
+                title="{% if ns.is_other %}Eintrag von {{ c.user_name }} bearbeiten{% else %}Deinen Eintrag bearbeiten{% endif %}">
                 ✏️
               </button>
               {% endif %}
             </div>
 
             {# Inline-Bearbeitungsformular #}
-            {% if edit_id %}
-            <div id="edit-{{ edit_id }}" style="display:none;margin-top:0.4rem;padding:0.6rem 0.75rem;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:6px;">
-              {% if can_edit_all and c.user_id != uid %}
+            {% if ns.edit_id %}
+            <div id="edit-{{ ns.edit_id }}" style="display:none;margin-top:0.4rem;padding:0.6rem 0.75rem;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:6px;">
+              {% if ns.is_other %}
               <div style="font-size:0.7rem;color:#a5b4fc;margin-bottom:0.4rem;">✏️ Bearbeite Eintrag von <strong>{{ c.user_name }}</strong></div>
               {% endif %}
               <form method="post" action="/guild/{{ guild.guild_id }}/defend/update-sent"
                     style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-end;">
-                <input type="hidden" name="sent_id" value="{{ edit_id }}">
+                <input type="hidden" name="sent_id" value="{{ ns.edit_id }}">
                 <input type="hidden" name="channel_id" value="{{ ch.channel_id }}">
                 <div style="display:flex;flex-direction:column;gap:0.2rem;flex:1;min-width:100px;">
                   <label style="font-size:0.68rem;color:var(--text-muted);">Anzahl</label>
-                  <input type="text" name="amount_raw" value="{{ edit_raw }}"
+                  <input type="text" name="amount_raw" value="{{ ns.edit_raw }}"
                     placeholder="z.B. 5000"
                     style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.8rem;width:100%;">
                 </div>
                 <div style="display:flex;flex-direction:column;gap:0.2rem;flex:2;min-width:130px;">
                   <label style="font-size:0.68rem;color:var(--text-muted);">Truppentyp</label>
-                  <input type="text" name="troop_type" value="{{ edit_type }}"
+                  <input type="text" name="troop_type" value="{{ ns.edit_type }}"
                     placeholder="z.B. Prätorianer"
                     style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.8rem;width:100%;">
                 </div>
@@ -265,7 +265,7 @@
                     style="background:#6366f1;border:none;border-radius:4px;padding:0.3rem 0.75rem;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;">
                     Speichern
                   </button>
-                  <button type="button" onclick="toggleDefEdit('edit-{{ edit_id }}')"
+                  <button type="button" onclick="toggleDefEdit('edit-{{ ns.edit_id }}')"
                     style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.3rem 0.6rem;color:var(--text-muted);font-size:0.78rem;cursor:pointer;">
                     Abbrechen
                   </button>
