@@ -10755,11 +10755,14 @@ async def verteidigung_page(request: Request, guild_id: str):
         or "ally_manage"   in await database.get_member_permissions(guild_id, uid)
     )
     contributions = await database.get_defend_contributions_for_guild(guild_id)
+    my_sent = await database.get_my_defend_sent(guild_id, uid)
     return templates.TemplateResponse("verteidigung.html", {
         "request": request,
         "guild": guild,
         "channels": channels,
         "contributions": contributions,
+        "my_sent": my_sent,
+        "uid": uid,
         "show": show,
         "total_open":   sum(1 for c in all_channels if c.get("status") != "closed"),
         "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),
@@ -10833,6 +10836,49 @@ async def defend_reopen(request: Request, guild_id: str, channel_id: str):
     return RedirectResponse(
         f"/guild/{guild_id}/verteidigung?show=closed&flash=reopened&bot={quote(bot_msg)}", status_code=303
     )
+
+
+@app.post("/guild/{guild_id}/defend/update-sent")
+async def defend_update_sent(request: Request, guild_id: str):
+    """Allow a user to edit their own defend_sent entry (amount + troop type)."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    form = await request.form()
+    sent_id = int(form.get("sent_id", 0))
+    channel_id = str(form.get("channel_id", ""))
+    amount_raw = str(form.get("amount_raw", "")).strip()
+    troop_type = str(form.get("troop_type", "")).strip()
+
+    # Parse amount_raw → int
+    import re as _re
+    def _parse_num(s: str) -> int:
+        s = s.replace(".", "").replace(",", "").replace(" ", "").upper()
+        m = _re.match(r"(\d+(?:\.\d+)?)(K|M)?", s)
+        if not m:
+            return 0
+        n = float(m.group(1))
+        if m.group(2) == "K": n *= 1_000
+        elif m.group(2) == "M": n *= 1_000_000
+        return int(n)
+
+    amount_parsed = _parse_num(amount_raw)
+
+    # Determine grain per unit from known unit table
+    _UNIT_GRAIN = {
+        "equites legati": 2, "equites imperatoris": 3, "equites caesaris": 4,
+        "paladin": 2, "teutonischer ritter": 3,
+        "treverer-späher": 2, "druidenreiter": 2, "haeduer": 3,
+        "steppenkämpfer": 2, "marksman": 3, "mameluk": 3, "amazonas": 3,
+        "sopdu-speerkämpfer": 2, "anhur-garde": 3, "asclepion": 2,
+    }
+    grain_per_unit = _UNIT_GRAIN.get(troop_type.lower(), 1)
+
+    ok = await database.update_defend_sent_entry(sent_id, uid, amount_raw, amount_parsed, troop_type, grain_per_unit)
+    flash = "saved" if ok else "error"
+    return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash={flash}", status_code=303)
 
 
 @app.get("/guild/{guild_id}/verteidigung/stats", response_class=HTMLResponse)

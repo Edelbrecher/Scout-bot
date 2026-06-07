@@ -6063,6 +6063,46 @@ async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
     return result
 
 
+async def get_my_defend_sent(guild_id: str, user_id: str) -> dict[str, dict]:
+    """Return {channel_id: sent_row} for the current user's own defend_sent entries."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT id, channel_id, amount_raw, amount_parsed, troop_type, grain_per_unit, sent_at
+            FROM defend_sent
+            WHERE guild_id = ? AND user_id = ?
+            ORDER BY sent_at DESC
+        """, (guild_id, user_id)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    # Keep only the latest entry per channel for the user
+    result: dict[str, dict] = {}
+    for r in rows:
+        cid = r["channel_id"]
+        if cid not in result:
+            result[cid] = r
+    return result
+
+
+async def update_defend_sent_entry(
+    sent_id: int, user_id: str, amount_raw: str, amount_parsed: int,
+    troop_type: str, grain_per_unit: int,
+) -> bool:
+    """Update a defend_sent row — only if user_id matches (security check). Returns True on success."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            "SELECT id FROM defend_sent WHERE id = ? AND user_id = ?", (sent_id, user_id)
+        )
+        if not await cur.fetchone():
+            return False  # not found or not owned by this user
+        await db.execute("""
+            UPDATE defend_sent
+            SET amount_raw = ?, amount_parsed = ?, troop_type = ?, grain_per_unit = ?
+            WHERE id = ? AND user_id = ?
+        """, (amount_raw, amount_parsed, troop_type, grain_per_unit, sent_id, user_id))
+        await db.commit()
+    return True
+
+
 async def close_defend_channel(channel_id: str):
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(

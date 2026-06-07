@@ -53,6 +53,14 @@
   <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;">
     ⛔ No permission.
   </div>
+  {% elif flash == 'saved' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;">
+    ✅ Dein Eintrag wurde aktualisiert.
+  </div>
+  {% elif flash == 'error' %}
+  <div style="padding:0.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;">
+    ❌ Fehler beim Speichern — nur eigene Einträge können bearbeitet werden.
+  </div>
   {% endif %}
 
   <!-- Filter tabs -->
@@ -190,22 +198,64 @@
         {% endif %}
 
         {# Spieler-Liste #}
-        <div style="display:flex;flex-direction:column;gap:0.25rem;">
+        <div style="display:flex;flex-direction:column;gap:0.3rem;">
           {% for c in ch_contribs %}
           {% set bar_w = ((c.total_troops / total_troops) * 100)|int if total_troops > 0 else 0 %}
-          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
-            <span style="font-weight:600;min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              {{ c.user_name }}
-            </span>
-            <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);">
-              <div style="height:4px;border-radius:2px;background:#6366f1;width:{{ bar_w }}%;"></div>
+          {% set my_entry = my_sent.get(ch.channel_id) if c.user_id == uid else None %}
+          <div>
+            <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
+              <span style="font-weight:600;min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                {{ c.user_name }}
+              </span>
+              <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);">
+                <div style="height:4px;border-radius:2px;background:#6366f1;width:{{ bar_w }}%;"></div>
+              </div>
+              <span style="color:#93c5fd;font-weight:600;white-space:nowrap;min-width:55px;text-align:right;">
+                {{ "{:,}".format(c.total_troops|int).replace(",",".") }}
+              </span>
+              <span style="color:#86efac;font-size:0.72rem;white-space:nowrap;min-width:60px;text-align:right;">
+                {{ "{:,}".format(c.total_grain|int).replace(",",".") }}/h
+              </span>
+              {% if my_entry %}
+              <button onclick="toggleDefEdit('edit-{{ my_entry.id }}')"
+                style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.1rem 0.4rem;font-size:0.68rem;color:var(--text-muted);cursor:pointer;flex-shrink:0;">
+                ✏️
+              </button>
+              {% endif %}
             </div>
-            <span style="color:#93c5fd;font-weight:600;white-space:nowrap;min-width:55px;text-align:right;">
-              {{ "{:,}".format(c.total_troops|int).replace(",",".") }}
-            </span>
-            <span style="color:#86efac;font-size:0.72rem;white-space:nowrap;min-width:60px;text-align:right;">
-              {{ "{:,}".format(c.total_grain|int).replace(",",".") }}/h
-            </span>
+
+            {# Inline-Bearbeitungsformular (nur für eigene Einträge) #}
+            {% if my_entry %}
+            <div id="edit-{{ my_entry.id }}" style="display:none;margin-top:0.4rem;padding:0.6rem 0.75rem;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:6px;">
+              <form method="post" action="/guild/{{ guild.guild_id }}/defend/update-sent"
+                    style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-end;">
+                <input type="hidden" name="sent_id" value="{{ my_entry.id }}">
+                <input type="hidden" name="channel_id" value="{{ ch.channel_id }}">
+                <div style="display:flex;flex-direction:column;gap:0.2rem;flex:1;min-width:100px;">
+                  <label style="font-size:0.68rem;color:var(--text-muted);">Anzahl</label>
+                  <input type="text" name="amount_raw" value="{{ my_entry.amount_raw }}"
+                    placeholder="z.B. 5000"
+                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.8rem;width:100%;">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.2rem;flex:2;min-width:130px;">
+                  <label style="font-size:0.68rem;color:var(--text-muted);">Truppentyp</label>
+                  <input type="text" name="troop_type" value="{{ my_entry.troop_type }}"
+                    placeholder="z.B. Prätorianer"
+                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.8rem;width:100%;">
+                </div>
+                <div style="display:flex;gap:0.4rem;">
+                  <button type="submit"
+                    style="background:#6366f1;border:none;border-radius:4px;padding:0.3rem 0.75rem;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;">
+                    Speichern
+                  </button>
+                  <button type="button" onclick="toggleDefEdit('edit-{{ my_entry.id }}')"
+                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.3rem 0.6rem;color:var(--text-muted);font-size:0.78rem;cursor:pointer;">
+                    Abbrechen
+                  </button>
+                </div>
+              </form>
+            </div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
@@ -227,4 +277,11 @@
   {% endif %}
 
 </div>
+
+<script>
+function toggleDefEdit(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 {% endblock %}
