@@ -413,26 +413,60 @@ const WORLD_SPEED = (function() {
   return m ? parseInt(m[1]) : 1;
 })();
 
-// Troop base speeds (fields/hour at x1)
+// Troop base speeds (fields/hour at x1) — German + English + common aliases
 const TROOP_SPEED = {
-  // Römer
-  "Legionär":6,"Prätorianer":5,"Imperianer":6,
-  "Equites Legati":16,"Equites Imperatoris":14,"Equites Caesaris":10,
-  "Battering Ram":4,"Fire Catapult":3,"Senator":4,"Settler":5,
-  // Teutonen
-  "Keule":7,"Speerträger":7,"Axtkämpfer":7,"Aufklärer":7,
-  "Paladin":10,"Teutonischer Ritter":9,
-  "Ram":4,"Katapult":3,"Häuptling":4,"Siedler":5,
-  // Gallier
-  "Phalanx":7,"Schwertkämpfer":6,
-  "Theutates-Blitz":19,"Druidenreiter":14,"Haeduer":13,"Pathfinder":17,
-  "Rammbock":5,"Trebs":5,"Stammesführer":5,"Gallischer Siedler":5,
-  // Hunnen
-  "Soldat":7,"Slugger":7,"Lanzenkämpfer":7,"Bogenschütze":6,
-  "Steppenkämpfer":14,"Marksman":13,"Mameluk":13,"Amazonas":17,
-  // Ägypter
-  "Schilf-Pfeil":6,"Edelgardist":5,"Khopesh-Kämpfer":7,
-  "Sopdu-Speerkämpfer":14,"Anhur-Garde":12,"Asclepion":16,
+  // ── Römer ──
+  "Legionär":6,"Legionnaire":6,
+  "Prätorianer":5,"Praetorian":5,
+  "Imperianer":6,"Imperian":6,
+  "Equites Legati":16,
+  "Equites Imperatoris":14,
+  "Equites Caesaris":10,
+  "Rammbock":4,"Ram":4,"Battering Ram":4,"Rambock":4,
+  "Feuerkatapult":3,"Fire Catapult":3,"Feuerschleuder":3,
+  "Senator":4,
+  // ── Teutonen ──
+  "Keule":7,"Clubswinger":7,
+  "Speerträger":7,"Spearman":7,"Speerkämpfer":7,
+  "Axtkämpfer":7,"Axeman":7,
+  "Aufklärer":7,"Scout":7,
+  "Paladin":10,
+  "Teutonischer Ritter":9,"Teutonic Knight":9,
+  "Katapult":3,"Catapult":3,"Kata":3,
+  "Häuptling":4,"Chief":4,
+  // ── Gallier ──
+  "Phalanx":7,
+  "Schwertkämpfer":6,"Swordsman":6,
+  "Pathfinder":17,"Treverer-Späher":17,
+  "Theutates-Blitz":19,"Theutates Thunder":19,"Theutates":19,
+  "Druidenreiter":14,"Druid Rider":14,
+  "Haeduer":13,"Haeduan":13,
+  "Gallier-Kata":5,"Gallier-Katapult":5,"Trebuchet":5,"Trebs":5,
+  "Stammesführer":5,"Chieftain":5,
+  // ── Hunnen ──
+  "Soldat":7,"Soldier":7,
+  "Slugger":7,
+  "Lanzenkämpfer":7,"Spearfighter":7,
+  "Bogenschütze":6,"Bowman":6,
+  "Steppenkämpfer":14,"Steppes Horseman":14,
+  "Marksman":13,
+  "Mameluk":13,"Mamluke":13,
+  "Amazonas":17,"Amazon":17,
+  "Hunnischer Khan":4,"Khan":4,
+  "Hunnischer Ram":3,"Hunnischer Rammbock":3,
+  // ── Ägypter ──
+  "Schilf-Pfeil":6,"Slave Militia":6,
+  "Edelgardist":5,"Ash Warden":5,
+  "Khopesh-Kämpfer":7,"Khopesh Warrior":7,
+  "Sopdu-Speerkämpfer":14,"Sopdu Spearman":14,
+  "Anhur-Garde":12,"Anhur Guard":12,
+  "Asclepion":16,
+  "Ägyptischer Ram":3,"Ägyptischer Rammbock":3,
+  "Pharaoh":4,
+  // ── Siedler (alle Völker) ──
+  "Siedler":5,"Settler":5,
+  // ── Held ──
+  "Held":0,"Hero":0,
 };
 
 let _tm_coords = null, _tm_arrival = null;
@@ -519,7 +553,12 @@ function calcRow(sel) {
   const durEl  = document.getElementById(`tm-dur-${i}`);
   const sendEl = document.getElementById(`tm-send-${i}`);
   distEl.textContent = dist.toFixed(1);
-  if (!spd) { durEl.textContent = '—'; sendEl.textContent = '—'; return; }
+  if (!spd) {
+    durEl.textContent = '—';
+    sendEl.textContent = '—';
+    sendEl.title = `Geschwindigkeit für "${troop}" unbekannt`;
+    return;
+  }
   const secs = travelSeconds(dist, spd, ts, boots, art, banner);
   const send = fmtSendTime(_tm_arrival, secs);
   durEl.textContent  = fmtDuration(secs);
