@@ -10755,6 +10755,14 @@ async def verteidigung_page(request: Request, guild_id: str):
         or "ally_manage"   in await database.get_member_permissions(guild_id, uid)
     )
     contributions = await database.get_defend_contributions_for_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    can_edit_all = (
+        session.get("type") == "admin"
+        or guild.get("owner_discord_id") == uid
+        or "ally_manage" in perms
+        or "defend_manage" in perms
+        or "defend_edit" in perms
+    )
     my_sent = await database.get_my_defend_sent(guild_id, uid)
     return templates.TemplateResponse("verteidigung.html", {
         "request": request,
@@ -10763,6 +10771,7 @@ async def verteidigung_page(request: Request, guild_id: str):
         "contributions": contributions,
         "my_sent": my_sent,
         "uid": uid,
+        "can_edit_all": can_edit_all,
         "show": show,
         "total_open":   sum(1 for c in all_channels if c.get("status") != "closed"),
         "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),
@@ -10876,7 +10885,20 @@ async def defend_update_sent(request: Request, guild_id: str):
     }
     grain_per_unit = _UNIT_GRAIN.get(troop_type.lower(), 1)
 
-    ok = await database.update_defend_sent_entry(sent_id, uid, amount_raw, amount_parsed, troop_type, grain_per_unit)
+    guild = await database.get_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    can_edit_all = (
+        session.get("type") == "admin"
+        or (guild and guild.get("owner_discord_id") == uid)
+        or "ally_manage" in perms
+        or "defend_manage" in perms
+        or "defend_edit" in perms
+    )
+
+    ok = await database.update_defend_sent_entry(
+        sent_id, uid, amount_raw, amount_parsed, troop_type, grain_per_unit,
+        can_edit_all=can_edit_all,
+    )
     flash = "saved" if ok else "error"
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash={flash}", status_code=303)
 

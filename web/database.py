@@ -6041,7 +6041,8 @@ async def get_defend_channels(guild_id: str) -> list[dict]:
 
 
 async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
-    """Return {channel_id: [contribution_dicts]} for all channels in a guild."""
+    """Return {channel_id: [contribution_dicts]} for all channels in a guild.
+    Each contribution includes the latest sent_id for that user+channel (for editing)."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
@@ -6049,10 +6050,19 @@ async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
                    SUM(amount_parsed) as total_troops,
                    SUM(amount_parsed * grain_per_unit) as total_grain,
                    GROUP_CONCAT(troop_type, ', ') as troop_types,
-                   MIN(sent_at) as first_sent
+                   MIN(sent_at) as first_sent,
+                   MAX(id) as latest_sent_id,
+                   (SELECT amount_raw FROM defend_sent d2
+                    WHERE d2.channel_id = defend_sent.channel_id
+                      AND d2.user_id = defend_sent.user_id
+                    ORDER BY d2.sent_at DESC LIMIT 1) as latest_amount_raw,
+                   (SELECT troop_type FROM defend_sent d2
+                    WHERE d2.channel_id = defend_sent.channel_id
+                      AND d2.user_id = defend_sent.user_id
+                    ORDER BY d2.sent_at DESC LIMIT 1) as latest_troop_type
             FROM defend_sent
             WHERE guild_id=?
-            GROUP BY channel_id, user_name
+            GROUP BY channel_id, user_id
             ORDER BY channel_id, total_troops DESC
         """, (guild_id,)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
@@ -6085,20 +6095,24 @@ async def get_my_defend_sent(guild_id: str, user_id: str) -> dict[str, dict]:
 
 async def update_defend_sent_entry(
     sent_id: int, user_id: str, amount_raw: str, amount_parsed: int,
-    troop_type: str, grain_per_unit: int,
+    troop_type: str, grain_per_unit: int, can_edit_all: bool = False,
 ) -> bool:
-    """Update a defend_sent row — only if user_id matches (security check). Returns True on success."""
+    """Update a defend_sent row. If can_edit_all is True (admin/lead), any entry can be edited.
+    Otherwise only the entry owner (user_id) may edit. Returns True on success."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        cur = await db.execute(
-            "SELECT id FROM defend_sent WHERE id = ? AND user_id = ?", (sent_id, user_id)
-        )
+        if can_edit_all:
+            cur = await db.execute("SELECT id FROM defend_sent WHERE id = ?", (sent_id,))
+        else:
+            cur = await db.execute(
+                "SELECT id FROM defend_sent WHERE id = ? AND user_id = ?", (sent_id, user_id)
+            )
         if not await cur.fetchone():
-            return False  # not found or not owned by this user
+            return False
         await db.execute("""
             UPDATE defend_sent
             SET amount_raw = ?, amount_parsed = ?, troop_type = ?, grain_per_unit = ?
-            WHERE id = ? AND user_id = ?
-        """, (amount_raw, amount_parsed, troop_type, grain_per_unit, sent_id, user_id))
+            WHERE id = ?
+        """, (amount_raw, amount_parsed, troop_type, grain_per_unit, sent_id))
         await db.commit()
     return True
 
