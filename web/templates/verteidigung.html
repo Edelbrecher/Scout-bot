@@ -415,9 +415,9 @@
 
 <script>
 const MY_VILLAGES = {{ my_villages | tojson }};
+const WORLD_URL   = "{{ tw_world }}".replace(/\/$/, '');
 const WORLD_SPEED = (function() {
-  const w = "{{ tw_world }}";
-  const m = w.match(/\.x(\d+)\./);
+  const m = WORLD_URL.match(/\.x(\d+)\./);
   return m ? parseInt(m[1]) : 1;
 })();
 
@@ -474,6 +474,7 @@ function buildTable() {
       <th style="text-align:right;padding:0.3rem 0.4rem;font-weight:500;">Dist.</th>
       <th style="text-align:right;padding:0.3rem 0.4rem;font-weight:500;">Laufzeit</th>
       <th style="text-align:right;padding:0.3rem 0.4rem;font-weight:500;">Abschicken</th>
+      <th style="padding:0.3rem 0.4rem;"></th>
     </tr></thead><tbody id="tm-tbody">`;
 
   MY_VILLAGES.forEach((v, i) => {
@@ -482,6 +483,7 @@ function buildTable() {
     const opts = troops.map(([n, c]) =>
       `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`
     ).join('');
+    const mapLink = WORLD_URL ? `${WORLD_URL}/karte.php?x=${v.x}&y=${v.y}` : '';
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
       <td style="padding:0.3rem 0.4rem;color:var(--text-muted);white-space:nowrap;">${v.name}<br><span style="font-size:0.7rem;font-family:monospace;">(${v.x}|${v.y})</span></td>
       <td style="padding:0.3rem 0.4rem;">
@@ -490,6 +492,7 @@ function buildTable() {
       <td id="tm-dist-${i}" style="padding:0.3rem 0.4rem;text-align:right;color:var(--text-muted);font-family:monospace;"></td>
       <td id="tm-dur-${i}"  style="padding:0.3rem 0.4rem;text-align:right;font-family:monospace;"></td>
       <td id="tm-send-${i}" style="padding:0.3rem 0.4rem;text-align:right;font-family:monospace;font-weight:600;"></td>
+      <td style="padding:0.3rem 0.4rem;text-align:center;">${mapLink ? `<a href="${mapLink}" target="_blank" rel="noopener" style="color:var(--text-muted);font-size:0.75rem;text-decoration:none;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.15rem 0.4rem;" title="Dorf in Travian öffnen">→</a>` : ''}</td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -546,20 +549,24 @@ function fmtDuration(secs) {
 }
 
 function fmtSendTime(arrivalStr, secs) {
-  // arrival_time may be "HH:MM:SS" or full datetime
   if (!arrivalStr) return '—';
   let arrDate;
-  if (/^\d{2}:\d{2}/.test(arrivalStr)) {
-    // time-only → assume today or next day
+  if (/^\d+:\d{2}:\d{2}$/.test(arrivalStr.trim())) {
+    // time-only, possibly hours > 23 (e.g. "25:00:00" = next day 01:00)
+    const parts = arrivalStr.trim().split(':');
+    const h = parseInt(parts[0]), m = parseInt(parts[1]), s = parseInt(parts[2]);
     const now = new Date();
-    arrDate = new Date(now.toDateString() + ' ' + arrivalStr + ' UTC');
-    if (arrDate < now) arrDate.setDate(arrDate.getDate() + 1);
+    // Start from today midnight UTC, add h/m/s
+    arrDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    arrDate = new Date(arrDate.getTime() + (h * 3600 + m * 60 + s) * 1000);
+    // If already past, add a day
+    if (arrDate.getTime() < now.getTime() - 60000) arrDate = new Date(arrDate.getTime() + 86400000);
   } else {
-    arrDate = new Date(arrivalStr.replace(' ','T') + (arrivalStr.includes('Z')?'':'Z'));
+    arrDate = new Date(arrivalStr.replace(' ','T') + (arrivalStr.includes('Z') ? '' : 'Z'));
   }
   if (isNaN(arrDate)) return '—';
   const send = new Date(arrDate.getTime() - secs * 1000);
-  return send.toLocaleString('de-DE', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).replace(',','');
+  return send.toLocaleString('de-DE', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).replace(',','');
 }
 
 
