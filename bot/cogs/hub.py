@@ -1601,6 +1601,17 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
                 submitted_by=interaction.user.display_name,
                 parsed=parsed,
             )
+        except ValueError as e:
+            if str(e).startswith("duplicate:"):
+                existing_id = str(e).split(":", 1)[1]
+                await interaction.followup.send(
+                    f"⚠️ **Dieser Bericht wurde bereits importiert** (Report #{existing_id}).\n"
+                    f"Kein doppelter Eintrag erstellt.",
+                    ephemeral=True,
+                )
+                return
+            await interaction.followup.send(f"❌ Fehler beim Speichern: {e}", ephemeral=True)
+            return
         except Exception as e:
             await interaction.followup.send(
                 f"❌ Fehler beim Speichern: {e}", ephemeral=True

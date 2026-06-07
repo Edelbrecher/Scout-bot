@@ -12743,7 +12743,13 @@ async def report_submit(request: Request, guild_id: str,
             "raw_text": text,
         })
 
-    report_id = await database.save_battle_report(guild_id, uid, parsed)
+    try:
+        report_id = await database.save_battle_report(guild_id, uid, parsed)
+    except ValueError as e:
+        if str(e).startswith("duplicate:"):
+            existing_id = str(e).split(":", 1)[1]
+            return RedirectResponse(f"/guild/{guild_id}/reports/{existing_id}?duplicate=1", status_code=303)
+        raise
     return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
@@ -12760,7 +12766,13 @@ async def report_submit_force(request: Request, guild_id: str,
     if not text:
         return RedirectResponse(f"/guild/{guild_id}/reports?error=empty", status_code=303)
     parsed = _parse_battle_report(text)
-    report_id = await database.save_battle_report(guild_id, uid, parsed)
+    try:
+        report_id = await database.save_battle_report(guild_id, uid, parsed)
+    except ValueError as e:
+        if str(e).startswith("duplicate:"):
+            existing_id = str(e).split(":", 1)[1]
+            return RedirectResponse(f"/guild/{guild_id}/reports/{existing_id}?duplicate=1", status_code=303)
+        raise
     return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
@@ -12797,7 +12809,7 @@ async def combat_intel_page(request: Request, guild_id: str, q: str = ""):
 
 
 @app.get("/guild/{guild_id}/reports/{report_id}", response_class=HTMLResponse)
-async def report_detail(request: Request, guild_id: str, report_id: int):
+async def report_detail(request: Request, guild_id: str, report_id: int, duplicate: int = 0):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -12836,6 +12848,7 @@ async def report_detail(request: Request, guild_id: str, report_id: int):
 
     return templates.TemplateResponse("report_detail.html", {
         "request": request, "guild": guild, "report": r,
+        "duplicate_warning": bool(duplicate),
     })
 
 

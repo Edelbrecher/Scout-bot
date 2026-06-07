@@ -1397,8 +1397,15 @@ async def _ensure_battle_reports_table():
         await db.commit()
 
 
+def _compute_report_hash(raw_text: str) -> str:
+    import hashlib
+    normalised = "\n".join(line.strip() for line in raw_text.strip().splitlines())
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
 async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> int:
-    """Save a parsed battle report to the DB. Returns the new report ID."""
+    """Save a parsed battle report.  Raises ValueError('duplicate:<id>') if the
+    exact same report (by content hash) was already saved for this guild."""
     import json as _json
     await _ensure_battle_reports_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -1411,12 +1418,24 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             ("fake_override",             "NULL"),
             ("fake_confidence",           "NULL"),
             ("fake_reason",               "NULL"),
+            ("report_hash",               "NULL"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
                 await db.commit()
             except Exception:
                 pass
+
+        # ── Duplicate check ───────────────────────────────────────────────────
+        raw = parsed.get("raw_text", "")
+        rhash = _compute_report_hash(raw)
+        async with db.execute(
+            "SELECT id FROM battle_reports WHERE guild_id=? AND report_hash=?",
+            (guild_id, rhash),
+        ) as cur:
+            existing = await cur.fetchone()
+        if existing:
+            raise ValueError(f"duplicate:{existing[0]}")
 
         async with db.execute("""
             INSERT INTO battle_reports
@@ -1427,8 +1446,8 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
                def_troops_json, def_troops_lost_json, def_troops_hospital_json,
                buildings_hit_json,
                spy_resources_json, plunder_json, plunder_total,
-               luck, hero_hp, fake_confidence, fake_reason, raw_text)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               luck, hero_hp, fake_confidence, fake_reason, raw_text, report_hash)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             guild_id, submitted_by,
             parsed.get("report_type"), parsed.get("report_date"),
@@ -1448,7 +1467,7 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             parsed.get("plunder_total", 0),
             parsed.get("luck"), parsed.get("hero_hp"),
             parsed.get("fake_confidence"), parsed.get("fake_reason"),
-            parsed.get("raw_text", ""),
+            raw, rhash,
         )) as cur:
             new_id = cur.lastrowid
 
