@@ -1748,10 +1748,26 @@ async def delete_attack_report(report_id: int):
 
 async def _init_farming_tables():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # ── Detect whether map_snapshots is the old TABLE or the new VIEW ──────
+        async with db.execute(
+            "SELECT type FROM sqlite_master WHERE name='map_snapshots'"
+        ) as cur:
+            row = await cur.fetchone()
+            snap_type = row[0] if row else None
+
+        if snap_type == "table":
+            # Old per-guild table exists — migrate to per-world schema.
+            # Drop legacy data (will refetch within minutes) to avoid slow migration.
+            print("[db] Migrating map_snapshots → world_snapshots (per-world storage)", flush=True)
+            await db.execute("DROP TABLE map_snapshots")
+            await db.commit()
+            snap_type = None  # fall through to create fresh
+
+        # ── world_snapshots: one row per village per world fetch ──────────────
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS map_snapshots (
+            CREATE TABLE IF NOT EXISTS world_snapshots (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id      TEXT NOT NULL,
+                world_url     TEXT NOT NULL,
                 fetched_at    TEXT NOT NULL,
                 village_id    TEXT NOT NULL,
                 x             INTEGER NOT NULL,
@@ -1767,6 +1783,33 @@ async def _init_farming_tables():
                 village_type  INTEGER DEFAULT 0
             )
         """)
+        # ── VIEW: exposes guild_id via guild_configs.tw_world join ────────────
+        # All existing queries "FROM map_snapshots WHERE guild_id=?" work unchanged.
+        if snap_type != "view":
+            await db.execute("DROP VIEW IF EXISTS map_snapshots")
+            await db.execute("""
+                CREATE VIEW map_snapshots AS
+                SELECT
+                    gc.guild_id,
+                    ws.id,
+                    ws.fetched_at,
+                    ws.village_id,
+                    ws.x,
+                    ws.y,
+                    ws.village_name,
+                    ws.player_id,
+                    ws.player_name,
+                    ws.alliance_id,
+                    ws.alliance_name,
+                    ws.population,
+                    ws.tribe,
+                    ws.is_capital,
+                    ws.village_type
+                FROM world_snapshots ws
+                JOIN guild_configs gc ON gc.tw_world = ws.world_url
+            """)
+        await db.commit()
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS farm_list_entries (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1783,23 +1826,17 @@ async def _init_farming_tables():
             )
         """)
         await db.commit()
-        # Migrations for new columns
-        try:
-            await db.execute("ALTER TABLE map_snapshots ADD COLUMN is_capital INTEGER DEFAULT 0")
-            await db.commit()
-        except Exception:
-            pass
-        try:
-            await db.execute("ALTER TABLE map_snapshots ADD COLUMN village_type INTEGER DEFAULT 0")
-            await db.commit()
-        except Exception:
-            pass
-        # Index for performance
-        try:
-            await db.execute("CREATE INDEX IF NOT EXISTS idx_map_snap_guild ON map_snapshots(guild_id, fetched_at)")
-            await db.commit()
-        except Exception:
-            pass
+        # Indexes on world_snapshots for fast lookups
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS idx_wsnap_url_ts   ON world_snapshots(world_url, fetched_at)",
+            "CREATE INDEX IF NOT EXISTS idx_wsnap_url_xy   ON world_snapshots(world_url, x, y)",
+            "CREATE INDEX IF NOT EXISTS idx_wsnap_url_ts_v ON world_snapshots(world_url, fetched_at, village_id)",
+        ]:
+            try:
+                await db.execute(idx_sql)
+                await db.commit()
+            except Exception:
+                pass
 
 
 async def _init_reports_table():
@@ -2314,19 +2351,31 @@ async def get_combat_intel_overview(guild_id: str, limit: int = 100) -> list[dic
 
 
 async def save_map_snapshot(guild_id: str, villages: list[dict]):
-    from datetime import datetime as _dt, timedelta as _td
+    """Save a world map snapshot. Stores once per world_url — shared across all guilds on the same world."""
+    from datetime import datetime as _dt
     fetched_at = _dt.utcnow().isoformat()
-    cutoff = (_dt.utcnow() - _td(days=7)).isoformat()
+
+    # Look up this guild's Travian world URL
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        # Insert new snapshot
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        world_url = row[0] if row else None
+
+    if not world_url:
+        return  # No world configured — nothing to save
+
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Insert into per-world table (not per-guild)
         await db.executemany("""
-            INSERT INTO map_snapshots
-                (guild_id, fetched_at, village_id, x, y, village_name, player_id, player_name,
+            INSERT INTO world_snapshots
+                (world_url, fetched_at, village_id, x, y, village_name, player_id, player_name,
                  alliance_id, alliance_name, population, tribe, is_capital, village_type)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (
-                guild_id, fetched_at,
+                world_url, fetched_at,
                 str(v.get("village_id", "")),
                 int(v.get("x", 0)), int(v.get("y", 0)),
                 v.get("village_name"), v.get("player_id"), v.get("player_name"),
@@ -2336,18 +2385,18 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
             )
             for v in villages
         ])
-        # Retention: keep only last 30 snapshots per guild (~2-3 days of history)
+        # Retention: keep only last 30 snapshots per world (~2-3 days of history)
         await db.execute("""
-            DELETE FROM map_snapshots
-            WHERE guild_id = ? AND fetched_at NOT IN (
-                SELECT DISTINCT fetched_at FROM map_snapshots
-                WHERE guild_id = ?
+            DELETE FROM world_snapshots
+            WHERE world_url = ? AND fetched_at NOT IN (
+                SELECT DISTINCT fetched_at FROM world_snapshots
+                WHERE world_url = ?
                 ORDER BY fetched_at DESC
                 LIMIT 30
             )
-        """, (guild_id, guild_id))
+        """, (world_url, world_url))
         await db.commit()
-    # Invalidate all cached results for this guild so next page load is fresh
+    # Invalidate all cached results for all guilds on this world
     cache_invalidate_guild(guild_id)
 
 
@@ -2369,8 +2418,14 @@ async def get_latest_snapshot_time(guild_id: str) -> str | None:
 
 async def clear_all_snapshots(guild_id: str):
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute("DELETE FROM map_snapshots WHERE guild_id = ?", (guild_id,))
-        await db.commit()
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        world_url = row[0] if row else None
+        if world_url:
+            await db.execute("DELETE FROM world_snapshots WHERE world_url = ?", (world_url,))
+            await db.commit()
 
 
 async def get_village_pop_history(guild_id: str, x: int, y: int, days: int = 7) -> list[dict]:
@@ -2603,42 +2658,9 @@ async def get_servers_overview() -> list[dict]:
 
 
 async def prune_old_snapshots(guild_id: str, keep_days: int = 14):
-    """Smart retention: keep all snapshots from last 48h, one-per-day for days 3-14, delete rest."""
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        # 1. Delete everything older than keep_days
-        await db.execute("""
-            DELETE FROM map_snapshots
-            WHERE guild_id = ?
-              AND fetched_at < datetime('now', ? || ' days')
-        """, (guild_id, f"-{keep_days}"))
-
-        # 2. Thin out snapshots older than 48h: keep only the latest per calendar day
-        #    Get all unique (date, fetched_at) for this guild older than 48h
-        async with db.execute("""
-            SELECT fetched_at
-            FROM map_snapshots
-            WHERE guild_id = ?
-              AND fetched_at < datetime('now', '-2 days')
-            GROUP BY guild_id, date(fetched_at), x, y
-            HAVING fetched_at != MAX(fetched_at)
-        """, (guild_id,)) as cur:
-            pass  # just a placeholder — use simpler approach below
-
-        # Simpler: find all fetched_at timestamps older than 48h
-        # then keep only the MAX(fetched_at) per date, delete the rest
-        await db.execute("""
-            DELETE FROM map_snapshots
-            WHERE guild_id = ?
-              AND fetched_at < datetime('now', '-2 days')
-              AND fetched_at NOT IN (
-                  SELECT MAX(fetched_at)
-                  FROM map_snapshots
-                  WHERE guild_id = ?
-                    AND fetched_at < datetime('now', '-2 days')
-                  GROUP BY date(fetched_at)
-              )
-        """, (guild_id, guild_id))
-        await db.commit()
+    """Retention is now handled automatically in save_map_snapshot (last 30 snapshots per world).
+    This function is kept for backwards compatibility but is a no-op."""
+    pass
 
 
 async def get_snapshot_count(guild_id: str) -> int:

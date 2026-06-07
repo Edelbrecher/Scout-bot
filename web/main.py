@@ -653,7 +653,7 @@ def _parse_map_sql(content: str) -> list[dict]:
 
 
 async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
-    """Fetch map.sql for a world and save it — also writes to all other guilds on the same world."""
+    """Fetch map.sql for a world and save it once (shared across all guilds on that world)."""
     tw_world = tw_world.rstrip("/")
     url = tw_world + "/map.sql"
     async with httpx.AsyncClient(timeout=30) as client:
@@ -663,21 +663,17 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
     villages = await loop.run_in_executor(None, _parse_map_sql, r.text)
     if not villages:
         return
-    # Save for the requesting guild
+    # Save ONCE for the world (world_snapshots table — shared across all guilds)
     await database.save_map_snapshot(guild_id, villages)
-    try:
-        await database.sync_alliance_members_from_snapshot(guild_id)
-    except Exception:
-        pass
-    asyncio.create_task(database.run_sector_scan(guild_id))
-    # Also save for all other guilds on the same world (so they stay in sync)
+    # Per-guild post-processing for all guilds on the same world
     try:
         all_guilds = await database.get_all_guilds()
         for g in all_guilds:
-            if g["guild_id"] == guild_id:
-                continue
             if (g.get("tw_world") or "").rstrip("/") == tw_world:
-                await database.save_map_snapshot(g["guild_id"], villages)
+                try:
+                    await database.sync_alliance_members_from_snapshot(g["guild_id"])
+                except Exception:
+                    pass
                 asyncio.create_task(database.run_sector_scan(g["guild_id"]))
     except Exception:
         pass
@@ -731,18 +727,19 @@ async def lifespan(app: FastAPI):
                         if not villages:
                             continue
 
-                        # Write snapshot to every guild on this world
+                        # Save snapshot ONCE per world (stored in world_snapshots, shared across guilds)
+                        try:
+                            await database.save_map_snapshot(world_guilds[0]["guild_id"], villages)
+                        except Exception as eg:
+                            print(f"[scanner] ERROR saving snapshot for {tw_world}: {eg}", flush=True)
+
+                        # Per-guild post-processing (alliance sync, sector scan)
                         for g in world_guilds:
                             try:
-                                await database.save_map_snapshot(g["guild_id"], villages)
-                                await database.prune_old_snapshots(g["guild_id"], keep_days=30)
-                                try:
-                                    await database.sync_alliance_members_from_snapshot(g["guild_id"])
-                                except Exception:
-                                    pass
-                                asyncio.create_task(database.run_sector_scan(g["guild_id"]))
-                            except Exception as eg:
-                                print(f"[scanner] ERROR saving for guild {g['guild_id']}: {eg}", flush=True)
+                                await database.sync_alliance_members_from_snapshot(g["guild_id"])
+                            except Exception:
+                                pass
+                            asyncio.create_task(database.run_sector_scan(g["guild_id"]))
 
                         print(f"[scanner] {tw_world} → saved for {len(world_guilds)} guild(s)", flush=True)
 
