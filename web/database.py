@@ -2350,9 +2350,12 @@ async def get_combat_intel_overview(guild_id: str, limit: int = 100) -> list[dic
     return rows
 
 
+_last_retention_run: dict[str, float] = {}  # world_url -> unix timestamp of last cleanup
+
 async def save_map_snapshot(guild_id: str, villages: list[dict]):
     """Save a world map snapshot. Stores once per world_url — shared across all guilds on the same world."""
     from datetime import datetime as _dt
+    import time as _time
     fetched_at = _dt.utcnow().isoformat()
 
     # Look up this guild's Travian world URL
@@ -2385,25 +2388,29 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
             )
             for v in villages
         ])
-        # Retention: keep all scans from last 2 days + one snapshot per day for up to 35 days
-        # Step 1: delete anything older than 35 days
-        await db.execute("""
-            DELETE FROM world_snapshots
-            WHERE world_url = ? AND fetched_at < datetime('now', '-35 days')
-        """, (world_url,))
-        # Step 2: for data older than 2 days, keep only the last snapshot of each calendar day
-        await db.execute("""
-            DELETE FROM world_snapshots
-            WHERE world_url = ?
-              AND fetched_at < datetime('now', '-2 days')
-              AND fetched_at NOT IN (
-                SELECT MAX(fetched_at)
-                FROM world_snapshots
+        # Retention cleanup: run at most once per hour per world to avoid slow DELETEs on every scan
+        now_ts = _time.monotonic()
+        last_run = _last_retention_run.get(world_url, 0)
+        if now_ts - last_run > 3600:
+            _last_retention_run[world_url] = now_ts
+            # Step 1: delete anything older than 35 days
+            await db.execute("""
+                DELETE FROM world_snapshots
+                WHERE world_url = ? AND fetched_at < datetime('now', '-35 days')
+            """, (world_url,))
+            # Step 2: for data older than 2 days, keep only the last snapshot of each calendar day
+            await db.execute("""
+                DELETE FROM world_snapshots
                 WHERE world_url = ?
                   AND fetched_at < datetime('now', '-2 days')
-                GROUP BY date(fetched_at)
-              )
-        """, (world_url, world_url))
+                  AND fetched_at NOT IN (
+                    SELECT MAX(fetched_at)
+                    FROM world_snapshots
+                    WHERE world_url = ?
+                      AND fetched_at < datetime('now', '-2 days')
+                    GROUP BY date(fetched_at)
+                  )
+            """, (world_url, world_url))
         await db.commit()
     # Invalidate all cached results for all guilds on this world
     cache_invalidate_guild(guild_id)
