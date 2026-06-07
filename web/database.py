@@ -6032,31 +6032,64 @@ async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
 
 
 async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dict]:
-    """Return own villages with coords + troops for travel time calculation."""
+    """Return own villages with coords + troops for travel time calculation.
+    Priority: member_troops (has troop data) → world_snapshots via travian_name (coords only)."""
     import json as _json
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+
+        # 1. Try member_troops (full troop data)
         async with db.execute(
             "SELECT villages_json FROM member_troops WHERE guild_id=? AND discord_id=?",
             (guild_id, discord_id),
         ) as cur:
             row = await cur.fetchone()
-    if not row or not row["villages_json"]:
-        return []
-    try:
-        villages = _json.loads(row["villages_json"])
+        if row and row["villages_json"]:
+            try:
+                villages = _json.loads(row["villages_json"])
+                result = [
+                    {
+                        "name": v.get("village_name", "?"),
+                        "x": v.get("x", 0),
+                        "y": v.get("y", 0),
+                        "troops": v.get("troops", {}),
+                    }
+                    for v in villages if v.get("x") is not None
+                ]
+                if result:
+                    return result
+            except Exception:
+                pass
+
+        # 2. Fallback: look up travian_name from ally_members, then get villages from world_snapshots
+        async with db.execute("""
+            SELECT am.travian_name FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            JOIN guild_configs gc ON gc.guild_id = ?
+            WHERE am.discord_id = ? AND am.status = 'approved'
+            LIMIT 1
+        """, (guild_id, discord_id)) as cur:
+            name_row = await cur.fetchone()
+        if not name_row or not name_row["travian_name"]:
+            return []
+
+        travian_name = name_row["travian_name"]
+        async with db.execute("""
+            SELECT village_name, x, y FROM world_snapshots
+            WHERE world_url = (SELECT tw_world FROM guild_configs WHERE guild_id = ?)
+              AND player_name = ?
+              AND fetched_at = (
+                SELECT MAX(fetched_at) FROM world_snapshots
+                WHERE world_url = (SELECT tw_world FROM guild_configs WHERE guild_id = ?)
+              )
+            ORDER BY village_name
+        """, (guild_id, travian_name, guild_id)) as cur:
+            rows = await cur.fetchall()
+
         return [
-            {
-                "name": v.get("village_name", "?"),
-                "x": v.get("x", 0),
-                "y": v.get("y", 0),
-                "troops": v.get("troops", {}),
-                "village_type": v.get("village_type", ""),
-            }
-            for v in villages if v.get("x") is not None
+            {"name": r["village_name"] or "?", "x": r["x"], "y": r["y"], "troops": {}}
+            for r in rows
         ]
-    except Exception:
-        return []
 
 
 async def get_defend_channels(guild_id: str) -> list[dict]:

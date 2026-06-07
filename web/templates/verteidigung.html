@@ -476,11 +476,12 @@ function buildTable() {
     </tr></thead><tbody id="tm-tbody">`;
 
   MY_VILLAGES.forEach((v, i) => {
-    const troops = Object.entries(v.troops || {}).filter(([,c]) => c > 0);
-    if (!troops.length) return;
-    const opts = troops.map(([n, c]) =>
-      `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`
-    ).join('');
+    const troopEntries = Object.entries(v.troops || {}).filter(([,c]) => c > 0);
+    // If no troop data available, show all known troop types for manual selection
+    const allTroops = ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Keule","Speerträger","Axtkämpfer","Aufklärer","Paladin","Teutonischer Ritter","Phalanx","Schwertkämpfer","Theutates-Blitz","Druidenreiter","Haeduer","Pathfinder","Soldat","Slugger","Lanzenkämpfer","Bogenschütze","Steppenkämpfer","Marksman","Mameluk","Amazonas","Schilf-Pfeil","Edelgardist","Khopesh-Kämpfer","Sopdu-Speerkämpfer","Anhur-Garde","Asclepion"];
+    const opts = troopEntries.length
+      ? troopEntries.map(([n, c]) => `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`).join('')
+      : allTroops.map(n => `<option value="${n}">${n}</option>`).join('');
     const mapLink = WORLD_URL ? `${WORLD_URL}/karte.php?x=${v.x}&y=${v.y}` : '';
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
       <td style="padding:0.3rem 0.4rem;color:var(--text-muted);white-space:nowrap;">${v.name}<br><span style="font-size:0.7rem;font-family:monospace;">(${v.x}|${v.y})</span></td>
