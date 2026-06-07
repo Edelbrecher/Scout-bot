@@ -6031,6 +6031,43 @@ async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
         await db.commit()
 
 
+async def get_village_ts_levels(discord_id: str) -> dict:
+    """Return {'{x}_{y}': ts_level} for a user's saved tournament square levels."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_ts_levels (
+                discord_id TEXT NOT NULL,
+                x INTEGER NOT NULL,
+                y INTEGER NOT NULL,
+                ts_level INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (discord_id, x, y)
+            )
+        """)
+        await db.commit()
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT x, y, ts_level FROM village_ts_levels WHERE discord_id=?", (discord_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+    return {f"{r['x']}_{r['y']}": r["ts_level"] for r in rows}
+
+
+async def save_village_ts_level(discord_id: str, x: int, y: int, ts_level: int):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_ts_levels (
+                discord_id TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
+                ts_level INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (discord_id, x, y)
+            )
+        """)
+        await db.execute("""
+            INSERT INTO village_ts_levels (discord_id, x, y, ts_level)
+            VALUES (?,?,?,?)
+            ON CONFLICT(discord_id, x, y) DO UPDATE SET ts_level=excluded.ts_level
+        """, (discord_id, x, y, max(0, min(20, ts_level))))
+        await db.commit()
+
+
 async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dict]:
     """Return own villages with coords + troops for travel time calculation.
     Priority: member_troops (has troop data) → world_snapshots via travian_name (coords only)."""
@@ -6058,6 +6095,9 @@ async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dic
                     for v in villages if v.get("x") is not None
                 ]
                 if result:
+                    ts_levels = await get_village_ts_levels(discord_id)
+                    for v in result:
+                        v["ts"] = ts_levels.get(f"{v['x']}_{v['y']}", 0)
                     return result
             except Exception:
                 pass

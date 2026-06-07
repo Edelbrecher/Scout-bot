@@ -479,10 +479,11 @@ function buildTable() {
       ? troopEntries.map(([n, c]) => `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`).join('')
       : allTroops.map(n => `<option value="${n}">${n}</option>`).join('');
     const mapLink = WORLD_URL ? `${WORLD_URL}/karte.php?x=${v.x}&y=${v.y}` : '';
-    const btnStyle = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:var(--text);width:22px;height:22px;border-radius:3px;cursor:pointer;font-size:0.9rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;';
+    const savedTs = v.ts || 0;
+    const btnStyle = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:var(--text);width:22px;height:22px;border-radius:3px;cursor:pointer;font-size:0.9rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
     const tsInput = `<div style="display:flex;align-items:center;gap:3px;justify-content:center;">
       <button type="button" style="${btnStyle}" onclick="tmStep(${i},-1)">−</button>
-      <span id="tm-ts-${i}" data-val="0" style="min-width:22px;text-align:center;font-size:0.82rem;">0</span>
+      <span id="tm-ts-${i}" data-val="${savedTs}" data-x="${v.x}" data-y="${v.y}" style="min-width:22px;text-align:center;font-size:0.82rem;">${savedTs}</span>
       <button type="button" style="${btnStyle}" onclick="tmStep(${i},1)">+</button>
     </div>`;
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
@@ -539,6 +540,12 @@ function tmStep(i, delta) {
   el.textContent = v;
   const sel = document.querySelector(`#tm-tbody select[data-vi="${i}"]`);
   if (sel) calcRow(sel);
+  // Auto-save immediately
+  fetch('/api/village-ts', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({x: parseInt(el.dataset.x), y: parseInt(el.dataset.y), ts: v})
+  });
 }
 
 function mapDist(ax, ay, bx, by) {

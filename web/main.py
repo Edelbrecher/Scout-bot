@@ -10889,6 +10889,19 @@ async def defend_update_request(request: Request, guild_id: str, channel_id: str
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?show={show}&flash=saved", status_code=303)
 
 
+@app.post("/api/village-ts")
+async def api_save_village_ts(request: Request):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    uid = session.get("uid", "")
+    data = await request.json()
+    x = int(data.get("x", 0))
+    y = int(data.get("y", 0))
+    ts = int(data.get("ts", 0))
+    await database.save_village_ts_level(uid, x, y, ts)
+    return JSONResponse({"ok": True})
+
+
 @app.post("/guild/{guild_id}/defend/update-sent")
 async def defend_update_sent(request: Request, guild_id: str):
     """Allow a user to edit their own defend_sent entry (amount + troop type)."""
