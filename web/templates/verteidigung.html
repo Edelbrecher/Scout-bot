@@ -448,7 +448,7 @@ let _tm_coords = null, _tm_arrival = null;
 function openTravelModal(btn) {
   const coords  = btn.dataset.coords  || '';
   const arrival = btn.dataset.arrival || '';
-  const m = coords.match(/(-?\d+)\s*[|,]\s*(-?\d+)/);
+  const m = coords.match(/(-?\d+)\s*[|,\/]\s*(-?\d+)/);
   _tm_coords  = m ? {x: parseInt(m[1]), y: parseInt(m[2])} : null;
   _tm_arrival = arrival;
   document.getElementById('tm-coords').textContent  = coords  || '—';
