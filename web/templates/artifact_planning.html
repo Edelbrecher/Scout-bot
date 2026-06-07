@@ -165,8 +165,8 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary">Speichern &amp; Analyse laden</button>
-      <button type="button" class="btn btn-secondary" onclick="loadAnalysis()" style="margin-left:.5rem;">🔄 Analyse aktualisieren</button>
+      <button type="button" class="btn btn-primary" onclick="saveAndAnalyze()">Speichern &amp; Analyse laden</button>
+      <button type="button" class="btn btn-secondary" onclick="loadAnalysis()" style="margin-left:.5rem;">Analyse aktualisieren</button>
     </form>
   </div>
 
@@ -385,7 +385,18 @@ async function loadAnalysis() {
     <span class="spinner"></span> Analyse wird berechnet…
   </div>`;
   try {
-    const resp = await fetch(`/guild/${GUILD_ID}/artifacts/planning/analyze`);
+    // Pass current UI values as query params so no save is needed before analyzing
+    const x1 = document.getElementById('hX1').value;
+    const y1 = document.getElementById('hY1').value;
+    const x2 = document.getElementById('hX2').value;
+    const y2 = document.getElementById('hY2').value;
+    const types = [...document.querySelectorAll('input[name="artifact_types"]:checked')].map(e=>e.value).join(',');
+    const sizes = [...document.querySelectorAll('input[name="artifact_sizes"]:checked')].map(e=>e.value).join(',');
+    const speed = document.querySelector('select[name="troop_speed"]')?.value || '7';
+    const params = new URLSearchParams({x1,y1,x2,y2,troop_speed:speed});
+    if (types) params.set('types', types);
+    if (sizes) params.set('sizes', sizes);
+    const resp = await fetch(`/guild/${GUILD_ID}/artifacts/planning/analyze?${params}`);
     if (!resp.ok) throw new Error(resp.statusText);
     const data = await resp.json();
     renderResults(data);
@@ -394,11 +405,18 @@ async function loadAnalysis() {
   }
 }
 
-// Auto-load if settings already configured (sector != default)
-const sx1 = {{ settings.sector_x1 }}, sx2 = {{ settings.sector_x2 }};
-const sy1 = {{ settings.sector_y1 }}, sy2 = {{ settings.sector_y2 }};
+async function saveAndAnalyze() {
+  // Save settings via form POST, then load analysis
+  const form = document.getElementById('settingsForm');
+  const fd = new FormData(form);
+  await fetch(form.action, {method:'POST', body: fd});
+  loadAnalysis();
+}
+
+// Auto-load if a sector is already saved
 const hasTypes = {{ settings.artifact_types | tojson }}.length > 0;
-if (hasTypes && !(sx1 === -200 && sx2 === 200 && sy1 === -200 && sy2 === 200)) {
+const hasSector = activeSectors.size > 0;
+if (hasSector) {
   loadAnalysis();
 }
 </script>

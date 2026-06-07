@@ -13730,12 +13730,17 @@ async def artifact_planning_analyze(request: Request, guild_id: str):
     settings = await database.get_artifact_plan_settings(guild_id)
     spawns = await database.get_artifact_plan_spawns(guild_id)
 
-    # Filter spawns by sector + selected types + sizes
-    x1, y1 = settings["sector_x1"], settings["sector_y1"]
-    x2, y2 = settings["sector_x2"], settings["sector_y2"]
-    sel_types = settings.get("artifact_types") or []
-    sel_sizes = settings.get("artifact_sizes") or ["unique", "great", "slight"]
-    troop_speed = float(settings.get("troop_speed") or 7.0)
+    # Allow query params to override saved settings (so UI changes take effect without saving)
+    qp = request.query_params
+    x1 = int(qp.get("x1", settings["sector_x1"]))
+    y1 = int(qp.get("y1", settings["sector_y1"]))
+    x2 = int(qp.get("x2", settings["sector_x2"]))
+    y2 = int(qp.get("y2", settings["sector_y2"]))
+    sel_types_raw = qp.get("types", None)
+    sel_types = sel_types_raw.split(",") if sel_types_raw else (settings.get("artifact_types") or [])
+    sel_sizes_raw = qp.get("sizes", None)
+    sel_sizes = sel_sizes_raw.split(",") if sel_sizes_raw else (settings.get("artifact_sizes") or ["unique", "great", "slight"])
+    troop_speed = float(qp.get("troop_speed", settings.get("troop_speed") or 7.0))
 
     # World speed
     guild_cfg = await database.get_guild(guild_id)
