@@ -44,7 +44,7 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artefakte</a>
-      <h1 style="margin:.25rem 0 0;">🎯 Artefakt-Planung</h1>
+      <h1 style="margin:.25rem 0 0;">Artefakt-Planung</h1>
       <p class="subtitle" style="margin:0;">Laufzeiten &amp; Kata-Empfehlungen für Artefakt-Runs</p>
     </div>
   </div>
@@ -136,7 +136,6 @@
   <!-- Analysis Output -->
   <div id="analysisArea">
     <div class="empty-state" id="emptyHint">
-      <div style="font-size:2.5rem;margin-bottom:.75rem;">🎯</div>
       <p>Sektor und Artefakt-Typen konfigurieren, dann auf <strong>Speichern &amp; Analyse laden</strong> klicken.</p>
     </div>
   </div>
@@ -148,10 +147,6 @@ const GUILD_ID = "{{ guild.guild_id }}";
 const TW_WORLD = "{{ tw_world }}";
 const WORLD_SPEED = {{ world_speed }};
 
-const TYPE_ICONS = {
-  boots: "👟", architect: "🏗️", trainer: "🪖", diet: "🌾",
-  confusion: "🌀", eyes: "🔭", fool: "🤡", storage: "📦"
-};
 
 function fmtHours(h) {
   if (h >= 9999) return "—";
@@ -192,14 +187,12 @@ function renderResults(data) {
   for (const r of data.results) {
     const s = r.spawn;
     const sizeClass = `badge-${s.size}`;
-    const icon = TYPE_ICONS[s.type] || "🏺";
     const ml = mapLink(s.x, s.y);
 
     let membersHtml = "";
     if (r.members.length === 0) {
       membersHtml = `<div style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">Keine Member mit Truppendaten gefunden.</div>`;
     } else {
-      const medals = ["🥇","🥈","🥉"];
       const showAll = r.members.length <= 5;
       membersHtml = `<table class="rank-table">
         <thead><tr>
@@ -207,10 +200,9 @@ function renderResults(data) {
         </tr></thead><tbody>`;
       r.members.forEach((m, i) => {
         const vml = mapLink(m.best_village.x, m.best_village.y);
-        const medal = medals[i] || `${i+1}.`;
         const hidden = !showAll && i >= 5 ? ' class="collapsed-rows"' : '';
         membersHtml += `<tr${hidden}>
-          <td><span class="medal">${medal}</span></td>
+          <td style="color:var(--text-muted);font-size:.78rem;">${i+1}.</td>
           <td><strong>${m.travian_name}</strong><br><span style="font-size:.72rem;color:var(--text-muted);">${m.discord_name}</span></td>
           <td>${m.best_village.village_name}<br>
             <span style="font-size:.72rem;color:var(--text-muted);">${m.best_village.x}|${m.best_village.y}
@@ -265,7 +257,6 @@ function renderResults(data) {
 
     html += `<div class="artifact-block">
       <div class="artifact-header">
-        <span class="type-icon">${icon}</span>
         <div>
           <div class="artifact-name">${s.label}
             <span class="size-badge ${sizeClass}">${s.size.toUpperCase()}</span>
