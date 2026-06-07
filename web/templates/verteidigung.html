@@ -439,7 +439,7 @@ const TROOP_SPEED = {
   "Schwertkämpfer":6,"Swordsman":6,
   "Pathfinder":17,"Treverer-Späher":17,
   "Theutates-Blitz":19,"Theutates Thunder":19,"Theutates":19,
-  "Druidenreiter":14,"Druid Rider":14,
+  "Druidenreiter":14,"Druidentreiter":14,"Druid Rider":14,
   "Haeduer":13,"Haeduan":13,
   "Gallier-Kata":5,"Gallier-Katapult":5,"Trebuchet":5,"Trebs":5,
   "Stammesführer":5,"Chieftain":5,
@@ -506,12 +506,17 @@ function buildTable() {
     </tr></thead><tbody id="tm-tbody">`;
 
   MY_VILLAGES.forEach((v, i) => {
-    const troopEntries = Object.entries(v.troops || {}).filter(([,c]) => c > 0);
-    // If no troop data available, show all known troop types for manual selection
-    const allTroops = ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Keule","Speerträger","Axtkämpfer","Aufklärer","Paladin","Teutonischer Ritter","Phalanx","Schwertkämpfer","Theutates-Blitz","Druidenreiter","Haeduer","Pathfinder","Soldat","Slugger","Lanzenkämpfer","Bogenschütze","Steppenkämpfer","Marksman","Mameluk","Amazonas","Schilf-Pfeil","Edelgardist","Khopesh-Kämpfer","Sopdu-Speerkämpfer","Anhur-Garde","Asclepion"];
-    const opts = troopEntries.length
-      ? troopEntries.map(([n, c]) => `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`).join('')
-      : allTroops.map(n => `<option value="${n}">${n}</option>`).join('');
+    const troopCounts = Object.fromEntries(Object.entries(v.troops || {}).filter(([,c]) => c > 0));
+    // All known troop types — village troops shown first with count, then rest
+    const allKnown = ["Phalanx","Schwertkämpfer","Druidentreiter","Druidenreiter","Theutates-Blitz","Haeduer","Pathfinder","Gallier-Kata","Stammesführer","Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Keule","Speerträger","Axtkämpfer","Aufklärer","Paladin","Teutonischer Ritter","Katapult","Häuptling","Soldat","Slugger","Lanzenkämpfer","Bogenschütze","Steppenkämpfer","Marksman","Mameluk","Amazonas","Schilf-Pfeil","Edelgardist","Khopesh-Kämpfer","Sopdu-Speerkämpfer","Anhur-Garde","Asclepion","Siedler"];
+    // Village troops first (with count), then remaining known types
+    const inVillage = Object.keys(troopCounts);
+    const rest = allKnown.filter(n => !inVillage.includes(n));
+    const opts = [
+      ...inVillage.map(n => `<option value="${n}">${n} (${troopCounts[n].toLocaleString('de')})</option>`),
+      ...(inVillage.length && rest.length ? ['<option disabled>──────────</option>'] : []),
+      ...rest.map(n => `<option value="${n}">${n}</option>`)
+    ].join('');
     const mapLink = WORLD_URL ? `${WORLD_URL}/karte.php?x=${v.x}&y=${v.y}` : '';
     const savedTs = v.ts || 0;
     const btnStyle = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:var(--text);width:22px;height:22px;border-radius:3px;cursor:pointer;font-size:0.9rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
