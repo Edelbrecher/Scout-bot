@@ -2385,15 +2385,24 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
             )
             for v in villages
         ])
-        # Retention: keep only last 30 snapshots per world (~2-3 days of history)
+        # Retention: keep all scans from last 2 days + one snapshot per day for up to 35 days
+        # Step 1: delete anything older than 35 days
         await db.execute("""
             DELETE FROM world_snapshots
-            WHERE world_url = ? AND fetched_at NOT IN (
-                SELECT DISTINCT fetched_at FROM world_snapshots
+            WHERE world_url = ? AND fetched_at < datetime('now', '-35 days')
+        """, (world_url,))
+        # Step 2: for data older than 2 days, keep only the last snapshot of each calendar day
+        await db.execute("""
+            DELETE FROM world_snapshots
+            WHERE world_url = ?
+              AND fetched_at < datetime('now', '-2 days')
+              AND fetched_at NOT IN (
+                SELECT MAX(fetched_at)
+                FROM world_snapshots
                 WHERE world_url = ?
-                ORDER BY fetched_at DESC
-                LIMIT 30
-            )
+                  AND fetched_at < datetime('now', '-2 days')
+                GROUP BY date(fetched_at)
+              )
         """, (world_url, world_url))
         await db.commit()
     # Invalidate all cached results for all guilds on this world
