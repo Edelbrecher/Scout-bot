@@ -532,7 +532,7 @@ async def update_guild_config_fields(guild_id: str, **fields):
     if not fields:
         return
     allowed = {"server_utc_offset", "tw_alliance_name", "alliance_manager_role_ids",
-               "bot_language", "poll_channel_id"}
+               "bot_language", "poll_channel_id", "digest_channel_id"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return
@@ -7279,6 +7279,12 @@ async def _init_op_tables():
         # guild_configs: separate public poll channel
         try:
             await db.execute("ALTER TABLE guild_configs ADD COLUMN poll_public_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
+        # guild_configs: weekly digest channel
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN digest_channel_id TEXT")
             await db.commit()
         except Exception:
             pass

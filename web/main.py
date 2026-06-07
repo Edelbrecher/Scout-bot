@@ -10676,6 +10676,29 @@ async def clear_request_hub(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}?saved=hub_cleared", status_code=303)
 
 
+@app.post("/guild/{guild_id}/digest/set")
+async def digest_set(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    if not (_is_leader(session, guild_id) or session.get("type") == "admin"):
+        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+    form = await request.form()
+    channel_id = (form.get("channel_id") or "").strip()
+    if channel_id:
+        await database.update_guild_config_fields(guild_id, digest_channel_id=channel_id)
+    return RedirectResponse(f"/guild/{guild_id}?saved=digest", status_code=303)
+
+
+@app.post("/guild/{guild_id}/digest/clear")
+async def digest_clear(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    if not (_is_leader(session, guild_id) or session.get("type") == "admin"):
+        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+    await database.update_guild_config_fields(guild_id, digest_channel_id=None)
+    return RedirectResponse(f"/guild/{guild_id}?saved=digest_cleared", status_code=303)
+
+
 @app.post("/guild/{guild_id}/clear-stale-channels")
 async def clear_stale_channels(request: Request, guild_id: str):
     """Remove DB entries for channels that no longer exist in Discord."""

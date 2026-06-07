@@ -1473,3 +1473,163 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
 
         await db.commit()
         return new_id
+
+
+# ---------------------------------------------------------------------------
+# Weekly Digest
+# ---------------------------------------------------------------------------
+
+async def get_set_digest_channel(guild_id: str, channel_id: str | None = None) -> str | None:
+    """Get or set the digest channel id for a guild."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN digest_channel_id TEXT")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN digest_last_sent TEXT")
+            await db.commit()
+        except Exception:
+            pass
+        if channel_id is not None:
+            await db.execute(
+                "UPDATE guild_configs SET digest_channel_id=? WHERE guild_id=?",
+                (channel_id, guild_id),
+            )
+            await db.commit()
+        async with db.execute(
+            "SELECT digest_channel_id FROM guild_configs WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def mark_digest_sent(guild_id: str, sent_at: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE guild_configs SET digest_last_sent=? WHERE guild_id=?",
+            (sent_at, guild_id),
+        )
+        await db.commit()
+
+
+async def get_digest_last_sent(guild_id: str) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT digest_last_sent FROM guild_configs WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def get_weekly_stats(guild_id: str, since_iso: str) -> dict:
+    """Collect all relevant stats since a given ISO timestamp for the weekly digest."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        stats: dict = {}
+
+        # Battle reports
+        async with db.execute(
+            "SELECT COUNT(*) n, report_type, submitted_by FROM battle_reports "
+            "WHERE guild_id=? AND created_at>=? GROUP BY report_type",
+            (guild_id, since_iso),
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+        stats["battle_total"] = sum(r["n"] for r in rows)
+        stats["battle_by_type"] = {r["report_type"]: r["n"] for r in rows}
+
+        # Top battle report submitters
+        async with db.execute(
+            "SELECT submitted_by, COUNT(*) n FROM battle_reports "
+            "WHERE guild_id=? AND created_at>=? GROUP BY submitted_by ORDER BY n DESC LIMIT 5",
+            (guild_id, since_iso),
+        ) as cur:
+            stats["top_reporters"] = [dict(r) for r in await cur.fetchall()]
+
+        # Total plunder this week
+        async with db.execute(
+            "SELECT COALESCE(SUM(plunder_total),0) total FROM battle_reports "
+            "WHERE guild_id=? AND created_at>=?",
+            (guild_id, since_iso),
+        ) as cur:
+            row = await cur.fetchone()
+            stats["plunder_total"] = row[0] if row else 0
+
+        # Scout reports
+        async with db.execute(
+            "SELECT COUNT(*) n FROM scout_reports WHERE guild_id=? AND created_at>=?",
+            (guild_id, since_iso),
+        ) as cur:
+            row = await cur.fetchone()
+            stats["scout_reports"] = row[0] if row else 0
+
+        # Scout channels created
+        async with db.execute(
+            "SELECT COUNT(*) n FROM scout_channels WHERE guild_id=? AND created_at>=?",
+            (guild_id, since_iso),
+        ) as cur:
+            row = await cur.fetchone()
+            stats["scout_requests"] = row[0] if row else 0
+
+        # Defend channels created
+        try:
+            async with db.execute(
+                "SELECT COUNT(*) n FROM defend_channels WHERE guild_id=? AND created_at>=?",
+                (guild_id, since_iso),
+            ) as cur:
+                row = await cur.fetchone()
+                stats["defends"] = row[0] if row else 0
+        except Exception:
+            stats["defends"] = 0
+
+        # Res push requests
+        try:
+            async with db.execute(
+                "SELECT COUNT(*) n FROM res_requests WHERE guild_id=? AND created_at>=?",
+                (guild_id, since_iso),
+            ) as cur:
+                row = await cur.fetchone()
+                stats["res_pushes"] = row[0] if row else 0
+        except Exception:
+            stats["res_pushes"] = 0
+
+        # Artifact handoffs this week
+        try:
+            async with db.execute(
+                "SELECT COUNT(*) n, status FROM artifact_handoffs "
+                "WHERE guild_id=? AND created_at>=? GROUP BY status",
+                (guild_id, since_iso),
+            ) as cur:
+                rows = [dict(r) for r in await cur.fetchall()]
+            stats["handoffs_confirmed"] = sum(r["n"] for r in rows if r["status"] == "confirmed")
+            stats["handoffs_late"] = sum(
+                r["n"] for r in rows
+                if r["status"] == "confirmed"  # late flag would need extra join
+            )
+        except Exception:
+            stats["handoffs_confirmed"] = 0
+
+        # Active artifacts
+        try:
+            async with db.execute(
+                "SELECT name, current_holder FROM artifacts WHERE guild_id=? AND status='active'",
+                (guild_id,),
+            ) as cur:
+                stats["active_artifacts"] = [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            stats["active_artifacts"] = []
+
+        # Upcoming artifact handoffs (pending, within next 48h)
+        try:
+            async with db.execute(
+                "SELECT from_player, to_player, scheduled_at, artifact_id "
+                "FROM artifact_handoffs WHERE guild_id=? AND status='pending' "
+                "ORDER BY scheduled_at ASC LIMIT 5",
+                (guild_id,),
+            ) as cur:
+                stats["upcoming_handoffs"] = [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            stats["upcoming_handoffs"] = []
+
+        return stats

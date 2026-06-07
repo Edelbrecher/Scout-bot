@@ -540,6 +540,40 @@
     </div>
     {% endif %}{# end not is_personal #}
 
+    <!-- Weekly Digest (nur Discord) -->
+    {% if not is_personal %}
+    <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
+      <div style="display:flex;align-items:center;gap:1rem;width:100%;">
+        <div class="feature-icon">📰</div>
+        <div class="feature-body">
+          <div class="feature-title">Wöchentlicher Digest</div>
+          <div class="feature-desc">Jeden Montag: Kampfbilanz, Top-Beitragende, Artefakt-Status — per Discord-Embed</div>
+        </div>
+      </div>
+      {% if guild.digest_channel_id %}
+      <div style="display:flex;align-items:center;gap:0.75rem;padding-left:3.4rem;flex-wrap:wrap;">
+        <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
+                     border-radius:20px;padding:0.2rem 0.75rem;font-size:0.82rem;font-family:monospace;color:#22c55e;">
+          ✅ Channel: {{ guild.digest_channel_id }}
+        </span>
+        <form method="post" action="/guild/{{ guild.guild_id }}/digest/clear" style="margin:0;">
+          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;">✕ Entfernen</button>
+        </form>
+        <div style="font-size:.78rem;color:var(--text-muted);">Tipp: <code>/digest #channel</code> im Discord zum manuellen Triggern</div>
+      </div>
+      {% else %}
+      <div style="padding-left:3.4rem;">
+        <form method="post" action="/guild/{{ guild.guild_id }}/digest/set" style="margin:0;display:flex;gap:.5rem;align-items:center;">
+          <input name="channel_id" placeholder="Channel-ID" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:160px;">
+          <button type="submit" class="btn btn-primary" style="font-size:0.82rem;">📰 Aktivieren</button>
+        </form>
+        <div style="margin-top:.35rem;font-size:.75rem;color:var(--text-muted);">Oder <code>/digest #channel</code> direkt im Discord</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+
     <!-- Hero scout setup (bot optional, always possible manually) -->
     <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
       <div style="display:flex;align-items:center;gap:1rem;width:100%;">
