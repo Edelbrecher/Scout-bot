@@ -1409,6 +1409,8 @@ async def save_battle_report(guild_id: str, submitted_by: str, parsed: dict) -> 
             ("def_troops_hospital_json",  "'{}'"),
             ("buildings_hit_json",        "'[]'"),
             ("fake_override",             "NULL"),
+            ("fake_confidence",           "NULL"),
+            ("fake_reason",               "NULL"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE battle_reports ADD COLUMN {col} TEXT DEFAULT {default}")
