@@ -455,7 +455,8 @@ function closeTravelModal() {
 function buildTable() {
   const wrap = document.getElementById('tm-table');
   if (!MY_VILLAGES.length) {
-    wrap.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);">Keine Dörfer gefunden. Bitte zuerst deine Truppen im Dashboard importieren.</p>';
+    wrap.innerHTML = `<p style="font-size:0.82rem;color:var(--text-muted);">Keine Dörfer gefunden. Bitte zuerst deine Truppen in
+      <a href="/guild/{{ guild.guild_id }}/my-account" style="color:#93c5fd;">My Account</a> importieren.</p>`;
     return;
   }
   const selStyle = 'background:#12141f;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:0.2rem 0.35rem;color:var(--text);font-size:0.78rem;width:100%;';
@@ -478,11 +479,12 @@ function buildTable() {
       ? troopEntries.map(([n, c]) => `<option value="${n}">${n} (${c.toLocaleString('de')})</option>`).join('')
       : allTroops.map(n => `<option value="${n}">${n}</option>`).join('');
     const mapLink = WORLD_URL ? `${WORLD_URL}/karte.php?x=${v.x}&y=${v.y}` : '';
-    const tsInput = `<input type="number" min="0" max="20" value="0" data-vi="${i}"
-      onchange="calcRow(this.closest('tr').querySelector('select[data-vi]'))"
-      oninput="calcRow(this.closest('tr').querySelector('select[data-vi]'))"
-      id="tm-ts-${i}"
-      style="width:42px;background:#12141f;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.2rem 0.3rem;color:var(--text);font-size:0.8rem;text-align:center;">`;
+    const btnStyle = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:var(--text);width:22px;height:22px;border-radius:3px;cursor:pointer;font-size:0.9rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;';
+    const tsInput = `<div style="display:flex;align-items:center;gap:3px;justify-content:center;">
+      <button type="button" style="${btnStyle}" onclick="tmStep(${i},-1)">−</button>
+      <span id="tm-ts-${i}" data-val="0" style="min-width:22px;text-align:center;font-size:0.82rem;">0</span>
+      <button type="button" style="${btnStyle}" onclick="tmStep(${i},1)">+</button>
+    </div>`;
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
       <td style="padding:0.3rem 0.4rem;color:var(--text-muted);white-space:nowrap;">${v.name}<br><span style="font-size:0.7rem;font-family:monospace;">(${v.x}|${v.y})</span></td>
       <td style="padding:0.3rem 0.4rem;">
@@ -504,7 +506,7 @@ function calcRow(sel) {
   const i     = parseInt(sel.dataset.vi);
   const v     = MY_VILLAGES[i];
   const troop = sel.value;
-  const ts     = parseInt(document.getElementById(`tm-ts-${i}`)?.value) || 0;
+  const ts     = parseInt(document.getElementById(`tm-ts-${i}`)?.dataset.val) || 0;
   const boots  = parseInt(document.getElementById('tm-boots').value) || 0;
   const art    = parseInt(document.getElementById('tm-art').value)   || 0;
   const banner = parseInt(document.getElementById('tm-banner').value)|| 0;
@@ -526,6 +528,17 @@ function calcRow(sel) {
 
 function calcAllTravel() {
   document.querySelectorAll('#tm-tbody select[data-vi]').forEach(sel => calcRow(sel));
+}
+
+function tmStep(i, delta) {
+  const el = document.getElementById(`tm-ts-${i}`);
+  if (!el) return;
+  let v = parseInt(el.dataset.val || 0) + delta;
+  v = Math.max(0, Math.min(20, v));
+  el.dataset.val = v;
+  el.textContent = v;
+  const sel = document.querySelector(`#tm-tbody select[data-vi="${i}"]`);
+  if (sel) calcRow(sel);
 }
 
 function mapDist(ax, ay, bx, by) {
