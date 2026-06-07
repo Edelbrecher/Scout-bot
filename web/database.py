@@ -6038,10 +6038,11 @@ async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dic
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
 
-        # 1. Try member_troops (full troop data)
+        # 1. Try member_troops (full troop data) — search by discord_id across all guilds
+        #    because players import data in their personal workspace, not the Discord guild
         async with db.execute(
-            "SELECT villages_json FROM member_troops WHERE guild_id=? AND discord_id=?",
-            (guild_id, discord_id),
+            "SELECT villages_json FROM member_troops WHERE discord_id=? ORDER BY updated_at DESC LIMIT 1",
+            (discord_id,),
         ) as cur:
             row = await cur.fetchone()
         if row and row["villages_json"]:
