@@ -252,6 +252,59 @@
         {% endif %}
       </div>
 
+      <!-- Gantt Timeline -->
+      {% if stats.timeline %}
+      <div style="margin-bottom:1.5rem;">
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Besitz-Verlauf</div>
+
+        <!-- Bar chart -->
+        <div style="display:flex;height:36px;border-radius:8px;overflow:hidden;gap:2px;margin-bottom:.6rem;">
+          {% for seg in stats.timeline %}
+          <div style="width:{{ seg.pct }}%;min-width:2px;background:{{ seg.color }};opacity:{% if seg.is_current %}1{% else %}0.75{% endif %};
+                      position:relative;cursor:default;transition:opacity .15s;"
+               title="{{ seg.player }}: {{ seg.hours }}h ({{ seg.start_label }} → {{ seg.end_label }}){% if seg.is_current %} 🔵 aktuell{% endif %}{% if seg.late %} ⚠️ verspätet übernommen{% endif %}">
+            {% if seg.pct > 8 %}
+            <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+                         font-size:.72rem;font-weight:700;color:#000;white-space:nowrap;overflow:hidden;padding:0 4px;">
+              {{ seg.player[:12] }}
+            </span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Legend -->
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem .75rem;">
+          {% set seen_players = [] %}
+          {% for seg in stats.timeline %}
+            {% if seg.player not in seen_players %}
+              {% set _ = seen_players.append(seg.player) %}
+              <span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--text-muted);">
+                <span style="width:10px;height:10px;border-radius:3px;background:{{ seg.color }};flex-shrink:0;display:inline-block;"></span>
+                {{ seg.player }}
+              </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <!-- Detailed segment list -->
+        <div style="margin-top:.85rem;display:flex;flex-direction:column;gap:.3rem;">
+          {% for seg in stats.timeline %}
+          <div style="display:flex;align-items:center;gap:.6rem;font-size:.8rem;">
+            <span style="width:10px;height:10px;border-radius:3px;background:{{ seg.color }};flex-shrink:0;"></span>
+            <span style="font-weight:600;color:var(--text);min-width:100px;">{{ seg.player }}</span>
+            <span style="color:var(--text-muted);">{{ seg.start_label }} → {{ seg.end_label }}</span>
+            <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;color:var(--text-muted);">
+              {{ seg.hours }}h
+            </span>
+            {% if seg.is_current %}<span style="color:#60a5fa;font-size:.72rem;">● aktuell</span>{% endif %}
+            {% if seg.late %}<span style="color:#fde047;font-size:.72rem;">⚠ verspätet</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Per-player table -->
       {% if stats.players %}
       <div style="overflow-x:auto;">

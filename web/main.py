@@ -13673,6 +13673,66 @@ def _compute_artifact_stats(artifact: dict, handoffs: list[dict]) -> dict:
     # Sort by times held desc
     players_list = sorted(player_stats.values(), key=lambda x: x["times_held"], reverse=True)
 
+    # ── Timeline segments for Gantt chart ────────────────────────────────────
+    # Each segment: {player, start_label, end_label, hours, pct, is_current, late}
+    timeline_segments = []
+    for i, h in enumerate(confirmed):
+        to_p = h.get("to_player", "")
+        if not to_p:
+            continue
+        recv_dt = _parse_dt(h.get("confirmed_to_time") or h.get("picked_up_at") or "")
+        gave_dt = None
+        is_current = False
+        for j in range(i + 1, len(handoffs)):
+            nxt = handoffs[j]
+            if nxt.get("from_player") == to_p and nxt.get("status") in ("confirmed", "pending"):
+                gave_dt = _parse_dt(nxt.get("confirmed_from_time") or nxt.get("picked_up_at") or "")
+                if gave_dt is None and nxt.get("status") == "pending":
+                    gave_dt = now
+                    is_current = (to_p == current_holder)
+                break
+        if gave_dt is None:
+            gave_dt = now
+            is_current = (to_p == current_holder)
+
+        if recv_dt:
+            hold_h = max(0.1, (gave_dt - recv_dt).total_seconds() / 3600)
+            # Check if this handoff was late (scheduled vs actual)
+            sched = _parse_dt(h.get("scheduled_at") or "")
+            late = False
+            if sched and recv_dt:
+                late = (recv_dt - sched).total_seconds() / 3600 > 1.0
+            timeline_segments.append({
+                "player": to_p,
+                "start_label": recv_dt.strftime("%d.%m %H:%M"),
+                "end_label": gave_dt.strftime("%d.%m %H:%M") if not is_current else "jetzt",
+                "hours": round(hold_h, 1),
+                "is_current": is_current,
+                "late": late,
+                "recv_ts": recv_dt.timestamp(),
+                "gave_ts": gave_dt.timestamp(),
+            })
+
+    # Compute percentages relative to total span
+    if timeline_segments:
+        total_span = sum(s["hours"] for s in timeline_segments)
+        for s in timeline_segments:
+            s["pct"] = round(s["hours"] / total_span * 100, 1) if total_span else 0
+
+    # Assign consistent colors per player (cycle through palette)
+    _palette = [
+        "#4ade80","#60a5fa","#f472b6","#fb923c","#a78bfa",
+        "#34d399","#fbbf24","#e879f9","#38bdf8","#f87171",
+    ]
+    player_colors: dict[str, str] = {}
+    _ci = 0
+    for s in timeline_segments:
+        p = s["player"]
+        if p not in player_colors:
+            player_colors[p] = _palette[_ci % len(_palette)]
+            _ci += 1
+        s["color"] = player_colors[p]
+
     return {
         "players": players_list,
         "total_confirmed": len(confirmed),
@@ -13680,6 +13740,8 @@ def _compute_artifact_stats(artifact: dict, handoffs: list[dict]) -> dict:
         "total_skipped": len([h for h in handoffs if h.get("status") == "skipped"]),
         "current_holder": current_holder,
         "current_hold_h": current_hold_h,
+        "timeline": timeline_segments,
+        "player_colors": player_colors,
     }
 
 
