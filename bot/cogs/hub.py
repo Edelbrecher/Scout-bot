@@ -1575,10 +1575,7 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
     report_text = discord.ui.TextInput(
         label="Kampfbericht (aus Travian kopieren)",
         style=discord.TextStyle.paragraph,
-        placeholder=(
-            "Bericht aus Travian vollständig hier einfügen.\n"
-            "Angreifer, Verteidiger, Truppen, Beute — alles wird automatisch erkannt."
-        ),
+        placeholder="Bericht aus Travian hier einfügen — wird automatisch erkannt.",
         max_length=4000,
         required=True,
     )
