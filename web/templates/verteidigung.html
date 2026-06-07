@@ -303,11 +303,21 @@
                       placeholder="z.B. 5000"
                       style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;width:100%;">
                   </div>
-                  <div style="display:flex;flex-direction:column;gap:0.15rem;flex:1;min-width:110px;">
+                  <div style="display:flex;flex-direction:column;gap:0.15rem;flex:1;min-width:140px;">
                     <label style="font-size:0.65rem;color:var(--text-muted);">Truppentyp</label>
-                    <input type="text" name="troop_type" value="{{ entry.troop_type }}"
-                      placeholder="z.B. Prätorianer"
-                      style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;width:100%;">
+                    <select name="troop_type"
+                      style="background:#1e2130;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;width:100%;">
+                      <optgroup label="🦶 Infanterie">
+                        {% for name in ['Legionär','Prätorianer','Imperianer','Keule','Speerträger','Axtkämpfer','Aufklärer','Phalanx','Schwertkämpfer','Soldat','Slugger','Lanzenkämpfer','Bogenschütze','Schilf-Pfeil','Edelgardist','Khopesh-Kämpfer'] %}
+                        <option value="{{ name }}" {% if entry.troop_type == name %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                      </optgroup>
+                      <optgroup label="🐴 Kavallerie">
+                        {% for name in ['Equites Legati','Equites Imperatoris','Equites Caesaris','Paladin','Teutonischer Ritter','Treverer-Späher','Druidenreiter','Haeduer','Steppenkämpfer','Marksman','Mameluk','Amazonas','Sopdu-Speerkämpfer','Anhur-Garde','Asclepion'] %}
+                        <option value="{{ name }}" {% if entry.troop_type == name %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                      </optgroup>
+                    </select>
                   </div>
                   <button type="submit"
                     style="background:#6366f1;border:none;border-radius:4px;padding:0.25rem 0.65rem;color:#fff;font-size:0.76rem;font-weight:600;cursor:pointer;flex-shrink:0;">
