@@ -57,26 +57,57 @@
   <div class="ap-card" style="margin-bottom:1.5rem;">
     <div class="ap-section-title">Konfiguration</div>
     <form method="post" action="/guild/{{ guild.guild_id }}/artifacts/planning/settings" id="settingsForm">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.2rem;">
-        <!-- Sector -->
+
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:flex-start;">
+        <!-- Sector picker (same as sector monitor) -->
         <div>
-          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor X von</label>
-          <input type="number" name="sector_x1" value="{{ settings.sector_x1 }}" class="form-input" style="width:100%;">
+          <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Sektor auswählen</div>
+          {% set cells = [
+            ('NW', -200,   0,   0, 200, 'NW'),
+            ('NE',    0,   0, 200, 200, 'NE'),
+            ('C',   -20, -20,  20,  20, 'Center'),
+            ('SW', -200,-200,   0,   0, 'SW'),
+            ('SE',    0,-200, 200,   0, 'SE'),
+          ] %}
+          <div style="display:grid;grid-template-columns:repeat(2,80px);grid-template-rows:repeat(3,52px);gap:4px;
+                      background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:6px;">
+            {% for key, cx1, cy1, cx2, cy2, label in cells %}{% if key in ['NW','NE'] %}
+            <div class="qcell" id="qc-{{ key }}"
+                 data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
+                 onclick="toggleSector('{{ key }}')"
+                 style="display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;
+                        border-radius:6px;cursor:pointer;border:1px solid var(--border);
+                        background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;user-select:none;">
+              {{ label }}
+            </div>
+            {% endif %}{% endfor %}
+            {% for key, cx1, cy1, cx2, cy2, label in cells %}{% if key == 'C' %}
+            <div class="qcell" id="qc-{{ key }}"
+                 data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
+                 onclick="toggleSector('{{ key }}')"
+                 style="grid-column:1/3;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;
+                        border-radius:6px;cursor:pointer;border:1px solid var(--border);
+                        background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;user-select:none;">
+              Center
+            </div>
+            {% endif %}{% endfor %}
+            {% for key, cx1, cy1, cx2, cy2, label in cells %}{% if key in ['SW','SE'] %}
+            <div class="qcell" id="qc-{{ key }}"
+                 data-key="{{ key }}" data-x1="{{ cx1 }}" data-y1="{{ cy1 }}" data-x2="{{ cx2 }}" data-y2="{{ cy2 }}"
+                 onclick="toggleSector('{{ key }}')"
+                 style="display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;
+                        border-radius:6px;cursor:pointer;border:1px solid var(--border);
+                        background:rgba(255,255,255,.03);color:var(--text-muted);transition:all .12s;user-select:none;">
+              {{ label }}
+            </div>
+            {% endif %}{% endfor %}
+          </div>
+          <div id="sectorSummary" style="font-size:.75rem;color:var(--text-muted);margin-top:.4rem;"></div>
         </div>
-        <div>
-          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor X bis</label>
-          <input type="number" name="sector_x2" value="{{ settings.sector_x2 }}" class="form-input" style="width:100%;">
-        </div>
-        <div>
-          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor Y von</label>
-          <input type="number" name="sector_y1" value="{{ settings.sector_y1 }}" class="form-input" style="width:100%;">
-        </div>
-        <div>
-          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor Y bis</label>
-          <input type="number" name="sector_y2" value="{{ settings.sector_y2 }}" class="form-input" style="width:100%;">
-        </div>
-        <div>
-          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Truppengeschwindigkeit (Felder/h)</label>
+
+        <!-- Troop speed -->
+        <div style="min-width:240px;">
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.5rem;">Truppengeschwindigkeit</label>
           <select name="troop_speed" class="form-input" style="width:100%;">
             {% set speeds = [
               (3, "Katapult — 3"),
@@ -96,6 +127,12 @@
           </select>
         </div>
       </div>
+
+      <!-- Hidden coord fields submitted with form -->
+      <input type="hidden" name="sector_x1" id="hX1" value="{{ settings.sector_x1 }}">
+      <input type="hidden" name="sector_y1" id="hY1" value="{{ settings.sector_y1 }}">
+      <input type="hidden" name="sector_x2" id="hX2" value="{{ settings.sector_x2 }}">
+      <input type="hidden" name="sector_y2" id="hY2" value="{{ settings.sector_y2 }}">
 
       <!-- Artifact Types -->
       <div style="margin-bottom:1rem;">
@@ -147,6 +184,61 @@ const GUILD_ID = "{{ guild.guild_id }}";
 const TW_WORLD = "{{ tw_world }}";
 const WORLD_SPEED = {{ world_speed }};
 
+// ── Sector picker ────────────────────────────────────────────────────────────
+const SECTOR_DEFS = {
+  NW: {x1:-200, y1:0,    x2:0,   y2:200},
+  NE: {x1:0,    y1:0,    x2:200, y2:200},
+  C:  {x1:-20,  y1:-20,  x2:20,  y2:20},
+  SW: {x1:-200, y1:-200, x2:0,   y2:0},
+  SE: {x1:0,    y1:-200, x2:200, y2:0},
+};
+let activeSectors = new Set();
+
+function toggleSector(key) {
+  if (activeSectors.has(key)) {
+    activeSectors.delete(key);
+  } else {
+    // Only allow one sector at a time (makes coord calculation simple)
+    activeSectors.clear();
+    activeSectors.add(key);
+  }
+  updateSectorUI();
+}
+
+function updateSectorUI() {
+  document.querySelectorAll('.qcell').forEach(el => {
+    const k = el.dataset.key;
+    const active = activeSectors.has(k);
+    el.style.background = active ? 'rgba(99,102,241,.2)' : 'rgba(255,255,255,.03)';
+    el.style.borderColor = active ? '#6366f1' : 'var(--border)';
+    el.style.color = active ? '#a5b4fc' : 'var(--text-muted)';
+  });
+  if (activeSectors.size === 0) {
+    document.getElementById('sectorSummary').textContent = '';
+    return;
+  }
+  const key = [...activeSectors][0];
+  const d = SECTOR_DEFS[key];
+  document.getElementById('hX1').value = d.x1;
+  document.getElementById('hY1').value = d.y1;
+  document.getElementById('hX2').value = d.x2;
+  document.getElementById('hY2').value = d.y2;
+  document.getElementById('sectorSummary').textContent =
+    `${key}: (${d.x1}|${d.y1}) → (${d.x2}|${d.y2})`;
+}
+
+// Restore active sector from saved settings
+(function() {
+  const sx1 = {{ settings.sector_x1 }}, sy1 = {{ settings.sector_y1 }};
+  const sx2 = {{ settings.sector_x2 }}, sy2 = {{ settings.sector_y2 }};
+  for (const [k, d] of Object.entries(SECTOR_DEFS)) {
+    if (d.x1===sx1 && d.y1===sy1 && d.x2===sx2 && d.y2===sy2) {
+      activeSectors.add(k);
+      break;
+    }
+  }
+  updateSectorUI();
+})();
 
 function fmtHours(h) {
   if (h >= 9999) return "—";
