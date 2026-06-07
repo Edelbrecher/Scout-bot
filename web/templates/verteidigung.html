@@ -170,6 +170,14 @@
       </div>
       {% endif %}
 
+      {# ── Laufzeit-Kalkulator ── #}
+      {% if my_villages %}
+      <button onclick="openTravelModal('{{ ch.channel_id }}','{{ ch.coords|e }}','{{ ch.arrival_time|e }}')"
+        style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.4rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:0.3rem 0.75rem;color:#f59e0b;font-size:0.78rem;font-weight:600;cursor:pointer;">
+        📍 Meine Laufzeiten
+      </button>
+      {% endif %}
+
       {# ── Request bearbeiten (can_close = Lead/HC/Admin) ── #}
       {% if can_close %}
       <div id="req-{{ ch.channel_id }}" style="display:none;margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.65rem;">
@@ -354,7 +362,214 @@
 
 </div>
 
+{# ── Laufzeit-Modal ── #}
+<div id="travel-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;overflow-y:auto;padding:2rem 1rem;">
+  <div style="max-width:700px;margin:auto;background:#1a1d2e;border:1px solid var(--border);border-radius:12px;padding:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h3 style="margin:0;font-size:1rem;">📍 Meine Laufzeiten</h3>
+      <button onclick="closeTravelModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+
+    <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem;">
+      Ziel: <span id="tm-coords" style="color:#93c5fd;font-weight:600;font-family:monospace;"></span>
+      &nbsp;·&nbsp; Ankunft: <span id="tm-arrival" style="color:#f59e0b;font-weight:600;"></span>
+    </div>
+
+    {# Modifikatoren #}
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;padding:0.65rem;background:rgba(255,255,255,.03);border-radius:8px;">
+      <div style="display:flex;flex-direction:column;gap:0.2rem;">
+        <label style="font-size:0.68rem;color:var(--text-muted);">🏟️ Turnierplatz</label>
+        <select id="tm-ts" onchange="calcTravel()" style="background:#1e2130;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;">
+          {% for i in range(21) %}<option value="{{ i }}">Level {{ i }}</option>{% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.2rem;">
+        <label style="font-size:0.68rem;color:var(--text-muted);">👟 Held-Schuhe</label>
+        <select id="tm-boots" onchange="calcTravel()" style="background:#1e2130;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;">
+          <option value="0">0%</option><option value="25">25%</option>
+          <option value="50">50%</option><option value="75">75%</option><option value="100">100%</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.2rem;">
+        <label style="font-size:0.68rem;color:var(--text-muted);">⚡ Speed-Artefakt</label>
+        <select id="tm-art" onchange="calcTravel()" style="background:#1e2130;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;">
+          <option value="0">Keins</option><option value="25">Klein (+25%)</option>
+          <option value="50">Groß (+50%)</option><option value="100">Einzigartig (+100%)</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.2rem;">
+        <label style="font-size:0.68rem;color:var(--text-muted);">🚩 Wimpel/Standarte</label>
+        <select id="tm-banner" onchange="calcTravel()" style="background:#1e2130;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.25rem 0.4rem;color:var(--text);font-size:0.8rem;">
+          <option value="0">Keiner</option><option value="5">+5%</option>
+          <option value="10">+10%</option><option value="20">+20%</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.2rem;justify-content:flex-end;">
+        <label style="font-size:0.68rem;color:var(--text-muted);">🏕️ Nur Def-Dörfer</label>
+        <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;padding:0.3rem 0;">
+          <input type="checkbox" id="tm-defonly" onchange="calcTravel()" checked style="width:16px;height:16px;">
+          <span style="font-size:0.8rem;">Aktiv</span>
+        </label>
+      </div>
+    </div>
+
+    <div id="tm-results" style="font-size:0.82rem;"></div>
+  </div>
+</div>
+
 <script>
+const MY_VILLAGES = {{ my_villages | tojson }};
+const WORLD_SPEED = (function() {
+  const w = "{{ tw_world }}";
+  const m = w.match(/\.x(\d+)\./);
+  return m ? parseInt(m[1]) : 1;
+})();
+
+// Troop base speeds (fields/hour at x1)
+const TROOP_SPEED = {
+  // Römer
+  "Legionär":6,"Prätorianer":5,"Imperianer":6,
+  "Equites Legati":16,"Equites Imperatoris":14,"Equites Caesaris":10,
+  "Battering Ram":4,"Fire Catapult":3,"Senator":4,"Settler":5,
+  // Teutonen
+  "Keule":7,"Speerträger":7,"Axtkämpfer":7,"Aufklärer":7,
+  "Paladin":10,"Teutonischer Ritter":9,
+  "Ram":4,"Katapult":3,"Häuptling":4,"Siedler":5,
+  // Gallier
+  "Phalanx":7,"Schwertkämpfer":6,
+  "Theutates-Blitz":19,"Druidenreiter":14,"Haeduer":13,"Pathfinder":17,
+  "Rammbock":5,"Trebs":5,"Stammesführer":5,"Gallischer Siedler":5,
+  // Hunnen
+  "Soldat":7,"Slugger":7,"Lanzenkämpfer":7,"Bogenschütze":6,
+  "Steppenkämpfer":14,"Marksman":13,"Mameluk":13,"Amazonas":17,
+  // Ägypter
+  "Schilf-Pfeil":6,"Edelgardist":5,"Khopesh-Kämpfer":7,
+  "Sopdu-Speerkämpfer":14,"Anhur-Garde":12,"Asclepion":16,
+};
+// Which troops are defensive (show by default)
+const DEF_TROOPS = new Set([
+  "Prätorianer","Imperianer","Legionär","Equites Caesaris","Equites Imperatoris",
+  "Keule","Speerträger","Phalanx","Schwertkämpfer","Paladin","Teutonischer Ritter",
+  "Soldat","Lanzenkämpfer","Bogenschütze","Steppenkämpfer","Marksman",
+  "Schilf-Pfeil","Edelgardist","Khopesh-Kämpfer","Anhur-Garde","Asclepion",
+]);
+
+let _tm_coords = null, _tm_arrival = null;
+
+function openTravelModal(chId, coords, arrival) {
+  const m = coords.match(/(-?\d+)\s*[|,]\s*(-?\d+)/);
+  _tm_coords = m ? {x: parseInt(m[1]), y: parseInt(m[2])} : null;
+  _tm_arrival = arrival;
+  document.getElementById('tm-coords').textContent = coords || '—';
+  document.getElementById('tm-arrival').textContent = arrival || '—';
+  calcTravel();
+  document.getElementById('travel-modal').style.display = 'block';
+}
+function closeTravelModal() {
+  document.getElementById('travel-modal').style.display = 'none';
+}
+
+function mapDist(ax, ay, bx, by) {
+  const S = 401; // standard map size
+  let dx = Math.abs(ax - bx); dx = Math.min(dx, S - dx);
+  let dy = Math.abs(ay - by); dy = Math.min(dy, S - dy);
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+function travelSeconds(dist, baseSpeed, tsLevel, bootsPct, artPct, bannerPct) {
+  const speedMult = WORLD_SPEED * (1 + (bootsPct + artPct + bannerPct) / 100);
+  // TS reduces time for distance beyond 20 tiles
+  const tsBonus = 1 + tsLevel * 0.1;
+  const effDist = Math.min(dist, 20) + Math.max(dist - 20, 0) / tsBonus;
+  return (effDist / (baseSpeed * speedMult)) * 3600;
+}
+
+function fmtDuration(secs) {
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = Math.floor(secs%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtSendTime(arrivalStr, secs) {
+  // arrival_time may be "HH:MM:SS" or full datetime
+  if (!arrivalStr) return '—';
+  let arrDate;
+  if (/^\d{2}:\d{2}/.test(arrivalStr)) {
+    // time-only → assume today or next day
+    const now = new Date();
+    arrDate = new Date(now.toDateString() + ' ' + arrivalStr + ' UTC');
+    if (arrDate < now) arrDate.setDate(arrDate.getDate() + 1);
+  } else {
+    arrDate = new Date(arrivalStr.replace(' ','T') + (arrivalStr.includes('Z')?'':'Z'));
+  }
+  if (isNaN(arrDate)) return '—';
+  const send = new Date(arrDate.getTime() - secs * 1000);
+  return send.toLocaleString('de-DE', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).replace(',','');
+}
+
+function calcTravel() {
+  const ts = parseInt(document.getElementById('tm-ts').value)||0;
+  const boots = parseInt(document.getElementById('tm-boots').value)||0;
+  const art = parseInt(document.getElementById('tm-art').value)||0;
+  const banner = parseInt(document.getElementById('tm-banner').value)||0;
+  const defOnly = document.getElementById('tm-defonly').checked;
+  const el = document.getElementById('tm-results');
+
+  if (!_tm_coords) {
+    el.innerHTML = '<p style="color:var(--text-muted);">Keine Zielkoordinaten beim Defend-Request hinterlegt.</p>';
+    return;
+  }
+  if (!MY_VILLAGES.length) {
+    el.innerHTML = '<p style="color:var(--text-muted);">Keine eigenen Dörfer gefunden. Bitte zuerst Dörfer importieren.</p>';
+    return;
+  }
+
+  let rows = [];
+  for (const v of MY_VILLAGES) {
+    const dist = mapDist(v.x, v.y, _tm_coords.x, _tm_coords.y);
+    for (const [troop, count] of Object.entries(v.troops||{})) {
+      if (count <= 0) continue;
+      if (defOnly && !DEF_TROOPS.has(troop)) continue;
+      const speed = TROOP_SPEED[troop];
+      if (!speed) continue;
+      const secs = travelSeconds(dist, speed, ts, boots, art, banner);
+      const send = fmtSendTime(_tm_arrival, secs);
+      rows.push({village: v.name, troop, count, dist, secs, send});
+    }
+  }
+
+  if (!rows.length) {
+    el.innerHTML = '<p style="color:var(--text-muted);">Keine passenden Truppen in deinen Dörfern gefunden.</p>';
+    return;
+  }
+
+  // Sort by send time (earliest last = most time left first)
+  rows.sort((a,b) => a.secs - b.secs);
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+    <thead><tr style="color:var(--text-muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);">
+      <th style="text-align:left;padding:0.3rem 0.4rem;">Dorf</th>
+      <th style="text-align:left;padding:0.3rem 0.4rem;">Einheit</th>
+      <th style="text-align:right;padding:0.3rem 0.4rem;">Anz.</th>
+      <th style="text-align:right;padding:0.3rem 0.4rem;">Dist.</th>
+      <th style="text-align:right;padding:0.3rem 0.4rem;">Laufzeit</th>
+      <th style="text-align:right;padding:0.3rem 0.4rem;">⏰ Abschicken</th>
+    </tr></thead><tbody>`;
+
+  for (const r of rows) {
+    const urgentColor = r.secs < 3600 ? '#f87171' : r.secs < 7200 ? '#f59e0b' : '#e2e8f0';
+    html += `<tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+      <td style="padding:0.3rem 0.4rem;color:#93c5fd;">${r.village}</td>
+      <td style="padding:0.3rem 0.4rem;">${r.troop}</td>
+      <td style="padding:0.3rem 0.4rem;text-align:right;color:var(--text-muted);">${r.count.toLocaleString('de')}</td>
+      <td style="padding:0.3rem 0.4rem;text-align:right;color:var(--text-muted);">${r.dist.toFixed(1)}</td>
+      <td style="padding:0.3rem 0.4rem;text-align:right;font-family:monospace;">${fmtDuration(r.secs)}</td>
+      <td style="padding:0.3rem 0.4rem;text-align:right;font-family:monospace;font-weight:600;color:${urgentColor};">${r.send}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
 function toggleDefEdit(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';

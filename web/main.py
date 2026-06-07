@@ -10755,6 +10755,7 @@ async def verteidigung_page(request: Request, guild_id: str):
         or "ally_manage"   in await database.get_member_permissions(guild_id, uid)
     )
     contributions = await database.get_defend_contributions_for_guild(guild_id)
+    my_villages = await database.get_my_villages_for_travel(guild_id, uid)
     perms = await database.get_member_permissions(guild_id, uid)
     can_edit_all = (
         session.get("type") == "admin"
@@ -10770,8 +10771,10 @@ async def verteidigung_page(request: Request, guild_id: str):
         "channels": channels,
         "contributions": contributions,
         "my_sent": my_sent,
+        "my_villages": my_villages,
         "uid": uid,
         "can_edit_all": can_edit_all,
+        "tw_world": guild.get("tw_world") or "",
         "show": show,
         "total_open":   sum(1 for c in all_channels if c.get("status") != "closed"),
         "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),

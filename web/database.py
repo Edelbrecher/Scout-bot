@@ -6031,6 +6031,34 @@ async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
         await db.commit()
 
 
+async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dict]:
+    """Return own villages with coords + troops for travel time calculation."""
+    import json as _json
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT villages_json FROM member_troops WHERE guild_id=? AND discord_id=?",
+            (guild_id, discord_id),
+        ) as cur:
+            row = await cur.fetchone()
+    if not row or not row["villages_json"]:
+        return []
+    try:
+        villages = _json.loads(row["villages_json"])
+        return [
+            {
+                "name": v.get("village_name", "?"),
+                "x": v.get("x", 0),
+                "y": v.get("y", 0),
+                "troops": v.get("troops", {}),
+                "village_type": v.get("village_type", ""),
+            }
+            for v in villages if v.get("x") is not None
+        ]
+    except Exception:
+        return []
+
+
 async def get_defend_channels(guild_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
