@@ -4611,6 +4611,7 @@ async def my_account_page(request: Request, guild_id: str):
 
     discord_id   = session.get("uid", "") or session.get("discord_id", "")
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, discord_id))
+    ts_levels    = await database.get_village_ts_levels(discord_id)
     scout_village = await database.get_scout_village(guild_id, discord_id)
     history      = await database.get_own_villages_history(guild_id, discord_id)
     my_troops    = await database.get_member_troops_single(guild_id, discord_id)
@@ -4663,6 +4664,7 @@ async def my_account_page(request: Request, guild_id: str):
         "request":            request,
         "guild":              guild,
         "own_villages":       own_villages,
+        "ts_levels":          ts_levels,
         "history":            history,
         "uploaded":           uploaded,
         "cleared":            cleared,

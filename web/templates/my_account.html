@@ -371,6 +371,7 @@
             <th style="text-align:right;">⚔️ Off</th>
             <th style="text-align:right;">🛡️ Def</th>
             <th style="text-align:right;">🌾 Korn</th>
+            <th style="text-align:center;">TS</th>
             <th style="min-width:200px;" data-i18n="account.th.troops">Troop distribution</th>
             <th data-i18n="account.th.imported">Imported</th>
           </tr>
@@ -396,6 +397,15 @@
             <td style="text-align:right;font-weight:700;color:#22c55e;white-space:nowrap;">{{ "{:,}".format(v.def_score).replace(",",".") }}</td>
             <td style="text-align:right;font-weight:700;color:#f59e0b;white-space:nowrap;">
               {% if v.total_crop %}{{ "{:,}".format(v.total_crop).replace(",",".") }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:center;">
+              {% set ts_key = v.x|string + '_' + v.y|string %}
+              {% set ts_val = ts_levels.get(ts_key, 0) %}
+              {% if ts_val %}
+              <span style="font-size:0.82rem;font-weight:600;color:#93c5fd;">{{ ts_val }}</span>
+              {% else %}
+              <span style="font-size:0.78rem;color:var(--text-muted);">—</span>
+              {% endif %}
             </td>
             <td>
               {% if v.troops %}
