@@ -10875,6 +10875,13 @@ async def defend_update_request(request: Request, guild_id: str, channel_id: str
             WHERE channel_id=? AND guild_id=?
         """, (attacker, coords, arrival_time, goal, notes, channel_id, guild_id))
         await db.commit()
+    # Refresh Discord tracking embed
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post("http://bot:7777/api/refresh-defend-tracking",
+                              json={"channel_id": channel_id})
+    except Exception:
+        pass
     show = str(form.get("show", "open"))
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?show={show}&flash=saved", status_code=303)
 
@@ -10931,6 +10938,14 @@ async def defend_update_sent(request: Request, guild_id: str):
         sent_id, uid, amount_raw, amount_parsed, troop_type, grain_per_unit,
         can_edit_all=can_edit_all,
     )
+    if ok:
+        # Refresh Discord tracking embed for the affected channel
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post("http://bot:7777/api/refresh-defend-tracking",
+                                  json={"channel_id": channel_id})
+        except Exception:
+            pass
     flash = "saved" if ok else "error"
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash={flash}", status_code=303)
 

@@ -1311,6 +1311,45 @@ async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aio
     return aiohttp_web.json_response({"ok": True})
 
 
+async def handle_refresh_defend_tracking(request: aiohttp_web.Request):
+    """Refresh the Discord tracking embed for a defend channel after dashboard edits."""
+    data = await request.json()
+    channel_id = str(data.get("channel_id", ""))
+    if not channel_id:
+        return aiohttp_web.json_response({"ok": False, "error": "missing channel_id"}, status=400)
+    try:
+        from cogs.hub import _build_defend_tracking_embed
+        contrib_rows = await database.get_defend_sent(channel_id)
+        defend_rec   = await database.get_defend_channel(channel_id)
+        if not defend_rec:
+            return aiohttp_web.json_response({"ok": False, "error": "channel not found"})
+        guild_id   = defend_rec.get("guild_id", "")
+        config     = await database.get_guild_config(guild_id)
+        tw_world   = (config or {}).get("tw_world") or ""
+        coords     = defend_rec.get("coords") or ""
+        goal_raw   = defend_rec.get("goal") or ""
+        ratio      = defend_rec.get("ratio") or ""
+        lang       = "de"
+        embed = _build_defend_tracking_embed(contrib_rows, lang, coords, tw_world, goal_raw, ratio)
+        tracking_msg_id = defend_rec.get("tracking_msg_id")
+        if not tracking_msg_id:
+            return aiohttp_web.json_response({"ok": False, "error": "no tracking message"})
+        # Find the Discord channel
+        disc_channel = None
+        for guild in bot.guilds:
+            ch = guild.get_channel(int(channel_id))
+            if ch:
+                disc_channel = ch
+                break
+        if not disc_channel:
+            return aiohttp_web.json_response({"ok": False, "error": "discord channel not found"})
+        msg = await disc_channel.fetch_message(int(tracking_msg_id))
+        await msg.edit(embed=embed)
+    except Exception as e:
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+    return aiohttp_web.json_response({"ok": True})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1331,6 +1370,7 @@ async def start_api_server():
     app.router.add_post("/api/announce-ep-cancelled", handle_announce_ep_cancelled)
     app.router.add_post("/api/archive-defend-channel", handle_archive_defend_channel)
     app.router.add_post("/api/unarchive-defend-channel", handle_unarchive_defend_channel)
+    app.router.add_post("/api/refresh-defend-tracking", handle_refresh_defend_tracking)
     app.router.add_post("/api/archive-res-push-channel", handle_archive_res_push_channel)
     app.router.add_post("/api/unarchive-res-push-channel", handle_unarchive_res_push_channel)
     runner = aiohttp_web.AppRunner(app)
