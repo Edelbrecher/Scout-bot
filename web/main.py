@@ -13675,7 +13675,7 @@ async def artifact_planning_page(request: Request, guild_id: str):
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     settings = await database.get_artifact_plan_settings(guild_id)
-    from web.artifact_spawns import ARTIFACT_TYPE_LABELS as SPAWN_TYPE_LABELS
+    from artifact_spawns import ARTIFACT_TYPE_LABELS as SPAWN_TYPE_LABELS
     guild_cfg = await database.get_guild_config(guild_id)
     tw_world = guild_cfg.get("tw_world", "") if guild_cfg else ""
     world_speed = 1

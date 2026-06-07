@@ -10583,7 +10583,7 @@ async def save_artifact_plan_settings(guild_id: str, data: dict):
 
 async def get_artifact_plan_spawns(guild_id: str) -> list[dict]:
     """Return guild-specific spawn overrides, merged with defaults."""
-    from web.artifact_spawns import DEFAULT_SPAWNS
+    from artifact_spawns import DEFAULT_SPAWNS
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
@@ -10603,7 +10603,7 @@ async def get_artifact_plan_spawns(guild_id: str) -> list[dict]:
 async def update_artifact_plan_spawn(guild_id: str, spawn_key: str, x: int, y: int):
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Get default label/type/size
-        from web.artifact_spawns import DEFAULT_SPAWNS
+        from artifact_spawns import DEFAULT_SPAWNS
         default = next((s for s in DEFAULT_SPAWNS if s["key"] == spawn_key), None)
         if not default:
             return
