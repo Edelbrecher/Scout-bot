@@ -23,7 +23,8 @@ def _fmt_n(n: int | float) -> str:
 
 
 def _medal(pos: int) -> str:
-    return ["🥇", "🥈", "🥉"].get(pos, "▪️") if pos < 3 else "▪️"
+    medals = ["🥇", "🥈", "🥉"]
+    return medals[pos] if pos < 3 else "▪️"
 
 
 async def build_digest_embed(guild_id: str, guild_name: str, week_label: str) -> discord.Embed:
@@ -41,11 +42,12 @@ async def build_digest_embed(guild_id: str, guild_name: str, week_label: str) ->
     )
 
     # ── Activity overview ─────────────────────────────────────────────────────
+    _TYPE_ICON = {"attack": "⚔️", "defense": "🛡️", "spy": "👁️"}
     lines = []
     if s["battle_total"]:
         types = s.get("battle_by_type", {})
         detail = "  ".join(
-            f"{{'attack':'⚔️','defense':'🛡️','spy':'👁️'}.get(k,k)}: {v}"
+            f"{_TYPE_ICON.get(k, k)}: {v}"
             for k, v in types.items() if v
         )
         lines.append(f"⚔️ **{s['battle_total']}** Kampfberichte  {detail}")
