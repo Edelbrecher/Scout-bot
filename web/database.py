@@ -6073,16 +6073,19 @@ async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
     Each contribution is aggregated per user and includes their individual entries for editing."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-        # Aggregated totals per user per channel
+        # Aggregated totals per user per channel — use latest user_name (name may have changed)
         async with db.execute("""
-            SELECT channel_id, user_name, user_id,
-                   SUM(amount_parsed) as total_troops,
-                   SUM(amount_parsed * grain_per_unit) as total_grain,
-                   MIN(sent_at) as first_sent
-            FROM defend_sent
-            WHERE guild_id=?
-            GROUP BY channel_id, user_id
-            ORDER BY channel_id, total_troops DESC
+            SELECT ds.channel_id, ds.user_id,
+                   (SELECT user_name FROM defend_sent d2
+                    WHERE d2.user_id = ds.user_id
+                    ORDER BY d2.sent_at DESC LIMIT 1) as user_name,
+                   SUM(ds.amount_parsed) as total_troops,
+                   SUM(ds.amount_parsed * ds.grain_per_unit) as total_grain,
+                   MIN(ds.sent_at) as first_sent
+            FROM defend_sent ds
+            WHERE ds.guild_id=?
+            GROUP BY ds.channel_id, ds.user_id
+            ORDER BY ds.channel_id, total_troops DESC
         """, (guild_id,)) as cur:
             agg_rows = [dict(r) for r in await cur.fetchall()]
 
