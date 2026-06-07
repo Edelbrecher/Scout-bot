@@ -13662,6 +13662,232 @@ async def artifact_run_clear_test(request: Request, guild_id: str):
     return JSONResponse({"ok": True})
 
 
+@app.get("/guild/{guild_id}/artifacts/planning", response_class=HTMLResponse)
+async def artifact_planning_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    uid = session.get("discord_id", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid)
+    if err: return err
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    settings = await database.get_artifact_plan_settings(guild_id)
+    from web.artifact_spawns import ARTIFACT_TYPE_LABELS as SPAWN_TYPE_LABELS
+    guild_cfg = await database.get_guild_config(guild_id)
+    tw_world = guild_cfg.get("tw_world", "") if guild_cfg else ""
+    world_speed = 1
+    try:
+        import re as _re
+        m = _re.search(r'x(\d+)', tw_world or "")
+        if m: world_speed = int(m.group(1))
+    except Exception:
+        pass
+    return templates.TemplateResponse("artifact_planning.html", {
+        "request": request, "guild": guild,
+        "is_leader": is_leader, "settings": settings,
+        "spawn_type_labels": SPAWN_TYPE_LABELS,
+        "world_speed": world_speed,
+        "tw_world": tw_world,
+    })
+
+
+@app.post("/guild/{guild_id}/artifacts/planning/settings")
+async def artifact_planning_save_settings(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    import json as _j
+    types = form.getlist("artifact_types")
+    sizes = form.getlist("artifact_sizes")
+    await database.save_artifact_plan_settings(guild_id, {
+        "sector_x1": int(form.get("sector_x1", -200)),
+        "sector_y1": int(form.get("sector_y1", -200)),
+        "sector_x2": int(form.get("sector_x2", 200)),
+        "sector_y2": int(form.get("sector_y2", 200)),
+        "artifact_types": types,
+        "artifact_sizes": sizes,
+        "troop_speed": float(form.get("troop_speed", 7.0)),
+    })
+    return RedirectResponse(f"/guild/{guild_id}/artifacts/planning?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/artifacts/planning/analyze")
+async def artifact_planning_analyze(request: Request, guild_id: str):
+    """Return full artifact planning analysis as JSON."""
+    import math, json as _j
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    settings = await database.get_artifact_plan_settings(guild_id)
+    spawns = await database.get_artifact_plan_spawns(guild_id)
+
+    # Filter spawns by sector + selected types + sizes
+    x1, y1 = settings["sector_x1"], settings["sector_y1"]
+    x2, y2 = settings["sector_x2"], settings["sector_y2"]
+    sel_types = settings.get("artifact_types") or []
+    sel_sizes = settings.get("artifact_sizes") or ["unique", "great", "slight"]
+    troop_speed = float(settings.get("troop_speed") or 7.0)
+
+    # World speed
+    guild_cfg = await database.get_guild_config(guild_id)
+    tw_world = guild_cfg.get("tw_world", "") if guild_cfg else ""
+    world_speed = 1
+    try:
+        import re as _re2
+        m2 = _re2.search(r'x(\d+)', tw_world or "")
+        if m2: world_speed = int(m2.group(1))
+    except Exception:
+        pass
+
+    if sel_types:
+        spawns = [s for s in spawns if s["type"] in sel_types]
+    if sel_sizes:
+        spawns = [s for s in spawns if s["size"] in sel_sizes]
+    # Filter by sector bounds (use min/max so order doesn't matter)
+    sx1, sx2 = min(x1, x2), max(x1, x2)
+    sy1, sy2 = min(y1, y2), max(y1, y2)
+    spawns = [s for s in spawns if sx1 <= s["x"] <= sx2 and sy1 <= s["y"] <= sy2]
+
+    # Get all alliance members with troop data
+    member_troops = await database.get_member_troops(guild_id)
+    # Get all discord_ids
+    discord_ids = [m["discord_id"] for m in member_troops]
+    troops_by_id = await database.get_member_troops_for_discord_ids(discord_ids)
+
+    # TS levels
+    ts_by_player: dict[str, dict] = {}
+    for m in member_troops:
+        did = m["discord_id"]
+        ts_levels = await database.get_village_ts_levels(did)
+        ts_by_player[did] = ts_levels
+
+    def calc_travel(dist: float, speed_tiles_hr: float, ts: int, world_spd: int) -> float:
+        """Returns travel time in hours."""
+        if speed_tiles_hr <= 0:
+            return 9999
+        effective_speed = speed_tiles_hr * world_spd * (1 + ts * 0.20)
+        return dist / effective_speed
+
+    def dist(x1, y1, x2, y2):
+        return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+    results = []
+    for spawn in spawns:
+        sx, sy = spawn["x"], spawn["y"]
+        member_ranking = []
+        for m in member_troops:
+            did = m["discord_id"]
+            troop_data = troops_by_id.get(did, {})
+            villages = troop_data.get("villages") or []
+            if not villages:
+                continue
+            ts_map = ts_by_player.get(did, {})
+            # Find closest village
+            best_village = None
+            best_time = 9999
+            for v in villages:
+                vx, vy = v.get("x", 0), v.get("y", 0)
+                d = dist(vx, vy, sx, sy)
+                ts_key = f"{vx}_{vy}"
+                ts_lvl = ts_map.get(ts_key, 0)
+                t = calc_travel(d, troop_speed, ts_lvl, world_speed)
+                if t < best_time:
+                    best_time = t
+                    best_village = {
+                        "village_name": v.get("name", v.get("village_name", "?")),
+                        "x": vx, "y": vy,
+                        "distance": round(d, 1),
+                        "travel_hours": round(t, 2),
+                        "ts": ts_lvl,
+                    }
+            if best_village:
+                member_ranking.append({
+                    "discord_name": m.get("discord_name", "?"),
+                    "travian_name": m.get("travian_name", "?"),
+                    "total_off": m.get("total_off", 0),
+                    "best_village": best_village,
+                })
+        # Sort by travel time
+        member_ranking.sort(key=lambda r: r["best_village"]["travel_hours"])
+
+        # Kata Recommendation A: best existing village (score: off_strength / travel_time²)
+        kata_existing = None
+        if member_ranking:
+            def kata_score(r):
+                t = r["best_village"]["travel_hours"]
+                off = r["total_off"] or 1
+                return off / max(t, 0.1) ** 2
+            best = max(member_ranking, key=kata_score)
+            kata_existing = {
+                "player": best["travian_name"],
+                "village": best["best_village"]["village_name"],
+                "x": best["best_village"]["x"],
+                "y": best["best_village"]["y"],
+                "travel_hours": best["best_village"]["travel_hours"],
+                "off": best["total_off"],
+                "distance": best["best_village"]["distance"],
+            }
+
+        # Kata Recommendation B: optimal new village position
+        # Geometric midpoint between member centroid (weighted by off) and artifact spawn
+        if member_ranking:
+            total_off = sum(r["total_off"] or 1 for r in member_ranking)
+            cx = sum(r["best_village"]["x"] * (r["total_off"] or 1) for r in member_ranking) / total_off
+            cy = sum(r["best_village"]["y"] * (r["total_off"] or 1) for r in member_ranking) / total_off
+            # Midpoint biased 70% toward artifact
+            opt_x = round(cx * 0.3 + sx * 0.7)
+            opt_y = round(cy * 0.3 + sy * 0.7)
+            opt_dist = dist(opt_x, opt_y, sx, sy)
+            opt_time = calc_travel(opt_dist, troop_speed, 0, world_speed)
+            kata_optimal = {
+                "x": opt_x, "y": opt_y,
+                "distance_to_artifact": round(opt_dist, 1),
+                "travel_hours": round(opt_time, 2),
+            }
+        else:
+            kata_optimal = None
+
+        results.append({
+            "spawn": spawn,
+            "member_count": len(member_ranking),
+            "members": member_ranking[:20],  # top 20
+            "kata_existing": kata_existing,
+            "kata_optimal": kata_optimal,
+        })
+
+    # Sort results: unique first, then great, then slight; within same size by type
+    size_order = {"unique": 0, "great": 1, "slight": 2}
+    results.sort(key=lambda r: (size_order.get(r["spawn"]["size"], 9), r["spawn"]["type"]))
+
+    return JSONResponse({
+        "settings": {**settings, "world_speed": world_speed, "troop_speed": troop_speed},
+        "results": results,
+        "member_count": len(member_troops),
+    })
+
+
+@app.post("/guild/{guild_id}/artifacts/planning/spawn/{spawn_key}")
+async def artifact_planning_update_spawn(request: Request, guild_id: str, spawn_key: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    form = await request.form()
+    x = int(form.get("x", 0))
+    y = int(form.get("y", 0))
+    await database.update_artifact_plan_spawn(guild_id, spawn_key, x, y)
+    return JSONResponse({"ok": True})
+
+
 @app.get("/guild/{guild_id}/artifacts", response_class=HTMLResponse)
 async def artifacts_page(request: Request, guild_id: str):
     session, err = _require_session(request)

@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}Artefakt-Planung · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.ap-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.25rem 1.4rem; margin-bottom:1rem; }
+.ap-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:.75rem; }
+.size-badge { display:inline-block; font-size:.68rem; font-weight:700; padding:.18rem .55rem; border-radius:20px; }
+.badge-unique { background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.4); color:#f87171; }
+.badge-great  { background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.35); color:#fbbf24; }
+.badge-slight { background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.3); color:#a5b4fc; }
+.rank-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.rank-table th { font-size:.7rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; padding:.35rem .6rem; border-bottom:1px solid var(--border); text-align:left; }
+.rank-table td { padding:.42rem .6rem; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+.rank-table tr:last-child td { border-bottom:none; }
+.rank-table tr:hover td { background:rgba(255,255,255,.03); }
+.medal { font-size:.9rem; }
+.kata-box { border-radius:10px; padding:.75rem 1rem; font-size:.82rem; margin-top:.9rem; }
+.kata-a { background:rgba(34,197,94,.07); border:1px solid rgba(34,197,94,.2); }
+.kata-b { background:rgba(59,130,246,.07); border:1px solid rgba(59,130,246,.2); }
+.kata-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.3rem; }
+.kata-label-a { color:#4ade80; }
+.kata-label-b { color:#60a5fa; }
+.artifact-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(520px,1fr)); gap:1.1rem; }
+.artifact-block { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.3rem; }
+.artifact-header { display:flex; align-items:center; gap:.6rem; margin-bottom:.9rem; }
+.artifact-name { font-weight:700; font-size:.95rem; }
+.artifact-coords { font-size:.78rem; color:var(--text-muted); }
+.travel-hr { font-weight:600; color:#a5b4fc; }
+.off-bar { display:inline-block; height:6px; background:rgba(239,68,68,.5); border-radius:3px; vertical-align:middle; margin-left:.4rem; }
+.map-link { font-size:.72rem; color:var(--text-muted); text-decoration:none; }
+.map-link:hover { color:var(--primary); }
+.collapsible-toggle { cursor:pointer; user-select:none; }
+.collapsed-rows { display:none; }
+.spinner { display:inline-block; width:18px; height:18px; border:2px solid rgba(255,255,255,.15); border-top-color:var(--primary); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.empty-state { text-align:center; padding:3rem; color:var(--text-muted); }
+.type-icon { font-size:1.1rem; }
+</style>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 1.25rem 3rem;">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
+    <div>
+      <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artefakte</a>
+      <h1 style="margin:.25rem 0 0;">🎯 Artefakt-Planung</h1>
+      <p class="subtitle" style="margin:0;">Laufzeiten &amp; Kata-Empfehlungen für Artefakt-Runs</p>
+    </div>
+  </div>
+
+  {% if request.query_params.get('saved') %}
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Einstellungen gespeichert.</div>
+  {% endif %}
+
+  <!-- Settings Panel -->
+  <div class="ap-card" style="margin-bottom:1.5rem;">
+    <div class="ap-section-title">Konfiguration</div>
+    <form method="post" action="/guild/{{ guild.guild_id }}/artifacts/planning/settings" id="settingsForm">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.2rem;">
+        <!-- Sector -->
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor X von</label>
+          <input type="number" name="sector_x1" value="{{ settings.sector_x1 }}" class="form-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor X bis</label>
+          <input type="number" name="sector_x2" value="{{ settings.sector_x2 }}" class="form-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor Y von</label>
+          <input type="number" name="sector_y1" value="{{ settings.sector_y1 }}" class="form-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Sektor Y bis</label>
+          <input type="number" name="sector_y2" value="{{ settings.sector_y2 }}" class="form-input" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Truppengeschwindigkeit (Felder/h)</label>
+          <select name="troop_speed" class="form-input" style="width:100%;">
+            {% set speeds = [
+              (3, "Katapult — 3"),
+              (4, "Ramme — 4"),
+              (5, "Prätorianer / Speerträger — 5"),
+              (6, "Legionär / Phalanx / Keulenschwinger — 6"),
+              (7, "Imperianer / Axtkrieger — 7"),
+              (9, "Teutonischer Ritter — 9"),
+              (10, "Equites Caesaris / Paladin — 10"),
+              (13, "Häduer — 13"),
+              (14, "Equites Imperiatoris / Druidenreiter — 14"),
+              (16, "Equites Legati / Theutates-Donner — 16"),
+            ] %}
+            {% for spd, label in speeds %}
+            <option value="{{ spd }}" {% if settings.troop_speed|int == spd %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Artifact Types -->
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Artefakt-Typen</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+          {% for key, label in spawn_type_labels.items() %}
+          <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;cursor:pointer;padding:.3rem .7rem;border:1px solid var(--border);border-radius:8px;transition:border-color .15s;"
+                 onmouseover="this.style.borderColor='rgba(99,102,241,.5)'" onmouseout="this.style.borderColor='var(--border)'">
+            <input type="checkbox" name="artifact_types" value="{{ key }}"
+              {% if key in settings.artifact_types %}checked{% endif %}
+              style="accent-color:var(--primary);">
+            {{ label }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Sizes -->
+      <div style="margin-bottom:1.2rem;">
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Artefakt-Größen</div>
+        <div style="display:flex;gap:.5rem;">
+          {% for size, slabel in [("unique","Unique"),("great","Great"),("slight","Slight")] %}
+          <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;cursor:pointer;padding:.3rem .7rem;border:1px solid var(--border);border-radius:8px;">
+            <input type="checkbox" name="artifact_sizes" value="{{ size }}"
+              {% if size in settings.artifact_sizes %}checked{% endif %}
+              style="accent-color:var(--primary);">
+            {{ slabel }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Speichern &amp; Analyse laden</button>
+      <button type="button" class="btn btn-secondary" onclick="loadAnalysis()" style="margin-left:.5rem;">🔄 Analyse aktualisieren</button>
+    </form>
+  </div>
+
+  <!-- Analysis Output -->
+  <div id="analysisArea">
+    <div class="empty-state" id="emptyHint">
+      <div style="font-size:2.5rem;margin-bottom:.75rem;">🎯</div>
+      <p>Sektor und Artefakt-Typen konfigurieren, dann auf <strong>Speichern &amp; Analyse laden</strong> klicken.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const GUILD_ID = "{{ guild.guild_id }}";
+const TW_WORLD = "{{ tw_world }}";
+const WORLD_SPEED = {{ world_speed }};
+
+const TYPE_ICONS = {
+  boots: "👟", architect: "🏗️", trainer: "🪖", diet: "🌾",
+  confusion: "🌀", eyes: "🔭", fool: "🤡", storage: "📦"
+};
+
+function fmtHours(h) {
+  if (h >= 9999) return "—";
+  const days = Math.floor(h / 24);
+  const hours = Math.floor(h % 24);
+  const mins = Math.round((h * 60) % 60);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  return `${hours}h ${mins}m`;
+}
+
+function mapLink(x, y) {
+  if (!TW_WORLD) return "";
+  const base = TW_WORLD.replace(/\/$/, "");
+  return `${base}/karte.php?x=${x}&y=${y}`;
+}
+
+function offBar(off, maxOff) {
+  if (!off || !maxOff) return "";
+  const w = Math.max(4, Math.round((off / maxOff) * 80));
+  return `<span class="off-bar" style="width:${w}px;"></span>`;
+}
+
+function renderResults(data) {
+  const area = document.getElementById("analysisArea");
+  if (!data.results || data.results.length === 0) {
+    area.innerHTML = `<div class="empty-state"><div style="font-size:2.5rem">🔍</div><p>Keine Artefakte im gewählten Sektor gefunden.<br>Bitte Sektor-Koordinaten anpassen.</p></div>`;
+    return;
+  }
+
+  const maxOff = Math.max(...data.results.flatMap(r => r.members.map(m => m.total_off || 0)));
+
+  let html = `<div style="margin-bottom:.75rem;font-size:.83rem;color:var(--text-muted);">
+    ${data.results.length} Artefakte im Sektor · ${data.member_count} Member mit Truppendaten
+    · Geschwindigkeit: ${data.settings.troop_speed} Felder/h · Weltengeschwindigkeit: x${data.settings.world_speed}
+  </div>`;
+
+  html += `<div class="artifact-grid">`;
+  for (const r of data.results) {
+    const s = r.spawn;
+    const sizeClass = `badge-${s.size}`;
+    const icon = TYPE_ICONS[s.type] || "🏺";
+    const ml = mapLink(s.x, s.y);
+
+    let membersHtml = "";
+    if (r.members.length === 0) {
+      membersHtml = `<div style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">Keine Member mit Truppendaten gefunden.</div>`;
+    } else {
+      const medals = ["🥇","🥈","🥉"];
+      const showAll = r.members.length <= 5;
+      membersHtml = `<table class="rank-table">
+        <thead><tr>
+          <th>#</th><th>Spieler</th><th>Bestes Dorf</th><th>Distanz</th><th>Laufzeit</th><th>Off-Stärke</th>
+        </tr></thead><tbody>`;
+      r.members.forEach((m, i) => {
+        const vml = mapLink(m.best_village.x, m.best_village.y);
+        const medal = medals[i] || `${i+1}.`;
+        const hidden = !showAll && i >= 5 ? ' class="collapsed-rows"' : '';
+        membersHtml += `<tr${hidden}>
+          <td><span class="medal">${medal}</span></td>
+          <td><strong>${m.travian_name}</strong><br><span style="font-size:.72rem;color:var(--text-muted);">${m.discord_name}</span></td>
+          <td>${m.best_village.village_name}<br>
+            <span style="font-size:.72rem;color:var(--text-muted);">${m.best_village.x}|${m.best_village.y}
+            ${m.best_village.ts > 0 ? `· TS${m.best_village.ts}` : ''}
+            ${vml ? `<a href="${vml}" target="_blank" class="map-link"> 🗺️</a>` : ''}</span></td>
+          <td>${m.best_village.distance} Felder</td>
+          <td class="travel-hr">${fmtHours(m.best_village.travel_hours)}</td>
+          <td>${(m.total_off||0).toLocaleString()}${offBar(m.total_off, maxOff)}</td>
+        </tr>`;
+      });
+      if (!showAll) {
+        membersHtml += `<tr><td colspan="6" style="text-align:center;padding:.4rem;">
+          <span class="collapsible-toggle" style="font-size:.78rem;color:var(--primary);"
+            onclick="toggleRows(this)">▼ ${r.members.length - 5} weitere anzeigen</span>
+        </td></tr>`;
+      }
+      membersHtml += `</tbody></table>`;
+    }
+
+    // Kata A
+    let kataAHtml = "";
+    if (r.kata_existing) {
+      const ke = r.kata_existing;
+      const kml = mapLink(ke.x, ke.y);
+      kataAHtml = `<div class="kata-box kata-a">
+        <div class="kata-label kata-label-a">A — Bestes vorhandenes Kata-Dorf</div>
+        <strong>${ke.player}</strong> · ${ke.village} (${ke.x}|${ke.y})
+        ${kml ? `<a href="${kml}" target="_blank" class="map-link">🗺️</a>` : ""}
+        <br>
+        <span style="color:var(--text-muted);font-size:.78rem;">
+          ${ke.distance} Felder · ${fmtHours(ke.travel_hours)} Laufzeit
+          · Off: ${(ke.off||0).toLocaleString()}
+        </span>
+      </div>`;
+    }
+
+    // Kata B
+    let kataBHtml = "";
+    if (r.kata_optimal) {
+      const ko = r.kata_optimal;
+      const koml = mapLink(ko.x, ko.y);
+      kataBHtml = `<div class="kata-box kata-b">
+        <div class="kata-label kata-label-b">B — Optimaler neuer Kata-Dorf-Standort</div>
+        Koordinaten: <strong>${ko.x}|${ko.y}</strong>
+        ${koml ? `<a href="${koml}" target="_blank" class="map-link">🗺️</a>` : ""}
+        <br>
+        <span style="color:var(--text-muted);font-size:.78rem;">
+          ${ko.distance_to_artifact} Felder zum Artefakt · ${fmtHours(ko.travel_hours)} Laufzeit (ohne TS)
+        </span>
+      </div>`;
+    }
+
+    html += `<div class="artifact-block">
+      <div class="artifact-header">
+        <span class="type-icon">${icon}</span>
+        <div>
+          <div class="artifact-name">${s.label}
+            <span class="size-badge ${sizeClass}">${s.size.toUpperCase()}</span>
+          </div>
+          <div class="artifact-coords">
+            Est. Spawn: ${s.x}|${s.y}
+            ${ml ? `<a href="${ml}" target="_blank" class="map-link">🗺️</a>` : ""}
+            ${s.custom ? ' <span style="color:#fbbf24;font-size:.68rem;">· angepasst</span>' : '· geschätzt'}
+          </div>
+        </div>
+      </div>
+      ${membersHtml}
+      ${kataAHtml}
+      ${kataBHtml}
+    </div>`;
+  }
+  html += `</div>`;
+  area.innerHTML = html;
+}
+
+function toggleRows(el) {
+  const tbody = el.closest("table").querySelector("tbody");
+  const hidden = tbody.querySelectorAll(".collapsed-rows");
+  const showing = hidden[0]?.style.display !== "none" && hidden[0]?.style.display !== "" ? false : true;
+  hidden.forEach(r => r.style.display = showing ? "table-row" : "none");
+  el.textContent = showing
+    ? `▲ weniger anzeigen`
+    : `▼ ${hidden.length} weitere anzeigen`;
+}
+
+async function loadAnalysis() {
+  const area = document.getElementById("analysisArea");
+  area.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);">
+    <span class="spinner"></span> Analyse wird berechnet…
+  </div>`;
+  try {
+    const resp = await fetch(`/guild/${GUILD_ID}/artifacts/planning/analyze`);
+    if (!resp.ok) throw new Error(resp.statusText);
+    const data = await resp.json();
+    renderResults(data);
+  } catch(e) {
+    area.innerHTML = `<div class="empty-state"><p style="color:#f87171;">Fehler beim Laden: ${e.message}</p></div>`;
+  }
+}
+
+// Auto-load if settings already configured (sector != default)
+const sx1 = {{ settings.sector_x1 }}, sx2 = {{ settings.sector_x2 }};
+const sy1 = {{ settings.sector_y1 }}, sy2 = {{ settings.sector_y2 }};
+const hasTypes = {{ settings.artifact_types | tojson }}.length > 0;
+if (hasTypes && !(sx1 === -200 && sx2 === 200 && sy1 === -200 && sy2 === 200)) {
+  loadAnalysis();
+}
+</script>
+{% endblock %}

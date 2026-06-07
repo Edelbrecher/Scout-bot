@@ -10507,6 +10507,112 @@ async def _init_artifact_tables():
             await db.commit()
         except Exception:
             pass
+        # Artifact planning tables
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_plan_settings (
+                guild_id        TEXT PRIMARY KEY,
+                sector_x1       INTEGER DEFAULT -200,
+                sector_y1       INTEGER DEFAULT -200,
+                sector_x2       INTEGER DEFAULT  200,
+                sector_y2       INTEGER DEFAULT  200,
+                artifact_types  TEXT DEFAULT '[]',
+                artifact_sizes  TEXT DEFAULT '["unique","great","slight"]',
+                troop_speed     REAL DEFAULT 7.0,
+                updated_at      TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_plan_spawns (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                spawn_key       TEXT NOT NULL,
+                label           TEXT NOT NULL,
+                artifact_type   TEXT NOT NULL,
+                artifact_size   TEXT NOT NULL,
+                x               INTEGER NOT NULL,
+                y               INTEGER NOT NULL,
+                UNIQUE(guild_id, spawn_key)
+            )
+        """)
+        await db.commit()
+
+
+async def get_artifact_plan_settings(guild_id: str) -> dict:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_plan_settings WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    if row:
+        d = dict(row)
+        import json as _j
+        d["artifact_types"] = _j.loads(d.get("artifact_types") or "[]")
+        d["artifact_sizes"] = _j.loads(d.get("artifact_sizes") or '["unique","great","slight"]')
+        return d
+    return {
+        "guild_id": guild_id, "sector_x1": -200, "sector_y1": -200,
+        "sector_x2": 200, "sector_y2": 200,
+        "artifact_types": [], "artifact_sizes": ["unique", "great", "slight"],
+        "troop_speed": 7.0,
+    }
+
+
+async def save_artifact_plan_settings(guild_id: str, data: dict):
+    import json as _j
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            INSERT INTO artifact_plan_settings (guild_id, sector_x1, sector_y1, sector_x2, sector_y2,
+                artifact_types, artifact_sizes, troop_speed, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(guild_id) DO UPDATE SET
+                sector_x1=excluded.sector_x1, sector_y1=excluded.sector_y1,
+                sector_x2=excluded.sector_x2, sector_y2=excluded.sector_y2,
+                artifact_types=excluded.artifact_types, artifact_sizes=excluded.artifact_sizes,
+                troop_speed=excluded.troop_speed, updated_at=excluded.updated_at
+        """, (
+            guild_id,
+            int(data.get("sector_x1", -200)), int(data.get("sector_y1", -200)),
+            int(data.get("sector_x2", 200)),  int(data.get("sector_y2", 200)),
+            _j.dumps(data.get("artifact_types", [])),
+            _j.dumps(data.get("artifact_sizes", ["unique", "great", "slight"])),
+            float(data.get("troop_speed", 7.0)),
+        ))
+        await db.commit()
+
+
+async def get_artifact_plan_spawns(guild_id: str) -> list[dict]:
+    """Return guild-specific spawn overrides, merged with defaults."""
+    from web.artifact_spawns import DEFAULT_SPAWNS
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_plan_spawns WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            overrides = {r["spawn_key"]: dict(r) for r in await cur.fetchall()}
+    result = []
+    for spawn in DEFAULT_SPAWNS:
+        key = spawn["key"]
+        if key in overrides:
+            result.append({**spawn, "x": overrides[key]["x"], "y": overrides[key]["y"], "custom": True})
+        else:
+            result.append({**spawn, "custom": False})
+    return result
+
+
+async def update_artifact_plan_spawn(guild_id: str, spawn_key: str, x: int, y: int):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # Get default label/type/size
+        from web.artifact_spawns import DEFAULT_SPAWNS
+        default = next((s for s in DEFAULT_SPAWNS if s["key"] == spawn_key), None)
+        if not default:
+            return
+        await db.execute("""
+            INSERT INTO artifact_plan_spawns (guild_id, spawn_key, label, artifact_type, artifact_size, x, y)
+            VALUES (?,?,?,?,?,?,?)
+            ON CONFLICT(guild_id, spawn_key) DO UPDATE SET x=excluded.x, y=excluded.y
+        """, (guild_id, spawn_key, default["label"], default["type"], default["size"], x, y))
+        await db.commit()
 
 
 async def bulk_delete_treasuries(guild_id: str, ids: list[int]) -> int:
