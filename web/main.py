@@ -13762,37 +13762,9 @@ async def artifact_planning_analyze(request: Request, guild_id: str):
     sy1, sy2 = min(y1, y2), max(y1, y2)
     spawns = [s for s in spawns if sx1 <= s["x"] <= sx2 and sy1 <= s["y"] <= sy2]
 
-    # Get all alliance members via ally_members (not member_troops guild filter)
-    # Players import troops in workspace guilds (ws_*), so we must look up by discord_id
-    ally_group = await database.get_ally_group_for_guild(guild_id)
-    if ally_group:
-        import aiosqlite as _aio
-        async with _aio.connect(database.DB_PATH, timeout=30) as _db:
-            _db.row_factory = _aio.Row
-            async with _db.execute(
-                "SELECT discord_id, discord_username, travian_name FROM ally_members WHERE ally_group_id=? AND status='active'",
-                (ally_group["id"],)
-            ) as _cur:
-                ally_member_rows = [dict(r) for r in await _cur.fetchall()]
-    else:
-        ally_member_rows = []
-
-    discord_ids = [m["discord_id"] for m in ally_member_rows]
-    # Fetch latest troop data for each discord_id regardless of guild
-    troops_by_id = await database.get_member_troops_for_discord_ids(discord_ids)
-
-    # Build member_troops list from ally members + their troop data
-    member_troops = []
-    for am in ally_member_rows:
-        did = am["discord_id"]
-        td = troops_by_id.get(did)
-        if td:
-            member_troops.append({
-                "discord_id": did,
-                "discord_name": am.get("discord_username", td.get("discord_name", "?")),
-                "travian_name": am.get("travian_name") or td.get("travian_name", "?"),
-                "total_off": td.get("total_off", 0),
-            })
+    # Load all member troops via ally_members → discord_id → latest troop data (any guild)
+    member_troops = await database.get_all_member_troops_for_guild(guild_id)
+    troops_by_id = {m["discord_id"]: m for m in member_troops}
 
     # TS levels
     ts_by_player: dict[str, dict] = {}
@@ -13817,8 +13789,7 @@ async def artifact_planning_analyze(request: Request, guild_id: str):
         member_ranking = []
         for m in member_troops:
             did = m["discord_id"]
-            troop_data = troops_by_id.get(did, {})
-            villages = troop_data.get("villages") or []
+            villages = m.get("villages") or []
             if not villages:
                 continue
             ts_map = ts_by_player.get(did, {})

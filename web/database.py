@@ -8080,6 +8080,80 @@ async def get_member_troops_for_discord_ids(discord_ids: list[str]) -> dict[str,
     return result
 
 
+async def get_all_member_troops_for_guild(guild_id: str) -> list[dict]:
+    """Return troop data for ALL ally members of a guild.
+    Looks up members via ally_members table (by discord_id), then fetches their
+    most recent member_troops entry regardless of guild — because players import
+    data in workspace guilds (ws_*), not necessarily in the alliance guild.
+    Returns list of dicts with discord_id, discord_name, travian_name, total_off,
+    total_def, total_crop, villages (parsed list), villages_json, etc.
+    """
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        # Get ally_group for this guild
+        async with db.execute(
+            "SELECT id FROM ally_groups WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            # Fallback: direct member_troops for guild
+            rows = await db.execute_fetchall(
+                "SELECT * FROM member_troops WHERE guild_id=?", (guild_id,)
+            )
+            result = []
+            for r in rows:
+                d = dict(r)
+                d["villages"] = _json_op.loads(d["villages_json"]) if d.get("villages_json") else []
+                result.append(d)
+            return result
+
+        ally_group_id = row[0]
+        # Get all ally members (any status — they're registered members)
+        async with db.execute(
+            "SELECT discord_id, discord_username, travian_name FROM ally_members WHERE ally_group_id=?",
+            (ally_group_id,)
+        ) as cur:
+            members = [dict(r) for r in await cur.fetchall()]
+
+        if not members:
+            return []
+
+        discord_ids = [m["discord_id"] for m in members]
+        name_map = {m["discord_id"]: m for m in members}
+        placeholders = ",".join("?" * len(discord_ids))
+
+        # Fetch latest troop entry per discord_id across ALL guilds
+        rows = await db.execute_fetchall(f"""
+            SELECT mt.*
+            FROM member_troops mt
+            INNER JOIN (
+                SELECT discord_id, MAX(updated_at) AS max_updated
+                FROM member_troops
+                WHERE discord_id IN ({placeholders})
+                GROUP BY discord_id
+            ) latest ON mt.discord_id = latest.discord_id
+                     AND mt.updated_at = latest.max_updated
+        """, discord_ids)
+
+    result = []
+    seen = set()
+    for r in rows:
+        d = dict(r)
+        did = d["discord_id"]
+        if did in seen:
+            continue
+        seen.add(did)
+        d["villages"] = _json_op.loads(d["villages_json"]) if d.get("villages_json") else []
+        # Prefer ally_members names (more up to date for travian_name)
+        am = name_map.get(did, {})
+        if am.get("travian_name"):
+            d["travian_name"] = am["travian_name"]
+        if am.get("discord_username"):
+            d["discord_name"] = am["discord_username"]
+        result.append(d)
+    return result
+
+
 async def get_member_leaderboard(guild_id: str) -> list[dict]:
     """Return member_troops enriched with population from latest map snapshot.
     Each row: discord_id, discord_name, travian_name, total_off, total_def,
