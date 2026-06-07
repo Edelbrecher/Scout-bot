@@ -815,7 +815,7 @@ const TRANSLATIONS = {
     "guild.feature.enemies.desc": "Scout-Historie pro Gegner — Ressourcen, Truppen, Dörfer über Zeit",
     "guild.feature.heroscout.title": "Helden-Scout",
     "guild.feature.heroscout.desc": "Gegner-Helden beobachten — Ausrüstungswechsel & XP-Sprünge automatisch erkennen",
-    "guild.feature.defense.title": "Verteidigung",
+    "guild.feature.defense.title": "Defense",
     "guild.feature.defense.desc": "Defend- und Timed-Defend Anfragen koordinieren und verwalten",
     "guild.feature.scout.title": "Scout",
     "guild.feature.scout.desc": "Scout-Archiv, Kanal-Verwaltung und Rollen-Zugriffsrechte",
@@ -861,7 +861,7 @@ const TRANSLATIONS = {
     "guild.settings.server.desc": "Dashboard-Zugang, Berechtigungen und Bot-Einstellungen",
 
     // Defense / Verteidigung
-    "defense.title": "🛡️ Verteidigung",
+    "defense.title": "🛡️ Defense",
     "defense.subtitle": "Defend- und Timed-Defend Anfragen dieser Allianz",
     "defense.heroscout_btn": "🗡️ Helden-Scout",
     "defense.field.attacker": "Angreifer",
@@ -873,7 +873,7 @@ const TRANSLATIONS = {
     "defense.empty": "Noch keine Defend-Anfragen. Sobald jemand im Discord einen Defend- oder Timed-Defend-Channel über den Anfragen-Hub erstellt, erscheint er hier.",
 
     // Hero Scout list
-    "scout.back": "← Verteidigung",
+    "scout.back": "← Defense",
     "scout.title": "🗡️ Helden-Scout",
     "scout.subtitle": "Gegnerische Helden beobachten — Ausrüstungsänderungen erkennen",
     "scout.add_manual": "➕ Held manuell anlegen",
@@ -1177,7 +1177,7 @@ const TRANSLATIONS = {
     "confirm.delete_report": "Meldung löschen?",
 
     // defense.html
-    "defense.title": "🛡️ Verteidigung",
+    "defense.title": "🛡️ Defense",
     "defense.subtitle": "Defend- und Timed-Defend Anfragen dieser Allianz",
     "defense.stats.btn": "📊 Statistiken",
     "defense.heroscout.btn": "🗡️ Helden-Scout",
