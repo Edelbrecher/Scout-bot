@@ -6042,54 +6042,65 @@ async def get_defend_channels(guild_id: str) -> list[dict]:
 
 async def get_defend_contributions_for_guild(guild_id: str) -> dict[str, list]:
     """Return {channel_id: [contribution_dicts]} for all channels in a guild.
-    Each contribution includes the latest sent_id for that user+channel (for editing)."""
+    Each contribution is aggregated per user and includes their individual entries for editing."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        # Aggregated totals per user per channel
         async with db.execute("""
             SELECT channel_id, user_name, user_id,
                    SUM(amount_parsed) as total_troops,
                    SUM(amount_parsed * grain_per_unit) as total_grain,
-                   GROUP_CONCAT(troop_type, ', ') as troop_types,
-                   MIN(sent_at) as first_sent,
-                   MAX(id) as latest_sent_id,
-                   (SELECT amount_raw FROM defend_sent d2
-                    WHERE d2.channel_id = defend_sent.channel_id
-                      AND d2.user_id = defend_sent.user_id
-                    ORDER BY d2.sent_at DESC LIMIT 1) as latest_amount_raw,
-                   (SELECT troop_type FROM defend_sent d2
-                    WHERE d2.channel_id = defend_sent.channel_id
-                      AND d2.user_id = defend_sent.user_id
-                    ORDER BY d2.sent_at DESC LIMIT 1) as latest_troop_type
+                   MIN(sent_at) as first_sent
             FROM defend_sent
             WHERE guild_id=?
             GROUP BY channel_id, user_id
             ORDER BY channel_id, total_troops DESC
         """, (guild_id,)) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+            agg_rows = [dict(r) for r in await cur.fetchall()]
+
+        # Individual entries per user per channel (for editing)
+        async with db.execute("""
+            SELECT id, channel_id, user_id, amount_raw, amount_parsed, troop_type, grain_per_unit
+            FROM defend_sent
+            WHERE guild_id=?
+            ORDER BY channel_id, user_id, sent_at ASC
+        """, (guild_id,)) as cur:
+            entry_rows = [dict(r) for r in await cur.fetchall()]
+
+    # Build {(channel_id, user_id): [entries]} lookup
+    entries_by_cu: dict = {}
+    for e in entry_rows:
+        key = (e["channel_id"], e["user_id"])
+        entries_by_cu.setdefault(key, []).append({
+            "id": e["id"], "amount_raw": e["amount_raw"],
+            "amount_parsed": e["amount_parsed"], "troop_type": e["troop_type"],
+            "grain_per_unit": e["grain_per_unit"],
+        })
+
     result: dict[str, list] = {}
-    for r in rows:
+    for r in agg_rows:
         cid = r.pop("channel_id")
+        r["entries"] = entries_by_cu.get((cid, r["user_id"]), [])
         result.setdefault(cid, []).append(r)
     return result
 
 
-async def get_my_defend_sent(guild_id: str, user_id: str) -> dict[str, dict]:
-    """Return {channel_id: sent_row} for the current user's own defend_sent entries."""
+async def get_my_defend_sent(guild_id: str, user_id: str) -> dict[str, list]:
+    """Return {channel_id: [sent_rows]} for ALL of the current user's defend_sent entries.
+    A user can have multiple rows per channel (e.g. foot troops + cavalry)."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
             SELECT id, channel_id, amount_raw, amount_parsed, troop_type, grain_per_unit, sent_at
             FROM defend_sent
             WHERE guild_id = ? AND user_id = ?
-            ORDER BY sent_at DESC
+            ORDER BY channel_id, sent_at ASC
         """, (guild_id, user_id)) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
-    # Keep only the latest entry per channel for the user
-    result: dict[str, dict] = {}
+    result: dict[str, list] = {}
     for r in rows:
-        cid = r["channel_id"]
-        if cid not in result:
-            result[cid] = r
+        cid = r.pop("channel_id")
+        result.setdefault(cid, []).append(r)
     return result
 
 
