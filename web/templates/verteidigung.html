@@ -102,6 +102,11 @@
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
           <span style="font-size:0.78rem;color:var(--text-muted);">{{ ch.created_at[:16].replace('T',' ') }} UTC</span>
+          {% if can_close %}
+          <button onclick="toggleDefEdit('req-{{ ch.channel_id }}')"
+            style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:0.2rem 0.5rem;font-size:0.72rem;color:var(--text-muted);cursor:pointer;"
+            title="Request bearbeiten">✏️ Edit</button>
+          {% endif %}
           {% if ch.status != 'closed' %}
           {% if can_close %}
           <form method="post" action="/guild/{{ guild.guild_id }}/defend/{{ ch.channel_id }}/close" style="margin:0;"
@@ -162,6 +167,52 @@
       <div style="margin-top:0.5rem;font-size:0.82rem;color:var(--text-muted);
                   background:rgba(255,255,255,0.03);border-radius:5px;padding:0.4rem 0.6rem;">
         {{ ch.notes }}
+      </div>
+      {% endif %}
+
+      {# ── Request bearbeiten (can_close = Lead/HC/Admin) ── #}
+      {% if can_close %}
+      <div id="req-{{ ch.channel_id }}" style="display:none;margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.65rem;">
+        <form method="post" action="/guild/{{ guild.guild_id }}/defend/{{ ch.channel_id }}/update-request">
+          <input type="hidden" name="show" value="{{ show }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
+            <div>
+              <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Angreifer</label>
+              <input type="text" name="attacker" value="{{ ch.attacker or '' }}"
+                style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.82rem;margin-top:0.15rem;">
+            </div>
+            <div>
+              <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Koordinaten</label>
+              <input type="text" name="coords" value="{{ ch.coords or '' }}" placeholder="(0|0)"
+                style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.82rem;margin-top:0.15rem;font-family:monospace;">
+            </div>
+            <div>
+              <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ankunftszeit</label>
+              <input type="text" name="arrival_time" value="{{ ch.arrival_time or '' }}" placeholder="z.B. 14:32:05"
+                style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.82rem;margin-top:0.15rem;">
+            </div>
+            <div>
+              <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">🎯 Ziel (Truppen)</label>
+              <input type="text" name="goal" value="{{ ch.goal or '' }}" placeholder="z.B. 21000"
+                style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.82rem;margin-top:0.15rem;">
+            </div>
+          </div>
+          <div style="margin-bottom:0.5rem;">
+            <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Notiz</label>
+            <input type="text" name="notes" value="{{ ch.notes or '' }}" placeholder="Optionale Notiz..."
+              style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text);font-size:0.82rem;margin-top:0.15rem;">
+          </div>
+          <div style="display:flex;gap:0.4rem;">
+            <button type="submit"
+              style="background:#6366f1;border:none;border-radius:5px;padding:0.3rem 0.9rem;color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">
+              💾 Speichern
+            </button>
+            <button type="button" onclick="toggleDefEdit('req-{{ ch.channel_id }}')"
+              style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:0.3rem 0.7rem;color:var(--text-muted);font-size:0.8rem;cursor:pointer;">
+              Abbrechen
+            </button>
+          </div>
+        </form>
       </div>
       {% endif %}
 

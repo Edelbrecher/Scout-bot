@@ -10847,6 +10847,38 @@ async def defend_reopen(request: Request, guild_id: str, channel_id: str):
     )
 
 
+@app.post("/guild/{guild_id}/defend/{channel_id}/update-request")
+async def defend_update_request(request: Request, guild_id: str, channel_id: str):
+    """Edit a defend channel's metadata (attacker, coords, arrival, goal, notes)."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    is_admin   = session.get("type") == "admin"
+    is_owner   = guild and guild.get("owner_discord_id") == uid
+    perms      = await database.get_member_permissions(guild_id, uid)
+    has_rights = "defend_manage" in perms or "ally_manage" in perms or "defend_edit" in perms
+    if not (is_admin or is_owner or has_rights):
+        return RedirectResponse(f"/guild/{guild_id}/verteidigung?flash=no_permission", status_code=303)
+    form = await request.form()
+    attacker     = str(form.get("attacker", "")).strip()
+    coords       = str(form.get("coords", "")).strip()
+    arrival_time = str(form.get("arrival_time", "")).strip()
+    goal         = str(form.get("goal", "")).strip()
+    notes        = str(form.get("notes", "")).strip()
+    async with __import__("aiosqlite").connect(database.DB_PATH) as db:
+        await db.execute("""
+            UPDATE defend_channels
+            SET attacker=?, coords=?, arrival_time=?, goal=?, notes=?
+            WHERE channel_id=? AND guild_id=?
+        """, (attacker, coords, arrival_time, goal, notes, channel_id, guild_id))
+        await db.commit()
+    show = str(form.get("show", "open"))
+    return RedirectResponse(f"/guild/{guild_id}/verteidigung?show={show}&flash=saved", status_code=303)
+
+
 @app.post("/guild/{guild_id}/defend/update-sent")
 async def defend_update_sent(request: Request, guild_id: str):
     """Allow a user to edit their own defend_sent entry (amount + troop type)."""
