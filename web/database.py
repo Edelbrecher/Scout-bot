@@ -4160,18 +4160,6 @@ async def get_scout_village(guild_id: str, discord_id: str) -> dict | None:
 async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: str, discord_id: str = ""):
     """Replace all own villages for a guild and record a history snapshot."""
     import json as _json
-    CROP_MAP = {
-        "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
-        "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
-        "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
-        "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
-        "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3,
-        "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Kriegsmaschine": 6,
-        "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
-        "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
-        "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
-        "Siedler": 1, "Held": 0,
-    }
     troop_roles = await get_troop_roles(guild_id)
     guild_crop_map = await get_troop_crop_map(guild_id)
     scout_units = {t for t, r in troop_roles.items() if r == "scout"}
@@ -10640,6 +10628,19 @@ async def update_map_preset_name(guild_id: str, preset_id: int, name: str) -> bo
 
 
 # ── Troop Roles ──────────────────────────────────────────────────────────────
+
+CROP_MAP: dict[str, float] = {
+    "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
+    "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
+    "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
+    "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
+    "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3,
+    "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Kriegsmaschine": 6,
+    "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
+    "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
+    "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
+    "Siedler": 1, "Held": 0,
+}
 
 TROOP_ROLE_DEFAULTS: dict[str, str] = {
     # off
