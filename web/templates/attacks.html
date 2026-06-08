@@ -27,6 +27,51 @@
     </div>
   </div>
 
+  <!-- ===== DEFENSE-CALL MODAL ===== -->
+  <div id="defenseCallModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1200;overflow-y:auto;backdrop-filter:blur(4px);">
+    <div style="max-width:520px;margin:2.5rem auto;background:var(--bg-card);border:1px solid rgba(239,68,68,.35);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,rgba(239,68,68,.18),rgba(220,38,38,.1));border-bottom:1px solid rgba(239,68,68,.25);padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:1rem;font-weight:800;">🛡️ Defense-Call erstellen</div>
+          <div id="dcm_subtitle" style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;"></div>
+        </div>
+        <button onclick="closeDefenseCallModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <!-- Attack summary -->
+      <div id="dcm_summary" style="padding:.75rem 1.2rem;background:rgba(239,68,68,.06);border-bottom:1px solid rgba(239,68,68,.15);font-size:.82rem;color:var(--text-muted);line-height:1.6;"></div>
+      <!-- Form -->
+      <div style="padding:1rem 1.2rem;display:flex;flex-direction:column;gap:.85rem;">
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.3rem;">🎯 Truppenziel (Korn/h) <span style="font-weight:400;color:var(--text-muted);">optional</span></label>
+          <input id="dcm_goal" type="text" placeholder="z.B. 15000"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.4rem .65rem;font-size:.88rem;">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.3rem;">⚖️ Verhältnis Fuß/Pferd <span style="font-weight:400;color:var(--text-muted);">optional, z.B. 70/30</span></label>
+          <input id="dcm_ratio" type="text" placeholder="z.B. 70/30"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.4rem .65rem;font-size:.88rem;">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.3rem;">📝 Notizen <span style="font-weight:400;color:var(--text-muted);">optional</span></label>
+          <textarea id="dcm_notes" rows="2" placeholder="Weitere Infos für die Verteidiger…"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.4rem .65rem;font-size:.88rem;resize:vertical;"></textarea>
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:7px;padding:.5rem .75rem;line-height:1.5;">
+          ℹ️ Es wird ein Discord-Kanal erstellt. Verteidiger können dort ihren <strong>Truppenplatz → Unterstützung</strong> und optional den <strong>Marktplatz</strong> einfügen, um die Ankunftszeiten und Ressourcen zu berechnen.
+        </div>
+        <div id="dcm_error" style="display:none;color:#f87171;font-size:.8rem;padding:.3rem .5rem;background:rgba(248,113,113,.08);border-radius:6px;"></div>
+        <div style="display:flex;gap:.65rem;justify-content:flex-end;margin-top:.25rem;">
+          <button class="btn btn-secondary" onclick="closeDefenseCallModal()">Abbrechen</button>
+          <button id="dcm_btn" class="btn btn-primary" onclick="submitDefenseCall()"
+            style="background:linear-gradient(135deg,#dc2626,#b91c1c);border-color:#dc2626;">
+            🛡️ Defense-Call absenden
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== IMPORT MODAL ===== -->
   <div id="importModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; overflow-y:auto;">
     <div style="max-width:760px; margin:2rem auto; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
@@ -1680,7 +1725,10 @@
                   border:1px solid ${hasNote ? 'rgba(251,191,36,.3)' : 'rgba(255,255,255,.08)'};
                   color:${hasNote ? '#fbbf24' : 'var(--text-muted)'};">✏️</button>
         ${CAN_LABEL
-          ? `<button onclick="archiveAttack(${a.id})" data-tip="Archivieren"
+          ? `<button onclick="openDefenseCallModal(${a.id})" data-tip="Defense-Call erstellen"
+              style="font-size:0.75rem;padding:2px 8px;border-radius:8px;cursor:pointer;font-weight:700;
+                     background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;white-space:nowrap;">🛡️ Def-Call</button>
+             <button onclick="archiveAttack(${a.id})" data-tip="Archivieren"
               style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">📁</button>
              <button onclick="deleteAttack(${a.id})" data-tip="Permanent löschen"
               style="background:none;border:none;color:#f87171;cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">🗑</button>`
@@ -2559,5 +2607,80 @@ function renderAttackCharts(attacks, groups) {
     }
   });
 }
+
+  // =========================================================
+  // DEFENSE-CALL MODAL
+  // =========================================================
+  let _dcmAttackId = null;
+
+  window.openDefenseCallModal = function(attackId) {
+    const attack = _allAttacks.find(a => a.id === attackId);
+    if (!attack) return;
+    _dcmAttackId = attackId;
+
+    // Fill subtitle + summary
+    const arrival = fmtArrival(attack.arrival_time);
+    document.getElementById('dcm_subtitle').textContent =
+      `${attack.own_village_name || '?'} (${attack.own_village_x}|${attack.own_village_y}) — Ankunft: ${arrival}`;
+    document.getElementById('dcm_summary').innerHTML =
+      `⚔️ <strong>${escHtml(attack.attacker_player||'?')}</strong> — ${escHtml(attack.attacker_village_name||'?')} (${attack.attacker_x}|${attack.attacker_y})<br>` +
+      `🏰 Ziel: <strong>${escHtml(attack.own_village_name||'?')}</strong> · ⏰ Ankunft: <strong>${arrival}</strong>` +
+      (attack.attacker_alliance ? ` · Allianz: <strong>${escHtml(attack.attacker_alliance)}</strong>` : '');
+
+    document.getElementById('dcm_goal').value  = '';
+    document.getElementById('dcm_ratio').value = '';
+    document.getElementById('dcm_notes').value = '';
+    document.getElementById('dcm_error').style.display = 'none';
+    document.getElementById('defenseCallModal').style.display = 'block';
+  };
+
+  window.closeDefenseCallModal = function() {
+    document.getElementById('defenseCallModal').style.display = 'none';
+    _dcmAttackId = null;
+  };
+
+  window.submitDefenseCall = async function() {
+    if (!_dcmAttackId) return;
+    const btn = document.getElementById('dcm_btn');
+    const errEl = document.getElementById('dcm_error');
+    btn.disabled = true; btn.textContent = '⏳ Erstelle Kanal…';
+    errEl.style.display = 'none';
+    try {
+      const resp = await fetch(`/guild/${GUILD_ID}/attacks/${_dcmAttackId}/defense-call`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          troop_goal: document.getElementById('dcm_goal').value.trim(),
+          ratio:      document.getElementById('dcm_ratio').value.trim(),
+          notes:      document.getElementById('dcm_notes').value.trim(),
+        }),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        closeDefenseCallModal();
+        // Reload to see updated label
+        loadOwnAttacks();
+        // Show success toast
+        const toast = document.createElement('div');
+        toast.textContent = `✅ Discord-Kanal erstellt!`;
+        Object.assign(toast.style, {
+          position:'fixed', bottom:'1.5rem', right:'1.5rem', zIndex:'9999',
+          background:'rgba(34,197,94,.9)', color:'#fff', padding:'.65rem 1.2rem',
+          borderRadius:'10px', fontWeight:'700', fontSize:'.9rem',
+          boxShadow:'0 8px 24px rgba(0,0,0,.4)', transition:'opacity .4s'
+        });
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.remove(), 400); }, 3000);
+      } else {
+        errEl.textContent = '❌ Fehler: ' + (data.error || 'Unbekannter Fehler');
+        errEl.style.display = 'block';
+      }
+    } catch(e) {
+      errEl.textContent = '❌ Netzwerkfehler: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.innerHTML = '🛡️ Defense-Call absenden';
+    }
+  };
 </script>
 {% endblock %}

@@ -429,6 +429,86 @@ async def _create_defend_channel(
     await interaction.followup.send(t(lang, "channel_created", channel=new_channel.mention), ephemeral=True)
 
 
+async def _create_defend_channel_api(
+    guild: discord.Guild,
+    defender: str, attacker: str, coords: str,
+    arrival_time: str,
+    troop_goal: str = "", ratio: str = "", notes: str = "",
+    requested_by_id: str = "", requested_by_name: str = "Webdashboard",
+) -> tuple[str, str]:
+    """Create a defend channel triggered from the web dashboard (no Interaction needed).
+    Returns (channel_id, channel_mention)."""
+    lang = await get_guild_lang(str(guild.id))
+    config, category = await _get_config_and_category(guild)
+    if not config or not category:
+        raise RuntimeError("Guild not configured or category not found")
+
+    safe_def   = re.sub(r"[^\w\-]", "_", defender)[:20]
+    safe_coord = re.sub(r"[^\w\-]", "_", coords)[:10]
+    channel_name = f"def-call-{safe_def}-{safe_coord}"[:100]
+    topic = f"Def-Call: {attacker} → {defender} @ {coords} | Ankunft: {arrival_time}"
+
+    overwrites = _build_defend_overwrites(guild, config, None)
+    new_channel = await guild.create_text_channel(
+        name=channel_name, category=category, topic=topic, overwrites=overwrites,
+    )
+
+    tw_world = (config or {}).get("tw_world") or ""
+    coord_match = re.search(r"(-?\d+)\s*[|/]\s*(-?\d+)", coords)
+    troop_link = map_link = ""
+    if coord_match and tw_world:
+        cx, cy = coord_match.group(1), coord_match.group(2)
+        base = tw_world.rstrip("/")
+        troop_link = f"{base}/build.php?gid=16&tt=2&eventType=5&x={cx}&y={cy}"
+        map_link   = f"{base}/karte.php?x={cx}&y={cy}"
+
+    embed = discord.Embed(
+        title="🛡️ Defense-Call",
+        color=discord.Color.from_rgb(239, 68, 68),
+        url=troop_link or discord.Embed.Empty,
+    )
+    if troop_link:
+        embed.description = f"### [⚔️ Jetzt Truppen schicken →]({troop_link})"
+
+    embed.add_field(name="🏰 Zu verteidigendes Dorf", value=defender, inline=True)
+    embed.add_field(name="⚔️ Angreifer",              value=attacker or "–", inline=True)
+    coords_display = f"[{coords}]({troop_link})" if troop_link else coords
+    embed.add_field(name="📍 Ziel-Koordinaten",       value=coords_display, inline=True)
+    embed.add_field(name="⏰ Ankunftszeit",            value=arrival_time or "–", inline=True)
+    if troop_goal:
+        embed.add_field(name="🎯 Truppenziel (Korn/h)", value=f"**{troop_goal}** 🌾/h", inline=True)
+    if ratio:
+        embed.add_field(name="⚖️ Verhältnis Fuß/Pferd", value=ratio, inline=True)
+    if notes:
+        embed.add_field(name="📝 Notizen", value=notes, inline=False)
+    embed.add_field(
+        name="📥 Import",
+        value="Kopiere deinen **Truppenplatz → Unterstützung** und poste ihn hier.\nOptional: auch **Marktplatz** für Ressourcenberechnung.",
+        inline=False,
+    )
+    embed.set_footer(text=f"Defense-Call erstellt von {requested_by_name} · TravOps")
+
+    ping_role_ids = (config or {}).get("defend_role_ids") or (config or {}).get("allowed_role_ids") or ""
+    ping_roles = " ".join(f"<@&{r.strip()}>" for r in ping_role_ids.split(",") if r.strip())
+    content = f"🛡️ **Defense-Call!** {ping_roles}\n"
+    if troop_link:
+        content += f"⚔️ **Truppen schicken:** <{troop_link}>"
+
+    from cogs.hub import DefendCloseView
+    await new_channel.send(content=content, embed=embed, view=DefendCloseView(troop_link=troop_link))
+
+    await database.add_defend_channel(
+        channel_id=str(new_channel.id), guild_id=str(guild.id),
+        type="defend",
+        attacker=attacker, coords=coords,
+        arrival_time=arrival_time, notes=notes,
+        goal=troop_goal, ratio=ratio,
+        requested_by_id=requested_by_id,
+        requested_by_name=requested_by_name,
+    )
+    return str(new_channel.id), new_channel.mention
+
+
 # ---------------------------------------------------------------------------
 # Defend — 2-step modal flow
 # Step 1: Attacker/defender/coords/arrival  →  ephemeral button  →  Step 2: goal/ratio

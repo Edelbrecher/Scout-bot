@@ -5137,6 +5137,64 @@ async def attacks_insert_test_data(request: Request, guild_id: str):
     return JSONResponse({"inserted": count})
 
 
+@app.post("/guild/{guild_id}/attacks/{attack_id}/defense-call")
+async def attack_create_defense_call(request: Request, guild_id: str, attack_id: int):
+    """Create a Discord defend channel for a specific incoming attack."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    if not guild: return JSONResponse({"error": "not_found"}, status_code=404)
+    is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id", "")
+    perms = await database.get_member_permissions(guild_id, uid)
+    can_label = is_admin or any(p in perms for p in ("ally_manage","defend_manage","attack_manage"))
+    if not can_label:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    # Load the attack
+    attacks = await database.get_incoming_attacks(guild_id)
+    attack = next((a for a in attacks if a["id"] == attack_id), None)
+    if not attack:
+        return JSONResponse({"error": "attack_not_found"}, status_code=404)
+
+    body = await request.json()
+    troop_goal = body.get("troop_goal", "")
+    ratio      = body.get("ratio", "")
+    notes      = body.get("notes", "")
+
+    # Build fields for the bot
+    defender = f"{attack.get('own_village_name','?')} ({attack.get('own_village_x','?')}|{attack.get('own_village_y','?')})"
+    attacker_txt = f"{attack.get('attacker_player','?')} — {attack.get('attacker_village_name','?')} ({attack.get('attacker_x','?')}|{attack.get('attacker_y','?')})"
+    coords = f"{attack.get('own_village_x','?')}|{attack.get('own_village_y','?')}"
+    arrival = attack.get("arrival_time","")
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post("http://bot:7777/api/create-defend-channel", json={
+                "guild_id": guild_id,
+                "defender": defender,
+                "attacker": attacker_txt,
+                "coords": coords,
+                "arrival_time": arrival,
+                "troop_goal": troop_goal,
+                "ratio": ratio,
+                "notes": notes,
+                "requested_by_id": uid,
+                "requested_by_name": session.get("username","Dashboard"),
+            })
+            data = resp.json()
+            if not data.get("ok"):
+                return JSONResponse({"error": data.get("error","bot_error")}, status_code=500)
+            # Label attack as need_def if no label yet
+            if not attack.get("label"):
+                await database.label_attack(attack_id, "need_def", uid)
+            return JSONResponse({"ok": True, "channel_id": data.get("channel_id"), "channel_mention": data.get("channel_mention")})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/guild/{guild_id}/attacks/api/alliance")
 async def attacks_api_alliance(request: Request, guild_id: str):
     session, err = await _attack_access(request, guild_id)

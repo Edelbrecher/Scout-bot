@@ -1350,6 +1350,47 @@ async def handle_refresh_defend_tracking(request: aiohttp_web.Request):
     return aiohttp_web.json_response({"ok": True})
 
 
+async def handle_create_defend_channel(request: aiohttp_web.Request):
+    """Create a defend channel from the web dashboard (attack detection page)."""
+    data = await request.json()
+    guild_id      = str(data.get("guild_id", ""))
+    defender      = str(data.get("defender", ""))        # own village name + coords
+    attacker      = str(data.get("attacker", ""))        # attacker player + village
+    coords        = str(data.get("coords", ""))          # target coords "X|Y"
+    arrival_time  = str(data.get("arrival_time", ""))    # ISO or "HH:MM" string
+    troop_goal    = str(data.get("troop_goal", ""))      # crop/h goal
+    ratio         = str(data.get("ratio", ""))           # e.g. "70/30"
+    notes         = str(data.get("notes", ""))
+    requested_by_id   = str(data.get("requested_by_id", ""))
+    requested_by_name = str(data.get("requested_by_name", "Webdashboard"))
+
+    if not guild_id or not defender or not coords:
+        return aiohttp_web.json_response({"ok": False, "error": "missing fields"}, status=400)
+
+    try:
+        from cogs.hub import _create_defend_channel_api, DefendCloseView
+        disc_guild = bot.get_guild(int(guild_id))
+        if not disc_guild:
+            return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+        channel_id, channel_mention = await _create_defend_channel_api(
+            guild=disc_guild,
+            defender=defender,
+            attacker=attacker,
+            coords=coords,
+            arrival_time=arrival_time,
+            troop_goal=troop_goal,
+            ratio=ratio,
+            notes=notes,
+            requested_by_id=requested_by_id,
+            requested_by_name=requested_by_name,
+        )
+        return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "channel_mention": channel_mention})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1368,6 +1409,7 @@ async def start_api_server():
     app.router.add_post("/api/op-hero-action", handle_op_hero_action)
     app.router.add_post("/api/announce-ep", handle_announce_ep)
     app.router.add_post("/api/announce-ep-cancelled", handle_announce_ep_cancelled)
+    app.router.add_post("/api/create-defend-channel", handle_create_defend_channel)
     app.router.add_post("/api/archive-defend-channel", handle_archive_defend_channel)
     app.router.add_post("/api/unarchive-defend-channel", handle_unarchive_defend_channel)
     app.router.add_post("/api/refresh-defend-tracking", handle_refresh_defend_tracking)
