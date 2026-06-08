@@ -8416,6 +8416,51 @@ async def op_search_villages(request: Request, guild_id: str, q: str = "", allia
     return JSONResponse({"results": rows})
 
 
+@app.get("/guild/{guild_id}/operations/api/player-tribe")
+async def op_player_tribe(request: Request, guild_id: str, name: str = ""):
+    """Quick lookup: return tribe for a player name from all available sources."""
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    if not name:
+        return JSONResponse({"tribe": ""})
+    import aiosqlite as _aiosqlite_pt
+    tribe = ""
+    async with _aiosqlite_pt.connect(database.DB_PATH, timeout=15) as db:
+        db.row_factory = _aiosqlite_pt.Row
+        # 1. member_troops
+        async with db.execute(
+            "SELECT tribe FROM member_troops WHERE guild_id=? AND (travian_name=? OR discord_name=?) AND tribe!='' LIMIT 1",
+            (guild_id, name, name)
+        ) as cur:
+            r = await cur.fetchone()
+            if r and r["tribe"]: tribe = r["tribe"]
+        # 2. alliance_members (has tribe from map import)
+        if not tribe:
+            async with db.execute(
+                "SELECT tribe FROM alliance_members WHERE guild_id=? AND player_name=? AND tribe!='' LIMIT 1",
+                (guild_id, name)
+            ) as cur:
+                r = await cur.fetchone()
+                if r and r["tribe"]: tribe = r["tribe"]
+        # 3. map_snapshots (most reliable — from actual game map)
+        if not tribe:
+            async with db.execute(
+                "SELECT tribe FROM map_snapshots WHERE guild_id=? AND player_name=? AND tribe!='' LIMIT 1",
+                (guild_id, name)
+            ) as cur:
+                r = await cur.fetchone()
+                if r and r["tribe"]: tribe = r["tribe"]
+        # 4. world_snapshots
+        if not tribe:
+            async with db.execute(
+                "SELECT tribe FROM world_snapshots WHERE world_url IN (SELECT tw_world FROM guilds WHERE guild_id=?) AND lower(player_name)=lower(?) AND tribe!='' LIMIT 1",
+                (guild_id, name)
+            ) as cur:
+                r = await cur.fetchone()
+                if r and r["tribe"]: tribe = r["tribe"]
+    return JSONResponse({"tribe": tribe})
+
+
 @app.get("/guild/{guild_id}/operations/api/attacker-list")
 async def op_attacker_list(request: Request, guild_id: str):
     """All own alliance members merged with their village coords from map_snapshots + troop data."""

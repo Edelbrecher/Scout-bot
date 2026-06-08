@@ -1955,16 +1955,22 @@ async function openWaveEditModal(waveId, targetId) {
       (m.travian_name||'').toLowerCase() === wName ||
       (m.discord_name||'').toLowerCase() === wName);
 
-  // ── 2. Set tribe — from attacker data, else from stored troop IDs ───────────
+  // ── 2. Set tribe — from attacker data → API lookup → troop IDs ─────────────
   let detectedTribe = wave.tribe || 'romans';
   if (a?.tribe && TROOPS_DEF[a.tribe]) {
-    detectedTribe = a.tribe; // attacker DB data is authoritative
+    detectedTribe = a.tribe; // local attacker data has tribe
   } else {
-    // Infer from troop IDs in wave
-    const storedIds = Object.keys(wave.troop_json || {}).filter(id => (wave.troop_json[id]||0) > 0);
-    const inferred = Object.entries(TROOPS_DEF).find(([, defs]) =>
-      defs.some(d => storedIds.includes(d.id)));
-    if (inferred) detectedTribe = inferred[0];
+    // Ask the server — checks member_troops, alliance_members, map_snapshots, world_snapshots
+    try {
+      const tr = await apiFetch(`/player-tribe?name=${encodeURIComponent(wave.attacker_name||'')}`);
+      if (tr.tribe && TROOPS_DEF[tr.tribe]) detectedTribe = tr.tribe;
+    } catch(_) {}
+    // Last resort: infer from stored troop IDs
+    if (detectedTribe === (wave.tribe || 'romans')) {
+      const storedIds = Object.keys(wave.troop_json || {}).filter(id => (wave.troop_json[id]||0) > 0);
+      const inferred = Object.entries(TROOPS_DEF).find(([, defs]) => defs.some(d => storedIds.includes(d.id)));
+      if (inferred) detectedTribe = inferred[0];
+    }
   }
   document.getElementById('wmTribe').value = detectedTribe;
 
