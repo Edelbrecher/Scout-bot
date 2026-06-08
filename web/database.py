@@ -10630,15 +10630,27 @@ async def update_map_preset_name(guild_id: str, preset_id: int, name: str) -> bo
 # ── Troop Roles ──────────────────────────────────────────────────────────────
 
 CROP_MAP: dict[str, float] = {
+    # Römer
     "Legionär": 1, "Prätorianer": 1, "Imperianer": 1,
     "Equites Legati": 2, "Equites Imperatoris": 3, "Equites Caesaris": 4,
     "Rammbock": 5, "Feuerkatapult": 6, "Senator": 5,
+    # Teutonen
     "Keulenschwinger": 1, "Speerkämpfer": 1, "Axtkämpfer": 1,
-    "Späher": 1, "Kundschafter": 1, "Paladin": 2, "Teut. Ritter": 3,
-    "Häuptling": 4, "Stammesführer": 4, "Teutonen-Rammbock": 5, "Kriegsmaschine": 6,
+    "Späher": 1, "Paladin": 2, "Teut. Ritter": 3,
+    "Teutonen-Rammbock": 5, "Kriegsmaschine": 6, "Häuptling": 4,
+    # Gallier
     "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
     "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
-    "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
+    "Gallier-Rammbock": 5, "Gallier-Kata": 6, "Stammesführer": 5,
+    # Ägypter
+    "Schleuderer": 1, "Ägyptischer Reiter": 1, "Khopesh-Krieger": 1,
+    "Sopdu-Erkunder": 1, "Anhur-Wächter": 3, "Resheph-Streitwagen": 3,
+    # Hunnen
+    "Soldat": 1, "Lanzenkämpfer": 1, "Marauder": 1,
+    "Ammende Nomadin": 1, "Boyar": 3, "Hunnischer Reiter": 3,
+    # Spartaner
+    "Hoplite": 1, "Sentinel": 1,
+    # Allgemein
     "Siedler": 1, "Held": 0,
 }
 

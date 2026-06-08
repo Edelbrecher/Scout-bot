@@ -4339,10 +4339,17 @@ def classify_own_village(troops: dict, troop_roles: dict | None = None) -> tuple
 TRIBE_COLUMN_ORDER: dict[str, list[str]] = {
     "römer":    ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"],
     "teutonen": ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutonen-Rammbock","Kriegsmaschine","Häuptling","Siedler","Held"],
-    "gallier":  ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gallier-Rammbock","Gallier-Kata","Häuptling","Siedler","Held"],
-    "ägypter":  ["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Häuptling","Siedler","Held"],
-    "hunnen":   ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Häuptling","Siedler","Held"],
-    "spartaner":["Hoplite","Sentinel","Häuptling","Siedler","Held"],
+    "gallier":  ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gallier-Rammbock","Gallier-Kata","Stammesführer","Siedler","Held"],
+    "ägypter":  ["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Siedler","Held"],
+    "hunnen":   ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Siedler","Held"],
+    "spartaner":["Hoplite","Sentinel","Siedler","Held"],
+    # EN tribe names (server locale)
+    "romans":   ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"],
+    "teutons":  ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutonen-Rammbock","Kriegsmaschine","Häuptling","Siedler","Held"],
+    "gauls":    ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gallier-Rammbock","Gallier-Kata","Stammesführer","Siedler","Held"],
+    "egyptians":["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Siedler","Held"],
+    "huns":     ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Siedler","Held"],
+    "spartans": ["Hoplite","Sentinel","Siedler","Held"],
 }
 
 
@@ -4363,98 +4370,123 @@ def parse_own_villages(text: str, tribe: str = "") -> list:
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
     TROOP_ALIASES = {
-        # ── Gallier ───────────────────────────────────────────────────────────
-        "Phalanx":                "Phalanx",
-        "Schwertkämpfer":         "Schwertkämpfer",
-        "Swordsman":              "Schwertkämpfer",
-        "Kundschafter":           "Pathfinder",   # DE Gallier-Scout
-        "Pathfinder":             "Pathfinder",   # EN Gallier-Scout
-        "Theutates-Blitz":        "Theutates-Blitz",
-        "Theutates Blitz":        "Theutates-Blitz",
-        "Theutates Thunder":      "Theutates-Blitz",
-        "Druidentreiter":         "Druidentreiter",
-        "Druidenreiter":          "Druidentreiter",
-        "Druidrider":             "Druidentreiter",
-        "Haeduer":                "Haeduer",
-        "Haeduan":                "Haeduer",
-        "Haeduaner":              "Haeduer",
-        "Gallier-Rammbock":       "Gallier-Rammbock",
-        "Rammholz":               "Gallier-Rammbock",
-        "Gallier-Kata":           "Gallier-Kata",
-        "Trebuchet":              "Gallier-Kata",
-        "Kriegskatapult":         "Gallier-Kata",
-        # ── Teutonen ─────────────────────────────────────────────────────────
-        "Keulenschwinger":        "Keulenschwinger",
-        "Clubswinger":            "Keulenschwinger",
-        "Speerkämpfer":           "Speerkämpfer",
-        "Spearman":               "Speerkämpfer",
-        "Axtkämpfer":             "Axtkämpfer",
-        "Axeman":                 "Axtkämpfer",
-        "Späher":                 "Späher",        # DE Teuton-Scout
-        "Scout":                  "Späher",        # EN Teuton-Scout
-        "Paladin":                "Paladin",
-        "Teut. Ritter":           "Teut. Ritter",
-        "Teutonischer Ritter":    "Teut. Ritter",
-        "Teutonen Reiter":        "Teut. Ritter",
-        "Teutonic Knight":        "Teut. Ritter",
-        "Teutonen-Rammbock":      "Teutonen-Rammbock",
-        "Ramme":                  "Teutonen-Rammbock",
-        "Battering Ram":          "Teutonen-Rammbock",
-        "Kriegsmaschine":         "Kriegsmaschine",
-        "Katapult":               "Kriegsmaschine",  # DE Teuton-Kata
-        "Catapult":               "Kriegsmaschine",
-        "Häuptling":              "Häuptling",
-        "Stammesführer":          "Häuptling",
-        "Chief":                  "Häuptling",
-        "Chieftain":              "Häuptling",
-        # ── Römer ────────────────────────────────────────────────────────────
-        "Legionär":               "Legionär",
-        "Legionnaire":            "Legionär",
-        "Prätorianer":            "Prätorianer",
-        "Praetorian":             "Prätorianer",
-        "Imperianer":             "Imperianer",
-        "Imperian":               "Imperianer",
-        "Equites Legati":         "Equites Legati",
-        "Equites Imperatoris":    "Equites Imperatoris",
-        "Equites Caesaris":       "Equites Caesaris",
-        "Rammbock":               "Rammbock",      # Roman battering ram DE
-        "Ram":                    "Rammbock",
-        "Feuerkatapult":          "Feuerkatapult",
-        "Fire Catapult":          "Feuerkatapult",
-        "Senator":                "Senator",
-        # ── Ägypter ──────────────────────────────────────────────────────────
-        "Schleuderer":            "Schleuderer",
-        "Slinger":                "Schleuderer",
-        "Ägyptischer Reiter":     "Ägyptischer Reiter",
-        "Khopesh-Krieger":        "Khopesh-Krieger",
-        "Khopesh Warrior":        "Khopesh-Krieger",
-        "Sopdu-Erkunder":         "Sopdu-Erkunder",
-        "Sopdu Explorer":         "Sopdu-Erkunder",
-        "Anhur-Wächter":          "Anhur-Wächter",
-        "Anhur Guard":            "Anhur-Wächter",
-        "Resheph-Streitwagen":    "Resheph-Streitwagen",
-        "Resheph Chariot":        "Resheph-Streitwagen",
-        # ── Hunnen ───────────────────────────────────────────────────────────
-        "Soldat":                 "Soldat",
-        "Soldiery":               "Soldat",
-        "Lanzenkämpfer":          "Lanzenkämpfer",
-        "Lancer":                 "Lanzenkämpfer",
-        "Marauder":               "Marauder",
-        "Ammende Nomadin":        "Ammende Nomadin",
-        "Nomad":                  "Ammende Nomadin",
-        "Boyar":                  "Boyar",
-        "Hunnischer Reiter":      "Hunnischer Reiter",
-        "Hunnic Rider":           "Hunnischer Reiter",
-        # ── Spartaner ────────────────────────────────────────────────────────
-        "Hoplite":                "Hoplite",
-        "Hopliten":               "Hoplite",
-        "Sentinel":               "Sentinel",
-        "Wächter":                "Sentinel",
-        # ── Allgemein ────────────────────────────────────────────────────────
-        "Siedler":                "Siedler",
-        "Settler":                "Siedler",
-        "Held":                   "Held",
-        "Hero":                   "Held",
+        # ══ Römer / Romans ════════════════════════════════════════════════════
+        # DE
+        "Legionär": "Legionär", "Prätorianer": "Prätorianer", "Imperianer": "Imperianer",
+        "Equites Legati": "Equites Legati", "Equites Imperatoris": "Equites Imperatoris",
+        "Equites Caesaris": "Equites Caesaris",
+        "Rammbock": "Rammbock", "Feuerkatapult": "Feuerkatapult", "Senator": "Senator",
+        # EN
+        "Legionnaire": "Legionär", "Praetorian": "Prätorianer", "Imperian": "Imperianer",
+        "Ram": "Rammbock", "Fire Catapult": "Feuerkatapult",
+        # FR
+        "Légionnaire": "Legionär", "Prétorien": "Prätorianer", "Impérien": "Imperianer",
+        "Bélier": "Rammbock", "Catapulte à feu": "Feuerkatapult", "Sénateur": "Senator",
+        # PL
+        "Legionista": "Legionär", "Pretorianin": "Prätorianer", "Imperianin": "Imperianer",
+        "Taran": "Rammbock", "Katapulta ognia": "Feuerkatapult", "Senator": "Senator",
+        # CS/SK
+        "Legionář": "Legionär", "Prétorian": "Prätorianer", "Imperián": "Imperianer",
+        "Beran": "Rammbock", "Ohnivá katapulta": "Feuerkatapult",
+        # RU
+        "Легионер": "Legionär", "Преторианец": "Prätorianer", "Империец": "Imperianer",
+        "Таран": "Rammbock", "Огненная катапульта": "Feuerkatapult", "Сенатор": "Senator",
+        # TR
+        "Lejyoner": "Legionär", "Pretorian": "Prätorianer", "İmparatorcu": "Imperianer",
+        "Koç": "Rammbock", "Ateş Mancınığı": "Feuerkatapult", "Senatör": "Senator",
+
+        # ══ Teutonen / Teutons ════════════════════════════════════════════════
+        # DE
+        "Keulenschwinger": "Keulenschwinger", "Speerkämpfer": "Speerkämpfer",
+        "Axtkämpfer": "Axtkämpfer", "Späher": "Späher", "Paladin": "Paladin",
+        "Teut. Ritter": "Teut. Ritter", "Teutonischer Ritter": "Teut. Ritter",
+        "Teutonen Reiter": "Teut. Ritter",
+        "Teutonen-Rammbock": "Teutonen-Rammbock", "Ramme": "Teutonen-Rammbock",
+        "Kriegsmaschine": "Kriegsmaschine", "Katapult": "Kriegsmaschine",
+        "Häuptling": "Häuptling", "Stammesführer": "Häuptling",
+        # EN
+        "Clubswinger": "Keulenschwinger", "Spearman": "Speerkämpfer",
+        "Axeman": "Axtkämpfer", "Scout": "Späher", "Teutonic Knight": "Teut. Ritter",
+        "Battering Ram": "Teutonen-Rammbock", "Catapult": "Kriegsmaschine",
+        "Chief": "Häuptling", "Chieftain": "Häuptling",
+        # FR
+        "Frondeur de massue": "Keulenschwinger", "Lancier": "Speerkämpfer",
+        "Hacheur": "Axtkämpfer", "Éclaireur": "Späher",
+        "Paladin": "Paladin", "Chevalier teuton": "Teut. Ritter",
+        "Bélier teuton": "Teutonen-Rammbock", "Machine de guerre": "Kriegsmaschine",
+        "Chef": "Häuptling",
+        # PL
+        "Maczugowiec": "Keulenschwinger", "Włócznik": "Speerkämpfer",
+        "Toporznik": "Axtkämpfer", "Zwiadowca": "Späher",
+        "Rycerz Teutońscy": "Teut. Ritter", "Taran teutońscy": "Teutonen-Rammbock",
+        "Machina wojenna": "Kriegsmaschine", "Wódz": "Häuptling",
+        # RU
+        "Дубинщик": "Keulenschwinger", "Копьеносец": "Speerkämpfer",
+        "Топорщик": "Axtkämpfer", "Разведчик": "Späher", "Паладин": "Paladin",
+        "Тевтонский рыцарь": "Teut. Ritter", "Таран тевтонский": "Teutonen-Rammbock",
+        "Боевая машина": "Kriegsmaschine", "Вождь": "Häuptling",
+
+        # ══ Gallier / Gauls ═══════════════════════════════════════════════════
+        # DE
+        "Phalanx": "Phalanx", "Schwertkämpfer": "Schwertkämpfer",
+        "Kundschafter": "Pathfinder", "Pathfinder": "Pathfinder",
+        "Theutates-Blitz": "Theutates-Blitz", "Theutates Blitz": "Theutates-Blitz",
+        "Druidentreiter": "Druidentreiter", "Druidenreiter": "Druidentreiter",
+        "Haeduer": "Haeduer", "Haeduaner": "Haeduer",
+        "Gallier-Rammbock": "Gallier-Rammbock", "Rammholz": "Gallier-Rammbock",
+        "Gallier-Kata": "Gallier-Kata", "Kriegskatapult": "Gallier-Kata",
+        # EN
+        "Swordsman": "Schwertkämpfer", "Theutates Thunder": "Theutates-Blitz",
+        "Druidrider": "Druidentreiter", "Haeduan": "Haeduer",
+        "Gaul Ram": "Gallier-Rammbock", "Trebuchet": "Gallier-Kata",
+        # FR
+        "Phalangiste": "Phalanx", "Épéiste": "Schwertkämpfer",
+        "Éclaireur gaulois": "Pathfinder", "Éclair de Teut.": "Theutates-Blitz",
+        "Chevaucheur druide": "Druidentreiter", "Haeduan": "Haeduer",
+        "Bélier gaulois": "Gallier-Rammbock", "Trébuchet": "Gallier-Kata",
+        # PL
+        "Falangista": "Phalanx", "Szermierz": "Schwertkämpfer",
+        "Druid jeździec": "Druidentreiter", "Galijczyk": "Haeduer",
+        "Taran galijski": "Gallier-Rammbock", "Trebusz": "Gallier-Kata",
+        # RU
+        "Фалангист": "Phalanx", "Мечник": "Schwertkämpfer",
+        "Следопыт": "Pathfinder", "Удар Теутатеса": "Theutates-Blitz",
+        "Друид-всадник": "Druidentreiter", "Эдуан": "Haeduer",
+        "Галльский таран": "Gallier-Rammbock", "Требушет": "Gallier-Kata",
+
+        # ══ Ägypter / Egyptians ═══════════════════════════════════════════════
+        "Schleuderer": "Schleuderer", "Slinger": "Schleuderer",
+        "Frondeur": "Schleuderer",
+        "Ägyptischer Reiter": "Ägyptischer Reiter",
+        "Egyptian Cavalry": "Ägyptischer Reiter", "Cavalier égyptien": "Ägyptischer Reiter",
+        "Khopesh-Krieger": "Khopesh-Krieger", "Khopesh Warrior": "Khopesh-Krieger",
+        "Guerrier Khopesh": "Khopesh-Krieger",
+        "Sopdu-Erkunder": "Sopdu-Erkunder", "Sopdu Explorer": "Sopdu-Erkunder",
+        "Explorateur Sopdu": "Sopdu-Erkunder",
+        "Anhur-Wächter": "Anhur-Wächter", "Anhur Guard": "Anhur-Wächter",
+        "Garde Anhur": "Anhur-Wächter",
+        "Resheph-Streitwagen": "Resheph-Streitwagen", "Resheph Chariot": "Resheph-Streitwagen",
+        "Char Resheph": "Resheph-Streitwagen",
+
+        # ══ Hunnen / Huns ═════════════════════════════════════════════════════
+        "Soldat": "Soldat", "Soldiery": "Soldat", "Soldat hun": "Soldat",
+        "Lanzenkämpfer": "Lanzenkämpfer", "Lancer": "Lanzenkämpfer",
+        "Marauder": "Marauder", "Maraudeur": "Marauder",
+        "Ammende Nomadin": "Ammende Nomadin", "Nomad": "Ammende Nomadin",
+        "Nomade": "Ammende Nomadin",
+        "Boyar": "Boyar",
+        "Hunnischer Reiter": "Hunnischer Reiter", "Hunnic Rider": "Hunnischer Reiter",
+        "Cavalier hun": "Hunnischer Reiter",
+
+        # ══ Spartaner / Spartans ══════════════════════════════════════════════
+        "Hoplite": "Hoplite", "Hopliten": "Hoplite", "Hoplite spartiate": "Hoplite",
+        "Sentinel": "Sentinel", "Wächter": "Sentinel", "Sentinelle": "Sentinel",
+
+        # ══ Allgemein / General ═══════════════════════════════════════════════
+        "Siedler": "Siedler", "Settler": "Siedler", "Colon": "Siedler",
+        "Colonist": "Siedler", "Colono": "Siedler",
+        "Held": "Held", "Hero": "Held", "Héros": "Held", "Heros": "Held",
+        "Герой": "Held", "Bohater": "Held",
     }
 
     def normalize(name: str) -> str:
