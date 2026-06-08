@@ -1469,41 +1469,68 @@ const _TROOP_PALETTE = {
   other: {bg:'rgba(255,255,255,.06)',border:'rgba(255,255,255,.14)',color:'var(--text-muted)'},
   inf:   {bg:'rgba(34,197,94,.18)',  border:'rgba(34,197,94,.4)',   color:'#86efac'},
 };
-// Build flat lookup by id AND by name → canonical troop definition
-const _TROOP_ALL = Object.values(TROOPS_DEF).flat();
-const _TROOP_BY_KEY = {};
-_TROOP_ALL.forEach(t => {
-  _TROOP_BY_KEY[t.id] = t;
-  if (t.name) _TROOP_BY_KEY[t.name] = t;
-  // also lowercase variants
-  _TROOP_BY_KEY[t.id.toLowerCase()] = t;
-  if (t.name) _TROOP_BY_KEY[t.name.toLowerCase()] = t;
-});
-// Explicit overrides for siege (can't distinguish from stats alone)
-const _SIEGE_CAT = new Set(['fire_cat','trebuchet','catapult','hun_cat','stone_cat',
-  'Feuerkatapult','Trebuchet','Katapult','Steinkatapult',
-  'Gallier-Kata','Gallierkata','Steinkata']);
-const _SIEGE_RAM = new Set(['bat_ram','gal_ram','teu_ram','hun_ram','egy_ram',
-  'Rammbock','Gallier-Rammbock','Gallierrammbock']);
-const _NEUTRAL   = new Set(['senator','chieftain','chief','logades','nomarch','settler',
-  'Senator','Häuptling','Stammesführer','Logades','Nomarch','Siedler','Held','Hero']);
-
+// Vollständige, explizite Zuordnung aller Einheiten (ID + dt. Name)
+// Kategorien: inf=Fuß-OFF grün | cav=Pferde-OFF blau | def=DEF rot | ram=Ramme lila | cat=Kata türkis | scout=grau | other=neutral
+const _TROOP_CAT_MAP = {
+  // ── Romans ──
+  'legionnaire':     'inf', 'Legionär':             'inf',
+  'praetorian':      'def', 'Prätorianer':           'def',
+  'imperian':        'inf', 'Imperianer':            'inf',
+  'eq_legati':     'scout', 'Equites Legati':       'scout',
+  'eq_imperatoris':  'cav', 'Equites Imperatoris':   'cav',
+  'eq_caesaris':     'cav', 'Equites Caesaris':      'cav',
+  'bat_ram':         'ram', 'Rammbock':              'ram',
+  'fire_cat':        'cat', 'Feuerkatapult':         'cat',
+  'senator':       'other', 'Senator':             'other',
+  // ── Gauls ──
+  'phalanx':         'def', 'Phalanx':               'def',
+  'swordsman':       'inf', 'Schwertkämpfer':        'inf',
+  'pathfinder':    'scout', 'Pathfinder':           'scout',
+  'thunder':         'cav', 'Theutates-Blitz':       'cav',  'Theutates Blitz': 'cav',
+  'druid':           'cav', 'Druidentreiter':        'cav',
+  'haeduan':         'cav', 'Haeduer':               'cav',
+  'gal_ram':         'ram', 'Gallier-Rammbock':      'ram',  'Gallier Rammbock': 'ram',
+  'trebuchet':       'cat', 'Trebuchet':             'cat',  'Gallier-Kata':     'cat',  'Gallierkata': 'cat',
+  'chieftain':     'other', 'Häuptling':           'other',
+  // ── Teutons ──
+  'clubswinger':     'inf', 'Keulenschwinger':       'inf',
+  'spearman':        'def', 'Speerkämpfer':          'def',
+  'axeman':          'inf', 'Axtkämpfer':            'inf',
+  'scout':         'scout', 'Kundschafter':         'scout',
+  'paladin':         'cav', 'Paladin':               'cav',
+  'tk':              'cav', 'Teutonenknight':        'cav',  'Teutonischer Ritter': 'cav',
+  'teu_ram':         'ram', 'Teutonen-Rammbock':     'ram',  'Teutonen Rammbock':  'ram',
+  'catapult':        'cat', 'Katapult':              'cat',
+  'chief':         'other', 'Stammesführer':       'other',
+  // ── Huns ──
+  'mercenary':       'inf', 'Söldner':               'inf',
+  'bowman':          'def', 'Bogenschütze':          'def',
+  'spotter':       'scout', 'Späher':               'scout',
+  'steppe_rider':    'cav', 'Steppenreiter':         'cav',
+  'marksman':        'cav', 'Scharfschütze':         'cav',
+  'marauder':        'cav', 'Plünderer':             'cav',
+  'hun_ram':         'ram', 'Hunnen-Rammbock':       'ram',  'Hunnen Rammbock':  'ram',
+  'hun_cat':         'cat', 'Hunnen-Katapult':       'cat',  'Hunnen Katapult':  'cat',
+  'logades':       'other', 'Logades':             'other',
+  // ── Egyptians ──
+  'slave_militia':   'def', 'Sklavenmiliz':          'def',
+  'ash_warden':      'inf', 'Aschenwächter':         'inf',
+  'khopesh':         'inf', 'Khopeschkämpfer':       'inf',
+  'sopdu':         'scout', 'Sopdu-Entdecker':      'scout',
+  'anhur':           'cav', 'Anhur-Wächter':         'cav',
+  'resheph':         'cav', 'Resheph-Streitwagen':   'cav',
+  'egy_ram':         'ram', 'Ägypter-Rammbock':      'ram',  'Ägypter Rammbock': 'ram',
+  'stone_cat':       'cat', 'Steinkatapult':         'cat',
+  'nomarch':       'other', 'Nomarch':             'other',
+  // ── Gemeinsam ──
+  'settler':       'other', 'Siedler':             'other',
+  'hero':          'other', 'Held':                'other', 'Hero': 'other',
+};
 function _troopColor(rawId) {
-  if (_SIEGE_CAT.has(rawId) || _SIEGE_CAT.has(rawId.toLowerCase())) return _TROOP_PALETTE.cat;
-  if (_SIEGE_RAM.has(rawId) || _SIEGE_RAM.has(rawId.toLowerCase())) return _TROOP_PALETTE.ram;
-  if (_NEUTRAL.has(rawId)   || _NEUTRAL.has(rawId.toLowerCase()))   return _TROOP_PALETTE.other;
-  // Resolve via TROOPS_DEF (by id or German name)
-  const t = _TROOP_BY_KEY[rawId] || _TROOP_BY_KEY[rawId.toLowerCase()];
-  if (!t) return _TROOP_PALETTE.inf; // unknown → green fallback
-  if (t.scout)              return _TROOP_PALETTE.scout;
-  if (t.carry === 0 && (t.attack||0) > 0) {
-    // Siege check by speed (cats=3, rams=4) — already handled above, but fallback:
-    if (t.speed <= 4) return _TROOP_PALETTE.ram;
-  }
-  // Classify by stats: DEF = attack ≤ 40, CAV = speed ≥ 9, else OFF infantry
-  if ((t.attack || 0) <= 40) return _TROOP_PALETTE.def;
-  if (t.speed >= 9)          return _TROOP_PALETTE.cav;
-  return _TROOP_PALETTE.inf;
+  const cat = _TROOP_CAT_MAP[rawId]
+           || _TROOP_CAT_MAP[rawId.toLowerCase()]
+           || 'inf';
+  return _TROOP_PALETTE[cat];
 }
 
 function _assignSettings() {
