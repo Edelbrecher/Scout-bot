@@ -1364,6 +1364,12 @@ async def dashboard(request: Request, flash: str = ""):
         ws_id = await database.get_or_create_default_workspace(owner_discord_id, username)
         return RedirectResponse(f"/guild/{ws_id}/setup?new=1", status_code=303)
 
+    # Auto-skip dashboard for workspace-only users: if they have exactly one workspace
+    # and no Discord guilds, go straight into the workspace (dashboard is useless to them)
+    if not discord_guilds and len(personal_workspaces) == 1 and not request.query_params.get("select"):
+        ws_id = personal_workspaces[0]["guild_id"]
+        return RedirectResponse(f"/guild/{ws_id}", status_code=302)
+
     # Merge: personal workspaces first, then discord guilds
     guilds = personal_workspaces + discord_guilds
 

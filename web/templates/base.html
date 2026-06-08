@@ -632,11 +632,11 @@ function escHtml(s) {
 
 <script>
 // Smart back-links: use browser history when available, fallback to href
+// Add data-no-history="1" to a back-link to always use the href instead.
 (function() {
   function applySmartBack() {
-    const links = document.querySelectorAll('a.back-link');
+    const links = document.querySelectorAll('a.back-link:not([data-no-history])');
     links.forEach(link => {
-      const fallback = link.href;
       link.addEventListener('click', function(e) {
         // Only intercept if there's a same-origin page to go back to
         if (window.history.length > 1 && document.referrer) {
