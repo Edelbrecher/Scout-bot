@@ -1587,6 +1587,49 @@
   }
 
   // Analyse a gap between two consecutive attack groups and return an intercept marker (HTML)
+  // ── Troop-speed table for composition estimation ────────────────────────
+  // base speed = fields/hour at server speed 1x, TP level 0
+  // TP bonus: each level +20% → TP20 = ×5
+  const TROOP_TYPES = [
+    { name:'Katapult / Trebuchet',  speed: 3,  icon:'💣', color:'#f87171' },
+    { name:'Rammbock / Ramme',      speed: 4,  icon:'🔨', color:'#fb923c' },
+    { name:'Häuptling / Senator',   speed: 4,  icon:'👑', color:'#fbbf24' },
+    { name:'Schwere Inf. (Prätor.)',speed: 5,  icon:'🛡️', color:'#a3e635' },
+    { name:'Leichte Inf. (Leg. etc.)',speed:6, icon:'⚔️', color:'#4ade80' },
+    { name:'Schnelle Inf.',         speed: 7,  icon:'🏃', color:'#34d399' },
+    { name:'Paladin / Druide',      speed:10,  icon:'✨', color:'#38bdf8' },
+    { name:'Equites Caesaris / TK', speed:10,  icon:'🐴', color:'#60a5fa' },
+    { name:'Equites Imp. / Haedu.', speed:14,  icon:'⚡', color:'#818cf8' },
+    { name:'TT / Eq.Legati',        speed:16,  icon:'💨', color:'#c084fc' },
+  ];
+
+  // Given distance (fields) and travel duration (seconds), return the slowest
+  // troop type that COULD be in the attack for each TP level.
+  function estimateTroopComposition(distFields, travelSec, serverSpeed = 1) {
+    if (!distFields || !travelSec || travelSec <= 0) return null;
+    const travelH = travelSec / 3600;
+    // min effective speed that could cover distFields in travelH hours
+    const minSpeedRequired = distFields / travelH / serverSpeed;
+
+    const results = [];
+    for (const t of TROOP_TYPES) {
+      // With TP level L, effective speed = base * (1 + L * 0.2)
+      // Find min TP level where troop could be in attack:
+      //   t.speed * (1 + L*0.2) >= minSpeedRequired
+      //   L >= (minSpeedRequired/t.speed - 1) / 0.2
+      if (t.speed >= minSpeedRequired) {
+        results.push({ ...t, tp: 0, possible: true });
+      } else {
+        const minTp = Math.ceil((minSpeedRequired / t.speed - 1) / 0.2);
+        if (minTp <= 20) {
+          results.push({ ...t, tp: minTp, possible: true });
+        }
+        // else: impossible even at TP20
+      }
+    }
+    return results;
+  }
+
   function gapMarker(waveA, waveB, waveIdx, allVillageAttacks) {
     const lastA = waveA[waveA.length - 1];
     const firstB = waveB[0];
@@ -1594,6 +1637,7 @@
     const t2 = new Date(firstB.arrival_time||0).getTime();
     const gapSec = Math.round((t2 - t1) / 1000);
     if (gapSec < 5) return ''; // same-second noise
+
     // No intercept markers if either wave is a fake
     const isFakeAttack = a => (a.fake_score||50) >= 70 || a.label === 'fake';
     if (isFakeAttack(lastA) || isFakeAttack(firstB)) return '';
@@ -1602,48 +1646,12 @@
     const arr1 = fmtArrival(lastA.arrival_time);
     const arr2 = fmtArrival(firstB.arrival_time);
 
-    // ── Chief detection ─────────────────────────────────────────────────────
-    // Pattern: same attacker player hitting same village multiple times,
-    // gap < 10 min, at least one wave has hidden troops
-    const samePlayer = lastA.attacker_player && lastA.attacker_player === firstB.attacker_player;
-    const anyHidden  = allVillageAttacks.some(a => a.troops_hidden);
-    const multiSamePlayer = allVillageAttacks.filter(a =>
-      a.attacker_player === lastA.attacker_player
-    ).length >= 2;
-    const isChiefPattern = (samePlayer || multiSamePlayer) && anyHidden && gapSec <= 600;
-
     // ── Zwischendeff detection ───────────────────────────────────────────────
-    // Gap between two real-looking attacks → window to send defence between waves
     const aReal = lastA.attack_type !== 'support' && (lastA.fake_score||50) < 60;
     const bReal = firstB.attack_type !== 'support' && (firstB.fake_score||50) < 60;
     const hasRealGap = (aReal || bReal) && gapSec >= 30;
 
-    if (isChiefPattern) {
-      // Blue chief-intercept marker
-      let interceptText = '';
-      if (gapSec < 60) {
-        interceptText = `Fenster <strong>${gapLabel}</strong> — sehr eng. Nur mit Paladin/Schnelle Ritter möglich.`;
-      } else if (gapSec < 300) {
-        interceptText = `Fenster <strong>${gapLabel}</strong> — Schnelle Einheiten (Ritter, Paladin, EI, Haeduaner) abschicken sobald Welle ${waveIdx} landet. Timing kritisch!`;
-      } else {
-        interceptText = `Fenster <strong>${gapLabel}</strong> — ausreichend Zeit. Infanterie + Kavallerie können zwischen den Wellen einlaufen.`;
-      }
-      return `<div style="margin:.3rem 0;padding:.5rem .85rem;border-radius:7px;
-        background:rgba(59,130,246,.1);border-left:3px solid #3b82f6;border:1px solid rgba(59,130,246,.3);
-        display:flex;align-items:flex-start;gap:.55rem;">
-        <span style="font-size:1rem;line-height:1.4;flex-shrink:0;">👑</span>
-        <div style="font-size:.78rem;line-height:1.5;">
-          <span style="color:#93c5fd;font-weight:800;">Möglicher Chief-Zug!</span>
-          <span style="color:var(--text-muted);margin:0 .3rem;">·</span>
-          <span style="color:var(--text-muted);">${arr1} → ${arr2}</span><br>
-          <span style="color:#bfdbfe;">${interceptText}</span><br>
-          <span style="color:var(--text-muted);font-size:.72rem;">💡 Schicke einen <strong style="color:#93c5fd;">Abfänger</strong> los, der zwischen den Wellen im Dorf landet und den Häuptling tötet.</span>
-        </div>
-      </div>`;
-    }
-
     if (hasRealGap) {
-      // Green zwischendeff marker
       let zwText = '';
       if (gapSec < 60) {
         zwText = `<strong>${gapLabel}</strong> Fenster — sehr eng. Nur Schnelleinheiten (Paladin, Ritter, EI) haben Chance.`;
@@ -1668,14 +1676,11 @@
     }
 
     // Small neutral gap — just a divider label
-    if (gapSec >= 5) {
-      return `<div style="display:flex;align-items:center;gap:.5rem;margin:.2rem 0;opacity:.55;">
-        <div style="flex:1;height:1px;background:var(--border);"></div>
-        <span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;">⏱ ${gapLabel} Abstand</span>
-        <div style="flex:1;height:1px;background:var(--border);"></div>
-      </div>`;
-    }
-    return '';
+    return `<div style="display:flex;align-items:center;gap:.5rem;margin:.2rem 0;opacity:.55;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;">⏱ ${gapLabel} Abstand</span>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>`;
   }
 
   // ── Collapse state ────────────────────────────────────────────────────────
@@ -1761,6 +1766,53 @@
     }
   }
 
+  // ── Troop composition estimate based on distance + remaining travel time ──
+  function troopEstimateLine(a) {
+    // Distance between attacker and defender village
+    const dx = (a.own_village_x||0) - (a.attacker_x||0);
+    const dy = (a.own_village_y||0) - (a.attacker_y||0);
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (!dist || !a.server_time_at_import || !a.arrival_time) return '';
+
+    // Remaining travel time at import = lower bound on total travel time
+    const importTs  = new Date(a.server_time_at_import).getTime();
+    const arrivalTs = new Date(a.arrival_time).getTime();
+    const remainSec = Math.round((arrivalTs - importTs) / 1000);
+    if (remainSec <= 0) return '';
+
+    const possible = estimateTroopComposition(dist, remainSec, 1);
+    if (!possible || !possible.length) return '';
+
+    // Slowest possible troop determines the composition
+    const slowest = possible[0]; // first = slowest (sorted by speed asc in TROOP_TYPES)
+    const tp0List  = possible.filter(t => t.tp === 0);
+    const tpList   = possible.filter(t => t.tp > 0);
+
+    // Build short summary: "Langsamste mögliche Einheit: Katapult (TP ≥ 12)"
+    const slowestTp = slowest.tp > 0 ? ` (TP ≥ ${slowest.tp})` : ' (ohne TP)';
+    const distFmt   = dist.toFixed(1);
+    const remainFmt = remainSec >= 3600
+      ? (remainSec/3600).toFixed(1)+'h'
+      : Math.round(remainSec/60)+'min';
+
+    const chips = possible.map(t =>
+      `<span data-tip="${t.name}${t.tp > 0 ? ' ab TP '+t.tp : ''}" style="display:inline-flex;align-items:center;gap:.15rem;
+        background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+        border-radius:4px;padding:.05rem .35rem;font-size:.68rem;color:${t.color};">
+        ${t.icon}${t.tp > 0 ? '<span style="color:var(--text-muted);font-size:.62rem;">TP'+t.tp+'</span>' : ''}
+      </span>`
+    ).join('');
+
+    return `<div style="width:100%;padding:.25rem .3rem .05rem 1.2rem;display:flex;align-items:center;flex-wrap:wrap;gap:.3rem;">
+      <span style="font-size:.67rem;color:var(--text-muted);flex-shrink:0;">
+        📐 ${distFmt} Felder · ⏳ noch ${remainFmt} →
+        <strong style="color:${slowest.color};">${slowest.icon} ${slowest.name}${slowestTp}</strong>
+        könnte langsamste Einheit sein
+      </span>
+      <span style="display:flex;gap:.2rem;flex-wrap:wrap;">${chips}</span>
+    </div>`;
+  }
+
   function renderAttackRow(a) {
     const coordStr = a.attacker_x != null ? ' ('+a.attacker_x+'|'+a.attacker_y+')' : '';
     const troopStr = a.troops_hidden
@@ -1822,6 +1874,7 @@
           style="font-size:.72rem;padding:.25rem .55rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);
                  border-radius:6px;color:#fbbf24;cursor:pointer;white-space:nowrap;flex-shrink:0;">💾 Save</button>
       </div>
+      ${troopEstimateLine(a)}
     </div>`;
   }
 
