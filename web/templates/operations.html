@@ -1944,7 +1944,7 @@ function openWaveEditModal(waveId, targetId) {
   document.getElementById('wmTournament').value = wave.tournament_square || 0;
   document.getElementById('wmNotes').value = wave.notes || '';
   updateTroopGrid();
-  // Set attacker dropdown — flexible name matching (case-insensitive)
+  // ── 1. Find attacker in local data (case-insensitive) ──────────────────────
   const wName = (wave.attacker_name || '').toLowerCase();
   const sel = document.getElementById('wmAttackerSelect');
   const a = attackers.find(a =>
@@ -1953,42 +1953,57 @@ function openWaveEditModal(waveId, targetId) {
     || members.find(m =>
       (m.travian_name||'').toLowerCase() === wName ||
       (m.discord_name||'').toLowerCase() === wName);
+
+  // ── 2. Set tribe — from attacker data, else from stored troop IDs ───────────
+  let detectedTribe = wave.tribe || 'romans';
+  if (a?.tribe && TROOPS_DEF[a.tribe]) {
+    detectedTribe = a.tribe; // attacker DB data is authoritative
+  } else {
+    // Infer from troop IDs in wave
+    const storedIds = Object.keys(wave.troop_json || {}).filter(id => (wave.troop_json[id]||0) > 0);
+    const inferred = Object.entries(TROOPS_DEF).find(([, defs]) =>
+      defs.some(d => storedIds.includes(d.id)));
+    if (inferred) detectedTribe = inferred[0];
+  }
+  document.getElementById('wmTribe').value = detectedTribe;
+
+  // ── 3. Populate attacker dropdown + village list ─────────────────────────────
   if (a) {
     sel.value = a.player_name || a.discord_name;
-    onAttackerSelect(false);
-    // Override tribe with attacker's actual tribe (takes priority over stored wave tribe)
-    if (a.tribe && TROOPS_DEF[a.tribe]) {
-      document.getElementById('wmTribe').value = a.tribe;
-      updateTroopGrid();
-    }
-    // Try to select the right village by coords
+    onAttackerSelect(false); // populates village dropdown
+    // Select matching village by coords
     const vs = document.getElementById('wmVillageSelect');
     for (let i = 0; i < vs.options.length; i++) {
       if (vs.options[i].dataset.x == wave.origin_x && vs.options[i].dataset.y == wave.origin_y) {
         vs.value = i - 1; break;
       }
     }
+    // ── 4. Populate _villageTroops from attacker village at these coords ──────
+    _villageTroops = {};
+    const allTroopDefs = Object.values(TROOPS_DEF).flat();
+    const village = (a.villages || []).find(v => v.x == wave.origin_x && v.y == wave.origin_y);
+    if (village?.troops) {
+      Object.entries(village.troops).forEach(([tname, cnt]) => {
+        const n = parseInt(cnt);
+        if (!n || n <= 0) return;
+        const troop = allTroopDefs.find(t =>
+          t.id === tname || t.name === tname ||
+          t.id.toLowerCase() === tname.toLowerCase() ||
+          t.name.toLowerCase() === tname.toLowerCase()
+        );
+        if (troop) _villageTroops[troop.id] = n;
+      });
+    }
   }
-  // Fill troop counts into chip UI (wave data, not village data)
-  // Load AFTER attacker/tribe is set so picker shows correct tribe
+
+  // ── 5. Re-render picker with correct tribe + available counts ────────────────
+  updateTroopGrid(); // resets _activeTroops — we refill below
+
+  // ── 6. Load wave's actual troop assignments into active chips ────────────────
   _activeTroops = {};
   Object.entries(wave.troop_json || {}).forEach(([id, cnt]) => {
     if (parseInt(cnt) > 0) _activeTroops[id] = parseInt(cnt);
   });
-  // If no stored troops but we know the tribe, derive from troop_json keys
-  // Ensure picker tribe matches the troop IDs present
-  const troopIds = Object.keys(_activeTroops);
-  if (troopIds.length > 0) {
-    const currentTribe = document.getElementById('wmTribe').value;
-    const tribeMatch = Object.entries(TROOPS_DEF).find(([tribe, defs]) =>
-      defs.some(d => troopIds.includes(d.id))
-    );
-    if (tribeMatch && tribeMatch[0] !== currentTribe && !a) {
-      // Only auto-correct tribe from troop IDs if no attacker was found
-      document.getElementById('wmTribe').value = tribeMatch[0];
-      updateTroopGrid();
-    }
-  }
   _renderTroopChips();
   _renderTroopPicker();
   recalcWaveTime();
