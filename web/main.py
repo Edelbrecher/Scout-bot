@@ -6046,12 +6046,14 @@ async def my_ally_troop_roles_page(request: Request, guild_id: str):
     if not guild: return RedirectResponse("/dashboard", status_code=303)
     if not await has_perm(request, guild_id, "ally_manage"):
         return HTMLResponse("Forbidden", status_code=403)
-    roles = await database.get_troop_roles(guild_id)
+    roles      = await database.get_troop_roles(guild_id)
+    crop_map   = await database.get_troop_crop_map(guild_id)
     all_troops = sorted(database.TROOP_ROLE_DEFAULTS.keys())
     flash = request.query_params.get("flash")
     return templates.TemplateResponse("troop_roles.html", {
         "request": request, "guild_id": guild_id, "guild": guild,
         "roles": roles, "all_troops": all_troops, "flash": flash,
+        "crop_map": crop_map, "default_crop_map": database.CROP_MAP,
     })
 
 
@@ -6063,8 +6065,20 @@ async def my_ally_troop_roles_save(request: Request, guild_id: str):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
     valid_roles = {"off", "def", "both", "scout", "siege", "ignore"}
-    new_roles = {k: v for k, v in form.items() if v in valid_roles}
-    await database.save_troop_roles(guild_id, new_roles)
+    new_roles = {}
+    new_crops: dict[str, float] = {}
+    for k, v in form.items():
+        if k.startswith("crop__"):
+            troop = k[6:]
+            try:
+                val = float(v)
+                if val >= 0:
+                    new_crops[troop] = val
+            except (ValueError, TypeError):
+                pass
+        elif v in valid_roles:
+            new_roles[k] = v
+    await database.save_troop_roles(guild_id, new_roles, new_crops)
     return RedirectResponse(f"/guild/{guild_id}/my-ally/troop-roles?flash=saved", status_code=303)
 
 

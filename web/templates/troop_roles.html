@@ -8,7 +8,7 @@
     <div>
       <a href="/guild/{{ guild_id }}/my-ally" class="back-link">← My Ally</a>
       <h1 style="margin:.25rem 0 0;">⚔️ Troops-Rolen</h1>
-      <p style="color:var(--text-muted);font-size:.85rem;margin:.25rem 0 0;">Lege fest wie jede Truppengattung klassifiziert wird. Wirkt sich auf Off/Def/Scout-Scores beim Account-Upload aus.</p>
+      <p style="color:var(--text-muted);font-size:.85rem;margin:.25rem 0 0;">Lege fest wie jede Truppengattung klassifiziert wird. Wirkt sich auf Off/Def/Scout-Scores und Korn/h-Berechnung beim Account-Upload aus.</p>
     </div>
   </div>
 
@@ -48,14 +48,27 @@
         {% for troop in faction_troops_filtered %}
         {% if troop in all_troops or troop in roles %}
         {% set current_role = roles.get(troop, "ignore") %}
-        <div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;border-radius:6px;background:var(--bg);">
-          <span style="min-width:130px;font-size:.85rem;">{{ troop }}</span>
+        {% set default_crop = default_crop_map.get(troop, 1) %}
+        {% set guild_crop   = crop_map.get(troop) %}
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;background:var(--bg);">
+          <span style="min-width:120px;font-size:.85rem;">{{ troop }}</span>
           <select name="{{ troop }}" style="font-size:.8rem;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;"
                   onchange="this.closest('div').style.background=roleColor(this.value)">
             {% for role_key, (label, color, bg) in role_labels.items() %}
             <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
+          <label style="display:flex;align-items:center;gap:.25rem;font-size:.75rem;color:var(--text-muted);white-space:nowrap;" title="Korn/h pro Einheit (Standard: {{ default_crop }})">
+            🌾
+            <input type="number" name="crop__{{ troop }}"
+                   value="{{ guild_crop if guild_crop is not none else default_crop }}"
+                   min="0" max="99" step="0.5"
+                   style="width:42px;background:var(--bg);border:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                          border-radius:4px;color:{% if guild_crop is not none %}#34d399{% else %}var(--text-muted){% endif %};
+                          padding:1px 4px;font-size:.78rem;text-align:center;"
+                   title="Korn/h pro Einheit. Standard: {{ default_crop }}"
+                   onchange="this.style.borderColor=this.value!=={{ default_crop }}?'#34d399':'var(--border)';this.style.color=this.value!=={{ default_crop }}?'#34d399':'var(--text-muted)'">
+          </label>
         </div>
         {% set seen_troops.names = seen_troops.names + [troop] %}
         {% endif %}
@@ -73,14 +86,26 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem;">
         {% for troop in remaining %}
         {% set current_role = roles.get(troop, "ignore") %}
-        <div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;border-radius:6px;background:var(--bg);">
-          <span style="min-width:130px;font-size:.85rem;">{{ troop }}</span>
+        {% set default_crop = default_crop_map.get(troop, 1) %}
+        {% set guild_crop   = crop_map.get(troop) %}
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;background:var(--bg);">
+          <span style="min-width:120px;font-size:.85rem;">{{ troop }}</span>
           <select name="{{ troop }}" style="font-size:.8rem;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;"
                   onchange="this.closest('div').style.background=roleColor(this.value)">
             {% for role_key, (label, color, bg) in role_labels.items() %}
             <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
+          <label style="display:flex;align-items:center;gap:.25rem;font-size:.75rem;color:var(--text-muted);white-space:nowrap;">
+            🌾
+            <input type="number" name="crop__{{ troop }}"
+                   value="{{ guild_crop if guild_crop is not none else default_crop }}"
+                   min="0" max="99" step="0.5"
+                   style="width:42px;background:var(--bg);border:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                          border-radius:4px;color:{% if guild_crop is not none %}#34d399{% else %}var(--text-muted){% endif %};
+                          padding:1px 4px;font-size:.78rem;text-align:center;"
+                   onchange="this.style.borderColor=this.value!=={{ default_crop }}?'#34d399':'var(--border)';this.style.color=this.value!=={{ default_crop }}?'#34d399':'var(--text-muted)'">
+          </label>
         </div>
         {% endfor %}
       </div>

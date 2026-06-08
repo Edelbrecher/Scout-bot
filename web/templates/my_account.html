@@ -412,15 +412,14 @@
               <span style="font-size:.65rem;color:var(--text-muted);display:block;line-height:1;">auto: {{ crop_auto }}</span>
               {% endif %}
             </td>
-            <td style="text-align:center;" id="ts-cell-{{ v.x }}-{{ v.y }}">
+            <td style="text-align:center;white-space:nowrap;" id="ts-cell-{{ v.x }}-{{ v.y }}">
               {% set ts_key = v.x|string + '_' + v.y|string %}
               {% set ts_val = ts_levels.get(ts_key, 0) %}
-              <span
-                id="ts-val-{{ v.x }}-{{ v.y }}"
-                title="Tournament Square Level — klicken zum Bearbeiten"
-                onclick="editTs({{ v.x }}, {{ v.y }}, {{ ts_val }})"
-                style="cursor:pointer;font-size:0.82rem;font-weight:600;color:{% if ts_val %}#93c5fd{% else %}var(--text-muted){% endif %};"
-              >{{ ts_val if ts_val else '—' }}<span style="font-size:.65rem;opacity:.6;margin-left:2px;">✎</span></span>
+              <div style="display:inline-flex;align-items:center;gap:2px;">
+                <button onclick="stepTs({{ v.x }}, {{ v.y }}, -1)" style="width:20px;height:20px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:.75rem;color:var(--text-muted);line-height:1;padding:0;" title="TS verringern">−</button>
+                <span id="ts-val-{{ v.x }}-{{ v.y }}" style="display:inline-block;min-width:22px;text-align:center;font-size:.82rem;font-weight:700;color:{% if ts_val %}#93c5fd{% else %}var(--text-muted){% endif %};">{{ ts_val if ts_val else 0 }}</span>
+                <button onclick="stepTs({{ v.x }}, {{ v.y }}, +1)" style="width:20px;height:20px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:.75rem;color:var(--text-muted);line-height:1;padding:0;" title="TS erhöhen">+</button>
+              </div>
             </td>
             <td>
               {% if v.troops %}
@@ -1176,24 +1175,17 @@ window.editCrop = function(x, y, current) {
   });
 };
 
-window.editTs = function(x, y, current) {
-  const cell = document.getElementById(`ts-cell-${x}-${y}`);
-  if (!cell) return;
-  _inlineEdit(cell, current, 'TS-Level', 0, 20, async (val) => {
-    const r = await fetch('/api/village-ts', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ x, y, ts: val })
-    });
-    if ((await r.json()).ok) {
-      const color = val > 0 ? '#93c5fd' : 'var(--text-muted)';
-      cell.innerHTML = `<span id="ts-val-${x}-${y}" onclick="editTs(${x},${y},${val})"
-        title="Tournament Square Level — klicken zum Bearbeiten"
-        style="cursor:pointer;font-size:.82rem;font-weight:600;color:${color};">
-        ${val > 0 ? val : '—'}<span style="font-size:.65rem;opacity:.6;margin-left:2px;">✎</span>
-      </span>`;
-    } else {
-      cell.innerHTML = `<span style="color:#f87171;font-size:.78rem;">Fehler</span>`;
-    }
+window.stepTs = async function(x, y, delta) {
+  const span = document.getElementById(`ts-val-${x}-${y}`);
+  if (!span) return;
+  const cur = parseInt(span.textContent) || 0;
+  const val = Math.max(0, Math.min(20, cur + delta));
+  if (val === cur) return;
+  span.textContent = val;
+  span.style.color = val > 0 ? '#93c5fd' : 'var(--text-muted)';
+  await fetch('/api/village-ts', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ x, y, ts: val })
   });
 };
 </script>

@@ -4173,6 +4173,7 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         "Siedler": 1, "Held": 0,
     }
     troop_roles = await get_troop_roles(guild_id)
+    guild_crop_map = await get_troop_crop_map(guild_id)
     scout_units = {t for t, r in troop_roles.items() if r == "scout"}
     total_off = sum(v.get("off_score", 0) for v in villages)
     total_def = sum(v.get("def_score", 0) for v in villages)
@@ -4180,8 +4181,10 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         sum(c for t, c in v.get("troops", {}).items() if t in scout_units)
         for v in villages
     )
+    # Use guild-specific crop values if set, else fall back to hardcoded CROP_MAP
+    effective_crop_map = {**CROP_MAP, **guild_crop_map}
     total_crop = sum(
-        sum(CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
+        sum(effective_crop_map.get(t, 1) * c for t, c in v.get("troops", {}).items())
         for v in villages
     )
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -4194,7 +4197,7 @@ async def save_own_villages(guild_id: str, villages: list[dict], uploaded_by: st
         else:
             await db.execute("DELETE FROM guild_own_villages WHERE guild_id = ?", (guild_id,))
         for v in villages:
-            v_crop = v.get("total_crop") or sum(CROP_MAP.get(t, 1) * c for t, c in v.get("troops", {}).items())
+            v_crop = v.get("total_crop") or sum(effective_crop_map.get(t, 1) * c for t, c in v.get("troops", {}).items())
             v_units = v.get("total_units") or sum(v.get("troops", {}).values())
             await db.execute("""
                 INSERT INTO guild_own_villages
@@ -10668,12 +10671,18 @@ async def _init_troop_roles_table():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS troop_roles (
-                guild_id   TEXT NOT NULL,
-                troop_name TEXT NOT NULL,
-                role       TEXT NOT NULL DEFAULT 'ignore',
+                guild_id       TEXT NOT NULL,
+                troop_name     TEXT NOT NULL,
+                role           TEXT NOT NULL DEFAULT 'ignore',
+                crop_per_unit  REAL DEFAULT NULL,
                 PRIMARY KEY (guild_id, troop_name)
             )
         """)
+        # Migration: add crop_per_unit if missing
+        try:
+            await db.execute("ALTER TABLE troop_roles ADD COLUMN crop_per_unit REAL DEFAULT NULL")
+        except Exception:
+            pass
         await db.commit()
 
 async def get_troop_roles(guild_id: str) -> dict[str, str]:
@@ -10688,13 +10697,32 @@ async def get_troop_roles(guild_id: str) -> dict[str, str]:
                 result[row["troop_name"]] = row["role"]
     return result
 
-async def save_troop_roles(guild_id: str, roles: dict[str, str]):
+async def get_troop_crop_map(guild_id: str) -> dict[str, float]:
+    """Return {troop_name: crop_per_unit} — guild overrides merged with CROP_MAP defaults."""
+    await _init_troop_roles_table()
+    result: dict[str, float] = {}
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT troop_name, crop_per_unit FROM troop_roles WHERE guild_id=? AND crop_per_unit IS NOT NULL",
+            (guild_id,)
+        ) as cur:
+            async for row in cur:
+                result[row["troop_name"]] = row["crop_per_unit"]
+    return result
+
+async def save_troop_roles(guild_id: str, roles: dict[str, str], crop_map: dict[str, float] | None = None):
     await _init_troop_roles_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for troop_name, role in roles.items():
+            crop = (crop_map or {}).get(troop_name)
             await db.execute(
-                "INSERT OR REPLACE INTO troop_roles (guild_id, troop_name, role) VALUES (?,?,?)",
-                (guild_id, troop_name, role)
+                """INSERT INTO troop_roles (guild_id, troop_name, role, crop_per_unit)
+                   VALUES (?,?,?,?)
+                   ON CONFLICT(guild_id, troop_name) DO UPDATE SET
+                     role=excluded.role,
+                     crop_per_unit=CASE WHEN excluded.crop_per_unit IS NOT NULL THEN excluded.crop_per_unit ELSE crop_per_unit END""",
+                (guild_id, troop_name, role, crop)
             )
         await db.commit()
 
