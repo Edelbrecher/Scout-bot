@@ -9176,6 +9176,43 @@ async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = No
 
 _BOT_DB_PATH = Path("/app/data/scouter.db")  # shared volume — same DB as bot
 
+async def get_active_def_calls(guild_id: str) -> list[dict]:
+    """Return all open defend channels with aggregated troop contributions."""
+    try:
+        async with aiosqlite.connect(_BOT_DB_PATH, timeout=10) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM defend_channels WHERE guild_id=? AND status='open' ORDER BY created_at DESC",
+                (guild_id,)
+            ) as cur:
+                channels = [dict(r) for r in await cur.fetchall()]
+            result = []
+            for ch in channels:
+                async with db.execute(
+                    "SELECT amount_parsed, grain_per_unit, user_name FROM defend_sent WHERE channel_id=?",
+                    (ch["channel_id"],)
+                ) as cur:
+                    rows = [dict(r) for r in await cur.fetchall()]
+                total_grain = sum(r["amount_parsed"] * r.get("grain_per_unit", 1) for r in rows)
+                goal = int(ch.get("goal") or 0) if str(ch.get("goal","")).isdigit() else 0
+                result.append({
+                    "channel_id":    ch["channel_id"],
+                    "attack_id":     ch.get("attack_id",""),
+                    "defender":      ch.get("coords",""),      # coords = "X|Y" of defended village
+                    "attacker":      ch.get("attacker",""),    # attacker player + village
+                    "coords":        ch.get("coords",""),
+                    "arrival_time":  ch.get("arrival_time",""),
+                    "goal":          ch.get("goal",""),
+                    "total_grain":   total_grain,
+                    "is_full":       goal > 0 and total_grain >= goal,
+                    "contributors":  len(set(r["user_name"] for r in rows)),
+                    "status":        ch.get("status","open"),
+                })
+            return result
+    except Exception:
+        return []
+
+
 async def get_defend_status_for_attack(guild_id: str, attack_id: str) -> dict:
     """Return active defend channel + sent troops for a given attack_id."""
     try:

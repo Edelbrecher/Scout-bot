@@ -5196,6 +5196,17 @@ async def attack_create_defense_call(request: Request, guild_id: str, attack_id:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/guild/{guild_id}/attacks/api/def-calls")
+async def attacks_api_def_calls(request: Request, guild_id: str):
+    """Return all open defend channels with troop fill status."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    calls = await database.get_active_def_calls(guild_id)
+    return JSONResponse(calls)
+
+
 @app.get("/guild/{guild_id}/attacks/{attack_id}/def-status")
 async def attack_def_status(request: Request, guild_id: str, attack_id: int):
     """Return defend channel status + sent troops for a specific attack."""
