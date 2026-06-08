@@ -2104,20 +2104,36 @@ function _renderTroopChips() {
   if (!grid) return;
   const troops = TROOPS_DEF[tribe] || [];
 
-  // Show active chips (troops with count > 0)
-  const active = troops.filter(t => (_activeTroops[t.id] || 0) > 0);
+  const active = troops.filter(t => t.id in _activeTroops);
   grid.innerHTML = active.map(t => {
     const pal = _troopColor(t.name);
     const cnt = _activeTroops[t.id] || '';
-    return `<span class="tc-chip active" id="tchip-${t.id}"
+    return `<span class="tc-chip active" data-tchip="${t.id}"
       style="background:${pal.bg};border-color:${pal.border};color:${pal.color};">
       ${escHtml(t.name)}
-      <input class="tc-amt" id="troop-${t.id}" type="number" min="0" value="${cnt}"
-        placeholder="Anz." oninput="_onTroopAmt('${t.id}', this.value)"
-        onclick="event.stopPropagation()">
-      <span class="tc-x" onclick="_removeTroop('${t.id}')">✕</span>
+      <input class="tc-amt" data-troop-id="${t.id}" type="number" min="0" value="${cnt}" placeholder="Anz.">
+      <span class="tc-x" data-remove="${t.id}">✕</span>
     </span>`;
   }).join('');
+
+  // Event delegation on grid
+  grid.onclick = null;
+  grid.addEventListener('click', function(e) {
+    const rem = e.target.closest('[data-remove]');
+    if (rem) { _removeTroop(rem.dataset.remove); return; }
+  }, {once: false});
+  grid.oninput = null;
+  grid.addEventListener('input', function(e) {
+    const inp = e.target.closest('[data-troop-id]');
+    if (inp) {
+      const n = parseInt(inp.value) || 0;
+      if (n > 0) _activeTroops[inp.dataset.troopId] = n;
+      else _activeTroops[inp.dataset.troopId] = 0;
+      const tr = document.getElementById('wmTribe')?.value || 'romans';
+      _updateTroopSummary(tr);
+      recalcWaveTime();
+    }
+  });
 
   _updateTroopSummary(tribe);
   recalcWaveTime();
@@ -2130,39 +2146,34 @@ function _renderTroopPicker() {
   const troops = TROOPS_DEF[tribe] || [];
   picker.innerHTML = troops.map(t => {
     const pal = _troopColor(t.name);
-    const isActive = (_activeTroops[t.id] || 0) > 0;
+    const isActive = t.id in _activeTroops;
     const style = isActive
-      ? `background:${pal.bg};border-color:${pal.border};color:${pal.color};opacity:.5;`
-      : `background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12);color:var(--text-muted);`;
-    return `<span class="tc-chip" id="tpick-${t.id}" onclick="_addTroop('${t.id}')"
-      style="${style}" title="${t.speed} Fel/h">
-      ${escHtml(t.name)}
+      ? `background:${pal.bg};border-color:${pal.border};color:${pal.color};opacity:.55;`
+      : `background:${pal.bg};border-color:${pal.border};color:${pal.color};`;
+    return `<span class="tc-chip" data-add="${t.id}" style="${style}" title="${t.name} · ${t.speed} Fel/h">
+      ${escHtml(t.name)}${isActive ? ' ✓' : ''}
     </span>`;
   }).join('');
-}
 
-function _updateTroopSummary(tribe) {
-  const troops = TROOPS_DEF[tribe] || [];
-  const parts = troops
-    .filter(t => (_activeTroops[t.id] || 0) > 0)
-    .map(t => `${t.name}: ${_activeTroops[t.id].toLocaleString()}`);
-  document.getElementById('troopSummary').textContent = parts.join(' · ');
-}
-
-function _addTroop(id) {
-  if (id in _activeTroops) {
-    // Already active — focus the amount field
-    const inp = document.getElementById('troop-' + id);
-    if (inp) inp.focus();
-    return;
-  }
-  _activeTroops[id] = 0;
-  _renderTroopChips();
-  _renderTroopPicker();
-  setTimeout(() => {
-    const inp = document.getElementById('troop-' + id);
-    if (inp) inp.focus();
-  }, 30);
+  // Single event-delegation listener on picker container
+  picker.onclick = function(e) {
+    const chip = e.target.closest('[data-add]');
+    if (!chip) return;
+    const id = chip.dataset.add;
+    if (!(id in _activeTroops)) {
+      _activeTroops[id] = 0;
+      _renderTroopChips();
+      _renderTroopPicker();
+      setTimeout(() => {
+        const inp = document.querySelector(`[data-troop-id="${id}"]`);
+        if (inp) inp.focus();
+      }, 30);
+    } else {
+      // already active — focus existing input
+      const inp = document.querySelector(`[data-troop-id="${id}"]`);
+      if (inp) inp.focus();
+    }
+  };
 }
 
 function _removeTroop(id) {
@@ -2171,13 +2182,13 @@ function _removeTroop(id) {
   _renderTroopPicker();
 }
 
-function _onTroopAmt(id, val) {
-  const n = parseInt(val) || 0;
-  if (n > 0) _activeTroops[id] = n;
-  else delete _activeTroops[id];
-  const tribe = document.getElementById('wmTribe')?.value || 'romans';
-  _updateTroopSummary(tribe);
-  recalcWaveTime();
+function _updateTroopSummary(tribe) {
+  const troops = TROOPS_DEF[tribe] || [];
+  const parts = troops
+    .filter(t => (_activeTroops[t.id] || 0) > 0)
+    .map(t => `${t.name}: ${_activeTroops[t.id].toLocaleString()}`);
+  const el = document.getElementById('troopSummary');
+  if (el) el.textContent = parts.join(' · ');
 }
 
 
