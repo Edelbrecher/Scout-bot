@@ -9,10 +9,17 @@
 
   {# ── Header ── #}
   <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
-    <div>
+    <div style="flex:1;">
       <h1 style="margin:0;font-size:1.5rem;">🔎 Player Intelligence</h1>
       <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Search any player from your world — villages, history, mini-map</p>
     </div>
+    {% if intel and tw_world and intel.player_id %}
+    <a href="{{ tw_world }}/spieler.php?uid={{ intel.player_id }}" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text);text-decoration:none;font-size:.82rem;white-space:nowrap;transition:border-color .15s;"
+       onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      🌐 Travian profile ↗
+    </a>
+    {% endif %}
   </div>
 
   {# ── Search bar ── #}
@@ -52,6 +59,8 @@
   {% set vt_labels = {6:'6c',7:'7c',9:'9c',15:'15c'} %}
 
   {# ── Summary cards ── #}
+  {% set trend_icon = {'up': '▲', 'down': '▼', 'same': '●'} %}
+  {% set trend_color = {'up': '#22c55e', 'down': '#ef4444', 'same': 'var(--text-muted)'} %}
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem;">
     {% set lost_count = intel.village_timeline | selectattr('is_active','equalto',false) | list | length %}
     {% for label, val in [
@@ -67,6 +76,27 @@
       <div style="font-size:.9rem;font-weight:600;">{{ val }}</div>
     </div>
     {% endfor %}
+
+    {# ── Rank cards from travian_stats ── #}
+    {% if intel.rank_data %}
+    {% set rd = intel.rank_data %}
+    {% for rlabel, rval, rtrend in [
+      ('Pop Rank',  rd.pop_rank,  rd.pop_trend),
+      ('Off Rank',  rd.off_rank,  rd.off_trend),
+      ('Def Rank',  rd.def_rank,  rd.def_trend),
+      ('Raid Rank', rd.raid_rank, rd.raid_trend),
+    ] %}
+    {% if rval %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;">
+      <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">{{ rlabel }}</div>
+      <div style="font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:.4rem;">
+        #{{ '{:,}'.format(rval) }}
+        <span style="font-size:.75rem;color:{{ trend_color[rtrend] }};" title="{{ 'Rank improved' if rtrend == 'up' else ('Rank dropped' if rtrend == 'down' else 'Unchanged') }}">{{ trend_icon[rtrend] }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start;">
@@ -217,28 +247,75 @@
 const searchInput = document.getElementById('playerSearch');
 const acDrop = document.getElementById('acDropdown');
 let acTimer;
+let acNames = [];
+let acIdx = -1;
+
+function _acHighlight(idx) {
+  const items = acDrop.querySelectorAll('[data-ac-item]');
+  items.forEach((el, i) => el.style.background = i === idx ? 'var(--bg-main)' : '');
+  acIdx = idx;
+}
+
+function _acRender(names) {
+  acNames = names;
+  acIdx = -1;
+  acDrop.innerHTML = names.map((n, i) =>
+    `<div data-ac-item="${i}" data-ac-name="${n.replace(/"/g,'&quot;')}"
+      style="padding:.5rem .85rem;cursor:pointer;font-size:.88rem;border-bottom:1px solid rgba(255,255,255,.04);">${n}</div>`
+  ).join('');
+  // Use mousedown (fires before blur) so dropdown is still visible when we handle it
+  acDrop.addEventListener('mousedown', e => {
+    const item = e.target.closest('[data-ac-item]');
+    if (!item) return;
+    e.preventDefault(); // prevent input blur from hiding the dropdown first
+    selectPlayer(item.dataset.acName);
+  }, { once: false });
+  acDrop.style.display = 'block';
+}
+
 if (searchInput) {
   searchInput.addEventListener('input', () => {
     clearTimeout(acTimer);
     const v = searchInput.value.trim();
-    if (v.length < 2) { acDrop.style.display='none'; return; }
+    if (v.length < 2) { acDrop.style.display='none'; acNames=[]; return; }
     acTimer = setTimeout(async () => {
       const r = await fetch(`/guild/{{ guild.guild_id }}/intel/autocomplete?q=${encodeURIComponent(v)}`);
       const names = await r.json();
-      if (!names.length) { acDrop.style.display='none'; return; }
-      acDrop.innerHTML = names.map(n =>
-        `<div onclick="selectPlayer(${JSON.stringify(n)})"
-          style="padding:.5rem .85rem;cursor:pointer;font-size:.88rem;"
-          onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">${n}</div>`
-      ).join('');
-      acDrop.style.display='block';
-    }, 200);
+      if (!names.length) { acDrop.style.display='none'; acNames=[]; return; }
+      _acRender(names);
+    }, 180);
   });
+
+  searchInput.addEventListener('keydown', e => {
+    if (!acNames.length || acDrop.style.display === 'none') return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _acHighlight(Math.min(acIdx + 1, acNames.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _acHighlight(Math.max(acIdx - 1, 0));
+    } else if (e.key === 'Tab' || e.key === 'Enter') {
+      const pick = acIdx >= 0 ? acNames[acIdx] : acNames[0];
+      if (pick) {
+        e.preventDefault();
+        selectPlayer(pick);
+      }
+    } else if (e.key === 'Escape') {
+      acDrop.style.display = 'none';
+    }
+  });
+
+  searchInput.addEventListener('blur', () => {
+    // Delay so mousedown on dropdown item fires first
+    setTimeout(() => { acDrop.style.display='none'; }, 150);
+  });
+
   document.addEventListener('click', e => { if (!e.target.closest('#searchForm')) acDrop.style.display='none'; });
 }
+
 function selectPlayer(name) {
   searchInput.value = name;
-  acDrop.style.display='none';
+  acDrop.style.display = 'none';
   document.getElementById('searchForm').submit();
 }
 

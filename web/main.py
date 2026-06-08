@@ -13123,6 +13123,7 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
             if not suggestions:
                 error = f"No player found matching '{q}'. Make sure a map snapshot has been loaded."
 
+    tw_world = guild.get("tw_world", "") if isinstance(guild, dict) else getattr(guild, "tw_world", "")
     return templates.TemplateResponse("player_intel.html", {
         "request": request,
         "guild": guild,
@@ -13130,6 +13131,7 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
         "intel": intel,
         "suggestions": suggestions,
         "error": error,
+        "tw_world": (tw_world or "").rstrip("/"),
     })
 
 

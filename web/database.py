@@ -3325,8 +3325,42 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         ) as cur:
             pop_history = [dict(r) for r in await cur.fetchall()]
 
+        # Player ID (for external link)
+        player_id = first.get("player_id") or ""
+
+        # Rank data from travian_stats_entries (latest 2 snapshots)
+        rank_data = {}
+        async with db.execute(
+            """SELECT snapshot_at, pop_rank, off_rank, def_rank, raid_rank
+               FROM travian_stats_entries
+               WHERE guild_id = ? AND lower(player_name) = ?
+               ORDER BY snapshot_at DESC LIMIT 2""",
+            (guild_id, pname_lower)
+        ) as cur:
+            rank_rows = [dict(r) for r in await cur.fetchall()]
+        if rank_rows:
+            latest_r = rank_rows[0]
+            prev_r   = rank_rows[1] if len(rank_rows) > 1 else None
+            def _trend(cur_rank, prev_rank):
+                if cur_rank and prev_rank:
+                    if cur_rank < prev_rank: return "up"   # lower rank number = better
+                    if cur_rank > prev_rank: return "down"
+                return "same"
+            rank_data = {
+                "pop_rank":  latest_r.get("pop_rank") or 0,
+                "off_rank":  latest_r.get("off_rank") or 0,
+                "def_rank":  latest_r.get("def_rank") or 0,
+                "raid_rank": latest_r.get("raid_rank") or 0,
+                "pop_trend":  _trend(latest_r.get("pop_rank"), prev_r.get("pop_rank") if prev_r else None),
+                "off_trend":  _trend(latest_r.get("off_rank"), prev_r.get("off_rank") if prev_r else None),
+                "def_trend":  _trend(latest_r.get("def_rank"), prev_r.get("def_rank") if prev_r else None),
+                "raid_trend": _trend(latest_r.get("raid_rank"), prev_r.get("raid_rank") if prev_r else None),
+                "snapshot_at": latest_r.get("snapshot_at", "")[:10],
+            }
+
         return {
             "player_name": real_name,
+            "player_id": player_id,
             "alliance_name": first.get("alliance_name"),
             "alliance_id": first.get("alliance_id"),
             "tribe": first.get("tribe"),
@@ -3339,6 +3373,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
             "snapshot_count": len(all_ts),
             "latest_snapshot": latest,
             "interval_snaps": interval_snaps,
+            "rank_data": rank_data,
         }
 
 
