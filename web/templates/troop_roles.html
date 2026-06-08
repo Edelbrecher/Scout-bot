@@ -58,17 +58,22 @@
             <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <label style="display:flex;align-items:center;gap:.25rem;font-size:.75rem;color:var(--text-muted);white-space:nowrap;" title="Korn/h pro Einheit (Standard: {{ default_crop }})">
-            🌾
+          <div style="display:flex;align-items:center;gap:0;font-size:.75rem;white-space:nowrap;" title="🌾 Korn/h pro Einheit (Standard: {{ default_crop }})">
+            <span style="color:var(--text-muted);margin-right:3px;">🌾</span>
+            <button type="button" onclick="stepCrop(this,-0.5)" style="width:18px;height:22px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;cursor:pointer;font-size:.8rem;color:var(--text-muted);padding:0;line-height:1;">−</button>
             <input type="number" name="crop__{{ troop }}"
                    value="{{ guild_crop if guild_crop is not none else default_crop }}"
                    min="0" max="99" step="0.5"
-                   style="width:42px;background:var(--bg);border:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
-                          border-radius:4px;color:{% if guild_crop is not none %}#34d399{% else %}var(--text-muted){% endif %};
-                          padding:1px 4px;font-size:.78rem;text-align:center;"
-                   title="Korn/h pro Einheit. Standard: {{ default_crop }}"
-                   onchange="this.style.borderColor=this.value!=={{ default_crop }}?'#34d399':'var(--border)';this.style.color=this.value!=={{ default_crop }}?'#34d399':'var(--text-muted)'">
-          </label>
+                   data-default="{{ default_crop }}"
+                   style="width:36px;height:22px;background:var(--bg);
+                          border:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                          border-radius:0;color:{% if guild_crop is not none %}#34d399{% else %}var(--text-muted){% endif %};
+                          padding:0 2px;font-size:.78rem;text-align:center;
+                          -moz-appearance:textfield;appearance:textfield;"
+                   oninput="syncCropColor(this)"
+                   onchange="syncCropColor(this)">
+            <button type="button" onclick="stepCrop(this,+0.5)" style="width:18px;height:22px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-left:none;border-radius:0 4px 4px 0;cursor:pointer;font-size:.8rem;color:var(--text-muted);padding:0;line-height:1;">+</button>
+          </div>
         </div>
         {% set seen_troops.names = seen_troops.names + [troop] %}
         {% endif %}
@@ -116,7 +121,28 @@
   </form>
 </div>
 
+<style>
+/* hide native number spinner arrows */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+input[type=number] { -moz-appearance:textfield; }
+</style>
 <script>
+function syncCropColor(inp) {
+  const def = parseFloat(inp.dataset.default ?? 1);
+  const val = parseFloat(inp.value);
+  const changed = !isNaN(val) && val !== def;
+  inp.style.borderColor = changed ? '#34d399' : 'var(--border)';
+  inp.style.color       = changed ? '#34d399' : 'var(--text-muted)';
+}
+function stepCrop(btn, delta) {
+  const inp = btn.parentElement.querySelector('input[type=number]');
+  if (!inp) return;
+  const v = Math.max(0, Math.min(99, (parseFloat(inp.value) || 0) + delta));
+  inp.value = Math.round(v * 2) / 2; // snap to 0.5 steps
+  syncCropColor(inp);
+}
+
 const roleBg = {
   off:    'rgba(239,68,68,.12)',
   def:    'rgba(96,165,250,.12)',
