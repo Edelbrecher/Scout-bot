@@ -1725,27 +1725,35 @@
       if (realCount > 0)    headerBadges += `<span style="color:#f87171;">⚠️ ${realCount} real?</span>`;
       if (chiefPattern)     headerBadges += `<span style="color:#93c5fd;">👑 Chief?</span>`;
 
-      html += `<div class="village-card">
-        <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;">
-          <span id="vc-arrow-${safeKey}" style="font-size:.7rem;margin-right:.4rem;color:var(--text-muted);">${isCollapsed?'▶':'▼'}</span>
-          🏰 ${escHtml(g.name)}${escHtml(coords)}
-          <span style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);font-weight:400;display:flex;gap:.5rem;align-items:center;">
-            ${waves.length} Welle(n) · ${g.attacks.length} Eintr.
-            ${headerBadges}
-          </span>
+        // Threat color for village header border
+      const threatColor = realCount > 0 ? '#ef4444' : supportCount > 0 ? '#22c55e' : '#6366f1';
+      const threatBg    = realCount > 0 ? 'rgba(239,68,68,.07)' : supportCount > 0 ? 'rgba(34,197,94,.05)' : 'rgba(99,102,241,.05)';
+
+      html += `<div class="village-card" style="border-left:3px solid ${threatColor};background:${threatBg};margin-bottom:.6rem;">
+        <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.6rem .85rem;display:flex;align-items:center;gap:.6rem;">
+          <span id="vc-arrow-${safeKey}" style="font-size:.65rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
+          <span style="font-size:.92rem;font-weight:800;color:var(--text);">🏰 ${escHtml(g.name)}</span>
+          <span style="font-size:.72rem;color:var(--text-muted);">${escHtml(coords)}</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:.55rem;flex-shrink:0;">
+            <span style="font-size:.72rem;color:var(--text-muted);">${g.attacks.length} Angriffe · ${waves.length} Welle(n)</span>
+            ${realCount    > 0 ? `<span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">⚠️ ${realCount} real</span>` : ''}
+            ${supportCount > 0 ? `<span style="background:rgba(34,197,94,.15);color:#4ade80;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">🛡️ ${supportCount}</span>` : ''}
+            ${chiefPattern     ? `<span style="background:rgba(147,197,253,.12);color:#93c5fd;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">👁️ verdeckt</span>` : ''}
+          </div>
         </div>
-        <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0.3rem;">`;
+        <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0;">`;
 
       for (let wi = 0; wi < waves.length; wi++) {
-        // Wave header (only when multiple waves)
+        // Wave header
         if (waves.length > 1) {
           const waveReal = waves[wi].filter(a => a.attack_type!=='support' && (a.fake_score||50)<60).length;
           const waveHide = waves[wi].some(a => a.troops_hidden);
-          html += `<div style="font-size:.72rem;color:var(--text-muted);padding:.12rem 0 .05rem;
-              border-top:1px solid var(--border);margin-top:.15rem;display:flex;gap:.4rem;align-items:center;">
-            <span>⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}</span>
-            ${waveReal ? `<span style="color:#f87171;font-size:.68rem;">⚠️ ${waveReal} real?</span>` : ''}
-            ${waveHide ? `<span style="color:#c084fc;font-size:.68rem;">👁️ verdeckt</span>` : ''}
+          html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .85rem;
+              background:rgba(255,255,255,.03);border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);">
+            <span style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Welle ${wi+1}</span>
+            <span style="font-size:.72rem;color:var(--text-muted);">— ${fmtArrival(waves[wi][0].arrival_time)}</span>
+            ${waveReal ? `<span style="font-size:.68rem;color:#f87171;margin-left:.2rem;">⚠️ ${waveReal} real</span>` : ''}
+            ${waveHide ? `<span style="font-size:.68rem;color:#c084fc;">👁️ verdeckt</span>` : ''}
           </div>`;
         }
         for (const a of waves[wi]) html += renderAttackRow(a);
@@ -1814,69 +1822,127 @@
   }
 
   function renderAttackRow(a) {
-    const coordStr = a.attacker_x != null ? ' ('+a.attacker_x+'|'+a.attacker_y+')' : '';
-    const troopStr = a.troops_hidden
-      ? '<span style="color:#fbbf24; font-size:0.8rem;">❓ Truppen verdeckt</span>'
-      : '<span style="font-size:0.8rem;">' + (a.troop_count||0) + ' Einh.</span>';
-    const importedBy = a.imported_by_name ? '<span style="color:var(--text-muted);font-size:0.75rem;">von '+escHtml(a.imported_by_name)+'</span>' : '';
-    const lbl = a.label || '';
-    const lblClass = lbl ? ' lbl-'+lbl : '';
-    const cbx = CAN_LABEL
-      ? `<input type="checkbox" class="atk-checkbox" data-id="${a.id}" onchange="onRowCheck(this)" onclick="e=>e.stopPropagation()">`
+    const coordStr  = a.attacker_x != null ? ' ('+a.attacker_x+'|'+a.attacker_y+')' : '';
+    const lbl       = a.label || '';
+    const lblClass  = lbl ? ' lbl-'+lbl : '';
+    const hasNote   = !!(a.notes && a.notes.trim());
+    const heroUrl   = `/guild/${GUILD_ID}/defense/hero-scout/${encodeURIComponent(a.attacker_player)}`;
+    const cbx       = CAN_LABEL
+      ? `<input type="checkbox" class="atk-checkbox" data-id="${a.id}" onchange="onRowCheck(this)" onclick="event.stopPropagation()" style="flex-shrink:0;">`
       : '';
-    const heroUrl = `/guild/${GUILD_ID}/defense/hero-scout/${encodeURIComponent(a.attacker_player)}`;
-    const hasNote = !!(a.notes && a.notes.trim());
-    const noteId = `note-${a.id}`;
-    return `<div class="atk-row${lblClass}" data-id="${a.id}" data-label="${lbl}" style="flex-wrap:wrap;">
-      ${cbx}
-      ${typeBadge(a.attack_type)}
-      <a class="player-link" onclick="openPlayerModal('${escHtml(a.attacker_player).replace(/'/g,"\\'")}')">
-        ${escHtml(a.attacker_player)}
-      </a>
-      <span style="color:var(--text-muted); font-size:0.8rem;">${escHtml(a.attacker_village_name||'')}${escHtml(coordStr)}</span>
-      <span style="color:var(--text-muted);">→</span>
-      <span style="font-size:0.8rem; color:var(--text-muted);">${fmtArrival(a.arrival_time)}</span>
-      <span style="margin-left:auto; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
-        ${troopStr}
-        ${fakeBadge(a.fake_score||50)}
+
+    // Troop info — short version for main row
+    const troopShort = a.troops_hidden
+      ? `<span style="color:#c084fc;font-size:.72rem;">👁️ verdeckt</span>`
+      : (a.troop_count ? `<span style="color:var(--text-muted);font-size:.72rem;">${a.troop_count} Einh.</span>` : '');
+
+    // Score indicator dot
+    const score = a.fake_score || 50;
+    const scoreDot = score >= 70
+      ? `<span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block;flex-shrink:0;" data-tip="Fake Score ${score}%"></span>`
+      : score < 60
+      ? `<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0;" data-tip="Real Score ${score}%"></span>`
+      : `<span style="width:7px;height:7px;border-radius:50%;background:#eab308;display:inline-block;flex-shrink:0;" data-tip="Score ${score}%"></span>`;
+
+    // Note dot indicator
+    const noteDot = hasNote
+      ? `<span style="width:5px;height:5px;border-radius:50%;background:#fbbf24;display:inline-block;" data-tip="Hat Notiz"></span>`
+      : '';
+
+    // ── MAIN ROW (always visible) ───────────────────────────────────────────
+    const mainRow = `
+      <div class="atk-row${lblClass}" data-id="${a.id}" data-label="${lbl}"
+           style="display:flex;align-items:center;gap:.5rem;padding:.38rem .85rem;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;flex-wrap:nowrap;"
+           onclick="toggleAttackDetail(${a.id}, event)">
+        ${cbx}
+        ${scoreDot}
+        ${typeBadge(a.attack_type)}
+        <a class="player-link" onclick="event.stopPropagation();openPlayerModal('${escHtml(a.attacker_player).replace(/'/g,"\\'")}')">
+          ${escHtml(a.attacker_player)}
+        </a>
+        <span style="color:var(--text-muted);font-size:.75rem;flex-shrink:0;">${escHtml(a.attacker_village_name||'')}${escHtml(coordStr)}</span>
+        <span style="flex:1;min-width:0;"></span>
+        ${troopShort}
         ${labelBadge(lbl)}
-        ${CAN_LABEL ? labelButtons(a.id, lbl) : ''}
-        ${importedBy}
-        <a href="${heroUrl}" target="_blank" data-tip="Hero Scout für ${escHtml(a.attacker_player)}"
-           style="font-size:0.78rem;padding:1px 7px;border-radius:8px;cursor:pointer;font-weight:600;
-                  background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);
-                  color:#c084fc;text-decoration:none;white-space:nowrap;">🦸</a>
-        <button onclick="toggleNote(${a.id})" data-tip="${hasNote ? 'Notiz bearbeiten' : 'Notiz hinzufügen'}"
-           style="font-size:0.78rem;padding:1px 7px;border-radius:8px;cursor:pointer;font-weight:600;
-                  background:${hasNote ? 'rgba(251,191,36,.12)' : 'rgba(255,255,255,.04)'};
-                  border:1px solid ${hasNote ? 'rgba(251,191,36,.3)' : 'rgba(255,255,255,.08)'};
-                  color:${hasNote ? '#fbbf24' : 'var(--text-muted)'};">✏️</button>
+        ${noteDot}
+        <span style="color:var(--text-muted);font-size:.78rem;font-family:monospace;flex-shrink:0;">${fmtArrival(a.arrival_time)}</span>
         ${CAN_LABEL
-          ? `<button onclick="openDefenseCallModal(${a.id})" data-tip="Defense-Call erstellen"
-              style="font-size:0.75rem;padding:2px 8px;border-radius:8px;cursor:pointer;font-weight:700;
-                     background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;white-space:nowrap;">🛡️ Def-Call</button>
-             <button onclick="archiveAttack(${a.id})" data-tip="Archivieren"
-              style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">📁</button>
-             <button onclick="deleteAttack(${a.id})" data-tip="Permanent löschen"
-              style="background:none;border:none;color:#f87171;cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">🗑</button>`
-          : `<button onclick="dismissAttack(${a.id})" data-tip="Ausblenden"
-              style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;">&times;</button>`
+          ? `<button onclick="event.stopPropagation();openDefenseCallModal(${a.id})"
+               style="font-size:.7rem;padding:1px 7px;border-radius:6px;cursor:pointer;font-weight:700;
+                      background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;
+                      white-space:nowrap;flex-shrink:0;">🛡️ Def</button>`
+          : `<button onclick="event.stopPropagation();dismissAttack(${a.id})"
+               style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.85rem;flex-shrink:0;">&times;</button>`
         }
-      </span>
-      <div id="${noteId}" style="display:${hasNote ? 'flex' : 'none'};width:100%;padding:.3rem .3rem .1rem 1.2rem;gap:.4rem;align-items:flex-start;">
-        <textarea rows="1" placeholder="Notiz…"
-          style="flex:1;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:6px;
-                 color:var(--text);font-size:.78rem;padding:.3rem .5rem;resize:vertical;min-height:28px;"
-          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';"
-          onblur="saveNote(${a.id},this.value)"
-          id="notetext-${a.id}">${escHtml(a.notes||'')}</textarea>
-        <button onclick="saveNote(${a.id},document.getElementById('notetext-${a.id}').value)"
-          style="font-size:.72rem;padding:.25rem .55rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);
-                 border-radius:6px;color:#fbbf24;cursor:pointer;white-space:nowrap;flex-shrink:0;">💾 Save</button>
-      </div>
-      ${troopEstimateLine(a)}
-    </div>`;
+        <span style="color:var(--text-muted);font-size:.7rem;flex-shrink:0;" id="atk-arrow-${a.id}">▸</span>
+      </div>`;
+
+    // ── DETAIL ROW (collapsed by default) ──────────────────────────────────
+    const detailRow = `
+      <div id="atk-detail-${a.id}" style="display:none;padding:.5rem .85rem .6rem 2.5rem;
+           background:rgba(0,0,0,.15);border-bottom:1px solid rgba(255,255,255,.06);flex-direction:column;gap:.45rem;">
+
+        <!-- Score + troop info -->
+        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+          ${fakeBadge(score)}
+          ${a.troops_hidden
+            ? '<span style="color:#c084fc;font-size:.78rem;">👁️ Truppen verdeckt</span>'
+            : `<span style="color:var(--text-muted);font-size:.78rem;">${a.troop_count||0} Einheiten</span>`}
+          ${a.imported_by_name ? `<span style="color:var(--text-muted);font-size:.72rem;">· importiert von ${escHtml(a.imported_by_name)}</span>` : ''}
+        </div>
+
+        <!-- Troop estimate -->
+        ${troopEstimateLine(a)}
+
+        <!-- Label buttons -->
+        ${CAN_LABEL ? `<div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:.7rem;color:var(--text-muted);">Label:</span>
+          ${labelButtons(a.id, lbl)}
+        </div>` : ''}
+
+        <!-- Note -->
+        <div style="display:flex;gap:.4rem;align-items:flex-start;">
+          <textarea rows="1" id="notetext-${a.id}" placeholder="Notiz…"
+            style="flex:1;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:6px;
+                   color:var(--text);font-size:.76rem;padding:.28rem .45rem;resize:vertical;min-height:26px;"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';"
+            onblur="saveNote(${a.id},this.value)">${escHtml(a.notes||'')}</textarea>
+          <button onclick="saveNote(${a.id},document.getElementById('notetext-${a.id}').value)"
+            style="font-size:.7rem;padding:.2rem .45rem;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);
+                   border-radius:5px;color:#fbbf24;cursor:pointer;white-space:nowrap;flex-shrink:0;">💾</button>
+        </div>
+
+        <!-- Secondary actions -->
+        <div style="display:flex;gap:.4rem;align-items:center;">
+          <a href="${heroUrl}" target="_blank"
+             style="font-size:.72rem;padding:1px 7px;border-radius:5px;background:rgba(168,85,247,.1);
+                    border:1px solid rgba(168,85,247,.25);color:#c084fc;text-decoration:none;">🦸 Hero Scout</a>
+          ${CAN_LABEL ? `
+          <button onclick="archiveAttack(${a.id})"
+            style="font-size:.72rem;padding:1px 7px;border-radius:5px;background:rgba(255,255,255,.04);
+                   border:1px solid rgba(255,255,255,.1);color:var(--text-muted);cursor:pointer;">📁 Archivieren</button>
+          <button onclick="deleteAttack(${a.id})"
+            style="font-size:.72rem;padding:1px 7px;border-radius:5px;background:rgba(239,68,68,.08);
+                   border:1px solid rgba(239,68,68,.2);color:#f87171;cursor:pointer;">🗑 Löschen</button>` : ''}
+        </div>
+      </div>`;
+
+    return mainRow + detailRow;
   }
+
+  window.toggleAttackDetail = function(id, event) {
+    if (event && event.target.closest('input,button,a,textarea')) return;
+    const detail = document.getElementById('atk-detail-' + id);
+    const arrow  = document.getElementById('atk-arrow-' + id);
+    if (!detail) return;
+    const open = detail.style.display === 'flex';
+    detail.style.display = open ? 'none' : 'flex';
+    if (arrow) arrow.textContent = open ? '▸' : '▾';
+    if (!open) {
+      const ta = document.getElementById('notetext-' + id);
+      if (ta) { ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
+    }
+  };
 
   window.toggleNote = function(id) {
     const div = document.getElementById('note-'+id);
