@@ -11984,6 +11984,92 @@ async def get_grain_simulation(guild_id: str, sim_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def _dc_grain_sim_placeholder(): pass  # marker for new section below
+
+
+# ── Def-Call Grain Simulations ────────────────────────────────────────────────
+
+async def _init_dc_grain_sim_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS dc_grain_sims (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id      TEXT NOT NULL,
+                guild_id        TEXT NOT NULL,
+                saved_by        TEXT DEFAULT '',
+                saved_at        TEXT DEFAULT (datetime('now')),
+                current_grain   INTEGER DEFAULT 0,
+                production_h    INTEGER DEFAULT 0,
+                capacity        INTEGER DEFAULT 0,
+                consumption_h   INTEGER DEFAULT 0,
+                net_per_h       INTEGER DEFAULT 0,
+                deliveries_json TEXT DEFAULT '[]',
+                run_out_at      TEXT DEFAULT NULL,
+                market_paste    TEXT DEFAULT ''
+            )
+        """)
+        await db.commit()
+
+
+async def save_dc_grain_sim(guild_id: str, channel_id: str, saved_by: str,
+                             current_grain: int, production_h: int, capacity: int,
+                             consumption_h: int, net_per_h: int,
+                             deliveries_json: str, run_out_at: str | None,
+                             market_paste: str) -> int:
+    """Save a grain sim for a def-call, keeping only the 5 newest (FIFO)."""
+    await _init_dc_grain_sim_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO dc_grain_sims
+                (channel_id, guild_id, saved_by, current_grain, production_h,
+                 capacity, consumption_h, net_per_h, deliveries_json, run_out_at, market_paste)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, (channel_id, guild_id, saved_by, current_grain, production_h,
+              capacity, consumption_h, net_per_h, deliveries_json, run_out_at, market_paste))
+        new_id = cur.lastrowid
+        # FIFO: keep only 5 newest
+        await db.execute("""
+            DELETE FROM dc_grain_sims
+            WHERE channel_id = ? AND guild_id = ?
+              AND id NOT IN (
+                SELECT id FROM dc_grain_sims
+                WHERE channel_id = ? AND guild_id = ?
+                ORDER BY id DESC LIMIT 5
+              )
+        """, (channel_id, guild_id, channel_id, guild_id))
+        await db.commit()
+    return new_id
+
+
+async def get_dc_grain_sims(guild_id: str, channel_id: str) -> list[dict]:
+    """Return up to 5 saved sims for a def-call, newest first."""
+    await _init_dc_grain_sim_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM dc_grain_sims
+            WHERE channel_id = ? AND guild_id = ?
+            ORDER BY id DESC LIMIT 5
+        """, (channel_id, guild_id)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_dc_troop_count_for_user(guild_id: str, channel_id: str, discord_id: str) -> int:
+    """Return total troops sent by this user to this def-call channel (from bot DB)."""
+    try:
+        async with aiosqlite.connect(_BOT_DB_PATH, timeout=10) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("""
+                SELECT COALESCE(SUM(amount_parsed), 0) as total
+                FROM defend_sent
+                WHERE channel_id = ? AND discord_id = ?
+            """, (channel_id, discord_id)) as cur:
+                row = await cur.fetchone()
+                return int(row["total"]) if row else 0
+    except Exception:
+        return 0
+
+
 async def delete_grain_simulation(guild_id: str, sim_id: int, discord_id: str,
                                    is_manager: bool = False) -> bool:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

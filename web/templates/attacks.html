@@ -3653,6 +3653,21 @@ function renderAttackCharts(attacks, groups) {
         <div id="gsm_ok"      style="display:none;margin-top:.5rem;padding:.5rem .75rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:7px;font-size:.8rem;color:#4ade80;"></div>
       </div>
 
+      <!-- Save button -->
+      <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:.75rem;gap:.75rem;">
+        <div id="gsm_save_feedback" style="font-size:.78rem;color:var(--text-muted);"></div>
+        <button onclick="saveGrainSim()"
+          style="background:rgba(251,191,36,.18);border:1px solid rgba(251,191,36,.4);border-radius:8px;color:#fbbf24;font-weight:700;font-size:.82rem;padding:.4rem 1rem;cursor:pointer;">
+          💾 Simulation speichern
+        </button>
+      </div>
+
+      <!-- Saved simulations (loaded on open) -->
+      <div id="gsm_saved_sims" style="display:none;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">📋 Gespeicherte Simulationen</div>
+        <div id="gsm_saved_sims_list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -3684,7 +3699,11 @@ window.openGrainSimModal = function(callData) {
   document.getElementById('gsm_parsed_deliveries').innerHTML = '';
   document.getElementById('gsm_warning').style.display = 'none';
   document.getElementById('gsm_ok').style.display      = 'none';
+  document.getElementById('gsm_save_feedback').textContent = '';
+  document.getElementById('gsm_saved_sims').style.display = 'none';
   if (_gsmChart) { _gsmChart.destroy(); _gsmChart = null; }
+  // Load saved sims for this def-call
+  if (callData.channel_id) _loadGrainSims(callData.channel_id);
 };
 
 window.closeGrainSimModal = function() {
@@ -3836,7 +3855,97 @@ window.updateGrainSim = function() {
   } else {
     warnEl.style.display = 'none'; okEl.style.display = 'none';
   }
+  // stash last run_out_at for save
+  window._gsmLastRunOut = runOutAt;
+  window._gsmLastDeliveries = deliveries;
 };
+
+window.saveGrainSim = async function() {
+  if (!_gsmCall?.channel_id) {
+    document.getElementById('gsm_save_feedback').textContent = '⚠️ Kein Def-Call verknüpft.';
+    return;
+  }
+  const fb = document.getElementById('gsm_save_feedback');
+  fb.textContent = '…';
+  const payload = {
+    channel_id:    _gsmCall.channel_id,
+    current_grain: parseInt(document.getElementById('gsm_current_grain').value) || 0,
+    production_h:  parseInt(document.getElementById('gsm_production').value)    || 0,
+    capacity:      parseInt(document.getElementById('gsm_capacity').value)      || 0,
+    consumption_h: _gsmCall.total_grain || 0,
+    net_per_h:     (parseInt(document.getElementById('gsm_production').value)||0) - (_gsmCall.total_grain||0),
+    deliveries:    (window._gsmLastDeliveries || []).map(d => ({ hour: d.hour, min: d.min, grain: d.grain })),
+    run_out_at:    window._gsmLastRunOut || null,
+    market_paste:  document.getElementById('gsm_market_paste').value,
+  };
+  try {
+    const r = await fetch(`/guild/${window.GUILD_ID}/attacks/api/dc-grain-sim/save`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      fb.textContent = '✅ Gespeichert';
+      fb.style.color = '#4ade80';
+      setTimeout(() => { fb.textContent = ''; fb.style.color = ''; }, 3000);
+      _loadGrainSims(_gsmCall.channel_id);
+    } else {
+      fb.textContent = '❌ Fehler beim Speichern'; fb.style.color = '#f87171';
+    }
+  } catch(e) {
+    fb.textContent = '❌ Netzwerkfehler'; fb.style.color = '#f87171';
+  }
+};
+
+async function _loadGrainSims(channelId) {
+  const listEl = document.getElementById('gsm_saved_sims_list');
+  const wrap   = document.getElementById('gsm_saved_sims');
+  listEl.innerHTML = '<span style="font-size:.75rem;color:var(--text-muted);">Lade…</span>';
+  wrap.style.display = 'block';
+
+  try {
+    const r = await fetch(`/guild/${window.GUILD_ID}/attacks/api/dc-grain-sim/${channelId}`);
+    const d = await r.json();
+
+    if (!d.ok || (!d.has_sims && d.access === 'suggestion' && !d.suggestion)) {
+      wrap.style.display = 'none'; return;
+    }
+
+    if (d.access === 'full') {
+      if (!d.sims.length) { wrap.style.display = 'none'; return; }
+      listEl.innerHTML = d.sims.map(s => {
+        const ts = s.saved_at ? s.saved_at.substring(0,16).replace('T',' ') : '–';
+        const netColor = s.net_per_h >= 0 ? '#4ade80' : '#f87171';
+        const delivHTML = (s.deliveries||[]).map(dv =>
+          `<span style="font-size:.68rem;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15);border-radius:3px;padding:0 5px;color:#86efac;">
+            ${String(dv.hour).padStart(2,'0')}:${String(dv.min).padStart(2,'0')} +${(dv.grain||0).toLocaleString('de-DE')}🌾
+          </span>`).join('');
+        const runOut = s.run_out_at
+          ? `<span style="color:#f87171;font-size:.72rem;">⚠️ läuft um ${s.run_out_at} aus</span>`
+          : `<span style="color:#4ade80;font-size:.72rem;">✅ reicht bis Ankunft</span>`;
+        return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;padding:.5rem .75rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;flex-wrap:wrap;gap:.25rem;">
+            <span style="font-size:.72rem;color:var(--text-muted);">📅 ${ts}</span>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <span style="font-size:.72rem;">📦 ${(s.current_grain||0).toLocaleString('de-DE')}🌾</span>
+              <span style="font-size:.72rem;color:${netColor};">Netto: ${(s.net_per_h||0).toLocaleString('de-DE')}/h</span>
+              ${runOut}
+            </div>
+          </div>
+          ${delivHTML ? `<div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.2rem;">${delivHTML}</div>` : ''}
+        </div>`;
+      }).join('');
+    } else {
+      // Suggestion only
+      const hint = d.suggestion
+        ? `⏰ Empfehlung: Getreide sollte spätestens um <strong>${d.suggestion}</strong> ankommen — danach könnten Truppen verhungern.`
+        : '📊 Getreidedaten werden vom Dorfbesitzer gerade simuliert.';
+      listEl.innerHTML = `<div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:7px;padding:.5rem .8rem;font-size:.8rem;color:#fbbf24;">${hint}</div>`;
+    }
+  } catch(e) {
+    wrap.style.display = 'none';
+  }
+}
 </script>
 
 {% endblock %}

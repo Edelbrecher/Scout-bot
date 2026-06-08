@@ -11181,6 +11181,88 @@ async def api_save_village_ts(request: Request):
     return JSONResponse({"ok": True})
 
 
+@app.post("/guild/{guild_id}/attacks/api/dc-grain-sim/save")
+async def api_save_dc_grain_sim(request: Request, guild_id: str):
+    """Save a grain simulation snapshot for a def-call channel."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    uid = session.get("uid", "")
+    data = await request.json()
+    channel_id   = str(data.get("channel_id", ""))
+    if not channel_id:
+        return JSONResponse({"ok": False, "error": "missing channel_id"})
+    import json as _json
+    new_id = await database.save_dc_grain_sim(
+        guild_id     = guild_id,
+        channel_id   = channel_id,
+        saved_by     = uid,
+        current_grain= int(data.get("current_grain", 0)),
+        production_h = int(data.get("production_h", 0)),
+        capacity     = int(data.get("capacity", 0)),
+        consumption_h= int(data.get("consumption_h", 0)),
+        net_per_h    = int(data.get("net_per_h", 0)),
+        deliveries_json = _json.dumps(data.get("deliveries", [])),
+        run_out_at   = data.get("run_out_at") or None,
+        market_paste = data.get("market_paste", ""),
+    )
+    return JSONResponse({"ok": True, "id": new_id})
+
+
+@app.get("/guild/{guild_id}/attacks/api/dc-grain-sim/{channel_id}")
+async def api_get_dc_grain_sims(request: Request, guild_id: str, channel_id: str):
+    """
+    Return saved grain sims for a def-call.
+    - ≥100 troops sent → full data
+    - <100 troops       → suggestion only (run_out_at of latest sim)
+    """
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    uid = session.get("uid", "")
+
+    troops = await database.get_dc_troop_count_for_user(guild_id, channel_id, uid)
+    sims   = await database.get_dc_grain_sims(guild_id, channel_id)
+
+    if troops >= 100:
+        # Full access
+        import json as _json
+        result = []
+        for s in sims:
+            try:
+                deliveries = _json.loads(s.get("deliveries_json") or "[]")
+            except Exception:
+                deliveries = []
+            result.append({
+                "id":            s["id"],
+                "saved_at":      s["saved_at"],
+                "saved_by":      s["saved_by"],
+                "current_grain": s["current_grain"],
+                "production_h":  s["production_h"],
+                "capacity":      s["capacity"],
+                "consumption_h": s["consumption_h"],
+                "net_per_h":     s["net_per_h"],
+                "deliveries":    deliveries,
+                "run_out_at":    s["run_out_at"],
+                "market_paste":  s["market_paste"],
+            })
+        return JSONResponse({"ok": True, "access": "full", "troops": troops, "sims": result})
+    else:
+        # Suggestion only: just the run_out_at from the latest sim
+        latest = sims[0] if sims else None
+        suggestion = None
+        if latest and latest.get("run_out_at"):
+            suggestion = latest["run_out_at"]
+        return JSONResponse({
+            "ok": True, "access": "suggestion",
+            "troops": troops,
+            "suggestion": suggestion,  # e.g. "19:28" or None
+            "has_sims": len(sims) > 0,
+        })
+
+
 @app.post("/api/village-crop")
 async def api_save_village_crop(request: Request):
     """Save a manual grain/h override for one of the user's villages."""
