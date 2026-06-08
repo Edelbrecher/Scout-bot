@@ -438,6 +438,17 @@
 
     </div><!-- /shared toolbar card -->
 
+    <!-- ══ PLAYER FILTER CHIPS ══════════════════════════════════════════════ -->
+    <div id="playerFilterBar" style="display:none;margin-bottom:.6rem;">
+      <div class="card" style="padding:.5rem .85rem;">
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <span style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;">Spieler</span>
+          <div id="playerFilterChips" style="display:flex;flex-wrap:wrap;gap:.3rem;flex:1;"></div>
+          <button id="playerFilterClearBtn" onclick="clearPlayerFilter()" style="display:none;font-size:.7rem;padding:1px 8px;border-radius:5px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;cursor:pointer;">✕ Alle</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ 2-COLUMN SPLIT VIEW ══════════════════════════════════════════════ -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;align-items:start;">
 
@@ -1422,6 +1433,7 @@
       }
       _allAttacks = window._allAttacks = await resp.json();
       renderVillageList();
+      _renderPlayerChips();
       applyFilters();
     } catch(e) {
       ['colLContent','colRContent'].forEach(id => {
@@ -1477,6 +1489,57 @@
   // ── Column toggle state ───────────────────────────────────────────────────
   // Each entry = set of hidden categories per column ('L' / 'R')
   const _colHide = { L: new Set(), R: new Set() };
+
+  // ── Player filter ─────────────────────────────────────────────────────────
+  const _playerFilter = new Set(); // empty = show all
+
+  function _renderPlayerChips() {
+    const bar    = document.getElementById('playerFilterBar');
+    const chips  = document.getElementById('playerFilterChips');
+    const clearB = document.getElementById('playerFilterClearBtn');
+    if (!bar || !chips) return;
+
+    // Count attacks per player from full dataset
+    const counts = {};
+    for (const a of _allAttacks) {
+      const p = a.attacker_player || '(Unbekannt)';
+      counts[p] = (counts[p] || 0) + 1;
+    }
+    const players = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    if (!players.length) { bar.style.display = 'none'; return; }
+    bar.style.display = 'block';
+
+    chips.innerHTML = players.map(([name, cnt]) => {
+      const active = _playerFilter.size === 0 || _playerFilter.has(name);
+      const selected = _playerFilter.has(name);
+      return `<button onclick="togglePlayerFilter('${escHtml(name).replace(/'/g,"\\'")}')"
+        style="font-size:.74rem;padding:2px 9px;border-radius:10px;cursor:pointer;font-weight:600;
+          transition:all .15s;
+          background:${selected ? 'rgba(99,102,241,.2)' : 'rgba(255,255,255,.04)'};
+          border:1px solid ${selected ? 'rgba(99,102,241,.5)' : 'rgba(255,255,255,.1)'};
+          color:${selected ? '#a5b4fc' : active ? 'var(--text)' : 'var(--text-muted)'};
+          opacity:${_playerFilter.size === 0 || selected ? '1' : '.4'};"
+      >${escHtml(name)} <span style="opacity:.7;">${cnt}</span></button>`;
+    }).join('');
+
+    if (clearB) clearB.style.display = _playerFilter.size > 0 ? 'inline-block' : 'none';
+  }
+
+  window.togglePlayerFilter = function(name) {
+    if (_playerFilter.has(name)) {
+      _playerFilter.delete(name);
+    } else {
+      _playerFilter.add(name);
+    }
+    _renderPlayerChips();
+    applyFilters();
+  };
+
+  window.clearPlayerFilter = function() {
+    _playerFilter.clear();
+    _renderPlayerChips();
+    applyFilters();
+  };
 
   // Toggle definitions: key → { label, icon, color, test(attack) }
   const TOGGLE_DEFS = [
@@ -1536,9 +1599,10 @@
     const colLFilter = document.getElementById('colLFilter')?.value || '';
     const colRFilter = document.getElementById('colRFilter')?.value || '';
 
-    // Base: apply shared type filter
+    // Base: apply shared type filter + player filter
     let base = [..._allAttacks];
     if (typeFilter) base = base.filter(a => a.attack_type === typeFilter);
+    if (_playerFilter.size > 0) base = base.filter(a => _playerFilter.has(a.attacker_player || '(Unbekannt)'));
 
     const leftData  = _filterByCol(base, colLFilter, 'L');
     const rightData = _filterByCol(base, colRFilter, 'R');
