@@ -312,26 +312,26 @@
 
           <!-- Donut 1: Typ -->
           <div>
-            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Typ-Verteilung</div>
-            <div style="position:relative;height:150px;"><canvas id="chartTypeDonut"></canvas></div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Typ-Verteilung</div>
+            <div style="position:relative;height:180px;"><canvas id="chartTypeDonut"></canvas></div>
           </div>
 
           <!-- Donut 2: Fake-Score -->
           <div>
-            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Bedrohungs-Level</div>
-            <div style="position:relative;height:150px;"><canvas id="chartFakeDonut"></canvas></div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Bedrohungs-Level</div>
+            <div style="position:relative;height:180px;"><canvas id="chartFakeDonut"></canvas></div>
           </div>
 
           <!-- Timeline -->
           <div>
-            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Ankunfts-Timeline</div>
-            <div style="position:relative;height:150px;"><canvas id="chartTimeline"></canvas></div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Ankunfts-Timeline</div>
+            <div style="position:relative;height:180px;"><canvas id="chartTimeline"></canvas></div>
           </div>
 
           <!-- Angreifer-Allianzen -->
           <div>
-            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Angreifer-Allianzen</div>
-            <div style="position:relative;height:150px;"><canvas id="chartAllianceBar"></canvas></div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Angreifer-Allianzen</div>
+            <div style="position:relative;height:180px;"><canvas id="chartAllianceBar"></canvas></div>
           </div>
 
         </div>
@@ -341,14 +341,14 @@
 
           <!-- Bedrohung pro Dorf (stacked: real + fake) -->
           <div>
-            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Bedrohung pro Dorf (Real vs Fake)</div>
-            <div style="position:relative;height:140px;"><canvas id="chartVillageThreat"></canvas></div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Bedrohung pro Dorf (Real vs Fake)</div>
+            <div style="position:relative;height:170px;"><canvas id="chartVillageThreat"></canvas></div>
           </div>
 
           <!-- Korn/h pro Dorf -->
           <div>
-            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Korn/h Verbrauch pro Dorf</div>
-            <div style="position:relative;height:140px;"><canvas id="chartCropPerVillage"></canvas></div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Korn/h Verbrauch pro Dorf</div>
+            <div style="position:relative;height:170px;"><canvas id="chartCropPerVillage"></canvas></div>
           </div>
 
         </div>
@@ -2336,10 +2336,10 @@ function renderAttackCharts(attacks, groups) {
     {label:'🌾 Korn/h est.',    value: totalCrop > 0 ? totalCrop.toLocaleString('de') : '?', color:'#fb923c', sub:'geschätzt'},
   ];
   document.getElementById('atkKpiRow').innerHTML = kpis.map(k =>
-    `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.45rem .8rem;min-width:100px;flex:1;">
-       <div style="font-size:.64rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem;">${k.label}</div>
-       <div style="font-size:1.05rem;font-weight:800;font-family:monospace;color:${k.color};line-height:1.2;">${k.value}</div>
-       ${k.sub ? `<div style="font-size:.62rem;color:var(--text-muted);margin-top:.1rem;">${k.sub}</div>` : ''}
+    `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;min-width:110px;flex:1;">
+       <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;">${k.label}</div>
+       <div style="font-size:1.25rem;font-weight:800;font-family:monospace;color:${k.color};line-height:1.2;">${k.value}</div>
+       ${k.sub ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">${k.sub}</div>` : ''}
      </div>`
   ).join('');
 
@@ -2355,7 +2355,7 @@ function renderAttackCharts(attacks, groups) {
     options: {
       responsive:true, maintainAspectRatio:false, cutout:'62%',
       plugins: {
-        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:10}, padding:6 } },
+        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:12}, padding:10 } },
         tooltip: { callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
       }
     }
@@ -2368,7 +2368,7 @@ function renderAttackCharts(attacks, groups) {
   _atkCharts.fakeDonut = new Chart(document.getElementById('chartFakeDonut').getContext('2d'), {
     type: 'doughnut',
     data: {
-      labels: ['🟢 Real (<40)','🟡 Unklar (40-70)','🔴 Fake (≥70)'],
+      labels: ['🟢 Real (<40)','🟡 Unklar (40–70)','🔴 Fake (≥70)'],
       datasets: [{ data: [lvlReal, lvlUnclear, lvlFake],
         backgroundColor: ['rgba(248,113,113,.8)','rgba(251,191,36,.75)','rgba(148,163,184,.7)'],
         borderColor: ['#f87171','#fbbf24','#94a3b8'], borderWidth: 2 }]
@@ -2376,7 +2376,7 @@ function renderAttackCharts(attacks, groups) {
     options: {
       responsive:true, maintainAspectRatio:false, cutout:'62%',
       plugins: {
-        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:9}, padding:5 } },
+        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:11}, padding:8 } },
         tooltip: { callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
       }
     }
@@ -2412,10 +2412,10 @@ function renderAttackCharts(attacks, groups) {
     options: {
       responsive:true, maintainAspectRatio:false,
       scales: {
-        x: { stacked:true, ticks:{color:'#6b7280',font:{size:9},maxRotation:55}, grid:{color:'rgba(255,255,255,.04)'} },
-        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true }
+        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:11},maxRotation:45}, grid:{color:'rgba(255,255,255,.04)'} },
+        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:11},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true }
       },
-      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:10},padding:8} } }
+      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:12},padding:10} } }
     }
   });
 
@@ -2442,10 +2442,10 @@ function renderAttackCharts(attacks, groups) {
     options: {
       responsive:true, maintainAspectRatio:false,
       scales: {
-        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},maxRotation:35}, grid:{color:'rgba(255,255,255,.04)'} },
-        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true }
+        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:11},maxRotation:35}, grid:{color:'rgba(255,255,255,.04)'} },
+        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:11},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true }
       },
-      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:10},padding:8} } }
+      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:12},padding:10} } }
     }
   });
 
@@ -2468,10 +2468,10 @@ function renderAttackCharts(attacks, groups) {
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       scales: {
-        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true },
-        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} }
+        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:11},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true },
+        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:11}}, grid:{color:'rgba(255,255,255,.04)'} }
       },
-      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:10},padding:8} } }
+      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:12},padding:10} } }
     }
   });
 
@@ -2499,8 +2499,8 @@ function renderAttackCharts(attacks, groups) {
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       scales: {
-        x: { ticks:{color:'#9ca3af',font:{size:9},callback:v=>v>=1000?Math.round(v/1000)+'k':v}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true },
-        y: { ticks:{color:'#9ca3af',font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} }
+        x: { ticks:{color:'#9ca3af',font:{size:11},callback:v=>v>=1000?Math.round(v/1000)+'k':v}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true },
+        y: { ticks:{color:'#9ca3af',font:{size:11}}, grid:{color:'rgba(255,255,255,.04)'} }
       },
       plugins: { legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw.toLocaleString('de')} Korn/h`}} }
     }
