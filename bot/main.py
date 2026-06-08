@@ -1369,9 +1369,25 @@ async def handle_create_defend_channel(request: aiohttp_web.Request):
 
     try:
         from cogs.hub import _create_defend_channel_api, DefendCloseView
-        disc_guild = bot.get_guild(int(guild_id))
+        gid_int = int(guild_id)
+        disc_guild = bot.get_guild(gid_int)
         if not disc_guild:
-            return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+            # Cache miss — try fetching; then re-check cache after a moment
+            try:
+                await bot.fetch_guild(gid_int)   # populates cache
+            except Exception:
+                pass
+            disc_guild = bot.get_guild(gid_int)
+        if not disc_guild:
+            # Last resort: direct API fetch (no channel cache, but worth trying)
+            try:
+                disc_guild = await bot.fetch_guild(gid_int)
+            except Exception:
+                disc_guild = None
+        if not disc_guild:
+            known = [str(g.id) for g in bot.guilds]
+            print(f"[defend-channel] guild {guild_id} not found. Bot knows: {known}")
+            return aiohttp_web.json_response({"ok": False, "error": f"guild not found (id={guild_id})"}, status=404)
 
         channel_id, channel_mention = await _create_defend_channel_api(
             guild=disc_guild,
