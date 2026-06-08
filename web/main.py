@@ -5189,7 +5189,7 @@ async def attack_create_defense_call(request: Request, guild_id: str, attack_id:
                 return JSONResponse({"error": data.get("error","bot_error")}, status_code=500)
             # Label attack as need_def if no label yet
             if not attack.get("label"):
-                await database.label_attack(attack_id, "need_def", uid)
+                await database.label_attack(attack_id, guild_id, "need_def", uid)
             return JSONResponse({"ok": True, "channel_id": data.get("channel_id"), "channel_mention": data.get("channel_mention")})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
