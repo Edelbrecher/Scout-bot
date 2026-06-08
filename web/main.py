@@ -5105,6 +5105,35 @@ async def attacks_api_alliance(request: Request, guild_id: str):
     return JSONResponse(attacks)
 
 
+@app.get("/guild/{guild_id}/attacks/api/member-status")
+async def attacks_api_member_status(request: Request, guild_id: str):
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
+    status = await database.get_attack_member_status(guild_id)
+    return JSONResponse(status)
+
+
+@app.get("/guild/{guild_id}/attacks/alliance-overview", response_class=HTMLResponse)
+async def attacks_alliance_overview(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard")
+    uid = session.get("uid", "")
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
+    if err: return err
+    is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id")
+    perms = await database.get_member_permissions(guild_id, uid)
+    can_label = is_admin or "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
+    return templates.TemplateResponse("alliance_attacks.html", {
+        "request": request, "guild": guild, "guild_id": guild_id,
+        "can_label": can_label,
+    })
+
+
 @app.post("/guild/{guild_id}/attacks/dismiss/{attack_id}")
 async def attacks_dismiss(request: Request, guild_id: str, attack_id: int):
     session, err = await _attack_access(request, guild_id)
@@ -9707,6 +9736,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "castle",    "label": "My Alliance",     "url_suffix": "/my-ally"},
     {"type": "item",  "icon": "users",     "label": "Members",         "url_suffix": "/allianz/mitglieder"},
     {"type": "item",  "icon": "shield",    "label": "Defense",         "url_suffix": "/verteidigung"},
+    {"type": "item",  "icon": "alert",     "label": "Alliance Attacks","url_suffix": "/attacks/alliance-overview"},
     {"type": "item",  "icon": "skull",     "label": "Enemies",         "url_suffix": "/enemies"},
     {"type": "item",  "icon": "cross",     "label": "Hospital",        "url_suffix": "/allianz/hospital"},
     {"type": "group", "label": "Tools"},

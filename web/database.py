@@ -9163,6 +9163,24 @@ async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_attack_member_status(guild_id: str) -> list[dict]:
+    """Return per-member import status: who imported, when, how many active attacks."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT imported_by_discord_id, imported_by_name,
+                      MAX(import_time) as last_import,
+                      COUNT(*) as attack_count
+               FROM incoming_attacks
+               WHERE guild_id=? AND is_dismissed=0
+               GROUP BY imported_by_discord_id
+               ORDER BY last_import DESC""",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
 async def label_attack(attack_id: int, guild_id: str, label: str, labeled_by: str) -> bool:
     """Set label on an attack: 'fake' | 'hard' | 'low' | '' (clear).
     Returns True if row was found and updated."""

@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+{% block title %}Allianz-Angriffe · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<div class="container-wide" style="padding-bottom:3rem;">
+  <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Attack Detection</a>
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+    <div>
+      <h1 style="margin:0;font-size:1.5rem;">🛡️ Allianz-Angriffe</h1>
+      <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Alle importierten Rally-Point-Daten aller Mitglieder in einer Ansicht</p>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+      <span id="lastRefresh" style="font-size:.75rem;color:var(--text-muted);"></span>
+      <button onclick="refresh()" class="btn btn-secondary" style="font-size:.83rem;">🔄 Aktualisieren</button>
+      <a href="/guild/{{ guild.guild_id }}/attacks" class="btn btn-secondary" style="font-size:.83rem;">📋 Eigene Angriffe</a>
+    </div>
+  </div>
+
+  <!-- Member Status Bar -->
+  <div id="memberStatusBar" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;padding:.75rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
+    <span style="font-size:.75rem;color:var(--text-muted);align-self:center;margin-right:.25rem;">👥 Import-Status:</span>
+    <span id="memberChips" style="display:flex;flex-wrap:wrap;gap:.4rem;"></span>
+    <span id="noMembers" style="font-size:.8rem;color:var(--text-muted);display:none;">Noch keine Daten importiert. Mitglieder müssen ihren Rallyepunkt importieren.</span>
+  </div>
+
+  <!-- KPI Row -->
+  <div id="kpiRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.65rem;margin-bottom:1.25rem;"></div>
+
+  <!-- Filter Bar -->
+  <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1rem;padding:.65rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+    <span style="font-size:.78rem;color:var(--text-muted);font-weight:600;">Filter:</span>
+    <label style="font-size:.82rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
+      <input type="checkbox" id="fOnlyReal" onchange="applyFiltersAndRender()"> Nur Echtangriffe (Score &lt;60)
+    </label>
+    <label style="font-size:.82rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
+      <input type="checkbox" id="fOnlyHidden" onchange="applyFiltersAndRender()"> Nur verdeckt
+    </label>
+    <label style="font-size:.82rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
+      <input type="checkbox" id="fHideFake" onchange="applyFiltersAndRender()"> Bestätigte Fakes ausblenden
+    </label>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:.4rem;">
+      <span style="font-size:.78rem;color:var(--text-muted);">Sortierung:</span>
+      <select id="sortMode" onchange="applyFiltersAndRender()" style="font-size:.82rem;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:.2rem .5rem;">
+        <option value="arrival">Ankunftszeit ↑</option>
+        <option value="defender">Verteidiger</option>
+        <option value="threat">Bedrohung ↓</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Coordination Warning -->
+  <div id="coordWarning" style="display:none;margin-bottom:1rem;"></div>
+
+  <!-- Main Content -->
+  <div id="mainContent">
+    <div style="text-align:center;color:var(--text-muted);padding:3rem;font-size:.9rem;">⏳ Lade Daten…</div>
+  </div>
+
+  <!-- Auto-refresh indicator -->
+  <div style="text-align:center;margin-top:1.5rem;">
+    <span style="font-size:.72rem;color:var(--text-muted);">🔄 Automatische Aktualisierung alle 30 Sekunden</span>
+  </div>
+</div>
+
+<style>
+.village-block {
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  margin-bottom:.85rem;
+  overflow:hidden;
+}
+.village-block-header {
+  display:flex;align-items:center;gap:.6rem;
+  padding:.65rem 1rem;
+  background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--border);
+  font-weight:700;font-size:.9rem;
+}
+.atk-row {
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  padding:.4rem .85rem;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:.82rem;
+}
+.atk-row:last-child { border-bottom:none; }
+.wave-divider {
+  padding:.2rem .85rem;
+  font-size:.7rem;color:var(--text-muted);
+  background:rgba(255,255,255,.02);
+  border-bottom:1px solid rgba(255,255,255,.04);
+}
+.threat-badge-hard { background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.35);border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700; }
+.threat-badge-fake { background:rgba(148,163,184,.1);color:#94a3b8;border:1px solid rgba(148,163,184,.2);border-radius:4px;padding:1px 7px;font-size:.7rem; }
+.threat-badge-low  { background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.25);border-radius:4px;padding:1px 7px;font-size:.7rem; }
+.member-chip { display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:20px;font-size:.73rem;border:1px solid; }
+.member-chip.fresh  { background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:#4ade80; }
+.member-chip.stale  { background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#fbbf24; }
+.member-chip.old    { background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#f87171; }
+</style>
+
+<script>
+const GUILD_ID = {{ guild.guild_id | tojson }};
+const CAN_LABEL = {{ 'true' if can_label else 'false' }};
+let allAttacks = [];
+let refreshTimer;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit',second:'2-digit'})
+         + ' ' + d.toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit'});
+  } catch { return iso; }
+}
+
+function fmtRelative(iso) {
+  if (!iso) return '—';
+  const diff = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diff < 1) return 'gerade eben';
+  if (diff < 60) return `vor ${diff} Min.`;
+  const h = Math.floor(diff/60), m = diff%60;
+  return `vor ${h}h ${m}m`;
+}
+
+function countdown(iso) {
+  if (!iso) return '—';
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return '<span style="color:#ef4444;">eingetroffen</span>';
+  const h = Math.floor(diff/3600000);
+  const m = Math.floor((diff%3600000)/60000);
+  const s = Math.floor((diff%60000)/1000);
+  const color = diff < 3600000 ? '#f87171' : diff < 7200000 ? '#fbbf24' : '#4ade80';
+  return `<span style="color:${color};font-weight:600;">${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>`;
+}
+
+function fakeBadge(score, label) {
+  if (label === 'fake') return `<span class="threat-badge-fake">✓ Fake</span>`;
+  if (label === 'hard') return `<span class="threat-badge-hard">⚠ Real</span>`;
+  if (label === 'low')  return `<span class="threat-badge-low">~ Low</span>`;
+  if (score >= 75) return `<span class="threat-badge-fake">${score}% Fake</span>`;
+  if (score <= 30) return `<span class="threat-badge-hard">${score}% Fake</span>`;
+  return `<span style="font-size:.7rem;color:var(--text-muted);">${score}% Fake</span>`;
+}
+
+function typeBadge(t) {
+  const map = {attack:'⚔️',raid:'🌾',siege:'🏹',def:'🛡️'};
+  return `<span style="font-size:.85rem;" title="${escHtml(t)}">${map[t]||'⚔️'}</span>`;
+}
+
+function scoreColor(score) {
+  if (score <= 30) return '#f87171';
+  if (score <= 60) return '#fbbf24';
+  return '#4ade80';
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+
+async function loadData() {
+  try {
+    const [atkResp, memResp] = await Promise.all([
+      fetch(`/guild/${GUILD_ID}/attacks/api/alliance`),
+      fetch(`/guild/${GUILD_ID}/attacks/api/member-status`),
+    ]);
+    if (!atkResp.ok) throw new Error('API error');
+    allAttacks = await atkResp.json();
+    const members = memResp.ok ? await memResp.json() : [];
+    renderMemberStatus(members);
+    renderKpi();
+    applyFiltersAndRender();
+    document.getElementById('lastRefresh').textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML =
+      `<div style="text-align:center;color:#f87171;padding:2rem;">Fehler beim Laden: ${escHtml(e.message)}</div>`;
+  }
+}
+
+async function refresh() { await loadData(); }
+
+// ── Member status ─────────────────────────────────────────────────────────────
+
+function renderMemberStatus(members) {
+  const chips = document.getElementById('memberChips');
+  const noMem = document.getElementById('noMembers');
+  if (!members.length) { noMem.style.display=''; chips.innerHTML=''; return; }
+  noMem.style.display='none';
+  chips.innerHTML = members.map(m => {
+    const age = m.last_import ? Math.round((Date.now()-new Date(m.last_import).getTime())/60000) : 9999;
+    const cls = age < 15 ? 'fresh' : age < 60 ? 'stale' : 'old';
+    const icon = age < 15 ? '🟢' : age < 60 ? '🟡' : '🔴';
+    return `<span class="member-chip ${cls}" title="Letzter Import: ${fmtTime(m.last_import)}">
+      ${icon} ${escHtml(m.imported_by_name||'Unbekannt')}
+      <span style="opacity:.65;">(${m.attack_count} Angriffe · ${fmtRelative(m.last_import)})</span>
+    </span>`;
+  }).join('');
+}
+
+// ── KPI ───────────────────────────────────────────────────────────────────────
+
+function renderKpi() {
+  const total   = allAttacks.length;
+  const hidden  = allAttacks.filter(a => a.troops_hidden).length;
+  const real    = allAttacks.filter(a => (a.fake_score||50) < 60 && a.label !== 'fake').length;
+  const labeled = allAttacks.filter(a => a.label === 'fake').length;
+  const defenders = new Set(allAttacks.map(a => `${a.own_village_x}|${a.own_village_y}`)).size;
+  const kpis = [
+    ['⚔️ Angriffe gesamt', total, '#a5b4fc'],
+    ['🏘️ Betroffene Dörfer', defenders, '#818cf8'],
+    ['❓ Verdeckt', hidden, '#fbbf24'],
+    ['🚨 Mögl. Echtangriffe', real, '#f87171'],
+    ['✓ Als Fake markiert', labeled, '#4ade80'],
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(([label, val, color]) =>
+    `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.65rem .9rem;text-align:center;">
+      <div style="font-size:1.35rem;font-weight:700;color:${color};">${val}</div>
+      <div style="font-size:.7rem;color:var(--text-muted);margin-top:.1rem;">${label}</div>
+    </div>`
+  ).join('');
+}
+
+// ── Filter + render ───────────────────────────────────────────────────────────
+
+function applyFiltersAndRender() {
+  let attacks = [...allAttacks];
+  if (document.getElementById('fOnlyReal').checked)   attacks = attacks.filter(a => (a.fake_score||50) < 60);
+  if (document.getElementById('fOnlyHidden').checked) attacks = attacks.filter(a => a.troops_hidden);
+  if (document.getElementById('fHideFake').checked)   attacks = attacks.filter(a => a.label !== 'fake');
+
+  if (!attacks.length) {
+    document.getElementById('coordWarning').style.display = 'none';
+    document.getElementById('mainContent').innerHTML =
+      `<div style="text-align:center;color:var(--text-muted);padding:3rem;font-size:.9rem;">
+        ${allAttacks.length ? '✅ Keine Angriffe nach aktiven Filtern.' : '📭 Keine Angriffe importiert. Mitglieder können ihren Rallyepunkt auf der <a href="/guild/'+GUILD_ID+'/attacks" style="color:var(--accent);">Attack-Detection-Seite</a> einfügen.'}
+      </div>`;
+    return;
+  }
+
+  // Group by defender village
+  const villageMap = {};
+  for (const a of attacks) {
+    const key = `${a.own_village_x}|${a.own_village_y}`;
+    if (!villageMap[key]) villageMap[key] = {
+      name: a.own_village_name, x: a.own_village_x, y: a.own_village_y,
+      owner: a.imported_by_name, attacks: []
+    };
+    villageMap[key].attacks.push(a);
+  }
+
+  // Sort groups
+  const sortMode = document.getElementById('sortMode').value;
+  let keys = Object.keys(villageMap);
+  if (sortMode === 'arrival') {
+    keys.sort((a,b) => (villageMap[a].attacks[0]?.arrival_time||'').localeCompare(villageMap[b].attacks[0]?.arrival_time||''));
+  } else if (sortMode === 'threat') {
+    keys.sort((a,b) => {
+      const minA = Math.min(...villageMap[a].attacks.map(x => x.fake_score||50));
+      const minB = Math.min(...villageMap[b].attacks.map(x => x.fake_score||50));
+      return minA - minB;
+    });
+  } else {
+    keys.sort((a,b) => (villageMap[a].name||'').localeCompare(villageMap[b].name||''));
+  }
+
+  // Coordination warning: multiple villages hit within 30 min
+  const allTs = attacks.map(a => new Date(a.arrival_time||0).getTime()).filter(t=>t>0).sort((a,b)=>a-b);
+  const cwEl = document.getElementById('coordWarning');
+  if (allTs.length > 1 && keys.length > 1) {
+    const windowMin = Math.round((allTs[allTs.length-1] - allTs[0]) / 60000);
+    if (windowMin <= 30) {
+      cwEl.style.display = 'block';
+      cwEl.innerHTML = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.75rem 1rem;font-size:.84rem;color:#f87171;">
+        🚨 <strong>Koordinierter Angriff erkannt!</strong> ${keys.length} Dörfer werden innerhalb von ${windowMin} Minuten angegriffen.
+      </div>`;
+    } else { cwEl.style.display = 'none'; }
+  } else { cwEl.style.display = 'none'; }
+
+  // Render village blocks
+  let html = '';
+  for (const key of keys) {
+    const g = villageMap[key];
+    const waves = groupIntoWaves(g.attacks, 60); // 60s window
+    const realCount = g.attacks.filter(a => (a.fake_score||50) < 60 && a.label !== 'fake').length;
+    const minScore  = Math.min(...g.attacks.map(a => a.fake_score||50));
+    const threatColor = realCount > 0 ? '#f87171' : '#4ade80';
+    const coords = g.x != null ? ` (${g.x}|${g.y})` : '';
+
+    html += `<div class="village-block">
+      <div class="village-block-header">
+        🏰 <span>${escHtml(g.name||'?')}${escHtml(coords)}</span>
+        <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">von ${escHtml(g.owner||'?')}</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:.5rem;font-size:.78rem;font-weight:400;">
+          ${waves.length} Welle(n) · ${g.attacks.length} Angriff(e)
+          ${realCount > 0
+            ? `<span style="color:#f87171;font-weight:600;">⚠ ${realCount} mögl. Real</span>`
+            : `<span style="color:#4ade80;">✓ Nur Fakes</span>`}
+        </span>
+      </div>`;
+
+    for (let wi = 0; wi < waves.length; wi++) {
+      const waveAttacks = waves[wi];
+      if (waves.length > 1) {
+        html += `<div class="wave-divider">⚡ Welle ${wi+1} — Ankunft ${fmtTime(waveAttacks[0]?.arrival_time)}</div>`;
+      }
+      for (const a of waveAttacks) {
+        const troopStr = a.troops_hidden
+          ? `<span style="color:#fbbf24;font-size:.78rem;">❓ verdeckt</span>`
+          : `<span style="font-size:.78rem;color:var(--text-muted);">${(a.troop_count||0).toLocaleString()} Einh.</span>`;
+        const labelBtns = CAN_LABEL ? `
+          <span style="display:flex;gap:.25rem;margin-left:.3rem;">
+            <button onclick="setLabel(${a.id},'fake',this)" title="Als Fake markieren"
+              style="font-size:.65rem;padding:1px 5px;border-radius:4px;cursor:pointer;border:1px solid rgba(148,163,184,.3);background:${a.label==='fake'?'rgba(148,163,184,.25)':'transparent'};color:var(--text-muted);">Fake</button>
+            <button onclick="setLabel(${a.id},'hard',this)" title="Als Echtangriff markieren"
+              style="font-size:.65rem;padding:1px 5px;border-radius:4px;cursor:pointer;border:1px solid rgba(239,68,68,.3);background:${a.label==='hard'?'rgba(239,68,68,.2)':'transparent'};color:#f87171;">Real</button>
+            <button onclick="setLabel(${a.id},'low',this)" title="Als Low markieren"
+              style="font-size:.65rem;padding:1px 5px;border-radius:4px;cursor:pointer;border:1px solid rgba(245,158,11,.3);background:${a.label==='low'?'rgba(245,158,11,.2)':'transparent'};color:#fbbf24;">Low</button>
+          </span>` : '';
+        html += `<div class="atk-row" data-attack-id="${a.id}">
+          ${typeBadge(a.attack_type)}
+          <span style="font-weight:600;min-width:120px;">${escHtml(a.attacker_player||'?')}</span>
+          <span style="color:var(--text-muted);font-size:.78rem;">${escHtml(a.attacker_village_name||'')}${a.attacker_x!=null?' ('+a.attacker_x+'|'+a.attacker_y+')':''}</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+            ${troopStr}
+            <span id="cd-${a.id}" style="min-width:80px;text-align:right;">${countdown(a.arrival_time)}</span>
+            ${fakeBadge(a.fake_score||50, a.label)}
+            ${labelBtns}
+          </span>
+        </div>`;
+      }
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('mainContent').innerHTML = html;
+  startCountdowns();
+}
+
+// ── Wave grouping ─────────────────────────────────────────────────────────────
+
+function groupIntoWaves(attacks, windowSec) {
+  const sorted = [...attacks].sort((a,b) => (a.arrival_time||'').localeCompare(b.arrival_time||''));
+  const waves = [];
+  for (const a of sorted) {
+    const ts = new Date(a.arrival_time||0).getTime()/1000;
+    let placed = false;
+    for (const w of waves) {
+      if (Math.abs(ts - w.base) <= windowSec) { w.attacks.push(a); placed=true; break; }
+    }
+    if (!placed) waves.push({base: ts, attacks: [a]});
+  }
+  return waves.map(w => w.attacks);
+}
+
+// ── Countdown ticker ──────────────────────────────────────────────────────────
+
+let _cdInterval;
+function startCountdowns() {
+  clearInterval(_cdInterval);
+  _cdInterval = setInterval(() => {
+    for (const a of allAttacks) {
+      const el = document.getElementById(`cd-${a.id}`);
+      if (el) el.innerHTML = countdown(a.arrival_time);
+    }
+  }, 1000);
+}
+
+// ── Label actions ─────────────────────────────────────────────────────────────
+
+async function setLabel(id, label, btn) {
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/attacks/label/${id}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({label})
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    // Update local data
+    const a = allAttacks.find(x => x.id === id);
+    if (a) { a.label = label === a.label ? '' : label; }
+    renderKpi();
+    applyFiltersAndRender();
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(async () => {
+    await loadData();
+  }, 30000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+loadData();
+startAutoRefresh();
+</script>
+{% endblock %}
