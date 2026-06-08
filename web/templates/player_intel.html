@@ -5,7 +5,11 @@
 <div class="container-wide" style="padding-bottom:3rem;">
 
   {# ── Back link ── #}
+  {% if intel %}
+  <a href="/guild/{{ guild.guild_id }}/intel" class="back-link">← Player Intelligence</a>
+  {% else %}
   <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+  {% endif %}
 
   {# ── Header ── #}
   <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">

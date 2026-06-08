@@ -630,5 +630,35 @@ function escHtml(s) {
   </footer>
 
 
+<script>
+// Smart back-links: use browser history when available, fallback to href
+(function() {
+  function applySmartBack() {
+    const links = document.querySelectorAll('a.back-link');
+    links.forEach(link => {
+      const fallback = link.href;
+      link.addEventListener('click', function(e) {
+        // Only intercept if there's a same-origin page to go back to
+        if (window.history.length > 1 && document.referrer) {
+          try {
+            const ref = new URL(document.referrer);
+            if (ref.origin === window.location.origin) {
+              e.preventDefault();
+              window.history.back();
+              return;
+            }
+          } catch(_) {}
+        }
+        // Otherwise fall through to the href
+      });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applySmartBack);
+  } else {
+    applySmartBack();
+  }
+})();
+</script>
 </body>
 </html>
