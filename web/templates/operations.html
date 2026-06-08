@@ -1460,35 +1460,49 @@ function _torusDist(x1, y1, x2, y2) {
 const CAT_BASE_SPEED = 3;
 
 // ── Troop colour classification ───────────────────────────────────────────────
-const _TROOP_CATS = {
-  // Katapulte → türkis
-  cat:  new Set(['fire_cat','trebuchet','catapult','hun_cat','stone_cat']),
-  // Rammen → lila
-  ram:  new Set(['bat_ram','gal_ram','teu_ram','hun_ram','egy_ram']),
-  // OFF-Kavallerie → blau
-  cav:  new Set(['eq_imperatoris','eq_caesaris','thunder','druid','haeduan',
-                 'paladin','tk','steppe_rider','marksman','marauder','anhur','resheph']),
-  // DEF-Truppen → rot
-  def:  new Set(['praetorian','phalanx','spearman','slave_militia']),
-  // Scouts → grau (neutral)
-  scout:new Set(['eq_legati','pathfinder','scout','spotter','sopdu']),
-  // Häuptlinge / Siedler → neutral
-  other:new Set(['senator','chieftain','chief','logades','nomarch','settler']),
-};
 const _TROOP_PALETTE = {
-  cat:   {bg:'rgba(20,184,166,.15)',  border:'rgba(20,184,166,.35)',  color:'#2dd4bf'},
-  ram:   {bg:'rgba(168,85,247,.15)', border:'rgba(168,85,247,.35)', color:'#c084fc'},
-  cav:   {bg:'rgba(59,130,246,.15)', border:'rgba(59,130,246,.35)', color:'#60a5fa'},
-  def:   {bg:'rgba(239,68,68,.13)',  border:'rgba(239,68,68,.3)',   color:'#fca5a5'},
-  scout: {bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.25)',color:'#94a3b8'},
-  other: {bg:'rgba(255,255,255,.05)',border:'rgba(255,255,255,.12)',color:'var(--text-muted)'},
-  inf:   {bg:'rgba(34,197,94,.13)',  border:'rgba(34,197,94,.3)',   color:'#86efac'},
+  cat:   {bg:'rgba(20,184,166,.18)',  border:'rgba(20,184,166,.45)',  color:'#2dd4bf'},
+  ram:   {bg:'rgba(168,85,247,.18)', border:'rgba(168,85,247,.45)', color:'#c084fc'},
+  cav:   {bg:'rgba(59,130,246,.18)', border:'rgba(59,130,246,.45)', color:'#60a5fa'},
+  def:   {bg:'rgba(239,68,68,.18)',  border:'rgba(239,68,68,.4)',   color:'#fca5a5'},
+  scout: {bg:'rgba(148,163,184,.12)',border:'rgba(148,163,184,.3)', color:'#94a3b8'},
+  other: {bg:'rgba(255,255,255,.06)',border:'rgba(255,255,255,.14)',color:'var(--text-muted)'},
+  inf:   {bg:'rgba(34,197,94,.18)',  border:'rgba(34,197,94,.4)',   color:'#86efac'},
 };
-function _troopColor(id) {
-  for (const [cat, set] of Object.entries(_TROOP_CATS)) {
-    if (set.has(id)) return _TROOP_PALETTE[cat];
+// Build flat lookup by id AND by name → canonical troop definition
+const _TROOP_ALL = Object.values(TROOPS_DEF).flat();
+const _TROOP_BY_KEY = {};
+_TROOP_ALL.forEach(t => {
+  _TROOP_BY_KEY[t.id] = t;
+  if (t.name) _TROOP_BY_KEY[t.name] = t;
+  // also lowercase variants
+  _TROOP_BY_KEY[t.id.toLowerCase()] = t;
+  if (t.name) _TROOP_BY_KEY[t.name.toLowerCase()] = t;
+});
+// Explicit overrides for siege (can't distinguish from stats alone)
+const _SIEGE_CAT = new Set(['fire_cat','trebuchet','catapult','hun_cat','stone_cat',
+  'Feuerkatapult','Trebuchet','Katapult','Steinkatapult',
+  'Gallier-Kata','Gallierkata','Steinkata']);
+const _SIEGE_RAM = new Set(['bat_ram','gal_ram','teu_ram','hun_ram','egy_ram',
+  'Rammbock','Gallier-Rammbock','Gallierrammbock']);
+const _NEUTRAL   = new Set(['senator','chieftain','chief','logades','nomarch','settler',
+  'Senator','Häuptling','Stammesführer','Logades','Nomarch','Siedler','Held','Hero']);
+
+function _troopColor(rawId) {
+  if (_SIEGE_CAT.has(rawId) || _SIEGE_CAT.has(rawId.toLowerCase())) return _TROOP_PALETTE.cat;
+  if (_SIEGE_RAM.has(rawId) || _SIEGE_RAM.has(rawId.toLowerCase())) return _TROOP_PALETTE.ram;
+  if (_NEUTRAL.has(rawId)   || _NEUTRAL.has(rawId.toLowerCase()))   return _TROOP_PALETTE.other;
+  // Resolve via TROOPS_DEF (by id or German name)
+  const t = _TROOP_BY_KEY[rawId] || _TROOP_BY_KEY[rawId.toLowerCase()];
+  if (!t) return _TROOP_PALETTE.inf; // unknown → green fallback
+  if (t.scout)              return _TROOP_PALETTE.scout;
+  if (t.carry === 0 && (t.attack||0) > 0) {
+    // Siege check by speed (cats=3, rams=4) — already handled above, but fallback:
+    if (t.speed <= 4) return _TROOP_PALETTE.ram;
   }
-  // Default: OFF infantry → grün
+  // Classify by stats: DEF = attack ≤ 40, CAV = speed ≥ 9, else OFF infantry
+  if ((t.attack || 0) <= 40) return _TROOP_PALETTE.def;
+  if (t.speed >= 9)          return _TROOP_PALETTE.cav;
   return _TROOP_PALETTE.inf;
 }
 
