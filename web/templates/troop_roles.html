@@ -16,146 +16,207 @@
   <div class="alert alert-success">✅ Troop roles gespeichert.</div>
   {% endif %}
 
+  {% set role_labels = {
+    "off":    ("🗡️ Off",    "#f87171", "rgba(239,68,68,.15)"),
+    "def":    ("🛡️ Def",    "#60a5fa", "rgba(96,165,250,.15)"),
+    "both":   ("⚔️ Both",   "#a78bfa", "rgba(167,139,250,.15)"),
+    "scout":  ("🔍 Scout",  "#34d399", "rgba(52,211,153,.15)"),
+    "siege":  ("💣 Siege",  "#fb923c", "rgba(251,146,60,.15)"),
+    "ignore": ("— Ignore", "#6b7280", "rgba(107,114,128,.1)"),
+  } %}
+
+  {% set role_colors = {
+    "off":    "rgba(239,68,68,.12)",
+    "def":    "rgba(96,165,250,.12)",
+    "both":   "rgba(167,139,250,.12)",
+    "scout":  "rgba(52,211,153,.12)",
+    "siege":  "rgba(251,146,60,.12)",
+    "ignore": "transparent",
+  } %}
+
+  {% set factions = [
+    ("🏛️ Romans",   ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"]),
+    ("🪓 Teutons",  ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutons-Rammbock","Kriegsmaschine","Häuptling","Tribeesführer","Siedler","Held"]),
+    ("🌿 Gauls",    ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gauls-Rammbock","Gauls-Kata","Siedler","Held"]),
+    ("🏺 Egyptians",["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Siedler","Held"]),
+    ("🏹 Huns",     ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Siedler","Held"]),
+    ("⚡ Spartans", ["Hoplite","Sentinel","Siedler","Held"]),
+  ] %}
+
+  {% set seen_troops = namespace(names=[]) %}
+
   <form method="post" action="/guild/{{ guild_id }}/my-ally/troop-roles">
 
-    {% set role_labels = {
-      "off":    ("🗡️ Off",    "#f87171", "rgba(239,68,68,.15)"),
-      "def":    ("🛡️ Def",    "#60a5fa", "rgba(96,165,250,.15)"),
-      "both":   ("⚔️ Both",   "#a78bfa", "rgba(167,139,250,.15)"),
-      "scout":  ("🔍 Scout",  "#34d399", "rgba(52,211,153,.15)"),
-      "siege":  ("💣 Siege",  "#fb923c", "rgba(251,146,60,.15)"),
-      "ignore": ("— Ignore", "#6b7280", "rgba(107,114,128,.1)"),
-    } %}
-
-    {# Group troops by faction #}
-    {% set factions = [
-      ("Romans",    ["Legionär","Prätorianer","Imperianer","Equites Legati","Equites Imperatoris","Equites Caesaris","Rammbock","Feuerkatapult","Senator","Siedler","Held"]),
-      ("Teutons", ["Keulenschwinger","Speerkämpfer","Axtkämpfer","Späher","Paladin","Teut. Ritter","Teutons-Rammbock","Kriegsmaschine","Häuptling","Tribeesführer","Siedler","Held"]),
-      ("Gauls",  ["Phalanx","Schwertkämpfer","Pathfinder","Theutates-Blitz","Druidentreiter","Haeduer","Gauls-Rammbock","Gauls-Kata","Siedler","Held"]),
-      ("Egyptians",  ["Schleuderer","Ägyptischer Reiter","Khopesh-Krieger","Sopdu-Erkunder","Anhur-Wächter","Resheph-Streitwagen","Siedler","Held"]),
-      ("Huns",   ["Soldat","Lanzenkämpfer","Marauder","Ammende Nomadin","Boyar","Hunnischer Reiter","Siedler","Held"]),
-      ("Spartans",["Hoplite","Sentinel","Siedler","Held"]),
-    ] %}
-
-    {% set seen_troops = namespace(names=[]) %}
+  {# Layout: factions side by side in a responsive grid of cards, each card = table #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:.75rem;margin-bottom:1rem;">
 
     {% for faction_name, faction_troops in factions %}
-    {% set faction_troops_filtered = faction_troops | reject("in", seen_troops.names) | list %}
-    {% if faction_troops_filtered %}
-    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;">
-      <h3 style="margin:0 0 .75rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">{{ faction_name }}</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem;">
-        {% for troop in faction_troops_filtered %}
-        {% if troop in all_troops or troop in roles %}
+    {% set faction_troops_filtered = faction_troops | reject("in", seen_troops.names) | selectattr("in", "equalto", all_troops) | list %}
+    {% if not faction_troops_filtered %}
+      {# also check roles for troops not yet in all_troops #}
+    {% endif %}
+    {% set faction_troops_filtered2 = [] %}
+    {% for t in faction_troops %}
+      {% if t not in seen_troops.names and (t in all_troops or t in roles) %}
+        {% set faction_troops_filtered2 = faction_troops_filtered2 + [t] %}
+      {% endif %}
+    {% endfor %}
+    {% if faction_troops_filtered2 %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="padding:.5rem .85rem;border-bottom:1px solid var(--border);font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">{{ faction_name }}</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+            <th style="padding:.3rem .85rem;text-align:left;font-size:.72rem;color:var(--text-muted);font-weight:600;">Truppe</th>
+            <th style="padding:.3rem .5rem;text-align:left;font-size:.72rem;color:var(--text-muted);font-weight:600;">Rolle</th>
+            <th style="padding:.3rem .85rem .3rem .3rem;text-align:center;font-size:.72rem;color:var(--text-muted);font-weight:600;">🌾 Korn/h</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for troop in faction_troops_filtered2 %}
         {% set current_role = roles.get(troop, "ignore") %}
         {% set default_crop = default_crop_map.get(troop, 1) %}
         {% set guild_crop   = crop_map.get(troop) %}
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;background:var(--bg);">
-          <span style="min-width:120px;font-size:.85rem;">{{ troop }}</span>
-          <select name="{{ troop }}" style="font-size:.8rem;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;"
-                  onchange="this.closest('div').style.background=roleColor(this.value)">
-            {% for role_key, (label, color, bg) in role_labels.items() %}
-            <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          <div style="display:flex;align-items:center;gap:0;font-size:.75rem;white-space:nowrap;" title="🌾 Korn/h pro Einheit (Standard: {{ default_crop }})">
-            <span style="color:var(--text-muted);margin-right:3px;">🌾</span>
-            <button type="button" onclick="stepCrop(this,-0.5)" style="width:18px;height:22px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;cursor:pointer;font-size:.8rem;color:var(--text-muted);padding:0;line-height:1;">−</button>
-            <input type="number" name="crop__{{ troop }}"
-                   value="{{ guild_crop if guild_crop is not none else default_crop }}"
-                   min="0" max="99" step="0.5"
-                   data-default="{{ default_crop }}"
-                   style="width:36px;height:22px;background:var(--bg);
-                          border:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
-                          border-radius:0;color:{% if guild_crop is not none %}#34d399{% else %}var(--text-muted){% endif %};
-                          padding:0 2px;font-size:.78rem;text-align:center;
-                          -moz-appearance:textfield;appearance:textfield;"
-                   oninput="syncCropColor(this)"
-                   onchange="syncCropColor(this)">
-            <button type="button" onclick="stepCrop(this,+0.5)" style="width:18px;height:22px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-left:none;border-radius:0 4px 4px 0;cursor:pointer;font-size:.8rem;color:var(--text-muted);padding:0;line-height:1;">+</button>
-          </div>
-        </div>
+        {% set row_bg = role_colors.get(current_role, "transparent") %}
+        <tr class="troop-row" data-role="{{ current_role }}" style="border-bottom:1px solid rgba(255,255,255,.03);background:{{ row_bg }};">
+          <td style="padding:.35rem .85rem;font-size:.84rem;font-weight:500;white-space:nowrap;">{{ troop }}</td>
+          <td style="padding:.35rem .5rem;">
+            <select name="{{ troop }}"
+                    style="font-size:.8rem;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer;min-width:110px;"
+                    onchange="rowRoleChange(this)">
+              {% for role_key, (label, color, bg) in role_labels.items() %}
+              <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td style="padding:.35rem .85rem .35rem .3rem;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;gap:0;">
+              <button type="button" onclick="stepCrop(this,-1)"
+                      style="width:22px;height:24px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-right:none;border-radius:5px 0 0 5px;cursor:pointer;font-size:.85rem;color:var(--text-muted);padding:0;line-height:1;">−</button>
+              <input type="number" name="crop__{{ troop }}"
+                     value="{{ guild_crop if guild_crop is not none else default_crop }}"
+                     min="0" max="99" step="1"
+                     data-default="{{ default_crop }}"
+                     style="width:40px;height:24px;background:var(--bg);
+                            border-top:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                            border-bottom:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                            border-left:none;border-right:none;border-radius:0;
+                            color:{% if guild_crop is not none %}#34d399{% else %}var(--text){% endif %};
+                            padding:0;font-size:.82rem;font-weight:600;text-align:center;"
+                     oninput="syncCropColor(this)" onchange="syncCropColor(this)">
+              <button type="button" onclick="stepCrop(this,+1)"
+                      style="width:22px;height:24px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-left:none;border-radius:0 5px 5px 0;cursor:pointer;font-size:.85rem;color:var(--text-muted);padding:0;line-height:1;">+</button>
+            </div>
+          </td>
+        </tr>
         {% set seen_troops.names = seen_troops.names + [troop] %}
-        {% endif %}
         {% endfor %}
-      </div>
+        </tbody>
+      </table>
     </div>
     {% endif %}
     {% endfor %}
 
-    {# Any remaining troops not in factions #}
-    {% set remaining = all_troops | reject("in", seen_troops.names) | list %}
+    {# Remaining #}
+    {% set remaining = [] %}
+    {% for t in all_troops %}
+      {% if t not in seen_troops.names %}
+        {% set remaining = remaining + [t] %}
+      {% endif %}
+    {% endfor %}
     {% if remaining %}
-    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;">
-      <h3 style="margin:0 0 .75rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Sonstige</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.5rem;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="padding:.5rem .85rem;border-bottom:1px solid var(--border);font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">⚙️ Sonstige</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+            <th style="padding:.3rem .85rem;text-align:left;font-size:.72rem;color:var(--text-muted);font-weight:600;">Truppe</th>
+            <th style="padding:.3rem .5rem;text-align:left;font-size:.72rem;color:var(--text-muted);font-weight:600;">Rolle</th>
+            <th style="padding:.3rem .85rem .3rem .3rem;text-align:center;font-size:.72rem;color:var(--text-muted);font-weight:600;">🌾 Korn/h</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for troop in remaining %}
         {% set current_role = roles.get(troop, "ignore") %}
         {% set default_crop = default_crop_map.get(troop, 1) %}
         {% set guild_crop   = crop_map.get(troop) %}
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;background:var(--bg);">
-          <span style="min-width:120px;font-size:.85rem;">{{ troop }}</span>
-          <select name="{{ troop }}" style="font-size:.8rem;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;"
-                  onchange="this.closest('div').style.background=roleColor(this.value)">
-            {% for role_key, (label, color, bg) in role_labels.items() %}
-            <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          <label style="display:flex;align-items:center;gap:.25rem;font-size:.75rem;color:var(--text-muted);white-space:nowrap;">
-            🌾
-            <input type="number" name="crop__{{ troop }}"
-                   value="{{ guild_crop if guild_crop is not none else default_crop }}"
-                   min="0" max="99" step="0.5"
-                   style="width:42px;background:var(--bg);border:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
-                          border-radius:4px;color:{% if guild_crop is not none %}#34d399{% else %}var(--text-muted){% endif %};
-                          padding:1px 4px;font-size:.78rem;text-align:center;"
-                   onchange="this.style.borderColor=this.value!=={{ default_crop }}?'#34d399':'var(--border)';this.style.color=this.value!=={{ default_crop }}?'#34d399':'var(--text-muted)'">
-          </label>
-        </div>
+        {% set row_bg = role_colors.get(current_role, "transparent") %}
+        <tr class="troop-row" data-role="{{ current_role }}" style="border-bottom:1px solid rgba(255,255,255,.03);background:{{ row_bg }};">
+          <td style="padding:.35rem .85rem;font-size:.84rem;font-weight:500;white-space:nowrap;">{{ troop }}</td>
+          <td style="padding:.35rem .5rem;">
+            <select name="{{ troop }}"
+                    style="font-size:.8rem;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer;min-width:110px;"
+                    onchange="rowRoleChange(this)">
+              {% for role_key, (label, color, bg) in role_labels.items() %}
+              <option value="{{ role_key }}" {% if current_role == role_key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td style="padding:.35rem .85rem .35rem .3rem;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;gap:0;">
+              <button type="button" onclick="stepCrop(this,-1)"
+                      style="width:22px;height:24px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-right:none;border-radius:5px 0 0 5px;cursor:pointer;font-size:.85rem;color:var(--text-muted);padding:0;line-height:1;">−</button>
+              <input type="number" name="crop__{{ troop }}"
+                     value="{{ guild_crop if guild_crop is not none else default_crop }}"
+                     min="0" max="99" step="1"
+                     data-default="{{ default_crop }}"
+                     style="width:40px;height:24px;background:var(--bg);
+                            border-top:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                            border-bottom:1px solid {% if guild_crop is not none %}#34d399{% else %}var(--border){% endif %};
+                            border-left:none;border-right:none;border-radius:0;
+                            color:{% if guild_crop is not none %}#34d399{% else %}var(--text){% endif %};
+                            padding:0;font-size:.82rem;font-weight:600;text-align:center;"
+                     oninput="syncCropColor(this)" onchange="syncCropColor(this)">
+              <button type="button" onclick="stepCrop(this,+1)"
+                      style="width:22px;height:24px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-left:none;border-radius:0 5px 5px 0;cursor:pointer;font-size:.85rem;color:var(--text-muted);padding:0;line-height:1;">+</button>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
-      </div>
+        </tbody>
+      </table>
     </div>
     {% endif %}
 
-    <button type="submit" class="btn btn-primary" style="margin-top:.5rem;">💾 Speichern</button>
+  </div>{# end grid #}
+
+  <button type="submit" class="btn btn-primary" style="margin-top:.25rem;">💾 Speichern</button>
   </form>
 </div>
 
 <style>
-/* hide native number spinner arrows */
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 input[type=number] { -moz-appearance:textfield; }
+.troop-row:hover { background: rgba(255,255,255,.03) !important; }
 </style>
 <script>
-function syncCropColor(inp) {
-  const def = parseFloat(inp.dataset.default ?? 1);
-  const val = parseFloat(inp.value);
-  const changed = !isNaN(val) && val !== def;
-  inp.style.borderColor = changed ? '#34d399' : 'var(--border)';
-  inp.style.color       = changed ? '#34d399' : 'var(--text-muted)';
-}
-function stepCrop(btn, delta) {
-  const inp = btn.parentElement.querySelector('input[type=number]');
-  if (!inp) return;
-  const v = Math.max(0, Math.min(99, (parseFloat(inp.value) || 0) + delta));
-  inp.value = Math.round(v * 2) / 2; // snap to 0.5 steps
-  syncCropColor(inp);
-}
-
 const roleBg = {
   off:    'rgba(239,68,68,.12)',
   def:    'rgba(96,165,250,.12)',
   both:   'rgba(167,139,250,.12)',
   scout:  'rgba(52,211,153,.12)',
   siege:  'rgba(251,146,60,.12)',
-  ignore: 'var(--bg)',
+  ignore: 'transparent',
 };
-function roleColor(v) { return roleBg[v] || 'var(--bg)'; }
-
-// Apply colors on load
-document.querySelectorAll('select[name]').forEach(sel => {
-  sel.closest('div').style.background = roleColor(sel.value);
-});
+function rowRoleChange(sel) {
+  sel.closest('tr').style.background = roleBg[sel.value] || 'transparent';
+}
+function syncCropColor(inp) {
+  const def = parseFloat(inp.dataset.default ?? 1);
+  const val = parseFloat(inp.value);
+  const changed = !isNaN(val) && val !== def;
+  const c = changed ? '#34d399' : 'var(--border)';
+  inp.style.borderTopColor    = c;
+  inp.style.borderBottomColor = c;
+  inp.style.color = changed ? '#34d399' : 'var(--text)';
+}
+function stepCrop(btn, delta) {
+  const inp = btn.parentElement.querySelector('input[type=number]');
+  if (!inp) return;
+  const v = Math.max(0, Math.min(99, (parseFloat(inp.value) || 0) + delta));
+  inp.value = v;
+  syncCropColor(inp);
+}
 </script>
 {% endblock %}
