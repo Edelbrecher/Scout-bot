@@ -28,43 +28,112 @@
   </div>
 
   <!-- ===== DEFENSE-CALL MODAL ===== -->
-  <div id="defenseCallModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1200;overflow-y:auto;backdrop-filter:blur(4px);">
-    <div style="max-width:520px;margin:2.5rem auto;background:var(--bg-card);border:1px solid rgba(239,68,68,.35);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);">
-      <!-- Header -->
-      <div style="background:linear-gradient(135deg,rgba(239,68,68,.18),rgba(220,38,38,.1));border-bottom:1px solid rgba(239,68,68,.25);padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between;">
+  <div id="defenseCallModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1200;overflow-y:auto;backdrop-filter:blur(5px);">
+    <div style="max-width:580px;margin:2rem auto 3rem;background:var(--bg-card);border:1px solid rgba(239,68,68,.4);border-radius:16px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.7);">
+
+      <!-- ── Header ── -->
+      <div style="background:linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.12));border-bottom:1px solid rgba(239,68,68,.3);padding:1rem 1.3rem;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:1rem;font-weight:800;">🛡️ Defense-Call erstellen</div>
-          <div id="dcm_subtitle" style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;"></div>
+          <div style="font-size:1.05rem;font-weight:800;letter-spacing:.01em;">🛡️ Defense-Call</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.1rem;">Discord-Verteidigungsanfrage erstellen</div>
         </div>
-        <button onclick="closeDefenseCallModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+        <button onclick="closeDefenseCallModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:.2rem .4rem;border-radius:6px;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
       </div>
-      <!-- Attack summary -->
-      <div id="dcm_summary" style="padding:.75rem 1.2rem;background:rgba(239,68,68,.06);border-bottom:1px solid rgba(239,68,68,.15);font-size:.82rem;color:var(--text-muted);line-height:1.6;"></div>
-      <!-- Form -->
-      <div style="padding:1rem 1.2rem;display:flex;flex-direction:column;gap:.85rem;">
+
+      <!-- ── Attack data (auto-filled, read-only) ── -->
+      <div style="padding:.85rem 1.3rem;background:rgba(239,68,68,.05);border-bottom:1px solid rgba(239,68,68,.15);">
+        <div style="font-size:.68rem;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.6rem;">⚔️ Angriffsdetails — automatisch befüllt</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .9rem;">
+          <div>
+            <div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.1rem;">🏰 Zu verteidigendes Dorf</div>
+            <div id="dcm_village" style="font-size:.85rem;font-weight:700;color:var(--text);"></div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.1rem;">⏰ Ankunftszeit</div>
+            <div id="dcm_arrival" style="font-size:.85rem;font-weight:700;color:#fb923c;font-family:monospace;"></div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.1rem;">⚔️ Angreifer</div>
+            <div id="dcm_attacker" style="font-size:.85rem;font-weight:700;color:var(--text);"></div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.1rem;">🛡 Angreifer-Allianz</div>
+            <div id="dcm_atk_ally" style="font-size:.85rem;font-weight:700;color:var(--text);"></div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.1rem;">📍 Angreifer-Dorf</div>
+            <div id="dcm_atk_village" style="font-size:.82rem;color:var(--text-muted);"></div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.1rem;">⏳ Verbleibende Zeit</div>
+            <div id="dcm_countdown" style="font-size:.85rem;font-weight:700;font-family:monospace;color:#fbbf24;"></div>
+          </div>
+        </div>
+        <!-- Fake score + type badges -->
+        <div id="dcm_badges" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.65rem;"></div>
+      </div>
+
+      <!-- ── Form fields ── -->
+      <div style="padding:1rem 1.3rem;display:flex;flex-direction:column;gap:.9rem;">
+
+        <!-- Korn/h — prominent -->
         <div>
-          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.3rem;">🎯 Truppenziel (Korn/h) <span style="font-weight:400;color:var(--text-muted);">optional</span></label>
-          <input id="dcm_goal" type="text" placeholder="z.B. 15000"
-            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.4rem .65rem;font-size:.88rem;">
+          <label style="font-size:.78rem;font-weight:700;color:var(--text);display:block;margin-bottom:.35rem;">
+            🌾 Benötigtes Korn/h (Truppenziel)
+            <span style="font-weight:400;font-size:.72rem;color:var(--text-muted);">— wie viel Verteidigung wird gebraucht?</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <input id="dcm_goal" type="number" min="0" step="500" placeholder="z.B. 20000"
+              style="flex:1;background:var(--bg);border:1px solid rgba(251,191,36,.4);border-radius:8px;color:var(--text);
+                     padding:.5rem .75rem;font-size:1rem;font-weight:700;outline:none;
+                     box-shadow:0 0 0 0 rgba(251,191,36,0);"
+              onfocus="this.style.boxShadow='0 0 0 2px rgba(251,191,36,.25)'"
+              onblur="this.style.boxShadow='0 0 0 0 rgba(251,191,36,0)'">
+            <span style="font-size:.82rem;color:#fbbf24;font-weight:700;white-space:nowrap;">🌾 / h</span>
+          </div>
         </div>
+
+        <!-- Ratio + Arrival type in one row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">⚖️ Verhältnis Fuß/Pferd</label>
+            <input id="dcm_ratio" type="text" placeholder="z.B. 70/30"
+              style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.42rem .65rem;font-size:.88rem;">
+          </div>
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">🎯 Angriffstyp</label>
+            <select id="dcm_type" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.42rem .65rem;font-size:.88rem;">
+              <option value="">Automatisch erkannt</option>
+              <option value="Normalangriff">⚔️ Normalangriff</option>
+              <option value="Chief-Angriff">👑 Chief-Angriff</option>
+              <option value="Def-Fake">👻 Def-Fake</option>
+              <option value="Raubzug">💰 Raubzug</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Notes -->
         <div>
-          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.3rem;">⚖️ Verhältnis Fuß/Pferd <span style="font-weight:400;color:var(--text-muted);">optional, z.B. 70/30</span></label>
-          <input id="dcm_ratio" type="text" placeholder="z.B. 70/30"
-            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.4rem .65rem;font-size:.88rem;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">📝 Notizen für Verteidiger</label>
+          <textarea id="dcm_notes" rows="2" placeholder="z.B. Held schicken, Chief-Zug möglich, priorität hoch…"
+            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.42rem .65rem;font-size:.88rem;resize:vertical;"></textarea>
         </div>
-        <div>
-          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.3rem;">📝 Notizen <span style="font-weight:400;color:var(--text-muted);">optional</span></label>
-          <textarea id="dcm_notes" rows="2" placeholder="Weitere Infos für die Verteidiger…"
-            style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.4rem .65rem;font-size:.88rem;resize:vertical;"></textarea>
+
+        <!-- Info box -->
+        <div style="font-size:.73rem;color:var(--text-muted);background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.18);border-radius:7px;padding:.55rem .8rem;line-height:1.6;">
+          📤 Ein Discord-Kanal wird erstellt und die Defend-Rolle gepingt.<br>
+          Verteidiger posten ihren <strong style="color:var(--text);">Truppenplatz → Unterstützung</strong> + optional <strong style="color:var(--text);">Marktplatz</strong> — das System berechnet wer rechtzeitig ankommt.
         </div>
-        <div style="font-size:.75rem;color:var(--text-muted);background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:7px;padding:.5rem .75rem;line-height:1.5;">
-          ℹ️ Es wird ein Discord-Kanal erstellt. Verteidiger können dort ihren <strong>Truppenplatz → Unterstützung</strong> und optional den <strong>Marktplatz</strong> einfügen, um die Ankunftszeiten und Ressourcen zu berechnen.
-        </div>
-        <div id="dcm_error" style="display:none;color:#f87171;font-size:.8rem;padding:.3rem .5rem;background:rgba(248,113,113,.08);border-radius:6px;"></div>
-        <div style="display:flex;gap:.65rem;justify-content:flex-end;margin-top:.25rem;">
+
+        <div id="dcm_error" style="display:none;color:#f87171;font-size:.8rem;padding:.35rem .65rem;background:rgba(248,113,113,.08);border-radius:6px;border:1px solid rgba(248,113,113,.2);"></div>
+
+        <!-- Buttons -->
+        <div style="display:flex;gap:.7rem;justify-content:flex-end;">
           <button class="btn btn-secondary" onclick="closeDefenseCallModal()">Abbrechen</button>
-          <button id="dcm_btn" class="btn btn-primary" onclick="submitDefenseCall()"
-            style="background:linear-gradient(135deg,#dc2626,#b91c1c);border-color:#dc2626;">
+          <button id="dcm_btn" onclick="submitDefenseCall()"
+            style="padding:.5rem 1.2rem;border-radius:8px;border:1px solid #dc2626;cursor:pointer;font-weight:700;font-size:.9rem;
+                   background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;transition:opacity .15s;"
+            onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
             🛡️ Defense-Call absenden
           </button>
         </div>
@@ -2704,30 +2773,71 @@ function renderAttackCharts(attacks, groups) {
   // DEFENSE-CALL MODAL
   // =========================================================
   let _dcmAttackId = null;
+  let _dcmCountdownTimer = null;
 
   window.openDefenseCallModal = function(attackId) {
     const attack = _allAttacks.find(a => a.id === attackId);
     if (!attack) return;
     _dcmAttackId = attackId;
 
-    // Fill subtitle + summary
-    const arrival = fmtArrival(attack.arrival_time);
-    document.getElementById('dcm_subtitle').textContent =
-      `${attack.own_village_name || '?'} (${attack.own_village_x}|${attack.own_village_y}) — Ankunft: ${arrival}`;
-    document.getElementById('dcm_summary').innerHTML =
-      `⚔️ <strong>${escHtml(attack.attacker_player||'?')}</strong> — ${escHtml(attack.attacker_village_name||'?')} (${attack.attacker_x}|${attack.attacker_y})<br>` +
-      `🏰 Ziel: <strong>${escHtml(attack.own_village_name||'?')}</strong> · ⏰ Ankunft: <strong>${arrival}</strong>` +
-      (attack.attacker_alliance ? ` · Allianz: <strong>${escHtml(attack.attacker_alliance)}</strong>` : '');
+    // ── Auto-fill read-only fields ──────────────────────────────────────────
+    const villageName = `${attack.own_village_name||'?'} (${attack.own_village_x||'?'}|${attack.own_village_y||'?'})`;
+    const attackerName = attack.attacker_player || '?';
+    const atkVillage   = `${attack.attacker_village_name||'?'} (${attack.attacker_x||'?'}|${attack.attacker_y||'?'})`;
 
+    document.getElementById('dcm_village').textContent    = villageName;
+    document.getElementById('dcm_arrival').textContent    = fmtArrival(attack.arrival_time);
+    document.getElementById('dcm_attacker').textContent   = attackerName;
+    document.getElementById('dcm_atk_ally').textContent   = attack.attacker_alliance || '–';
+    document.getElementById('dcm_atk_village').textContent = atkVillage;
+
+    // Countdown
+    if (_dcmCountdownTimer) clearInterval(_dcmCountdownTimer);
+    function updateCountdown() {
+      const ms = new Date(attack.arrival_time).getTime() - Date.now();
+      const el = document.getElementById('dcm_countdown');
+      if (!el) return;
+      if (ms <= 0) { el.textContent = '⛔ Bereits gelandet'; el.style.color='#f87171'; return; }
+      const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
+      el.textContent = h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+      el.style.color = ms < 300000 ? '#f87171' : ms < 1800000 ? '#fbbf24' : '#4ade80';
+    }
+    updateCountdown();
+    _dcmCountdownTimer = setInterval(updateCountdown, 1000);
+
+    // Badges
+    const fs = attack.fake_score || 50;
+    const typeLbl = attack.attack_type === 'raid' ? '💰 Raid' : attack.attack_type === 'support' ? '🛡️ Support' : '⚔️ Angriff';
+    const fakeCol = fs >= 70 ? '#94a3b8' : fs >= 40 ? '#fbbf24' : '#f87171';
+    const fakeLabel = fs >= 70 ? '👻 Wahrsch. Fake' : fs >= 40 ? '🟡 Unklar' : '🔴 Wahrsch. Real';
+    const hiddenBadge = attack.troops_hidden
+      ? `<span style="font-size:.72rem;padding:2px 8px;border-radius:8px;background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.3);color:#c084fc;">👁️ Truppen verdeckt</span>`
+      : '';
+    document.getElementById('dcm_badges').innerHTML =
+      `<span style="font-size:.72rem;padding:2px 8px;border-radius:8px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;">${typeLbl}</span>` +
+      `<span style="font-size:.72rem;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid ${fakeCol}44;color:${fakeCol};">${fakeLabel} (${fs}%)</span>` +
+      hiddenBadge;
+
+    // Auto-select attack type
+    const typeEl = document.getElementById('dcm_type');
+    if (typeEl) {
+      if (attack.attack_type === 'raid') typeEl.value = 'Raubzug';
+      else if (attack.troops_hidden) typeEl.value = '';  // unknown — user picks
+      else typeEl.value = '';
+    }
+
+    // Reset form
     document.getElementById('dcm_goal').value  = '';
     document.getElementById('dcm_ratio').value = '';
     document.getElementById('dcm_notes').value = '';
     document.getElementById('dcm_error').style.display = 'none';
     document.getElementById('defenseCallModal').style.display = 'block';
+    setTimeout(() => document.getElementById('dcm_goal').focus(), 80);
   };
 
   window.closeDefenseCallModal = function() {
     document.getElementById('defenseCallModal').style.display = 'none';
+    if (_dcmCountdownTimer) { clearInterval(_dcmCountdownTimer); _dcmCountdownTimer = null; }
     _dcmAttackId = null;
   };
 
@@ -2738,13 +2848,19 @@ function renderAttackCharts(attacks, groups) {
     btn.disabled = true; btn.textContent = '⏳ Erstelle Kanal…';
     errEl.style.display = 'none';
     try {
+      const atkType = document.getElementById('dcm_type')?.value || '';
+      const notesVal = [
+        document.getElementById('dcm_notes').value.trim(),
+        atkType ? `Typ: ${atkType}` : '',
+      ].filter(Boolean).join(' · ');
+
       const resp = await fetch(`/guild/${GUILD_ID}/attacks/${_dcmAttackId}/defense-call`, {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           troop_goal: document.getElementById('dcm_goal').value.trim(),
           ratio:      document.getElementById('dcm_ratio').value.trim(),
-          notes:      document.getElementById('dcm_notes').value.trim(),
+          notes:      notesVal,
         }),
       });
       const data = await resp.json();
