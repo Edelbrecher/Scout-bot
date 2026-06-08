@@ -1959,12 +1959,13 @@ function openWaveEditModal(waveId, targetId) {
       }
     }
   }
-  // Fill troop counts into chip UI
+  // Fill troop counts into chip UI (wave data, not village data)
   _activeTroops = {};
   Object.entries(wave.troop_json || {}).forEach(([id, cnt]) => {
-    if (cnt > 0) _activeTroops[id] = cnt;
+    if (parseInt(cnt) > 0) _activeTroops[id] = parseInt(cnt);
   });
   _renderTroopChips();
+  _renderTroopPicker();
   recalcWaveTime();
   openModal('waveModal');
 }
@@ -2062,8 +2063,10 @@ function onVillageSelect() {
       t.id.toLowerCase() === tname.toLowerCase()
     );
     if (troop) {
-      _activeTroops[troop.id] = n;
-      _villageTroops[troop.id] = n; // available = what's in the village
+      _villageTroops[troop.id] = n; // nur für Anzeige verfügbarer Truppen
+      // Bei neuer Welle: Dorfbestand als Vorschlag übernehmen
+      // Bei bestehender Welle (editingWaveId): NICHT überschreiben
+      if (!editingWaveId) _activeTroops[troop.id] = n;
     }
   });
   _renderTroopChips();
@@ -2138,7 +2141,7 @@ function _renderTroopChips() {
   if (!grid) return;
   const troops = TROOPS_DEF[tribe] || [];
 
-  const active = troops.filter(t => t.id in _activeTroops);
+  const active = troops.filter(t => t.id in _activeTroops && (_activeTroops[t.id] || 0) >= 0);
   grid.innerHTML = active.map(t => {
     const pal = _troopColor(t.name);
     const cnt = _activeTroops[t.id] || '';
