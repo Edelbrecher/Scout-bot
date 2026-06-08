@@ -708,7 +708,7 @@
 (function() {
   'use strict';
 
-  const GUILD_ID    = '{{ guild.guild_id }}';
+  const GUILD_ID = window.GUILD_ID = '{{ guild.guild_id }}';
   const CAN_LABEL   = {{ 'true' if can_label else 'false' }};
   const CAN_SEE_ALL = {{ 'true' if can_see_all else 'false' }};
   let parsedAttacks = [];
