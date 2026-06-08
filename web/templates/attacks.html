@@ -293,31 +293,66 @@
     </div>
   </div>
 
-  <!-- ===== OWN INCOMING ATTACKS ===== -->
   <!-- ===== CHARTS SECTION ===== -->
   <div id="attackChartsSection" style="display:none; margin-bottom:1.25rem;">
     <div class="card" style="padding:1rem 1.25rem;">
+
+      <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem;">
         <div style="font-size:.9rem;font-weight:700;">📊 Übersicht — Eingehende Truppen</div>
         <button onclick="toggleCharts()" id="btnToggleCharts" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:.2rem .6rem;font-size:.75rem;cursor:pointer;">▲ Charts ausblenden</button>
       </div>
-      <!-- KPI Row -->
-      <div id="atkKpiRow" style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1rem;"></div>
-      <!-- Chart row -->
-      <div style="display:grid;grid-template-columns:200px 1fr 1fr;gap:1rem;align-items:start;">
-        <div>
-          <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Typ-Verteilung</div>
-          <div style="position:relative;height:160px;"><canvas id="chartTypeDonut"></canvas></div>
+
+      <div id="atkChartsBody">
+        <!-- KPI Row -->
+        <div id="atkKpiRow" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.1rem;"></div>
+
+        <!-- Chart grid: 2 donuts | timeline | alliances -->
+        <div style="display:grid;grid-template-columns:160px 160px 1fr 1fr;gap:1rem;align-items:start;margin-bottom:1rem;">
+
+          <!-- Donut 1: Typ -->
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Typ-Verteilung</div>
+            <div style="position:relative;height:150px;"><canvas id="chartTypeDonut"></canvas></div>
+          </div>
+
+          <!-- Donut 2: Fake-Score -->
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Bedrohungs-Level</div>
+            <div style="position:relative;height:150px;"><canvas id="chartFakeDonut"></canvas></div>
+          </div>
+
+          <!-- Timeline -->
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Ankunfts-Timeline</div>
+            <div style="position:relative;height:150px;"><canvas id="chartTimeline"></canvas></div>
+          </div>
+
+          <!-- Angreifer-Allianzen -->
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Angreifer-Allianzen</div>
+            <div style="position:relative;height:150px;"><canvas id="chartAllianceBar"></canvas></div>
+          </div>
+
         </div>
-        <div>
-          <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Ankunfts-Timeline</div>
-          <div style="position:relative;height:160px;"><canvas id="chartTimeline"></canvas></div>
+
+        <!-- Second chart row: Bedrohung pro Dorf + Korn/h -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+          <!-- Bedrohung pro Dorf (stacked: real + fake) -->
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Bedrohung pro Dorf (Real vs Fake)</div>
+            <div style="position:relative;height:140px;"><canvas id="chartVillageThreat"></canvas></div>
+          </div>
+
+          <!-- Korn/h pro Dorf -->
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Korn/h Verbrauch pro Dorf</div>
+            <div style="position:relative;height:140px;"><canvas id="chartCropPerVillage"></canvas></div>
+          </div>
+
         </div>
-        <div>
-          <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Korn/h Verbrauch pro Dorf</div>
-          <div style="position:relative;height:160px;"><canvas id="chartCropPerVillage"></canvas></div>
-        </div>
-      </div>
+      </div><!-- /atkChartsBody -->
     </div>
   </div>
 
@@ -2246,100 +2281,202 @@ function destroyCharts() {
 let _chartsVisible = true;
 window.toggleCharts = function() {
   _chartsVisible = !_chartsVisible;
-  const inner = document.querySelector('#attackChartsSection .card > div:last-child');
-  const kpi   = document.getElementById('atkKpiRow');
-  const btn   = document.getElementById('btnToggleCharts');
-  if (inner) inner.style.display = _chartsVisible ? '' : 'none';
-  if (kpi)   kpi.style.display   = _chartsVisible ? '' : 'none';
-  if (btn)   btn.textContent = _chartsVisible ? '▲ Charts ausblenden' : '▼ Charts anzeigen';
+  const body = document.getElementById('atkChartsBody');
+  const btn  = document.getElementById('btnToggleCharts');
+  if (body) body.style.display = _chartsVisible ? '' : 'none';
+  if (btn)  btn.textContent = _chartsVisible ? '▲ Charts ausblenden' : '▼ Charts anzeigen';
 };
 
 function renderAttackCharts(attacks, groups) {
   destroyCharts();
   document.getElementById('attackChartsSection').style.display = 'block';
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
-  const totalAtk  = attacks.filter(a => a.attack_type === 'attack').length;
-  const totalRaid = attacks.filter(a => a.attack_type === 'raid').length;
-  const totalSup  = attacks.filter(a => a.attack_type === 'support').length;
+  // ── Pre-compute key stats ──────────────────────────────────────────────────
+  const totalAtk    = attacks.filter(a => a.attack_type === 'attack').length;
+  const totalRaid   = attacks.filter(a => a.attack_type === 'raid').length;
+  const totalSup    = attacks.filter(a => a.attack_type === 'support').length;
+  const totalHidden = attacks.filter(a => a.troops_hidden).length;
+  const totalReal   = attacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60).length;
+  const totalFakeScore = attacks.filter(a => (a.fake_score||50) >= 70).length;
   const totalTroops = attacks.reduce((s,a) => s + (a.troop_count||0), 0);
   const totalCrop   = attacks.reduce((s,a) => {
     let d = a.troop_details;
     if (typeof d === 'string') try { d = JSON.parse(d); } catch(e){ d={}; }
     return s + calcCrop(d || {});
   }, 0);
+  const affectedVillages = Object.keys(groups).length;
 
+  // Next arrival
+  const now = Date.now();
+  let nextArr = null, nextDiff = Infinity;
+  for (const a of attacks) {
+    if (!a.arrival_time) continue;
+    const t = new Date(a.arrival_time).getTime();
+    if (t > now && (t - now) < nextDiff) { nextDiff = t - now; nextArr = t; }
+  }
+  const nextLabel = nextArr
+    ? (() => { const s=Math.round(nextDiff/1000); const m=Math.floor(s/60); return m>0?`${m}m ${s%60}s`:`${s}s`; })()
+    : '–';
+
+  // Unique attacking alliances
+  const atkAlliances = [...new Set(attacks.filter(a=>a.attacker_alliance).map(a=>a.attacker_alliance))];
+  const atkPlayers   = [...new Set(attacks.map(a=>a.attacker_player).filter(Boolean))];
+
+  // ── KPI Row ───────────────────────────────────────────────────────────────
   const kpis = [
-    {label:'⚔️ Angriffe',    value: totalAtk,  color:'#f87171'},
-    {label:'💰 Raubzüge',    value: totalRaid, color:'#fbbf24'},
-    {label:'🛡️ Support',     value: totalSup,  color:'#4ade80'},
-    {label:'👣 Truppen',     value: totalTroops.toLocaleString('de'), color:'#a5b4fc'},
-    {label:'🌾 Korn/h est.', value: totalCrop > 0 ? totalCrop.toLocaleString('de') : '?', color:'#fb923c'},
+    {label:'⚔️ Angriffe',      value: totalAtk,         color:'#f87171',  sub: totalRaid ? `+${totalRaid} Raids` : ''},
+    {label:'💰 Raubzüge',      value: totalRaid,         color:'#fbbf24',  sub:''},
+    {label:'🛡️ Support',       value: totalSup,          color:'#4ade80',  sub:''},
+    {label:'👁️ Verdeckt',      value: totalHidden,       color:'#c084fc',  sub: totalHidden ? 'Truppen unsichtbar' : 'alle sichtbar'},
+    {label:'🟢 Wahrsch. Real', value: totalReal,         color:'#f87171',  sub: totalReal ? '⚠️ verteidigen!' : 'keine'},
+    {label:'👻 Wahrsch. Fake', value: totalFakeScore,    color:'#94a3b8',  sub:'Score ≥ 70'},
+    {label:'🏰 Betr. Dörfer',  value: affectedVillages,  color:'#a5b4fc',  sub: `${atkPlayers.length} Angreifer`},
+    {label:'⏱️ Nächster Angriff', value: nextLabel,      color:'#fb923c',  sub:''},
+    {label:'👣 Truppen',        value: totalTroops > 0 ? totalTroops.toLocaleString('de') : '?', color:'#a5b4fc', sub:'sichtbar'},
+    {label:'🌾 Korn/h est.',    value: totalCrop > 0 ? totalCrop.toLocaleString('de') : '?', color:'#fb923c', sub:'geschätzt'},
   ];
   document.getElementById('atkKpiRow').innerHTML = kpis.map(k =>
-    `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem .9rem;min-width:110px;flex:1;">
-       <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">${k.label}</div>
-       <div style="font-size:1.1rem;font-weight:800;font-family:monospace;color:${k.color};">${k.value}</div>
+    `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.45rem .8rem;min-width:100px;flex:1;">
+       <div style="font-size:.64rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem;">${k.label}</div>
+       <div style="font-size:1.05rem;font-weight:800;font-family:monospace;color:${k.color};line-height:1.2;">${k.value}</div>
+       ${k.sub ? `<div style="font-size:.62rem;color:var(--text-muted);margin-top:.1rem;">${k.sub}</div>` : ''}
      </div>`
   ).join('');
 
-  // ── Donut: type breakdown ────────────────────────────────────────────────────
-  const donutCtx = document.getElementById('chartTypeDonut').getContext('2d');
-  _atkCharts.donut = new Chart(donutCtx, {
+  // ── Donut 1: Typ-Verteilung ────────────────────────────────────────────────
+  _atkCharts.donut = new Chart(document.getElementById('chartTypeDonut').getContext('2d'), {
     type: 'doughnut',
     data: {
-      labels: ['Attack','Raid','Support'],
+      labels: ['Angriff','Raubzug','Support'],
       datasets: [{ data: [totalAtk, totalRaid, totalSup],
         backgroundColor: ['rgba(248,113,113,.8)','rgba(251,191,36,.8)','rgba(74,222,128,.8)'],
         borderColor: ['#f87171','#fbbf24','#4ade80'], borderWidth: 2 }]
     },
     options: {
-      responsive:true, maintainAspectRatio:false,
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
       plugins: {
-        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:10}, padding:8 } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
-      },
-      cutout: '60%',
+        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:10}, padding:6 } },
+        tooltip: { callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
+      }
     }
   });
 
-  // ── Bar: arrivals per hour (timeline) ───────────────────────────────────────
+  // ── Donut 2: Bedrohungs-Level ──────────────────────────────────────────────
+  const lvlReal   = attacks.filter(a => (a.fake_score||50) < 40).length;
+  const lvlUnclear= attacks.filter(a => (a.fake_score||50) >= 40 && (a.fake_score||50) < 70).length;
+  const lvlFake   = attacks.filter(a => (a.fake_score||50) >= 70).length;
+  _atkCharts.fakeDonut = new Chart(document.getElementById('chartFakeDonut').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['🟢 Real (<40)','🟡 Unklar (40-70)','🔴 Fake (≥70)'],
+      datasets: [{ data: [lvlReal, lvlUnclear, lvlFake],
+        backgroundColor: ['rgba(248,113,113,.8)','rgba(251,191,36,.75)','rgba(148,163,184,.7)'],
+        borderColor: ['#f87171','#fbbf24','#94a3b8'], borderWidth: 2 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins: {
+        legend: { position:'bottom', labels:{ color:'#9ca3af', font:{size:9}, padding:5 } },
+        tooltip: { callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
+      }
+    }
+  });
+
+  // ── Bar: Ankunfts-Timeline ─────────────────────────────────────────────────
   const buckets = {};
   for (const a of attacks) {
     if (!a.arrival_time) continue;
     try {
       const d = new Date(a.arrival_time);
-      const key = d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-      if (!buckets[key]) buckets[key] = {atk:0, sup:0};
+      const key = d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      if (!buckets[key]) buckets[key] = {atk:0, sup:0, fake:0};
       if (a.attack_type === 'support') buckets[key].sup++;
+      else if ((a.fake_score||50) >= 70) buckets[key].fake++;
       else buckets[key].atk++;
     } catch(e){}
   }
   const tlKeys = Object.keys(buckets).sort();
-  const tlCtx = document.getElementById('chartTimeline').getContext('2d');
-  _atkCharts.timeline = new Chart(tlCtx, {
+  _atkCharts.timeline = new Chart(document.getElementById('chartTimeline').getContext('2d'), {
     type: 'bar',
     data: {
       labels: tlKeys,
       datasets: [
-        { label:'Angriffe/Raids', data: tlKeys.map(k=>buckets[k].atk),
-          backgroundColor:'rgba(248,113,113,.7)', borderColor:'#f87171', borderWidth:1 },
-        { label:'Support',        data: tlKeys.map(k=>buckets[k].sup),
-          backgroundColor:'rgba(74,222,128,.6)',  borderColor:'#4ade80', borderWidth:1 },
+        { label:'Real/Unklar', data: tlKeys.map(k=>buckets[k].atk),
+          backgroundColor:'rgba(248,113,113,.75)', borderColor:'#f87171', borderWidth:1 },
+        { label:'Wahrsch. Fake', data: tlKeys.map(k=>buckets[k].fake),
+          backgroundColor:'rgba(148,163,184,.55)', borderColor:'#94a3b8', borderWidth:1 },
+        { label:'Support', data: tlKeys.map(k=>buckets[k].sup),
+          backgroundColor:'rgba(74,222,128,.6)', borderColor:'#4ade80', borderWidth:1 },
       ]
     },
     options: {
       responsive:true, maintainAspectRatio:false,
       scales: {
-        x: { stacked:true, ticks:{color:'#6b7280',font:{size:9},maxRotation:45}, grid:{color:'rgba(255,255,255,.04)'} },
+        x: { stacked:true, ticks:{color:'#6b7280',font:{size:9},maxRotation:55}, grid:{color:'rgba(255,255,255,.04)'} },
         y: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true }
       },
       plugins: { legend:{ labels:{color:'#9ca3af',font:{size:10},padding:8} } }
     }
   });
 
-  // ── Horizontal bar: crop per village ────────────────────────────────────────
-  const villageNames = [], villageCrop = [], villageColors = [];
+  // ── Bar: Angreifer-Allianzen ───────────────────────────────────────────────
+  const alliMap = {};
+  for (const a of attacks) {
+    const ally = a.attacker_alliance || '(unbekannt)';
+    if (!alliMap[ally]) alliMap[ally] = {real:0, fake:0};
+    if ((a.fake_score||50) >= 70) alliMap[ally].fake++;
+    else alliMap[ally].real++;
+  }
+  const alliKeys = Object.keys(alliMap).sort((a,b)=>(alliMap[b].real+alliMap[b].fake)-(alliMap[a].real+alliMap[a].fake));
+  _atkCharts.alliance = new Chart(document.getElementById('chartAllianceBar').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: alliKeys,
+      datasets: [
+        { label:'Real/Unklar', data: alliKeys.map(k=>alliMap[k].real),
+          backgroundColor:'rgba(248,113,113,.75)', borderColor:'#f87171', borderWidth:1 },
+        { label:'Wahrsch. Fake', data: alliKeys.map(k=>alliMap[k].fake),
+          backgroundColor:'rgba(148,163,184,.5)', borderColor:'#94a3b8', borderWidth:1 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales: {
+        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},maxRotation:35}, grid:{color:'rgba(255,255,255,.04)'} },
+        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true }
+      },
+      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:10},padding:8} } }
+    }
+  });
+
+  // ── Stacked bar: Bedrohung pro Dorf ───────────────────────────────────────
+  const vNames=[], vReal=[], vFake=[];
+  for (const g of Object.values(groups).sort((a,b)=>b.attacks.length-a.attacks.length)) {
+    const r = g.attacks.filter(a=>a.attack_type!=='support'&&(a.fake_score||50)<60).length;
+    const f = g.attacks.filter(a=>(a.fake_score||50)>=70).length;
+    if (r > 0 || f > 0) { vNames.push(g.name||'?'); vReal.push(r); vFake.push(f); }
+  }
+  _atkCharts.threat = new Chart(document.getElementById('chartVillageThreat').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: vNames,
+      datasets: [
+        { label:'Real/Unklar', data: vReal, backgroundColor:'rgba(248,113,113,.75)', borderColor:'#f87171', borderWidth:1 },
+        { label:'Wahrsch. Fake', data: vFake, backgroundColor:'rgba(148,163,184,.5)', borderColor:'#94a3b8', borderWidth:1 },
+      ]
+    },
+    options: {
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales: {
+        x: { stacked:true, ticks:{color:'#9ca3af',font:{size:9},stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true },
+        y: { stacked:true, ticks:{color:'#9ca3af',font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} }
+      },
+      plugins: { legend:{ labels:{color:'#9ca3af',font:{size:10},padding:8} } }
+    }
+  });
+
+  // ── Horizontal bar: Korn/h pro Dorf ───────────────────────────────────────
+  const villageNames=[], villageCrop=[], villageColors=[];
   for (const g of Object.values(groups)) {
     let crop = 0;
     for (const a of g.attacks) {
@@ -2348,22 +2485,19 @@ function renderAttackCharts(attacks, groups) {
       crop += calcCrop(d || {});
     }
     if (crop > 0 || g.attacks.some(a=>a.troop_count>0)) {
-      villageNames.push(g.name || '?');
+      villageNames.push(g.name||'?');
       villageCrop.push(crop || g.attacks.reduce((s,a)=>s+(a.troop_count||0),0));
-      const hasAtk = g.attacks.some(a => a.attack_type !== 'support');
-      villageColors.push(hasAtk ? 'rgba(248,113,113,.7)' : 'rgba(74,222,128,.65)');
+      villageColors.push(g.attacks.some(a=>a.attack_type!=='support') ? 'rgba(248,113,113,.7)' : 'rgba(74,222,128,.65)');
     }
   }
-  const cropCtx = document.getElementById('chartCropPerVillage').getContext('2d');
-  _atkCharts.crop = new Chart(cropCtx, {
+  _atkCharts.crop = new Chart(document.getElementById('chartCropPerVillage').getContext('2d'), {
     type: 'bar',
     data: {
       labels: villageNames,
       datasets: [{ label:'Korn/h', data: villageCrop, backgroundColor: villageColors, borderWidth:1 }]
     },
     options: {
-      indexAxis: 'y',
-      responsive:true, maintainAspectRatio:false,
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
       scales: {
         x: { ticks:{color:'#9ca3af',font:{size:9},callback:v=>v>=1000?Math.round(v/1000)+'k':v}, grid:{color:'rgba(255,255,255,.05)'}, beginAtZero:true },
         y: { ticks:{color:'#9ca3af',font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} }
