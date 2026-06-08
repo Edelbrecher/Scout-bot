@@ -423,21 +423,23 @@
       <!-- ── LEFT COLUMN ── -->
       <div class="card" style="padding:0;overflow:hidden;">
         <!-- Column header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <span id="colLBadge" style="font-size:.72rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 8px;font-weight:700;">–</span>
+        <div style="border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .85rem .4rem;">
+            <span id="colLBadge" style="font-size:.75rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:2px 9px;font-weight:700;">–</span>
+            <select id="colLFilter" onchange="applyFilters()" style="font-size:.8rem;padding:.2rem .55rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-weight:600;cursor:pointer;">
+              <option value="" selected>🌐 Alle</option>
+              <option value="_real">🟢 Wahrsch. Real (Score &lt; 60)</option>
+              <option value="_fakescore">🔴 Wahrsch. Fake (Score ≥ 70)</option>
+              <option value="need_def">🛡️ Need to Def</option>
+              <option value="priority">🔥 Priority</option>
+              <option value="chief">👑 Chief Att</option>
+              <option value="no_hero">🚫 No Hero</option>
+              <option value="fake">👻 Fake (manuell)</option>
+              <option value="_unlabeled">❓ Ohne Label</option>
+            </select>
           </div>
-          <select id="colLFilter" onchange="applyFilters()" style="font-size:.8rem;padding:.2rem .55rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-weight:600;cursor:pointer;">
-            <option value="" selected>🌐 Alle</option>
-            <option value="_real">🟢 Wahrsch. Real (Score &lt; 60)</option>
-            <option value="_fakescore">🔴 Wahrsch. Fake (Score ≥ 70)</option>
-            <option value="need_def">🛡️ Need to Def</option>
-            <option value="priority">🔥 Priority</option>
-            <option value="chief">👑 Chief Att</option>
-            <option value="no_hero">🚫 No Hero</option>
-            <option value="fake">👻 Fake (manuell)</option>
-            <option value="_unlabeled">❓ Ohne Label</option>
-          </select>
+          <!-- Toggle chips -->
+          <div id="colLToggles" style="display:flex;flex-wrap:wrap;gap:.3rem;padding:.3rem .85rem .55rem;"></div>
         </div>
         <div id="colLContent" style="min-height:120px;"></div>
       </div>
@@ -445,21 +447,23 @@
       <!-- ── RIGHT COLUMN ── -->
       <div class="card" style="padding:0;overflow:hidden;">
         <!-- Column header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <span id="colRBadge" style="font-size:.72rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 8px;font-weight:700;">–</span>
+        <div style="border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .85rem .4rem;">
+            <span id="colRBadge" style="font-size:.75rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:2px 9px;font-weight:700;">–</span>
+            <select id="colRFilter" onchange="applyFilters()" style="font-size:.8rem;padding:.2rem .55rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-weight:600;cursor:pointer;">
+              <option value="">🌐 Alle</option>
+              <option value="_real" selected>🟢 Wahrsch. Real (Score &lt; 60)</option>
+              <option value="_fakescore">🔴 Wahrsch. Fake (Score ≥ 70)</option>
+              <option value="need_def">🛡️ Need to Def</option>
+              <option value="priority">🔥 Priority</option>
+              <option value="chief">👑 Chief Att</option>
+              <option value="no_hero">🚫 No Hero</option>
+              <option value="fake">👻 Fake (manuell)</option>
+              <option value="_unlabeled">❓ Ohne Label</option>
+            </select>
           </div>
-          <select id="colRFilter" onchange="applyFilters()" style="font-size:.8rem;padding:.2rem .55rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-weight:600;cursor:pointer;">
-            <option value="">🌐 Alle</option>
-            <option value="_real" selected>🟢 Wahrsch. Real (Score &lt; 60)</option>
-            <option value="_fakescore">🔴 Wahrsch. Fake (Score ≥ 70)</option>
-            <option value="need_def">🛡️ Need to Def</option>
-            <option value="priority">🔥 Priority</option>
-            <option value="chief">👑 Chief Att</option>
-            <option value="no_hero">🚫 No Hero</option>
-            <option value="fake">👻 Fake (manuell)</option>
-            <option value="_unlabeled">❓ Ohne Label</option>
-          </select>
+          <!-- Toggle chips -->
+          <div id="colRToggles" style="display:flex;flex-wrap:wrap;gap:.3rem;padding:.3rem .85rem .55rem;"></div>
         </div>
         <div id="colRContent" style="min-height:120px;"></div>
       </div>
@@ -1448,13 +1452,61 @@
     if (badge) badge.textContent = _allAttacks.length + ' gesamt · ' + Object.keys(groups).length + ' Dörfer';
   };
 
-  // Helper: apply one column's label filter
-  function _filterByCol(attacks, colFilter) {
-    if (!colFilter)                  return attacks;
-    if (colFilter === '_real')       return attacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60);
-    if (colFilter === '_fakescore')  return attacks.filter(a => (a.fake_score||50) >= 70);
-    if (colFilter === '_unlabeled')  return attacks.filter(a => !a.label);
-    return attacks.filter(a => a.label === colFilter);
+  // ── Column toggle state ───────────────────────────────────────────────────
+  // Each entry = set of hidden categories per column ('L' / 'R')
+  const _colHide = { L: new Set(), R: new Set() };
+
+  // Toggle definitions: key → { label, icon, color, test(attack) }
+  const TOGGLE_DEFS = [
+    { key:'fakescore', icon:'🔴', label:'Wahrsch. Fake',  color:'#94a3b8', test: a => (a.fake_score||50) >= 70 },
+    { key:'real',      icon:'🟢', label:'Wahrsch. Real',  color:'#f87171', test: a => a.attack_type !== 'support' && (a.fake_score||50) < 60 },
+    { key:'support',   icon:'🛡️', label:'Support',        color:'#4ade80', test: a => a.attack_type === 'support' },
+    { key:'hidden',    icon:'👁️', label:'Verdeckt',       color:'#c084fc', test: a => !!a.troops_hidden },
+    { key:'lbl_fake',  icon:'👻', label:'Label: Fake',    color:'#94a3b8', test: a => a.label === 'fake' },
+    { key:'lbl_need',  icon:'🛡️', label:'Label: Need Def',color:'#a5b4fc', test: a => a.label === 'need_def' },
+    { key:'lbl_pri',   icon:'🔥', label:'Label: Priority',color:'#f87171', test: a => a.label === 'priority' },
+    { key:'lbl_chief', icon:'👑', label:'Label: Chief',   color:'#fbbf24', test: a => a.label === 'chief' },
+  ];
+
+  function _renderToggles(side) {
+    const hidden = _colHide[side];
+    const el = document.getElementById('col'+side+'Toggles');
+    if (!el) return;
+    el.innerHTML = TOGGLE_DEFS.map(t => {
+      const active = !hidden.has(t.key); // active = currently shown
+      return `<button onclick="toggleColHide('${side}','${t.key}')"
+        style="font-size:.72rem;padding:2px 9px;border-radius:10px;cursor:pointer;font-weight:600;
+          transition:all .15s;
+          background:${active ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.02)'};
+          border:1px solid ${active ? t.color+'66' : 'rgba(255,255,255,.08)'};
+          color:${active ? t.color : 'var(--text-muted)'};
+          opacity:${active ? '1' : '.45'};"
+        data-tip="${active ? t.label+' ausblenden' : t.label+' einblenden'}"
+      >${t.icon} ${t.label}</button>`;
+    }).join('');
+  }
+
+  window.toggleColHide = function(side, key) {
+    const s = _colHide[side];
+    if (s.has(key)) s.delete(key); else s.add(key);
+    _renderToggles(side);
+    applyFilters();
+  };
+
+  // Helper: apply one column's main filter + hide toggles
+  function _filterByCol(attacks, colFilter, side) {
+    let result = attacks;
+    // Main dropdown filter
+    if (colFilter === '_real')       result = result.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60);
+    else if (colFilter === '_fakescore') result = result.filter(a => (a.fake_score||50) >= 70);
+    else if (colFilter === '_unlabeled') result = result.filter(a => !a.label);
+    else if (colFilter)              result = result.filter(a => a.label === colFilter);
+    // Hide toggles (exclude matching)
+    const hidden = _colHide[side];
+    for (const t of TOGGLE_DEFS) {
+      if (hidden.has(t.key)) result = result.filter(a => !t.test(a));
+    }
+    return result;
   }
 
   window.applyFilters = function() {
@@ -1466,23 +1518,24 @@
     let base = [..._allAttacks];
     if (typeFilter) base = base.filter(a => a.attack_type === typeFilter);
 
-    // Left column
-    const leftData  = _filterByCol(base, colLFilter);
-    const rightData = _filterByCol(base, colRFilter);
+    const leftData  = _filterByCol(base, colLFilter, 'L');
+    const rightData = _filterByCol(base, colRFilter, 'R');
 
-    const colL = document.getElementById('colLContent');
-    const colR = document.getElementById('colRContent');
-    renderOwnAttacks(leftData,  colL);
-    renderOwnAttacks(rightData, colR);
+    renderOwnAttacks(leftData,  document.getElementById('colLContent'));
+    renderOwnAttacks(rightData, document.getElementById('colRContent'));
 
-    // Update column badges
+    // Update badges
     const lblNames = { '':'Alle', '_real':'🟢 Real', '_fakescore':'🔴 Fake-Score', '_unlabeled':'❓ Ohne Label',
       fake:'👻 Fake', need_def:'🛡️ Need Def', priority:'🔥 Priority',
       chief:'👑 Chief', no_hero:'🚫 No Hero' };
     const lBadge = document.getElementById('colLBadge');
     const rBadge = document.getElementById('colRBadge');
-    if (lBadge) lBadge.textContent = (lblNames[colLFilter] || colLFilter) + ' · ' + leftData.length;
-    if (rBadge) rBadge.textContent = (lblNames[colRFilter] || colRFilter) + ' · ' + rightData.length;
+    if (lBadge) lBadge.textContent = (lblNames[colLFilter] || colLFilter || 'Alle') + ' · ' + leftData.length;
+    if (rBadge) rBadge.textContent = (lblNames[colRFilter] || colRFilter || 'Alle') + ' · ' + rightData.length;
+
+    // Render toggles (they may not exist yet on first call)
+    _renderToggles('L');
+    _renderToggles('R');
   };
 
   // ── Wave detection ────────────────────────────────────────────────────────
