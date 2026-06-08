@@ -51,17 +51,13 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:.75rem;margin-bottom:1rem;">
 
     {% for faction_name, faction_troops in factions %}
-    {% set faction_troops_filtered = faction_troops | reject("in", seen_troops.names) | selectattr("in", "equalto", all_troops) | list %}
-    {% if not faction_troops_filtered %}
-      {# also check roles for troops not yet in all_troops #}
-    {% endif %}
-    {% set faction_troops_filtered2 = [] %}
+    {% set ns2 = namespace(filtered=[]) %}
     {% for t in faction_troops %}
       {% if t not in seen_troops.names and (t in all_troops or t in roles) %}
-        {% set faction_troops_filtered2 = faction_troops_filtered2 + [t] %}
+        {% set ns2.filtered = ns2.filtered + [t] %}
       {% endif %}
     {% endfor %}
-    {% if faction_troops_filtered2 %}
+    {% if ns2.filtered %}
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="padding:.5rem .85rem;border-bottom:1px solid var(--border);font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">{{ faction_name }}</div>
       <table style="width:100%;border-collapse:collapse;">
@@ -73,7 +69,7 @@
           </tr>
         </thead>
         <tbody>
-        {% for troop in faction_troops_filtered2 %}
+        {% for troop in ns2.filtered %}
         {% set current_role = roles.get(troop, "ignore") %}
         {% set default_crop = default_crop_map.get(troop, 1) %}
         {% set guild_crop   = crop_map.get(troop) %}
@@ -118,13 +114,13 @@
     {% endfor %}
 
     {# Remaining #}
-    {% set remaining = [] %}
+    {% set ns_rem = namespace(remaining=[]) %}
     {% for t in all_troops %}
       {% if t not in seen_troops.names %}
-        {% set remaining = remaining + [t] %}
+        {% set ns_rem.remaining = ns_rem.remaining + [t] %}
       {% endif %}
     {% endfor %}
-    {% if remaining %}
+    {% if ns_rem.remaining %}
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="padding:.5rem .85rem;border-bottom:1px solid var(--border);font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">⚙️ Sonstige</div>
       <table style="width:100%;border-collapse:collapse;">
@@ -136,7 +132,7 @@
           </tr>
         </thead>
         <tbody>
-        {% for troop in remaining %}
+        {% for troop in ns_rem.remaining %}
         {% set current_role = roles.get(troop, "ignore") %}
         {% set default_crop = default_crop_map.get(troop, 1) %}
         {% set guild_crop   = crop_map.get(troop) %}
