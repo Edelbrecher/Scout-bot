@@ -1459,6 +1459,39 @@ function _torusDist(x1, y1, x2, y2) {
 // Catapult speed = 3 for all tribes (Feuerkatapult/Katapult/Trebuchet all = 3)
 const CAT_BASE_SPEED = 3;
 
+// ── Troop colour classification ───────────────────────────────────────────────
+const _TROOP_CATS = {
+  // Katapulte → türkis
+  cat:  new Set(['fire_cat','trebuchet','catapult','hun_cat','stone_cat']),
+  // Rammen → lila
+  ram:  new Set(['bat_ram','gal_ram','teu_ram','hun_ram','egy_ram']),
+  // OFF-Kavallerie → blau
+  cav:  new Set(['eq_imperatoris','eq_caesaris','thunder','druid','haeduan',
+                 'paladin','tk','steppe_rider','marksman','marauder','anhur','resheph']),
+  // DEF-Truppen → rot
+  def:  new Set(['praetorian','phalanx','spearman','slave_militia']),
+  // Scouts → grau (neutral)
+  scout:new Set(['eq_legati','pathfinder','scout','spotter','sopdu']),
+  // Häuptlinge / Siedler → neutral
+  other:new Set(['senator','chieftain','chief','logades','nomarch','settler']),
+};
+const _TROOP_PALETTE = {
+  cat:   {bg:'rgba(20,184,166,.15)',  border:'rgba(20,184,166,.35)',  color:'#2dd4bf'},
+  ram:   {bg:'rgba(168,85,247,.15)', border:'rgba(168,85,247,.35)', color:'#c084fc'},
+  cav:   {bg:'rgba(59,130,246,.15)', border:'rgba(59,130,246,.35)', color:'#60a5fa'},
+  def:   {bg:'rgba(239,68,68,.13)',  border:'rgba(239,68,68,.3)',   color:'#fca5a5'},
+  scout: {bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.25)',color:'#94a3b8'},
+  other: {bg:'rgba(255,255,255,.05)',border:'rgba(255,255,255,.12)',color:'var(--text-muted)'},
+  inf:   {bg:'rgba(34,197,94,.13)',  border:'rgba(34,197,94,.3)',   color:'#86efac'},
+};
+function _troopColor(id) {
+  for (const [cat, set] of Object.entries(_TROOP_CATS)) {
+    if (set.has(id)) return _TROOP_PALETTE[cat];
+  }
+  // Default: OFF infantry → grün
+  return _TROOP_PALETTE.inf;
+}
+
 function _assignSettings() {
   return {
     ts:          Math.max(0, Math.min(20, parseInt(document.getElementById('assignTS')?.value)||0)),
@@ -1605,7 +1638,8 @@ function _renderAssignmentPanel(settings) {
           ? troopEntries.map(([id, cnt]) => {
               const tDef = (TROOPS_DEF[r.tribe] || []).find(t => t.id === id);
               const label = tDef ? tDef.name : id;
-              return `<span style="font-size:.68rem;background:rgba(255,255,255,.06);border-radius:4px;padding:.1rem .35rem;white-space:nowrap;">${escHtml(label)}: <b>${cnt.toLocaleString()}</b></span>`;
+              const tc = _troopColor(id);
+              return `<span style="font-size:.68rem;background:${tc.bg};border:1px solid ${tc.border};color:${tc.color};border-radius:4px;padding:.1rem .35rem;white-space:nowrap;">${escHtml(label)}: <b>${cnt.toLocaleString()}</b></span>`;
             }).join('')
           : '<span style="font-size:.68rem;color:var(--text-muted);">No troop data</span>';
         const hasTroops = troopEntries.length > 0;
