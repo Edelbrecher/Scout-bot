@@ -3377,6 +3377,88 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         }
 
 
+async def get_player_summaries(guild_id: str, names: list[str]) -> list[dict]:
+    """Return lightweight summary for each player name (pop, alliance, tribe, rank, village count).
+    Used for the recent-searches quick-tile grid on the Player Intelligence page.
+    """
+    if not names:
+        return []
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Resolve world_url
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        world_url = row[0] if row else None
+        if not world_url:
+            return []
+
+        # Latest snapshot timestamp
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url = ?", (world_url,)
+        ) as cur:
+            row = await cur.fetchone()
+        latest = row[0] if row else None
+        if not latest:
+            return []
+
+        placeholders = ",".join("?" for _ in names)
+        lower_names = [n.lower() for n in names]
+
+        # Aggregate population + village count per player at latest snapshot
+        async with db.execute(
+            f"""SELECT player_name,
+                       SUM(population) as total_pop,
+                       COUNT(*) as village_count,
+                       MAX(alliance_name) as alliance_name,
+                       MAX(tribe) as tribe,
+                       MAX(player_id) as player_id
+                FROM world_snapshots
+                WHERE world_url = ? AND fetched_at = ? AND lower(player_name) IN ({placeholders})
+                GROUP BY lower(player_name)""",
+            [world_url, latest] + lower_names
+        ) as cur:
+            rows = {r["player_name"].lower(): dict(r) for r in await cur.fetchall()}
+
+        # Latest rank data per player
+        async with db.execute(
+            f"""SELECT player_name, pop_rank, off_rank, def_rank, raid_rank
+                FROM travian_stats_entries
+                WHERE guild_id = ? AND lower(player_name) IN ({placeholders})
+                  AND snapshot_id IN (
+                    SELECT MAX(snapshot_id) FROM travian_stats_entries
+                    WHERE guild_id = ? AND lower(player_name) IN ({placeholders})
+                    GROUP BY lower(player_name)
+                  )""",
+            [guild_id] + lower_names + [guild_id] + lower_names
+        ) as cur:
+            ranks = {r["player_name"].lower(): dict(r) for r in await cur.fetchall()}
+
+        result = []
+        for name in names:
+            key = name.lower()
+            snap = rows.get(key)
+            if not snap:
+                # player not found in latest snapshot — skip
+                continue
+            rank = ranks.get(key, {})
+            result.append({
+                "player_name":   snap["player_name"],
+                "player_id":     snap.get("player_id") or "",
+                "alliance_name": snap.get("alliance_name") or "—",
+                "tribe":         snap.get("tribe"),
+                "total_pop":     snap.get("total_pop") or 0,
+                "village_count": snap.get("village_count") or 0,
+                "pop_rank":      rank.get("pop_rank") or 0,
+                "off_rank":      rank.get("off_rank") or 0,
+                "def_rank":      rank.get("def_rank") or 0,
+                "raid_rank":     rank.get("raid_rank") or 0,
+            })
+        return result
+
+
 async def search_players_in_snapshot(guild_id: str, query: str, limit: int = 20) -> list[str]:
     """Return distinct player names matching query from the latest snapshot."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

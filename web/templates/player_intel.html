@@ -38,6 +38,17 @@
     </div>
   </form>
 
+  {# ── Recent searches (JS-rendered from localStorage) ── #}
+  {% if not intel %}
+  <div id="recentSection" style="display:none;margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem;">
+      <span style="font-size:.8rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">🕘 Zuletzt angesehen</span>
+      <button onclick="clearRecent()" style="background:none;border:none;color:var(--text-muted);font-size:.75rem;cursor:pointer;padding:0 .2rem;">✕ Verlauf löschen</button>
+    </div>
+    <div id="recentGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.65rem;"></div>
+  </div>
+  {% endif %}
+
   {# ── Error / suggestions ── #}
   {% if error %}
   <div style="background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:8px;padding:.75rem 1rem;color:#ef4444;margin-bottom:1rem;">{{ error }}</div>
@@ -488,6 +499,81 @@ function selectPlayer(name) {
     } else { mapTip.textContent=''; }
   });
   canvas.addEventListener('mouseleave', ()=> mapTip.textContent='');
+})();
+{% endif %}
+
+{# ── Recent searches ── #}
+const GUILD_ID = '{{ guild.guild_id }}';
+const RECENT_KEY = `recent_intel_${GUILD_ID}`;
+const TRIBE_ICONS = {1:'🏛️',2:'⚔️',3:'🌿',4:'👾',5:'🏹',6:'🏺',7:'🛡️'};
+
+function _getRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch(_) { return []; }
+}
+function _saveRecent(arr) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(arr.slice(0,20))); } catch(_) {}
+}
+function addRecent(name) {
+  const arr = _getRecent().filter(n => n.toLowerCase() !== name.toLowerCase());
+  arr.unshift(name);
+  _saveRecent(arr);
+}
+function clearRecent() {
+  localStorage.removeItem(RECENT_KEY);
+  const sec = document.getElementById('recentSection');
+  if (sec) sec.style.display = 'none';
+}
+
+{% if intel %}
+// Current page shows a player — add them to recent history
+addRecent({{ intel.player_name | tojson }});
+{% else %}
+// Search page — render recent tiles
+(async function loadRecentTiles() {
+  const names = _getRecent();
+  if (!names.length) return;
+  const sec = document.getElementById('recentSection');
+  const grid = document.getElementById('recentGrid');
+  if (!sec || !grid) return;
+
+  const r = await fetch(`/guild/${GUILD_ID}/intel/batch-summary?names=${encodeURIComponent(names.join(','))}`);
+  if (!r.ok) return;
+  const players = await r.json();
+  if (!players.length) return;
+
+  // Re-sort to match stored order (most recent first)
+  const order = names.map(n => n.toLowerCase());
+  players.sort((a, b) => order.indexOf(a.player_name.toLowerCase()) - order.indexOf(b.player_name.toLowerCase()));
+
+  grid.innerHTML = players.map(p => {
+    const tribeIcon = TRIBE_ICONS[p.tribe] || '?';
+    const pop = (p.total_pop||0).toLocaleString();
+    const ranks = [];
+    if (p.pop_rank)  ranks.push(`Pop #${p.pop_rank.toLocaleString()}`);
+    if (p.off_rank)  ranks.push(`Off #${p.off_rank.toLocaleString()}`);
+    if (p.def_rank)  ranks.push(`Def #${p.def_rank.toLocaleString()}`);
+    if (p.raid_rank) ranks.push(`Raid #${p.raid_rank.toLocaleString()}`);
+    const rankHtml = ranks.length
+      ? `<div style="font-size:.68rem;color:var(--text-muted);margin-top:.3rem;display:flex;flex-wrap:wrap;gap:.25rem;">
+          ${ranks.map(r => `<span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;">${r}</span>`).join('')}
+         </div>`
+      : '';
+    return `<a href="?q=${encodeURIComponent(p.player_name)}"
+      style="display:block;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+             padding:.7rem .9rem;text-decoration:none;color:var(--text);transition:border-color .15s;"
+      onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.3rem;">
+        <span style="font-weight:700;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.player_name}</span>
+        <span style="font-size:.8rem;flex-shrink:0;">${tribeIcon}</span>
+      </div>
+      <div style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        ${p.alliance_name && p.alliance_name !== '—' ? `<span style="color:#a5b4fc;">[${p.alliance_name}]</span> · ` : ''}${pop} pop · ${p.village_count} Dörfer
+      </div>
+      ${rankHtml}
+    </a>`;
+  }).join('');
+
+  sec.style.display = 'block';
 })();
 {% endif %}
 </script>

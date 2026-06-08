@@ -13146,6 +13146,19 @@ async def player_intel_autocomplete(request: Request, guild_id: str, q: str = ""
     return JSONResponse(names)
 
 
+@app.get("/guild/{guild_id}/intel/batch-summary")
+async def player_intel_batch_summary(request: Request, guild_id: str, names: str = ""):
+    """Return lightweight summary cards for a comma-separated list of player names."""
+    session = _get_session(request)
+    if not session or not (can_access_guild(session, guild_id) or await can_access_guild_async(session, guild_id)):
+        return JSONResponse([])
+    name_list = [n.strip() for n in names.split(",") if n.strip()][:20]
+    if not name_list:
+        return JSONResponse([])
+    results = await database.get_player_summaries(guild_id, name_list)
+    return JSONResponse(results)
+
+
 # ---------------------------------------------------------------------------
 # Routes — Scout Incidents (enemy scouted our members)
 # ---------------------------------------------------------------------------
