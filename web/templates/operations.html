@@ -203,10 +203,27 @@
 .form-group input:focus, .form-group select:focus {
   outline:none; border-color:#f59e0b; box-shadow:0 0 0 2px rgba(245,158,11,.15);
 }
-.troop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:.5rem .6rem; }
-.troop-entry { display:flex; flex-direction:column; gap:.2rem; }
-.troop-entry label { font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.troop-entry input { width:100%; background:var(--bg-main); border:1px solid var(--border); border-radius:5px; padding:.3rem .5rem; color:var(--text); font-size:.88rem; text-align:right; box-sizing:border-box; }
+.troop-grid { display:flex; flex-wrap:wrap; gap:.45rem; }
+/* new chip-based troop selector */
+.tc-chip {
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.28rem .6rem; border-radius:8px; cursor:pointer;
+  font-size:.76rem; font-weight:600; user-select:none;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05); color:var(--text-muted);
+  transition:all .12s;
+}
+.tc-chip.active { border-width:1.5px; }
+.tc-chip .tc-amt {
+  width:52px; background:rgba(0,0,0,.35); border:none; border-radius:5px;
+  padding:.15rem .35rem; color:var(--text); font-size:.82rem;
+  text-align:right; outline:none;
+}
+.tc-chip .tc-x {
+  font-size:.72rem; opacity:.6; cursor:pointer; padding:0 .1rem;
+  line-height:1; transition:opacity .1s;
+}
+.tc-chip .tc-x:hover { opacity:1; }
 
 /* ── Empty state ─────────────────────────────────────────────── */
 .op-empty { text-align:center; padding:4rem 2rem; color:var(--text-muted); }
@@ -626,10 +643,23 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </div>
       </div>
 
-      <!-- Troop grid -->
+      <!-- Troop selector -->
       <div style="margin-bottom:.6rem;">
-        <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Troops</div>
-        <div class="troop-grid" id="troopGrid"></div>
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+          <span style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Truppen</span>
+          <button type="button" id="troopPickerToggle" onclick="toggleTroopPicker()"
+            style="width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:rgba(99,102,241,.15);
+                   color:#a5b4fc;font-size:.9rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">
+            +
+          </button>
+          <span id="troopSummary" style="font-size:.74rem;color:var(--text-muted);"></span>
+        </div>
+        <!-- Active chips (always visible) -->
+        <div id="troopGrid" class="troop-grid" style="margin-bottom:.4rem;"></div>
+        <!-- Picker: all available troops, shown on + click -->
+        <div id="troopPicker" style="display:none;flex-wrap:wrap;gap:.35rem;padding:.6rem .75rem;
+             background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;margin-top:.3rem;">
+        </div>
       </div>
 
       <!-- Timing preview -->
@@ -1924,11 +1954,12 @@ function openWaveEditModal(waveId, targetId) {
       }
     }
   }
-  // Fill troop counts
+  // Fill troop counts into chip UI
+  _activeTroops = {};
   Object.entries(wave.troop_json || {}).forEach(([id, cnt]) => {
-    const el = document.getElementById('troop-' + id);
-    if (el && cnt > 0) el.value = cnt;
+    if (cnt > 0) _activeTroops[id] = cnt;
   });
+  _renderTroopChips();
   recalcWaveTime();
   openModal('waveModal');
 }
@@ -2012,36 +2043,118 @@ function onVillageSelect() {
   document.getElementById('wmOX').value = v.x ?? '';
   document.getElementById('wmOY').value = v.y ?? '';
   const tribe = a.tribe || document.getElementById('wmTribe').value;
-  updateTroopGrid();
-  // Fill troops from village data (troops keyed by name or id)
+  // Fill troops from village data into chip UI
+  _activeTroops = {};
   const troopSrc = v.troops && typeof v.troops === 'object' ? v.troops : {};
   const allTroops = Object.values(TROOPS_DEF).flat();
   Object.entries(troopSrc).forEach(([tname, cnt]) => {
     const n = parseInt(cnt);
     if (!n || n <= 0) return;
-    // Match by id, name, or partial name (case-insensitive)
     const troop = allTroops.find(t =>
       t.id === tname || t.name === tname ||
       t.name.toLowerCase() === tname.toLowerCase() ||
       t.id.toLowerCase() === tname.toLowerCase()
     );
-    if (troop) {
-      const el = document.getElementById('troop-' + troop.id);
-      if (el) { el.value = n; el.style.background = 'rgba(74,222,128,.08)'; }
-    }
+    if (troop) _activeTroops[troop.id] = n;
   });
+  _renderTroopChips();
   recalcWaveTime();
 }
 
+// ── Troop chip UI ─────────────────────────────────────────────────────────────
+let _activeTroops = {}; // id → count
+
 function updateTroopGrid() {
-  const tribe = document.getElementById('wmTribe').value;
-  const troops = TROOPS_DEF[tribe]||[];
-  document.getElementById('troopGrid').innerHTML = troops.map(t =>
-    `<div class="troop-entry">
-      <label title="${t.name} · ${t.speed} Fel/h${t.scout?' · Scout':''}">${t.name}</label>
-      <input type="number" id="troop-${t.id}" min="0" value="" placeholder="0" oninput="recalcWaveTime()">
-    </div>`
-  ).join('');
+  _activeTroops = {};
+  _renderTroopChips();
+  _renderTroopPicker();
+}
+
+function _renderTroopChips() {
+  const tribe = document.getElementById('wmTribe')?.value || 'romans';
+  const grid = document.getElementById('troopGrid');
+  if (!grid) return;
+  const troops = TROOPS_DEF[tribe] || [];
+
+  // Show active chips (troops with count > 0)
+  const active = troops.filter(t => (_activeTroops[t.id] || 0) > 0);
+  grid.innerHTML = active.map(t => {
+    const pal = _troopColor(t.name);
+    const cnt = _activeTroops[t.id] || '';
+    return `<span class="tc-chip active" id="tchip-${t.id}"
+      style="background:${pal.bg};border-color:${pal.border};color:${pal.color};">
+      ${escHtml(t.name)}
+      <input class="tc-amt" id="troop-${t.id}" type="number" min="0" value="${cnt}"
+        placeholder="Anz." oninput="_onTroopAmt('${t.id}', this.value)"
+        onclick="event.stopPropagation()">
+      <span class="tc-x" onclick="_removeTroop('${t.id}')">✕</span>
+    </span>`;
+  }).join('');
+
+  _updateTroopSummary(tribe);
+  recalcWaveTime();
+}
+
+function _renderTroopPicker() {
+  const tribe = document.getElementById('wmTribe')?.value || 'romans';
+  const picker = document.getElementById('troopPicker');
+  if (!picker) return;
+  const troops = TROOPS_DEF[tribe] || [];
+  picker.innerHTML = troops.map(t => {
+    const pal = _troopColor(t.name);
+    const isActive = (_activeTroops[t.id] || 0) > 0;
+    const style = isActive
+      ? `background:${pal.bg};border-color:${pal.border};color:${pal.color};opacity:.5;`
+      : `background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12);color:var(--text-muted);`;
+    return `<span class="tc-chip" id="tpick-${t.id}" onclick="_addTroop('${t.id}')"
+      style="${style}" title="${t.speed} Fel/h">
+      ${escHtml(t.name)}
+    </span>`;
+  }).join('');
+}
+
+function _updateTroopSummary(tribe) {
+  const troops = TROOPS_DEF[tribe] || [];
+  const parts = troops
+    .filter(t => (_activeTroops[t.id] || 0) > 0)
+    .map(t => `${t.name}: ${_activeTroops[t.id].toLocaleString()}`);
+  document.getElementById('troopSummary').textContent = parts.join(' · ');
+}
+
+function _addTroop(id) {
+  if ((_activeTroops[id] || 0) > 0) return; // already added
+  _activeTroops[id] = 0;
+  _renderTroopChips();
+  _renderTroopPicker();
+  // Focus the input
+  setTimeout(() => {
+    const inp = document.getElementById('troop-' + id);
+    if (inp) inp.focus();
+  }, 30);
+}
+
+function _removeTroop(id) {
+  delete _activeTroops[id];
+  _renderTroopChips();
+  _renderTroopPicker();
+}
+
+function _onTroopAmt(id, val) {
+  const n = parseInt(val) || 0;
+  if (n > 0) _activeTroops[id] = n;
+  else delete _activeTroops[id];
+  const tribe = document.getElementById('wmTribe')?.value || 'romans';
+  _updateTroopSummary(tribe);
+  recalcWaveTime();
+}
+
+function toggleTroopPicker() {
+  const picker = document.getElementById('troopPicker');
+  const btn    = document.getElementById('troopPickerToggle');
+  const open   = picker.style.display !== 'none';
+  picker.style.display = open ? 'none' : 'flex';
+  btn.textContent = open ? '+' : '−';
+  if (!open) _renderTroopPicker();
 }
 
 function recalcWaveTime() {
@@ -2054,8 +2167,7 @@ function recalcWaveTime() {
   if (!t) { document.getElementById('waveTiming').style.display='none'; return; }
   let slowestSpeed = 999, slowestName = '';
   troops.forEach(tr => {
-    const inp = document.getElementById('troop-'+tr.id);
-    if (inp && parseInt(inp.value)>0 && tr.speed < slowestSpeed) {
+    if ((_activeTroops[tr.id] || 0) > 0 && tr.speed < slowestSpeed) {
       slowestSpeed = tr.speed; slowestName = tr.name;
     }
   });
@@ -2079,12 +2191,7 @@ function recalcWaveTime() {
 async function saveWave() {
   if (!currentTargetId || !activePlanId) return;
   const tribe = document.getElementById('wmTribe').value;
-  const troops = {};
-  (TROOPS_DEF[tribe]||[]).forEach(t => {
-    const el = document.getElementById('troop-'+t.id);
-    const v = parseInt(el?.value||0);
-    if (v > 0) troops[t.id] = v;
-  });
+  const troops = {..._activeTroops};
   const ox = document.getElementById('wmOX').value;
   const oy = document.getElementById('wmOY').value;
   const attacker = document.getElementById('wmAttackerSelect').value;
