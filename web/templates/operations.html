@@ -632,7 +632,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </div>
         <div class="form-group" style="max-width:145px;">
           <label>Wavestyp</label>
-          <select id="wmTypee">
+          <select id="wmTypee" onchange="onWaveTypeChange(this.value)">
             <option value="real">⚔️ Echter Attack</option>
             <option value="fake">👻 Fake</option>
             <option value="def">🛡️ Defense</option>
@@ -984,10 +984,11 @@ function renderWavesTable(t) {
 
     // Show troops: if all waves identical show chips, otherwise show "mixed"
     const allTroopsSame = g.waves.every(x => JSON.stringify(x.troop_json||{}) === JSON.stringify(w.troop_json||{}));
-    const troops = allTroopsSame
+    const troopChips = allTroopsSame
       ? Object.entries(w.troop_json||{}).filter(([,v])=>v>0)
           .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,w.tribe)} ×${cnt}</span>`).join('')
-      : `<span style="font-size:.75rem;color:#a78bfa;font-style:italic;">Mixed troops — expand to see</span>`;
+      : `<span style="font-size:.75rem;color:#a78bfa;font-style:italic;">Mixed — expand</span>`;
+    const troops = `<span style="cursor:pointer;" title="Klicken zum Bearbeiten" onclick="openWaveEditModal(${w.id},${t.id})">${troopChips || '<span style="color:var(--text-muted);font-size:.78rem;">— hinzufügen ✏</span>'}</span>`;
     const tsInfo = w.tournament_square > 0 ? `<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;">🏆${w.tournament_square}</span>` : '';
     const csMap = {on_time:['✅','#4ade80','On time'], late:['⏱','#fbbf24',`Late`], not_sent:['❌','#f87171','Not sent'], cant_send:['🚫','#f87171','Cannot send']};
     const cs = csMap[w.confirm_status];
@@ -1017,7 +1018,7 @@ function renderWavesTable(t) {
         <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(w.origin_village||'')} ${w.origin_x!=null?'('+w.origin_x+'|'+w.origin_y+')':''}${tsInfo}</span>
       </td>
       <td><span class="tribe-pill">${tribeName(w.tribe)}</span></td>
-      <td>${troops || '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>${troops}</td>
       <td>
         <div class="send-time">${w.send_time ? fmtDatetime(w.send_time) : '—'}</div>
         <div class="travel-time">${w.travel_seconds ? '🕐 '+fmtTravel(w.travel_seconds) : ''}</div>
@@ -1042,8 +1043,9 @@ function renderWavesTable(t) {
         </td>
       </tr>`;
       html += g.waves.map((wv, idx) => {
-        const wvTroops = Object.entries(wv.troop_json||{}).filter(([,v])=>v>0)
+        const wvTroopsRaw = Object.entries(wv.troop_json||{}).filter(([,v])=>v>0)
           .map(([id,cnt])=>`<span class="troop-chip">${getTroopName(id,wv.tribe)} ×${cnt}</span>`).join('');
+        const wvTroops = `<span style="cursor:pointer;" title="Klicken zum Bearbeiten" onclick="openWaveEditModal(${wv.id},${t.id})">${wvTroopsRaw || '<span style="color:var(--text-muted);font-size:.78rem;">— hinzufügen ✏</span>'}</span>`;
         const wvCs = csMap[wv.confirm_status];
         const wvCsInd = wvCs ? `<span style="font-size:.85rem;margin-left:.2rem;">${wvCs[0]}</span>` : '';
         const wvBg = wv.confirm_status==='on_time'?'rgba(74,222,128,.04)':wv.confirm_status==='late'?'rgba(251,191,36,.06)':wv.confirm_status?'rgba(248,113,113,.06)':'';
@@ -1056,7 +1058,7 @@ function renderWavesTable(t) {
             <br><span style="font-size:.72rem;color:var(--text-muted);">${escHtml(wv.origin_village||'')} ${wv.origin_x!=null?'('+wv.origin_x+'|'+wv.origin_y+')':''}</span>
           </td>
           <td><span class="tribe-pill">${tribeName(wv.tribe)}</span></td>
-          <td>${wvTroops || '<span style="color:var(--text-muted)">—</span>'}</td>
+          <td>${wvTroops}</td>
           <td>
             <div class="send-time">${wv.send_time ? fmtDatetime(wv.send_time) : '—'}</div>
             <div class="travel-time">${wv.travel_seconds ? '🕐 '+fmtTravel(wv.travel_seconds) : ''}</div>
@@ -2052,6 +2054,38 @@ function onVillageSelect() {
     if (troop) _activeTroops[troop.id] = n;
   });
   _renderTroopChips();
+  recalcWaveTime();
+}
+
+// ── Wave type change → fake preset ───────────────────────────────────────────
+// Slowest DEF/infantry unit per tribe (for fake composition)
+const _FAKE_INFANTRY = {
+  romans:    'praetorian',   // Prätorianer speed 5
+  gauls:     'phalanx',      // Phalanx speed 7 (slowest gaul foot)
+  teutons:   'spearman',     // Speerkämpfer speed 7
+  huns:      'bowman',       // Bogenschütze speed 9
+  egyptians: 'slave_militia',// Sklavenmiliz speed 8
+};
+const _FAKE_KATA = {
+  romans:    'fire_cat',
+  gauls:     'trebuchet',
+  teutons:   'catapult',
+  huns:      'hun_cat',
+  egyptians: 'stone_cat',
+};
+
+function onWaveTypeChange(type) {
+  if (type !== 'fake') return;
+  // Only apply preset if no troops are set yet
+  const hasAny = Object.values(_activeTroops).some(v => v > 0);
+  if (hasAny) return;
+  const tribe = document.getElementById('wmTribe')?.value || 'romans';
+  const infId  = _FAKE_INFANTRY[tribe];
+  const catId  = _FAKE_KATA[tribe];
+  if (infId) _activeTroops[infId] = 19;
+  if (catId) _activeTroops[catId] = 1;
+  _renderTroopChips();
+  _renderTroopPicker();
   recalcWaveTime();
 }
 
