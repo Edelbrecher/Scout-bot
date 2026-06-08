@@ -1033,6 +1033,7 @@ function renderWavesTable(t) {
         ${expandBtn}
         <button class="wave-action-btn" title="+1" onclick="duplicateWave(${w.id})" style="font-weight:800;color:#4ade80;border-color:rgba(74,222,128,.35);">+1</button>
         ${count > 1 ? `<button class="wave-action-btn" title="−1" onclick="deleteWave(${ids[ids.length-1]},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
+        <button class="wave-action-btn" title="Als Fake markieren + Preset setzen" onclick="applyFakePreset(${w.id},'${escJs(w.tribe||'romans')}')" style="color:#a78bfa;border-color:rgba(167,139,250,.35);">👻</button>
         <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
         <button class="wave-action-btn danger" title="${count>1?`Delete all ${count}`:'Delete'}" onclick="${count>1?`if(confirm('Delete ${count} waves?')){${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')}}`:`deleteWave(${w.id},${t.id})`}">🗑${count>1?` ×${count}`:''}</button>
         <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
@@ -2060,6 +2061,24 @@ function onVillageSelect() {
   });
   _renderTroopChips();
   recalcWaveTime();
+}
+
+// ── Quick fake button on wave row ─────────────────────────────────────────────
+async function applyFakePreset(waveId, tribe) {
+  const infId = _FAKE_INFANTRY[tribe] || _FAKE_INFANTRY['romans'];
+  const catId = _FAKE_KATA[tribe]     || _FAKE_KATA['romans'];
+  const troops = {};
+  if (infId) troops[infId] = 19;
+  if (catId) troops[catId] = 1;
+  try {
+    await apiFetch(`/waves/${waveId}/update`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ wave_type: 'fake', troop_json: troops }),
+    });
+    reloadActivePlan();
+    showToast('👻 Fake-Preset gesetzt');
+  } catch(e) { showToast('Fehler: ' + e.message, true); }
 }
 
 // ── Wave type change → fake preset ───────────────────────────────────────────
