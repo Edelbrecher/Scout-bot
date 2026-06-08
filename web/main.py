@@ -466,12 +466,29 @@ async def _require_alliance(guild: dict | None, guild_id: str):
 
 
 async def _require_ally_or_plan(guild: dict | None, guild_id: str, uid: str,
-                                 perm_flag: str = "") -> "Response | None":
+                                 perm_flag: str = "",
+                                 redirect_path: str = "") -> "Response | None":
     """Alliance gate that also accepts approved ally members (with optional perm check).
     - Guild owner or admin → always pass
     - Guild has alliance plan → pass
     - User is an approved ally member (and optionally has perm_flag) → pass
+    - If the current guild_id is a workspace (ws_*), look up the user's alliance guild
+      and redirect them there so they access the correct alliance features.
     Returns redirect response if denied, None if granted."""
+    # If this is a personal workspace and the plan check fails, try to redirect to alliance guild
+    if WORKSPACE_RE.match(guild_id) and uid:
+        ally_guilds = await database.get_guild_ids_for_discord_user(uid)
+        # Find a non-workspace guild the user is an ally member of
+        for ag in ally_guilds:
+            if not WORKSPACE_RE.match(ag):
+                ag_guild = await database.get_guild(ag)
+                plan_err = await _require_alliance(ag_guild, ag)
+                if plan_err is None:
+                    # Redirect to the same page but on the alliance guild
+                    target = redirect_path or f"/guild/{ag}"
+                    target = target.replace(f"/guild/{guild_id}", f"/guild/{ag}")
+                    return RedirectResponse(target, status_code=303)
+
     # Try plan gate first
     plan_err = await _require_alliance(guild, guild_id)
     if plan_err is None:
@@ -2121,7 +2138,7 @@ async def guild_stats(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
 
     scout_stats = await database.get_guild_stats(guild_id)
@@ -2404,7 +2421,7 @@ async def res_push_stats(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     stats = await database.get_res_stats(guild_id)
     return templates.TemplateResponse("res_push_stats.html", {"request": request, "guild": guild, "stats": stats})
@@ -4888,7 +4905,7 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     attack_stats = await database.get_attack_stats(guild_id)
     attack_reports = await database.get_attack_reports(guild_id, limit=50)
@@ -4995,7 +5012,7 @@ async def _attack_access(request, guild_id):
     if not guild:
         return None, JSONResponse({"error": "not_found"}, status_code=404)
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err:
         return None, JSONResponse({"error": "alliance_required"}, status_code=403)
     return session, None
@@ -10398,7 +10415,7 @@ async def alliance_tracking_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     watched = await database.get_watched_alliances(guild_id)
     top_alliances = await database.get_top_alliances(guild_id, limit=10)
@@ -10424,7 +10441,7 @@ async def alliance_tracking_meta_own(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     ally_group = await database.get_ally_group_for_guild(guild_id)
     alliances = []
@@ -10452,7 +10469,7 @@ async def alliance_tracking_meta(request: Request, guild_id: str, group_id: int)
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     meta_groups = await database.get_meta_groups(guild_id)
     group = next((g for g in meta_groups if g["id"] == group_id), None)
@@ -10501,7 +10518,7 @@ async def alliance_tracking_detail(request: Request, guild_id: str, alliance_nam
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     data = await database.get_alliance_tracking_data(guild_id, alliance_name)
     flows = await database.get_alliance_player_flows(guild_id, alliance_name)
@@ -10528,7 +10545,7 @@ async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     enemies = await database.get_enemies(guild_id)
     report_channel = await database.get_report_channel(guild_id)
@@ -11388,7 +11405,7 @@ async def blueprints_main(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     templates_list = await database.get_blueprint_templates(guild_id)
     player_bps = await database.get_player_blueprints(guild_id)
@@ -11960,7 +11977,7 @@ async def hero_scout_page(request: Request, guild_id: str):
         return RedirectResponse("/dashboard", status_code=303)
     uid = session.get("uid", "")
     # Hero scout is open to all approved ally members (no specific perm needed)
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
 
     entries = await _get_hero_scout_entries(guild_id)
@@ -11986,7 +12003,7 @@ async def hero_scout_detail(request: Request, guild_id: str, player_name: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
     uid = session.get("uid", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
 
     history = await _get_hero_scout_history(guild_id, player_name)
@@ -13222,7 +13239,7 @@ async def _artifact_access(request: Request, guild_id: str):
     if not guild:
         return None, JSONResponse({"error": "not_found"}, status_code=404)
     uid = session.get("uid", "") or session.get("discord_id", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err:
         return None, err
     return session, None
@@ -13309,7 +13326,7 @@ async def all_treasuries_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "") or session.get("discord_id", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     treasuries = await database.get_all_treasuries(guild_id)
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
@@ -13671,7 +13688,7 @@ async def artifact_planning_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "") or session.get("discord_id", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     settings = await database.get_artifact_plan_settings(guild_id)
@@ -13901,7 +13918,7 @@ async def artifacts_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "") or session.get("discord_id", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     artifacts = await database.get_artifacts(guild_id)
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
@@ -14137,7 +14154,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "") or session.get("discord_id", "")
-    err = await _require_ally_or_plan(guild, guild_id, uid)
+    err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     artifact = await database.get_artifact(artifact_id, guild_id)
     if not artifact: return RedirectResponse(f"/guild/{guild_id}/artifacts")
