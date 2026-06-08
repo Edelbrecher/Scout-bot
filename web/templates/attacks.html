@@ -353,6 +353,27 @@
 
         </div>
       </div><!-- /atkChartsBody -->
+
+      <!-- ── Angreifer-Tabelle ─────────────────────────────────────────────── -->
+      <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.85rem;">
+        <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;">
+          👤 Angreifer — wer greift welche Dörfer an?
+        </div>
+        <div id="attackerPlayerTable" style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead>
+              <tr style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);">
+                <th style="text-align:left;padding:.3rem .5rem;font-weight:600;">Angreifer</th>
+                <th style="text-align:left;padding:.3rem .5rem;font-weight:600;">Allianz</th>
+                <th style="text-align:center;padding:.3rem .5rem;font-weight:600;">Angriffe</th>
+                <th style="text-align:left;padding:.3rem .5rem;font-weight:600;">Ziele (Dorf → Ankunft)</th>
+              </tr>
+            </thead>
+            <tbody id="attackerPlayerTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1372,7 +1393,7 @@
   // OWN ATTACKS
   // =========================================================
   // ── Global attack state ───────────────────────────────────────────────────
-  let _allAttacks = [];           // full unfiltered dataset
+  let _allAttacks = window._allAttacks = [];  // full unfiltered dataset (window-exposed for modal)
   let _selectedVillage = null;    // null = "All"
 
   window.loadOwnAttacks = async function() {
@@ -1398,7 +1419,7 @@
         });
         return;
       }
-      _allAttacks = await resp.json();
+      _allAttacks = window._allAttacks = await resp.json();
       renderVillageList();
       applyFilters();
     } catch(e) {
@@ -1572,6 +1593,9 @@
     const t2 = new Date(firstB.arrival_time||0).getTime();
     const gapSec = Math.round((t2 - t1) / 1000);
     if (gapSec < 5) return ''; // same-second noise
+    // No intercept markers if either wave is a fake
+    const isFakeAttack = a => (a.fake_score||50) >= 70 || a.label === 'fake';
+    if (isFakeAttack(lastA) || isFakeAttack(firstB)) return '';
 
     const gapLabel = fmtGap(gapSec);
     const arr1 = fmtArrival(lastA.arrival_time);
@@ -1730,7 +1754,10 @@
     cont.innerHTML = html;
 
     // Charts always use full dataset (not filtered), shown after first load
-    if (_allAttacks.length) renderAttackCharts(_allAttacks, buildGroups(_allAttacks));
+    if (_allAttacks.length) {
+      renderAttackCharts(_allAttacks, buildGroups(_allAttacks));
+      renderAttackerTable(_allAttacks);
+    }
   }
 
   function renderAttackRow(a) {
@@ -2435,6 +2462,67 @@ window.toggleCharts = function() {
   if (btn)  btn.textContent = _chartsVisible ? '▲ Charts ausblenden' : '▼ Charts anzeigen';
 };
 
+function renderAttackerTable(attacks) {
+  const tbody = document.getElementById('attackerPlayerTbody');
+  if (!tbody) return;
+
+  // Group by attacker player
+  const playerMap = {};
+  for (const a of attacks) {
+    const player = a.attacker_player || '(Unbekannt)';
+    const ally   = a.attacker_alliance || '–';
+    if (!playerMap[player]) playerMap[player] = { ally, targets: [] };
+    playerMap[player].targets.push(a);
+  }
+
+  // Sort by number of attacks desc
+  const sorted = Object.entries(playerMap).sort((a, b) => b[1].targets.length - a[1].targets.length);
+
+  const rows = sorted.map(([player, info]) => {
+    // Sort targets by arrival_time
+    const targets = [...info.targets].sort((a, b) =>
+      new Date(a.arrival_time||0) - new Date(b.arrival_time||0)
+    );
+
+    const targetCells = targets.map(t => {
+      const vill = t.own_village_name
+        ? `${t.own_village_name} (${t.own_village_x||'?'}|${t.own_village_y||'?'})`
+        : `(${t.own_village_x||'?'}|${t.own_village_y||'?'})`;
+      const arr = t.arrival_time ? fmtArrival(t.arrival_time) : '?';
+      const isFake = (t.fake_score||50) >= 70 || t.label === 'fake';
+      const color  = isFake ? '#94a3b8' : t.label === 'priority' ? '#f87171' : t.label === 'need_def' ? '#a5b4fc' : 'var(--text)';
+      const icon   = isFake ? '👻' : t.attack_type === 'support' ? '🛡️' : (t.fake_score||50) < 60 ? '🟢' : '⚔️';
+      return `<div style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:5px;padding:.15rem .45rem;margin:.1rem .15rem .1rem 0;font-size:.76rem;color:${color};">
+        <span>${icon}</span>
+        <span>${vill}</span>
+        <span style="color:var(--text-muted);font-family:monospace;font-size:.72rem;">⏰${arr}</span>
+      </div>`;
+    }).join('');
+
+    // Count labels
+    const nFake = targets.filter(t => (t.fake_score||50) >= 70 || t.label === 'fake').length;
+    const nReal = targets.filter(t => t.attack_type !== 'support' && (t.fake_score||50) < 60).length;
+    const nSupport = targets.filter(t => t.attack_type === 'support').length;
+    const badges = [
+      nReal    > 0 ? `<span style="background:rgba(34,197,94,.15);color:#86efac;border-radius:4px;padding:0 5px;font-size:.7rem;">🟢 ${nReal} real</span>` : '',
+      nFake    > 0 ? `<span style="background:rgba(148,163,184,.1);color:#94a3b8;border-radius:4px;padding:0 5px;font-size:.7rem;">👻 ${nFake} fake</span>` : '',
+      nSupport > 0 ? `<span style="background:rgba(99,102,241,.12);color:#a5b4fc;border-radius:4px;padding:0 5px;font-size:.7rem;">🛡️ ${nSupport} supp</span>` : '',
+    ].filter(Boolean).join(' ');
+
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+      <td style="padding:.45rem .5rem;font-weight:700;white-space:nowrap;color:var(--text);">${player}</td>
+      <td style="padding:.45rem .5rem;color:var(--text-muted);white-space:nowrap;">${info.ally}</td>
+      <td style="padding:.45rem .5rem;text-align:center;">
+        <span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:10px;padding:1px 8px;font-weight:700;">${targets.length}</span>
+        <div style="margin-top:.2rem;">${badges}</div>
+      </td>
+      <td style="padding:.45rem .5rem;">${targetCells}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.innerHTML = rows || `<tr><td colspan="4" style="padding:.5rem;color:var(--text-muted);text-align:center;">Keine Angriffe</td></tr>`;
+}
+
 function renderAttackCharts(attacks, groups) {
   destroyCharts();
   document.getElementById('attackChartsSection').style.display = 'block';
@@ -2662,7 +2750,7 @@ function renderAttackCharts(attacks, groups) {
   let _dcmCountdownTimer = null;
 
   window.openDefenseCallModal = function(attackId) {
-    const attack = _allAttacks.find(a => a.id === attackId);
+    const attack = (window._allAttacks || []).find(a => a.id === attackId);
     if (!attack) return;
     _dcmAttackId = attackId;
 
