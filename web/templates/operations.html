@@ -1460,6 +1460,11 @@ function _torusDist(x1, y1, x2, y2) {
 const CAT_BASE_SPEED = 3;
 
 // ── Troop colour classification ───────────────────────────────────────────────
+// Primary source: troop_roles (guild-configured, same as used everywhere else)
+// Roles: off | def | scout | siege | ignore
+// Sub-distinctions: off → inf (grün) or cav (blau), siege → ram (lila) or cat (türkis)
+const TROOP_ROLES = {{ troop_roles | tojson }};
+
 const _TROOP_PALETTE = {
   cat:   {bg:'rgba(20,184,166,.18)',  border:'rgba(20,184,166,.45)',  color:'#2dd4bf'},
   ram:   {bg:'rgba(168,85,247,.18)', border:'rgba(168,85,247,.45)', color:'#c084fc'},
@@ -1469,68 +1474,32 @@ const _TROOP_PALETTE = {
   other: {bg:'rgba(255,255,255,.06)',border:'rgba(255,255,255,.14)',color:'var(--text-muted)'},
   inf:   {bg:'rgba(34,197,94,.18)',  border:'rgba(34,197,94,.4)',   color:'#86efac'},
 };
-// Vollständige, explizite Zuordnung aller Einheiten (ID + dt. Name)
-// Kategorien: inf=Fuß-OFF grün | cav=Pferde-OFF blau | def=DEF rot | ram=Ramme lila | cat=Kata türkis | scout=grau | other=neutral
-const _TROOP_CAT_MAP = {
-  // ── Romans ──
-  'legionnaire':     'inf', 'Legionär':             'inf',
-  'praetorian':      'def', 'Prätorianer':           'def',
-  'imperian':        'inf', 'Imperianer':            'inf',
-  'eq_legati':     'scout', 'Equites Legati':       'scout',
-  'eq_imperatoris':  'cav', 'Equites Imperatoris':   'cav',
-  'eq_caesaris':     'cav', 'Equites Caesaris':      'cav',
-  'bat_ram':         'ram', 'Rammbock':              'ram',
-  'fire_cat':        'cat', 'Feuerkatapult':         'cat',
-  'senator':       'other', 'Senator':             'other',
-  // ── Gauls ──
-  'phalanx':         'def', 'Phalanx':               'def',
-  'swordsman':       'inf', 'Schwertkämpfer':        'inf',
-  'pathfinder':    'scout', 'Pathfinder':           'scout',
-  'thunder':         'cav', 'Theutates-Blitz':       'cav',  'Theutates Blitz': 'cav',
-  'druid':           'cav', 'Druidentreiter':        'cav',
-  'haeduan':         'cav', 'Haeduer':               'cav',
-  'gal_ram':         'ram', 'Gallier-Rammbock':      'ram',  'Gallier Rammbock': 'ram',
-  'trebuchet':       'cat', 'Trebuchet':             'cat',  'Gallier-Kata':     'cat',  'Gallierkata': 'cat',
-  'chieftain':     'other', 'Häuptling':           'other',
-  // ── Teutons ──
-  'clubswinger':     'inf', 'Keulenschwinger':       'inf',
-  'spearman':        'def', 'Speerkämpfer':          'def',
-  'axeman':          'inf', 'Axtkämpfer':            'inf',
-  'scout':         'scout', 'Kundschafter':         'scout',
-  'paladin':         'cav', 'Paladin':               'cav',
-  'tk':              'cav', 'Teutonenknight':        'cav',  'Teutonischer Ritter': 'cav',
-  'teu_ram':         'ram', 'Teutonen-Rammbock':     'ram',  'Teutonen Rammbock':  'ram',
-  'catapult':        'cat', 'Katapult':              'cat',
-  'chief':         'other', 'Stammesführer':       'other',
-  // ── Huns ──
-  'mercenary':       'inf', 'Söldner':               'inf',
-  'bowman':          'def', 'Bogenschütze':          'def',
-  'spotter':       'scout', 'Späher':               'scout',
-  'steppe_rider':    'cav', 'Steppenreiter':         'cav',
-  'marksman':        'cav', 'Scharfschütze':         'cav',
-  'marauder':        'cav', 'Plünderer':             'cav',
-  'hun_ram':         'ram', 'Hunnen-Rammbock':       'ram',  'Hunnen Rammbock':  'ram',
-  'hun_cat':         'cat', 'Hunnen-Katapult':       'cat',  'Hunnen Katapult':  'cat',
-  'logades':       'other', 'Logades':             'other',
-  // ── Egyptians ──
-  'slave_militia':   'def', 'Sklavenmiliz':          'def',
-  'ash_warden':      'inf', 'Aschenwächter':         'inf',
-  'khopesh':         'inf', 'Khopeschkämpfer':       'inf',
-  'sopdu':         'scout', 'Sopdu-Entdecker':      'scout',
-  'anhur':           'cav', 'Anhur-Wächter':         'cav',
-  'resheph':         'cav', 'Resheph-Streitwagen':   'cav',
-  'egy_ram':         'ram', 'Ägypter-Rammbock':      'ram',  'Ägypter Rammbock': 'ram',
-  'stone_cat':       'cat', 'Steinkatapult':         'cat',
-  'nomarch':       'other', 'Nomarch':             'other',
-  // ── Gemeinsam ──
-  'settler':       'other', 'Siedler':             'other',
-  'hero':          'other', 'Held':                'other', 'Hero': 'other',
-};
-function _troopColor(rawId) {
-  const cat = _TROOP_CAT_MAP[rawId]
-           || _TROOP_CAT_MAP[rawId.toLowerCase()]
-           || 'inf';
-  return _TROOP_PALETTE[cat];
+// Cavalry names (sub-set of "off") → blau statt grün
+const _CAV_NAMES = new Set([
+  'Equites Imperatoris','Equites Caesaris',
+  'Theutates-Blitz','Druidentreiter','Haeduer',
+  'Paladin','Teut. Ritter','Teutonischer Ritter','Teutonenknight',
+  'Steppenreiter','Scharfschütze','Marauder','Plünderer',
+  'Anhur-Wächter','Resheph-Streitwagen',
+  'Ägyptischer Reiter','Hunnischer Reiter','Boyar',
+  'eq_imperatoris','eq_caesaris','thunder','druid','haeduan',
+  'paladin','tk','steppe_rider','marksman','marauder','anhur','resheph',
+]);
+// Catapult names (sub-set of "siege") → türkis statt lila
+const _CAT_NAMES = new Set([
+  'Feuerkatapult','Trebuchet','Gallier-Kata','Katapult','Steinkatapult',
+  'Kriegsmaschine','Hunnen-Katapult',
+  'fire_cat','trebuchet','catapult','hun_cat','stone_cat',
+]);
+
+function _troopColor(name) {
+  const role = TROOP_ROLES[name] || TROOP_ROLES[name.toLowerCase()] || 'off';
+  if (role === 'ignore') return _TROOP_PALETTE.other;
+  if (role === 'scout')  return _TROOP_PALETTE.scout;
+  if (role === 'def')    return _TROOP_PALETTE.def;
+  if (role === 'siege')  return _CAT_NAMES.has(name) ? _TROOP_PALETTE.cat : _TROOP_PALETTE.ram;
+  // role === 'off' (or unknown → treat as off)
+  return _CAV_NAMES.has(name) ? _TROOP_PALETTE.cav : _TROOP_PALETTE.inf;
 }
 
 function _assignSettings() {

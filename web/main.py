@@ -7734,6 +7734,7 @@ async def operations_page(request: Request, guild_id: str):
     plans = await database.get_op_plans(guild_id)
     favorites = await database.get_op_favorites(guild_id, uid)
     members   = await database.get_member_troops(guild_id)
+    troop_roles = await database.get_troop_roles(guild_id)
     return templates.TemplateResponse("operations.html", {
         "request":   request,
         "guild":     guild,
@@ -7742,6 +7743,7 @@ async def operations_page(request: Request, guild_id: str):
         "favorites": favorites,
         "members":   members,
         "troops_def": database.TRAVIAN_TROOPS,
+        "troop_roles": troop_roles,
         "default_ts": guild.get("default_tournament_square") or 0,
     })
 
