@@ -627,6 +627,18 @@
       {{ OK_ARROW }}
     </a>
 
+    <!-- Troop Roles (nur Owner/Admin) -->
+    {% if is_owner or get_is_admin(request) %}
+    <a href="/guild/{{ guild.guild_id }}/my-ally/troop-roles" class="feature-card" style="text-decoration:none;">
+      <div class="feature-icon">⚔️</div>
+      <div class="feature-body">
+        <div class="feature-title">Troop Roles</div>
+        <div class="feature-desc">Konfiguriere welche Truppen als OFF, DEF, Siege oder Scout gelten — beeinflusst Dorfklassifizierung &amp; Angriffspläne</div>
+      </div>
+      {{ OK_ARROW }}
+    </a>
+    {% endif %}
+
     <!-- Serververwaltung (nur Discord) -->
     {% if not is_personal %}
     <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">
