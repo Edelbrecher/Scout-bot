@@ -1926,7 +1926,8 @@ function openWaveModal(targetId, targetLabel) {
   openModal('waveModal');
 }
 
-function openWaveEditModal(waveId, targetId) {
+async function openWaveEditModal(waveId, targetId) {
+  if (!attackers.length) await loadAttackers();
   const wave = findWaveById(waveId);
   if (!wave) return;
   currentTargetId = targetId;
