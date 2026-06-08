@@ -3693,17 +3693,62 @@ window.closeGrainSimModal = function() {
 };
 
 function _parseMarketPaste(text) {
+  // Travian market format:
+  //   Transport from X : Y
+  //   Nx
+  //   <lumber>
+  //   <clay>
+  //   <iron>
+  //   <grain>          ← 4th number = grain
+  //   In HH:MM:SS at HH:MM   ← arrival clock time (after "at ")
+  //
+  // Also handles older single-line format: "HH:MM  ...  <big number>"
   const deliveries = [];
-  for (const line of text.split('\n')) {
-    const timeMatch = line.match(/(\d{1,2}):(\d{2})/);
-    if (!timeMatch) continue;
-    const nums = [...line.matchAll(/(\d+)/g)].map(m => parseInt(m[1]));
-    const grainCandidates = nums.filter(n => n >= 100 && n <= 10_000_000);
-    if (!grainCandidates.length) continue;
-    const grain = grainCandidates[grainCandidates.length - 1];
-    deliveries.push({ hour: parseInt(timeMatch[1]), min: parseInt(timeMatch[2]), grain });
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+  // ── Format 1: block format (Travian delivery overview) ──────────────────
+  // Find "In ... at HH:MM" lines and collect 4 resource numbers above them
+  for (let i = 0; i < lines.length; i++) {
+    const atMatch = lines[i].match(/\bat\s+(\d{1,2}):(\d{2})\b/);
+    if (!atMatch) continue;
+    const hour = parseInt(atMatch[1]);
+    const min  = parseInt(atMatch[2]);
+
+    // Collect up to 8 lines above, find the last 4 consecutive numbers
+    const nums = [];
+    for (let j = Math.max(0, i - 10); j < i; j++) {
+      const clean = lines[j].replace(/[.,\s]/g, '');
+      if (/^\d+$/.test(clean)) nums.push(parseInt(lines[j].replace(/[.,\s]/g, '')));
+      else if (nums.length > 0) nums.length = 0; // reset on non-number line
+    }
+    if (nums.length >= 4) {
+      // resources are lumber/clay/iron/grain (last 4)
+      const grain = nums[nums.length - 1];
+      if (grain >= 0) deliveries.push({ hour, min, grain });
+      continue;
+    }
+    // fewer than 4 nums: take last number as grain if reasonable
+    if (nums.length >= 1) {
+      const grain = nums[nums.length - 1];
+      if (grain > 0) deliveries.push({ hour, min, grain });
+    }
   }
-  return deliveries.sort((a,b) => a.hour*60+a.min - (b.hour*60+b.min));
+
+  // ── Format 2: single-line fallback "HH:MM ... <big number>" ─────────────
+  if (deliveries.length === 0) {
+    for (const line of lines) {
+      if (line.match(/\bat\s+\d/)) continue; // skip block-format lines
+      const timeMatch = line.match(/(\d{1,2}):(\d{2})/);
+      if (!timeMatch) continue;
+      const nums = [...line.matchAll(/\d[\d.,]*/g)]
+        .map(m => parseInt(m[0].replace(/[.,]/g, '')))
+        .filter(n => n >= 100 && n <= 10_000_000);
+      if (!nums.length) continue;
+      deliveries.push({ hour: parseInt(timeMatch[1]), min: parseInt(timeMatch[2]), grain: nums[nums.length - 1] });
+    }
+  }
+
+  return deliveries.sort((a, b) => a.hour * 60 + a.min - (b.hour * 60 + b.min));
 }
 
 window.updateGrainSim = function() {
@@ -3738,15 +3783,21 @@ window.updateGrainSim = function() {
   let grain = currentGrain;
   let runOutAt = null;
 
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  // Normalize delivery times relative to now (handle day wrap-around)
+  const deliveriesNorm = deliveries.map(d => {
+    let dm = d.hour * 60 + d.min;
+    if (dm < nowMins - 30) dm += 1440; // next day
+    return { relMin: dm - nowMins, grain: d.grain };
+  });
+
   for (let i = 0; i <= steps; i++) {
     const mins = i * 15;
     const t    = new Date(now.getTime() + mins * 60000);
     labels.push(`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`);
-    // Market deliveries in this slot
-    for (const d of deliveries) {
-      const dMins = d.hour*60 + d.min;
-      const slotStart = now.getHours()*60 + now.getMinutes() + mins - 15;
-      if (dMins > slotStart && dMins <= slotStart + 15)
+    // Market deliveries arriving in this 15-min slot
+    for (const d of deliveriesNorm) {
+      if (d.relMin > mins - 15 && d.relMin <= mins)
         grain = Math.min(capacity, grain + d.grain);
     }
     grain = Math.max(0, Math.min(capacity, grain + netPerH * 0.25));
