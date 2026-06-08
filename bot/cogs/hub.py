@@ -80,7 +80,7 @@ def _build_overwrites(guild: discord.Guild, config: dict, requester: discord.Mem
     return overwrites
 
 
-def _build_defend_overwrites(guild: discord.Guild, config: dict, requester: discord.Member) -> dict:
+def _build_defend_overwrites(guild: discord.Guild, config: dict, requester: discord.Member | None) -> dict:
     """Like _build_overwrites but uses defend_role_ids (fallback: allowed_role_ids)."""
     defend_ids = (config.get("defend_role_ids") or "").strip()
     role_source = defend_ids if defend_ids else (config.get("allowed_role_ids") or "")
@@ -90,8 +90,9 @@ def _build_defend_overwrites(guild: discord.Guild, config: dict, requester: disc
             view_channel=True, send_messages=True,
             embed_links=True, attach_files=True, manage_channels=True,
         ),
-        requester: discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True),
     }
+    if requester is not None:
+        overwrites[requester] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True)
     for role_id_str in role_source.split(","):
         role_id_str = role_id_str.strip()
         if not role_id_str:
