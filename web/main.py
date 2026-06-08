@@ -5317,6 +5317,36 @@ async def attacks_archive(request: Request, guild_id: str, attack_id: int):
     return JSONResponse({"ok": ok})
 
 
+@app.post("/guild/{guild_id}/attacks/bulk-archive")
+async def attacks_bulk_archive(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    if not await has_perm(request, guild_id, "label_attack"):
+        return JSONResponse({"ok": False}, status_code=403)
+    count = await database.bulk_archive_attacks(guild_id)
+    return JSONResponse({"ok": True, "count": count})
+
+
+@app.post("/guild/{guild_id}/attacks/bulk-delete")
+async def attacks_bulk_delete(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    if not await has_perm(request, guild_id, "label_attack"):
+        return JSONResponse({"ok": False}, status_code=403)
+    count = await database.bulk_delete_attacks(guild_id)
+    return JSONResponse({"ok": True, "count": count})
+
+
+@app.get("/guild/{guild_id}/attacks/api/analysis")
+async def attacks_api_analysis(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    data = await database.get_attack_analysis(guild_id)
+    return JSONResponse({"ok": True, **data})
+
+
 @app.post("/guild/{guild_id}/attacks/delete/{attack_id}")
 async def attacks_delete(request: Request, guild_id: str, attack_id: int):
     session, err = await _attack_access(request, guild_id)

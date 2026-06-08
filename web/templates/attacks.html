@@ -19,9 +19,18 @@
       <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
         &#x1F3F0; Own Villages
       </a>
+      <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:0.9rem;">
+        📊 Analyse
+      </button>
       {% if can_label %}
       <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:0.9rem;">
-        &#x1F4C1; Archive
+        📁 Archiv
+      </button>
+      <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:0.9rem;color:#a5b4fc;">
+        📦 Alle archivieren
+      </button>
+      <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:0.9rem;color:#f87171;">
+        🗑️ Alle löschen
       </button>
       {% endif %}
     </div>
@@ -289,6 +298,19 @@
       </div>
       <div id="allianceContent">
         <div style="text-align:center; color:var(--text-muted); padding:2rem;">Klicke auf "Allianz-Analyse" um die Daten zu laden.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ANALYSIS PANEL ===== -->
+  <div id="analysisPanel" style="display:none;margin-bottom:1.25rem;">
+    <div class="card" style="padding:1rem 1.25rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+        <h2 style="margin:0;font-size:1rem;">📊 Angriffs-Analyse</h2>
+        <button onclick="toggleAnalysisPanel()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">&times;</button>
+      </div>
+      <div id="analysisContent">
+        <div style="text-align:center;color:var(--text-muted);padding:1.5rem;">Lade…</div>
       </div>
     </div>
   </div>
@@ -2340,6 +2362,129 @@
 
   let archivedLoaded = false;
   let archivedVisible = false;
+  // ── Bulk actions ──────────────────────────────────────────────────────────
+  window.confirmArchiveAll = async function() {
+    const n = _allAttacks.filter(a => !a.is_dismissed).length;
+    if (!confirm(`Alle ${n} sichtbaren Angriffe ins Archiv verschieben?`)) return;
+    const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-archive`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) { await loadAttacks(); alert(`✅ ${d.count} Angriffe archiviert.`); }
+    else alert('Fehler beim Archivieren.');
+  };
+
+  window.confirmDeleteAll = async function() {
+    const n = _allAttacks.length;
+    if (!confirm(`⚠️ Wirklich ALLE ${n} Angriffe unwiderruflich löschen?\n\nDies kann nicht rückgängig gemacht werden.`)) return;
+    if (!confirm('Bist du sicher? Alle Daten werden gelöscht.')) return;
+    const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-delete`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) { await loadAttacks(); alert(`🗑️ ${d.count} Angriffe gelöscht.`); }
+    else alert('Fehler beim Löschen.');
+  };
+
+  // ── Analysis panel ─────────────────────────────────────────────────────────
+  let _analysisVisible = false;
+  window.toggleAnalysisPanel = async function() {
+    const panel = document.getElementById('analysisPanel');
+    _analysisVisible = !_analysisVisible;
+    panel.style.display = _analysisVisible ? 'block' : 'none';
+    document.getElementById('btnAnalysisToggle').style.background = _analysisVisible ? 'rgba(99,102,241,.2)' : '';
+    if (_analysisVisible) await _renderAnalysis();
+  };
+
+  async function _renderAnalysis() {
+    const el = document.getElementById('analysisContent');
+    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:1.5rem;">Lade…</div>';
+    try {
+      const r = await fetch(`/guild/${GUILD_ID}/attacks/api/analysis`);
+      const d = await r.json();
+      if (!d.ok) { el.innerHTML = '<p style="color:#f87171;">Fehler beim Laden.</p>'; return; }
+
+      const bar = (val, max, color) => {
+        const pct = max > 0 ? Math.round(val / max * 100) : 0;
+        return `<div style="flex:1;background:rgba(255,255,255,.06);border-radius:3px;height:7px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div></div>`;
+      };
+
+      // ── Top targets ──────────────────────────────────────────────────────
+      const maxT = d.top_targets[0]?.total || 1;
+      const targetsHtml = d.top_targets.map((t,i) => `
+        <div style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+          <span style="min-width:16px;font-size:.72rem;color:var(--text-muted);text-align:right;">${i+1}</span>
+          <span style="flex:1;font-size:.82rem;font-weight:${i<3?'700':'500'};color:var(--text);">${escHtml(t.village)}</span>
+          ${bar(t.total, maxT, '#6366f1')}
+          <span style="font-size:.78rem;font-weight:700;color:#a5b4fc;min-width:20px;text-align:right;">${t.total}</span>
+          ${t.real>0 ? `<span style="font-size:.68rem;color:#f87171;min-width:32px;">⚔️${t.real}</span>` : '<span style="min-width:32px;"></span>'}
+        </div>`).join('');
+
+      // ── Top attackers ────────────────────────────────────────────────────
+      const maxA = d.top_attackers[0]?.total || 1;
+      const attackersHtml = d.top_attackers.map((a,i) => `
+        <div style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+          <span style="min-width:16px;font-size:.72rem;color:var(--text-muted);text-align:right;">${i+1}</span>
+          <span style="flex:1;font-size:.82rem;font-weight:${i<3?'700':'500'};color:var(--text);">${escHtml(a.player)}</span>
+          <span style="font-size:.7rem;color:var(--text-muted);">${escHtml(a.ally)}</span>
+          ${bar(a.total, maxA, '#ef4444')}
+          <span style="font-size:.78rem;font-weight:700;color:#f87171;min-width:20px;text-align:right;">${a.total}</span>
+          ${a.real>0 ? `<span style="font-size:.68rem;color:#fbbf24;min-width:32px;">⚔️${a.real}</span>` : '<span style="min-width:32px;"></span>'}
+        </div>`).join('');
+
+      // ── Sequence patterns ────────────────────────────────────────────────
+      const seqHtml = d.sequence_patterns.filter(s => s.unique_targets >= 2).map(s => {
+        const seqArrow = s.sequence.map(v => `<span style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:4px;padding:1px 6px;font-size:.7rem;">${escHtml(v)}</span>`).join(' → ');
+        const warn = s.real_count >= 2 ? `<span style="color:#f87171;font-size:.7rem;font-weight:700;">⚠️ ${s.real_count} real</span>` : '';
+        return `<div style="padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem;">
+            <span style="font-size:.82rem;font-weight:700;">${escHtml(s.player)}</span>
+            <span style="font-size:.7rem;color:var(--text-muted);">${escHtml(s.ally)}</span>
+            <span style="font-size:.7rem;color:var(--text-muted);">${s.attack_count}× auf ${s.unique_targets} Dörfer</span>
+            ${warn}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;">${seqArrow}</div>
+        </div>`;
+      }).join('') || '<span style="font-size:.8rem;color:var(--text-muted);">Keine Muster gefunden</span>';
+
+      // ── Time clusters ────────────────────────────────────────────────────
+      const maxH = Math.max(...d.time_clusters.map(h => h.count), 1);
+      const timeHtml = d.time_clusters.map(h =>
+        `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:28px;">
+          <span style="font-size:.65rem;color:var(--text-muted);">${h.count}</span>
+          <div style="width:20px;background:#6366f1;border-radius:3px 3px 0 0;height:${Math.max(4, Math.round(h.count/maxH*60))}px;"></div>
+          <span style="font-size:.62rem;color:var(--text-muted);">${String(h.hour).padStart(2,'0')}</span>
+        </div>`).join('');
+
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">🏰 Meistangegriffene Dörfer</div>
+            ${targetsHtml || '<span style="font-size:.8rem;color:var(--text-muted);">Keine Daten</span>'}
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">⚔️ Aktivste Angreifer</div>
+            ${attackersHtml || '<span style="font-size:.8rem;color:var(--text-muted);">Keine Daten</span>'}
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">🔀 Angriffs-Sequenzen (Spieler → Dörfer)</div>
+            ${seqHtml}
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">⏰ Ankunfts-Zeitverteilung</div>
+            <div style="display:flex;align-items:flex-end;gap:2px;height:80px;overflow-x:auto;padding-bottom:.25rem;">
+              ${timeHtml || '<span style="font-size:.8rem;color:var(--text-muted);">Keine Daten</span>'}
+            </div>
+          </div>
+
+        </div>
+        <div style="margin-top:.5rem;font-size:.72rem;color:var(--text-muted);">Gesamt: ${d.total} Angriffe analysiert · ⚔️ = echte Angriffe (Score &lt;60)</div>`;
+    } catch(e) {
+      el.innerHTML = '<p style="color:#f87171;">Netzwerkfehler: ' + escHtml(e.message) + '</p>';
+    }
+  }
+
   window.toggleArchivedView = async function() {
     const panel = document.getElementById('archivedPanel');
     archivedVisible = !archivedVisible;

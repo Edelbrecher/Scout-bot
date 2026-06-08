@@ -9462,6 +9462,133 @@ async def delete_attack(attack_id: int, guild_id: str) -> bool:
         return cur.rowcount > 0
 
 
+async def bulk_archive_attacks(guild_id: str) -> int:
+    """Archive (soft-hide) all non-dismissed attacks for a guild."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            "UPDATE incoming_attacks SET is_dismissed=1 WHERE guild_id=? AND is_dismissed=0",
+            (guild_id,)
+        )
+        await db.commit()
+        return cur.rowcount
+
+
+async def bulk_delete_attacks(guild_id: str) -> int:
+    """Hard-delete all attacks for a guild."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            "DELETE FROM incoming_attacks WHERE guild_id=?", (guild_id,)
+        )
+        await db.commit()
+        return cur.rowcount
+
+
+async def get_attack_analysis(guild_id: str) -> dict:
+    """
+    Analyse all active (non-dismissed) attacks and return:
+    - top_targets: villages sorted by attack count
+    - top_attackers: players sorted by attack count
+    - sequence_patterns: villages attacked in sequence by same player
+    - time_clusters: attacks grouped by arrival hour
+    """
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT id, attacker_player, attacker_alliance, own_village_name,
+                   own_village_x, own_village_y, attacker_x, attacker_y,
+                   arrival_time, fake_score, label, attack_type
+            FROM incoming_attacks
+            WHERE guild_id=? AND is_dismissed=0
+            ORDER BY arrival_time ASC
+        """, (guild_id,)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    if not rows:
+        return {"top_targets": [], "top_attackers": [], "sequence_patterns": [], "time_clusters": []}
+
+    import collections, re as _re
+
+    # ── Top targets ────────────────────────────────────────────────────────
+    target_counts: dict = collections.Counter()
+    target_real:   dict = collections.Counter()
+    for r in rows:
+        key = f"{r['own_village_name'] or '?'} ({r['own_village_x']}|{r['own_village_y']})"
+        target_counts[key] += 1
+        if (r['fake_score'] or 50) < 60 and r['attack_type'] != 'support':
+            target_real[key] += 1
+    top_targets = [{"village": k, "total": v, "real": target_real.get(k, 0)}
+                   for k, v in target_counts.most_common(10)]
+
+    # ── Top attackers ──────────────────────────────────────────────────────
+    atk_counts: dict  = collections.Counter()
+    atk_ally:   dict  = {}
+    atk_real:   dict  = collections.Counter()
+    for r in rows:
+        p = r['attacker_player'] or '(unbekannt)'
+        atk_counts[p] += 1
+        atk_ally[p] = r['attacker_alliance'] or '–'
+        if (r['fake_score'] or 50) < 60 and r['attack_type'] != 'support':
+            atk_real[p] += 1
+    top_attackers = [{"player": k, "ally": atk_ally.get(k,'–'), "total": v, "real": atk_real.get(k,0)}
+                     for k, v in atk_counts.most_common(10)]
+
+    # ── Sequence patterns: same attacker hitting multiple villages ─────────
+    player_villages: dict = collections.defaultdict(list)
+    for r in rows:
+        p = r['attacker_player'] or '(unbekannt)'
+        vkey = f"{r['own_village_name'] or '?'} ({r['own_village_x']}|{r['own_village_y']})"
+        player_villages[p].append({"village": vkey, "arrival": r['arrival_time'] or '', "fake_score": r['fake_score'] or 50})
+
+    sequence_patterns = []
+    for player, attacks in player_villages.items():
+        if len(attacks) >= 2:
+            villages = [a['village'] for a in attacks]
+            unique = list(dict.fromkeys(villages))  # preserve order, deduplicate
+            real_count = sum(1 for a in attacks if a['fake_score'] < 60)
+            sequence_patterns.append({
+                "player": player,
+                "ally": atk_ally.get(player,'–'),
+                "attack_count": len(attacks),
+                "unique_targets": len(unique),
+                "real_count": real_count,
+                "sequence": unique,
+            })
+    sequence_patterns.sort(key=lambda x: x['attack_count'], reverse=True)
+    sequence_patterns = sequence_patterns[:10]
+
+    # ── Time clusters: attacks grouped by arrival hour ─────────────────────
+    hour_counts: dict = collections.Counter()
+    for r in rows:
+        arr = r['arrival_time'] or ''
+        m = _re.search(r'(\d{1,2}):\d{2}', arr)
+        if m:
+            hour_counts[int(m.group(1))] += 1
+    time_clusters = [{"hour": h, "count": c} for h, c in sorted(hour_counts.items())]
+
+    # ── Alliance breakdown ─────────────────────────────────────────────────
+    ally_counts: dict = collections.Counter()
+    ally_real:   dict = collections.Counter()
+    for r in rows:
+        a = r['attacker_alliance'] or '(keine)'
+        ally_counts[a] += 1
+        if (r['fake_score'] or 50) < 60 and r['attack_type'] != 'support':
+            ally_real[a] += 1
+    top_alliances = [{"alliance": k, "total": v, "real": ally_real.get(k,0)}
+                     for k, v in ally_counts.most_common(6)]
+
+    return {
+        "total": len(rows),
+        "top_targets": top_targets,
+        "top_attackers": top_attackers,
+        "sequence_patterns": sequence_patterns,
+        "time_clusters": time_clusters,
+        "top_alliances": top_alliances,
+    }
+
+
 async def save_attack_note(attack_id: int, guild_id: str, notes: str) -> bool:
     """Save or update the notes field for an attack."""
     await _init_attack_detection_tables()
