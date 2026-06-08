@@ -1604,24 +1604,98 @@
     return waves;
   }
 
-  function zwischendefWarning(waves) {
-    if (waves.length <= 1) return '';
-    const parts = [];
-    for (let i = 0; i < waves.length - 1; i++) {
-      const t1 = new Date(waves[i][waves[i].length-1].arrival_time||0).getTime();
-      const t2 = new Date(waves[i+1][0].arrival_time||0).getTime();
-      const gapSec = Math.round((t2 - t1) / 1000);
-      const gapMin = Math.floor(gapSec / 60);
-      const gapRemSec = gapSec % 60;
-      const gapLabel = gapMin > 0 ? `${gapMin} Min ${gapRemSec} Sek` : `${gapSec} Sek`;
-      const arr1 = fmtArrival(waves[i][waves[i].length-1].arrival_time);
-      const arr2 = fmtArrival(waves[i+1][0].arrival_time);
-      parts.push(`Welle ${i+1} (${arr1}) → Welle ${i+2} (${arr2}): ${gapLabel} Abstand`);
+  function fmtGap(gapSec) {
+    const m = Math.floor(gapSec / 60), s = gapSec % 60;
+    return m > 0 ? `${m} Min ${s} Sek` : `${s} Sek`;
+  }
+
+  // Analyse a gap between two consecutive attack groups and return an intercept marker (HTML)
+  function gapMarker(waveA, waveB, waveIdx, allVillageAttacks) {
+    const lastA = waveA[waveA.length - 1];
+    const firstB = waveB[0];
+    const t1 = new Date(lastA.arrival_time||0).getTime();
+    const t2 = new Date(firstB.arrival_time||0).getTime();
+    const gapSec = Math.round((t2 - t1) / 1000);
+    if (gapSec < 5) return ''; // same-second noise
+
+    const gapLabel = fmtGap(gapSec);
+    const arr1 = fmtArrival(lastA.arrival_time);
+    const arr2 = fmtArrival(firstB.arrival_time);
+
+    // ── Chief detection ─────────────────────────────────────────────────────
+    // Pattern: same attacker player hitting same village multiple times,
+    // gap < 10 min, at least one wave has hidden troops
+    const samePlayer = lastA.attacker_player && lastA.attacker_player === firstB.attacker_player;
+    const anyHidden  = allVillageAttacks.some(a => a.troops_hidden);
+    const multiSamePlayer = allVillageAttacks.filter(a =>
+      a.attacker_player === lastA.attacker_player
+    ).length >= 2;
+    const isChiefPattern = (samePlayer || multiSamePlayer) && anyHidden && gapSec <= 600;
+
+    // ── Zwischendeff detection ───────────────────────────────────────────────
+    // Gap between two real-looking attacks → window to send defence between waves
+    const aReal = lastA.attack_type !== 'support' && (lastA.fake_score||50) < 60;
+    const bReal = firstB.attack_type !== 'support' && (firstB.fake_score||50) < 60;
+    const hasRealGap = (aReal || bReal) && gapSec >= 30;
+
+    if (isChiefPattern) {
+      // Blue chief-intercept marker
+      let interceptText = '';
+      if (gapSec < 60) {
+        interceptText = `Fenster <strong>${gapLabel}</strong> — sehr eng. Nur mit Paladin/Schnelle Ritter möglich.`;
+      } else if (gapSec < 300) {
+        interceptText = `Fenster <strong>${gapLabel}</strong> — Schnelle Einheiten (Ritter, Paladin, EI, Haeduaner) abschicken sobald Welle ${waveIdx} landet. Timing kritisch!`;
+      } else {
+        interceptText = `Fenster <strong>${gapLabel}</strong> — ausreichend Zeit. Infanterie + Kavallerie können zwischen den Wellen einlaufen.`;
+      }
+      return `<div style="margin:.3rem 0;padding:.5rem .85rem;border-radius:7px;
+        background:rgba(59,130,246,.1);border-left:3px solid #3b82f6;border:1px solid rgba(59,130,246,.3);
+        display:flex;align-items:flex-start;gap:.55rem;">
+        <span style="font-size:1rem;line-height:1.4;flex-shrink:0;">👑</span>
+        <div style="font-size:.78rem;line-height:1.5;">
+          <span style="color:#93c5fd;font-weight:800;">Möglicher Chief-Zug!</span>
+          <span style="color:var(--text-muted);margin:0 .3rem;">·</span>
+          <span style="color:var(--text-muted);">${arr1} → ${arr2}</span><br>
+          <span style="color:#bfdbfe;">${interceptText}</span><br>
+          <span style="color:var(--text-muted);font-size:.72rem;">💡 Schicke einen <strong style="color:#93c5fd;">Abfänger</strong> los, der zwischen den Wellen im Dorf landet und den Häuptling tötet.</span>
+        </div>
+      </div>`;
     }
-    return `<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;font-size:0.8rem;color:#fbbf24;">
-      ⏱️ <strong>Intermediate def possible!</strong> ${waves.length} waves with time gap:<br>
-      ${parts.map(p => '• ' + p).join('<br>')}
-    </div>`;
+
+    if (hasRealGap) {
+      // Green zwischendeff marker
+      let zwText = '';
+      if (gapSec < 60) {
+        zwText = `<strong>${gapLabel}</strong> Fenster — sehr eng. Nur Schnelleinheiten (Paladin, Ritter, EI) haben Chance.`;
+      } else if (gapSec < 300) {
+        zwText = `<strong>${gapLabel}</strong> Fenster — Kavallerie als Zwischendeff schicken, sobald Welle ${waveIdx} aufschlägt.`;
+      } else if (gapSec < 1800) {
+        zwText = `<strong>${gapLabel}</strong> Fenster — Kavallerie oder Infanterie rechtzeitig schickbar. Zwischendeff gut möglich.`;
+      } else {
+        zwText = `<strong>${gapLabel}</strong> Fenster — große Lücke. Vollständige Verstärkung möglich, auch Infanterie kommt an.`;
+      }
+      return `<div style="margin:.3rem 0;padding:.5rem .85rem;border-radius:7px;
+        background:rgba(34,197,94,.08);border-left:3px solid #22c55e;border:1px solid rgba(34,197,94,.25);
+        display:flex;align-items:flex-start;gap:.55rem;">
+        <span style="font-size:1rem;line-height:1.4;flex-shrink:0;">🟢</span>
+        <div style="font-size:.78rem;line-height:1.5;">
+          <span style="color:#86efac;font-weight:800;">Zwischendeff-Fenster</span>
+          <span style="color:var(--text-muted);margin:0 .3rem;">·</span>
+          <span style="color:var(--text-muted);">${arr1} → ${arr2}</span><br>
+          <span style="color:#bbf7d0;">${zwText}</span>
+        </div>
+      </div>`;
+    }
+
+    // Small neutral gap — just a divider label
+    if (gapSec >= 5) {
+      return `<div style="display:flex;align-items:center;gap:.5rem;margin:.2rem 0;opacity:.55;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;">⏱ ${gapLabel} Abstand</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>`;
+    }
+    return '';
   }
 
   // ── Collapse state ────────────────────────────────────────────────────────
@@ -1654,29 +1728,47 @@
       const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
       const coords = g.x != null ? ' ('+g.x+'|'+g.y+')' : '';
       const waves = groupIntoWaves(g.attacks);
-      const zwWarning = zwischendefWarning(waves);
       const realCount = g.attacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60).length;
       const supportCount = g.attacks.filter(a => a.attack_type === 'support').length;
+      const chiefPattern = g.attacks.some(a=>a.troops_hidden) &&
+        g.attacks.filter(a=>a.attack_type!=='support').length >= 2;
       const isCollapsed = !!_villageCollapsed[safeKey];
+
+      // Header badges
+      let headerBadges = '';
+      if (supportCount > 0) headerBadges += `<span style="color:#4ade80;">🛡️ ${supportCount}</span>`;
+      if (realCount > 0)    headerBadges += `<span style="color:#f87171;">⚠️ ${realCount} real?</span>`;
+      if (chiefPattern)     headerBadges += `<span style="color:#93c5fd;">👑 Chief?</span>`;
+
       html += `<div class="village-card">
         <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;">
           <span id="vc-arrow-${safeKey}" style="font-size:.7rem;margin-right:.4rem;color:var(--text-muted);">${isCollapsed?'▶':'▼'}</span>
           🏰 ${escHtml(g.name)}${escHtml(coords)}
           <span style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);font-weight:400;display:flex;gap:.5rem;align-items:center;">
             ${waves.length} Welle(n) · ${g.attacks.length} Eintr.
-            ${supportCount>0?'<span style="color:#4ade80;">🛡️ '+supportCount+'</span>':''}
-            ${realCount>0?'<span style="color:#f87171;">⚠️ '+realCount+' real?</span>':''}
+            ${headerBadges}
           </span>
         </div>
-        <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0.4rem;">
-          ${zwWarning}`;
+        <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0.3rem;">`;
+
       for (let wi = 0; wi < waves.length; wi++) {
+        // Wave header (only when multiple waves)
         if (waves.length > 1) {
-          html += `<div style="font-size:0.72rem;color:var(--text-muted);padding:0.15rem 0 0.1rem;border-top:1px solid var(--border);margin-top:0.2rem;">
-            ⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}
+          const waveReal = waves[wi].filter(a => a.attack_type!=='support' && (a.fake_score||50)<60).length;
+          const waveHide = waves[wi].some(a => a.troops_hidden);
+          html += `<div style="font-size:.72rem;color:var(--text-muted);padding:.12rem 0 .05rem;
+              border-top:1px solid var(--border);margin-top:.15rem;display:flex;gap:.4rem;align-items:center;">
+            <span>⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}</span>
+            ${waveReal ? `<span style="color:#f87171;font-size:.68rem;">⚠️ ${waveReal} real?</span>` : ''}
+            ${waveHide ? `<span style="color:#c084fc;font-size:.68rem;">👁️ verdeckt</span>` : ''}
           </div>`;
         }
         for (const a of waves[wi]) html += renderAttackRow(a);
+
+        // Gap marker between this wave and the next
+        if (wi < waves.length - 1) {
+          html += gapMarker(waves[wi], waves[wi+1], wi+1, g.attacks);
+        }
       }
       html += '</div></div>';
     }
