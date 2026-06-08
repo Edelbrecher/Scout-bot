@@ -8416,9 +8416,26 @@ async def op_search_villages(request: Request, guild_id: str, q: str = "", allia
     return JSONResponse({"results": rows})
 
 
+def _normalize_tribe(raw) -> str:
+    """Convert any tribe representation to the JS TROOPS_DEF key (gauls/romans/teutons/huns/egyptians)."""
+    _ID_MAP = {1: "romans", 2: "teutons", 3: "gauls", 5: "egyptians", 6: "huns"}
+    _NAME_MAP = {
+        "römer": "romans", "romans": "romans", "roman": "romans",
+        "teutonen": "teutons", "teutons": "teutons", "teuton": "teutons",
+        "gallier": "gauls", "gauls": "gauls", "gaul": "gauls",
+        "ägypter": "egyptians", "egyptians": "egyptians", "egyptian": "egyptians",
+        "hunnen": "huns", "huns": "huns", "hun": "huns",
+    }
+    if raw is None: return ""
+    try:
+        return _ID_MAP.get(int(raw), "")
+    except (ValueError, TypeError):
+        return _NAME_MAP.get(str(raw).lower().strip(), "")
+
+
 @app.get("/guild/{guild_id}/operations/api/player-tribe")
 async def op_player_tribe(request: Request, guild_id: str, name: str = ""):
-    """Quick lookup: return tribe for a player name from all available sources."""
+    """Quick lookup: return normalized tribe key for a player from all available sources."""
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     if not name:
@@ -8429,35 +8446,27 @@ async def op_player_tribe(request: Request, guild_id: str, name: str = ""):
         db.row_factory = _aiosqlite_pt.Row
         # 1. member_troops
         async with db.execute(
-            "SELECT tribe FROM member_troops WHERE guild_id=? AND (travian_name=? OR discord_name=?) AND tribe!='' LIMIT 1",
-            (guild_id, name, name)
+            "SELECT tribe FROM member_troops WHERE (travian_name=? OR discord_name=?) AND tribe!='' LIMIT 1",
+            (name, name)
         ) as cur:
             r = await cur.fetchone()
-            if r and r["tribe"]: tribe = r["tribe"]
-        # 2. alliance_members (has tribe from map import)
+            if r: tribe = _normalize_tribe(r["tribe"])
+        # 2. map_snapshots (numeric tribe from game data)
+        if not tribe:
+            async with db.execute(
+                "SELECT tribe FROM map_snapshots WHERE guild_id=? AND player_name=? AND tribe IS NOT NULL AND tribe!=0 LIMIT 1",
+                (guild_id, name)
+            ) as cur:
+                r = await cur.fetchone()
+                if r: tribe = _normalize_tribe(r["tribe"])
+        # 3. alliance_members
         if not tribe:
             async with db.execute(
                 "SELECT tribe FROM alliance_members WHERE guild_id=? AND player_name=? AND tribe!='' LIMIT 1",
                 (guild_id, name)
             ) as cur:
                 r = await cur.fetchone()
-                if r and r["tribe"]: tribe = r["tribe"]
-        # 3. map_snapshots (most reliable — from actual game map)
-        if not tribe:
-            async with db.execute(
-                "SELECT tribe FROM map_snapshots WHERE guild_id=? AND player_name=? AND tribe!='' LIMIT 1",
-                (guild_id, name)
-            ) as cur:
-                r = await cur.fetchone()
-                if r and r["tribe"]: tribe = r["tribe"]
-        # 4. world_snapshots
-        if not tribe:
-            async with db.execute(
-                "SELECT tribe FROM world_snapshots WHERE world_url IN (SELECT tw_world FROM guilds WHERE guild_id=?) AND lower(player_name)=lower(?) AND tribe!='' LIMIT 1",
-                (guild_id, name)
-            ) as cur:
-                r = await cur.fetchone()
-                if r and r["tribe"]: tribe = r["tribe"]
+                if r: tribe = _normalize_tribe(r["tribe"])
     return JSONResponse({"tribe": tribe})
 
 
@@ -8613,7 +8622,7 @@ async def op_attacker_list(request: Request, guild_id: str):
             "player_name": name,
             "discord_id": tr.get("discord_id", ""),
             "discord_name": tr.get("discord_name", ""),
-            "tribe": tr.get("tribe") or snap_tribe.get(name) or am.get("tribe", ""),
+            "tribe": _normalize_tribe(tr.get("tribe") or snap_tribe.get(name) or am.get("tribe") or ""),
             "rank": am.get("rank", 9999),
             "villages": villages,
         })
