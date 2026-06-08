@@ -9174,6 +9174,46 @@ async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = No
             return [dict(r) for r in await cur.fetchall()]
 
 
+_BOT_DB_PATH = Path("/app/data/scouter.db")  # shared volume — same DB as bot
+
+async def get_defend_status_for_attack(guild_id: str, attack_id: str) -> dict:
+    """Return active defend channel + sent troops for a given attack_id."""
+    try:
+        async with aiosqlite.connect(_BOT_DB_PATH, timeout=10) as db:
+            db.row_factory = aiosqlite.Row
+            # Find open defend channel linked to this attack
+            async with db.execute(
+                "SELECT * FROM defend_channels WHERE guild_id=? AND attack_id=? ORDER BY created_at DESC LIMIT 1",
+                (guild_id, attack_id)
+            ) as cur:
+                row = await cur.fetchone()
+            if not row:
+                return {"has_call": False}
+            ch = dict(row)
+            # Get sent troops
+            async with db.execute(
+                "SELECT user_name, amount_raw, amount_parsed, troop_type, grain_per_unit, sent_at FROM defend_sent WHERE channel_id=? ORDER BY sent_at ASC",
+                (ch["channel_id"],)
+            ) as cur:
+                sent = [dict(r) for r in await cur.fetchall()]
+            total_grain = sum(s.get("amount_parsed", 0) * s.get("grain_per_unit", 1) for s in sent)
+            goal = int(ch.get("goal") or 0) if str(ch.get("goal", "")).isdigit() else 0
+            is_full = goal > 0 and total_grain >= goal
+            return {
+                "has_call": True,
+                "channel_id": ch["channel_id"],
+                "status": ch.get("status", "open"),
+                "goal": ch.get("goal", ""),
+                "ratio": ch.get("ratio", ""),
+                "total_grain": total_grain,
+                "is_full": is_full,
+                "contributors": len(set(s["user_name"] for s in sent)),
+                "sent": sent,
+            }
+    except Exception as e:
+        return {"has_call": False, "error": str(e)}
+
+
 async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list[dict]:
     await _init_attack_detection_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

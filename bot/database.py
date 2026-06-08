@@ -315,7 +315,7 @@ async def init_db():
             )
         """)
         # Add new columns to defend_channels if not present
-        for col in ("tracking_msg_id TEXT", "goal TEXT DEFAULT ''", "ratio TEXT DEFAULT ''"):
+        for col in ("tracking_msg_id TEXT", "goal TEXT DEFAULT ''", "ratio TEXT DEFAULT ''", "attack_id TEXT DEFAULT ''"):
             try:
                 await db.execute(f"ALTER TABLE defend_channels ADD COLUMN {col}")
             except Exception:
@@ -1097,16 +1097,16 @@ async def add_defend_channel(
     channel_id: str, guild_id: str, type: str,
     attacker: str, coords: str, arrival_time: str,
     notes: str, requested_by_id: str, requested_by_name: str,
-    goal: str = "", ratio: str = "",
+    goal: str = "", ratio: str = "", attack_id: str = "",
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT INTO defend_channels
                 (channel_id, guild_id, type, attacker, coords, arrival_time,
-                 notes, goal, ratio, requested_by_id, requested_by_name, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,'open')
+                 notes, goal, ratio, requested_by_id, requested_by_name, attack_id, status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'open')
         """, (channel_id, guild_id, type, attacker, coords, arrival_time,
-              notes, goal or "", ratio or "", requested_by_id, requested_by_name))
+              notes, goal or "", ratio or "", requested_by_id, requested_by_name, attack_id or ""))
         await db.commit()
 
 

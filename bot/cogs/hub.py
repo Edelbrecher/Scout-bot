@@ -436,6 +436,7 @@ async def _create_defend_channel_api(
     arrival_time: str,
     troop_goal: str = "", ratio: str = "", notes: str = "",
     requested_by_id: str = "", requested_by_name: str = "Webdashboard",
+    attack_id: str = "",
 ) -> tuple[str, str]:
     """Create a defend channel triggered from the web dashboard (no Interaction needed).
     Returns (channel_id, channel_mention)."""
@@ -506,6 +507,7 @@ async def _create_defend_channel_api(
         goal=troop_goal, ratio=ratio,
         requested_by_id=requested_by_id,
         requested_by_name=requested_by_name,
+        attack_id=attack_id,
     )
     return str(new_channel.id), new_channel.mention
 

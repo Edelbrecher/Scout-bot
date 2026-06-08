@@ -1361,6 +1361,7 @@ async def handle_create_defend_channel(request: aiohttp_web.Request):
     troop_goal    = str(data.get("troop_goal", ""))      # crop/h goal
     ratio         = str(data.get("ratio", ""))           # e.g. "70/30"
     notes         = str(data.get("notes", ""))
+    attack_id     = str(data.get("attack_id", ""))
     requested_by_id   = str(data.get("requested_by_id", ""))
     requested_by_name = str(data.get("requested_by_name", "Webdashboard"))
 
@@ -1400,6 +1401,7 @@ async def handle_create_defend_channel(request: aiohttp_web.Request):
             notes=notes,
             requested_by_id=requested_by_id,
             requested_by_name=requested_by_name,
+            attack_id=attack_id,
         )
         return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "channel_mention": channel_mention})
     except Exception as e:

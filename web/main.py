@@ -5183,6 +5183,7 @@ async def attack_create_defense_call(request: Request, guild_id: str, attack_id:
                 "notes": notes,
                 "requested_by_id": uid,
                 "requested_by_name": session.get("username","Dashboard"),
+                "attack_id": str(attack_id),
             })
             data = resp.json()
             if not data.get("ok"):
@@ -5193,6 +5194,17 @@ async def attack_create_defense_call(request: Request, guild_id: str, attack_id:
             return JSONResponse({"ok": True, "channel_id": data.get("channel_id"), "channel_mention": data.get("channel_mention")})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/guild/{guild_id}/attacks/{attack_id}/def-status")
+async def attack_def_status(request: Request, guild_id: str, attack_id: int):
+    """Return defend channel status + sent troops for a specific attack."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    status = await database.get_defend_status_for_attack(guild_id, str(attack_id))
+    return JSONResponse(status)
 
 
 @app.get("/guild/{guild_id}/attacks/api/alliance")
