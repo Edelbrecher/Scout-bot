@@ -789,7 +789,7 @@ function doSearch() {
   for (const f of allianceFilters) {
     const q = f.name.toLowerCase();
     for (const v of villages) {
-      if ((v.alliance||'').toLowerCase().includes(q)) {
+      if ((v.alliance||'').toLowerCase() === q) {
         highlighted.set(`${v.x}|${v.y}`, f.color);
         total++;
       }
@@ -799,7 +799,7 @@ function doSearch() {
   for (const f of playerFilters) {
     const q = f.name.toLowerCase();
     for (const v of villages) {
-      if ((v.player||'').toLowerCase().includes(q)) {
+      if ((v.player||'').toLowerCase() === q) {
         highlighted.set(`${v.x}|${v.y}`, f.color);
       }
     }

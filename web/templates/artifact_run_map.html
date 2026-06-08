@@ -448,7 +448,7 @@ function draw(){
     const hasFilter = allyFilter.length > 0;
     for(const v of S.bgV){
       if(v.x<vx0||v.x>vx1||v.y<vy1||v.y>vy0) continue;
-      const isAlly = hasFilter && (v.alliance||'').toLowerCase().includes(allyFilter);
+      const isAlly = hasFilter && (v.alliance||'').toLowerCase() === allyFilter;
       if(allyOnly && hasFilter && !isAlly) continue;
       const[px,py]=w2c(v.x,v.y);
       const color=v.isNatar?NATAR_COLOR:(TRIBE_COLOR[v.tribe]||'#aaaaaa');

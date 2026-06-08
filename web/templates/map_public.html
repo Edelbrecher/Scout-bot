@@ -354,7 +354,7 @@ function rebuildHighlights() {
   }
   for (const f of allianceFilters) {
     for (const v of villages) {
-      if (v.alliance && v.alliance.toLowerCase().includes(f.name.toLowerCase()))
+      if (v.alliance && v.alliance.toLowerCase() === f.name.toLowerCase())
         highlighted.set(`${v.x}|${v.y}`, f.color);
     }
   }
