@@ -645,21 +645,15 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 
       <!-- Troop selector -->
       <div style="margin-bottom:.6rem;">
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-          <span style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Truppen</span>
-          <button type="button" id="troopPickerToggle" onclick="toggleTroopPicker()"
-            style="width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:rgba(99,102,241,.15);
-                   color:#a5b4fc;font-size:.9rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">
-            +
-          </button>
-          <span id="troopSummary" style="font-size:.74rem;color:var(--text-muted);"></span>
+        <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">
+          Truppen <span id="troopSummary" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);font-size:.72rem;"></span>
         </div>
-        <!-- Active chips (always visible) -->
-        <div id="troopGrid" class="troop-grid" style="margin-bottom:.4rem;"></div>
-        <!-- Picker: all available troops, shown on + click -->
-        <div id="troopPicker" style="display:none;flex-wrap:wrap;gap:.35rem;padding:.6rem .75rem;
-             background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;margin-top:.3rem;">
+        <!-- Picker: all troops always visible as colored chips -->
+        <div id="troopPicker" style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.55rem .7rem;
+             background:rgba(0,0,0,.18);border:1px solid var(--border);border-radius:8px;margin-bottom:.4rem;">
         </div>
+        <!-- Active chips with amount inputs -->
+        <div id="troopGrid" class="troop-grid"></div>
       </div>
 
       <!-- Timing preview -->
@@ -2122,11 +2116,15 @@ function _updateTroopSummary(tribe) {
 }
 
 function _addTroop(id) {
-  if ((_activeTroops[id] || 0) > 0) return; // already added
+  if (id in _activeTroops) {
+    // Already active — focus the amount field
+    const inp = document.getElementById('troop-' + id);
+    if (inp) inp.focus();
+    return;
+  }
   _activeTroops[id] = 0;
   _renderTroopChips();
   _renderTroopPicker();
-  // Focus the input
   setTimeout(() => {
     const inp = document.getElementById('troop-' + id);
     if (inp) inp.focus();
@@ -2148,14 +2146,6 @@ function _onTroopAmt(id, val) {
   recalcWaveTime();
 }
 
-function toggleTroopPicker() {
-  const picker = document.getElementById('troopPicker');
-  const btn    = document.getElementById('troopPickerToggle');
-  const open   = picker.style.display !== 'none';
-  picker.style.display = open ? 'none' : 'flex';
-  btn.textContent = open ? '+' : '−';
-  if (!open) _renderTroopPicker();
-}
 
 function recalcWaveTime() {
   const tribe = document.getElementById('wmTribe').value;
