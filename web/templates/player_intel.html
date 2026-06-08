@@ -40,12 +40,15 @@
 
   {# ── Recent searches (JS-rendered from localStorage) ── #}
   {% if not intel %}
-  <div id="recentSection" style="display:none;margin-bottom:1.5rem;">
+  <div id="recentSection" style="margin-bottom:1.5rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem;">
       <span style="font-size:.8rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">🕘 Zuletzt angesehen</span>
-      <button onclick="clearRecent()" style="background:none;border:none;color:var(--text-muted);font-size:.75rem;cursor:pointer;padding:0 .2rem;">✕ Verlauf löschen</button>
+      <button id="recentClearBtn" onclick="clearRecent()" style="display:none;background:none;border:none;color:var(--text-muted);font-size:.75rem;cursor:pointer;padding:0 .2rem;">✕ Verlauf löschen</button>
     </div>
-    <div id="recentGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.65rem;"></div>
+    <div id="recentEmpty" style="color:var(--text-muted);font-size:.82rem;padding:.5rem 0;">
+      Noch kein Verlauf — suche nach einem Spieler und er erscheint hier als Schnellzugriff.
+    </div>
+    <div id="recentGrid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.65rem;"></div>
   </div>
   {% endif %}
 
@@ -536,10 +539,17 @@ addRecent({{ intel.player_name | tojson }});
   const grid = document.getElementById('recentGrid');
   if (!sec || !grid) return;
 
-  const r = await fetch(`/guild/${GUILD_ID}/intel/batch-summary?names=${encodeURIComponent(names.join(','))}`);
-  if (!r.ok) return;
-  const players = await r.json();
+  const resp = await fetch(`/guild/${GUILD_ID}/intel/batch-summary?names=${encodeURIComponent(names.join(','))}`);
+  if (!resp.ok) return;
+  const players = await resp.json();
   if (!players.length) return;
+
+  // Hide empty placeholder, show grid + clear button
+  const emptyEl = document.getElementById('recentEmpty');
+  const clearBtn = document.getElementById('recentClearBtn');
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (clearBtn) clearBtn.style.display = '';
+  grid.style.display = 'grid';
 
   // Re-sort to match stored order (most recent first)
   const order = names.map(n => n.toLowerCase());
