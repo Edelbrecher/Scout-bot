@@ -2,7 +2,7 @@
 {% block title %}Attack-Detection · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-wide" style="padding:0 1rem;">
   <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">&larr; {{ guild.guild_name }}</a>
@@ -322,12 +322,14 @@
   </div>
 
   <div id="ownAttacksSection">
-    <div class="card" style="padding:0;overflow:hidden;">
 
-      <!-- ── Top bar ── -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.5rem;">
+    <!-- ══ SHARED TOOLBAR ══════════════════════════════════════════════════ -->
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:.75rem;">
+
+      <!-- Top bar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.5rem;">
         <div style="display:flex;align-items:center;gap:.6rem;">
-          <h2 style="margin:0;font-size:.95rem;">&#x2694;&#xFE0F; Incoming Attacks</h2>
+          <h2 style="margin:0;font-size:.95rem;">⚔️ Incoming Attacks</h2>
           <span id="atkTotalBadge" style="font-size:.72rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 9px;font-weight:700;"></span>
         </div>
         <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
@@ -336,41 +338,31 @@
             <input type="checkbox" id="selectAllCbx" onchange="toggleSelectAll(this.checked)" style="accent-color:#6366f1;"> Alle
           </label>
           {% endif %}
-          <!-- Filter: type -->
+          <!-- Shared type filter -->
           <select id="filterType" onchange="applyFilters()" style="font-size:.78rem;padding:.2rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
             <option value="">All types</option>
             <option value="attack">⚔️ Attacks</option>
             <option value="raid">💰 Raids</option>
             <option value="support">🛡️ Support</option>
           </select>
-          <!-- Filter: label -->
-          <select id="filterLabel" onchange="applyFilters()" style="font-size:.78rem;padding:.2rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-            <option value="">All labels</option>
-            <option value="fake">👻 Fake</option>
-            <option value="need_def">🛡️ Need to Def</option>
-            <option value="priority">🔥 Priority</option>
-            <option value="chief">👑 Chief Att</option>
-            <option value="no_hero">🚫 No Hero</option>
-            <option value="_unlabeled">Unlabeled</option>
-          </select>
-          <button class="btn btn-secondary" style="font-size:0.8rem;padding:0.25rem 0.6rem;" onclick="loadOwnAttacks()">&#x21BB;</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem;padding:0.25rem 0.6rem;" onclick="loadOwnAttacks()">↻</button>
           {% if can_label %}
           <button class="btn btn-secondary" id="btnTestData" onclick="insertTestData()" style="font-size:0.78rem;padding:0.25rem 0.6rem;border-color:rgba(168,85,247,.35);color:#c084fc;" title="Insert test data">🧪 Test</button>
           {% endif %}
         </div>
       </div>
 
-      <!-- ── Search/Filter bar ── -->
-      <div id="advFilterBar" style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem 1rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
-        <input id="fAtkName"      type="search" placeholder="🗡️ Attacker name"    oninput="loadOwnAttacks()" style="flex:1;min-width:130px;max-width:180px;font-size:.78rem;padding:.25rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fAtkAlliance"  type="search" placeholder="🛡 Atk alliance"      oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:165px;font-size:.78rem;padding:.25rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fAtkVillage"   type="search" placeholder="📍 Atk village"       oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:165px;font-size:.78rem;padding:.25rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fDefAlliance"  type="search" placeholder="🏰 Def alliance"      oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:165px;font-size:.78rem;padding:.25rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fDefVillage"   type="search" placeholder="🏘️ Def village"       oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:165px;font-size:.78rem;padding:.25rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+      <!-- Shared search/filter bar -->
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.45rem 1rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015);">
+        <input id="fAtkName"     type="search" placeholder="🗡️ Angreifer"       oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:170px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fAtkAlliance" type="search" placeholder="🛡 Atk-Allianz"     oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fAtkVillage"  type="search" placeholder="📍 Atk-Dorf"        oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fDefAlliance" type="search" placeholder="🏰 Def-Allianz"     oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fDefVillage"  type="search" placeholder="🏘️ Def-Dorf"        oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
         <button onclick="clearAdvFilters()" style="font-size:.75rem;padding:.2rem .55rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;">✕ Clear</button>
       </div>
 
-      <!-- ── Bulk bar ── -->
+      <!-- Bulk bar -->
       {% if can_label %}
       <div class="bulk-bar" id="bulkBar">
         <span id="bulkCount" style="font-size:.82rem;font-weight:700;color:#a5b4fc;">0 ausgewählt</span>
@@ -388,26 +380,58 @@
       </div>
       {% endif %}
 
-      <!-- ── Two-column layout: sidebar + content ── -->
-      <div style="display:grid;grid-template-columns:220px 1fr;min-height:200px;">
+    </div><!-- /shared toolbar card -->
 
-        <!-- LEFT: Village filter sidebar -->
-        <div id="villageSidebar" style="border-right:1px solid var(--border);display:flex;flex-direction:column;max-height:calc(100vh - 240px);position:sticky;top:72px;">
-          <div style="padding:.55rem .65rem;border-bottom:1px solid var(--border);">
-            <input id="villageSearchInput" type="search" placeholder="🔍 Dorf suchen…"
-              oninput="renderVillageList()"
-              style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.78rem;padding:.3rem .5rem;outline:none;">
+    <!-- ══ 2-COLUMN SPLIT VIEW ══════════════════════════════════════════════ -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;align-items:start;">
+
+      <!-- ── LEFT COLUMN ── -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <!-- Column header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span id="colLBadge" style="font-size:.72rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 8px;font-weight:700;">–</span>
           </div>
-          <div id="villageList" style="overflow-y:auto;flex:1;padding:.3rem 0;"></div>
+          <select id="colLFilter" onchange="applyFilters()" style="font-size:.8rem;padding:.2rem .55rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-weight:600;cursor:pointer;">
+            <option value="">🌐 Alle</option>
+            <option value="_real">🟢 Real (Fake-Score &lt; 60)</option>
+            <option value="need_def" selected>🛡️ Need to Def</option>
+            <option value="priority">🔥 Priority</option>
+            <option value="chief">👑 Chief Att</option>
+            <option value="no_hero">🚫 No Hero</option>
+            <option value="fake">👻 Fake</option>
+            <option value="_unlabeled">❓ Ohne Label</option>
+          </select>
         </div>
-
-        <!-- RIGHT: Attack content for selected village -->
-        <div id="ownAttacksContent" style="padding:.75rem;min-width:0;">
-          <div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>
-        </div>
-
+        <div id="colLContent" style="min-height:120px;"></div>
       </div>
-    </div>
+
+      <!-- ── RIGHT COLUMN ── -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <!-- Column header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span id="colRBadge" style="font-size:.72rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 8px;font-weight:700;">–</span>
+          </div>
+          <select id="colRFilter" onchange="applyFilters()" style="font-size:.8rem;padding:.2rem .55rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;color:var(--text);font-weight:600;cursor:pointer;">
+            <option value="">🌐 Alle</option>
+            <option value="_real">🟢 Real (Fake-Score &lt; 60)</option>
+            <option value="need_def">🛡️ Need to Def</option>
+            <option value="priority">🔥 Priority</option>
+            <option value="chief">👑 Chief Att</option>
+            <option value="no_hero">🚫 No Hero</option>
+            <option value="fake" selected>👻 Fake</option>
+            <option value="_unlabeled">❓ Ohne Label</option>
+          </select>
+        </div>
+        <div id="colRContent" style="min-height:120px;"></div>
+      </div>
+
+    </div><!-- /split view -->
+
+    <!-- Hidden element kept for backward-compat JS references -->
+    <div id="ownAttacksContent" style="display:none;"></div>
+
   </div>
 
   <!-- ===== CONFIG SECTION (collapsed) ===== -->
@@ -1311,8 +1335,11 @@
   let _selectedVillage = null;    // null = "All"
 
   window.loadOwnAttacks = async function() {
-    const cont = document.getElementById('ownAttacksContent');
-    cont.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>';
+    // Show loading state in both columns
+    ['colLContent','colRContent'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade…</div>';
+    });
     try {
       const params = new URLSearchParams();
       const v = id => (document.getElementById(id)?.value||'').trim();
@@ -1323,12 +1350,21 @@
       if (v('fDefVillage'))  params.set('def_village',  v('fDefVillage'));
       const qs = params.toString();
       const resp = await fetch('/guild/' + GUILD_ID + '/attacks/api/incoming' + (qs ? '?'+qs : ''));
-      if (!resp.ok) { cont.innerHTML = '<p class="hint" style="text-align:center;">Error loading.</p>'; return; }
+      if (!resp.ok) {
+        ['colLContent','colRContent'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<p class="hint" style="text-align:center;">Error loading.</p>';
+        });
+        return;
+      }
       _allAttacks = await resp.json();
       renderVillageList();
       applyFilters();
     } catch(e) {
-      cont.innerHTML = '<p class="hint" style="text-align:center;">Netzwerkfehler: ' + escHtml(e.message) + '</p>';
+      ['colLContent','colRContent'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<p class="hint" style="text-align:center;">Netzwerkfehler: ' + escHtml(e.message) + '</p>';
+      });
     }
   };
 
@@ -1368,78 +1404,47 @@
     return groups;
   }
 
-  // Render the left sidebar village list
+  // Update total badge (replaces old village sidebar)
   window.renderVillageList = function() {
-    const q = (document.getElementById('villageSearchInput')?.value || '').toLowerCase();
     const groups = buildGroups(_allAttacks);
-    const totalReal = _allAttacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60).length;
-    const totalSup  = _allAttacks.filter(a => a.attack_type === 'support').length;
-
-    let html = `<div class="vsb-item ${_selectedVillage===null?'active':''}" onclick="selectVillage(null)">
-      <span class="vsb-name">🌐 All villages</span>
-      <span class="vsb-cnt" style="color:var(--text-muted);">${_allAttacks.length}</span>
-      ${totalReal > 0 ? `<span class="vsb-real">⚠️${totalReal}</span>` : ''}
-    </div>
-    <div style="height:1px;background:var(--border);margin:.2rem 0;"></div>`;
-
-    const sortedKeys = Object.keys(groups).sort((a,b) => {
-      // Sort by real-attack count desc, then total desc
-      const ga = groups[a], gb = groups[b];
-      const ra = ga.attacks.filter(x => x.attack_type!=='support' && (x.fake_score||50)<60).length;
-      const rb = gb.attacks.filter(x => x.attack_type!=='support' && (x.fake_score||50)<60).length;
-      return rb - ra || gb.attacks.length - ga.attacks.length;
-    });
-
-    for (const key of sortedKeys) {
-      const g = groups[key];
-      if (q && !g.name.toLowerCase().includes(q)) continue;
-      const realCnt = g.attacks.filter(a => a.attack_type!=='support' && (a.fake_score||50)<60).length;
-      const supCnt  = g.attacks.filter(a => a.attack_type==='support').length;
-      const atkCnt  = g.attacks.length - supCnt;
-      const isActive = _selectedVillage === key;
-      const coords   = g.x != null ? ` (${g.x}|${g.y})` : '';
-      html += `<div class="vsb-item ${isActive?'active':''}" onclick="selectVillage('${key.replace(/'/g,"\\'")}')">
-        <span class="vsb-name" title="${escHtml(g.name+coords)}">🏰 ${escHtml(g.name)}</span>
-        <span class="vsb-cnt" style="color:${realCnt>0?'#f87171':'var(--text-muted)'};">${g.attacks.length}</span>
-        ${supCnt > 0 ? `<span class="vsb-real" style="color:#4ade80;">🛡${supCnt}</span>` : ''}
-        ${realCnt > 0 ? `<span class="vsb-real">⚠️${realCnt}</span>` : ''}
-      </div>`;
-    }
-    const el = document.getElementById('villageList');
-    if (el) el.innerHTML = html;
-
-    // Update total badge
     const badge = document.getElementById('atkTotalBadge');
-    if (badge) badge.textContent = _allAttacks.length + ' total · ' + Object.keys(groups).length + ' villages';
+    if (badge) badge.textContent = _allAttacks.length + ' gesamt · ' + Object.keys(groups).length + ' Dörfer';
   };
 
-  window.selectVillage = function(key) {
-    _selectedVillage = key;
-    renderVillageList();
-    applyFilters();
-  };
+  // Helper: apply one column's label filter
+  function _filterByCol(attacks, colFilter) {
+    if (!colFilter)              return attacks;
+    if (colFilter === '_real')   return attacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60);
+    if (colFilter === '_unlabeled') return attacks.filter(a => !a.label);
+    return attacks.filter(a => a.label === colFilter);
+  }
 
   window.applyFilters = function() {
-    const typeFilter  = document.getElementById('filterType')?.value  || '';
-    const labelFilter = document.getElementById('filterLabel')?.value || '';
+    const typeFilter = document.getElementById('filterType')?.value || '';
+    const colLFilter = document.getElementById('colLFilter')?.value || '';
+    const colRFilter = document.getElementById('colRFilter')?.value || '';
 
-    // Filter by village
-    let filtered = _selectedVillage === null
-      ? [..._allAttacks]
-      : _allAttacks.filter(a => {
-          const key = (a.own_village_name||'?')+'|'+(a.own_village_x||'?')+'|'+(a.own_village_y||'?');
-          return key === _selectedVillage;
-        });
+    // Base: apply shared type filter
+    let base = [..._allAttacks];
+    if (typeFilter) base = base.filter(a => a.attack_type === typeFilter);
 
-    // Filter by type
-    if (typeFilter)  filtered = filtered.filter(a => a.attack_type === typeFilter);
+    // Left column
+    const leftData  = _filterByCol(base, colLFilter);
+    const rightData = _filterByCol(base, colRFilter);
 
-    // Filter by label
-    if (labelFilter === '_unlabeled') filtered = filtered.filter(a => !a.label);
-    else if (labelFilter)             filtered = filtered.filter(a => a.label === labelFilter);
+    const colL = document.getElementById('colLContent');
+    const colR = document.getElementById('colRContent');
+    renderOwnAttacks(leftData,  colL);
+    renderOwnAttacks(rightData, colR);
 
-    const cont = document.getElementById('ownAttacksContent');
-    renderOwnAttacks(filtered, cont);
+    // Update column badges
+    const lblNames = { '':'Alle', '_real':'Real', '_unlabeled':'Ohne Label',
+      fake:'👻 Fake', need_def:'🛡️ Need Def', priority:'🔥 Priority',
+      chief:'👑 Chief', no_hero:'🚫 No Hero' };
+    const lBadge = document.getElementById('colLBadge');
+    const rBadge = document.getElementById('colRBadge');
+    if (lBadge) lBadge.textContent = (lblNames[colLFilter] || colLFilter) + ' · ' + leftData.length;
+    if (rBadge) rBadge.textContent = (lblNames[colRFilter] || colRFilter) + ' · ' + rightData.length;
   };
 
   // ── Wave detection ────────────────────────────────────────────────────────
