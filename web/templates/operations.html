@@ -90,7 +90,7 @@
 }
 
 /* ── Player Browser Modal ────────────────────────────────────── */
-.pb-modal { width:98vw; max-width:1600px; height:92vh; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; pointer-events:auto; }
+.pb-modal { width:98vw; max-width:1920px; height:92vh; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; pointer-events:auto; }
 .pb-split { display:flex; flex:1; min-height:0; }
 .pb-left  { flex:0 0 60%; width:60%; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border); overflow:hidden; }
 .pb-right { flex:0 0 40%; width:40%; display:flex; flex-direction:column; background:rgba(0,0,0,.12); overflow-y:auto; }
@@ -1393,10 +1393,35 @@ function togglePbPlayer(header) {
 
 async function addVillageFromBrowser(x, y, player, village, pop, el) {
   if (!activePlanId) return;
-  // Visual feedback
+  // Toggle: if already selected, deselect (remove target)
+  if (el.dataset.selected === '1') {
+    const existing = (activePlan?.targets || []).find(t => t.x === x && t.y === y && t.player_name === player);
+    if (existing) {
+      try {
+        await apiPost(`/targets/${existing.id}/delete`);
+        el.dataset.selected = '0';
+        el.style.borderColor = '';
+        el.querySelector('.add-icon').textContent = '＋';
+        pbAddedCount = Math.max(0, pbAddedCount - 1);
+        document.getElementById('pbAddedCount').textContent =
+          pbAddedCount > 0 ? `✓ ${pbAddedCount} target${pbAddedCount>1?'s':''} added` : '';
+        reloadActivePlan();
+        // Clear assignment panel if this was the open target
+        if (assignTarget?.x === x && assignTarget?.y === y) {
+          document.getElementById('pbAssignPanel').innerHTML = `<div class="pb-right-empty">
+            <span style="font-size:1.5rem;">🎯</span>
+            <span>Click a village<br>to see your players<br>with march times</span>
+          </div>`;
+          assignTarget = null;
+        }
+      } catch(e) { /* ignore */ }
+    }
+    return;
+  }
+  // Visual feedback — add
   el.style.borderColor = '#4ade80';
   el.querySelector('.add-icon').textContent = '✓';
-  el.style.pointerEvents = 'none';
+  el.dataset.selected = '1';
   try {
     await apiPost(`/plans/${activePlanId}/targets`, {
       player_name: player, village_name: village, x, y, population: pop, notes: ''
@@ -1410,7 +1435,7 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
   } catch(e) {
     el.style.borderColor = '#ef4444';
     el.querySelector('.add-icon').textContent = '✗';
-    el.style.pointerEvents = '';
+    el.dataset.selected = '0';
   }
 }
 
@@ -1594,10 +1619,10 @@ function _renderAssignmentPanel(settings) {
           <div class="atk-village" style="display:flex;justify-content:space-between;align-items:center;">
             <span>${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</span>
             <button onclick="toggleTroopRow(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem;padding:0 .2rem;" title="Troops anzeigen/ausblenden">
-              🪖 <span id="troop-toggle-${i}">▼</span>
+              🪖 <span id="troop-toggle-${i}">▲</span>
             </button>
           </div>
-          <div id="troop-row-${i}" style="display:none;flex-wrap:wrap;gap:.25rem;padding:.25rem 0;">
+          <div id="troop-row-${i}" style="display:flex;flex-wrap:wrap;gap:.25rem;padding:.25rem 0;">
             ${troopHtml}
           </div>
           ${sendStr ? `<div style="font-size:.7rem;color:#4ade80;">📤 ${sendStr}</div>` : ''}
