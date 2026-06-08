@@ -218,7 +218,10 @@
   width:52px; background:rgba(0,0,0,.35); border:none; border-radius:5px;
   padding:.15rem .35rem; color:var(--text); font-size:.82rem;
   text-align:right; outline:none;
+  -moz-appearance:textfield;
 }
+.tc-chip .tc-amt::-webkit-outer-spin-button,
+.tc-chip .tc-amt::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .tc-chip .tc-x {
   font-size:.72rem; opacity:.6; cursor:pointer; padding:0 .1rem;
   line-height:1; transition:opacity .1s;
@@ -2047,6 +2050,7 @@ function onVillageSelect() {
   const tribe = a.tribe || document.getElementById('wmTribe').value;
   // Fill troops from village data into chip UI
   _activeTroops = {};
+  _villageTroops = {};
   const troopSrc = v.troops && typeof v.troops === 'object' ? v.troops : {};
   const allTroops = Object.values(TROOPS_DEF).flat();
   Object.entries(troopSrc).forEach(([tname, cnt]) => {
@@ -2057,9 +2061,13 @@ function onVillageSelect() {
       t.name.toLowerCase() === tname.toLowerCase() ||
       t.id.toLowerCase() === tname.toLowerCase()
     );
-    if (troop) _activeTroops[troop.id] = n;
+    if (troop) {
+      _activeTroops[troop.id] = n;
+      _villageTroops[troop.id] = n; // available = what's in the village
+    }
   });
   _renderTroopChips();
+  _renderTroopPicker();
   recalcWaveTime();
 }
 
@@ -2114,10 +2122,12 @@ function onWaveTypeChange(type) {
 }
 
 // ── Troop chip UI ─────────────────────────────────────────────────────────────
-let _activeTroops = {}; // id → count
+let _activeTroops  = {}; // id → count (what we plan to send)
+let _villageTroops = {}; // id → count (what's available in the selected village)
 
 function updateTroopGrid() {
-  _activeTroops = {};
+  _activeTroops  = {};
+  _villageTroops = {};
   _renderTroopChips();
   _renderTroopPicker();
 }
@@ -2187,11 +2197,15 @@ function _renderTroopPicker() {
   picker.innerHTML = troops.map(t => {
     const pal = _troopColor(t.name);
     const isActive = t.id in _activeTroops;
+    const avail = _villageTroops[t.id] || 0;
+    const availHtml = avail > 0
+      ? `<span style="font-size:.68rem;opacity:.7;margin-left:.2rem;">(${avail.toLocaleString()})</span>`
+      : '';
     const style = isActive
       ? `background:${pal.bg};border-color:${pal.border};color:${pal.color};opacity:.55;`
       : `background:${pal.bg};border-color:${pal.border};color:${pal.color};`;
     return `<span class="tc-chip" data-add="${t.id}" style="${style}" title="${t.name} · ${t.speed} Fel/h">
-      ${escHtml(t.name)}${isActive ? ' ✓' : ''}
+      ${escHtml(t.name)}${availHtml}${isActive ? ' ✓' : ''}
     </span>`;
   }).join('');
 
