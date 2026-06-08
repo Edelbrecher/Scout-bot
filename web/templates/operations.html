@@ -224,6 +224,11 @@
   line-height:1; transition:opacity .1s;
 }
 .tc-chip .tc-x:hover { opacity:1; }
+.tc-stepper {
+  font-size:.82rem; font-weight:700; cursor:pointer; padding:0 .25rem;
+  opacity:.75; line-height:1; border-radius:3px; transition:opacity .1s;
+}
+.tc-stepper:hover { opacity:1; }
 
 /* ── Empty state ─────────────────────────────────────────────── */
 .op-empty { text-align:center; padding:4rem 2rem; color:var(--text-muted); }
@@ -2111,17 +2116,33 @@ function _renderTroopChips() {
     return `<span class="tc-chip active" data-tchip="${t.id}"
       style="background:${pal.bg};border-color:${pal.border};color:${pal.color};">
       ${escHtml(t.name)}
-      <input class="tc-amt" data-troop-id="${t.id}" type="number" min="0" value="${cnt}" placeholder="Anz.">
+      <span class="tc-stepper" data-step="-1" data-tid="${t.id}">−</span>
+      <input class="tc-amt" data-troop-id="${t.id}" type="number" min="0" value="${cnt}" placeholder="0">
+      <span class="tc-stepper" data-step="1" data-tid="${t.id}">+</span>
       <span class="tc-x" data-remove="${t.id}">✕</span>
     </span>`;
   }).join('');
 
   // Event delegation on grid
-  grid.onclick = null;
-  grid.addEventListener('click', function(e) {
+  grid.onclick = function(e) {
     const rem = e.target.closest('[data-remove]');
     if (rem) { _removeTroop(rem.dataset.remove); return; }
-  }, {once: false});
+    const step = e.target.closest('[data-step]');
+    if (step) {
+      const id = step.dataset.tid;
+      const inp = grid.querySelector(`[data-troop-id="${id}"]`);
+      if (!inp) return;
+      const delta = parseInt(step.dataset.step);
+      const newVal = Math.max(0, (parseInt(inp.value) || 0) + delta);
+      inp.value = newVal;
+      if (newVal > 0) _activeTroops[id] = newVal;
+      else _activeTroops[id] = 0;
+      const tr = document.getElementById('wmTribe')?.value || 'romans';
+      _updateTroopSummary(tr);
+      recalcWaveTime();
+      return;
+    }
+  };
   grid.oninput = null;
   grid.addEventListener('input', function(e) {
     const inp = e.target.closest('[data-troop-id]');
