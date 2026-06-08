@@ -475,6 +475,17 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 </div>
               </div>
             </div>
+
+            <!-- 🏠 Heimtruppen-Kachel -->
+            <div class="op-panel" style="margin-top:.75rem;" id="homeTroopPanel">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .9rem;border-bottom:1px solid var(--border);">
+                <span style="font-size:.8rem;font-weight:700;color:var(--text-muted);">🏠 Heimtruppen (nach Hauptangriff)</span>
+                <span style="font-size:.68rem;color:var(--text-muted);opacity:.65;" title="Truppen die zuhause bleiben müssen um alle Fakes zu senden">?</span>
+              </div>
+              <div class="op-panel-body" id="homeTroopContent" style="padding:.7rem .9rem;">
+                <div style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:.5rem 0;">Kein Plan geladen.</div>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -1985,8 +1996,14 @@ async function openWaveEditModal(waveId, targetId) {
         vs.value = i - 1; break;
       }
     }
-    // ── 4. Populate _villageTroops from attacker village at these coords ──────
-    _villageTroops = {};
+  }
+
+  // ── 5. Re-render picker with correct tribe (updateTroopGrid resets _activeTroops only) ──
+  updateTroopGrid();
+
+  // ── 4b. Populate _villageTroops AFTER updateTroopGrid so it isn't wiped ─────
+  _villageTroops = {};
+  if (a) {
     const allTroopDefs = Object.values(TROOPS_DEF).flat();
     const village = (a.villages || []).find(v => v.x == wave.origin_x && v.y == wave.origin_y);
     if (village?.troops) {
@@ -2000,11 +2017,22 @@ async function openWaveEditModal(waveId, targetId) {
         );
         if (troop) _villageTroops[troop.id] = n;
       });
+      // Subtract troops already assigned to OTHER waves from same village
+      for (const t of activePlan?.targets || []) {
+        for (const w of t.waves || []) {
+          if (w.id === waveId) continue; // skip the wave being edited
+          if (w.origin_x == wave.origin_x && w.origin_y == wave.origin_y) {
+            Object.entries(w.troop_json || {}).forEach(([tid, c]) => {
+              const n2 = parseInt(c) || 0;
+              if (n2 > 0 && tid in _villageTroops) {
+                _villageTroops[tid] = Math.max(0, _villageTroops[tid] - n2);
+              }
+            });
+          }
+        }
+      }
     }
   }
-
-  // ── 5. Re-render picker with correct tribe + available counts ────────────────
-  updateTroopGrid(); // resets _activeTroops — we refill below
 
   // ── 6. Load wave's actual troop assignments into active chips ────────────────
   _activeTroops = {};
@@ -2025,6 +2053,7 @@ function _resetWaveForm() {
   document.getElementById('wmTypee').value = 'real';
   document.getElementById('wmNotes').value = '';
   document.getElementById('waveTiming').style.display = 'none';
+  _villageTroops = {}; // clear for new wave
   updateTroopGrid();
 }
 
@@ -2116,6 +2145,24 @@ function onVillageSelect() {
       if (!editingWaveId) _activeTroops[troop.id] = n;
     }
   });
+  // Subtract troops already assigned in other waves from this village
+  const ox = v.x, oy = v.y;
+  for (const tgt of activePlan?.targets || []) {
+    for (const wv of tgt.waves || []) {
+      if (editingWaveId && wv.id === editingWaveId) continue;
+      if (wv.origin_x == ox && wv.origin_y == oy) {
+        Object.entries(wv.troop_json || {}).forEach(([tid, c]) => {
+          const n2 = parseInt(c) || 0;
+          if (n2 > 0 && tid in _villageTroops) {
+            _villageTroops[tid] = Math.max(0, _villageTroops[tid] - n2);
+          }
+          if (n2 > 0 && tid in _activeTroops) {
+            _activeTroops[tid] = Math.max(0, _activeTroops[tid] - n2);
+          }
+        });
+      }
+    }
+  }
   _renderTroopChips();
   _renderTroopPicker();
   recalcWaveTime();
@@ -2177,7 +2224,8 @@ let _villageTroops = {}; // id → count (what's available in the selected villa
 
 function updateTroopGrid() {
   _activeTroops  = {};
-  _villageTroops = {};
+  // NOTE: _villageTroops is NOT reset here — it is managed by the callers
+  // (openWaveEditModal sets it from village data; _resetWaveForm clears it for new waves)
   _renderTroopChips();
   _renderTroopPicker();
 }
@@ -3069,7 +3117,59 @@ async function reloadActivePlan() {
   if (!activePlanId) return;
   activePlan = await apiFetch(`/plans/${activePlanId}`);
   renderEditor();
+  renderHomeTroopPanel();
   await refreshPlanList();
+}
+
+// ── 🏠 Heimtruppen-Panel ─────────────────────────────────────────────────────
+// Shows, per player/village, how many troops must stay home to cover all FAKE
+// waves after the main (real/off) attack goes out.
+function renderHomeTroopPanel() {
+  const el = document.getElementById('homeTroopContent');
+  if (!el) return;
+  if (!activePlan?.targets?.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:.5rem 0;">Kein Plan geladen.</div>';
+    return;
+  }
+
+  // Collect fake-wave troop totals per village (origin_x|origin_y → {tid: total})
+  const fakeReqs = {}; // key = "x|y" → { attacker_name, troops: {tid: n} }
+  for (const t of activePlan.targets) {
+    for (const w of t.waves || []) {
+      if (w.wave_type !== 'fake') continue;
+      const key = `${w.origin_x}|${w.origin_y}`;
+      if (!fakeReqs[key]) fakeReqs[key] = { name: w.attacker_name || '?', x: w.origin_x, y: w.origin_y, troops: {} };
+      Object.entries(w.troop_json || {}).forEach(([tid, cnt]) => {
+        const n = parseInt(cnt) || 0;
+        if (n > 0) fakeReqs[key].troops[tid] = (fakeReqs[key].troops[tid] || 0) + n;
+      });
+    }
+  }
+
+  if (!Object.keys(fakeReqs).length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:.5rem 0;">Keine Fakes im Plan.</div>';
+    return;
+  }
+
+  // Render per village
+  const allTroops = Object.values(TROOPS_DEF).flat();
+  let html = '';
+  for (const [key, entry] of Object.entries(fakeReqs)) {
+    const troopLines = Object.entries(entry.troops).map(([tid, n]) => {
+      const troopDef = allTroops.find(t => t.id === tid);
+      const name = troopDef?.name || tid;
+      const pal = _troopColor(name);
+      return `<span class="tc-chip" style="font-size:.7rem;padding:.18rem .45rem;background:${pal.bg};border-color:${pal.border};color:${pal.color};margin:.1rem .15rem 0 0;">${escHtml(name)} <strong>${n.toLocaleString()}</strong></span>`;
+    }).join('');
+    html += `
+      <div style="margin-bottom:.65rem;padding-bottom:.55rem;border-bottom:1px solid rgba(255,255,255,.06);">
+        <div style="font-size:.75rem;font-weight:600;margin-bottom:.25rem;color:var(--text-muted);">
+          ${escHtml(entry.name)} <span style="opacity:.55;">(${entry.x}|${entry.y})</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:.1rem;">${troopLines}</div>
+      </div>`;
+  }
+  el.innerHTML = html;
 }
 async function refreshPlanList() {
   const r = await fetch(`/guild/${GUILD_ID}/operations/api/plan-list`);
