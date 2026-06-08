@@ -4917,11 +4917,14 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     attack_reports = await database.get_attack_reports(guild_id, limit=50)
     is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id")
     perms = await database.get_member_permissions(guild_id, uid)
-    can_label = is_admin or "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
+    can_label   = is_admin or "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
+    can_see_all = can_label or "ally_view" in perms or "defend_view" in perms
     return templates.TemplateResponse("attacks.html", {
         "request": request, "guild": guild, "guild_id": guild_id,
         "attack_stats": attack_stats, "attack_reports": attack_reports,
-        "is_admin": is_admin, "saved": saved, "can_label": can_label,
+        "is_admin": is_admin, "saved": saved,
+        "can_label": can_label,
+        "can_see_all": can_see_all,
     })
 
 
@@ -5089,12 +5092,49 @@ def _compute_fake_score_server(atk: dict, artifacts: list) -> dict:
 
 
 @app.get("/guild/{guild_id}/attacks/api/incoming")
-async def attacks_api_incoming(request: Request, guild_id: str,
-                                x: int = None, y: int = None):
+async def attacks_api_incoming(
+    request: Request, guild_id: str,
+    x: int = None, y: int = None,
+    atk_name: str = "", atk_alliance: str = "", atk_village: str = "",
+    def_alliance: str = "", def_village: str = "",
+):
     session, err = await _attack_access(request, guild_id)
     if err: return err
-    attacks = await database.get_incoming_attacks(guild_id, x, y)
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    is_admin = session.get("type") == "admin" or uid == (guild or {}).get("owner_discord_id", "")
+    perms = await database.get_member_permissions(guild_id, uid)
+    can_see_all = is_admin or any(p in perms for p in ("ally_manage","defend_manage","attack_manage","ally_view","defend_view"))
+    # Users without rights only see their own imports
+    own_id = None if can_see_all else uid
+    attacks = await database.get_incoming_attacks(
+        guild_id, x, y,
+        own_discord_id=own_id,
+        attacker_name=atk_name or None,
+        attacker_alliance=atk_alliance or None,
+        attacker_village=atk_village or None,
+        defender_alliance=def_alliance or None,
+        defender_village=def_village or None,
+    )
     return JSONResponse(attacks)
+
+
+@app.post("/guild/{guild_id}/attacks/test-data")
+async def attacks_insert_test_data(request: Request, guild_id: str):
+    """Insert test attacks for development/demo purposes."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return JSONResponse({"error": "not_found"}, status_code=404)
+    uid = session.get("uid", "")
+    is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id", "")
+    perms = await database.get_member_permissions(guild_id, uid)
+    if not (is_admin or "ally_manage" in perms):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    count = await database.insert_attack_test_data(guild_id, uid, session.get("username", "Tester"))
+    return JSONResponse({"inserted": count})
 
 
 @app.get("/guild/{guild_id}/attacks/api/alliance")
