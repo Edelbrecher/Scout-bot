@@ -8997,7 +8997,10 @@ async def _init_attack_detection_tables():
             ON incoming_attacks(arrival_time)
         """)
         # Migration: add columns if missing
-        for col, default in [("label","''"), ("labeled_by","''"), ("labeled_at","''"), ("notes","''")]:
+        for col, default in [
+            ("label","''"), ("labeled_by","''"), ("labeled_at","''"), ("notes","''"),
+            ("attacker_alliance","''"), ("own_alliance","''"),
+        ]:
             try:
                 await db.execute(f"ALTER TABLE incoming_attacks ADD COLUMN {col} TEXT DEFAULT {default}")
             except Exception:
@@ -9129,26 +9132,46 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
 
 
 async def get_incoming_attacks(guild_id: str, own_x: int = None, own_y: int = None,
-                                limit: int = 200) -> list[dict]:
+                                limit: int = 500,
+                                own_discord_id: str = None,
+                                attacker_name: str = None,
+                                attacker_alliance: str = None,
+                                attacker_village: str = None,
+                                defender_alliance: str = None,
+                                defender_village: str = None) -> list[dict]:
     await _init_attack_detection_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        clauses = ["guild_id=?", "is_dismissed=0"]
+        params: list = [guild_id]
         if own_x is not None and own_y is not None:
-            async with db.execute(
-                """SELECT * FROM incoming_attacks
-                   WHERE guild_id=? AND own_village_x=? AND own_village_y=? AND is_dismissed=0
-                   ORDER BY arrival_time ASC LIMIT ?""",
-                (guild_id, own_x, own_y, limit)
-            ) as cur:
-                return [dict(r) for r in await cur.fetchall()]
-        else:
-            async with db.execute(
-                """SELECT * FROM incoming_attacks
-                   WHERE guild_id=? AND is_dismissed=0
-                   ORDER BY arrival_time ASC LIMIT ?""",
-                (guild_id, limit)
-            ) as cur:
-                return [dict(r) for r in await cur.fetchall()]
+            clauses.append("own_village_x=? AND own_village_y=?")
+            params += [own_x, own_y]
+        if own_discord_id:
+            clauses.append("imported_by_discord_id=?")
+            params.append(own_discord_id)
+        if attacker_name:
+            clauses.append("lower(attacker_player) LIKE ?")
+            params.append(f"%{attacker_name.lower()}%")
+        if attacker_alliance:
+            clauses.append("lower(attacker_alliance) LIKE ?")
+            params.append(f"%{attacker_alliance.lower()}%")
+        if attacker_village:
+            clauses.append("lower(attacker_village_name) LIKE ?")
+            params.append(f"%{attacker_village.lower()}%")
+        if defender_alliance:
+            clauses.append("lower(own_alliance) LIKE ?")
+            params.append(f"%{defender_alliance.lower()}%")
+        if defender_village:
+            clauses.append("lower(own_village_name) LIKE ?")
+            params.append(f"%{defender_village.lower()}%")
+        where = " AND ".join(clauses)
+        params.append(limit)
+        async with db.execute(
+            f"SELECT * FROM incoming_attacks WHERE {where} ORDER BY arrival_time ASC LIMIT ?",
+            params
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list[dict]:
@@ -9161,6 +9184,99 @@ async def get_incoming_attacks_alliance(guild_id: str, limit: int = 500) -> list
             (guild_id, limit)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def insert_attack_test_data(guild_id: str, discord_id: str, discord_name: str) -> int:
+    """Insert realistic test attacks for UI development/testing. Returns count inserted."""
+    import datetime as _dt, random as _rnd
+    await _init_attack_detection_tables()
+    now = _dt.datetime.utcnow()
+
+    test_attacks = [
+        # Confirmed fakes
+        {"own_village_name":"Hauptdorf","own_village_x":100,"own_village_y":100,
+         "own_alliance":"TD","attacker_player":"Raider001","attacker_village_name":"Raider Base",
+         "attacker_x":105,"attacker_y":103,"attacker_alliance":"CCCP","attack_type":"attack",
+         "troops_hidden":0,"troop_count":1,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(minutes=45)).isoformat(),"fake_score":99,
+         "imported_by_discord_id":discord_id,"imported_by_name":discord_name},
+        {"own_village_name":"Hauptdorf","own_village_x":100,"own_village_y":100,
+         "own_alliance":"TD","attacker_player":"Raider002","attacker_village_name":"Base2",
+         "attacker_x":110,"attacker_y":98,"attacker_alliance":"CCCP","attack_type":"raid",
+         "troops_hidden":0,"troop_count":3,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(minutes=47)).isoformat(),"fake_score":95,
+         "imported_by_discord_id":discord_id,"imported_by_name":discord_name},
+        # Hidden (possible real)
+        {"own_village_name":"Außendorf","own_village_x":102,"own_village_y":99,
+         "own_alliance":"TD","attacker_player":"BigHitter","attacker_village_name":"Hammer",
+         "attacker_x":90,"attacker_y":110,"attacker_alliance":"CC","attack_type":"attack",
+         "troops_hidden":1,"troop_count":0,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(hours=1,minutes=12)).isoformat(),"fake_score":25,
+         "imported_by_discord_id":discord_id,"imported_by_name":discord_name},
+        {"own_village_name":"Hauptdorf","own_village_x":100,"own_village_y":100,
+         "own_alliance":"TD","attacker_player":"BigHitter","attacker_village_name":"Hammer2",
+         "attacker_x":91,"attacker_y":109,"attacker_alliance":"CC","attack_type":"attack",
+         "troops_hidden":1,"troop_count":0,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(hours=1,minutes=12,seconds=3)).isoformat(),"fake_score":22,
+         "imported_by_discord_id":discord_id,"imported_by_name":discord_name},
+        # Chieftain wave pattern
+        {"own_village_name":"Getreidefeld","own_village_x":101,"own_village_y":101,
+         "own_alliance":"TD","attacker_player":"ChiefMaster","attacker_village_name":"Chiefs HQ",
+         "attacker_x":120,"attacker_y":120,"attacker_alliance":"ROTA","attack_type":"attack",
+         "troops_hidden":1,"troop_count":0,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(hours=2,minutes=5)).isoformat(),"fake_score":15,
+         "imported_by_discord_id":discord_id,"imported_by_name":discord_name},
+        {"own_village_name":"Getreidefeld","own_village_x":101,"own_village_y":101,
+         "own_alliance":"TD","attacker_player":"ChiefMaster","attacker_village_name":"Chiefs V2",
+         "attacker_x":121,"attacker_y":119,"attacker_alliance":"ROTA","attack_type":"attack",
+         "troops_hidden":1,"troop_count":0,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(hours=2,minutes=5,seconds=1)).isoformat(),"fake_score":12,
+         "imported_by_discord_id":discord_id,"imported_by_name":discord_name},
+        # Mix of fake waves from second player import
+        {"own_village_name":"Ally Village","own_village_x":98,"own_village_y":102,
+         "own_alliance":"TD","attacker_player":"Spammer","attacker_village_name":"SpamBase",
+         "attacker_x":115,"attacker_y":95,"attacker_alliance":"CCCP","attack_type":"attack",
+         "troops_hidden":0,"troop_count":1,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(minutes=30)).isoformat(),"fake_score":99,
+         "imported_by_discord_id":"test_member_2","imported_by_name":"AllySoldier"},
+        {"own_village_name":"Ally Village","own_village_x":98,"own_village_y":102,
+         "own_alliance":"TD","attacker_player":"Spammer","attacker_village_name":"SpamBase2",
+         "attacker_x":116,"attacker_y":94,"attacker_alliance":"CCCP","attack_type":"raid",
+         "troops_hidden":0,"troop_count":1,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(minutes=32)).isoformat(),"fake_score":99,
+         "imported_by_discord_id":"test_member_2","imported_by_name":"AllySoldier"},
+        {"own_village_name":"Ally Village","own_village_x":98,"own_village_y":102,
+         "own_alliance":"TD","attacker_player":"DarkArcher","attacker_village_name":"Arch Base",
+         "attacker_x":88,"attacker_y":105,"attacker_alliance":"CC","attack_type":"attack",
+         "troops_hidden":1,"troop_count":0,"troop_details":"{}",
+         "arrival_time":(now+_dt.timedelta(hours=1,minutes=45)).isoformat(),"fake_score":30,
+         "imported_by_discord_id":"test_member_2","imported_by_name":"AllySoldier"},
+    ]
+
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        count = 0
+        for a in test_attacks:
+            try:
+                await db.execute(
+                    """INSERT OR IGNORE INTO incoming_attacks
+                       (guild_id, imported_by_discord_id, imported_by_name, import_time,
+                        own_village_name, own_village_x, own_village_y, own_alliance,
+                        attacker_player, attacker_village_name, attacker_x, attacker_y, attacker_alliance,
+                        attack_type, troops_hidden, troop_count, troop_details,
+                        arrival_time, fake_score, fake_reasons)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (guild_id, a["imported_by_discord_id"], a["imported_by_name"],
+                     now.isoformat(), a["own_village_name"], a["own_village_x"], a["own_village_y"],
+                     a.get("own_alliance",""), a["attacker_player"], a["attacker_village_name"],
+                     a["attacker_x"], a["attacker_y"], a.get("attacker_alliance",""),
+                     a["attack_type"], a["troops_hidden"], a["troop_count"], a["troop_details"],
+                     a["arrival_time"], a["fake_score"], "[]")
+                )
+                count += 1
+            except Exception:
+                pass
+        await db.commit()
+    return count
 
 
 async def get_attack_member_status(guild_id: str) -> list[dict]:
@@ -9182,11 +9298,12 @@ async def get_attack_member_status(guild_id: str) -> list[dict]:
 
 
 async def label_attack(attack_id: int, guild_id: str, label: str, labeled_by: str) -> bool:
-    """Set label on an attack: 'fake' | 'hard' | 'low' | '' (clear).
+    """Set label on an attack.
+    Valid labels: 'fake' | 'need_def' | 'priority' | 'chief' | 'no_hero' | '' (clear).
     Returns True if row was found and updated."""
     import datetime as _dt
     await _init_attack_detection_tables()
-    valid = {"fake", "hard", "low", ""}
+    valid = {"fake", "need_def", "priority", "chief", "no_hero", "hard", "low", ""}
     if label not in valid:
         return False
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
