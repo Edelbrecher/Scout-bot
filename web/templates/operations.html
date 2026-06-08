@@ -1944,13 +1944,23 @@ function openWaveEditModal(waveId, targetId) {
   document.getElementById('wmTournament').value = wave.tournament_square || 0;
   document.getElementById('wmNotes').value = wave.notes || '';
   updateTroopGrid();
-  // Set attacker dropdown
+  // Set attacker dropdown — flexible name matching (case-insensitive)
+  const wName = (wave.attacker_name || '').toLowerCase();
   const sel = document.getElementById('wmAttackerSelect');
-  const a = attackers.find(a => a.player_name === wave.attacker_name || a.discord_name === wave.attacker_name)
-         || members.find(m => m.discord_name === wave.attacker_name || m.travian_name === wave.attacker_name);
+  const a = attackers.find(a =>
+      (a.player_name||'').toLowerCase() === wName ||
+      (a.discord_name||'').toLowerCase() === wName)
+    || members.find(m =>
+      (m.travian_name||'').toLowerCase() === wName ||
+      (m.discord_name||'').toLowerCase() === wName);
   if (a) {
     sel.value = a.player_name || a.discord_name;
     onAttackerSelect(false);
+    // Override tribe with attacker's actual tribe (takes priority over stored wave tribe)
+    if (a.tribe && TROOPS_DEF[a.tribe]) {
+      document.getElementById('wmTribe').value = a.tribe;
+      updateTroopGrid();
+    }
     // Try to select the right village by coords
     const vs = document.getElementById('wmVillageSelect');
     for (let i = 0; i < vs.options.length; i++) {
@@ -1960,10 +1970,25 @@ function openWaveEditModal(waveId, targetId) {
     }
   }
   // Fill troop counts into chip UI (wave data, not village data)
+  // Load AFTER attacker/tribe is set so picker shows correct tribe
   _activeTroops = {};
   Object.entries(wave.troop_json || {}).forEach(([id, cnt]) => {
     if (parseInt(cnt) > 0) _activeTroops[id] = parseInt(cnt);
   });
+  // If no stored troops but we know the tribe, derive from troop_json keys
+  // Ensure picker tribe matches the troop IDs present
+  const troopIds = Object.keys(_activeTroops);
+  if (troopIds.length > 0) {
+    const currentTribe = document.getElementById('wmTribe').value;
+    const tribeMatch = Object.entries(TROOPS_DEF).find(([tribe, defs]) =>
+      defs.some(d => troopIds.includes(d.id))
+    );
+    if (tribeMatch && tribeMatch[0] !== currentTribe && !a) {
+      // Only auto-correct tribe from troop IDs if no attacker was found
+      document.getElementById('wmTribe').value = tribeMatch[0];
+      updateTroopGrid();
+    }
+  }
   _renderTroopChips();
   _renderTroopPicker();
   recalcWaveTime();
