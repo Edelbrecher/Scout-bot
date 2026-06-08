@@ -395,17 +395,32 @@
             </td>
             <td style="text-align:right;font-weight:700;color:#ef4444;white-space:nowrap;">{{ "{:,}".format(v.off_score).replace(",",".") }}</td>
             <td style="text-align:right;font-weight:700;color:#22c55e;white-space:nowrap;">{{ "{:,}".format(v.def_score).replace(",",".") }}</td>
-            <td style="text-align:right;font-weight:700;color:#f59e0b;white-space:nowrap;">
-              {% if v.total_crop %}{{ "{:,}".format(v.total_crop).replace(",",".") }}{% else %}—{% endif %}
+            <td style="text-align:right;white-space:nowrap;" id="crop-cell-{{ v.x }}-{{ v.y }}">
+              {% set crop_key = v.x|string + '_' + v.y|string %}
+              {% set crop_auto = v.total_crop or 0 %}
+              {% set crop_ov   = crop_overrides.get(crop_key) %}
+              <span
+                id="crop-val-{{ v.x }}-{{ v.y }}"
+                title="{% if crop_ov is not none %}Manuell gesetzt (Auto: {{ crop_auto }}/h) — klicken zum Bearbeiten{% else %}Aus Truppen berechnet ({{ crop_auto }}/h) — klicken zum Bearbeiten{% endif %}"
+                onclick="editCrop({{ v.x }}, {{ v.y }}, {{ crop_ov if crop_ov is not none else crop_auto }})"
+                style="cursor:pointer;font-weight:700;color:{% if crop_ov is not none %}#34d399{% else %}#f59e0b{% endif %};"
+              >
+                {% if crop_ov is not none %}{{ "{:,}".format(crop_ov).replace(",",".") }}{% elif crop_auto %}{{ "{:,}".format(crop_auto).replace(",",".") }}{% else %}—{% endif %}
+                <span style="font-size:.65rem;opacity:.6;margin-left:2px;">✎</span>
+              </span>
+              {% if crop_ov is not none %}
+              <span style="font-size:.65rem;color:var(--text-muted);display:block;line-height:1;">auto: {{ crop_auto }}</span>
+              {% endif %}
             </td>
-            <td style="text-align:center;">
+            <td style="text-align:center;" id="ts-cell-{{ v.x }}-{{ v.y }}">
               {% set ts_key = v.x|string + '_' + v.y|string %}
               {% set ts_val = ts_levels.get(ts_key, 0) %}
-              {% if ts_val %}
-              <span style="font-size:0.82rem;font-weight:600;color:#93c5fd;">{{ ts_val }}</span>
-              {% else %}
-              <span style="font-size:0.78rem;color:var(--text-muted);">—</span>
-              {% endif %}
+              <span
+                id="ts-val-{{ v.x }}-{{ v.y }}"
+                title="Tournament Square Level — klicken zum Bearbeiten"
+                onclick="editTs({{ v.x }}, {{ v.y }}, {{ ts_val }})"
+                style="cursor:pointer;font-size:0.82rem;font-weight:600;color:{% if ts_val %}#93c5fd{% else %}var(--text-muted){% endif %};"
+              >{{ ts_val if ts_val else '—' }}<span style="font-size:.65rem;opacity:.6;margin-left:2px;">✎</span></span>
             </td>
             <td>
               {% if v.troops %}
@@ -1114,5 +1129,72 @@ loadMissions();
 
   loadCropSends();
 })();
+</script>
+
+<script>
+// ── Inline village crop / TS editing ─────────────────────────────────────
+function _inlineEdit(cell, currentVal, label, min, max, onSave) {
+  const prev = cell.innerHTML;
+  cell.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.25rem;justify-content:flex-end;">
+      <input id="_ie_input" type="number" min="${min}" max="${max}" value="${currentVal}"
+             style="width:64px;background:var(--bg);border:1px solid #6366f1;border-radius:5px;
+                    color:var(--text);padding:2px 5px;font-size:.8rem;text-align:right;"
+             onkeydown="if(event.key==='Enter')document.getElementById('_ie_ok').click();
+                        if(event.key==='Escape')document.getElementById('_ie_cancel').click();">
+      <button id="_ie_ok"     style="background:#4ade80;border:none;border-radius:4px;padding:2px 6px;font-size:.75rem;cursor:pointer;color:#0a0a0a;">✓</button>
+      <button id="_ie_cancel" style="background:rgba(255,255,255,.1);border:none;border-radius:4px;padding:2px 6px;font-size:.75rem;cursor:pointer;color:var(--text);">✕</button>
+    </div>`;
+  const inp = document.getElementById('_ie_input');
+  inp.focus(); inp.select();
+  document.getElementById('_ie_cancel').onclick = () => { cell.innerHTML = prev; };
+  document.getElementById('_ie_ok').onclick = async () => {
+    const v = parseInt(inp.value);
+    if (isNaN(v) || v < min || v > max) { inp.style.borderColor='#f87171'; return; }
+    cell.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem;">…</span>';
+    await onSave(v);
+  };
+}
+
+window.editCrop = function(x, y, current) {
+  const cell = document.getElementById(`crop-cell-${x}-${y}`);
+  if (!cell) return;
+  _inlineEdit(cell, current, 'Korn/h', 0, 9999999, async (val) => {
+    const r = await fetch('/api/village-crop', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ x, y, crop: val })
+    });
+    if ((await r.json()).ok) {
+      cell.innerHTML = `<span id="crop-val-${x}-${y}" onclick="editCrop(${x},${y},${val})"
+        title="Manuell gesetzt — klicken zum Bearbeiten"
+        style="cursor:pointer;font-weight:700;color:#34d399;">
+        ${val.toLocaleString('de-DE')}<span style="font-size:.65rem;opacity:.6;margin-left:2px;">✎</span>
+      </span>`;
+    } else {
+      cell.innerHTML = `<span style="color:#f87171;font-size:.78rem;">Fehler</span>`;
+    }
+  });
+};
+
+window.editTs = function(x, y, current) {
+  const cell = document.getElementById(`ts-cell-${x}-${y}`);
+  if (!cell) return;
+  _inlineEdit(cell, current, 'TS-Level', 0, 20, async (val) => {
+    const r = await fetch('/api/village-ts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ x, y, ts: val })
+    });
+    if ((await r.json()).ok) {
+      const color = val > 0 ? '#93c5fd' : 'var(--text-muted)';
+      cell.innerHTML = `<span id="ts-val-${x}-${y}" onclick="editTs(${x},${y},${val})"
+        title="Tournament Square Level — klicken zum Bearbeiten"
+        style="cursor:pointer;font-size:.82rem;font-weight:600;color:${color};">
+        ${val > 0 ? val : '—'}<span style="font-size:.65rem;opacity:.6;margin-left:2px;">✎</span>
+      </span>`;
+    } else {
+      cell.innerHTML = `<span style="color:#f87171;font-size:.78rem;">Fehler</span>`;
+    }
+  });
+};
 </script>
 {% endblock %}

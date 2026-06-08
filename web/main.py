@@ -4634,7 +4634,8 @@ async def my_account_page(request: Request, guild_id: str):
 
     discord_id   = session.get("uid", "") or session.get("discord_id", "")
     own_villages = _enrich_own_villages(await database.get_own_villages(guild_id, discord_id))
-    ts_levels    = await database.get_village_ts_levels(discord_id)
+    ts_levels      = await database.get_village_ts_levels(discord_id)
+    crop_overrides = await database.get_village_crop_overrides(discord_id)
     scout_village = await database.get_scout_village(guild_id, discord_id)
     history      = await database.get_own_villages_history(guild_id, discord_id)
     my_troops    = await database.get_member_troops_single(guild_id, discord_id)
@@ -4688,6 +4689,7 @@ async def my_account_page(request: Request, guild_id: str):
         "guild":              guild,
         "own_villages":       own_villages,
         "ts_levels":          ts_levels,
+        "crop_overrides":     crop_overrides,
         "history":            history,
         "uploaded":           uploaded,
         "cleared":            cleared,
@@ -11130,6 +11132,20 @@ async def api_save_village_ts(request: Request):
     y = int(data.get("y", 0))
     ts = int(data.get("ts", 0))
     await database.save_village_ts_level(uid, x, y, ts)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/village-crop")
+async def api_save_village_crop(request: Request):
+    """Save a manual grain/h override for one of the user's villages."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    uid = session.get("uid", "")
+    data = await request.json()
+    x    = int(data.get("x", 0))
+    y    = int(data.get("y", 0))
+    crop = int(data.get("crop", -1))
+    await database.save_village_crop_override(uid, x, y, crop)
     return JSONResponse({"ok": True})
 
 

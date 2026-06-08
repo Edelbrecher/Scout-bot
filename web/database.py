@@ -6220,6 +6220,49 @@ async def save_village_ts_level(discord_id: str, x: int, y: int, ts_level: int):
         await db.commit()
 
 
+async def get_village_crop_overrides(discord_id: str) -> dict:
+    """Return {'{x}_{y}': crop_override} for a user's manually set grain values."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_crop_overrides (
+                discord_id TEXT NOT NULL,
+                x INTEGER NOT NULL,
+                y INTEGER NOT NULL,
+                crop_per_hour INTEGER NOT NULL,
+                PRIMARY KEY (discord_id, x, y)
+            )
+        """)
+        await db.commit()
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT x, y, crop_per_hour FROM village_crop_overrides WHERE discord_id=?", (discord_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+    return {f"{r['x']}_{r['y']}": r["crop_per_hour"] for r in rows}
+
+
+async def save_village_crop_override(discord_id: str, x: int, y: int, crop_per_hour: int):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_crop_overrides (
+                discord_id TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
+                crop_per_hour INTEGER NOT NULL, PRIMARY KEY (discord_id, x, y)
+            )
+        """)
+        if crop_per_hour < 0:
+            await db.execute(
+                "DELETE FROM village_crop_overrides WHERE discord_id=? AND x=? AND y=?",
+                (discord_id, x, y)
+            )
+        else:
+            await db.execute("""
+                INSERT INTO village_crop_overrides (discord_id, x, y, crop_per_hour)
+                VALUES (?,?,?,?)
+                ON CONFLICT(discord_id, x, y) DO UPDATE SET crop_per_hour=excluded.crop_per_hour
+            """, (discord_id, x, y, crop_per_hour))
+        await db.commit()
+
+
 async def get_my_villages_for_travel(guild_id: str, discord_id: str) -> list[dict]:
     """Return own villages with coords + troops for travel time calculation.
     Priority: member_troops (has troop data) → world_snapshots via travian_name (coords only)."""
