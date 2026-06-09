@@ -389,8 +389,16 @@ function escHtml(s) {
   <script>
   var _gsBadges = {};
   var _gsHasPro = false;
-  var _LOCK_OPEN   = '<svg class="gs-lock" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0"/></svg>';
-  var _LOCK_CLOSED = '<svg class="gs-lock gs-lock-closed" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>';
+  var _gsHasAlliancePro = false;
+  // Corner-fold lock badge — white lock SVG, plan determines triangle color (player=blue, alliance=purple)
+  function _cornerLock(plan) {
+    var cls = plan === 'alliance' ? 'gs-corner-lock gs-corner-alliance' : 'gs-corner-lock gs-corner-player';
+    return '<span class="'+cls+'">'
+      +'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+      +'<rect x="4" y="9" width="12" height="9" rx="2"/>'
+      +'<path d="M7 9V6a3 3 0 016 0v3"/>'
+      +'</svg></span>';
+  }
 
   (function(){
     var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
@@ -534,14 +542,21 @@ function escHtml(s) {
       var badgeHtml = badgeCount > 0
         ? '<span class="gs-badge">'+(badgeCount > 99?'99+':badgeCount)+'</span>'
         : '';
-      var lockHtml = item.requires_pro
-        ? (_gsHasPro ? _LOCK_OPEN : _LOCK_CLOSED)
-        : '';
-      var reqPro = item.requires_pro ? ' data-requires-pro="1"' : '';
+      // Resolve requires_plan (new) with fallback to legacy requires_pro bool
+      var reqPlan = item.requires_plan || (item.requires_pro ? 'player_pro' : '');
+      var lockHtml = '';
+      var reqPro = '';
+      if (reqPlan) {
+        lockHtml = _cornerLock(reqPlan);
+        reqPro = ' data-requires-pro="1" data-requires-plan="'+reqPlan+'"';
+      }
       // If Pro required and user doesn't have it, redirect to upgrade page
       var effectiveHref = url;
-      if (item.requires_pro && !_gsHasPro && !item.disabled) {
-        effectiveHref = '/guild/'+gid+'/upgrade?plan=player_pro&from='+encodeURIComponent(item.url_suffix||'');
+      if (reqPlan && !item.disabled) {
+        var userHasPlan = (reqPlan === 'alliance') ? _gsHasAlliancePro : _gsHasPro;
+        if (!userHasPlan) {
+          effectiveHref = '/guild/'+gid+'/upgrade?plan='+reqPlan+'&from='+encodeURIComponent(item.url_suffix||'');
+        }
       }
       return '<a class="gs-item'+extraCls+'"'
         +' href="'+(item.disabled?'javascript:void(0)':effectiveHref)+'"'
@@ -588,8 +603,8 @@ function escHtml(s) {
           '/my-operations':      data.my_operations  || 0,
         };
         _gsHasPro = !!data.has_player_pro;
+        _gsHasAlliancePro = !!data.has_alliance_pro;
         _applyBadges();
-        _applyLocks();
       }).catch(function(){});
   }
 
@@ -616,16 +631,6 @@ function escHtml(s) {
       } else {
         if (existing) existing.remove();
       }
-    });
-  }
-
-  function _applyLocks() {
-    var nav = document.getElementById('gs-nav-items');
-    if (!nav) return;
-    nav.querySelectorAll('.gs-item[data-requires-pro]').forEach(function(el){
-      var existing = el.querySelector('.gs-lock');
-      if (existing) existing.remove();
-      el.insertAdjacentHTML('beforeend', _gsHasPro ? _LOCK_OPEN : _LOCK_CLOSED);
     });
   }
 

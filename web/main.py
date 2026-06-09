@@ -10174,10 +10174,12 @@ async def sidebar_badges(request: Request, guild_id: str):
         _count_sector_alerts(guild_id),
         database.get_my_op_waves(guild_id, uid),
     )
+    g = guild or {}
     return JSONResponse({
         "sector_monitor": sector_count,
         "my_operations": len({w["plan_id"] for w in waves}),
-        "has_player_pro": _has_player_pro(guild or {}),
+        "has_player_pro": _has_player_pro(g),
+        "has_alliance_pro": _has_alliance_pro(g),
     })
 
 
@@ -10237,6 +10239,12 @@ async def admin_sidebar_save(request: Request):
             return {"type": "group", "label": str(item.get("label", ""))[:60]}
         if t == "item":
             bc = str(item.get("border_color", ""))[:20]
+            # Migrate old requires_pro bool → requires_plan string
+            rp = item.get("requires_plan", "")
+            if not rp and item.get("requires_pro"):
+                rp = "player_pro"
+            if rp not in ("player_pro", "alliance", ""):
+                rp = ""
             return {
                 "type":         "item",
                 "icon":         str(item.get("icon", "home"))[:30],
@@ -10244,7 +10252,7 @@ async def admin_sidebar_save(request: Request):
                 "url_suffix":   str(item.get("url_suffix", ""))[:200],
                 "disabled":     bool(item.get("disabled", False)),
                 "border_color": bc if bc.startswith("#") or bc == "" else "",
-                "requires_pro": bool(item.get("requires_pro", False)),
+                "requires_plan": rp,
             }
         if t == "submenu":
             children = [_clean_item(c) for c in (item.get("children") or []) if c.get("type") == "item"]

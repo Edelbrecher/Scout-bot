@@ -258,6 +258,11 @@ document.addEventListener('click', function(e) {
 .sn-del { background:none; border:none; color:#6b7280; cursor:pointer; font-size:.9rem; padding:0 3px; line-height:1; }
 .sn-del:hover { color:#ef4444; }
 /* ── Pro toggle ── */
+.sn-pro-select {
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text); cursor: pointer; font-size: .78rem; padding: 3px 6px; flex-shrink: 0;
+}
+.sn-pro-select:focus { outline: none; border-color: #6366f1; }
 .sn-pro-btn {
   background:none; border:1px solid var(--border); border-radius:5px;
   color:#6b7280; cursor:pointer; font-size:.78rem; padding:3px 7px; line-height:1;
@@ -481,21 +486,24 @@ if (!document.getElementById(dlId)) {
   document.body.appendChild(dl);
 }
 
-/* ── Pro toggle ── */
-function makeProToggle(isPro, onChange) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'sn-pro-btn' + (isPro ? ' on' : '');
-  btn.title = isPro ? 'Player Pro erforderlich (klicken zum Deaktivieren)' : 'Kein Pro erforderlich';
-  btn.textContent = isPro ? '🔒 Pro' : '🔓 Pro';
-  btn.onclick = () => {
-    const now = !btn.classList.contains('on');
-    btn.classList.toggle('on', now);
-    btn.textContent = now ? '🔒 Pro' : '🔓 Pro';
-    btn.title = now ? 'Player Pro erforderlich (klicken zum Deaktivieren)' : 'Kein Pro erforderlich';
-    onChange(now);
-  };
-  return btn;
+/* ── Pro plan selector ── */
+function makeProToggle(requiresPlan, onChange) {
+  const sel = document.createElement('select');
+  sel.className = 'sn-pro-select';
+  sel.title = 'Pro requirement for this item';
+  const opts = [
+    ['', '🔓 Free'],
+    ['player_pro', '🔵 Player Pro'],
+    ['alliance',   '🟣 Alliance Pro'],
+  ];
+  opts.forEach(([val, label]) => {
+    const o = document.createElement('option');
+    o.value = val; o.textContent = label;
+    if (val === requiresPlan) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.onchange = () => onChange(sel.value);
+  return sel;
 }
 
 /* ── Disabled toggle ── */
@@ -637,7 +645,7 @@ function render() {
       wrap.appendChild(makeIconPicker(item.icon||'home', v => { navData[i].icon = v; }));
       wrap.appendChild(makeLabelInput(item.label, v => navData[i].label = v, '130px'));
       wrap.appendChild(makeUrlInput(item.url_suffix, v => navData[i].url_suffix = v));
-      wrap.appendChild(makeProToggle(!!item.requires_pro, v => { navData[i].requires_pro = v; }));
+      wrap.appendChild(makeProToggle(item.requires_plan||'', v => { navData[i].requires_plan = v; }));
       wrap.appendChild(makeDisabledToggle(!!item.disabled, v => { navData[i].disabled = v; }));
       wrap.appendChild(makeColorPicker(item.border_color||'', v => { navData[i].border_color = v; }));
       const del = document.createElement('button');
@@ -661,7 +669,7 @@ function makeChildRow(i, ci, child) {
   crow.appendChild(makeIconPicker(child.icon||'home', v => { navData[i].children[ci].icon = v; }));
   crow.appendChild(makeLabelInput(child.label, v => navData[i].children[ci].label = v, '110px'));
   crow.appendChild(makeUrlInput(child.url_suffix, v => navData[i].children[ci].url_suffix = v));
-  crow.appendChild(makeProToggle(!!child.requires_pro, v => { navData[i].children[ci].requires_pro = v; }));
+  crow.appendChild(makeProToggle(child.requires_plan||'', v => { navData[i].children[ci].requires_plan = v; }));
   crow.appendChild(makeDisabledToggle(!!child.disabled, v => { navData[i].children[ci].disabled = v; }));
   crow.appendChild(makeColorPicker(child.border_color||'', v => { navData[i].children[ci].border_color = v; }));
   const del = document.createElement('button');
