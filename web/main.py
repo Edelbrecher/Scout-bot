@@ -10089,18 +10089,28 @@ async def admin_sidebar_save(request: Request):
     body = await request.json()
     nav = body.get("nav", [])
     # Sanitise: only allow known fields
-    clean = []
-    for item in nav:
+    def _clean_item(item):
         t = item.get("type")
         if t == "group":
-            clean.append({"type": "group", "label": str(item.get("label", ""))[:60]})
-        elif t == "item":
-            clean.append({
+            return {"type": "group", "label": str(item.get("label", ""))[:60]}
+        if t == "item":
+            return {
                 "type":       "item",
                 "icon":       str(item.get("icon", "home"))[:30],
                 "label":      str(item.get("label", ""))[:60],
-                "url_suffix": str(item.get("url_suffix", ""))[:120],
-            })
+                "url_suffix": str(item.get("url_suffix", ""))[:200],
+            }
+        if t == "submenu":
+            children = [_clean_item(c) for c in (item.get("children") or []) if c.get("type") == "item"]
+            return {
+                "type":     "submenu",
+                "icon":     str(item.get("icon", "home"))[:30],
+                "label":    str(item.get("label", ""))[:60],
+                "children": children,
+            }
+        return None
+
+    clean = [x for x in (_clean_item(i) for i in nav) if x is not None]
     await database.set_setting("sidebar_nav_config", _json_mod.dumps(clean))
     return JSONResponse({"ok": True})
 
