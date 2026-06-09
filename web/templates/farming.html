@@ -830,20 +830,17 @@
         </table>
       </div>
 
-      {% if inactive_farms_total > 100 %}
+      {% if inactive_farms_has_more %}
       <div id="loadMoreWrap" style="padding:1rem;text-align:center;border-top:1px solid var(--border);">
         <button id="loadMoreBtn" onclick="loadMoreFarms()"
                 style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;
                        padding:0.5rem 1.5rem;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">
-          ⬇ Weitere <span id="loadMoreCount">{{ inactive_farms_total - 100 }}</span> von {{ inactive_farms_total }} laden
+          ⬇ Weitere 100 laden · <span id="loadMoreCount">{{ inactive_farms_total - inactive_farms_page_total }}</span> verbleibend
         </button>
       </div>
       <script>
-      var _farmRest = {{ inactive_farms_rest_json | safe }};
-      var _farmRestIdx = 0;
-      var _farmBatchSize = 100;
-      var _farmHasMore = {{ 'true' if inactive_farms_has_more else 'false' }};
-      var _farmServerOffset = {{ inactive_farms_offset + 500 }};
+      var _farmHasMore = true;
+      var _farmServerOffset = {{ inactive_farms_offset + 100 }};
       var _farmServerTotal = {{ inactive_farms_total }};
       var _farmLoadingAjax = false;
       var _twWorld = {{ ('"' + guild.tw_world.rstrip('/') + '"') if guild.tw_world else 'null' }};
@@ -953,76 +950,37 @@
         try { tbody.insertAdjacentHTML('beforeend', html); } catch(e) { console.error('insertAdjacentHTML failed:', e); }
       }
 
-      function _updateLoadMoreBtn(remaining) {
-        var wrap = document.getElementById('loadMoreWrap');
-        var lbl = document.getElementById('loadMoreCount');
-        if (remaining <= 0 && !_farmHasMore) {
-          if (wrap) wrap.style.display = 'none';
-        } else {
-          var total = remaining + (_farmHasMore ? (_farmServerTotal - _farmServerOffset) : 0);
-          if (lbl) lbl.textContent = Math.max(remaining, total);
-        }
-      }
-
       function loadMoreFarms() {
-        if (_farmLoadingAjax) return;
-        var currentRows = document.querySelectorAll('#inactiveBody tr').length;
-
-        // 1. Consume local JSON batch first
-        if (_farmRestIdx < _farmRest.length) {
-          var batch = _farmRest.slice(_farmRestIdx, _farmRestIdx + _farmBatchSize);
-          _appendFarmBatch(batch, currentRows + 1);
-          _farmRestIdx += batch.length;
-          var remaining = _farmRest.length - _farmRestIdx;
-          if (remaining <= 0 && !_farmHasMore) {
-            document.getElementById('loadMoreWrap').style.display = 'none';
-          } else {
-            var totalLeft = remaining + (_farmHasMore ? (_farmServerTotal - _farmServerOffset) : 0);
-            document.getElementById('loadMoreCount').textContent = totalLeft;
-          }
-          return;
-        }
-
-        // 2. Local JSON exhausted — fetch next 500 from server via AJAX
-        if (!_farmHasMore) {
-          document.getElementById('loadMoreWrap').style.display = 'none';
-          return;
-        }
+        if (_farmLoadingAjax || !_farmHasMore) return;
         _farmLoadingAjax = true;
         var btn = document.getElementById('loadMoreBtn');
-        var origText = btn ? btn.innerHTML : '';
         if (btn) btn.innerHTML = '⏳ Laden…';
 
-        // Build AJAX URL from current page URL
         var url = new URL(window.location.href);
         url.searchParams.set('_ajax', '1');
         url.searchParams.set('_offset', _farmServerOffset);
-        url.searchParams.delete('_offset');  // clean if already set
-        url.searchParams.set('_offset', _farmServerOffset);
 
         fetch(url.toString())
-          .then(function(r){ return r.json(); })
+          .then(function(r) { return r.json(); })
           .then(function(data) {
             var startRow = document.querySelectorAll('#inactiveBody tr').length + 1;
             _appendFarmBatch(data.farms || [], startRow);
-            _farmRest = data.farms || [];
-            _farmRestIdx = 0;
-            _farmServerOffset += 500;
+            _farmServerOffset += 100;
             _farmHasMore = data.has_more || false;
             _farmLoadingAjax = false;
-            if (btn) btn.innerHTML = origText;
-            var remaining = _farmRest.length - _farmRestIdx;
-            if (remaining <= 0 && !_farmHasMore) {
+            var loaded = document.querySelectorAll('#inactiveBody tr').length;
+            var remaining = _farmServerTotal - loaded;
+            if (!_farmHasMore) {
               document.getElementById('loadMoreWrap').style.display = 'none';
             } else {
-              var totalLeft = remaining + (_farmHasMore ? (_farmServerTotal - _farmServerOffset) : 0);
-              document.getElementById('loadMoreCount').textContent = totalLeft;
+              document.getElementById('loadMoreCount').textContent = remaining;
+              if (btn) btn.innerHTML = '⬇ Weitere 100 laden · <span id="loadMoreCount">' + remaining + '</span> verbleibend';
             }
           })
           .catch(function(e) {
             console.error('AJAX farm load failed:', e);
             _farmLoadingAjax = false;
-            if (btn) btn.innerHTML = origText;
+            if (btn) btn.innerHTML = '⬇ Weitere 100 laden · <span id="loadMoreCount">' + (_farmServerTotal - document.querySelectorAll(\'#inactiveBody tr\').length) + '</span> verbleibend';
           });
       }
       </script>

@@ -7779,8 +7779,8 @@ async def farming_page(
         else:
             inactive_farms = inactive_farms_raw
 
-    # ── Pagination: limit to 500 per page ────────────────────────────────────
-    _PAGE_SIZE = 500
+    # ── Pagination: 100 per page (initial + AJAX) ────────────────────────────
+    _PAGE_SIZE = 100
     inactive_farms_real_total = len(inactive_farms)
     inactive_farms = inactive_farms[_offset:_offset + _PAGE_SIZE]
 
@@ -7815,8 +7815,8 @@ async def farming_page(
         })
 
     # ── Parallel batch 2: per-village stats (depend on inactive_farms result) ─
-    _INITIAL_RENDER = 100  # rows rendered as Jinja HTML
-    _farm_slice = inactive_farms[:200]  # fetch deltas for first 200
+    _INITIAL_RENDER = 100  # rows rendered as Jinja HTML (= _PAGE_SIZE, no split needed)
+    _farm_slice = inactive_farms[:100]  # fetch deltas for the 100 rendered farms
     result_coords = [(f["x"], f["y"]) for f in _farm_slice]
     result_players = list({f["player_name"] for f in _farm_slice if f.get("player_name")})
     pop_deltas, player_growth = await _asyncio.gather(
@@ -7838,32 +7838,10 @@ async def farming_page(
         if not search_error:
             search_results = await database.search_map_snapshot(guild_id, q.strip())
 
-    # Split: first 100 rendered as Jinja HTML, rest as JSON for lazy JS rendering
+    # All 100 farms rendered as Jinja HTML; no rest-JSON needed (AJAX handles paging)
     import json as _json
-    inactive_farms_visible = inactive_farms[:_INITIAL_RENDER]
-    inactive_farms_rest = []
-    for f in inactive_farms[_INITIAL_RENDER:]:
-        fd = pop_deltas.get((f["x"], f["y"]), {})
-        pg = player_growth.get(f.get("player_name", ""), {})
-        coords = (f["x"], f["y"])
-        inactive_farms_rest.append({
-            "x": f["x"], "y": f["y"],
-            "village_name": f.get("village_name") or "",
-            "player_name": f.get("player_name") or "",
-            "alliance_name": f.get("alliance_name") or "",
-            "tribe": f.get("tribe") or 0,
-            "population": f.get("population") or 0,
-            "days_tracked": f.get("days_tracked") or 0,
-            "is_capital": 1 if f.get("is_capital") else 0,
-            "village_type": int(f.get("village_type") or 0),
-            "is_cross": coords in cross_ref_coords,
-            "is_on_list": coords in farm_list_coords,
-            "farmlist_groups": f.get("farmlist_groups") or [],
-            "acc_delta": pg.get("delta") if pg else None,
-            "d1": fd.get(1), "d2": fd.get(2), "d3": fd.get(3),
-            "d5": fd.get(5), "d7": fd.get(7), "d14": fd.get(14),
-        })
-    inactive_farms_rest_json = _json.dumps(inactive_farms_rest)
+    inactive_farms_visible = inactive_farms  # all 100
+    inactive_farms_rest_json = "[]"          # always empty — AJAX fetches next pages
 
     return templates.TemplateResponse("farming.html", {
         "request": request,
@@ -7873,7 +7851,7 @@ async def farming_page(
         "farm_stats": farm_stats,
         "inactive_farms": inactive_farms_visible,
         "inactive_farms_total": inactive_farms_real_total,
-        "inactive_farms_page_total": len(inactive_farms_visible) + len(inactive_farms_rest),
+        "inactive_farms_page_total": len(inactive_farms_visible),
         "inactive_farms_offset": _offset,
         "inactive_farms_has_more": (_offset + _PAGE_SIZE) < inactive_farms_real_total,
         "inactive_farms_rest_json": inactive_farms_rest_json,
