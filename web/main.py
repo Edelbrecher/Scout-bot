@@ -6179,6 +6179,7 @@ async def my_ally_save_server_end(
     request: Request, guild_id: str,
     server_end_date: str = Form(""),
     wewin_music_url: str = Form(""),
+    wewin_winner_user_id: str = Form(""),
     server_utc_offset: int = Form(60),
 ):
     session, err = _require_session(request)
@@ -6214,14 +6215,16 @@ async def my_ally_save_server_end(
     offset = max(-720, min(840, server_utc_offset))
     await database.update_guild_config_fields(guild_id, server_utc_offset=offset)
 
-    # Save date + channel + music url
-    music_url = wewin_music_url.strip() or None
+    # Save date + channel + music url + winner user
+    music_url      = wewin_music_url.strip() or None
+    winner_user_id = wewin_winner_user_id.strip() or None
     await database.update_guild_server_end(
         guild_id,
         server_end_date=end_val,
         wewin_channel_id=channel_id,
         wewin_channel_name=channel_name,
         wewin_music_url=music_url,
+        wewin_winner_user_id=winner_user_id,
     )
 
     # Post/update Discord embed immediately

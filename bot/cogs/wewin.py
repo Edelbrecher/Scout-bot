@@ -40,7 +40,22 @@ class WinnerView(discord.ui.View):
         custom_id="persistent:wewin_winner",
     )
     async def winner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await _has_winner_perm(interaction):
+        # Check configured winner user ID first
+        try:
+            guild_cfg = await database.get_guild(str(interaction.guild_id))
+            winner_uid = guild_cfg.get("wewin_winner_user_id") if guild_cfg else None
+        except Exception:
+            guild_cfg  = None
+            winner_uid = None
+
+        if winner_uid:
+            if str(interaction.user.id) != str(winner_uid):
+                await interaction.response.send_message(
+                    "⛔ Only the designated winner can press this button.",
+                    ephemeral=True,
+                )
+                return
+        elif not await _has_winner_perm(interaction):
             await interaction.response.send_message(
                 "⛔ Only Leaders and Admins can trigger this.",
                 ephemeral=True,
@@ -50,7 +65,6 @@ class WinnerView(discord.ui.View):
         # Check if countdown has actually expired
         from datetime import datetime as _dt, timezone as _tz
         try:
-            guild_cfg = await database.get_guild(str(interaction.guild_id))
             end_date = guild_cfg.get("server_end_date") if guild_cfg else None
             if end_date:
                 end_dt = _dt.fromisoformat(end_date.replace("T", " ")).replace(tzinfo=_tz.utc)

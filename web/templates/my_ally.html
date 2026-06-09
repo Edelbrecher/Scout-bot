@@ -1144,6 +1144,14 @@
           {% endif %}
 
           <div>
+            <label class="d-label">🏆 WINNER Button — Discord User-ID (nur diese Person kann klicken)</label>
+            <input type="text" name="wewin_winner_user_id" value="{{ guild.wewin_winner_user_id or '' }}"
+                   placeholder="z.B. 123456789012345678"
+                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;font-family:monospace;">
+            <div style="font-size:.73rem;color:var(--text-muted);margin-top:.2rem;">Rechtsklick auf Nutzer → ID kopieren (Entwicklermodus). Leer lassen = alle Leader/Admins dürfen klicken.</div>
+          </div>
+
+          <div>
             <label class="d-label">🎵 Musik-Link (optional — wird am Ende gepostet)</label>
             <input type="url" name="wewin_music_url" value="{{ guild.wewin_music_url or '' }}"
                    placeholder="https://www.youtube.com/watch?v=..."
