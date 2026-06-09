@@ -1902,8 +1902,15 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
             guild["subscription_plan"] = pplan
         preview_info = pplan
 
-    unread_notif = await database.count_unread_notifications(guild_id, session.get("uid",""))
-    my_waves = await database.get_my_op_waves(guild_id, session.get("uid",""))
+    uid = session.get("uid", "")
+    unread_notif, my_waves, farm_stats, recent_battles, recent_attacks, player_growth = await asyncio.gather(
+        database.count_unread_notifications(guild_id, uid),
+        database.get_my_op_waves(guild_id, uid),
+        database.get_farm_stats(guild_id),
+        database.get_battle_reports(guild_id, limit=6),
+        database.get_attack_reports(guild_id, limit=6),
+        database.get_player_growth(guild_id, limit=8),
+    )
     pending_waves = sum(1 for w in my_waves if not w.get("confirm_status") and w.get("send_time"))
 
     return templates.TemplateResponse(
@@ -1917,6 +1924,10 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "preview_plan": preview_info,
          "unread_notif": unread_notif,
          "pending_waves": pending_waves,
+         "farm_stats": farm_stats,
+         "recent_battles": recent_battles,
+         "recent_attacks": recent_attacks,
+         "player_growth": player_growth,
          },
     )
 

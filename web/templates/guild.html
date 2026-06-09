@@ -4,10 +4,11 @@
 {% block content %}
 {% set is_premium = guild.subscription_status in ('active', 'trialing', 'past_due') %}
 {% set is_personal = guild.workspace_type == 'personal' %}
-{# Player Pro = any paid plan. Alliance Pro = any paid plan except player_pro #}
 {% set _plan = (guild.subscription_plan or '') | lower | replace('_monthly','') | replace('_annual','') %}
 {% set has_player_pro = is_premium %}
 {% set has_alliance_pro = is_premium and _plan != 'player_pro' %}
+
+{# ── Admin Preview Banner ── #}
 {% if preview_plan %}
 <div style="position:sticky;top:0;z-index:9999;background:#7c2d12;border-bottom:2px solid #f97316;padding:0.5rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
   <span style="color:#fed7aa;font-weight:700;font-size:0.9rem;">👁️ PREVIEW MODE</span>
@@ -27,99 +28,93 @@
 </div>
 {% endif %}
 
-<div class="container" style="max-width:1100px;">
+<div class="container" style="max-width:1200px;">
 
-  <!-- ── Header ── -->
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  {# ── Page Header ── #}
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
     <div>
       {% if is_personal %}
       <a href="/dashboard?select=1" class="back-link" data-no-history="1">← Workspace-Auswahl</a>
       {% else %}
-      <a href="/dashboard" class="back-link" data-i18n="guild.back" data-no-history="1">← Dashboard</a>
+      <a href="/dashboard" class="back-link" data-no-history="1">← Dashboard</a>
       {% endif %}
-      <h1 style="margin:0.25rem 0 0.25rem; font-size:1.75rem; display:flex; align-items:center; gap:0.5rem;">
+      <h1 style="margin:0.25rem 0 0.15rem;font-size:1.6rem;display:flex;align-items:center;gap:0.5rem;">
         {% if is_personal %}🗂️{% else %}🏰{% endif %} {{ guild.guild_name }}
       </h1>
       {% if is_personal %}
       <span style="font-size:0.78rem;padding:2px 10px;background:rgba(139,92,246,0.12);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);border-radius:20px;">📁 Personal Workspace · no Discord server needed</span>
       {% else %}
-      <span style="color:var(--text-muted); font-size:0.82rem; font-family:monospace;">Server ID: {{ guild.guild_id }}</span>
+      <span style="color:var(--text-muted);font-size:0.82rem;font-family:monospace;">Server ID: {{ guild.guild_id }}</span>
       {% endif %}
     </div>
-    <!-- Abo-Badge -->
+    {# Subscription badge #}
     {% set sub = guild.subscription_status or 'free' %}
-    <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="text-decoration:none; align-self:flex-start;">
+    <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="text-decoration:none;align-self:flex-start;">
       {% if sub == 'active' %}
-        <span class="badge" style="background:#14532d; color:#4ade80; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #4ade80;">✅ Pro active</span>
+        <span class="badge" style="background:#14532d;color:#4ade80;font-size:0.8rem;padding:0.3rem 0.75rem;border-radius:20px;border:1px solid #4ade80;">✅ Pro active</span>
       {% elif sub == 'trialing' %}
-        <span class="badge" style="background:#1e3a5f; color:#93c5fd; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #93c5fd;">🎁 Trial</span>
+        <span class="badge" style="background:#1e3a5f;color:#93c5fd;font-size:0.8rem;padding:0.3rem 0.75rem;border-radius:20px;border:1px solid #93c5fd;">🎁 Trial</span>
       {% elif sub == 'past_due' %}
-        <span class="badge" style="background:#431407; color:#fb923c; font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid #fb923c;">⚠️ Payment due</span>
+        <span class="badge" style="background:#431407;color:#fb923c;font-size:0.8rem;padding:0.3rem 0.75rem;border-radius:20px;border:1px solid #fb923c;">⚠️ Payment due</span>
       {% else %}
-        <span class="badge" style="background:var(--bg-card); color:var(--text-muted); font-size:0.8rem; padding:0.3rem 0.75rem; border-radius:20px; border:1px solid var(--border);">💳 Free – Upgrade</span>
+        <span class="badge" style="background:var(--bg-card);color:var(--text-muted);font-size:0.8rem;padding:0.3rem 0.75rem;border-radius:20px;border:1px solid var(--border);">💳 Free – Upgrade</span>
       {% endif %}
     </a>
   </div>
 
-  <!-- ── Flash messages ── -->
+  {# ── Flash messages ── #}
   {% set _saved = request.query_params.get("saved") %}
   {% set _error = request.query_params.get("error") %}
   {% if _saved == "perms_fixed" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">
-    ✅ Bot permissions in the archive channel set successfully. Images will now be archived.
-  </div>
+  <div class="flash flash-ok">✅ Bot permissions in the archive channel set successfully.</div>
   {% elif _saved == "hub_created" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Request hub channel created.</div>
+  <div class="flash flash-ok">✅ Request hub channel created.</div>
   {% elif _saved == "hub_refreshed" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🔄 Request hub updated.</div>
+  <div class="flash flash-ok">🔄 Request hub updated.</div>
   {% elif _saved == "channels_cleaned" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Stale channel entries cleaned up.</div>
+  <div class="flash flash-ok">✅ Stale channel entries cleaned up.</div>
   {% elif _saved == "hub_cleared" %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">🗑️ Request hub removed.</div>
+  <div class="flash flash-ok">🗑️ Request hub removed.</div>
   {% elif _saved %}
-  <div style="background:rgba(34,197,94,0.1); border:1px solid #22c55e; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#22c55e; font-size:0.9rem;">✅ Saved.</div>
+  <div class="flash flash-ok">✅ Saved.</div>
   {% endif %}
   {% if _error == "billing_owner_only" %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Only the subscription owner can open payment settings.</div>
+  <div class="flash flash-err">⚠️ Only the subscription owner can open payment settings.</div>
   {% elif _error == "only_owner" %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Only the subscription owner can remove the bot.</div>
+  <div class="flash flash-err">⚠️ Only the subscription owner can remove the bot.</div>
   {% elif _error %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">⚠️ Error: {{ _error }}</div>
+  <div class="flash flash-err">⚠️ Error: {{ _error }}</div>
   {% endif %}
+
+  {# ── Personal workspace info banner ── #}
   {% if is_personal %}
   <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1rem;align-items:flex-start;">
     <div style="font-size:1.6rem;flex-shrink:0;">🗂️</div>
     <div>
       <div style="font-weight:700;color:#c4b5fd;margin-bottom:0.3rem;">Personal Workspace — no Discord server needed</div>
-      <div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6;">
-        All web-based features are available immediately. Features that require the Discord bot (screenshots, notifications) are marked with <span style="background:rgba(239,68,68,0.15);color:#f87171;padding:1px 6px;border-radius:4px;font-size:0.78rem;">🤖 Bot</span> — connect a Discord server later to unlock them.
-      </div>
+      <div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6;">All web-based features are available immediately. Features that require the Discord bot (screenshots, notifications) are marked with <span style="background:rgba(239,68,68,0.15);color:#f87171;padding:1px 6px;border-radius:4px;font-size:0.78rem;">🤖 Bot</span>.</div>
     </div>
   </div>
   {% endif %}
 
+  {# ── Trial activated flash ── #}
   {% if request.query_params.get("trial_activated") %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;color:#4ade80;font-size:0.9rem;">
     🎉 <strong>14-day trial activated!</strong> You have full Pro access until {{ trial_expires_at[:10] if trial_expires_at else '' }}. After that, you'll automatically be switched to Free unless you have a subscription.
   </div>
   {% endif %}
 
+  {# ── Trial expiry banner ── #}
   {% if trial_expires_at and guild.subscription_status == 'trialing' %}
-  {% set _now_str = now().strftime('%Y-%m-%dT%H:%M:%S') if now is defined else '' %}
-  {# Calculate days left client-side to avoid Jinja2 date math #}
   <div id="trialBanner" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:0.9rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
     <div style="display:flex;align-items:center;gap:0.75rem;">
       <span style="font-size:1.4rem;">⏳</span>
       <div>
         <div style="font-weight:700;color:#fbbf24;margin-bottom:0.15rem;">Trial access expiring</div>
-        <div style="font-size:0.82rem;color:var(--text-muted);" id="trialCountdown">
-          Trial ends on {{ trial_expires_at[:10] }}
-        </div>
+        <div style="font-size:0.82rem;color:var(--text-muted);" id="trialCountdown">Trial ends on {{ trial_expires_at[:10] }}</div>
       </div>
     </div>
-    <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="background:#f59e0b;color:#000;padding:0.5rem 1.1rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.85rem;white-space:nowrap;">
-      💳 Upgrade now
-    </a>
+    <a href="{% if is_personal %}/billing{% else %}/guild/{{ guild.guild_id }}/billing{% endif %}" style="background:#f59e0b;color:#000;padding:0.5rem 1.1rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.85rem;white-space:nowrap;">💳 Upgrade now</a>
   </div>
   <script>
   (function() {
@@ -136,687 +131,328 @@
   </script>
   {% endif %}
 
+  {# ── Permission issues ── #}
   {% if perm_issues %}
   {% set missing_perms = perm_issues | selectattr('missing') | list %}
   {% set stale_channels = perm_issues | rejectattr('missing') | list %}
   {% if missing_perms %}
-  <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#f87171; font-size:0.9rem;">
-    ⚠️ <strong>Bot permissions missing</strong> — the bot does not have all required permissions in the following channels:
-    <ul style="margin:0.5rem 0 0 1rem; padding:0;">
+  <div class="flash flash-err">
+    ⚠️ <strong>Bot permissions missing</strong> in:
+    <ul style="margin:0.4rem 0 0 1rem;padding:0;">
       {% for issue in missing_perms %}
-      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>: missing permissions: {{ issue.missing | join(", ") }}</li>
+      <li><strong>#{{ issue.channel_name or issue.channel_id }}</strong>: {{ issue.missing | join(", ") }}</li>
       {% endfor %}
     </ul>
-    Please restore the missing permissions for the bot in these channels.
   </div>
   {% endif %}
   {% if stale_channels %}
-  <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; color:#fbbf24; font-size:0.9rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-    <span>🗑️ <strong>Stale channel entries</strong> — these channels no longer exist in Discord:
+  <div class="flash flash-warn" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+    <span>🗑️ <strong>Stale channels:</strong>
       {% for issue in stale_channels %}<strong>#{{ issue.channel_id }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
     </span>
     <form method="post" action="/guild/{{ guild.guild_id }}/clear-stale-channels" style="margin:0;">
-      <button type="submit" class="btn" style="font-size:0.8rem;padding:0.3rem 0.75rem;border-color:rgba(245,158,11,0.5);color:#fbbf24;">🗑️ Clean up entries</button>
+      <button type="submit" class="btn" style="font-size:0.8rem;padding:0.3rem 0.75rem;border-color:rgba(245,158,11,0.5);color:#fbbf24;">🗑️ Clean up</button>
     </form>
   </div>
   {% endif %}
   {% endif %}
 
-  <!-- ── Tile-Edit Button ── -->
-  <div style="display:flex;justify-content:flex-end;margin-bottom:.5rem;">
-    <button id="editTilesBtn" onclick="toggleEditMode()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;">✏️ Customize</button>
-  </div>
+  {# ══════════════════════════════════════════════════════════════
+     ANALYTICS DASHBOARD
+     ══════════════════════════════════════════════════════════════ #}
 
-  <!-- ── Feature-Grid ── -->
+  {# ── Quick Stats Row ── #}
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:1.5rem;">
 
-  {# Reusable badge macros #}
-  {%- set PRO_BADGE -%}<span style="font-size:0.72rem;background:#a855f7;color:#fff;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Pro</span>{%- endset -%}
-  {%- set PLAYER_BADGE -%}<span style="font-size:0.72rem;background:#2563eb;color:#bfdbfe;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Player Pro</span>{%- endset -%}
-  {%- set ALLIANCE_BADGE -%}<span style="font-size:0.72rem;background:#7c3aed;color:#e9d5ff;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">Alliance</span>{%- endset -%}
-  {%- set WIP_BADGE -%}<span style="font-size:0.72rem;background:#92400e;color:#fcd34d;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">🚧 Beta</span>{%- endset -%}
-  {%- set LOCK_ARROW -%}<span class="feature-arrow">🔒</span>{%- endset -%}
-  {%- set OK_ARROW -%}<span class="feature-arrow">→</span>{%- endset -%}
-  {%- set BOT_BADGE -%}<span style="font-size:0.72rem;background:rgba(239,68,68,0.15);color:#f87171;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;border:1px solid rgba(239,68,68,0.3);">🤖 Bot</span>{%- endset -%}
-
-  <!-- ── Spieler ── -->
-  <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
-    <span style="font-size:1.1rem;">👤</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.player">Player</h2>
-    <div style="flex:1;height:1px;background:var(--border);"></div>
-  </div>
-  <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
-
-    <!-- Mein Account (Free) -->
-    <a href="/guild/{{ guild.guild_id }}/my-account{% if pending_waves %}#missionsCard{% endif %}" class="feature-card" style="text-decoration:none;{% if pending_waves %}border-color:rgba(239,68,68,.5);box-shadow:0 0 0 2px rgba(239,68,68,.15);{% endif %}">
-      <div class="feature-icon" style="position:relative;">🏰
-        {% if pending_waves %}<span style="position:absolute;top:-4px;right:-8px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px;">{{ pending_waves }}</span>{% endif %}
+    {# Farms tracked #}
+    <div class="stat-card">
+      <div class="stat-icon">⚜️</div>
+      <div class="stat-body">
+        <div class="stat-value">{{ farm_stats.inactive_count or 0 }}</div>
+        <div class="stat-label">Inactive Farms</div>
+        {% if farm_stats.snapshot_count %}
+        <div class="stat-sub">{{ farm_stats.snapshot_count }} snapshots</div>
+        {% endif %}
       </div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.account.title">My Account</span>
-          {% if pending_waves %}<span style="background:#ef4444;color:#fff;font-size:.62rem;padding:1px 6px;border-radius:8px;margin-left:.4rem;font-weight:700;animation:pulse 2s infinite;">{{ pending_waves }} EP-Welle{{ 'n' if pending_waves != 1 }}</span>{% endif %}
-        </div>
-        <div class="feature-desc">{% if pending_waves %}⚔️ You have assigned operation waves — view now!{% else %}<span data-i18n="guild.feature.account.desc">Import own villages &amp; troops — data foundation for all features</span>{% endif %}</div>
-      </div>
-      <span style="color:{% if pending_waves %}#ef4444{% else %}var(--text-muted){% endif %};font-size:1rem;">→</span>
-    </a>
-
-
-    <!-- Farming (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/farming" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">⚜️</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.farming.title">Farming Intelligence</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.farming.desc">Detect inactive farms, manage and analyse farm lists</div>
-      </div>
-      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
-    </a>
-
-    <!-- Farmlist-Analyst (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/farmlist-analyst" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">📋</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.farmlist.title">Farmlist-Analyst</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.farmlist.desc">Analyse farm lists — identify good, mediocre and pointless farms</div>
-      </div>
-      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
-    </a>
-
-    <!-- Benachrichtigungen -->
-    <a href="/guild/{{ guild.guild_id }}/notifications" class="feature-card" style="text-decoration:none;position:relative;{% if unread_notif %}border:2px solid #ef4444;animation:pulse-strong 1.4s ease-in-out infinite;{% endif %}">
-      <div class="feature-icon">🔔</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.notifications.title">Notifications</span>
-          {% if unread_notif %}<span style="background:#ef4444;color:#fff;font-size:.65rem;padding:1px 7px;border-radius:10px;margin-left:.4rem;font-weight:700;">{{ unread_notif }}</span>{% endif %}
-        </div>
-        <div class="feature-desc" data-i18n="guild.feature.notifications.desc">Operation failures, status messages, alliance updates</div>
-      </div>
-      <span style="color:var(--text-muted);">→</span>
-    </a>
-
-    <!-- Einsatzplanung (Alliance Op Planner) -->
-    <a href="/guild/{{ guild.guild_id }}/operations" class="feature-card feature-card-highlight" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">⚔️</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.ops.title">Operation Planner</span> {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.ops.desc">Plan alliance ops · Wave builder · Fake check · March times</div>
-      </div>
-      {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
-    </a>
-
-    <!-- Personal Planning (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/einsatz" class="feature-card" style="text-decoration:none;{% if not has_player_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">📋</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.personal.title">Personal Planning</span> {{ PLAYER_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.personal.desc">Personal march times, waves and solo planning</div>
-      </div>
-      {{ LOCK_ARROW if not has_player_pro else OK_ARROW }}
-    </a>
-
-    <!-- Timer -->
-    <a href="/guild/{{ guild.guild_id }}/timer" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">⏱️</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.timer.title">Timer &amp; Reminders</div>
-        <div class="feature-desc" data-i18n="guild.feature.timer.desc">Farm list timer, attack reminders and audio alarms</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Settle-Liste -->
-    <a href="/guild/{{ guild.guild_id }}/settle-list" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">📍</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.settle.title">Settle-Liste</div>
-        <div class="feature-desc" data-i18n="guild.feature.settle.desc">Coordinate next settlements — prevents conflicts at world start</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Polls -->
-    <a href="/guild/{{ guild.guild_id }}/polls" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">📅</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.polls.title">Polls</div>
-        <div class="feature-desc" data-i18n="guild.feature.polls.desc">Create team polls, coordinate schedules and evaluate results</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Res-Push -->
-    <a href="/guild/{{ guild.guild_id }}/res-push" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🪖</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.respush.title">Res-Push</div>
-        <div class="feature-desc" data-i18n="guild.feature.respush.desc">Manage, accept and coordinate resource requests</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Statistics -->
-    <a href="/guild/{{ guild.guild_id }}/stats" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">📊</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.stats.title">Statistics</div>
-        <div class="feature-desc" data-i18n="guild.feature.stats.desc">Activity, scout history and team performance at a glance</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Travian Statistiken-Verlauf -->
-    <a href="/guild/{{ guild.guild_id }}/travian-stats" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">📈</div>
-      <div class="feature-body">
-        <div class="feature-title">Ranking-Import</div>
-        <div class="feature-desc">Farm, off &amp; def trends from Travian statistics — detect anomalies &amp; patterns</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Heldenaufgaben -->
-    <a href="/guild/{{ guild.guild_id }}/tools/hero-tasks" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🗡️</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.herotasks.title">Hero Tasks</div>
-        <div class="feature-desc" data-i18n="guild.feature.herotasks.desc">Track milestones, collect resources &amp; XP rewards</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Getreidefeld-Rechner -->
-    <a href="/guild/{{ guild.guild_id }}/tools/crop-calculator" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🌾</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.crop.title">Cropland Calculator</div>
-        <div class="feature-desc" data-i18n="guild.feature.crop.desc">Optimal upgrade order for croplands — ROI-based (T4.4 Extended)</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Blueprints -->
-    <a href="/guild/{{ guild.guild_id }}/blueprints" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">📐</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.blueprints.title">Blueprints</div>
-        <div class="feature-desc" data-i18n="guild.feature.blueprints.desc">Step-by-step build guide for all tribes — up to the artifacts</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Chrome Extension -->
-    <a href="/extension" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🧩</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.extension.title">Chrome Extension</div>
-        <div class="feature-desc" data-i18n="guild.feature.extension.desc">Background timer with countdown and clock alarms — for farm list reminders</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Karte — admin only (under construction) -->
-    {% if get_is_admin(request) %}
-    <a href="/guild/{{ guild.guild_id }}/map" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);">
-      <div class="feature-icon">🗺️</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.map.title">Map</span> {{ ALLIANCE_BADGE }} {{ WIP_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.map.desc">Interactive Travian map with alliance heatmap and player search</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-    {% endif %}
-
-    <!-- Angriff-Detection — admin only (under construction) -->
-    {% if get_is_admin(request) %}
-    <a href="/guild/{{ guild.guild_id }}/attacks" class="feature-card" style="text-decoration:none; border-color:rgba(245,158,11,0.4);{% if is_personal %}opacity:0.5;{% endif %}">
-      <div class="feature-icon">⚔️</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.attacks.title">Attack Detection</span> {{ WIP_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
-        <div class="feature-desc" data-i18n="guild.feature.attacks.desc">Report and analyse incoming attacks via Discord modal</div>
-      </div>
-      {{ LOCK_ARROW if is_personal else OK_ARROW }}
-    </a>
-
-    {% endif %}
-
-  </div>
-
-  <!-- ── Allianz ── -->
-  <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
-    <span style="font-size:1.1rem;">🛡️</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.alliance">Alliance</h2>
-    <div style="flex:1;height:1px;background:var(--border);"></div>
-  </div>
-  <div class="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:0.5rem;">
-
-    <!-- Artefakte -->
-    <a href="/guild/{{ guild.guild_id }}/artifacts" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🏺</div>
-      <div class="feature-body">
-        <div class="feature-title">Artefakte</div>
-        <div class="feature-desc">Artefakt-Verwaltung, Rotation &amp; Übergabe-Timeline für die Allianz</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- My Ally -->
-    <a href="/guild/{{ guild.guild_id }}/my-ally" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🤝</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.myally.title">My Ally</div>
-        <div class="feature-desc" data-i18n="guild.feature.myally.desc">Invite, list &amp; manage alliance members</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Meta-Builder -->
-    <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">👥</div>
-      <div class="feature-body">
-        <div class="feature-title">Meta-Builder</div>
-        <div class="feature-desc" data-i18n="guild.feature.members.desc">Import member list — overview, tribes, population, points</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Allianz-Sitter-Listen -->
-    <a href="/guild/{{ guild.guild_id }}/allianz/sitter-liste" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🤝</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.sitter.title">Alliance Lists</div>
-        <div class="feature-desc" data-i18n="guild.feature.sitter.desc">Shared sitter and dual lists of all members at a glance</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Allianz-Lazarett (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/allianz/hospital" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">🏥</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.hospital.title">Alliance Hospital</span> {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.hospital.desc">Coordinate healing troops of all members at a glance</div>
-      </div>
-      {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
-    </a>
-
-    <!-- Gegner-Kartei -->
-    <a href="/guild/{{ guild.guild_id }}/enemies" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">🎯</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.enemies.title">Enemy Records</span> {{ ALLIANCE_BADGE }}</div>
-        <div class="feature-desc" data-i18n="guild.feature.enemies.desc">Scout history per enemy — resources, troops, villages over time</div>
-      </div>
-      {{ LOCK_ARROW if not has_alliance_pro else OK_ARROW }}
-    </a>
-
-    <!-- Player Intel -->
-    <a href="/guild/{{ guild.guild_id }}/intel" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🔎</div>
-      <div class="feature-body">
-        <div class="feature-title">Player Intelligence</div>
-        <div class="feature-desc">Search any player — villages, population history, settlement/conquest timeline, mini-map</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Helden-Scout -->
-    <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🗡️</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.heroscout.title">Hero Scout</div>
-        <div class="feature-desc" data-i18n="guild.feature.heroscout.desc">Monitor enemy heroes — automatically detect equipment changes &amp; XP jumps</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Allianz-Angriffe -->
-    <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🛡️</div>
-      <div class="feature-body">
-        <div class="feature-title">Allianz-Angriffe</div>
-        <div class="feature-desc">Alle importierten Rally-Point-Daten aller Mitglieder — Bedrohungsübersicht, Wellenanalyse, Live-Countdown</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Verteidigung -->
-    <a href="/guild/{{ guild.guild_id }}/verteidigung" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">🛡️</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.feature.defense.title">Defense</div>
-        <div class="feature-desc" data-i18n="guild.feature.defense.desc">Coordinate and manage defend and timed-defend requests</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Gegner-Scouts -->
-    <a href="/guild/{{ guild.guild_id }}/scout-incidents" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">👁️</div>
-      <div class="feature-body">
-        <div class="feature-title">Enemy Scouts</div>
-        <div class="feature-desc">Reported scouting actions against alliance members — detect concentrations early</div>
-      </div>
-      {{ OK_ARROW }}
-    </a>
-
-    <!-- Scout (Pro) -->
-    <a href="/guild/{{ guild.guild_id }}/scout" class="feature-card" style="text-decoration:none;{% if not has_alliance_pro or is_personal %}opacity:0.65;{% endif %}">
-      <div class="feature-icon">🔍</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.scout.title">Scout</span> {{ ALLIANCE_BADGE }}{% if is_personal %} {{ BOT_BADGE }}{% endif %}</div>
-        <div class="feature-desc" data-i18n="guild.feature.scout.desc">Scout archive, channel management and role access rights</div>
-      </div>
-      {{ LOCK_ARROW if (not has_alliance_pro or is_personal) else OK_ARROW }}
-    </a>
-
-  </div>
-
-  <!-- ── Einstellungen ── -->
-  <div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;">
-    <span style="font-size:1.1rem;">⚙️</span>
-    <h2 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;" data-i18n="guild.section.settings">Settings</h2>
-    <div style="flex:1;height:1px;background:var(--border);"></div>
-  </div>
-
-  {% set needs_setup = not guild.tw_world and not is_personal %}
-
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem;">
-
-    <!-- Request Hub (nur Discord) -->
-    {% if not is_personal %}
-    <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
-      <div style="display:flex;align-items:center;gap:1rem;width:100%;">
-        <div class="feature-icon">📋</div>
-        <div class="feature-body">
-          <div class="feature-title" data-i18n="guild.settings.hub.title">Request Hub</div>
-          <div class="feature-desc" data-i18n="guild.settings.hub.desc">One channel with all buttons — Scout, Defend, Res-Push and more</div>
-        </div>
-      </div>
-      {% if request_hub and request_hub.channel_id %}
-      <div style="display:flex;align-items:center;gap:0.75rem;padding-left:3.4rem;flex-wrap:wrap;">
-        <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
-                     border-radius:20px;padding:0.2rem 0.75rem;font-size:0.82rem;font-family:monospace;color:#22c55e;">
-          ✅ #{{ request_hub.channel_name or request_hub.channel_id }}
-        </span>
-        <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/refresh" style="margin:0;">
-          <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.15rem 0.5rem;">🔄 Refresh</button>
-        </form>
-        <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/clear" style="margin:0;">
-          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;" data-i18n="guild.settings.hub.remove">Remove</button>
-        </form>
-      </div>
-      {% else %}
-      <div style="padding-left:3.4rem;">
-        <form method="post" action="/guild/{{ guild.guild_id }}/request-hub/create" style="margin:0;">
-          <button type="submit" class="btn btn-primary" style="font-size:0.875rem;" data-i18n="guild.settings.hub.create">➕ Create hub channel</button>
-        </form>
-      </div>
-      {% endif %}
     </div>
-    {% endif %}{# end not is_personal #}
 
-    <!-- Weekly Digest (nur Discord) -->
-    {% if not is_personal %}
-    <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
-      <div style="display:flex;align-items:center;gap:1rem;width:100%;">
-        <div class="feature-icon">📰</div>
-        <div class="feature-body">
-          <div class="feature-title">Wöchentlicher Digest</div>
-          <div class="feature-desc">Jeden Montag: Kampfbilanz, Top-Beitragende, Artefakt-Status — per Discord-Embed</div>
-        </div>
+    {# Pending waves #}
+    <a href="/guild/{{ guild.guild_id }}/my-account#missionsCard" class="stat-card {% if pending_waves %}stat-card-alert{% endif %}" style="text-decoration:none;color:inherit;">
+      <div class="stat-icon">⚔️</div>
+      <div class="stat-body">
+        <div class="stat-value {% if pending_waves %}stat-value-alert{% endif %}">{{ pending_waves }}</div>
+        <div class="stat-label">Pending Waves</div>
+        <div class="stat-sub">{% if pending_waves %}⚠️ Action needed{% else %}All clear{% endif %}</div>
       </div>
-      {% if guild.digest_channel_id %}
-      <div style="display:flex;align-items:center;gap:0.75rem;padding-left:3.4rem;flex-wrap:wrap;">
-        <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
-                     border-radius:20px;padding:0.2rem 0.75rem;font-size:0.82rem;font-family:monospace;color:#22c55e;">
-          ✅ Channel: {{ guild.digest_channel_id }}
-        </span>
-        <form method="post" action="/guild/{{ guild.guild_id }}/digest/clear" style="margin:0;">
-          <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;">✕ Entfernen</button>
-        </form>
-        <div style="font-size:.78rem;color:var(--text-muted);">Tipp: <code>/digest #channel</code> im Discord zum manuellen Triggern</div>
+    </a>
+
+    {# Unread notifications #}
+    <a href="/guild/{{ guild.guild_id }}/notifications" class="stat-card {% if unread_notif %}stat-card-alert{% endif %}" style="text-decoration:none;color:inherit;">
+      <div class="stat-icon">🔔</div>
+      <div class="stat-body">
+        <div class="stat-value {% if unread_notif %}stat-value-alert{% endif %}">{{ unread_notif }}</div>
+        <div class="stat-label">Unread Alerts</div>
+        <div class="stat-sub">{% if unread_notif %}New notifications{% else %}Nothing new{% endif %}</div>
       </div>
-      {% else %}
-      <div style="padding-left:3.4rem;">
-        <form method="post" action="/guild/{{ guild.guild_id }}/digest/set" style="margin:0;display:flex;gap:.5rem;align-items:center;">
-          <input name="channel_id" placeholder="Channel-ID" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.82rem;width:160px;">
-          <button type="submit" class="btn btn-primary" style="font-size:0.82rem;">📰 Aktivieren</button>
-        </form>
-        <div style="margin-top:.35rem;font-size:.75rem;color:var(--text-muted);">Oder <code>/digest #channel</code> direkt im Discord</div>
+    </a>
+
+    {# Battle reports #}
+    <div class="stat-card">
+      <div class="stat-icon">🛡️</div>
+      <div class="stat-body">
+        <div class="stat-value">{{ recent_battles | length }}</div>
+        <div class="stat-label">Recent Reports</div>
+        <div class="stat-sub">last {{ recent_battles | length }} battle records</div>
       </div>
-      {% endif %}
     </div>
-    {% endif %}
+  </div>
 
+  {# ── Main Grid: left (wider) + right ── #}
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:1.25rem;align-items:start;">
 
-    <!-- Hero scout setup (bot optional, always possible manually) -->
-    <div class="feature-card" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
-      <div style="display:flex;align-items:center;gap:1rem;width:100%;">
-        <div class="feature-icon">🗡️</div>
-        <div class="feature-body">
-          <div class="feature-title" data-i18n="guild.settings.heroscout.title">Hero Scout{% if is_personal %} <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">(manual)</span>{% endif %}</div>
-          <div class="feature-desc" data-i18n="guild.settings.heroscout.desc">Discord channel for screenshots — bot detects equipment &amp; XP automatically</div>
+    {# ── LEFT COLUMN ── #}
+    <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+      {# Recent Battle Reports #}
+      <div class="card">
+        <div class="card-header">
+          <span>🛡️ Recent Battle Reports</span>
+          <a href="/guild/{{ guild.guild_id }}/reports" class="card-link">All reports →</a>
         </div>
-      </div>
-      {% if hero_scout_channel %}
-      <div style="display:flex;align-items:center;gap:0.75rem;padding-left:3.4rem;flex-wrap:wrap;">
-        <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);
-                     border-radius:20px;padding:0.2rem 0.75rem;font-size:0.82rem;font-family:monospace;color:#f59e0b;">
-          ✅ Channel-ID: {{ hero_scout_channel }}
-        </span>
-        <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
-           style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;" data-i18n="guild.settings.heroscout.change">Change →</a>
-      </div>
-      {% else %}
-      <div style="padding-left:3.4rem;">
-        {% if is_personal %}
-        <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
-           class="btn btn-primary" style="font-size:0.875rem;text-decoration:none;display:inline-block;
-           padding:0.4rem 1rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);
-           border-radius:8px;color:#f59e0b;font-weight:600;">
-          ⚔️ Open Hero Scout →
-        </a>
+        {% if recent_battles %}
+        <div class="activity-list">
+          {% for rep in recent_battles %}
+          <a href="/guild/{{ guild.guild_id }}/reports/{{ rep.id }}" class="activity-row" style="text-decoration:none;color:inherit;">
+            <div class="activity-dot" style="background:{% if rep.report_type == 'attack' %}#ef4444{% elif rep.report_type == 'defense' %}#22c55e{% else %}#6366f1{% endif %};"></div>
+            <div class="activity-body">
+              <div class="activity-title">
+                <strong>{{ rep.attacker_name or '?' }}</strong>
+                <span style="color:var(--text-muted);margin:0 4px;">→</span>
+                <strong>{{ rep.defender_name or '?' }}</strong>
+                {% if rep.report_type %}<span class="rtype-badge rtype-{{ rep.report_type }}">{{ rep.report_type }}</span>{% endif %}
+              </div>
+              <div class="activity-meta">{{ (rep.created_at or '')[:16] | replace('T',' ') }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
         {% else %}
-        <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
-           class="btn btn-primary" style="font-size:0.875rem;text-decoration:none;display:inline-block;
-           padding:0.4rem 1rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);
-           border-radius:8px;color:#f59e0b;font-weight:600;" data-i18n="guild.settings.heroscout.configure">
-          ➕ Configure channel
-        </a>
+        <div class="empty-state">No battle reports yet — import reports via the Discord bot or the Battles section.</div>
+        {% endif %}
+      </div>
+
+      {# Recent Attack Reports #}
+      <div class="card">
+        <div class="card-header">
+          <span>⚔️ Incoming Attack Reports</span>
+          <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="card-link">Alliance overview →</a>
+        </div>
+        {% if recent_attacks %}
+        <div class="activity-list">
+          {% for atk in recent_attacks %}
+          <div class="activity-row">
+            <div class="activity-dot" style="background:#f59e0b;"></div>
+            <div class="activity-body">
+              <div class="activity-title">
+                Rally data from <strong>{{ atk.reporter_name or '?' }}</strong>
+              </div>
+              <div class="activity-meta">{{ (atk.created_at or '')[:16] | replace('T',' ') }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No attack reports yet — members can import rally-point data via the bot.</div>
+        {% endif %}
+      </div>
+
+      {# Farming snapshot status #}
+      {% if has_player_pro %}
+      <div class="card">
+        <div class="card-header">
+          <span>⚜️ Farming Intelligence</span>
+          <a href="/guild/{{ guild.guild_id }}/farming" class="card-link">Open →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;padding:0.25rem 0;">
+          <div class="mini-stat">
+            <div class="mini-val">{{ farm_stats.snapshot_count or 0 }}</div>
+            <div class="mini-lbl">Map Snapshots</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-val">{{ farm_stats.inactive_count or 0 }}</div>
+            <div class="mini-lbl">Inactive Farms</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-val">{{ farm_stats.farm_list_count or 0 }}</div>
+            <div class="mini-lbl">Farmlist Entries</div>
+          </div>
+        </div>
+        {% if farm_stats.latest_snapshot %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;">Last snapshot: {{ farm_stats.latest_snapshot[:16] | replace('T',' ') }}</div>
         {% endif %}
       </div>
       {% endif %}
-    </div>
 
-    <!-- World / Server -->
-    <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="feature-card" style="text-decoration:none;{% if needs_setup %}border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.2);{% endif %}">
-      <div class="feature-icon">🌍</div>
-      <div class="feature-body">
-        <div class="feature-title"><span data-i18n="guild.feature.world.title">World / Server</span>{% if needs_setup %} <span data-i18n="guild.feature.world.setup" style="font-size:.72rem;background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;margin-left:4px;">Set up</span>{% endif %}</div>
-        <div class="feature-desc">{% if guild.tw_world %}<span style="color:#4ade80;">✅ {{ guild.tw_world.replace('https://','') }}</span>{% else %}<span data-i18n="guild.feature.world.desc">Configure Travian server URL &amp; bot language</span>{% endif %}</div>
+    </div>{# /left column #}
+
+    {# ── RIGHT COLUMN ── #}
+    <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+      {# Player Growth Leaderboard #}
+      <div class="card">
+        <div class="card-header">
+          <span>📈 Population Growth</span>
+          <a href="/guild/{{ guild.guild_id }}/travian-stats" class="card-link">Details →</a>
+        </div>
+        {% if player_growth %}
+        <div class="leaderboard">
+          {% for p in player_growth[:8] %}
+          {% set delta = p.delta if p.delta is defined else 0 %}
+          <div class="lb-row">
+            <div class="lb-rank">{{ loop.index }}</div>
+            <div class="lb-name">{{ p.player_name or '?' }}</div>
+            <div class="lb-val {% if delta >= 0 %}lb-pos{% else %}lb-neg{% endif %}">
+              {% if delta >= 0 %}+{% endif %}{{ delta | int }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No growth data yet — import map snapshots to track population changes.</div>
+        {% endif %}
       </div>
-      {{ OK_ARROW }}
-    </a>
 
-    <!-- Troop Roles (nur Owner/Admin) -->
-    {% if is_owner or get_is_admin(request) %}
-    <a href="/guild/{{ guild.guild_id }}/my-ally/troop-roles" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">⚔️</div>
-      <div class="feature-body">
-        <div class="feature-title">Troop Roles</div>
-        <div class="feature-desc">Konfiguriere welche Truppen als OFF, DEF, Siege oder Scout gelten — beeinflusst Dorfklassifizierung &amp; Angriffspläne</div>
+      {# Quick Actions #}
+      <div class="card">
+        <div class="card-header"><span>⚡ Quick Actions</span></div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <a href="/guild/{{ guild.guild_id }}/my-account" class="quick-link">🏰 My Account</a>
+          <a href="/guild/{{ guild.guild_id }}/operations" class="quick-link">⚔️ Operation Planner</a>
+          <a href="/guild/{{ guild.guild_id }}/verteidigung" class="quick-link">🛡️ Defense Coordination</a>
+          <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" class="quick-link">👥 Alliance Members</a>
+          <a href="/guild/{{ guild.guild_id }}/enemies" class="quick-link">🎯 Enemy Records</a>
+          <a href="/guild/{{ guild.guild_id }}/intel" class="quick-link">🔎 Player Intelligence</a>
+          <a href="/guild/{{ guild.guild_id }}/timer" class="quick-link">⏱️ Timer &amp; Reminders</a>
+          <a href="/guild/{{ guild.guild_id }}/settings" class="quick-link">⚙️ Server Settings</a>
+        </div>
       </div>
-      {{ OK_ARROW }}
-    </a>
-    {% endif %}
 
-    <!-- Serververwaltung (nur Discord) -->
-    {% if not is_personal %}
-    <a href="/guild/{{ guild.guild_id }}/settings" class="feature-card" style="text-decoration:none;">
-      <div class="feature-icon">⚙️</div>
-      <div class="feature-body">
-        <div class="feature-title" data-i18n="guild.settings.server.title">Server Management</div>
-        <div class="feature-desc" data-i18n="guild.settings.server.desc">Dashboard access, permissions and bot settings</div>
+      {# World / Setup hint #}
+      {% if not guild.tw_world and not is_personal %}
+      <div class="card" style="border-color:rgba(245,158,11,0.4);">
+        <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+          <span style="font-size:1.4rem;">🌍</span>
+          <div>
+            <div style="font-weight:700;color:#fbbf24;margin-bottom:0.25rem;">World not configured</div>
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem;">Set your Travian server URL to enable map snapshots, march timers and more.</div>
+            <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="btn btn-primary" style="font-size:0.82rem;text-decoration:none;display:inline-block;">➕ Configure world</a>
+          </div>
+        </div>
       </div>
-      {{ OK_ARROW }}
-    </a>
-    {% endif %}
+      {% endif %}
 
-  </div>
+      {# Upgrade teaser for free users #}
+      {% if not is_premium %}
+      <div class="card" style="border-color:rgba(99,102,241,0.4);background:linear-gradient(135deg,var(--bg-card),rgba(99,102,241,0.05));">
+        <div style="font-weight:700;color:#a5b4fc;margin-bottom:0.5rem;">🔓 Unlock Pro Features</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5;">Farming Intelligence, Operation Planner, Alliance Hospital and more — available with Player or Alliance Pro.</div>
+        <a href="/guild/{{ guild.guild_id }}/upgrade" class="btn btn-primary" style="text-decoration:none;display:inline-block;font-size:0.85rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;">✨ View Plans</a>
+      </div>
+      {% endif %}
 
+    </div>{# /right column #}
+  </div>{# /main grid #}
 
-</div>
+</div>{# /container #}
 
 <style>
-.feature-card {
-  display:flex;
-  align-items:center;
-  gap:1rem;
-  padding:1.1rem 1.25rem;
+/* Flash messages */
+.flash { border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.9rem; }
+.flash-ok  { background:rgba(34,197,94,0.1);  border:1px solid #22c55e; color:#22c55e; }
+.flash-err { background:rgba(239,68,68,0.1);  border:1px solid #ef4444; color:#f87171; }
+.flash-warn{ background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);color:#fbbf24; }
+
+/* Stat cards */
+.stat-card {
   background:var(--bg-card);
   border:1px solid var(--border);
   border-radius:12px;
-  transition:border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-  color:var(--text);
+  padding:1rem 1.1rem;
+  display:flex;
+  gap:0.85rem;
+  align-items:center;
+  transition:border-color .15s, box-shadow .15s;
 }
-.feature-card:hover {
-  border-color:#3b82f6;
-  transform:translateY(-2px);
-  box-shadow:0 4px 20px rgba(59,130,246,0.15);
-}
-.feature-card-highlight {
-  border-color:rgba(245,158,11,0.4);
-  background:linear-gradient(135deg,var(--bg-card),#1c1600 300%);
-}
-.feature-card-highlight:hover {
-  border-color:#f59e0b;
-  box-shadow:0 4px 20px rgba(245,158,11,0.15);
-}
-.feature-icon {
-  font-size:1.9rem;
-  flex-shrink:0;
-  width:2.4rem;
-  text-align:center;
-}
-.feature-body { flex:1; min-width:0; }
-.feature-title { font-weight:700; font-size:1rem; margin-bottom:0.2rem; }
-.feature-desc { font-size:0.82rem; color:var(--text-muted); line-height:1.4; }
-.feature-arrow { color:var(--text-muted); font-size:1.1rem; flex-shrink:0; transition:transform 0.15s; }
-.feature-card:hover .feature-arrow { transform:translateX(4px); color:#3b82f6; }
-.feature-card-highlight:hover .feature-arrow { color:#f59e0b; }
+.stat-card:hover { border-color:#6366f1; box-shadow:0 2px 12px rgba(99,102,241,.12); }
+.stat-card-alert { border-color:rgba(239,68,68,.4); box-shadow:0 0 0 2px rgba(239,68,68,.1); }
+.stat-icon { font-size:1.6rem; flex-shrink:0; }
+.stat-value { font-size:1.65rem; font-weight:800; line-height:1; }
+.stat-value-alert { color:#f87171; }
+.stat-label { font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+.stat-sub { font-size:0.75rem; color:var(--text-muted); margin-top:2px; }
 
-details.card > summary { cursor:pointer; }
-details.card[open] .details-chevron { transform:rotate(180deg); }
-.details-chevron { transition:transform 0.2s; }
-@keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 3px rgba(239,68,68,.2);} 50%{opacity:.85;box-shadow:0 0 0 8px rgba(239,68,68,.0);} }
-@keyframes pulse-strong { 0%,100%{box-shadow:0 0 0 3px rgba(239,68,68,.5),0 0 12px rgba(239,68,68,.3);} 50%{box-shadow:0 0 0 7px rgba(239,68,68,.0),0 0 20px rgba(239,68,68,.0);} }
+/* General card */
+.card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1rem 1.1rem; }
+.card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem; font-weight:700; font-size:0.95rem; }
+.card-link { font-size:0.78rem; color:#6366f1; text-decoration:none; font-weight:600; }
+.card-link:hover { color:#a5b4fc; }
+
+/* Activity list */
+.activity-list { display:flex; flex-direction:column; gap:0px; }
+.activity-row { display:flex; gap:0.75rem; align-items:flex-start; padding:0.6rem 0; border-bottom:1px solid var(--border); transition:background .1s; border-radius:6px; }
+.activity-row:last-child { border-bottom:none; }
+.activity-row:hover { background:rgba(255,255,255,.03); }
+.activity-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:6px; }
+.activity-body { flex:1; min-width:0; }
+.activity-title { font-size:0.875rem; line-height:1.3; }
+.activity-meta { font-size:0.75rem; color:var(--text-muted); margin-top:2px; }
+.rtype-badge { font-size:0.7rem; padding:1px 6px; border-radius:4px; margin-left:4px; vertical-align:middle; font-weight:600; }
+.rtype-attack  { background:rgba(239,68,68,.15); color:#f87171; }
+.rtype-defense { background:rgba(34,197,94,.15); color:#4ade80; }
+.rtype-raid    { background:rgba(245,158,11,.15); color:#fbbf24; }
+
+/* Empty state */
+.empty-state { font-size:0.83rem; color:var(--text-muted); padding:0.5rem 0; line-height:1.5; }
+
+/* Leaderboard */
+.leaderboard { display:flex; flex-direction:column; gap:0; }
+.lb-row { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 0; border-bottom:1px solid var(--border); font-size:0.875rem; }
+.lb-row:last-child { border-bottom:none; }
+.lb-rank { width:1.4rem; text-align:center; font-size:0.75rem; color:var(--text-muted); font-weight:700; flex-shrink:0; }
+.lb-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-val  { font-weight:700; font-size:0.85rem; flex-shrink:0; }
+.lb-pos  { color:#4ade80; }
+.lb-neg  { color:#f87171; }
+
+/* Quick links */
+.quick-link { display:block; padding:0.5rem 0.7rem; border-radius:8px; font-size:0.875rem; text-decoration:none; color:var(--text); transition:background .12s, color .12s; }
+.quick-link:hover { background:rgba(99,102,241,.12); color:#a5b4fc; }
+
+/* Mini stats (farming panel) */
+.mini-stat { text-align:center; padding:0.6rem 0.5rem; background:rgba(255,255,255,.03); border-radius:8px; }
+.mini-val  { font-size:1.25rem; font-weight:800; color:#a5b4fc; }
+.mini-lbl  { font-size:0.72rem; color:var(--text-muted); margin-top:2px; text-transform:uppercase; letter-spacing:.04em; }
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 900px) {
+  .stat-card { padding:.75rem .85rem; gap:.6rem; }
+  .stat-value { font-size:1.3rem; }
+  [style*="grid-template-columns:1fr 320px"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
+}
+@media (max-width: 500px) {
+  [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: 1fr 1fr !important; }
+}
 </style>
 
 <script>
-// ── Tile drag & drop ──────────────────────────────────────────────────────────
-const TILE_ORDER_KEY = 'tileOrder_{{ guild.guild_id }}';
-let editMode = false;
-let dragSrc = null;
-
-function initTiles() {
-  // Assign data-tile-id to every feature-card that doesn't have one
-  document.querySelectorAll('.tile-grid .feature-card, .tile-grid a.feature-card').forEach((el, i) => {
-    if (!el.dataset.tileId) {
-      // Use href or title or index as stable ID
-      const href = el.getAttribute('href') || '';
-      el.dataset.tileId = href ? href.replace(/.*\/guild\/[^/]+\//,'') || ('tile'+i) : ('tile'+i);
-    }
-  });
-  applyStoredOrder();
-}
-
-function applyStoredOrder() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(TILE_ORDER_KEY) || '{}');
-    document.querySelectorAll('.tile-grid').forEach(grid => {
-      const cards = [...grid.querySelectorAll('.feature-card')];
-      const sorted = cards.slice().sort((a, b) => {
-        const ia = stored[a.dataset.tileId] ?? 999;
-        const ib = stored[b.dataset.tileId] ?? 999;
-        return ia - ib;
-      });
-      sorted.forEach(c => grid.appendChild(c));
-    });
-  } catch(e) {}
-}
-
-function saveOrder() {
-  const order = {};
-  document.querySelectorAll('.tile-grid .feature-card').forEach((el, i) => {
-    if (el.dataset.tileId) order[el.dataset.tileId] = i;
-  });
-  localStorage.setItem(TILE_ORDER_KEY, JSON.stringify(order));
-}
-
-function toggleEditMode() {
-  editMode = !editMode;
-  const btn = document.getElementById('editTilesBtn');
-  btn.textContent = editMode ? '✅ Done' : '✏️ Customize';
-  btn.style.background = editMode ? 'rgba(74,222,128,.15)' : '';
-  btn.style.borderColor = editMode ? '#4ade80' : '';
-  document.querySelectorAll('.tile-grid .feature-card').forEach(el => {
-    if (editMode) {
-      el.setAttribute('draggable', 'true');
-      el.style.cursor = 'grab';
-      el.addEventListener('dragstart', onDragStart);
-      el.addEventListener('dragover', onDragOver);
-      el.addEventListener('drop', onDrop);
-      el.addEventListener('dragend', onDragEnd);
-    } else {
-      el.setAttribute('draggable', 'false');
-      el.style.cursor = '';
-      el.removeEventListener('dragstart', onDragStart);
-      el.removeEventListener('dragover', onDragOver);
-      el.removeEventListener('drop', onDrop);
-      el.removeEventListener('dragend', onDragEnd);
-    }
-  });
-}
-
-function onDragStart(e) {
-  dragSrc = this;
-  this.style.opacity = '0.4';
-  e.dataTransfer.effectAllowed = 'move';
-}
-function onDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  this.style.outline = '2px dashed #6366f1';
-  return false;
-}
-function onDrop(e) {
-  e.stopPropagation();
-  if (dragSrc !== this) {
-    const grid = this.parentNode;
-    const cards = [...grid.querySelectorAll('.feature-card')];
-    const srcIdx = cards.indexOf(dragSrc);
-    const dstIdx = cards.indexOf(this);
-    if (srcIdx < dstIdx) grid.insertBefore(dragSrc, this.nextSibling);
-    else grid.insertBefore(dragSrc, this);
-    saveOrder();
-  }
-  this.style.outline = '';
-  return false;
-}
-function onDragEnd() {
-  this.style.opacity = '';
-  document.querySelectorAll('.tile-grid .feature-card').forEach(el => el.style.outline = '');
-}
-
-document.addEventListener('DOMContentLoaded', initTiles);
-
 // Auto-push tw_world to localStorage (so Timer & Einsatz pick it up)
 {% if guild.tw_world %}
 (function() {
-  const server = {{ guild.tw_world | tojson }};
+  var server = {{ guild.tw_world | tojson }};
   try {
-    // Update both profile keys used by timer.html and einsatz.html
-    ['travian_profile', 'travian_profile_einsatz'].forEach(key => {
-      const p = JSON.parse(localStorage.getItem(key) || '{}');
+    ['travian_profile', 'travian_profile_einsatz'].forEach(function(key) {
+      var p = JSON.parse(localStorage.getItem(key) || '{}');
       if (!p.server) { p.server = server; localStorage.setItem(key, JSON.stringify(p)); }
     });
   } catch(e) {}

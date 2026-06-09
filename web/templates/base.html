@@ -548,7 +548,7 @@ function escHtml(s) {
       var reqPro = '';
       if (reqPlan) {
         lockHtml = _cornerLock(reqPlan);
-        reqPro = ' data-requires-pro="1" data-requires-plan="'+reqPlan+'"';
+        reqPro = ' data-requires-pro="1" data-requires-plan="'+reqPlan+'" data-url-suffix="'+(item.url_suffix||'')+'"';
       }
       // If Pro required and user doesn't have it, redirect to upgrade page
       var effectiveHref = url;
@@ -605,7 +605,21 @@ function escHtml(s) {
         _gsHasPro = !!data.has_player_pro;
         _gsHasAlliancePro = !!data.has_alliance_pro;
         _applyBadges();
+        _applyProLinks(gid);
       }).catch(function(){});
+  }
+
+  function _applyProLinks(gid) {
+    var nav = document.getElementById('gs-nav-items');
+    if (!nav) return;
+    nav.querySelectorAll('.gs-item[data-requires-plan]').forEach(function(el) {
+      var plan = el.getAttribute('data-requires-plan');
+      var suffix = el.getAttribute('data-url-suffix') || '';
+      var userHasPlan = (plan === 'alliance') ? _gsHasAlliancePro : _gsHasPro;
+      el.href = userHasPlan
+        ? '/guild/' + gid + suffix
+        : '/guild/' + gid + '/upgrade?plan=' + plan + '&from=' + encodeURIComponent(suffix);
+    });
   }
 
   function _applyBadges() {
