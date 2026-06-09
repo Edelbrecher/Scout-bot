@@ -657,6 +657,25 @@ function escHtml(s) {
     setInterval(function(){ _loadBadges(gid); }, 60 * 60 * 1000);
   })();
 
+  // Apply sidebar font style from admin settings
+  (function(){
+    var cached = sessionStorage.getItem('gs_style');
+    if (cached) { try { _applySidebarStyle(JSON.parse(cached)); } catch(e){} }
+    fetch('/api/sidebar-style').then(function(r){ return r.json(); }).then(function(s){
+      sessionStorage.setItem('gs_style', JSON.stringify(s));
+      _applySidebarStyle(s);
+    }).catch(function(){});
+  })();
+
+  function _applySidebarStyle(s) {
+    var sb = document.getElementById('gs-sidebar');
+    if (!sb) return;
+    if (s.font_size)   sb.style.setProperty('--gs-font-size',   s.font_size);
+    else               sb.style.removeProperty('--gs-font-size');
+    if (s.font_family) sb.style.setProperty('--gs-font-family', s.font_family);
+    else               sb.style.removeProperty('--gs-font-family');
+  }
+
   function gsSidebarToggle() {
     var body = document.body;
     var btn  = document.getElementById('gs-collapse-btn');

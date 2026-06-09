@@ -10173,6 +10173,33 @@ async def api_sidebar_config(request: Request):
     return JSONResponse(nav)
 
 
+@app.get("/api/sidebar-style")
+async def api_sidebar_style(request: Request):
+    raw = await database.get_setting("sidebar_style_config")
+    if raw:
+        try:
+            return JSONResponse(_json_mod.loads(raw))
+        except Exception:
+            pass
+    return JSONResponse({"font_family": "", "font_size": ""})
+
+
+@app.post("/admin/sidebar/style")
+async def admin_sidebar_style_save(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return JSONResponse({"error": "admin only"}, status_code=403)
+    body = await request.json()
+    font_family = str(body.get("font_family", "")).strip()
+    font_size   = str(body.get("font_size", "")).strip()
+    await database.set_setting("sidebar_style_config", _json_mod.dumps({
+        "font_family": font_family,
+        "font_size": font_size,
+    }))
+    return JSONResponse({"ok": True})
+
+
 @app.get("/guild/{guild_id}/api/sidebar-badges")
 async def sidebar_badges(request: Request, guild_id: str):
     """Return notification counts for sidebar badges + player pro status."""

@@ -55,6 +55,45 @@
         <strong>url_suffix</strong> wird an <code>/guild/&lt;id&gt;</code> angehängt — leer lassen für Übersicht. URL-Feld hat Autocomplete für alle bekannten Routen.
       </p>
 
+      <!-- ── Typography Settings ───────────────────────────────────────── -->
+      <div class="card" style="margin-top:2rem;padding:1.25rem;">
+        <div style="font-size:1rem;font-weight:700;margin-bottom:.15rem;">🔤 Sidebar Typography</div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem;">Font family and size for all sidebar items.</div>
+        <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
+          <div>
+            <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Font Family</label>
+            <select id="styleFontFamily" style="background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;color:var(--text);font-size:.85rem;min-width:200px;">
+              <option value="">— System default —</option>
+              <option value="'Inter', sans-serif">Inter</option>
+              <option value="'Roboto', sans-serif">Roboto</option>
+              <option value="'DM Sans', sans-serif">DM Sans</option>
+              <option value="'Nunito', sans-serif">Nunito</option>
+              <option value="'Poppins', sans-serif">Poppins</option>
+              <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Font Size</label>
+            <select id="styleFontSize" style="background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;color:var(--text);font-size:.85rem;">
+              <option value="">— Default (0.8rem) —</option>
+              <option value="0.7rem">0.7 rem (very small)</option>
+              <option value="0.75rem">0.75 rem</option>
+              <option value="0.8rem">0.8 rem</option>
+              <option value="0.85rem">0.85 rem</option>
+              <option value="0.875rem">0.875 rem</option>
+              <option value="0.9rem">0.9 rem</option>
+              <option value="0.95rem">0.95 rem</option>
+              <option value="1rem">1 rem (large)</option>
+            </select>
+          </div>
+          <div>
+            <button onclick="saveStyle()" class="btn btn-primary" style="font-size:.85rem;">💾 Save</button>
+            <span id="styleSaveMsg" style="display:none;margin-left:.6rem;font-size:.8rem;color:#4ade80;">✅ Saved</span>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Pro Management ─────────────────────────────────────────────── -->
       <div class="card" style="margin-top:2rem;padding:1.25rem;">
         <div style="font-size:1rem;font-weight:700;margin-bottom:.15rem;">🔒 Player Pro & Alliance Pro</div>
@@ -797,5 +836,41 @@ async function resetNav() {
 }
 
 render();
+
+// Load current style settings into dropdowns
+(async function() {
+  try {
+    const s = await (await fetch('/api/sidebar-style')).json();
+    if (s.font_family) {
+      const sel = document.getElementById('styleFontFamily');
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === s.font_family) { sel.selectedIndex = i; break; }
+      }
+    }
+    if (s.font_size) {
+      const sel = document.getElementById('styleFontSize');
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === s.font_size) { sel.selectedIndex = i; break; }
+      }
+    }
+  } catch(e) {}
+})();
+
+async function saveStyle() {
+  const font_family = document.getElementById('styleFontFamily').value;
+  const font_size   = document.getElementById('styleFontSize').value;
+  const r = await fetch('/admin/sidebar/style', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ font_family, font_size })
+  });
+  if (r.ok) {
+    // Invalidate style cache so next page load picks up new values
+    sessionStorage.removeItem('gs_style');
+    const msg = document.getElementById('styleSaveMsg');
+    msg.style.display = 'inline';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+  }
+}
 </script>
 {% endblock %}
