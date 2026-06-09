@@ -1122,7 +1122,9 @@ loadMissions();
 
   window.removeCropSend = async function(id) {
     if (!confirm('Remove this crop obligation?')) return;
-    await fetch(`/guild/${GUILD_ID_CROP}/api/def-crop/${id}/deactivate`, {method:'POST'});
+    try {
+      await fetch(`/guild/${GUILD_ID_CROP}/api/def-crop/${id}/deactivate`, {method:'POST'});
+    } catch(e) { alert('Netzwerkfehler: ' + e.message); return; }
     loadCropSends();
   };
 
@@ -1183,10 +1185,15 @@ window.stepTs = async function(x, y, delta) {
   if (val === cur) return;
   span.textContent = val;
   span.style.color = val > 0 ? '#93c5fd' : 'var(--text-muted)';
-  await fetch('/api/village-ts', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ x, y, ts: val })
-  });
+  try {
+    await fetch('/api/village-ts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ x, y, ts: val })
+    });
+  } catch(e) {
+    span.textContent = cur; // revert on failure
+    span.style.color = cur > 0 ? '#93c5fd' : 'var(--text-muted)';
+  }
 };
 </script>
 {% endblock %}

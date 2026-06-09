@@ -2366,20 +2366,24 @@
   window.confirmArchiveAll = async function() {
     const n = _allAttacks.filter(a => !a.is_dismissed).length;
     if (!confirm(`Alle ${n} sichtbaren Angriffe ins Archiv verschieben?`)) return;
-    const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-archive`, { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) { await loadAttacks(); alert(`✅ ${d.count} Angriffe archiviert.`); }
-    else alert('Fehler beim Archivieren.');
+    try {
+      const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-archive`, { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) { await loadAttacks(); alert(`✅ ${d.count} Angriffe archiviert.`); }
+      else alert('Fehler beim Archivieren.');
+    } catch(e) { alert('Netzwerkfehler: ' + e.message); }
   };
 
   window.confirmDeleteAll = async function() {
     const n = _allAttacks.length;
     if (!confirm(`⚠️ Wirklich ALLE ${n} Angriffe unwiderruflich löschen?\n\nDies kann nicht rückgängig gemacht werden.`)) return;
     if (!confirm('Bist du sicher? Alle Daten werden gelöscht.')) return;
-    const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-delete`, { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) { await loadAttacks(); alert(`🗑️ ${d.count} Angriffe gelöscht.`); }
-    else alert('Fehler beim Löschen.');
+    try {
+      const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-delete`, { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) { await loadAttacks(); alert(`🗑️ ${d.count} Angriffe gelöscht.`); }
+      else alert('Fehler beim Löschen.');
+    } catch(e) { alert('Netzwerkfehler: ' + e.message); }
   };
 
   // ── Analysis panel ─────────────────────────────────────────────────────────

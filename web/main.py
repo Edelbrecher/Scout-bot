@@ -4403,18 +4403,18 @@ def parse_own_villages(text: str, tribe: str = "") -> list:
         "Teutonen Reiter": "Teut. Ritter",
         "Teutonen-Rammbock": "Teutonen-Rammbock", "Ramme": "Teutonen-Rammbock",
         "Kriegsmaschine": "Kriegsmaschine", "Katapult": "Kriegsmaschine",
-        "Häuptling": "Häuptling", "Stammesführer": "Häuptling",
+        "Häuptling": "Häuptling",          # Teutonen-Häuptling
         # EN
         "Clubswinger": "Keulenschwinger", "Spearman": "Speerkämpfer",
         "Axeman": "Axtkämpfer", "Scout": "Späher", "Teutonic Knight": "Teut. Ritter",
         "Battering Ram": "Teutonen-Rammbock", "Catapult": "Kriegsmaschine",
-        "Chief": "Häuptling", "Chieftain": "Häuptling",
+        "Chief": "Häuptling",              # Teuton chief EN
         # FR
         "Frondeur de massue": "Keulenschwinger", "Lancier": "Speerkämpfer",
         "Hacheur": "Axtkämpfer", "Éclaireur": "Späher",
         "Paladin": "Paladin", "Chevalier teuton": "Teut. Ritter",
         "Bélier teuton": "Teutonen-Rammbock", "Machine de guerre": "Kriegsmaschine",
-        "Chef": "Häuptling",
+        "Chef": "Häuptling",               # Teuton chief FR
         # PL
         "Maczugowiec": "Keulenschwinger", "Włócznik": "Speerkämpfer",
         "Toporznik": "Axtkämpfer", "Zwiadowca": "Späher",
@@ -4433,11 +4433,13 @@ def parse_own_villages(text: str, tribe: str = "") -> list:
         "Theutates-Blitz": "Theutates-Blitz", "Theutates Blitz": "Theutates-Blitz",
         "Druidentreiter": "Druidentreiter", "Druidenreiter": "Druidentreiter",
         "Haeduer": "Haeduer", "Haeduaner": "Haeduer",
+        "Stammesführer": "Stammesführer",  # Gallier-Häuptling (different from Teuton Häuptling!)
         "Gallier-Rammbock": "Gallier-Rammbock", "Rammholz": "Gallier-Rammbock",
         "Gallier-Kata": "Gallier-Kata", "Kriegskatapult": "Gallier-Kata",
         # EN
         "Swordsman": "Schwertkämpfer", "Theutates Thunder": "Theutates-Blitz",
         "Druidrider": "Druidentreiter", "Haeduan": "Haeduer",
+        "Chieftain": "Stammesführer",      # Gaul chief EN (distinct from Teuton "Chief")
         "Gaul Ram": "Gallier-Rammbock", "Trebuchet": "Gallier-Kata",
         # FR
         "Phalangiste": "Phalanx", "Épéiste": "Schwertkämpfer",
@@ -4633,7 +4635,7 @@ _CROP_MAP = {
     "Kriegsmaschine": 6, "Katapult": 6,
     "Phalanx": 1, "Schwertkämpfer": 1, "Pathfinder": 2,
     "Theutates-Blitz": 2, "Druidentreiter": 2, "Haeduer": 3,
-    "Stammesältester": 5, "Gallier-Rammbock": 5, "Gallier-Kata": 6,
+    "Gallier-Rammbock": 5, "Gallier-Kata": 6,
     "Siedler": 1, "Held": 0,
 }
 
