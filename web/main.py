@@ -7579,6 +7579,7 @@ async def farming_page(
     in_farmlist: str = "",
     advanced: bool = False,
     farmlist_id: Optional[int] = None,
+    _offset: int = 0,
 ):
     session, err = _require_session(request)
     if err: return err
@@ -7719,6 +7720,41 @@ async def farming_page(
         else:
             inactive_farms = inactive_farms_raw
 
+    # ── Pagination: limit to 500 per page ────────────────────────────────────
+    _PAGE_SIZE = 500
+    inactive_farms_real_total = len(inactive_farms)
+    inactive_farms = inactive_farms[_offset:_offset + _PAGE_SIZE]
+
+    # ── AJAX mode: return JSON only (for load-more button) ───────────────────
+    if request.query_params.get("_ajax") == "1":
+        import json as _json
+        ajax_farms = []
+        for f in inactive_farms:
+            coords = (f["x"], f["y"])
+            ajax_farms.append({
+                "x": f["x"], "y": f["y"],
+                "village_name": f.get("village_name") or "",
+                "player_name": f.get("player_name") or "",
+                "alliance_name": f.get("alliance_name") or "",
+                "tribe": f.get("tribe") or 0,
+                "population": f.get("population") or 0,
+                "days_tracked": f.get("days_tracked") or 0,
+                "is_capital": 1 if f.get("is_capital") else 0,
+                "village_type": int(f.get("village_type") or 0),
+                "is_cross": coords in cross_ref_coords,
+                "is_on_list": coords in farm_list_coords,
+                "farmlist_groups": f.get("farmlist_groups") or [],
+                "acc_delta": None,
+                "d1": None, "d2": None, "d3": None, "d5": None,
+                "d7": None, "d14": None,
+            })
+        return JSONResponse({
+            "farms": ajax_farms,
+            "total": inactive_farms_real_total,
+            "offset": _offset,
+            "has_more": (_offset + _PAGE_SIZE) < inactive_farms_real_total,
+        })
+
     # ── Parallel batch 2: per-village stats (depend on inactive_farms result) ─
     _INITIAL_RENDER = 100  # rows rendered as Jinja HTML
     _farm_slice = inactive_farms[:200]  # fetch deltas for first 200
@@ -7777,7 +7813,10 @@ async def farming_page(
         "saved": saved,
         "farm_stats": farm_stats,
         "inactive_farms": inactive_farms_visible,
-        "inactive_farms_total": len(inactive_farms),
+        "inactive_farms_total": inactive_farms_real_total,
+        "inactive_farms_page_total": len(inactive_farms_visible) + len(inactive_farms_rest),
+        "inactive_farms_offset": _offset,
+        "inactive_farms_has_more": (_offset + _PAGE_SIZE) < inactive_farms_real_total,
         "inactive_farms_rest_json": inactive_farms_rest_json,
         "pop_deltas": pop_deltas,
         "player_growth": player_growth,

@@ -455,10 +455,10 @@
       </div>
     </div><!-- /filter-left -->
     {% if inactive_farms %}
-    <div><!-- chart-right -->
-      <div class="card" style="padding:.75rem 1rem;">
-        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;margin-bottom:.4rem;">📊 Population distribution</div>
-        <canvas id="chartPop" height="70"></canvas>
+    <div id="chartRight" style="display:{% if _filter_active %}flex{% else %}none{% endif %};flex-direction:column;"><!-- chart-right -->
+      <div class="card" style="padding:.85rem 1rem;flex:1;">
+        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;margin-bottom:.5rem;">📊 Population distribution</div>
+        <canvas id="chartPop" height="110"></canvas>
       </div>
     </div><!-- /chart-right -->
     {% endif %}
@@ -490,7 +490,7 @@
           {% if inactive_farms %}
           {# count missing via JS — badge updated dynamically #}
           <span style="font-size:0.8rem;font-weight:400;color:var(--text-muted);margin-left:0.4rem;">
-            {{ inactive_farms_total }} results · min. {{ min_days }} days · Pop. {{ min_pop }}–{{ max_pop }}
+            {{ inactive_farms_total }} results{% if inactive_farms_has_more %} <span style="color:#f59e0b;">(showing first {{ inactive_farms_page_total }})</span>{% endif %} · min. {{ min_days }} days · Pop. {{ min_pop }}–{{ max_pop }}
           </span>
           {% if farm_list %}
           <span id="missingBadge" style="font-size:0.75rem;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.35);border-radius:5px;padding:1px 7px;margin-left:0.4rem;"></span>
@@ -835,13 +835,17 @@
         <button id="loadMoreBtn" onclick="loadMoreFarms()"
                 style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;
                        padding:0.5rem 1.5rem;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">
-          ⬇ Weitere <span id="loadMoreCount">{{ inactive_farms_total - 100 }}</span> laden
+          ⬇ Weitere <span id="loadMoreCount">{{ inactive_farms_total - 100 }}</span> von {{ inactive_farms_total }} laden
         </button>
       </div>
       <script>
       var _farmRest = {{ inactive_farms_rest_json | safe }};
       var _farmRestIdx = 0;
       var _farmBatchSize = 100;
+      var _farmHasMore = {{ 'true' if inactive_farms_has_more else 'false' }};
+      var _farmServerOffset = {{ inactive_farms_offset + 500 }};
+      var _farmServerTotal = {{ inactive_farms_total }};
+      var _farmLoadingAjax = false;
       var _twWorld = {{ ('"' + guild.tw_world.rstrip('/') + '"') if guild.tw_world else 'null' }};
       var _hasFarmlist = {{ 'true' if has_farmlist else 'false' }};
       var _scoutVillageId = {{ ('"' + scout_village.travian_village_id|string + '"') if scout_village and scout_village.travian_village_id else 'null' }};
@@ -942,21 +946,84 @@
           '</tr>';
       }
 
-      function loadMoreFarms() {
+      function _appendFarmBatch(farms, startRow) {
         var tbody = document.getElementById('inactiveBody');
-        var btn = document.getElementById('loadMoreBtn');
-        var startRow = 101 + _farmRestIdx;
-        var batch = _farmRest.slice(_farmRestIdx, _farmRestIdx + _farmBatchSize);
         var html = '';
-        batch.forEach(function(f, i){ html += _buildFarmRow(f, startRow+i); });
-        tbody.insertAdjacentHTML('beforeend', html);
-        _farmRestIdx += batch.length;
-        var remaining = _farmRest.length - _farmRestIdx;
-        if (remaining <= 0) {
-          document.getElementById('loadMoreWrap').style.display = 'none';
+        farms.forEach(function(f, i){ html += _buildFarmRow(f, startRow+i); });
+        try { tbody.insertAdjacentHTML('beforeend', html); } catch(e) { console.error('insertAdjacentHTML failed:', e); }
+      }
+
+      function _updateLoadMoreBtn(remaining) {
+        var wrap = document.getElementById('loadMoreWrap');
+        var lbl = document.getElementById('loadMoreCount');
+        if (remaining <= 0 && !_farmHasMore) {
+          if (wrap) wrap.style.display = 'none';
         } else {
-          document.getElementById('loadMoreCount').textContent = remaining;
+          var total = remaining + (_farmHasMore ? (_farmServerTotal - _farmServerOffset) : 0);
+          if (lbl) lbl.textContent = Math.max(remaining, total);
         }
+      }
+
+      function loadMoreFarms() {
+        if (_farmLoadingAjax) return;
+        var currentRows = document.querySelectorAll('#inactiveBody tr').length;
+
+        // 1. Consume local JSON batch first
+        if (_farmRestIdx < _farmRest.length) {
+          var batch = _farmRest.slice(_farmRestIdx, _farmRestIdx + _farmBatchSize);
+          _appendFarmBatch(batch, currentRows + 1);
+          _farmRestIdx += batch.length;
+          var remaining = _farmRest.length - _farmRestIdx;
+          if (remaining <= 0 && !_farmHasMore) {
+            document.getElementById('loadMoreWrap').style.display = 'none';
+          } else {
+            var totalLeft = remaining + (_farmHasMore ? (_farmServerTotal - _farmServerOffset) : 0);
+            document.getElementById('loadMoreCount').textContent = totalLeft;
+          }
+          return;
+        }
+
+        // 2. Local JSON exhausted — fetch next 500 from server via AJAX
+        if (!_farmHasMore) {
+          document.getElementById('loadMoreWrap').style.display = 'none';
+          return;
+        }
+        _farmLoadingAjax = true;
+        var btn = document.getElementById('loadMoreBtn');
+        var origText = btn ? btn.innerHTML : '';
+        if (btn) btn.innerHTML = '⏳ Laden…';
+
+        // Build AJAX URL from current page URL
+        var url = new URL(window.location.href);
+        url.searchParams.set('_ajax', '1');
+        url.searchParams.set('_offset', _farmServerOffset);
+        url.searchParams.delete('_offset');  // clean if already set
+        url.searchParams.set('_offset', _farmServerOffset);
+
+        fetch(url.toString())
+          .then(function(r){ return r.json(); })
+          .then(function(data) {
+            var startRow = document.querySelectorAll('#inactiveBody tr').length + 1;
+            _appendFarmBatch(data.farms || [], startRow);
+            _farmRest = data.farms || [];
+            _farmRestIdx = 0;
+            _farmServerOffset += 500;
+            _farmHasMore = data.has_more || false;
+            _farmLoadingAjax = false;
+            if (btn) btn.innerHTML = origText;
+            var remaining = _farmRest.length - _farmRestIdx;
+            if (remaining <= 0 && !_farmHasMore) {
+              document.getElementById('loadMoreWrap').style.display = 'none';
+            } else {
+              var totalLeft = remaining + (_farmHasMore ? (_farmServerTotal - _farmServerOffset) : 0);
+              document.getElementById('loadMoreCount').textContent = totalLeft;
+            }
+          })
+          .catch(function(e) {
+            console.error('AJAX farm load failed:', e);
+            _farmLoadingAjax = false;
+            if (btn) btn.innerHTML = origText;
+          });
       }
       </script>
       {% endif %}
@@ -1461,9 +1528,11 @@ function switchTab(id) {
 // Filter panel toggle
 function toggleFilter() {
   const panel = document.getElementById('filterPanel');
+  const chart = document.getElementById('chartRight');
   const arrow = document.getElementById('filterArrow');
   const open = panel.style.display !== 'none';
   panel.style.display = open ? 'none' : '';
+  if (chart) chart.style.display = open ? 'none' : 'flex';
   arrow.textContent = open ? '▾' : '▴';
 }
 
