@@ -57,7 +57,7 @@
   {% endif %}
 
   {# ── 2-column layout: results left, config right ── #}
-  <div style="display:grid;grid-template-columns:1fr 360px;gap:1.5rem;align-items:start;">
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,680px);gap:1.5rem;align-items:start;">
 
   {# ════ LEFT: Stats + Alerts ════ #}
   <div>
@@ -161,7 +161,7 @@
   <div class="card" style="padding:1.5rem;">
       <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/save">
 
-        {# Enable toggle #}
+        {# Enable toggle — full width #}
         <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;">
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:1rem;font-weight:600;">
             <input type="hidden" name="enabled" value="0">
@@ -177,7 +177,11 @@
           {% endif %}
         </div>
 
-        {# ── Watch area ── #}
+        {# ── Inner 2-col: Watch Area left | Detection + Alliances right ── #}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start;">
+
+        {# LEFT: Watch area #}
+        <div>
         <div style="margin-bottom:1.5rem;">
           <div style="font-size:.85rem;font-weight:600;color:var(--text-muted);margin-bottom:.75rem;">📐 Watch Area</div>
 
@@ -330,6 +334,11 @@
           </div>
         </div>
 
+        </div>{# end Watch Area div #}
+        </div>{# end inner left col #}
+
+        {# RIGHT: Detection + Thresholds + Alliances #}
+        <div>
         {# Alert types #}
         <div style="margin-bottom:1.25rem;">
           <div style="font-size:.85rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem;">🔔 Detection Types</div>
@@ -415,7 +424,10 @@
           {% endif %}
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width:100%;">💾 Save settings</button>
+        </div>{# end inner right col #}
+        </div>{# end inner 2-col grid #}
+
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:.75rem;">💾 Save settings</button>
       </form>
 
       <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/scan" style="margin-top:.6rem;">
