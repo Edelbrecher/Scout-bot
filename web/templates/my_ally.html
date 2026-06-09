@@ -1107,7 +1107,7 @@
             <div>
               <label class="d-label">Datum &amp; Uhrzeit des Server-Endes</label>
               <input type="datetime-local" name="server_end_date"
-                     value="{{ guild.server_end_date | replace(' ','T') if guild.server_end_date else '' }}"
+                     value="{{ server_end_date_local or '' }}"
                      style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
             </div>
             <div>

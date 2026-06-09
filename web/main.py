@@ -5956,8 +5956,21 @@ async def my_ally_page(request: Request, guild_id: str):
     if missing_names and is_editor:
         map_only_members = await database.get_players_from_snapshot(guild_id, missing_names)
 
+    # Convert stored UTC server_end_date to the configured "Serverzeit" for display in the form
+    server_end_date_local = None
+    if guild and guild.get("server_end_date"):
+        try:
+            from datetime import datetime as _dt, timedelta as _td
+            _utc_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " "))
+            _offset = guild.get("server_utc_offset")
+            _offset = 60 if _offset is None else _offset
+            server_end_date_local = (_utc_dt + _td(minutes=_offset)).strftime("%Y-%m-%dT%H:%M")
+        except ValueError:
+            server_end_date_local = guild["server_end_date"]
+
     return templates.TemplateResponse("my_ally.html", {
         "request": request, "guild": guild,
+        "server_end_date_local": server_end_date_local,
         "ally_group": ally_group, "members": members, "roles": roles,
         "membership": membership, "guild_group": guild_group,
         "member_view_members": member_view_members,
@@ -6217,12 +6230,16 @@ async def my_ally_save_server_end(
     if not ally_group:
         return RedirectResponse(f"/guild/{guild_id}/my-ally", status_code=303)
 
-    # Validate datetime
+    # Validate datetime — the form value is entered in the configured "Serverzeit" (UTC offset),
+    # so convert it to UTC before storing/calculating the countdown.
+    offset = max(-720, min(840, server_utc_offset))
     end_val = server_end_date.strip() or None
     if end_val:
         try:
-            from datetime import datetime as _dt
-            _dt.fromisoformat(end_val.replace("T", " "))
+            from datetime import datetime as _dt, timedelta as _td
+            local_dt = _dt.fromisoformat(end_val.replace("T", " "))
+            utc_dt = local_dt - _td(minutes=offset)
+            end_val = utc_dt.strftime("%Y-%m-%dT%H:%M")
         except ValueError:
             end_val = None
 
@@ -6238,7 +6255,6 @@ async def my_ally_save_server_end(
             channel_id, channel_name = result
 
     # Save timezone offset
-    offset = max(-720, min(840, server_utc_offset))
     await database.update_guild_config_fields(guild_id, server_utc_offset=offset)
 
     # Save date + channel + music url + winner user
@@ -6317,13 +6333,19 @@ async def api_server_end(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("server_end_date"):
         return JSONResponse({"configured": False})
-    from datetime import datetime as _dt, timezone as _tz
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     try:
         end_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " ")).replace(tzinfo=_tz.utc)
     except ValueError:
         return JSONResponse({"configured": False})
     now   = _dt.now(_tz.utc)
     total = int((end_dt - now).total_seconds())
+    offset = guild.get("server_utc_offset")
+    offset = 60 if offset is None else offset
+    local_tz = _tz(offset=_td(minutes=offset))
+    sign     = "+" if offset >= 0 else "-"
+    tz_hours = abs(offset) // 60
+    tz_label = f"UTC{sign}{tz_hours}" if tz_hours else "UTC"
     return JSONResponse({
         "configured": True,
         "end_iso": end_dt.isoformat(),
@@ -6333,7 +6355,7 @@ async def api_server_end(request: Request, guild_id: str):
         "hours":   max(0, (total % 86400) // 3600),
         "minutes": max(0, (total % 3600) // 60),
         "seconds": max(0, total % 60),
-        "end_display": end_dt.strftime("%d.%m.%Y %H:%M UTC"),
+        "end_display": end_dt.astimezone(local_tz).strftime(f"%d.%m.%Y %H:%M {tz_label}"),
     })
 
 
