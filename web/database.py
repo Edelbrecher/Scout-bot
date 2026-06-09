@@ -238,6 +238,7 @@ async def init_db():
             "wewin_channel_id TEXT",
             "wewin_channel_name TEXT",
             "wewin_message_id TEXT",
+            "wewin_music_url TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
@@ -564,7 +565,7 @@ async def update_guild_config_fields(guild_id: str, **fields):
 
 async def update_guild_server_end(guild_id: str, **fields):
     """Save server_end_date / wewin_channel_id / wewin_channel_name / wewin_message_id."""
-    allowed = {"server_end_date", "wewin_channel_id", "wewin_channel_name", "wewin_message_id"}
+    allowed = {"server_end_date", "wewin_channel_id", "wewin_channel_name", "wewin_message_id", "wewin_music_url"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return

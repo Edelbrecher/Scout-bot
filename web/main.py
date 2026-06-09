@@ -6173,6 +6173,7 @@ async def _create_wewin_channel(discord_guild_id: str) -> tuple[str, str] | None
 async def my_ally_save_server_end(
     request: Request, guild_id: str,
     server_end_date: str = Form(""),
+    wewin_music_url: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -6203,12 +6204,14 @@ async def my_ally_save_server_end(
         if result:
             channel_id, channel_name = result
 
-    # Save date + channel
+    # Save date + channel + music url
+    music_url = wewin_music_url.strip() or None
     await database.update_guild_server_end(
         guild_id,
         server_end_date=end_val,
         wewin_channel_id=channel_id,
         wewin_channel_name=channel_name,
+        wewin_music_url=music_url,
     )
 
     # Post/update Discord embed immediately

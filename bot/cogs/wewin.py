@@ -91,7 +91,15 @@ class WinnerView(discord.ui.View):
         # Final epic closer + music
         all_messages.append("🎊🎊🎊 **CONGRATULATIONS TO EVERY WARRIOR IN THIS ALLIANCE!** 🎊🎊🎊")
         all_messages.append("@here 🏆 **WE ARE THE CHAMPIONS!** 🏆 @here")
-        all_messages.append("🎵 **This one's for you, champions:** https://www.youtube.com/watch?v=04854XqcfBY")
+
+        # Music link from guild config (optional)
+        try:
+            guild_cfg = await database.get_guild(str(interaction.guild_id))
+            music_url = guild_cfg.get("wewin_music_url") if guild_cfg else None
+        except Exception:
+            music_url = None
+        if music_url:
+            all_messages.append(f"🎵 **This one's for you, champions:**\n{music_url}")
 
         for msg_content in all_messages:
             try:

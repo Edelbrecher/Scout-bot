@@ -1121,6 +1121,14 @@
           </div>
           {% endif %}
 
+          <div>
+            <label class="d-label">🎵 Musik-Link (optional — wird am Ende gepostet)</label>
+            <input type="url" name="wewin_music_url" value="{{ guild.wewin_music_url or '' }}"
+                   placeholder="https://www.youtube.com/watch?v=..."
+                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+            <div style="font-size:.73rem;color:var(--text-muted);margin-top:.2rem;">YouTube, Spotify, SoundCloud — beliebiger Link. Discord embedded automatisch.</div>
+          </div>
+
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
             <button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern &amp; posten</button>
             {% if guild.server_end_date and guild.wewin_channel_id %}
