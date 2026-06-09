@@ -231,7 +231,8 @@
 
     <!-- Filter + Farmlist Import -->
     {% set _filter_active = advanced or player_filter or alliance_filter or exclude_players or exclude_alliances or ref_x or ref_y or min_dist or max_dist or tribes or in_farmlist %}
-    <div style="margin-bottom:1rem;">
+    <div style="margin-bottom:1rem;display:grid;grid-template-columns:1fr {% if inactive_farms %}minmax(0,300px){% endif %};gap:1rem;align-items:start;">
+    <div><!-- filter-left -->
       <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
         <button onclick="toggleFilter()" id="filterToggleBtn"
                 style="background:var(--bg-card);border:1px solid {% if _filter_active %}var(--accent){% else %}var(--border){% endif %};
@@ -452,7 +453,16 @@
           </form>
         </div>
       </div>
-    </div>
+    </div><!-- /filter-left -->
+    {% if inactive_farms %}
+    <div><!-- chart-right -->
+      <div class="card" style="padding:.75rem 1rem;">
+        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;margin-bottom:.4rem;">📊 Population distribution</div>
+        <canvas id="chartPop" height="70"></canvas>
+      </div>
+    </div><!-- /chart-right -->
+    {% endif %}
+    </div><!-- /filter+chart grid -->
 
     {% if scout_village and guild.tw_world %}
     <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:8px;
@@ -894,6 +904,9 @@
         var vname = (f.village_name||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         var pname = (f.player_name||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         var aname = (f.alliance_name||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        // onclick-safe versions: escape " to prevent breaking the attribute
+        var vnameJs = vname.replace(/"/g,'&quot;').replace(/'/g,"\\'");
+        var pnameJs = pname.replace(/"/g,'&quot;').replace(/'/g,"\\'");
 
         return '<tr data-population="'+f.population+'" data-days="'+f.days_tracked+'" data-score="'+score+'"'+
           ' data-d7="'+(f.d7!==null&&f.d7!==undefined?f.d7:9999)+'" data-d14="'+(f.d14!==null&&f.d14!==undefined?f.d14:9999)+'"'+
@@ -923,7 +936,7 @@
           '<td style="text-align:center;white-space:nowrap;">'+_troopsHtml(f.population)+'</td>'+
           (_hasFarmlist?'<td style="font-size:.72rem;">'+flGroupsHtml+'</td>':'')+
           '<td style="white-space:nowrap;"><div style="display:flex;gap:3px;align-items:center;">'+
-            '<button onclick="addToMyFarms('+f.x+','+f.y+',\''+vname.replace(/'/g,"\\'")+'\''+',\''+pname.replace(/'/g,"\\'")+'\','+f.population+')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:.75rem;padding:2px 6px;color:var(--text-muted);" title="Add to TravOps farmlist">＋</button>'+
+            '<button onclick="addToMyFarms('+f.x+','+f.y+',\''+vnameJs+'\''+',\''+pnameJs+'\','+f.population+')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:.75rem;padding:2px 6px;color:var(--text-muted);" title="Add to TravOps farmlist">＋</button>'+
             (_twWorld?'<a href="'+scoutHref+'" target="_blank" rel="noopener" title="'+'Send scout'+'" style="display:inline-flex;align-items:center;'+scoutStyle+'border-radius:5px;font-size:.75rem;padding:2px 6px;color:#818cf8;text-decoration:none;">🔭</a>':'')+
           '</div></td>'+
           '</tr>';
@@ -947,12 +960,6 @@
       }
       </script>
       {% endif %}
-
-      <!-- Population Histogram -->
-      <div style="padding:1rem 1rem 0.5rem;border-top:1px solid var(--border);">
-        <div style="font-size:0.8rem;color:var(--text-muted);font-weight:600;margin-bottom:0.5rem;">Population distribution</div>
-        <canvas id="chartPop" height="60"></canvas>
-      </div>
 
       {% else %}
       <div style="padding:2.5rem;text-align:center;color:var(--text-muted);">
