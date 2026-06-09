@@ -3206,45 +3206,60 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         for vt in village_timeline:
             vt["is_active"] = (vt["x"], vt["y"]) in current_coords
 
-        # Village population at key intervals (7 / 14 / 30 days ago)
+        # Village population at key intervals (1 / 2 / 3 / 5 / 7 / 14 / 30 days ago)
         import datetime as _dt_mod
         try:
             now_dt = _dt_mod.datetime.fromisoformat(latest)
         except Exception:
             now_dt = _dt_mod.datetime.utcnow()
 
+        _INTERVALS = [("d1", 1), ("d2", 2), ("d3", 3), ("d5", 5), ("d7", 7), ("d14", 14), ("d30", 30)]
+
         def _offset_ts(days):
             return (now_dt - _dt_mod.timedelta(days=days)).isoformat(sep=' ', timespec='seconds')
 
-        # Find closest snapshot timestamp for each interval (3 queries, not N*3)
-        interval_snaps = {}
-        for label, days in [("d7", 7), ("d14", 14), ("d30", 30)]:
-            target = _offset_ts(days)
-            async with db.execute(
-                """SELECT fetched_at FROM world_snapshots
-                   WHERE world_url = ? AND fetched_at <= ? AND lower(player_name) = ?
-                   ORDER BY fetched_at DESC LIMIT 1""",
-                (world_url, target, pname_lower)
-            ) as cur:
-                r = await cur.fetchone()
-            interval_snaps[label] = r[0] if r else None
+        # ── Single query: fetch all distinct snapshot timestamps in the last 30 days ──
+        cutoff_30 = _offset_ts(31)   # a little margin
+        async with db.execute(
+            """SELECT DISTINCT fetched_at FROM world_snapshots
+               WHERE world_url = ? AND lower(player_name) = ? AND fetched_at >= ?
+               ORDER BY fetched_at""",
+            (world_url, pname_lower, cutoff_30)
+        ) as cur:
+            recent_ts_list = [r[0] for r in await cur.fetchall()]
 
-        # Batch fetch all per-village population at each interval timestamp (1 query per interval)
+        # For each interval pick the closest timestamp at-or-before the target (pure Python)
+        interval_snaps = {}
+        for label, days in _INTERVALS:
+            target = _offset_ts(days)
+            # latest ts that is <= target
+            best = None
+            for ts in recent_ts_list:
+                if ts <= target:
+                    best = ts
+            interval_snaps[label] = best
+
+        # ── One batch query: all village populations for all needed timestamps ──
+        needed_ts = list({ts for ts in interval_snaps.values() if ts})
+        village_pop_at: dict = {}   # (x, y, ts) -> population
+        if needed_ts:
+            ph = ",".join("?" * len(needed_ts))
+            async with db.execute(
+                f"""SELECT x, y, fetched_at, population FROM world_snapshots
+                    WHERE world_url = ? AND lower(player_name) = ? AND fetched_at IN ({ph})""",
+                [world_url, pname_lower] + needed_ts
+            ) as cur:
+                for row in await cur.fetchall():
+                    village_pop_at[(row[0], row[1], row[2])] = row[3]
+
+        # Build per-village interval dict
         village_pop_intervals: dict = {(vt["x"], vt["y"]): {"first": vt["min_pop"]} for vt in village_timeline}
         for label, ts in interval_snaps.items():
-            if ts:
-                async with db.execute(
-                    """SELECT x, y, population FROM world_snapshots
-                       WHERE world_url = ? AND fetched_at = ? AND lower(player_name) = ?""",
-                    (world_url, ts, pname_lower)
-                ) as cur:
-                    for row in await cur.fetchall():
-                        key = (row[0], row[1])
-                        if key in village_pop_intervals:
-                            village_pop_intervals[key][label] = row[2]
-            # Fill None for villages not found at this interval
             for key in village_pop_intervals:
-                village_pop_intervals[key].setdefault(label, None)
+                if ts:
+                    village_pop_intervals[key][label] = village_pop_at.get((key[0], key[1], ts))
+                else:
+                    village_pop_intervals[key][label] = None
 
         for vt in village_timeline:
             vt["pop_intervals"] = village_pop_intervals.get((vt["x"], vt["y"]), {})

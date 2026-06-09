@@ -10108,7 +10108,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "group", "label": "Aufklärung"},
     {"type": "item",  "icon": "map",       "label": "Map",                "url_suffix": "/map"},
     {"type": "item",  "icon": "radar",     "label": "Sector Monitor",     "url_suffix": "/map/sector-monitor"},
-    {"type": "item",  "icon": "search",    "label": "Player Intel",       "url_suffix": "/intel"},
+    {"type": "item",  "icon": "search",    "label": "Player Intelligence","url_suffix": "/intel"},
     {"type": "item",  "icon": "eye",       "label": "Scout Tracking",     "url_suffix": "/scout"},
     {"type": "item",  "icon": "shield",    "label": "Hero Scout",         "url_suffix": "/defense/hero-scout"},
     {"type": "item",  "icon": "alert",     "label": "Scout Incidents",    "url_suffix": "/scout-incidents"},

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Player Intel{% if intel %} · {{ intel.player_name }}{% endif %} · TravOps{% endblock %}
+{% block title %}Player Intelligence{% if intel %} · {{ intel.player_name }}{% endif %} · TravOps{% endblock %}
 
 {% block content %}
 <div class="container-wide" style="padding-bottom:3rem;">
@@ -141,30 +141,34 @@
 
       {# ── Village table ── #}
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:1.25rem;overflow:hidden;">
-        <div style="padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.88rem;">
-          🏘️ Villages &amp; Development
+        <div style="padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+          <span>🏘️ Villages &amp; Development</span>
+          <span style="font-size:.72rem;color:var(--text-muted);">Ø/Tag = Durchschnittliches Wachstum pro Tag über den Zeitraum</span>
         </div>
         <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
             <thead>
               <tr style="background:var(--bg-main);">
-                <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Village</th>
-                <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Coords</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Now</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth vs 7 days ago">+7d</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth vs 14 days ago">+14d</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth vs 30 days ago">+30d</th>
-                <th style="padding:.45rem .7rem;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);" title="Growth since first seen">Total</th>
-                <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Origin</th>
-                <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Since</th>
-                <th style="padding:.45rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Status</th>
+                <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);white-space:nowrap;">Village</th>
+                <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Coords</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Jetzt</th>
+                {# Growth columns — total delta then Ø/day for each interval #}
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);border-left:1px solid rgba(255,255,255,.07);" title="Gesamt seit erstem Snapshot">Δ Total</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 1 Tag">Ø 1d</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 2 Tage">Ø 2d</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 3 Tage">Ø 3d</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 5 Tage">Ø 5d</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 7 Tage">Ø 7d</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 14 Tage">Ø 14d</th>
+                <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 30 Tage">Ø 30d</th>
+                <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-left:1px solid rgba(255,255,255,.07);">Origin</th>
+                <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Status</th>
               </tr>
             </thead>
             <tbody>
               {% for vt in intel.village_timeline %}
               {% set pi = vt.get('pop_intervals', {}) %}
               {% set origin = vt.get('origin', {}) %}
-              {# current pop: from current_villages if active, else max_pop #}
               {% if vt.is_active %}
                 {% set cur_v = intel.current_villages | selectattr('x','equalto',vt.x) | selectattr('y','equalto',vt.y) | first %}
                 {% set cur_pop = cur_v.population if cur_v else vt.max_pop %}
@@ -172,8 +176,19 @@
                 {% set cur_pop = vt.max_pop %}
               {% endif %}
 
-              {# delta helpers — positive=green, negative=red #}
-              {% macro delta(old_pop) %}
+              {# avg_day macro: delta / days, colored, shows e.g. +42/d #}
+              {% macro avg_day(old_pop, days) %}
+                {% if old_pop is not none and cur_pop is not none %}
+                  {% set d = cur_pop - old_pop %}
+                  {% set avg = (d / days) | round(1) %}
+                  {% if avg > 0 %}<span style="color:#22c55e;" title="{{ '+' if d>0 else '' }}{{ '{:,}'.format(d) }} gesamt">+{{ avg }}</span>
+                  {% elif avg < 0 %}<span style="color:#ef4444;" title="{{ '{:,}'.format(d) }} gesamt">{{ avg }}</span>
+                  {% else %}<span style="color:var(--text-muted);">±0</span>{% endif %}
+                {% else %}<span style="color:rgba(255,255,255,.18);">—</span>{% endif %}
+              {% endmacro %}
+
+              {# total delta since first seen #}
+              {% macro delta_total(old_pop) %}
                 {% if old_pop is not none and cur_pop is not none %}
                   {% set d = cur_pop - old_pop %}
                   {% if d > 0 %}<span style="color:#22c55e;">+{{ '{:,}'.format(d) }}</span>
@@ -182,41 +197,46 @@
                 {% else %}—{% endif %}
               {% endmacro %}
 
-              <tr style="border-top:1px solid var(--border);{% if not vt.is_active %}opacity:.5;{% endif %}">
-                <td style="padding:.45rem .7rem;font-weight:500;white-space:nowrap;">
+              <tr style="border-top:1px solid var(--border);{% if not vt.is_active %}opacity:.45;{% endif %}">
+                <td style="padding:.4rem .6rem;font-weight:500;white-space:nowrap;">
                   {% if vt.is_active and cur_v and cur_v.get('is_capital') %}<span style="color:#f59e0b;">★</span> {% endif %}
                   {% if vt.is_active %}
                   <a href="/guild/{{ guild.guild_id }}/map?cx={{ vt.x }}&cy={{ vt.y }}&z=5" style="color:inherit;text-decoration:none;border-bottom:1px dotted rgba(165,180,252,.4);" title="Open on map">{{ vt.village_name or '?' }}</a>
                   {% else %}{{ vt.village_name or '?' }}{% endif %}
                   {% if vt.is_active and cur_v %}
                     {% set ft = vt_labels.get(cur_v.get('village_type',0)|int, '') %}
-                    {% if ft %}<span style="font-size:.68rem;color:var(--text-muted);margin-left:.3rem;">{{ ft }}</span>{% endif %}
+                    {% if ft %}<span style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;">{{ ft }}</span>{% endif %}
                   {% endif %}
                 </td>
-                <td style="padding:.45rem .7rem;font-family:monospace;color:var(--text-muted);font-size:.75rem;">{{ vt.x }}|{{ vt.y }}</td>
-                <td style="padding:.45rem .7rem;text-align:right;">{{ '{:,}'.format(cur_pop) if cur_pop else '—' }}</td>
-                <td style="padding:.45rem .7rem;text-align:right;">{{ delta(pi.get('d7')) }}</td>
-                <td style="padding:.45rem .7rem;text-align:right;">{{ delta(pi.get('d14')) }}</td>
-                <td style="padding:.45rem .7rem;text-align:right;">{{ delta(pi.get('d30')) }}</td>
-                <td style="padding:.45rem .7rem;text-align:right;">{{ delta(pi.get('first')) }}</td>
-                <td style="padding:.45rem .7rem;white-space:nowrap;">
+                <td style="padding:.4rem .6rem;font-family:monospace;color:var(--text-muted);font-size:.72rem;">{{ vt.x }}|{{ vt.y }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;font-weight:600;">{{ '{:,}'.format(cur_pop) if cur_pop else '—' }}</td>
+                {# Total delta #}
+                <td style="padding:.4rem .6rem;text-align:right;border-left:1px solid rgba(255,255,255,.07);">{{ delta_total(pi.get('first')) }}</td>
+                {# Ø/day for each interval #}
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d1'),  1)  }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d2'),  2)  }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d3'),  3)  }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d5'),  5)  }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d7'),  7)  }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d14'), 14) }}</td>
+                <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d30'), 30) }}</td>
+                <td style="padding:.4rem .6rem;white-space:nowrap;border-left:1px solid rgba(255,255,255,.07);">
                   {% if origin.type == 'conquered' %}
                   <span title="Conquered from {{ origin.from_player }}{% if origin.from_alliance %} [{{ origin.from_alliance }}]{% endif %}"
-                        style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 6px;font-size:.7rem;cursor:help;">
-                    ⚔️ {{ origin.from_player[:14] }}
+                        style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;cursor:help;">
+                    ⚔️ {{ origin.from_player[:12] }}
                   </span>
                   {% else %}
-                  <span style="background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:1px 6px;font-size:.7rem;">
+                  <span style="background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:1px 5px;font-size:.68rem;">
                     🏗️ Settled
                   </span>
                   {% endif %}
                 </td>
-                <td style="padding:.45rem .7rem;color:var(--text-muted);font-size:.75rem;white-space:nowrap;">{{ vt.first_seen[:10] if vt.first_seen else '—' }}</td>
-                <td style="padding:.45rem .7rem;">
+                <td style="padding:.4rem .6rem;">
                   {% if vt.is_active %}
-                  <span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 6px;font-size:.7rem;">Active</span>
+                  <span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 5px;font-size:.68rem;">Active</span>
                   {% else %}
-                  <span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 6px;font-size:.7rem;">Lost {{ vt.last_seen[:10] if vt.last_seen else '' }}</span>
+                  <span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;" title="{{ vt.first_seen[:10] if vt.first_seen else '' }} – {{ vt.last_seen[:10] if vt.last_seen else '' }}">Lost</span>
                   {% endif %}
                 </td>
               </tr>
