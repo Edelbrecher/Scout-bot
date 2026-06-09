@@ -13741,6 +13741,69 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
     })
 
 
+@app.get("/api/world-suggestions")
+async def world_suggestions(request: Request, q: str = ""):
+    """Return Travian world URL suggestions based on known configured worlds + pattern matching."""
+    session = _get_session(request)
+    if not session:
+        return JSONResponse([])
+    q = q.strip().lower()
+
+    # 1. Known worlds already configured in the platform (distinct, non-empty)
+    async with __import__("aiosqlite").connect(database.DB_PATH) as db:
+        async with db.execute(
+            "SELECT DISTINCT tw_world FROM guild_configs WHERE tw_world IS NOT NULL AND tw_world != '' ORDER BY tw_world"
+        ) as cur:
+            known = [r[0] for r in await cur.fetchall()]
+
+    # Filter known worlds by query
+    if q:
+        known_filtered = [w for w in known if q in w.lower()]
+    else:
+        known_filtered = known[:8]
+
+    # 2. Pattern-based suggestions from what the user typed
+    pattern_hits = []
+    if q and len(q) >= 2:
+        # Try to parse partial input like "ts3", "ts3.x1", "arabics", "com.x3" etc.
+        # Common Travian URL patterns:
+        #   https://<server>.<speed>.<region>.travian.com
+        #   https://<server>.<speed>.travian.<tld>
+        #   https://ts<n>.x<n>.travian.com
+        import itertools
+        servers  = ["ts1","ts2","ts3","ts4","ts5","ts6","ts7","ts8","ts20","ts30","fire","fun","classic","t4","t3"]
+        speeds   = ["x1","x2","x3","x5","x10"]
+        regions  = ["arabics","anglo","france","germany","balkans","nordics","italy","spain","latam","poland","czech","turkey","netherlands","arabia","asia","russia","ukraine","global"]
+        tlds     = ["com","de","fr","it","es","pl","cz","nl","net","org","uk"]
+
+        # Build candidate URLs
+        candidates = set()
+        for s in servers:
+            for sp in speeds:
+                # International standard
+                candidates.add(f"https://{s}.{sp}.travian.com")
+                # Regional
+                for reg in regions:
+                    candidates.add(f"https://{s}.{sp}.{reg}.travian.com")
+                for tld in tlds:
+                    candidates.add(f"https://{s}.{sp}.travian.{tld}")
+
+        pattern_hits = sorted([c for c in candidates if q in c.lower()])[:12]
+
+    # Merge: known first (exact matches), then patterns, deduplicate
+    seen = set()
+    results = []
+    for w in known_filtered + pattern_hits:
+        w_clean = w.rstrip("/")
+        if w_clean not in seen:
+            seen.add(w_clean)
+            results.append(w_clean)
+        if len(results) >= 10:
+            break
+
+    return JSONResponse(results)
+
+
 @app.post("/guild/{guild_id}/admin/set-world")
 async def guild_set_world_inline(request: Request, guild_id: str):
     """Quick-setup endpoint: save tw_world URL without visiting the admin page."""

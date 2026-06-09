@@ -67,14 +67,21 @@
           Trage die URL deiner Travian-Welt ein — das ist alles was du brauchst.<br>
           <span style="font-size:.78rem;opacity:.7;">Beispiel: <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px;">https://ts3.x3.arabics.travian.com</code></span>
         </div>
-        <form id="worldSetupForm" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-          <input id="worldUrlInput" type="url" placeholder="https://ts3.x1.travian.com" required
-            style="flex:1;min-width:260px;padding:.5rem .8rem;background:var(--bg-main);border:1px solid rgba(251,191,36,.5);
-                   border-radius:7px;color:var(--text);font-size:.85rem;outline:none;"
-            onfocus="this.style.borderColor='#fbbf24'" onblur="this.style.borderColor='rgba(251,191,36,.5)'">
+        <form id="worldSetupForm" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-start;">
+          <div style="position:relative;flex:1;min-width:260px;">
+            <input id="worldUrlInput" type="text" placeholder="https://ts3.x1.travian.com" autocomplete="off" required
+              style="width:100%;box-sizing:border-box;padding:.5rem .8rem;background:var(--bg-main);border:1px solid rgba(251,191,36,.5);
+                     border-radius:7px;color:var(--text);font-size:.85rem;outline:none;"
+              onfocus="this.style.borderColor='#fbbf24'" onblur="setTimeout(function(){_wsDrop.style.display='none'},160)">
+            <div id="wsSuggestDrop"
+              style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;background:var(--bg-card);
+                     border:1px solid rgba(251,191,36,.35);border-radius:7px;z-index:200;max-height:200px;
+                     overflow-y:auto;box-shadow:0 6px 18px rgba(0,0,0,.45);">
+            </div>
+          </div>
           <button type="submit" id="worldSaveBtn"
             style="padding:.5rem 1.1rem;background:#fbbf24;color:#1a1a2e;border:none;border-radius:7px;
-                   font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s;">
+                   font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s;flex-shrink:0;">
             ✓ Speichern &amp; suchen
           </button>
         </form>
@@ -83,6 +90,41 @@
     </div>
   </div>
   <script>
+  /* ── World URL autocomplete ── */
+  var _wsInput = document.getElementById('worldUrlInput');
+  var _wsDrop  = document.getElementById('wsSuggestDrop');
+  var _wsTimer;
+
+  _wsInput.addEventListener('input', function() {
+    clearTimeout(_wsTimer);
+    var v = _wsInput.value.trim();
+    _wsTimer = setTimeout(async function() {
+      if (v.length < 2) { _wsDrop.style.display='none'; return; }
+      try {
+        var r = await fetch('/api/world-suggestions?q=' + encodeURIComponent(v));
+        var list = await r.json();
+        if (!list.length) { _wsDrop.style.display='none'; return; }
+        _wsDrop.innerHTML = list.map(function(w) {
+          var hl = w.replace(new RegExp('(' + v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi'),
+                             '<strong style="color:#fbbf24;">$1</strong>');
+          return '<div data-val="' + w.replace(/"/g,'&quot;') + '" '
+            + 'style="padding:.45rem .8rem;cursor:pointer;font-size:.82rem;border-bottom:1px solid rgba(255,255,255,.05);"'
+            + ' onmouseover="this.style.background=\'rgba(251,191,36,.1)\'"'
+            + ' onmouseout="this.style.background=\'\'">'
+            + hl + '</div>';
+        }).join('');
+        _wsDrop.style.display = 'block';
+        _wsDrop.querySelectorAll('[data-val]').forEach(function(el) {
+          el.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            _wsInput.value = el.dataset.val;
+            _wsDrop.style.display = 'none';
+          });
+        });
+      } catch(e) { _wsDrop.style.display='none'; }
+    }, 220);
+  });
+
   document.getElementById('worldSetupForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     var url = document.getElementById('worldUrlInput').value.trim().replace(/\/$/, '');
