@@ -302,15 +302,13 @@
     {# ── RIGHT COLUMN ── #}
     <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
-      {# ── Analytics widget with 3-way selector ── #}
+      {# ── Analytics widget with 2-way selector ── #}
       <div class="card" id="analyticsWidget">
         <div class="card-header" style="flex-wrap:wrap;gap:.5rem;">
           <span id="widgetTitle">📈 Population Growth</span>
           <div style="display:flex;gap:.3rem;margin-left:auto;">
             <button onclick="switchWidget('growth')" id="wbtn-growth"
               class="wbtn wbtn-active" title="Population Growth">📈 Growth</button>
-            <button onclick="switchWidget('raiders')" id="wbtn-raiders"
-              class="wbtn" title="Raider of the Week">🏆 Raiders</button>
             <button onclick="switchWidget('alliances')" id="wbtn-alliances"
               class="wbtn" title="Alliance Top 10">🛡️ Alliances</button>
           </div>
@@ -332,45 +330,6 @@
           {% endif %}
         </div>
 
-        {# View: Raiders of the Week #}
-        <div id="widget-raiders" style="display:none;">
-          {% if top_raiders %}
-          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-            <thead><tr style="background:var(--bg-main);">
-              <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">#</th>
-              <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">Spieler</th>
-              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Raid-Punkte</th>
-              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">+Gewinn</th>
-            </tr></thead>
-            <tbody>
-            {% for r in top_raiders %}
-            <tr style="border-top:1px solid var(--border);">
-              <td style="padding:.35rem .6rem;color:var(--text-muted);font-size:.75rem;">
-                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
-              </td>
-              <td style="padding:.35rem .6rem;font-weight:500;">
-                <a href="/guild/{{ guild.guild_id }}/intel?q={{ r.player_name | urlencode }}"
-                   style="color:inherit;text-decoration:none;border-bottom:1px dotted rgba(165,180,252,.3);">
-                  {{ r.player_name }}
-                </a>
-              </td>
-              <td style="padding:.35rem .6rem;text-align:right;font-family:monospace;font-size:.8rem;">{{ '{:,}'.format(r.raid_points or 0) }}</td>
-              <td style="padding:.35rem .6rem;text-align:right;font-size:.8rem;">
-                {% if r.raid_gain and r.raid_gain > 0 %}
-                  <span style="color:#22c55e;">+{{ '{:,}'.format(r.raid_gain) }}</span>
-                {% elif r.raid_gain and r.raid_gain < 0 %}
-                  <span style="color:#ef4444;">{{ '{:,}'.format(r.raid_gain) }}</span>
-                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          <div class="empty-state">No raid data yet — import Travian Stats to track raiders.</div>
-          {% endif %}
-        </div>
-
         {# View: Alliance Top 10 #}
         <div id="widget-alliances" style="display:none;">
           {% if top_alliances %}
@@ -380,6 +339,7 @@
               <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">Allianz</th>
               <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Mitglieder</th>
               <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Ges. Pop</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Wachstum</th>
               <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Dörfer</th>
             </tr></thead>
             <tbody>
@@ -389,29 +349,43 @@
               <td style="padding:.35rem .6rem;font-weight:500;">{{ a.alliance_name }}</td>
               <td style="padding:.35rem .6rem;text-align:right;">{{ a.member_count }}</td>
               <td style="padding:.35rem .6rem;text-align:right;font-family:monospace;font-size:.8rem;">{{ '{:,}'.format(a.total_pop or 0) }}</td>
+              <td style="padding:.35rem .6rem;text-align:right;font-size:.8rem;">
+                {% if a.pop_growth is not none %}
+                  {% if a.pop_growth > 0 %}
+                    <span style="color:#22c55e;">+{{ '{:,}'.format(a.pop_growth) }}</span>
+                  {% elif a.pop_growth < 0 %}
+                    <span style="color:#ef4444;">{{ '{:,}'.format(a.pop_growth) }}</span>
+                  {% else %}
+                    <span style="color:var(--text-muted);">±0</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
               <td style="padding:.35rem .6rem;text-align:right;color:var(--text-muted);">{{ a.village_count }}</td>
             </tr>
             {% endfor %}
             </tbody>
           </table>
           {% else %}
-          <div class="empty-state">No map snapshot data yet.</div>
+          <div class="empty-state">Noch keine Kartendaten — lade einen Welt-Snapshot um Allianzen anzuzeigen.</div>
           {% endif %}
         </div>
       </div>
 
       <script>
       var _activeWidget = localStorage.getItem('dash_widget') || 'growth';
+      // migrate old 'raiders' preference to 'alliances'
+      if (_activeWidget === 'raiders') { _activeWidget = 'alliances'; localStorage.setItem('dash_widget','alliances'); }
       var _widgetLinks = {
         growth:    '/guild/{{ guild.guild_id }}/travian-stats',
-        raiders:   '/guild/{{ guild.guild_id }}/travian-stats',
         alliances: '/guild/{{ guild.guild_id }}/map',
       };
       var _widgetTitles = {
-        growth: '📈 Population Growth', raiders: '🏆 Raider der Woche', alliances: '🛡️ Alliance Top 10'
+        growth: '📈 Population Growth', alliances: '🛡️ Alliance Top 10'
       };
       function switchWidget(name) {
-        ['growth','raiders','alliances'].forEach(function(w) {
+        ['growth','alliances'].forEach(function(w) {
           var el = document.getElementById('widget-' + w);
           var btn = document.getElementById('wbtn-' + w);
           if (el) el.style.display = w === name ? '' : 'none';

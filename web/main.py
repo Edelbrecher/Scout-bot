@@ -1921,14 +1921,13 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
         preview_info = pplan
 
     uid = session.get("uid", "")
-    unread_notif, my_waves, farm_stats, recent_battles, recent_attacks, player_growth, top_raiders, top_alliances = await asyncio.gather(
+    unread_notif, my_waves, farm_stats, recent_battles, recent_attacks, player_growth, top_alliances = await asyncio.gather(
         database.count_unread_notifications(guild_id, uid),
         database.get_my_op_waves(guild_id, uid),
         database.get_farm_stats(guild_id),
         database.get_battle_reports(guild_id, limit=6),
         database.get_attack_reports(guild_id, limit=6),
         database.get_player_growth(guild_id, limit=8),
-        database.get_top_raiders(guild_id, limit=10),
         database.get_top_alliances(guild_id, limit=10),
     )
     pending_waves = sum(1 for w in my_waves if not w.get("confirm_status") and w.get("send_time"))
@@ -1948,7 +1947,6 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "recent_battles": recent_battles,
          "recent_attacks": recent_attacks,
          "player_growth": player_growth,
-         "top_raiders": top_raiders,
          "top_alliances": top_alliances,
          },
     )
