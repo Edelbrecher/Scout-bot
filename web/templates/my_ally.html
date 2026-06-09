@@ -19,6 +19,7 @@
   {% elif flash == "approved" %}<div class="alert alert-success">✅ Mitglied freigeschaltet.</div>
   {% elif flash == "deleted" %}<div class="alert alert-success">🗑️ Alliance deleted.</div>
   {% elif flash == "token_renewed" %}<div class="alert alert-success">🔄 Neuer Link generiert.</div>
+  {% elif flash == "server_end_saved" %}<div class="alert alert-success">⏳ Server-Countdown gespeichert.</div>
   {% elif flash == "role_created" %}<div class="alert alert-success">✅ Role created.</div>
   {% elif flash == "role_deleted" %}<div class="alert alert-success">🗑️ Role deleted.</div>
   {% elif flash == "role_updated" %}<div class="alert alert-success">✅ Role updated.</div>
@@ -1097,6 +1098,45 @@
           <div><button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern</button></div>
         </form>
       </div>
+
+      {# ── Server-End Countdown ── #}
+      <div class="card">
+        <h3 style="margin:0 0 .9rem;font-size:.95rem;">⏳ Server-Ende Countdown</h3>
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/server-end" style="display:flex;flex-direction:column;gap:.65rem;">
+          <div>
+            <label class="d-label">Datum &amp; Uhrzeit (Serverzeit / UTC)</label>
+            <input type="datetime-local" name="server_end_date"
+                   value="{{ guild.server_end_date | replace(' ','T') if guild.server_end_date else '' }}"
+                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+          </div>
+          <div>
+            <label class="d-label">Discord „WE WIN" Channel-ID</label>
+            <input type="text" name="wewin_channel_id" value="{{ guild.wewin_channel_id or '' }}"
+                   placeholder="z.B. 1234567890123456789"
+                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;font-family:monospace;">
+            <div style="font-size:.73rem;color:var(--text-muted);margin-top:.25rem;">Rechtsklick auf Channel → ID kopieren (Entwicklermodus)</div>
+          </div>
+          <div>
+            <label class="d-label">Channel-Name (optional, nur zur Anzeige)</label>
+            <input type="text" name="wewin_channel_name" value="{{ guild.wewin_channel_name or '' }}"
+                   placeholder="z.B. we-win"
+                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+            <button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern</button>
+            {% if guild.server_end_date and guild.wewin_channel_id %}
+            <button type="button" onclick="postCountdown()" class="btn" style="font-size:.85rem;background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.4);color:#a5b4fc;">
+              📣 Jetzt in Discord posten
+            </button>
+            {% endif %}
+          </div>
+          {% if guild.server_end_date %}
+          <div id="cd-preview" style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.65rem 1rem;font-size:.85rem;">
+            ⏳ Lädt…
+          </div>
+          {% endif %}
+        </form>
+      </div>
     </div>
   </div>
 
@@ -1903,5 +1943,57 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
     hideTimer = setTimeout(() => { tip.style.opacity = '0'; }, 80);
   });
 })();
+</script>
+
+<script>
+// ── Server-End Countdown preview + Discord post ──────────────────────────
+(function() {
+  var preview = document.getElementById('cd-preview');
+  if (!preview) return;
+
+  function _pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function updatePreview() {
+    fetch('/api/guild/{{ guild.guild_id }}/server-end')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.configured) { preview.textContent = '—'; return; }
+        if (d.ended) {
+          preview.innerHTML = '🏆 <strong>Server ist beendet!</strong>';
+          return;
+        }
+        preview.innerHTML =
+          '⏳ Noch <strong>' + d.days + 'd ' + _pad(d.hours) + 'h ' + _pad(d.minutes) + 'm</strong>'
+          + ' <span style="color:var(--text-muted);font-size:.8rem;">— ' + d.end_display + '</span>';
+      })
+      .catch(function() { preview.textContent = 'Fehler beim Laden'; });
+  }
+  updatePreview();
+  setInterval(updatePreview, 60000);
+})();
+
+function postCountdown() {
+  var btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = '⏳ Wird gepostet…';
+  fetch('/guild/{{ guild.guild_id }}/my-ally/server-end/post-discord', {method:'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        btn.textContent = '✅ Gepostet!';
+        btn.style.borderColor = '#22c55e';
+        btn.style.color = '#22c55e';
+      } else {
+        btn.disabled = false;
+        btn.textContent = '📣 Jetzt in Discord posten';
+        alert('Fehler: ' + (d.error || 'Unbekannt'));
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = '📣 Jetzt in Discord posten';
+      alert('Netzwerkfehler');
+    });
+}
 </script>
 {% endblock %}

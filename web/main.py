@@ -6030,6 +6030,154 @@ async def meta_alliance_remove(request: Request, guild_id: str,
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#meta-alliances", status_code=303)
 
 
+@app.post("/guild/{guild_id}/my-ally/server-end")
+async def my_ally_save_server_end(
+    request: Request, guild_id: str,
+    server_end_date: str = Form(""),
+    wewin_channel_id: str = Form(""),
+    wewin_channel_name: str = Form(""),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally", status_code=303)
+    # Validate ISO datetime format
+    end_val = server_end_date.strip() or None
+    if end_val:
+        try:
+            from datetime import datetime as _dt
+            # Accept "YYYY-MM-DDTHH:MM" (HTML datetime-local format)
+            _dt.fromisoformat(end_val.replace("T", " "))
+        except ValueError:
+            end_val = None
+    async with __import__("aiosqlite").connect(__import__("database", fromlist=["DB_PATH"]).DB_PATH, timeout=30) as _db:
+        pass  # ensure migration ran
+    await database.update_guild_server_end(
+        guild_id,
+        server_end_date=end_val,
+        wewin_channel_id=wewin_channel_id.strip() or None,
+        wewin_channel_name=wewin_channel_name.strip() or None,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=server_end_saved#einstellungen", status_code=303)
+
+
+@app.post("/guild/{guild_id}/my-ally/server-end/post-discord")
+async def my_ally_post_server_end_discord(request: Request, guild_id: str):
+    """Post or update a countdown embed in the WE WIN channel."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return JSONResponse({"error": "no ally group"}, status_code=403)
+    guild = await database.get_guild(guild_id)
+    channel_id  = guild.get("wewin_channel_id")
+    end_date    = guild.get("server_end_date")
+    if not channel_id:
+        return JSONResponse({"error": "Kein Discord-Channel konfiguriert"}, status_code=400)
+    if not end_date:
+        return JSONResponse({"error": "Kein Enddatum konfiguriert"}, status_code=400)
+
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        end_dt = _dt.fromisoformat(end_date.replace("T", " ")).replace(tzinfo=_tz.utc)
+    except ValueError:
+        return JSONResponse({"error": "Ungültiges Datum"}, status_code=400)
+
+    now = _dt.now(_tz.utc)
+    delta = end_dt - now
+    total_seconds = int(delta.total_seconds())
+    days    = max(0, total_seconds // 86400)
+    hours   = max(0, (total_seconds % 86400) // 3600)
+    minutes = max(0, (total_seconds % 3600) // 60)
+
+    ally_name = ally_group.get("ally_name", "Unsere Allianz")
+    end_str   = end_dt.strftime("%d.%m.%Y %H:%M UTC")
+
+    if total_seconds <= 0:
+        title       = "🏆 Der Server ist beendet!"
+        description = f"**{ally_name}** hat den Server abgeschlossen!\n\n🎉 Glückwunsch an alle!\n\n📅 Serverzeit: {end_str}"
+        color       = 0xffd700
+    else:
+        title       = f"⏳ Server-Countdown · {ally_name}"
+        description = (
+            f"**{days}** Tage · **{hours}** Stunden · **{minutes}** Minuten\n\n"
+            f"📅 Server-Ende: **{end_str}**\n\n"
+            f"*Zähler wird regelmäßig aktualisiert.*"
+        )
+        color = 0x6366f1
+
+    embed = {
+        "title": title,
+        "description": description,
+        "color": color,
+        "footer": {"text": "TravOps · travops.online"},
+        "timestamp": now.isoformat(),
+    }
+
+    bot_token = os.environ.get("DISCORD_TOKEN", "")
+    headers   = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
+    existing_msg_id = guild.get("wewin_message_id")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        if existing_msg_id:
+            # Try to edit existing message
+            r = await client.patch(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages/{existing_msg_id}",
+                headers=headers, json={"embeds": [embed]}
+            )
+            if r.status_code == 404:
+                existing_msg_id = None  # message deleted — fall through to create
+
+        if not existing_msg_id:
+            r = await client.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers=headers, json={"embeds": [embed]}
+            )
+            if r.status_code in (200, 201):
+                msg_id = r.json().get("id")
+                await database.update_guild_server_end(guild_id, wewin_message_id=msg_id)
+            else:
+                return JSONResponse({"error": f"Discord Fehler {r.status_code}: {r.text[:200]}"}, status_code=502)
+
+    return JSONResponse({"ok": True, "days": days, "hours": hours, "minutes": minutes})
+
+
+@app.get("/api/guild/{guild_id}/server-end")
+async def api_server_end(request: Request, guild_id: str):
+    """Return countdown data for frontend widget."""
+    session = get_session(request) or {}
+    if not session.get("uid"):
+        return JSONResponse({})
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("server_end_date"):
+        return JSONResponse({"configured": False})
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        end_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " ")).replace(tzinfo=_tz.utc)
+    except ValueError:
+        return JSONResponse({"configured": False})
+    now   = _dt.now(_tz.utc)
+    total = int((end_dt - now).total_seconds())
+    return JSONResponse({
+        "configured": True,
+        "end_iso": end_dt.isoformat(),
+        "total_seconds": total,
+        "ended": total <= 0,
+        "days":    max(0, total // 86400),
+        "hours":   max(0, (total % 86400) // 3600),
+        "minutes": max(0, (total % 3600) // 60),
+        "seconds": max(0, total % 60),
+        "end_display": end_dt.strftime("%d.%m.%Y %H:%M UTC"),
+    })
+
+
 @app.post("/guild/{guild_id}/my-ally/regen-token")
 async def my_ally_regen_token(request: Request, guild_id: str, which: str = Form("main")):
     session, err = _require_session(request)

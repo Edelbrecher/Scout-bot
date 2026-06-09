@@ -165,6 +165,18 @@
      ANALYTICS DASHBOARD
      ══════════════════════════════════════════════════════════════ #}
 
+  {# ── Server-End Countdown Banner ── #}
+  {% if guild.server_end_date %}
+  <div id="server-countdown-banner" style="background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.08));border:1px solid rgba(99,102,241,.35);border-radius:12px;padding:.85rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <span style="font-size:1.4rem;">⏳</span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem;">Server-Ende</div>
+      <div id="cd-banner-text" style="font-size:1.05rem;font-weight:700;letter-spacing:.02em;">Lädt…</div>
+    </div>
+    <div id="cd-tiles" style="display:flex;gap:.5rem;"></div>
+  </div>
+  {% endif %}
+
   {# ── Quick Stats Row ── #}
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:1.5rem;">
 
@@ -573,6 +585,54 @@
       if (!p.server) { p.server = server; localStorage.setItem(key, JSON.stringify(p)); }
     });
   } catch(e) {}
+})();
+{% endif %}
+
+{% if guild.server_end_date %}
+// ── Server-End Countdown ─────────────────────────────────────────────────
+(function() {
+  var bannerText = document.getElementById('cd-banner-text');
+  var tilesEl    = document.getElementById('cd-tiles');
+  if (!bannerText) return;
+
+  function _pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function _tile(val, label) {
+    return '<div style="text-align:center;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:.3rem .6rem;min-width:44px;">'
+      + '<div style="font-size:1.1rem;font-weight:800;font-family:monospace;line-height:1;">' + _pad(val) + '</div>'
+      + '<div style="font-size:.6rem;color:var(--text-muted);margin-top:.1rem;">' + label + '</div>'
+      + '</div>';
+  }
+
+  var _endTs = null;
+
+  function tick() {
+    if (_endTs === null) return;
+    var now   = Date.now();
+    var total = Math.max(0, Math.floor((_endTs - now) / 1000));
+    if (total === 0) {
+      bannerText.innerHTML = '🏆 <span style="color:#ffd700;">Server ist beendet — GG!</span>';
+      if (tilesEl) tilesEl.innerHTML = '';
+      return;
+    }
+    var d = Math.floor(total / 86400);
+    var h = Math.floor((total % 86400) / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+    bannerText.textContent = d + 'd ' + _pad(h) + 'h ' + _pad(m) + 'm ' + _pad(s) + 's';
+    if (tilesEl) tilesEl.innerHTML = _tile(d,'Tage') + _tile(h,'Std') + _tile(m,'Min') + _tile(s,'Sek');
+  }
+
+  fetch('/api/guild/{{ guild.guild_id }}/server-end')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.configured) { bannerText.textContent = '—'; return; }
+      if (d.ended) { bannerText.innerHTML = '🏆 Server ist beendet!'; return; }
+      // compute absolute end timestamp from server response
+      _endTs = Date.now() + d.total_seconds * 1000;
+      tick();
+      setInterval(tick, 1000);
+    })
+    .catch(function() { bannerText.textContent = 'Fehler'; });
 })();
 {% endif %}
 </script>

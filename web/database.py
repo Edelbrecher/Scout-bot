@@ -232,6 +232,19 @@ async def init_db():
         except Exception:
             pass
 
+        # Server-end countdown
+        for col in [
+            "server_end_date TEXT",
+            "wewin_channel_id TEXT",
+            "wewin_channel_name TEXT",
+            "wewin_message_id TEXT",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+
         # Bot last seen / activity tracking & inactive flag
         for col in [
             "bot_last_seen TEXT",
@@ -537,6 +550,21 @@ async def update_guild_config_fields(guild_id: str, **fields):
         return
     allowed = {"server_utc_offset", "tw_alliance_name", "alliance_manager_role_ids",
                "bot_language", "poll_channel_id", "digest_channel_id"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    vals = list(updates.values()) + [guild_id]
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(f"UPDATE guild_configs SET {set_clause} WHERE guild_id = ?", vals)
+        await db.commit()
+    _CACHE.pop(f"guild:{guild_id}", None)
+    _CACHE.pop("all_guilds", None)
+
+
+async def update_guild_server_end(guild_id: str, **fields):
+    """Save server_end_date / wewin_channel_id / wewin_channel_name / wewin_message_id."""
+    allowed = {"server_end_date", "wewin_channel_id", "wewin_channel_name", "wewin_message_id"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return
