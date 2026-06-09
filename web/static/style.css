@@ -349,14 +349,15 @@ body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
   height: 13px;
   flex-shrink: 0;
   margin-left: auto;
-  color: #374151;
-  opacity: 0.45;
+  color: #a78bfa;
+  opacity: 0.55;
   stroke: currentColor;
 }
 .gs-lock-closed {
-  color: #f97316;
-  opacity: 0.85;
+  color: #a78bfa;
+  opacity: 0.9;
 }
+.gs-item:hover .gs-lock { opacity: 0.85; }
 .gs-item:hover .gs-lock-closed { opacity: 1; }
 
 /* ── Sidebar notification badge ── */

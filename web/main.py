@@ -9421,6 +9421,28 @@ async def api_server_stats(request: Request):
     return JSONResponse(stats)
 
 
+@app.get("/admin/api/guild-search")
+async def admin_guild_search(request: Request, q: str = ""):
+    session, err = _require_admin(request)
+    if err: return JSONResponse({"guilds": []}, status_code=403)
+    all_guilds = await database.get_all_guilds()
+    q_lower = q.strip().lower()
+    results = []
+    for g in all_guilds:
+        name = (g.get("guild_name") or "").lower()
+        gid = (g.get("guild_id") or "")
+        if q_lower in name or q_lower in gid:
+            results.append({
+                "guild_id": gid,
+                "guild_name": g.get("guild_name") or gid,
+                "subscription_status": g.get("subscription_status") or "free",
+                "subscription_plan": g.get("subscription_plan") or "",
+            })
+        if len(results) >= 20:
+            break
+    return JSONResponse({"guilds": results})
+
+
 @app.get("/admin/customers", response_class=HTMLResponse)
 async def admin_customers(request: Request):
     session, err = _require_admin(request)

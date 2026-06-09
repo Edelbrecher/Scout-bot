@@ -388,6 +388,9 @@ function escHtml(s) {
   <!-- Guild Sidebar Logic -->
   <script>
   var _gsBadges = {};
+  var _gsHasPro = false;
+  var _LOCK_OPEN   = '<svg class="gs-lock" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0"/></svg>';
+  var _LOCK_CLOSED = '<svg class="gs-lock gs-lock-closed" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>';
 
   (function(){
     var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
@@ -568,7 +571,6 @@ function escHtml(s) {
 
   // ── Sidebar badges + pro status ──────────────────────────────────────
   var _gsBadgeGid = null;
-  var _gsHasPro = false;
 
   function _loadBadges(gid) {
     _gsBadgeGid = gid;
@@ -611,9 +613,6 @@ function escHtml(s) {
       }
     });
   }
-
-  var _LOCK_OPEN   = '<svg class="gs-lock" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0"/></svg>';
-  var _LOCK_CLOSED = '<svg class="gs-lock gs-lock-closed" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>';
 
   function _applyLocks() {
     var nav = document.getElementById('gs-nav-items');
