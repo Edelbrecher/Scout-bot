@@ -1,0 +1,496 @@
+{% extends "base.html" %}
+{% block title %}Unlock Pro Features · TravOps{% endblock %}
+
+{% block content %}
+<style>
+/* ── Upgrade page styles ─────────────────────────────────────────── */
+.up-hero {
+  text-align: center;
+  padding: 3.5rem 1rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.up-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.up-lock-badge {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: rgba(167,139,250,.12); border: 1px solid rgba(167,139,250,.3);
+  border-radius: 20px; padding: .35rem .9rem; font-size: .8rem;
+  color: #a78bfa; margin-bottom: 1.5rem;
+}
+.up-hero h1 { font-size: 2.5rem; font-weight: 800; margin: 0 0 1rem; line-height: 1.15; }
+.up-hero h1 span { background: linear-gradient(135deg, #a78bfa, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.up-hero p { color: var(--text-muted); font-size: 1.05rem; max-width: 580px; margin: 0 auto 2rem; line-height: 1.6; }
+.up-cta-row { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+.up-btn-primary {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; border: none; border-radius: 10px;
+  padding: .75rem 1.75rem; font-size: .95rem; font-weight: 600;
+  cursor: pointer; text-decoration: none;
+  box-shadow: 0 4px 20px rgba(99,102,241,.4);
+  transition: transform .15s, box-shadow .15s;
+}
+.up-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(99,102,241,.55); }
+.up-btn-secondary {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: var(--bg-card); color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: .75rem 1.5rem; font-size: .9rem; font-weight: 500;
+  cursor: pointer; text-decoration: none; transition: border-color .15s, color .15s;
+}
+.up-btn-secondary:hover { border-color: #6366f1; color: #a5b4fc; }
+
+/* ── Feature cards ── */
+.up-section { max-width: 1100px; margin: 0 auto; padding: 0 1rem 3rem; }
+.up-section-title { text-align: center; font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; }
+.up-section-sub { text-align: center; color: var(--text-muted); font-size: .9rem; margin-bottom: 2rem; }
+.up-features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.up-feature-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.25rem; transition: border-color .15s, transform .15s;
+}
+.up-feature-card:hover { border-color: rgba(99,102,241,.5); transform: translateY(-2px); }
+.up-feature-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; margin-bottom: .75rem;
+}
+.up-feature-card h3 { font-size: .95rem; font-weight: 700; margin: 0 0 .35rem; }
+.up-feature-card p { font-size: .82rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.up-pro-tag {
+  display: inline-block; font-size: .65rem; font-weight: 700; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 4px; margin-left: .4rem; vertical-align: middle;
+}
+.up-player-tag { background: rgba(167,139,250,.15); color: #a78bfa; }
+.up-alliance-tag { background: rgba(34,197,94,.12); color: #22c55e; }
+
+/* ── Tutorial / How it works ── */
+.up-steps { display: flex; flex-direction: column; gap: 1.5rem; }
+.up-step { display: flex; gap: 1.25rem; align-items: flex-start; }
+.up-step-num {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .9rem; color: #fff; margin-top: .15rem;
+}
+.up-step-body h3 { font-size: .95rem; font-weight: 700; margin: 0 0 .3rem; }
+.up-step-body p { font-size: .83rem; color: var(--text-muted); margin: 0; line-height: 1.55; }
+
+/* ── Pricing ── */
+.up-pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.up-plan-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 1.5rem; display: flex; flex-direction: column; gap: .5rem;
+  transition: border-color .15s;
+}
+.up-plan-card.featured {
+  border-color: #6366f1;
+  background: linear-gradient(160deg, rgba(99,102,241,.07) 0%, var(--bg-card) 60%);
+  position: relative;
+}
+.up-plan-card.featured::before {
+  content: 'Most Popular';
+  position: absolute; top: -1px; right: 1.25rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; font-size: .65rem; font-weight: 700; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 0 0 8px 8px;
+}
+.up-plan-name { font-weight: 700; font-size: 1rem; }
+.up-plan-price { font-size: 2rem; font-weight: 800; line-height: 1; margin: .25rem 0; }
+.up-plan-price span { font-size: .85rem; font-weight: 400; color: var(--text-muted); }
+.up-plan-annual { font-size: .75rem; color: var(--text-muted); }
+.up-plan-annual b { color: #22c55e; }
+.up-plan-servers { font-size: .78rem; color: var(--text-muted); margin: .25rem 0; }
+.up-plan-divider { height: 1px; background: var(--border); margin: .75rem 0; }
+.up-plan-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; flex: 1; }
+.up-plan-features li { font-size: .82rem; color: var(--text-muted); display: flex; align-items: flex-start; gap: .4rem; }
+.up-plan-features li::before { content: '✓'; color: #22c55e; font-weight: 700; flex-shrink: 0; margin-top: .05rem; }
+.up-plan-btn { display: block; text-align: center; margin-top: .75rem; }
+
+/* ── Comparison table ── */
+.up-compare { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.up-compare th { padding: .75rem 1rem; text-align: left; border-bottom: 2px solid var(--border); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.up-compare td { padding: .6rem 1rem; border-bottom: 1px solid rgba(255,255,255,.04); }
+.up-compare tr:last-child td { border-bottom: none; }
+.up-compare td:first-child { color: var(--text); font-weight: 500; }
+.up-compare td:not(:first-child) { text-align: center; }
+.up-check { color: #22c55e; font-size: 1rem; }
+.up-cross { color: #374151; font-size: 1rem; }
+.up-col-free { color: var(--text-muted); }
+.up-col-player { color: #a78bfa; }
+.up-col-alliance { color: #22c55e; }
+
+/* ── Divider ── */
+.up-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(99,102,241,.2), transparent); margin: 1rem 0 2.5rem; }
+</style>
+
+<!-- ══ HERO ══════════════════════════════════════════════════════════════════ -->
+<div class="up-hero">
+  <div class="up-lock-badge">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>
+    {% if plan == "player_pro" %}Player Pro Feature{% elif plan == "alliance" %}Alliance Pro Feature{% else %}Pro Feature{% endif %}
+  </div>
+  <h1>
+    {% if plan == "player_pro" %}
+      Unlock your <span>Personal Command Center</span>
+    {% elif plan == "alliance" %}
+      Unlock full <span>Alliance Intelligence</span>
+    {% else %}
+      Take your game to the<br><span>next level</span>
+    {% endif %}
+  </h1>
+  <p>
+    {% if plan == "player_pro" %}
+      Get powerful solo tools — farm detection, personal op tracking, growth analytics, and more. Everything you need to dominate your server.
+    {% elif plan == "alliance" %}
+      Give your alliance the edge. Real-time sector surveillance, coordinated defense, enemy tracking, and full operation planning.
+    {% else %}
+      TravOps Pro unlocks the full intelligence suite — from personal farm detection to alliance-wide operation coordination. Stop playing blind.
+    {% endif %}
+  </p>
+  <div class="up-cta-row">
+    <a href="{{ billing_url }}" class="up-btn-primary">
+      🚀 Upgrade Now
+    </a>
+    <a href="#features" class="up-btn-secondary">
+      See All Features ↓
+    </a>
+  </div>
+</div>
+
+<div class="up-section">
+
+<!-- ══ SOCIAL PROOF ══════════════════════════════════════════════════════════ -->
+<div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem;padding:1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;">
+  <div style="text-align:center;">
+    <div style="font-size:1.5rem;font-weight:800;color:#a78bfa;">2,500+</div>
+    <div style="font-size:.78rem;color:var(--text-muted);">Active Players</div>
+  </div>
+  <div style="width:1px;background:var(--border);"></div>
+  <div style="text-align:center;">
+    <div style="font-size:1.5rem;font-weight:800;color:#6366f1;">150+</div>
+    <div style="font-size:.78rem;color:var(--text-muted);">Alliances Using TravOps</div>
+  </div>
+  <div style="width:1px;background:var(--border);"></div>
+  <div style="text-align:center;">
+    <div style="font-size:1.5rem;font-weight:800;color:#22c55e;">1.2M+</div>
+    <div style="font-size:.78rem;color:var(--text-muted);">Farms Tracked</div>
+  </div>
+  <div style="width:1px;background:var(--border);"></div>
+  <div style="text-align:center;">
+    <div style="font-size:1.5rem;font-weight:800;color:#f59e0b;">99.9%</div>
+    <div style="font-size:.78rem;color:var(--text-muted);">Uptime</div>
+  </div>
+</div>
+
+<!-- ══ FEATURES ══════════════════════════════════════════════════════════════ -->
+<div id="features">
+{% if plan != "alliance" %}
+<!-- Player Pro Features -->
+<div class="up-section-title">🔓 Player Pro Features <span style="font-size:.75rem;background:rgba(167,139,250,.15);color:#a78bfa;border-radius:6px;padding:2px 8px;vertical-align:middle;">$2.99/mo</span></div>
+<div class="up-section-sub">Personal tools that give every solo player a massive edge</div>
+<div class="up-features-grid" style="margin-bottom:2.5rem;">
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;">🏚️</div>
+    <h3>Farming Intelligence</h3>
+    <p>Automatically detects inactive villages near you. See population stability, days inactive, and estimated troop count. Filter by distance, player, tribe, and farmlist status. Export to CSV or copy coordinates in one click.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(99,102,241,.1);color:#818cf8;">📈</div>
+    <h3>Growth Analytics</h3>
+    <p>Track player population trends over time. Identify who is growing fast (potential threat) and who is stagnating (easy target). Population distribution charts give you a full map overview at a glance.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(167,139,250,.1);color:#a78bfa;">⚔️</div>
+    <h3>My Op Plan</h3>
+    <p>See every operation wave assigned to you across all active plans. Never miss an attack window. Get a badge notification in the sidebar as soon as new waves are assigned to you.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(34,197,94,.1);color:#22c55e;">🎯</div>
+    <h3>My Farms List</h3>
+    <p>Save your best farm villages and track them across sessions. Cross-reference with your TravOps farmlist to instantly see which villages you're already farming and which are missing.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(251,146,60,.1);color:#fb923c;">💪</div>
+    <h3>Combat Power Stats</h3>
+    <p>Track your personal offence and defence power over time. See how your account grows, compare yourself against other members, and identify your strengths and weaknesses.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(59,130,246,.1);color:#60a5fa;">🔔</div>
+    <h3>Personal Notifications</h3>
+    <p>Get Discord alerts for events that matter to you — scout incidents, incoming attacks on your villages, and operation assignments. No alliance admin required.</p>
+  </div>
+
+</div>
+{% endif %}
+
+{% if plan != "player_pro" %}
+<!-- Alliance Pro Features -->
+<div class="up-section-title">🛡️ Alliance Pro Features <span style="font-size:.75rem;background:rgba(34,197,94,.12);color:#22c55e;border-radius:6px;padding:2px 8px;vertical-align:middle;">from $6.99/mo</span></div>
+<div class="up-section-sub">Full command & control for alliance leadership</div>
+<div class="up-features-grid" style="margin-bottom:2.5rem;">
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(239,68,68,.1);color:#ef4444;">📡</div>
+    <h3>Sector Monitor</h3>
+    <p>Define map sectors and watch them for troop movement. TravOps automatically checks every hour and sends a Discord alert the moment hostile activity is detected. Your early warning system.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(99,102,241,.1);color:#818cf8;">🗺️</div>
+    <h3>Operation Planning</h3>
+    <p>Plan multi-wave operations with a full drag-and-drop interface. Assign waves to members, set timings, and share the plan with a single link. Everyone sees their assignments in real time.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;">🏴</div>
+    <h3>Alliance Tracking</h3>
+    <p>Track all member stats in one dashboard — population, combat power, growth rate, and activity. Spot inactive members and reward top performers. Full history with trend charts.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(167,139,250,.1);color:#a78bfa;">🛡️</div>
+    <h3>Defense Coordination</h3>
+    <p>Broadcast incoming attacks and coordinate defensive send across all members. Manage hero scouts, track defense assignments, and see who responded — all from one screen.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(239,68,68,.1);color:#f87171;">💀</div>
+    <h3>Enemy Intelligence</h3>
+    <p>Track hostile alliances and individual enemies. Record their villages, monitor population changes, and correlate attack reports to build a comprehensive threat picture.</p>
+  </div>
+
+  <div class="up-feature-card">
+    <div class="up-feature-icon" style="background:rgba(34,197,94,.1);color:#22c55e;">🌾</div>
+    <h3>Resource Push & Trade Routes</h3>
+    <p>Calculate optimal trade routes between alliance members. Plan resource pushes to support hammers before key operations. Crop calculator included for WW endgame logistics.</p>
+  </div>
+
+</div>
+{% endif %}
+</div>
+
+<div class="up-divider"></div>
+
+<!-- ══ HOW IT WORKS ═══════════════════════════════════════════════════════════ -->
+<div class="up-section-title">⚡ Up & Running in 3 Steps</div>
+<div class="up-section-sub" style="margin-bottom:1.75rem;">No complex setup. You're powerful in minutes.</div>
+<div class="up-steps" style="max-width:620px;margin:0 auto 2.5rem;">
+  <div class="up-step">
+    <div class="up-step-num">1</div>
+    <div class="up-step-body">
+      <h3>Choose your plan & activate</h3>
+      <p>Click Upgrade Now and select the plan that fits your needs. Player Pro is for solo players — Alliance plans add server-wide intelligence. You can upgrade or downgrade any time.</p>
+    </div>
+  </div>
+  <div class="up-step">
+    <div class="up-step-num">2</div>
+    <div class="up-step-body">
+      <h3>Connect your Travian world</h3>
+      <p>In your guild settings, set your TravOps server's Travian world URL (e.g. <code style="background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px;">https://ts1.x1.europe.travian.com</code>). TravOps starts fetching map snapshots automatically.</p>
+    </div>
+  </div>
+  <div class="up-step">
+    <div class="up-step-num">3</div>
+    <div class="up-step-body">
+      <h3>Use the sidebar to explore</h3>
+      <p>All Pro features appear in your sidebar. Start with Farming Intelligence to find your first farm targets, or check Sector Monitor to set up your first map watch area. Each feature has an in-page help tooltip.</p>
+    </div>
+  </div>
+</div>
+
+<div class="up-divider"></div>
+
+<!-- ══ COMPARISON TABLE ═══════════════════════════════════════════════════════ -->
+<div class="up-section-title">📋 What's Included</div>
+<div class="up-section-sub" style="margin-bottom:1.5rem;">Full feature comparison across all tiers</div>
+<div style="overflow-x:auto;margin-bottom:2.5rem;">
+<table class="up-compare">
+  <thead>
+    <tr>
+      <th>Feature</th>
+      <th class="up-col-free">Free</th>
+      <th class="up-col-player">Player Pro</th>
+      <th class="up-col-alliance">Alliance Pro</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="4" style="padding:.5rem 1rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6366f1;background:rgba(99,102,241,.05);">Personal Features</td></tr>
+    <tr><td>Intel Search (players, villages)</td><td class="up-check">✓</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>Battle Reports</td><td class="up-check">✓</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>Farming Intelligence</td><td class="up-cross">—</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>My Op Plan (personal waves)</td><td class="up-cross">—</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>My Farms List</td><td class="up-cross">—</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>Growth Analytics</td><td class="up-cross">—</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>Combat Power Stats</td><td class="up-cross">—</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+    <tr><td>Personal Notifications</td><td class="up-cross">—</td><td class="up-check">✓</td><td class="up-check">✓</td></tr>
+
+    <tr><td colspan="4" style="padding:.5rem 1rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#22c55e;background:rgba(34,197,94,.05);">Alliance Features</td></tr>
+    <tr><td>Sector Monitor (map surveillance)</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Operation Planning</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Alliance Tracking & Leaderboard</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Defense Coordination</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Enemy Tracking</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Resource Push & Trade Routes</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Farmlist Analysis</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓</td></tr>
+    <tr><td>Multiple Discord Servers</td><td class="up-cross">—</td><td class="up-cross">—</td><td class="up-check">✓ 1–5 servers</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="up-divider"></div>
+
+<!-- ══ PRICING ════════════════════════════════════════════════════════════════ -->
+<div class="up-section-title">💳 Simple, Transparent Pricing</div>
+<div class="up-section-sub" style="margin-bottom:1.5rem;">Cancel any time. No contracts. Annual plan saves 20%+.</div>
+<div class="up-pricing-grid" style="margin-bottom:2.5rem;">
+
+  {% if plan != "alliance" %}
+  <div class="up-plan-card" style="border-color:rgba(167,139,250,.4);background:linear-gradient(160deg,rgba(167,139,250,.06) 0%,var(--bg-card) 60%);">
+    <div class="up-plan-name" style="color:#a78bfa;">🔓 Player Pro</div>
+    <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.25rem;">For solo players</div>
+    <div class="up-plan-price">$2.99<span>/mo</span></div>
+    <div class="up-plan-annual"><b>$23.99/year</b> — save $11.89</div>
+    <div class="up-plan-divider"></div>
+    <ul class="up-plan-features">
+      <li>Farming Intelligence</li>
+      <li>Growth analytics & charts</li>
+      <li>My Op Plan (personal)</li>
+      <li>My Farms List</li>
+      <li>Combat power tracker</li>
+      <li>Personal Discord notifications</li>
+      <li>No Discord server required</li>
+    </ul>
+    <div class="up-plan-btn">
+      <a href="{{ billing_url }}" class="up-btn-primary" style="width:100%;justify-content:center;box-sizing:border-box;">
+        Get Player Pro
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if plan != "player_pro" %}
+  <div class="up-plan-card featured">
+    <div class="up-plan-name" style="color:#4ade80;">🟢 Starter</div>
+    <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.25rem;">1 Discord server</div>
+    <div class="up-plan-price">$6.99<span>/mo</span></div>
+    <div class="up-plan-annual"><b>$55.99/year</b> — save $27.89</div>
+    <div class="up-plan-divider"></div>
+    <ul class="up-plan-features">
+      <li>Everything in Player Pro</li>
+      <li>Sector Monitor</li>
+      <li>Operation Planning</li>
+      <li>Alliance Tracking & Leaderboard</li>
+      <li>Defense Coordination</li>
+      <li>Enemy Tracking</li>
+      <li>Resource Push & Trade Routes</li>
+    </ul>
+    <div class="up-plan-btn">
+      <a href="{{ billing_url }}" class="up-btn-primary" style="width:100%;justify-content:center;box-sizing:border-box;">
+        Get Starter
+      </a>
+    </div>
+  </div>
+
+  <div class="up-plan-card">
+    <div class="up-plan-name" style="color:#22c55e;">🟢 Clan</div>
+    <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.25rem;">2 Discord servers</div>
+    <div class="up-plan-price">$10.99<span>/mo</span></div>
+    <div class="up-plan-annual"><b>$87.99/year</b> — save $43.89</div>
+    <div class="up-plan-divider"></div>
+    <ul class="up-plan-features">
+      <li>Everything in Starter</li>
+      <li>2 Discord servers</li>
+      <li>Priority support</li>
+    </ul>
+    <div class="up-plan-btn">
+      <a href="{{ billing_url }}" class="up-btn-secondary" style="width:100%;justify-content:center;box-sizing:border-box;">
+        Get Clan
+      </a>
+    </div>
+  </div>
+
+  <div class="up-plan-card">
+    <div class="up-plan-name" style="color:#16a34a;">🟢 Alliance Pro</div>
+    <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.25rem;">3 Discord servers</div>
+    <div class="up-plan-price">$14.99<span>/mo</span></div>
+    <div class="up-plan-annual"><b>$119.99/year</b> — save $59.89</div>
+    <div class="up-plan-divider"></div>
+    <ul class="up-plan-features">
+      <li>Everything in Clan</li>
+      <li>3 Discord servers</li>
+    </ul>
+    <div class="up-plan-btn">
+      <a href="{{ billing_url }}" class="up-btn-secondary" style="width:100%;justify-content:center;box-sizing:border-box;">
+        Get Alliance Pro
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<div class="up-divider"></div>
+
+<!-- ══ FAQ ════════════════════════════════════════════════════════════════════ -->
+<div class="up-section-title">❓ Common Questions</div>
+<div style="max-width:700px;margin:1.5rem auto 3rem;display:flex;flex-direction:column;gap:.75rem;">
+
+  <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      Can I try before subscribing? <span style="color:var(--text-muted);font-size:.9rem;">▾</span>
+    </summary>
+    <p style="margin:.75rem 0 0;color:var(--text-muted);font-size:.85rem;line-height:1.6;">Yes — new guilds get a free trial period to explore all features. If your trial has expired, upgrading takes less than 60 seconds via Stripe. You can cancel any time from your billing page.</p>
+  </details>
+
+  <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      What's the difference between Player Pro and Alliance plans? <span style="color:var(--text-muted);font-size:.9rem;">▾</span>
+    </summary>
+    <p style="margin:.75rem 0 0;color:var(--text-muted);font-size:.85rem;line-height:1.6;"><strong style="color:var(--text);">Player Pro ($2.99)</strong> is for individual players — no Discord server needed. It unlocks personal analytics like Farming Intelligence and your own operation plan. <br><br><strong style="color:var(--text);">Alliance plans (from $6.99)</strong> include everything in Player Pro plus server-wide features: Sector Monitor, operation planning, alliance tracking, defense coordination, and more.</p>
+  </details>
+
+  <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      Can I change my plan later? <span style="color:var(--text-muted);font-size:.9rem;">▾</span>
+    </summary>
+    <p style="margin:.75rem 0 0;color:var(--text-muted);font-size:.85rem;line-height:1.6;">Absolutely. You can upgrade, downgrade, or cancel at any time from the billing page. Upgrades take effect immediately. Downgrades apply at the end of your billing period.</p>
+  </details>
+
+  <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;">
+    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      How does the map scanning work? <span style="color:var(--text-muted);font-size:.9rem;">▾</span>
+    </summary>
+    <p style="margin:.75rem 0 0;color:var(--text-muted);font-size:.85rem;line-height:1.6;">TravOps fetches a full map snapshot from your Travian world every 15 minutes. Each snapshot captures all village populations and coordinates. By comparing snapshots over time, we can detect inactive farms (stable population), track growth, and alert you to troop movements in monitored sectors.</p>
+  </details>
+
+</div>
+
+<!-- ══ FINAL CTA ══════════════════════════════════════════════════════════════ -->
+<div style="text-align:center;padding:2.5rem 1rem 3rem;background:linear-gradient(160deg,rgba(99,102,241,.08) 0%,transparent 60%);border-radius:16px;border:1px solid rgba(99,102,241,.15);margin-bottom:2rem;">
+  <div style="font-size:1.5rem;font-weight:800;margin-bottom:.5rem;">Ready to dominate your server?</div>
+  <div style="color:var(--text-muted);font-size:.9rem;margin-bottom:1.5rem;">Join thousands of Travian players who use TravOps to gain a decisive edge.</div>
+  <div class="up-cta-row">
+    <a href="{{ billing_url }}" class="up-btn-primary" style="font-size:1rem;padding:.85rem 2rem;">
+      🚀 Upgrade Now — from $2.99/mo
+    </a>
+    <a href="/guild/{{ guild_id }}" class="up-btn-secondary">
+      ← Back to Dashboard
+    </a>
+  </div>
+</div>
+
+</div><!-- /up-section -->
+{% endblock %}

@@ -3737,6 +3737,36 @@ async def guild_settings_page(request: Request, guild_id: str):
     })
 
 
+@app.get("/guild/{guild_id}/upgrade")
+async def upgrade_page(request: Request, guild_id: str, plan: str = ""):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    guild = await _enrich_guild_subscription(guild)
+    has_player = _has_player_pro(guild)
+    has_alliance = _has_alliance_pro(guild)
+    billing_url = f"/guild/{guild_id}/billing"
+    # If they already have what they need, send to billing for management
+    if plan == "player_pro" and has_player:
+        return RedirectResponse(billing_url, status_code=303)
+    if plan == "alliance" and has_alliance:
+        return RedirectResponse(billing_url, status_code=303)
+    return templates.TemplateResponse("upgrade.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "plan": plan,  # "player_pro" or "alliance" or "" (show both)
+        "has_player_pro": has_player,
+        "has_alliance_pro": has_alliance,
+        "billing_url": billing_url,
+        "plans": TIER_META,
+    })
+
+
 @app.get("/guild/{guild_id}/billing")
 async def billing_page(request: Request, guild_id: str):
     session, err = _require_session(request)
