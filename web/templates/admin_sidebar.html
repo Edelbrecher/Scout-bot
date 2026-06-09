@@ -81,7 +81,8 @@
 /* ── Submenu block ── */
 .sn-submenu-block {
   border:1px solid rgba(245,158,11,.28); border-radius:10px;
-  background:rgba(245,158,11,.02); overflow:hidden;
+  background:rgba(245,158,11,.02);
+  /* no overflow:hidden — would clip the icon picker popup */
 }
 .sn-submenu-block.drag-over { border-color:#5865f2; background:rgba(88,101,242,.06); }
 .sn-submenu-block.dragging  { opacity:.35; }
@@ -117,27 +118,29 @@
 /* ── Icon picker ── */
 .sn-icon-wrap { position:relative; flex-shrink:0; }
 .sn-icon-btn {
-  display:flex; align-items:center; gap:.3rem;
-  background:var(--bg-main); border:1px solid var(--border); border-radius:5px;
-  color:var(--text); font-size:.82rem; padding:.28rem .5rem; cursor:pointer;
-  min-width:80px; white-space:nowrap;
+  display:flex; align-items:center; gap:.35rem;
+  background:var(--bg-main); border:1px solid var(--border); border-radius:6px;
+  color:var(--text); font-size:.82rem; padding:.3rem .6rem; cursor:pointer;
+  min-width:90px; white-space:nowrap; height:30px;
 }
-.sn-icon-btn:hover { border-color:#5865f2; }
-.sn-icon-preview { font-size:.9rem; }
+.sn-icon-btn:hover { border-color:#5865f2; background:rgba(88,101,242,.06); }
+.sn-icon-btn svg { width:15px; height:15px; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+/* Picker floats via JS fixed-positioning — not position:absolute to avoid clipping */
 .sn-icon-picker {
-  position:absolute; top:calc(100% + 4px); left:0; z-index:999;
-  background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
-  padding:.5rem; display:none; flex-wrap:wrap; gap:4px;
-  width:260px; box-shadow:0 8px 24px rgba(0,0,0,.4);
+  position:fixed; z-index:9999;
+  background:var(--bg-card); border:1px solid rgba(255,255,255,.12); border-radius:10px;
+  padding:.6rem; display:none; flex-wrap:wrap; gap:3px;
+  width:252px; box-shadow:0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04);
 }
 .sn-icon-picker.open { display:flex; }
 .sn-icon-opt {
-  width:32px; height:32px; display:flex; align-items:center; justify-content:center;
-  border-radius:6px; cursor:pointer; font-size:.72rem; color:var(--text-muted);
-  border:1px solid transparent; transition:background .1s;
+  width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  border-radius:7px; cursor:pointer; color:var(--text-muted);
+  border:1px solid transparent; transition:background .1s, border-color .1s, color .1s;
 }
-.sn-icon-opt:hover, .sn-icon-opt.sel { background:rgba(88,101,242,.2); border-color:#5865f2; color:var(--text); }
-.sn-icon-opt svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.sn-icon-opt:hover { background:rgba(255,255,255,.07); color:var(--text); }
+.sn-icon-opt.sel  { background:rgba(88,101,242,.25); border-color:#5865f2; color:#a5b4fc; }
+.sn-icon-opt svg { width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
 
 /* ── Delete btn ── */
 .sn-del { background:none; border:none; color:#6b7280; cursor:pointer; font-size:.9rem; padding:0 3px; line-height:1; }
@@ -193,15 +196,55 @@ document.getElementById('iconLegend').innerHTML = ICONS.map(k=>`<code>${k}</code
 let navData = {{ nav | tojson }};
 let _openPicker = null;
 
-// Close picker on outside click
-document.addEventListener('click', e => {
-  if (_openPicker && !_openPicker.contains(e.target)) {
-    _openPicker.querySelector('.sn-icon-picker')?.classList.remove('open');
-    _openPicker = null;
-  }
+// (picker close handled in makeIconPicker section below)
+
+/* ── Shared picker element (one, reused) ── */
+const _picker = document.createElement('div');
+_picker.className = 'sn-icon-picker';
+document.body.appendChild(_picker);
+let _pickerOnSelect = null;
+let _pickerBtn = null;
+
+function _positionPicker() {
+  if (!_pickerBtn) return;
+  const r = _pickerBtn.getBoundingClientRect();
+  const ph = 260; // approx picker height
+  const top = (r.bottom + ph > window.innerHeight && r.top > ph)
+    ? r.top - ph - 4 : r.bottom + 4;
+  _picker.style.top  = top + 'px';
+  _picker.style.left = Math.min(r.left, window.innerWidth - 266) + 'px';
+}
+
+ICONS.forEach(k => {
+  const opt = document.createElement('div');
+  opt.className = 'sn-icon-opt';
+  opt.dataset.icon = k;
+  opt.title = k;
+  opt.innerHTML = iconSvg(k);
+  opt.onclick = e => {
+    e.stopPropagation();
+    if (_pickerOnSelect) _pickerOnSelect(k);
+    _closePicker();
+  };
+  _picker.appendChild(opt);
 });
 
-/* ── Icon picker widget ── */
+function _closePicker() {
+  _picker.classList.remove('open');
+  _pickerBtn = null;
+  _openPicker = null;
+  _pickerOnSelect = null;
+}
+
+document.addEventListener('click', e => {
+  if (_picker.classList.contains('open') && !_picker.contains(e.target) && e.target !== _pickerBtn) {
+    _closePicker();
+  }
+});
+window.addEventListener('scroll', _closePicker, true);
+window.addEventListener('resize', () => { if (_pickerBtn) _positionPicker(); });
+
+/* ── Icon picker widget (button only — picker is shared) ── */
 function makeIconPicker(currentIcon, onSelect) {
   const wrap = document.createElement('div');
   wrap.className = 'sn-icon-wrap';
@@ -209,38 +252,42 @@ function makeIconPicker(currentIcon, onSelect) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'sn-icon-btn';
-  btn.innerHTML = `<span class="sn-icon-preview">${iconSvg(currentIcon)}</span><span>${currentIcon}</span>`;
+
+  function updateBtn(k) {
+    btn.innerHTML = `${iconSvg(k)}<span style="color:var(--text-muted);font-size:.78rem;">${k}</span>`;
+  }
+  updateBtn(currentIcon);
+
   btn.onclick = e => {
     e.stopPropagation();
-    const picker = wrap.querySelector('.sn-icon-picker');
-    const isOpen = picker.classList.contains('open');
-    if (_openPicker && _openPicker !== wrap) {
-      _openPicker.querySelector('.sn-icon-picker')?.classList.remove('open');
-    }
-    picker.classList.toggle('open', !isOpen);
-    _openPicker = !isOpen ? wrap : null;
-  };
+    const alreadyOpen = _picker.classList.contains('open') && _pickerBtn === btn;
+    _closePicker();
+    if (alreadyOpen) return;
 
-  const picker = document.createElement('div');
-  picker.className = 'sn-icon-picker';
-  ICONS.forEach(k => {
-    const opt = document.createElement('div');
-    opt.className = 'sn-icon-opt' + (k === currentIcon ? ' sel' : '');
-    opt.title = k;
-    opt.innerHTML = iconSvg(k);
-    opt.onclick = e => {
-      e.stopPropagation();
-      btn.innerHTML = `<span class="sn-icon-preview">${iconSvg(k)}</span><span>${k}</span>`;
-      wrap.querySelectorAll('.sn-icon-opt').forEach(o => o.classList.toggle('sel', o.title===k));
-      picker.classList.remove('open');
-      _openPicker = null;
+    // Wire up this picker instance
+    _pickerOnSelect = k => {
+      updateBtn(k);
       onSelect(k);
     };
-    picker.appendChild(opt);
-  });
+    _pickerBtn = btn;
+    _openPicker = wrap;
+
+    // Update selected state
+    _picker.querySelectorAll('.sn-icon-opt').forEach(o => {
+      o.classList.toggle('sel', o.dataset.icon === (currentIcon || 'home'));
+    });
+    // Track current after selection
+    const origOnSelect = _pickerOnSelect;
+    _pickerOnSelect = k => {
+      currentIcon = k;
+      origOnSelect(k);
+    };
+
+    _picker.classList.add('open');
+    _positionPicker();
+  };
 
   wrap.appendChild(btn);
-  wrap.appendChild(picker);
   return wrap;
 }
 
@@ -379,7 +426,7 @@ function makeChildRow(i, ci, child) {
 /* ── Drag: top-level items ── */
 function attachTopDrag(el, i) {
   el.addEventListener('dragstart', e => {
-    if (e.target.closest('.sn-icon-picker, .sn-child-row, input')) return e.preventDefault();
+    if (e.target.closest('.sn-icon-btn, .sn-child-row, input')) return e.preventDefault();
     e.dataTransfer.setData('text/plain', JSON.stringify({from: i}));
     setTimeout(() => el.classList.add('dragging'), 0);
   });
