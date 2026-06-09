@@ -10085,7 +10085,7 @@ async def sidebar_badges(request: Request, guild_id: str):
     )
     return JSONResponse({
         "sector_monitor": sector_count,
-        "my_operations": len([w for w in waves if (w.get("plan_status") or "") in ("active", "draft")]),
+        "my_operations": len({w["plan_id"] for w in waves}),
         "has_player_pro": _has_player_pro(guild or {}),
     })
 

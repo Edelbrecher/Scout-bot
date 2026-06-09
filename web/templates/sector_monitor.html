@@ -2,7 +2,7 @@
 {% block title %}Sector Monitor · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:900px;">
+<div class="container-wide">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/map" class="back-link">← Map</a>
@@ -56,13 +56,109 @@
   </div>
   {% endif %}
 
-  {# ── Config ── #}
-  <details open style="margin-bottom:1.5rem;">
-    <summary style="cursor:pointer;font-size:1rem;font-weight:700;color:var(--text);padding:.75rem 0;list-style:none;display:flex;align-items:center;gap:.5rem;">
-      <span>⚙️ Configuration</span>
-      <span style="font-size:.75rem;color:var(--text-muted);margin-left:auto;">click to collapse</span>
-    </summary>
-    <div class="card" style="padding:1.5rem;margin-top:.25rem;">
+  {# ── 2-column layout: results left, config right ── #}
+  <div style="display:grid;grid-template-columns:1fr 360px;gap:1.5rem;align-items:start;">
+
+  {# ════ LEFT: Stats + Alerts ════ #}
+  <div>
+
+  {# ── Stats row ── #}
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-bottom:1.25rem;">
+    <div class="card" style="padding:.9rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">{{ stats.total }}</div>
+      <div style="font-size:.7rem;color:var(--text-muted);">Total</div>
+    </div>
+    <div class="card" style="padding:.9rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;color:#60a5fa;">{{ stats.new_village }}</div>
+      <div style="font-size:.7rem;color:var(--text-muted);">🆕 New</div>
+    </div>
+    <div class="card" style="padding:.9rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;color:#f87171;">{{ stats.nobling }}</div>
+      <div style="font-size:.7rem;color:var(--text-muted);">👑 Nobling</div>
+    </div>
+    <div class="card" style="padding:.9rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;color:#fbbf24;">{{ stats.fast_growth }}</div>
+      <div style="font-size:.7rem;color:var(--text-muted);">📈 Growth</div>
+    </div>
+    <div class="card" style="padding:.9rem;text-align:center;">
+      <div style="font-size:1.5rem;font-weight:800;color:#a78bfa;">{{ stats.capital_change }}</div>
+      <div style="font-size:.7rem;color:var(--text-muted);">🏰 HD</div>
+    </div>
+  </div>
+
+  {# ── Alert list ── #}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem;">
+    <h2 style="margin:0;font-size:1.05rem;">Active Alerts</h2>
+    {% if alerts %}
+    <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/dismiss-all">
+      <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">🗑️ Dismiss all</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not alerts %}
+  <div class="card">
+    <p style="text-align:center;color:var(--text-muted);padding:2rem 0;margin:0;">
+      ✅ No active alerts — your sector is quiet.
+    </p>
+  </div>
+  {% else %}
+  <div style="display:flex;flex-direction:column;gap:.6rem;">
+    {% for alert in alerts %}
+    {% if alert.alert_type == 'new_village' %}
+      {% set bg='#1e3a5f' %}{% set col='#93c5fd' %}{% set bd='#1d4ed8' %}{% set lbl='🆕 New village' %}
+    {% elif alert.alert_type == 'nobling' %}
+      {% set bg='#3b0f0f' %}{% set col='#fca5a5' %}{% set bd='#b91c1c' %}{% set lbl='👑 Nobling' %}
+    {% elif alert.alert_type == 'capital_change' %}
+      {% set bg='#2a1a4a' %}{% set col='#c4b5fd' %}{% set bd='#7c3aed' %}{% set lbl='🏰 HD changed' %}
+    {% else %}
+      {% set bg='#2d2006' %}{% set col='#fde68a' %}{% set bd='#b45309' %}{% set lbl='📈 Fast growth' %}
+    {% endif %}
+    <div class="card" style="padding:.9rem 1.1rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+      <div style="display:flex;align-items:flex-start;gap:.85rem;flex-wrap:wrap;flex:1;min-width:0;">
+        <span style="font-size:.75rem;font-weight:700;background:{{ bg }};color:{{ col }};border:1px solid {{ bd }};border-radius:12px;padding:3px 10px;white-space:nowrap;flex-shrink:0;">{{ lbl }}</span>
+        <div style="min-width:0;flex:1;">
+          <div style="font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ alert.village_name or '—' }}</div>
+          <div style="font-size:.78rem;color:var(--text-muted);">{{ alert.player_name or '—' }} · {{ alert.alliance_name or '—' }}</div>
+          {% if alert.alert_type == 'capital_change' %}
+            {% set ex = alert.extra or {} %}
+            {% if ex.get('old_is_capital') == 0 and ex.get('new_is_capital') == 1 %}
+            <div style="font-size:.78rem;color:#a78bfa;margin-top:.2rem;">
+              🏰 → Became capital
+              <span style="color:var(--text-muted);">between <strong>{{ (ex.get('ts_old') or '')[:16].replace('T',' ') }}</strong> and <strong>{{ (ex.get('ts_new') or '')[:16].replace('T',' ') }}</strong></span>
+            </div>
+            {% elif ex.get('old_is_capital') == 1 and ex.get('new_is_capital') == 0 %}
+            <div style="font-size:.78rem;color:#f87171;margin-top:.2rem;">
+              ❌ Lost capital status
+              <span style="color:var(--text-muted);">between <strong>{{ (ex.get('ts_old') or '')[:16].replace('T',' ') }}</strong> and <strong>{{ (ex.get('ts_new') or '')[:16].replace('T',' ') }}</strong></span>
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.2rem;flex-shrink:0;align-items:flex-end;">
+          <a href="/guild/{{ guild.guild_id }}/map?cx={{ alert.x }}&cy={{ alert.y }}&z=4"
+             style="font-family:monospace;font-size:.85rem;color:#93c5fd;text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;padding:1px 6px;border-radius:6px;border:1px solid rgba(147,197,253,.2);background:rgba(147,197,253,.06);transition:background .12s;"
+             onmouseover="this.style.background='rgba(147,197,253,.15)'" onmouseout="this.style.background='rgba(147,197,253,.06)'"
+             title="Open on map">
+            🗺️ {{ alert.x }}|{{ alert.y }}
+          </a>
+          <span style="font-size:.85rem;">{{ alert.population }} pop{% if alert.pop_change and alert.pop_change > 0 %} <span style="color:#4ade80;font-size:.8rem;">+{{ alert.pop_change }}</span>{% endif %}</span>
+          <span style="font-size:.72rem;color:var(--text-muted);">{{ alert.detected_at[:16].replace('T',' ') if alert.detected_at else '' }}</span>
+        </div>
+      </div>
+      <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/dismiss/{{ alert.id }}" style="flex-shrink:0;">
+        <button type="submit" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;opacity:.7;">✕ Dismiss</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  </div>{# end left col #}
+
+  {# ════ RIGHT: Config (sticky) ════ #}
+  <div style="position:sticky;top:1rem;">
+  <div class="card" style="padding:1.5rem;">
       <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/save">
 
         {# Enable toggle #}
@@ -319,16 +415,65 @@
           {% endif %}
         </div>
 
-        <button type="submit" class="btn btn-primary">💾 Save settings</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;">💾 Save settings</button>
       </form>
 
-      <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/scan" style="margin-top:.75rem;">
-        <button type="submit" class="btn btn-secondary">🔍 Scan now</button>
+      <form method="post" action="/guild/{{ guild.guild_id }}/map/sector-monitor/scan" style="margin-top:.6rem;">
+        <button type="submit" class="btn btn-secondary" style="width:100%;">🔍 Scan now</button>
       </form>
-    </div>
-  </details>
 
-  {# ── Stats + mini-map row ── #}
+      {# ── Mini-map ── #}
+      {% if monitor %}
+      {% set mx1 = monitor.get('x1', -50) | int %}
+      {% set my1 = monitor.get('y1', -50) | int %}
+      {% set mx2 = monitor.get('x2',  50) | int %}
+      {% set my2 = monitor.get('y2',  50) | int %}
+      {% set world = 200 %}
+      {% set sz = 300 %}
+      {% set sc = sz / (world * 2) %}
+      {% set rx  = ((mx1 + world) * sc) | round | int %}
+      {% set ry  = ((world - my2) * sc) | round | int %}
+      {% set rw  = ((mx2 - mx1)   * sc) | round | int %}
+      {% set rh  = ((my2 - my1)   * sc) | round | int %}
+      <div style="margin-top:1rem;">
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.4rem;">📍 Sector preview</div>
+        <svg viewBox="0 0 {{ sz }} {{ sz }}" style="width:100%;height:auto;background:#0f1f0f;border:1px solid var(--border);border-radius:8px;display:block;">
+          <rect x="0" y="0" width="{{ sz }}" height="{{ sz }}" fill="none" stroke="#1e3a1e" stroke-width="1"/>
+          <line x1="{{ sz//2 }}" y1="0" x2="{{ sz//2 }}" y2="{{ sz }}" stroke="#1e3a1e" stroke-width="0.5" stroke-dasharray="2,3"/>
+          <line x1="0" y1="{{ sz//2 }}" x2="{{ sz }}" y2="{{ sz//2 }}" stroke="#1e3a1e" stroke-width="0.5" stroke-dasharray="2,3"/>
+          {% set saved_sectors = monitor.get('sectors', '') %}
+          {% set sector_defs = {'NW': (-200,0,0,200), 'NE': (0,0,200,200), 'SW': (-200,-200,0,0), 'SE': (0,-200,200,0)} %}
+          {% for skey, scoords in sector_defs.items() %}{% if skey in saved_sectors %}
+          {% set sx1=((scoords[0]+world)*sc)|round|int %}{% set sy1=((world-scoords[3])*sc)|round|int %}
+          {% set sw=((scoords[2]-scoords[0])*sc)|round|int %}{% set sh=((scoords[3]-scoords[1])*sc)|round|int %}
+          <rect x="{{ sx1 }}" y="{{ sy1 }}" width="{{ sw }}" height="{{ sh }}" fill="rgba(59,130,246,0.18)" stroke="#3b82f6" stroke-width="1.5" rx="1"/>
+          {% endif %}{% endfor %}
+          {% if 'C' in saved_sectors %}
+          <circle cx="{{ sz//2 }}" cy="{{ sz//2 }}" r="{{ (20*sc)|round|int }}" fill="rgba(99,102,241,0.25)" stroke="#818cf8" stroke-width="1.5"/>
+          {% endif %}
+          {% if not saved_sectors %}
+          <rect x="{{ rx }}" y="{{ ry }}" width="{{ rw }}" height="{{ rh }}" fill="rgba(59,130,246,0.18)" stroke="#3b82f6" stroke-width="1.5" rx="1"/>
+          {% endif %}
+          {% for alert in alerts %}
+          {% set ax=((alert.x+world)*sc)|round|int %}{% set ay=((world-alert.y)*sc)|round|int %}
+          {% if alert.alert_type=='new_village' %}<circle cx="{{ ax }}" cy="{{ ay }}" r="3" fill="#60a5fa" opacity="0.9"/>
+          {% elif alert.alert_type=='nobling' %}<circle cx="{{ ax }}" cy="{{ ay }}" r="4" fill="#f87171" opacity="0.9"/>
+          {% elif alert.alert_type=='capital_change' %}<circle cx="{{ ax }}" cy="{{ ay }}" r="5" fill="#a78bfa" opacity="0.9"/>
+          {% else %}<circle cx="{{ ax }}" cy="{{ ay }}" r="3" fill="#fbbf24" opacity="0.9"/>{% endif %}
+          {% endfor %}
+          <circle cx="{{ sz//2 }}" cy="{{ sz//2 }}" r="3" fill="#4ade80" opacity="0.6"/>
+        </svg>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.3rem;text-align:center;">({{ mx1 }}|{{ my1 }}) – ({{ mx2 }}|{{ my2 }})</div>
+      </div>
+      {% endif %}
+
+    </div>{# end config card #}
+  </div>{# end right col #}
+
+  </div>{# end 2-col grid #}
+
+  {# old content below replaced — skip #}
+  {% if false %}{# ── OLD Stats + mini-map row ── #}
   <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;margin-bottom:1.5rem;align-items:start;">
 
     {# KPI cards #}
@@ -507,6 +652,8 @@
     {% endfor %}
   </div>
   {% endif %}
+
+  {% endif %}{# end if false #}
 
   </div>{# end locked overlay wrapper #}
 </div>
