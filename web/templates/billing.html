@@ -84,7 +84,11 @@
   </div>
 
   <!-- ── Flash ── -->
-  {% if saved %}
+  {% if saved == 'trial_started' %}
+  <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;color:#4ade80;display:flex;gap:0.75rem;align-items:center;">
+    🎉 <div><strong>30-Tage Trial gestartet!</strong> Alle Features für diesen Server sind jetzt freigeschaltet. Viel Erfolg!</div>
+  </div>
+  {% elif saved %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:8px;color:#4ade80;">
     ✅ Subscription aktiviert – danke! Deine Features sind jetzt freigeschaltet.
   </div>
@@ -97,6 +101,8 @@
   <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
     🛡️ This feature requires an Alliance plan. Choose Starter or higher.
   </div>
+  {% elif error == 'trial_already_used' %}
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:8px;color:#fcd34d;">⚠️ Der kostenlose Trial wurde für diesen Server bereits genutzt.</div>
   {% elif error == 'cancelled' %}
   <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ Payment abgebrochen.</div>
   {% elif error %}
@@ -104,7 +110,7 @@
   {% endif %}
 
   <!-- ── Aktueller Status ── -->
-  {% set sub_status = guild.subscription_status or 'free' %}
+  {% set sub_status = guild.get('subscription_status', 'free') if guild else 'free' %}
   {% set sub_plan   = guild.subscription_plan or '' %}
   {% set sub_tier   = sub_plan.split('_')[0] if '_' in sub_plan else '' %}
   {% set sub_int    = sub_plan.split('_')[1] if '_' in sub_plan else '' %}
@@ -157,10 +163,44 @@
   </div>
   {% else %}
 
+  <!-- ── Free Trial Banner ── -->
+  {% if not free_trial_used and sub_status not in ('active', 'trialing') %}
+  <div style="background:linear-gradient(135deg,rgba(5,150,105,0.12),rgba(16,185,129,0.06));border:1px solid rgba(16,185,129,0.35);border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.75rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+    <div style="font-size:2.5rem;">🎁</div>
+    <div style="flex:1;">
+      <div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-bottom:0.25rem;">30 Tage kostenlos testen</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);">Einmalig · Keine Kreditkarte · Wähle deinen Plan und starte sofort</div>
+    </div>
+    <form method="post" action="/guild/{{ guild.guild_id }}/billing/start-free-trial" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+      <select name="plan" style="padding:0.45rem 0.75rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.88rem;">
+        <option value="starter">⚡ Starter</option>
+        <option value="clan" selected>⚔️ Clan</option>
+        <option value="alliance">🛡️ Alliance</option>
+        <option value="imperium">👑 Imperium</option>
+      </select>
+      <button type="submit" style="padding:0.55rem 1.4rem;background:linear-gradient(135deg,#059669,#0d9488);border:none;border-radius:9px;color:#fff;font-size:0.9rem;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px rgba(5,150,105,0.3);">
+        Jetzt kostenlos starten →
+      </button>
+    </form>
+  </div>
+  {% elif sub_status == 'trialing' and free_trial_used and trial_days_left is not none %}
+  <div style="background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(59,130,246,0.06));border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <div style="font-size:1.5rem;">🎁</div>
+    <div style="flex:1;font-size:0.88rem;">
+      <strong style="color:#c4b5fd;">30-Tage Trial aktiv</strong>
+      <span style="color:var(--text-muted);margin-left:0.5rem;">— Noch <strong style="color:#a78bfa;">{{ trial_days_left }} Tag{{ 'e' if trial_days_left != 1 else '' }}</strong></span>
+    </div>
+  </div>
+  {% elif free_trial_used and sub_status not in ('active', 'trialing') %}
+  <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#fcd34d;font-size:0.88rem;">
+    ⏱️ Dein kostenloser Trial ist abgelaufen. Abonniere einen Plan, um weiterzumachen.
+  </div>
+  {% endif %}
+
   <!-- ── Header ── -->
   <div class="billing-header">
     <h1 style="margin:0 0 0.4rem;font-size:1.8rem;font-weight:900;">Choose your plan</h1>
-    <p style="color:var(--text-muted);margin:0 0 1.5rem;font-size:0.95rem;">All plans with 7-day free trial · Cancel anytime</p>
+    <p style="color:var(--text-muted);margin:0 0 1.5rem;font-size:0.95rem;">Monatlich oder jährlich · Jederzeit kündbar</p>
 
     <!-- Billing Toggle -->
     <div class="billing-toggle">
@@ -269,7 +309,7 @@
       <input type="hidden" name="tier" id="selectedTier" value="clan">
       <input type="hidden" name="plan" id="selectedPlan" value="monthly">
       <button type="submit" class="checkout-main" id="checkoutBtn">
-        🚀 Clan · 7 Tage gratis testen
+        🚀 Clan · Abonnieren
       </button>
     </form>
     <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.75rem;">
@@ -329,8 +369,8 @@ function updateBtn() {
   const btn = document.getElementById('checkoutBtn');
   const label = TIER_LABELS[currentTier] || currentTier;
   btn.textContent = currentPlan === 'annual'
-    ? `🚀 ${label} · Annual starten`
-    : `🚀 ${label} · 7 Tage gratis testen`;
+    ? `🚀 ${label} · Annual abonnieren`
+    : `🚀 ${label} · Abonnieren`;
 }
 
 selectTier('clan');

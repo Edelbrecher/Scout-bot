@@ -778,7 +778,10 @@ async def lifespan(app: FastAPI):
             try:
                 expired = await database.expire_overdue_trials()
                 if expired:
-                    print(f"[trials] Expired {len(expired)} trial(s): {expired}", flush=True)
+                    print(f"[trials] Expired {len(expired)} guild trial(s): {expired}", flush=True)
+                expired_users = await database.expire_overdue_user_trials()
+                if expired_users:
+                    print(f"[trials] Expired {len(expired_users)} user trial(s): {expired_users}", flush=True)
             except Exception as e:
                 print(f"[trials] ERROR: {e}", flush=True)
             await asyncio.sleep(3600)
@@ -1721,6 +1724,16 @@ async def user_billing_page(request: Request):
     owner_discord_id = session.get("uid", "")
     user_sub = await database.get_user_subscription(owner_discord_id) if owner_discord_id else None
     stripe_configured = bool(STRIPE_SECRET_KEY)
+    # Compute trial days remaining
+    trial_days_left = None
+    if user_sub and user_sub.get("subscription_status") == "trialing" and user_sub.get("expires_at"):
+        from datetime import datetime as _dt
+        try:
+            exp = _dt.fromisoformat(user_sub["expires_at"])
+            delta = (exp - _dt.utcnow()).days
+            trial_days_left = max(0, delta)
+        except Exception:
+            pass
     return templates.TemplateResponse("user_billing.html", {
         "request": request,
         "session": session,
@@ -1730,6 +1743,8 @@ async def user_billing_page(request: Request):
         "tier_meta": TIER_META,
         "error": request.query_params.get("error", ""),
         "saved": request.query_params.get("saved", ""),
+        "trial_days_left": trial_days_left,
+        "free_trial_used": bool((user_sub or {}).get("free_trial_used")),
     })
 
 
@@ -1803,6 +1818,22 @@ async def user_billing_portal(request: Request):
         return_url=f"{base_url}/billing",
     )
     return RedirectResponse(portal.url, status_code=303)
+
+
+@app.post("/billing/start-free-trial")
+async def user_start_free_trial(request: Request, plan: str = Form("player_pro")):
+    """Activate the one-time 30-day free trial for Player Pro (no credit card required)."""
+    session, err = _require_session(request)
+    if err: return err
+    owner_discord_id = session.get("uid", "")
+    if not owner_discord_id:
+        return RedirectResponse("/billing?error=not_logged_in", status_code=303)
+    if plan not in ("player_pro",):
+        plan = "player_pro"
+    ok = await database.start_user_free_trial(owner_discord_id, plan)
+    if not ok:
+        return RedirectResponse("/billing?error=trial_already_used", status_code=303)
+    return RedirectResponse("/billing?saved=trial_started", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -3719,6 +3750,16 @@ async def billing_page(request: Request, guild_id: str):
     if not is_guild_owner(session, guild):
         return RedirectResponse(f"/guild/{guild_id}?error=billing_owner_only", status_code=303)
     stripe_configured = bool(STRIPE_SECRET_KEY)
+    # Compute trial days remaining for guild
+    trial_days_left = None
+    if guild.get("subscription_status") == "trialing" and guild.get("trial_expires_at"):
+        from datetime import datetime as _dt
+        try:
+            exp = _dt.fromisoformat(guild["trial_expires_at"])
+            delta = (exp - _dt.utcnow()).days
+            trial_days_left = max(0, delta)
+        except Exception:
+            pass
     return templates.TemplateResponse("billing.html", {
         "request": request,
         "guild": guild,
@@ -3730,6 +3771,8 @@ async def billing_page(request: Request, guild_id: str):
         "saved": request.query_params.get("saved"),
         "cancelled": request.query_params.get("cancelled"),
         "error": request.query_params.get("error"),
+        "trial_days_left": trial_days_left,
+        "free_trial_used": bool(guild.get("free_trial_used")),
     })
 
 
@@ -3905,6 +3948,25 @@ async def billing_cancel(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/billing?cancelled=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/billing/start-free-trial")
+async def guild_start_free_trial(request: Request, guild_id: str, plan: str = Form("starter")):
+    """Activate the one-time 30-day free trial for a guild (no credit card required)."""
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not is_guild_owner(session, guild) and session.get("type") != "admin":
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=not_owner", status_code=303)
+    valid_plans = ("starter", "clan", "alliance", "imperium")
+    if plan not in valid_plans:
+        plan = "starter"
+    ok = await database.start_guild_free_trial(guild_id, plan)
+    if not ok:
+        return RedirectResponse(f"/guild/{guild_id}/billing?error=trial_already_used", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/billing?saved=trial_started", status_code=303)
+
+
 @app.post("/plans/cancel")
 async def plans_cancel(request: Request):
     """Cancel the user-level subscription at period end."""
@@ -3965,6 +4027,7 @@ async def plans_page(request: Request, error: str = "", cancelled: str = ""):
         "user_sub": user_sub,
         "error": error,
         "cancelled": cancelled,
+        "free_trial_used": bool((user_sub or {}).get("free_trial_used")),
     })
 
 
@@ -9918,45 +9981,52 @@ async def admin_impressum_save(
 # ---------------------------------------------------------------------------
 
 _DEFAULT_SIDEBAR_NAV = [
-    {"type": "item",  "icon": "home",      "label": "Overview",        "url_suffix": ""},
-    {"type": "group", "label": "Map & Attacks"},
-    {"type": "item",  "icon": "map",       "label": "Map",             "url_suffix": "/map"},
-    {"type": "item",  "icon": "sword",     "label": "Attacks",         "url_suffix": "/attacks"},
-    {"type": "item",  "icon": "radar",     "label": "Sector Monitor",  "url_suffix": "/map/sector-monitor"},
-    {"type": "group", "label": "Farming"},
-    {"type": "item",  "icon": "wheat",     "label": "Farming Intel",   "url_suffix": "/farming"},
-    {"type": "item",  "icon": "list",      "label": "Farmlist Analyst","url_suffix": "/farmlist-analyst"},
-    {"type": "group", "label": "Scouting"},
+    # ── Home ──────────────────────────────────────────────────────────────
+    {"type": "item",  "icon": "home",      "label": "Overview",           "url_suffix": ""},
+    # ── Aufklärung ────────────────────────────────────────────────────────
+    {"type": "group", "label": "Aufklärung"},
+    {"type": "item",  "icon": "map",       "label": "Map",                "url_suffix": "/map"},
+    {"type": "item",  "icon": "radar",     "label": "Sector Monitor",     "url_suffix": "/map/sector-monitor"},
     {"type": "item",  "icon": "search",    "label": "Player Intel",       "url_suffix": "/intel"},
-    {"type": "item",  "icon": "scroll",    "label": "Battle Reports",     "url_suffix": "/reports"},
     {"type": "item",  "icon": "eye",       "label": "Scout Tracking",     "url_suffix": "/scout"},
     {"type": "item",  "icon": "shield",    "label": "Hero Scout",         "url_suffix": "/defense/hero-scout"},
     {"type": "item",  "icon": "alert",     "label": "Scout Incidents",    "url_suffix": "/scout-incidents"},
     {"type": "item",  "icon": "radar",     "label": "Alliance Tracking",  "url_suffix": "/alliance-tracking"},
-    {"type": "group", "label": "Alliance"},
-    {"type": "item",  "icon": "castle",    "label": "My Alliance",     "url_suffix": "/my-ally"},
-    {"type": "item",  "icon": "users",     "label": "Members",         "url_suffix": "/allianz/mitglieder"},
-    {"type": "item",  "icon": "shield",    "label": "Defense",         "url_suffix": "/verteidigung"},
-    {"type": "item",  "icon": "alert",     "label": "Alliance Attacks","url_suffix": "/attacks/alliance-overview"},
-    {"type": "item",  "icon": "skull",     "label": "Enemies",         "url_suffix": "/enemies"},
-    {"type": "item",  "icon": "cross",     "label": "Hospital",        "url_suffix": "/allianz/hospital"},
+    # ── Kämpfe ────────────────────────────────────────────────────────────
+    {"type": "group", "label": "Kämpfe"},
+    {"type": "item",  "icon": "sword",     "label": "Attacks",            "url_suffix": "/attacks"},
+    {"type": "item",  "icon": "scroll",    "label": "Battle Reports",     "url_suffix": "/reports"},
+    {"type": "item",  "icon": "alert",     "label": "Alliance Attacks",   "url_suffix": "/attacks/alliance-overview"},
+    # ── Farming ───────────────────────────────────────────────────────────
+    {"type": "group", "label": "Farming"},
+    {"type": "item",  "icon": "wheat",     "label": "Farming Intel",      "url_suffix": "/farming"},
+    {"type": "item",  "icon": "list",      "label": "Farmlist Analyst",   "url_suffix": "/farmlist-analyst"},
+    {"type": "item",  "icon": "crop",      "label": "Crop Calculator",    "url_suffix": "/tools/crop-calculator"},
+    {"type": "item",  "icon": "wheat",     "label": "Grain Simulations",  "url_suffix": "/tools/grain-simulations"},
+    # ── Allianz ───────────────────────────────────────────────────────────
+    {"type": "group", "label": "Allianz"},
+    {"type": "item",  "icon": "castle",    "label": "My Alliance",        "url_suffix": "/my-ally"},
+    {"type": "item",  "icon": "users",     "label": "Members",            "url_suffix": "/allianz/mitglieder"},
+    {"type": "item",  "icon": "shield",    "label": "Defense",            "url_suffix": "/verteidigung"},
+    {"type": "item",  "icon": "skull",     "label": "Enemies",            "url_suffix": "/enemies"},
+    {"type": "item",  "icon": "cross",     "label": "Hospital",           "url_suffix": "/allianz/hospital"},
+    {"type": "item",  "icon": "gear",      "label": "Operations",         "url_suffix": "/operations"},
+    {"type": "item",  "icon": "flag",      "label": "My Op Plan",         "url_suffix": "/my-operations"},
+    {"type": "item",  "icon": "poll",      "label": "Polls",              "url_suffix": "/polls"},
+    {"type": "item",  "icon": "blueprint", "label": "Blueprints",         "url_suffix": "/blueprints"},
+    # ── Tools ─────────────────────────────────────────────────────────────
     {"type": "group", "label": "Tools"},
-    {"type": "item",  "icon": "gear",      "label": "Operations",      "url_suffix": "/operations"},
-    {"type": "item",  "icon": "flag",      "label": "My Op Plan",      "url_suffix": "/my-operations"},
-    {"type": "item",  "icon": "box",       "label": "Res Push",        "url_suffix": "/res-push"},
-    {"type": "item",  "icon": "chart",     "label": "Statistics",      "url_suffix": "/stats"},
-    {"type": "item",  "icon": "clock",     "label": "Timer",           "url_suffix": "/timer"},
-    {"type": "item",  "icon": "flag",      "label": "Settle List",     "url_suffix": "/settle-list"},
-    {"type": "item",  "icon": "poll",      "label": "Polls",           "url_suffix": "/polls"},
-    {"type": "item",  "icon": "blueprint", "label": "Blueprints",      "url_suffix": "/blueprints"},
-    {"type": "item",  "icon": "fist",      "label": "Combat Power",    "url_suffix": "/my-account/kampfkraft"},
-    {"type": "item",  "icon": "crop",      "label": "Crop Calculator", "url_suffix": "/tools/crop-calculator"},
-    {"type": "item",  "icon": "wheat",     "label": "Grain Simulations", "url_suffix": "/tools/grain-simulations"},
+    {"type": "item",  "icon": "box",       "label": "Res Push",           "url_suffix": "/res-push"},
+    {"type": "item",  "icon": "chart",     "label": "Statistics",         "url_suffix": "/stats"},
+    {"type": "item",  "icon": "clock",     "label": "Timer",              "url_suffix": "/timer"},
+    {"type": "item",  "icon": "flag",      "label": "Settle List",        "url_suffix": "/settle-list"},
+    {"type": "item",  "icon": "fist",      "label": "Combat Power",       "url_suffix": "/my-account/kampfkraft"},
+    # ── Account ───────────────────────────────────────────────────────────
     {"type": "group", "label": "Account"},
-    {"type": "item",  "icon": "person",    "label": "My Account",      "url_suffix": "/my-account"},
-    {"type": "item",  "icon": "bell",      "label": "Notifications",   "url_suffix": "/notifications"},
-    {"type": "item",  "icon": "gear",      "label": "Settings",        "url_suffix": "/settings"},
-    {"type": "item",  "icon": "card",      "label": "Billing",         "url_suffix": "/billing"},
+    {"type": "item",  "icon": "person",    "label": "My Account",         "url_suffix": "/my-account"},
+    {"type": "item",  "icon": "bell",      "label": "Notifications",      "url_suffix": "/notifications"},
+    {"type": "item",  "icon": "gear",      "label": "Settings",           "url_suffix": "/settings"},
+    {"type": "item",  "icon": "card",      "label": "Billing",            "url_suffix": "/billing"},
 ]
 
 

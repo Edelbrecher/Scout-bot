@@ -217,6 +217,10 @@ async def init_db():
         # Trial system
         try:
             await db.execute("ALTER TABLE guild_configs ADD COLUMN trial_expires_at TEXT")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE guild_configs ADD COLUMN free_trial_used INTEGER DEFAULT 0")
             await db.commit()
         except Exception:
             pass
@@ -3772,6 +3776,9 @@ async def _init_user_sub_tables():
         # Migrations for existing tables
         for col in [
             "discord_username TEXT",
+            "free_trial_used INTEGER DEFAULT 0",
+            "free_trial_plan TEXT",
+            "free_trial_started_at TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE user_subscriptions ADD COLUMN {col}")
@@ -6862,6 +6869,90 @@ async def get_all_trial_links() -> list[dict]:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM trial_links ORDER BY created_at DESC") as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def start_user_free_trial(discord_user_id: str, plan: str = "player_pro") -> bool:
+    """Activate a 30-day free trial for a user. Returns False if trial was already used."""
+    from datetime import datetime as _dt, timedelta as _td
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT free_trial_used FROM user_subscriptions WHERE discord_user_id = ?",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        if row and row["free_trial_used"]:
+            return False
+        expires = (_dt.utcnow() + _td(days=30)).isoformat()
+        now = _dt.utcnow().isoformat()
+        await db.execute("""
+            INSERT INTO user_subscriptions
+                (discord_user_id, subscription_status, plan, expires_at,
+                 free_trial_used, free_trial_plan, free_trial_started_at, updated_at)
+            VALUES (?, 'trialing', ?, ?, 1, ?, ?, ?)
+            ON CONFLICT(discord_user_id) DO UPDATE SET
+                subscription_status    = 'trialing',
+                plan                   = excluded.plan,
+                expires_at             = excluded.expires_at,
+                free_trial_used        = 1,
+                free_trial_plan        = excluded.free_trial_plan,
+                free_trial_started_at  = excluded.free_trial_started_at,
+                updated_at             = excluded.updated_at
+        """, (discord_user_id, plan, expires, plan, now, now))
+        await db.commit()
+    return True
+
+
+async def start_guild_free_trial(guild_id: str, plan: str = "starter") -> bool:
+    """Activate a 30-day free trial for a guild. Returns False if trial was already used."""
+    from datetime import datetime as _dt, timedelta as _td
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT free_trial_used FROM guild_configs WHERE guild_id = ?", (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        if row and row["free_trial_used"]:
+            return False
+        expires = (_dt.utcnow() + _td(days=30)).isoformat()
+        await db.execute("""
+            UPDATE guild_configs SET
+                subscription_status = 'trialing',
+                subscription_plan   = ?,
+                trial_expires_at    = ?,
+                free_trial_used     = 1
+            WHERE guild_id = ?
+        """, (plan + "_monthly", expires, guild_id))
+        await db.commit()
+    return True
+
+
+async def expire_overdue_user_trials():
+    """Downgrade user-level trials that have expired. Returns list of expired user_ids."""
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT discord_user_id FROM user_subscriptions
+               WHERE expires_at IS NOT NULL
+                 AND expires_at <= ?
+                 AND subscription_status = 'trialing'
+                 AND free_trial_used = 1
+                 AND (stripe_subscription_id IS NULL OR stripe_subscription_id = '')""",
+            (now,),
+        ) as cur:
+            rows = await cur.fetchall()
+        expired = [r["discord_user_id"] for r in rows]
+        if expired:
+            placeholders = ",".join("?" * len(expired))
+            await db.execute(
+                f"""UPDATE user_subscriptions SET subscription_status='free', plan=''
+                    WHERE discord_user_id IN ({placeholders})""",
+                expired,
+            )
+            await db.commit()
+    return expired
 
 
 async def expire_overdue_trials():

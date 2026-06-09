@@ -2,7 +2,7 @@
 {% block title %}Player Pro · TravOps{% endblock %}
 
 {% block content %}
-{% set sub_status = (user_sub or {}).get('status', 'free') %}
+{% set sub_status = (user_sub or {}).get('subscription_status', 'free') %}
 {% set sub_plan   = (user_sub or {}).get('plan', '') %}
 {% set is_active  = sub_status in ('active', 'trialing') %}
 
@@ -108,7 +108,11 @@
   <!-- ── Flash messages ── -->
   {% if error == 'price_not_configured' %}
   <div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#f87171;">
-    ⚠️ Stripe-Preis noch nicht konfiguriert. Please den Admin kontaktieren.
+    ⚠️ Stripe-Preis noch nicht konfiguriert. Bitte den Admin kontaktieren.
+  </div>
+  {% elif error == 'trial_already_used' %}
+  <div style="background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#fcd34d;">
+    ⚠️ Du hast deinen kostenlosen Trial bereits genutzt. Wähle ein Abo-Modell, um weiterzumachen.
   </div>
   {% elif error == 'cancelled' %}
   <div style="background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#fcd34d;">
@@ -120,20 +124,44 @@
   </div>
   {% endif %}
 
-  {% if saved %}
+  {% if saved == 'trial_started' %}
+  <div style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;color:#4ade80;display:flex;gap:0.75rem;align-items:center;">
+    🎉 <div><strong>30-Tage Trial aktiviert!</strong> Alle Player-Pro-Features sind jetzt freigeschaltet. Viel Spaß!</div>
+  </div>
+  {% elif saved %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#4ade80;">
     ✅ Abo erfolgreich! Alle Features sind jetzt freigeschaltet.
   </div>
   {% endif %}
 
   {% if is_active %}
-  <!-- ── Aktiv ── -->
+  <!-- ── Aktiv / Trial ── -->
+  {% if sub_status == 'trialing' and free_trial_used %}
+  <div style="background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(59,130,246,0.08));border:1px solid rgba(139,92,246,0.35);border-radius:14px;padding:1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+    <div style="font-size:2.5rem;">🎁</div>
+    <div style="flex:1;">
+      <div style="font-size:1.15rem;font-weight:700;color:#c4b5fd;margin-bottom:0.2rem;">30-Tage Trial aktiv</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);">
+        {% if trial_days_left is not none %}
+          Noch <strong style="color:#a78bfa;">{{ trial_days_left }} Tag{{ 'e' if trial_days_left != 1 else '' }}</strong> · Danach für weiteren Zugang abonnieren.
+        {% endif %}
+      </div>
+    </div>
+    {% if stripe_configured %}
+    <form method="post" action="/billing/checkout">
+      <input type="hidden" name="tier" value="player_pro">
+      <input type="hidden" name="plan" value="monthly">
+      <button type="submit" style="padding:0.55rem 1.25rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;border-radius:9px;color:#fff;cursor:pointer;font-size:0.88rem;font-weight:600;">
+        💳 Jetzt abonnieren →
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}
   <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.3);border-radius:14px;padding:1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
     <div style="font-size:2.5rem;">✅</div>
     <div style="flex:1;">
-      <div style="font-size:1.15rem;font-weight:700;color:#4ade80;margin-bottom:0.2rem;">
-        {% if sub_status == 'trialing' %}🎁 Trial aktiv{% else %}Player Pro aktiv{% endif %}
-      </div>
+      <div style="font-size:1.15rem;font-weight:700;color:#4ade80;margin-bottom:0.2rem;">Player Pro aktiv</div>
       <div style="font-size:0.85rem;color:var(--text-muted);">
         Plan: <strong>{{ sub_plan or 'Player Pro' }}</strong>
         {% if (user_sub or {}).get('expires_at') %} · Renewal: {{ (user_sub.expires_at or '')[:10] }}{% endif %}
@@ -145,6 +173,7 @@
       </button>
     </form>
   </div>
+  {% endif %}
 
   {% else %}
   <!-- ── Hero CTA ── -->
@@ -171,19 +200,43 @@
       </button>
     </div>
 
+    {% if not free_trial_used %}
+    <!-- Free Trial CTA (no credit card) -->
+    <form method="post" action="/billing/start-free-trial" style="margin-bottom:1rem;">
+      <input type="hidden" name="plan" value="player_pro">
+      <button type="submit" class="checkout-btn" style="background:linear-gradient(135deg,#059669,#0d9488);box-shadow:0 6px 28px rgba(5,150,105,0.35);font-size:1.1rem;">
+        🎁 30 Tage kostenlos testen
+      </button>
+    </form>
+    <p style="font-size:0.78rem;color:#475569;margin-top:0;margin-bottom:1.5rem;">
+      Keine Kreditkarte · Einmalig · Endet automatisch
+    </p>
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
+      <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
+      <span style="font-size:0.75rem;color:#475569;">oder direkt abonnieren</span>
+      <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
+    </div>
+    {% endif %}
+
     {% if stripe_configured %}
     <form method="post" action="/billing/checkout" id="checkoutForm">
       <input type="hidden" name="tier" value="player_pro">
       <input type="hidden" name="plan" id="planInput" value="monthly">
-      <button type="submit" class="checkout-btn">
-        🚀 7 days free testen → dann <span id="priceLabel">€2,99/Monat</span>
+      <button type="submit" class="checkout-btn" {% if not free_trial_used %}style="background:rgba(124,58,237,0.5);box-shadow:none;font-size:0.95rem;"{% endif %}>
+        💳 Abonnieren → <span id="priceLabel">€2,99/Monat</span>
       </button>
     </form>
     <p style="font-size:0.75rem;color:#475569;margin-top:0.85rem;">
-      🔒 Payment via Stripe &nbsp;·&nbsp; Keine Bindung &nbsp;·&nbsp; Credit card oder PayPal
+      🔒 Payment via Stripe &nbsp;·&nbsp; Keine Bindung &nbsp;·&nbsp; Kreditkarte oder PayPal
     </p>
     {% else %}
     <p style="color:var(--text-muted);font-size:0.9rem;">Stripe noch nicht konfiguriert.</p>
+    {% endif %}
+
+    {% if free_trial_used and not is_active %}
+    <p style="font-size:0.78rem;color:#f59e0b;margin-top:0.85rem;">
+      ⏱️ Dein 30-Tage Trial ist abgelaufen. Abonniere, um wieder Zugang zu erhalten.
+    </p>
     {% endif %}
   </div>
   {% endif %}

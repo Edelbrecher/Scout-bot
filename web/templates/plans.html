@@ -190,7 +190,7 @@
     </div>
     <h1 data-i18n="plans.title">Choose your plan</h1>
     <p style="color:var(--text-muted);font-size:0.95rem;max-width:500px;margin:0 auto 1.75rem;line-height:1.6;">
-      Start with <strong style="color:#4ade80;">7 days free</strong> — no credit card until the end of the trial.
+      Starte mit <strong style="color:#4ade80;">30 Tagen kostenlos</strong> — einmalig, keine Kreditkarte nötig.
     </p>
     <div class="billing-toggle">
       <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">Monthly</button>
@@ -246,11 +246,22 @@
       <button class="pp-cta-btn" style="background:rgba(255,255,255,0.06);box-shadow:none;cursor:default;color:var(--text-muted);" disabled>Aktiver Plan ✓</button>
       {% elif not logged_in %}
       <a href="/login" class="pp-cta-btn">Mit Discord starten →</a>
+      {% elif not free_trial_used %}
+      <form method="post" action="/billing/start-free-trial" style="width:100%;margin-bottom:0.5rem;">
+        <input type="hidden" name="plan" value="player_pro">
+        <button type="submit" class="pp-cta-btn" style="background:linear-gradient(135deg,#059669,#0d9488);box-shadow:0 4px 20px rgba(5,150,105,0.35);">🎁 30 Tage gratis testen</button>
+      </form>
+      <div style="font-size:0.7rem;color:#475569;text-align:center;margin-bottom:0.5rem;">Keine Kreditkarte · Einmalig</div>
+      <form method="post" action="/plans/checkout" style="width:100%;">
+        <input type="hidden" name="tier" value="player_pro">
+        <input type="hidden" class="input-plan" name="plan" value="monthly">
+        <button type="submit" class="pp-cta-btn" style="background:rgba(124,58,237,0.35);box-shadow:none;font-size:0.88rem;">💳 Direkt abonnieren</button>
+      </form>
       {% else %}
       <form method="post" action="/plans/checkout" style="width:100%;">
         <input type="hidden" name="tier" value="player_pro">
         <input type="hidden" class="input-plan" name="plan" value="monthly">
-        <button type="submit" class="pp-cta-btn">🚀 7 days free testen</button>
+        <button type="submit" class="pp-cta-btn">🚀 Abonnieren</button>
       </form>
       {% endif %}
       <div style="font-size:0.72rem;color:#475569;text-align:center;">Keine Bindung · Credit card oder PayPal</div>
@@ -297,7 +308,7 @@
 
       {% if is_popular %}<div class="popular-badge">⭐ BELIEBTESTE WAHL</div>{% endif %}
       {% if is_current %}<div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#3b82f6;color:#fff;font-size:0.65rem;font-weight:900;padding:2px 12px;border-radius:10px;white-space:nowrap;">Aktueller Plan</div>{% endif %}
-      <div class="trial-badge">7T GRATIS</div>
+      <div class="trial-badge">30T GRATIS</div>
 
       <div class="tier-icon" style="background:{{ tcolor }}18;border:1px solid {{ tcolor }}33;">{{ temoji }}</div>
       <div class="tier-name" style="color:{{ tcolor }};">{{ tname }}</div>
@@ -347,7 +358,7 @@
     <span>🔒 Payment via Stripe</span>
     <span>🎟️ Voucher redeemable at checkout</span>
     <span>↩️ Cancel anytime</span>
-    <span>🎁 7 days free — no credit card needed</span>
+    <span>🎁 30 Tage gratis testen — einmalig, keine Kreditkarte</span>
   </div>
 
   <div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin-bottom:2.5rem;">
