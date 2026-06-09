@@ -10032,7 +10032,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "group", "label": "Allianz"},
     {"type": "submenu", "icon": "castle", "label": "My Alliance", "children": [
         {"type": "item", "icon": "castle",  "label": "My Alliance", "url_suffix": "/my-ally"},
-        {"type": "item", "icon": "gear",    "label": "Settings",    "url_suffix": "/settings"},
+        {"type": "item", "icon": "gear",    "label": "Roles & Perms", "url_suffix": "/settings#roles"},
     ]},
     {"type": "item",  "icon": "users",     "label": "Members",            "url_suffix": "/allianz/mitglieder"},
     {"type": "item",  "icon": "shield",    "label": "Defense",            "url_suffix": "/verteidigung"},
