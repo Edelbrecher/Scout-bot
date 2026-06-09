@@ -6120,13 +6120,15 @@ _WINNER_BUTTON_COMPONENT = {
 async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, ally_name: str,
                                  existing_msg_id: str | None, utc_offset: int = 60,
                                  button_tooltip: str | None = None) -> str | None:
-    """Post or edit countdown embed. Returns message_id or None on failure."""
+    """Post or edit countdown embed. Returns message_id or None on failure.
+    If channel returns 404, auto-creates a new one and retries."""
     bot_token = os.environ.get("DISCORD_TOKEN", "")
     headers   = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
     embed, _, _, _ = _build_countdown_embed(end_date, ally_name, utc_offset, button_tooltip)
     payload = {"embeds": [embed], "components": [_WINNER_BUTTON_COMPONENT]}
 
     async with httpx.AsyncClient(timeout=15) as client:
+        # Try editing existing message first
         if existing_msg_id:
             r = await client.patch(
                 f"https://discord.com/api/v10/channels/{channel_id}/messages/{existing_msg_id}",
@@ -6134,14 +6136,33 @@ async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, a
             )
             if r.status_code in (200, 201):
                 return existing_msg_id
-            # 404 = deleted, fall through to create
+            # on 404 fall through to post a new message
 
+        # Try posting to channel
         r = await client.post(
             f"https://discord.com/api/v10/channels/{channel_id}/messages",
             headers=headers, json=payload,
         )
         if r.status_code in (200, 201):
             return r.json().get("id")
+
+        # Channel doesn't exist (404) — recreate it
+        if r.status_code == 404 and not guild_id.startswith("ws_"):
+            print(f"[wewin] channel {channel_id} not found, recreating for guild {guild_id}", flush=True)
+            result = await _create_wewin_channel(guild_id)
+            if result:
+                new_channel_id, new_channel_name = result
+                await database.update_guild_server_end(
+                    guild_id, wewin_channel_id=new_channel_id,
+                    wewin_channel_name=new_channel_name, wewin_message_id=None
+                )
+                r2 = await client.post(
+                    f"https://discord.com/api/v10/channels/{new_channel_id}/messages",
+                    headers=headers, json=payload,
+                )
+                if r2.status_code in (200, 201):
+                    return r2.json().get("id")
+
         print(f"[wewin] Discord error {r.status_code}: {r.text[:200]}", flush=True)
         return None
 
