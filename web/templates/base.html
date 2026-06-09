@@ -499,12 +499,18 @@ function escHtml(s) {
       var extraCls = (indent?' gs-sub-item':'')+(isActive?' active':'')+(item.disabled?' gs-item-disabled':'');
       var extraStyle = '';
       if (item.border_color) extraStyle += 'border-left:3px solid '+item.border_color+';padding-left:calc(0.85rem - 3px);';
+      // Badge for known tracked suffixes
+      var badgeCount = _gsBadges[item.url_suffix] || 0;
+      var badgeHtml = badgeCount > 0
+        ? '<span class="gs-badge">'+(badgeCount > 99?'99+':badgeCount)+'</span>'
+        : '';
       return '<a class="gs-item'+extraCls+'"'
         +' href="'+(item.disabled?'javascript:void(0)':url)+'"'
         +' data-label="'+item.label+'"'
         +(extraStyle?' style="'+extraStyle+'"':'')+' >'
         +ico(item.icon||'home')
         +'<span class="gs-label">'+item.label+'</span>'
+        +badgeHtml
         +'</a>';
     }
     var html = '';
@@ -526,6 +532,59 @@ function escHtml(s) {
     var mobileBtn = document.getElementById('gs-mobile-toggle');
     if (window.innerWidth <= 768 && mobileBtn) mobileBtn.style.display = 'flex';
   }
+
+  // ── Sidebar badges (sector monitor + my op plan) ─────────────────────
+  var _gsBadges = {};
+  var _gsBadgeGid = null;
+
+  function _loadBadges(gid) {
+    _gsBadgeGid = gid;
+    fetch('/guild/'+gid+'/api/sidebar-badges')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data){
+        if (!data) return;
+        _gsBadges = {
+          '/map/sector-monitor': data.sector_monitor || 0,
+          '/my-operations':      data.my_operations  || 0,
+        };
+        _applyBadges();
+      }).catch(function(){});
+  }
+
+  function _applyBadges() {
+    // Update existing badge elements without full re-render
+    var nav = document.getElementById('gs-nav-items');
+    if (!nav) return;
+    nav.querySelectorAll('.gs-item[data-label]').forEach(function(el){
+      var href = el.getAttribute('href') || '';
+      // Extract suffix from href
+      var suffixMatch = href.match(/\/guild\/[^\/]+(.*)$/);
+      var suffix = suffixMatch ? suffixMatch[1] : '';
+      var count = _gsBadges[suffix] || 0;
+      var existing = el.querySelector('.gs-badge');
+      if (count > 0) {
+        var txt = count > 99 ? '99+' : String(count);
+        if (existing) { existing.textContent = txt; }
+        else {
+          var b = document.createElement('span');
+          b.className = 'gs-badge';
+          b.textContent = txt;
+          el.appendChild(b);
+        }
+      } else {
+        if (existing) existing.remove();
+      }
+    });
+  }
+
+  // Kick off badge loading once sidebar is ready, then every 60 minutes
+  (function(){
+    var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
+    if (!m) return;
+    var gid = m[1];
+    setTimeout(function(){ _loadBadges(gid); }, 500);
+    setInterval(function(){ _loadBadges(gid); }, 60 * 60 * 1000);
+  })();
 
   function gsSidebarToggle() {
     var body = document.body;

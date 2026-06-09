@@ -10071,6 +10071,32 @@ async def api_sidebar_config(request: Request):
     return JSONResponse(nav)
 
 
+@app.get("/guild/{guild_id}/api/sidebar-badges")
+async def sidebar_badges(request: Request, guild_id: str):
+    """Return notification counts for sidebar badges (sector monitor alerts + my op waves)."""
+    session = get_session(request) or {}
+    if not session.get("uid"):
+        return JSONResponse({"sector_monitor": 0, "my_operations": 0})
+    uid = session["uid"]
+    sector_count, waves = await asyncio.gather(
+        _count_sector_alerts(guild_id),
+        database.get_my_op_waves(guild_id, uid),
+    )
+    return JSONResponse({
+        "sector_monitor": sector_count,
+        "my_operations": len([w for w in waves if (w.get("plan_status") or "") in ("active", "draft")]),
+    })
+
+
+async def _count_sector_alerts(guild_id: str) -> int:
+    """Count undismissed sector alerts for a guild."""
+    try:
+        alerts = await database.get_sector_alerts(guild_id, include_dismissed=False, limit=500)
+        return len(alerts)
+    except Exception:
+        return 0
+
+
 @app.get("/admin/features", response_class=HTMLResponse)
 async def admin_features(request: Request):
     session, err = _require_session(request)

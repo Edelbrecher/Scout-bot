@@ -340,6 +340,27 @@ body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
 .gs-sub-item.active .gs-icon { color: #818cf8; }
 .gs-item-disabled { opacity: 0.35 !important; pointer-events: none !important; cursor: default !important; }
 
+/* ── Sidebar notification badge ── */
+.gs-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  animation: gs-badge-pulse 2s ease-in-out infinite;
+}
+@keyframes gs-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); opacity: 1; }
+  50%       { box-shadow: 0 0 0 5px rgba(239,68,68,0); opacity: 0.85; }
+}
+
 /* Vertical connecting line for submenu children */
 .gs-submenu-items {
   position: relative;
