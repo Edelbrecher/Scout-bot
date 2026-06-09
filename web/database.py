@@ -2832,16 +2832,6 @@ async def search_inactive_advanced(
 
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
 
-        # Ensure indexes exist for fast lookups
-        await db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_mapsnap_guild_ts
-            ON map_snapshots(guild_id, fetched_at)
-        """)
-        await db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_mapsnap_guild_xy
-            ON map_snapshots(guild_id, x, y)
-        """)
-
         # Last 8 distinct snapshot timestamps
         async with db.execute("""
             SELECT DISTINCT fetched_at FROM map_snapshots
