@@ -227,13 +227,31 @@
 </style>
 
 <div class="container-wide" style="max-width:1100px; margin: 0 auto;">
-  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
     <div>
       <a href="/guild/{{ guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 data-i18n="crop.title">🌾 Grainfeld-Effizienz-Rechner</h1>
-      <p class="subtitle" data-i18n="crop.subtitle">Optimal upgrade order for grain fields — ROI-based (T4.4 Extended)</p>
+      <h1 id="cc-page-title">🌾 Grainfeld-Rechner</h1>
     </div>
   </div>
+
+  <!-- ── Tab Navigation ── -->
+  <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;">
+    <button class="cc-tab-btn" id="tab-btn-efficiency"   onclick="switchTab('efficiency')"
+            style="padding:0.6rem 1.4rem;border:none;background:none;cursor:pointer;font-size:0.92rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;">
+      📊 Effizienz
+    </button>
+    <button class="cc-tab-btn" id="tab-btn-traderoutes"  onclick="switchTab('traderoutes')"
+            style="padding:0.6rem 1.4rem;border:none;background:none;cursor:pointer;font-size:0.92rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;">
+      🚛 Traderouten
+    </button>
+    <button class="cc-tab-btn" id="tab-btn-grain-supply" onclick="switchTab('grain-supply')"
+            style="padding:0.6rem 1.4rem;border:none;background:none;cursor:pointer;font-size:0.92rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;">
+      📈 Grain Supply
+    </button>
+  </div>
+
+  <!-- ══ TAB: Efficiency ══ -->
+  <div id="cc-tab-efficiency">
 
   <!-- Configuration -->
   <div class="cc-section">
@@ -883,10 +901,15 @@ function renderResults(steps, finalState, totalOasisPct) {
 buildFieldInputs();
 </script>
 
+  </div><!-- /cc-tab-efficiency -->
+
+  <!-- ══ TAB: Traderoutes ══ -->
+  <div id="cc-tab-traderoutes" style="display:none;">
+
 {# ══════════════════════════════════════════════════════════════
    TRADEROUTEN-RECHNER
 ══════════════════════════════════════════════════════════════ #}
-<div class="cc-section" style="margin-top:2rem;">
+<div class="cc-section">
   <h2>🚛 Traderouten-Rechner</h2>
   <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.25rem;">
     Berechnet wie viele Traderouten du brauchst, um einen Grainmangel dauerhaft auszugleichen.
@@ -1177,7 +1200,12 @@ calcTradeRoutes();
 .cs-btn-secondary:hover { border-color: #22c55e; color: var(--text); }
 </style>
 
-<div class="cc-section" style="margin-top:2rem;" id="grain-supply-section">
+  </div><!-- /cc-tab-traderoutes -->
+
+  <!-- ══ TAB: Grain Supply ══ -->
+  <div id="cc-tab-grain-supply" style="display:none;">
+
+<div class="cc-section" id="grain-supply-section">
   <h2>📈 Grain Supply Simulator</h2>
   <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.5rem;">
     Simulates grain flow over time — troop starvation, warehouse overflow and merchant deliveries at a glance.
@@ -1730,8 +1758,47 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') closeSaveSimMod
     const lbl = name ? `„${name}"` : (label || 'Simulation');
     statusEl.innerHTML = `<span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:.25rem .65rem;color:#4ade80;font-size:.78rem;">📂 ${lbl} geladen — Klick auf Analyse &amp; Simulate</span>`;
   }
-  // Scroll to grain supply section
-  document.getElementById('grain-supply-section')?.scrollIntoView({behavior:'smooth'});
+  // Switch to grain supply tab when loaded via sim
+  switchTab('grain-supply');
 })();
 </script>
+
+  </div><!-- /cc-tab-grain-supply -->
+
+<script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+const TAB_TITLES = {
+  'efficiency':   '📊 Grainfeld-Effizienz-Rechner',
+  'traderoutes':  '🚛 Traderouten-Rechner',
+  'grain-supply': '📈 Grain Supply Simulator',
+};
+
+function switchTab(tab) {
+  ['efficiency','traderoutes','grain-supply'].forEach(t => {
+    const el  = document.getElementById('cc-tab-' + t);
+    const btn = document.getElementById('tab-btn-' + t);
+    if (!el || !btn) return;
+    const active = t === tab;
+    el.style.display  = active ? '' : 'none';
+    btn.style.color         = active ? '#f59e0b' : 'var(--text-muted)';
+    btn.style.borderBottomColor = active ? '#f59e0b' : 'transparent';
+    btn.style.fontWeight    = active ? '700' : '600';
+  });
+  const titleEl = document.getElementById('cc-page-title');
+  if (titleEl) titleEl.textContent = TAB_TITLES[tab] || '🌾 Grainfeld-Rechner';
+  // Update URL without reload so back button / link sharing works
+  const url = new URL(window.location.href);
+  if (tab === 'efficiency') url.searchParams.delete('tab');
+  else url.searchParams.set('tab', tab);
+  history.replaceState(null, '', url.toString());
+}
+
+// Activate tab from URL param on load
+(function() {
+  const tab = new URLSearchParams(window.location.search).get('tab') || 'efficiency';
+  switchTab(tab);
+})();
+</script>
+
+</div><!-- /container-wide -->
 {% endblock %}

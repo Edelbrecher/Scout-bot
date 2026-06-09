@@ -10001,7 +10001,9 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "group", "label": "Farming"},
     {"type": "item",  "icon": "wheat",     "label": "Farming Intel",      "url_suffix": "/farming"},
     {"type": "item",  "icon": "list",      "label": "Farmlist Analyst",   "url_suffix": "/farmlist-analyst"},
-    {"type": "item",  "icon": "crop",      "label": "Crop Calculator",    "url_suffix": "/tools/crop-calculator"},
+    {"type": "item",  "icon": "crop",      "label": "Effizienz",          "url_suffix": "/tools/crop-calculator"},
+    {"type": "item",  "icon": "truck",     "label": "Traderouten",        "url_suffix": "/tools/crop-calculator?tab=traderoutes"},
+    {"type": "item",  "icon": "wheat",     "label": "Grain Supply",       "url_suffix": "/tools/crop-calculator?tab=grain-supply"},
     {"type": "item",  "icon": "wheat",     "label": "Grain Simulations",  "url_suffix": "/tools/grain-simulations"},
     # ── Allianz ───────────────────────────────────────────────────────────
     {"type": "group", "label": "Allianz"},
