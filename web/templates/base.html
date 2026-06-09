@@ -56,7 +56,7 @@
       // Pre-apply sidebar layout before first paint to avoid layout shift
       try{
         var gm=location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
-        if(gm&&gm[2]&&gm[2]!=='/'){
+        if(gm){
           document.documentElement.classList.add('on-guild-page');
           if(localStorage.getItem('gs_collapsed')==='1')document.documentElement.classList.add('gs-pre-collapsed');
         }
@@ -408,9 +408,8 @@ function escHtml(s) {
     var gid  = m[1];
     var path = location.pathname;
 
-    // Only show on feature sub-pages, not the guild overview
-    var subPath = m[2] || '';
-    if (!subPath || subPath === '/') return;
+    // Show sidebar on all guild pages (including the dashboard root)
+    var subPath = m[2] || '/';
 
     var sidebar = document.getElementById('guild-sidebar');
     var body    = document.body;
