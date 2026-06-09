@@ -47,6 +47,27 @@ class WinnerView(discord.ui.View):
             )
             return
 
+        # Check if countdown has actually expired
+        from datetime import datetime as _dt, timezone as _tz
+        try:
+            guild_cfg = await database.get_guild(str(interaction.guild_id))
+            end_date = guild_cfg.get("server_end_date") if guild_cfg else None
+            if end_date:
+                end_dt = _dt.fromisoformat(end_date.replace("T", " ")).replace(tzinfo=_tz.utc)
+                remaining = (end_dt - _dt.now(_tz.utc)).total_seconds()
+                if remaining > 0:
+                    h = int(remaining // 3600)
+                    m = int((remaining % 3600) // 60)
+                    s = int(remaining % 60)
+                    await interaction.response.send_message(
+                        f"⏳ The server hasn't ended yet!\n"
+                        f"**{h}h {m:02d}m {s:02d}s** remaining — hold your horses! 🐴",
+                        ephemeral=True,
+                    )
+                    return
+        except Exception:
+            pass  # if DB check fails, allow through
+
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
