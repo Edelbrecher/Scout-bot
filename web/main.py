@@ -10030,10 +10030,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "wheat",     "label": "Grain Simulations",  "url_suffix": "/tools/grain-simulations"},
     # ── Allianz ───────────────────────────────────────────────────────────
     {"type": "group", "label": "Allianz"},
-    {"type": "submenu", "icon": "castle", "label": "My Alliance", "children": [
-        {"type": "item", "icon": "castle",  "label": "My Alliance", "url_suffix": "/my-ally"},
-        {"type": "item", "icon": "gear",    "label": "Roles & Perms", "url_suffix": "/settings#roles"},
-    ]},
+    {"type": "item",  "icon": "castle",    "label": "My Alliance",        "url_suffix": "/my-ally"},
     {"type": "item",  "icon": "users",     "label": "Members",            "url_suffix": "/allianz/mitglieder"},
     {"type": "item",  "icon": "shield",    "label": "Defense",            "url_suffix": "/verteidigung"},
     {"type": "item",  "icon": "skull",     "label": "Enemies",            "url_suffix": "/enemies"},
@@ -10053,6 +10050,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "group", "label": "Account"},
     {"type": "item",  "icon": "person",    "label": "My Account",         "url_suffix": "/my-account"},
     {"type": "item",  "icon": "bell",      "label": "Notifications",      "url_suffix": "/notifications"},
+    {"type": "item",  "icon": "gear",      "label": "Settings",           "url_suffix": "/settings"},
     {"type": "item",  "icon": "card",      "label": "Billing",            "url_suffix": "/billing"},
 ]
 

@@ -59,6 +59,7 @@
     {% if is_editor %}<button class="ma-tab" onclick="showTab('battlegroups',this)">⚔️ Battlegroups</button>{% endif %}
     <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Alliance Bonus</button>
     <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Settings</button>
+    <a class="ma-tab" href="/guild/{{ guild.guild_id }}/settings#roles" style="text-decoration:none;">🤖 Bot Settings</a>
     {% if leaderboard %}
     <button class="ma-tab" onclick="showTab('leaderboard',this)">🏆 Leaderboard</button>
     {% endif %}
