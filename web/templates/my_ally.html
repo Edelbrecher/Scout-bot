@@ -1103,11 +1103,33 @@
       <div class="card">
         <h3 style="margin:0 0 .9rem;font-size:.95rem;">⏳ Server-Ende Countdown</h3>
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/server-end" style="display:flex;flex-direction:column;gap:.65rem;">
-          <div>
-            <label class="d-label">Datum &amp; Uhrzeit des Server-Endes (UTC)</label>
-            <input type="datetime-local" name="server_end_date"
-                   value="{{ guild.server_end_date | replace(' ','T') if guild.server_end_date else '' }}"
-                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:end;">
+            <div>
+              <label class="d-label">Datum &amp; Uhrzeit des Server-Endes</label>
+              <input type="datetime-local" name="server_end_date"
+                     value="{{ guild.server_end_date | replace(' ','T') if guild.server_end_date else '' }}"
+                     style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+            </div>
+            <div>
+              <label class="d-label">Serverzeit</label>
+              {% set utc_offset = guild.server_utc_offset if guild.server_utc_offset is not none else 60 %}
+              <select name="server_utc_offset"
+                      style="padding:.4rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;white-space:nowrap;">
+                <option value="-120" {% if utc_offset==-120 %}selected{% endif %}>UTC−2</option>
+                <option value="-60"  {% if utc_offset==-60  %}selected{% endif %}>UTC−1</option>
+                <option value="0"    {% if utc_offset==0    %}selected{% endif %}>UTC±0</option>
+                <option value="60"   {% if utc_offset==60   %}selected{% endif %}>UTC+1 ⭐</option>
+                <option value="120"  {% if utc_offset==120  %}selected{% endif %}>UTC+2</option>
+                <option value="180"  {% if utc_offset==180  %}selected{% endif %}>UTC+3</option>
+                <option value="240"  {% if utc_offset==240  %}selected{% endif %}>UTC+4</option>
+                <option value="300"  {% if utc_offset==300  %}selected{% endif %}>UTC+5</option>
+                <option value="360"  {% if utc_offset==360  %}selected{% endif %}>UTC+6</option>
+                <option value="420"  {% if utc_offset==420  %}selected{% endif %}>UTC+7</option>
+                <option value="480"  {% if utc_offset==480  %}selected{% endif %}>UTC+8</option>
+                <option value="540"  {% if utc_offset==540  %}selected{% endif %}>UTC+9</option>
+                <option value="600"  {% if utc_offset==600  %}selected{% endif %}>UTC+10</option>
+              </select>
+            </div>
           </div>
 
           {% if guild.wewin_channel_id %}
