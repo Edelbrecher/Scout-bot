@@ -574,6 +574,9 @@ function escHtml(s) {
     navData.forEach(function(item){ html += buildItem(item, gid, path, false); });
     document.getElementById('gs-nav-items').innerHTML = html;
 
+    // ── Workspace switcher (injected at top of sidebar) ───────────────────
+    _buildWsSwitcher(gid);
+
     // Show sidebar
     sidebar.style.display = 'flex';
     body.classList.add('has-guild-sidebar');
@@ -588,6 +591,124 @@ function escHtml(s) {
     // Mobile toggle button
     var mobileBtn = document.getElementById('gs-mobile-toggle');
     if (window.innerWidth <= 768 && mobileBtn) mobileBtn.style.display = 'flex';
+  }
+
+  // ── Workspace switcher ───────────────────────────────────────────────
+  var _wsData = null;
+
+  function _buildWsSwitcher(currentGid) {
+    var nav = document.getElementById('gs-nav-items');
+    if (!nav) return;
+
+    // Inject placeholder immediately, load data lazily
+    var wrap = document.createElement('div');
+    wrap.id = 'gs-ws-switcher';
+    wrap.style.cssText = 'position:relative;margin:0 0 .5rem;';
+    nav.insertBefore(wrap, nav.firstChild);
+
+    function _render(workspaces) {
+      var current = workspaces.find(function(w){ return w.guild_id === currentGid; });
+      var label = current ? (current.guild_name || current.tw_world_short || current.guild_id) : '…';
+      var world = current && current.tw_world_short ? current.tw_world_short : '';
+
+      wrap.innerHTML =
+        '<button id="gs-ws-btn" onclick="_wsToggle()" '
+        + 'style="width:100%;display:flex;align-items:center;gap:.5rem;padding:.5rem .65rem;'
+        + 'background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:8px;'
+        + 'cursor:pointer;color:var(--text);font-size:.8rem;text-align:left;transition:background .15s;"'
+        + ' onmouseover="this.style.background=\'rgba(99,102,241,.18)\'"'
+        + ' onmouseout="this.style.background=\'rgba(99,102,241,.1)\'">'
+        + '<span style="font-size:1rem;line-height:1;flex-shrink:0;">🌍</span>'
+        + '<span style="flex:1;min-width:0;overflow:hidden;">'
+        +   '<span style="font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _esc(label) + '</span>'
+        +   (world ? '<span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">' + _esc(world) + '</span>' : '')
+        + '</span>'
+        + '<span id="gs-ws-chevron" style="font-size:.65rem;color:var(--text-muted);transition:transform .2s;flex-shrink:0;">▼</span>'
+        + '</button>'
+        + '<div id="gs-ws-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;'
+        + 'background:var(--bg-card);border:1px solid rgba(99,102,241,.3);border-radius:8px;z-index:300;'
+        + 'box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden;">'
+        + workspaces.map(function(w) {
+            var active = w.guild_id === currentGid;
+            var wname = w.guild_name || w.guild_id;
+            var wworld = w.tw_world_short || '';
+            return '<a href="/guild/' + w.guild_id + '" data-no-loader '
+              + 'style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;font-size:.8rem;'
+              + 'text-decoration:none;color:var(--text);border-bottom:1px solid rgba(255,255,255,.05);'
+              + 'background:' + (active ? 'rgba(99,102,241,.18)' : 'transparent') + ';"'
+              + ' onmouseover="this.style.background=\'rgba(99,102,241,.15)\'"'
+              + ' onmouseout="this.style.background=\'' + (active ? 'rgba(99,102,241,.18)' : 'transparent') + '\'">'
+              + (active ? '<span style="color:#6366f1;font-size:.7rem;">✓</span>' : '<span style="width:.7rem;display:inline-block;"></span>')
+              + '<span style="flex:1;min-width:0;">'
+              +   '<span style="font-weight:' + (active ? '700' : '500') + ';display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _esc(wname) + '</span>'
+              +   (wworld ? '<span style="font-size:.68rem;color:var(--text-muted);">' + _esc(wworld) + '</span>' : '')
+              + '</span></a>';
+          }).join('')
+        + '<a href="/dashboard/new-workspace" data-no-loader onclick="_wsNewWorkspace(event)"'
+        + ' style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;font-size:.8rem;'
+        + 'text-decoration:none;color:#6366f1;font-weight:600;"'
+        + ' onmouseover="this.style.background=\'rgba(99,102,241,.1)\'"'
+        + ' onmouseout="this.style.background=\'transparent\'">'
+        + '<span style="font-size:.9rem;">＋</span> Neue Welt hinzufügen</a>'
+        + '</div>';
+    }
+
+    function _esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    if (_wsData) {
+      _render(_wsData);
+    } else {
+      _render([{guild_id: currentGid, guild_name: '…', tw_world_short: ''}]);
+      fetch('/api/my-workspaces').then(function(r){ return r.json(); }).then(function(d) {
+        _wsData = d;
+        _render(d);
+      }).catch(function(){});
+    }
+  }
+
+  function _wsToggle() {
+    var drop = document.getElementById('gs-ws-drop');
+    var chev = document.getElementById('gs-ws-chevron');
+    if (!drop) return;
+    var open = drop.style.display === 'block';
+    drop.style.display = open ? 'none' : 'block';
+    if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
+    if (!open) {
+      // close on outside click
+      function _close(e) {
+        var sw = document.getElementById('gs-ws-switcher');
+        if (sw && !sw.contains(e.target)) {
+          drop.style.display = 'none';
+          if (chev) chev.style.transform = '';
+          document.removeEventListener('click', _close);
+        }
+      }
+      setTimeout(function(){ document.addEventListener('click', _close); }, 10);
+    }
+  }
+
+  function _wsNewWorkspace(e) {
+    e.preventDefault();
+    // Close dropdown
+    var drop = document.getElementById('gs-ws-drop');
+    if (drop) drop.style.display = 'none';
+    // Quick-create modal
+    var name = prompt('Name für den neuen Workspace (z.B. "com7 x3"):');
+    if (!name || !name.trim()) return;
+    fetch('/dashboard/create-workspace', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name.trim()})
+    }).then(function(r){ return r.json(); }).then(function(d) {
+      if (d.guild_id) {
+        _wsData = null; // invalidate cache
+        window.location.href = '/guild/' + d.guild_id + '/setup?new=1';
+      } else {
+        alert(d.error || 'Fehler beim Erstellen');
+      }
+    }).catch(function(){ alert('Netzwerkfehler'); });
   }
 
   // ── Sidebar badges + pro status ──────────────────────────────────────

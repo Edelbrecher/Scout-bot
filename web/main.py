@@ -10169,6 +10169,53 @@ async def api_sidebar_config(request: Request):
     return JSONResponse(nav)
 
 
+@app.get("/api/my-workspaces")
+async def api_my_workspaces(request: Request):
+    """Return all personal workspaces for the current user (for the sidebar switcher)."""
+    session = _get_session(request)
+    if not session:
+        return JSONResponse([])
+    uid = session.get("uid", "")
+    if not uid:
+        return JSONResponse([])
+    workspaces = await database.get_personal_workspaces(uid)
+    result = []
+    for w in workspaces:
+        tw = (w.get("tw_world") or "").rstrip("/")
+        short = tw.replace("https://", "").replace("http://", "") if tw else ""
+        result.append({
+            "guild_id":      w["guild_id"],
+            "guild_name":    w.get("guild_name") or w["guild_id"],
+            "tw_world":      tw,
+            "tw_world_short": short,
+        })
+    return JSONResponse(result)
+
+
+@app.post("/dashboard/create-workspace")
+async def dashboard_create_workspace(request: Request):
+    """Create a new personal workspace (JSON API for the sidebar switcher)."""
+    session = _get_session(request)
+    if not session:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+    uid = session.get("uid", "")
+    if not uid:
+        return JSONResponse({"error": "No user id"}, status_code=400)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    name = (body.get("name") or "").strip()[:80]
+    if not name:
+        return JSONResponse({"error": "Name required"}, status_code=422)
+    # Limit: max 10 personal workspaces
+    existing = await database.get_personal_workspaces(uid)
+    if len(existing) >= 10:
+        return JSONResponse({"error": "Maximum 10 Workspaces erreicht"}, status_code=422)
+    guild_id = await database.create_personal_workspace(uid, name)
+    return JSONResponse({"guild_id": guild_id})
+
+
 @app.get("/api/sidebar-style")
 async def api_sidebar_style(request: Request):
     raw = await database.get_setting("sidebar_style_config")
