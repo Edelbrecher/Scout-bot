@@ -1,6 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Player Intelligence{% if intel %} · {{ intel.player_name }}{% endif %} · TravOps{% endblock %}
 
+{% block extra_head %}
+<style>
+/* ── Player Intelligence — mobile-first responsive fixes ── */
+.pi-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.pi-map-col { position: sticky; top: 1rem; }
+
+/* Village table: always horizontally scrollable */
+.pi-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pi-table-wrap table { min-width: 820px; }
+
+@media (max-width: 860px) {
+  .pi-main-grid {
+    grid-template-columns: 1fr;
+  }
+  .pi-map-col {
+    position: static;
+    order: -1;          /* map appears above table on mobile */
+  }
+  .pi-map-col canvas { max-height: 260px; }
+}
+
+@media (max-width: 600px) {
+  /* Summary stat cards: 2 per row */
+  .pi-stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Search bar full width */
+  #searchForm > div { max-width: 100% !important; }
+  /* Recent grid: 1 col */
+  #recentGrid { grid-template-columns: 1fr !important; }
+  /* Smaller padding on container */
+  .container-wide { padding-left: .75rem !important; padding-right: .75rem !important; }
+  /* World setup form stack */
+  #worldSetupForm { flex-direction: column !important; }
+  #worldSaveBtn { width: 100%; text-align: center; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-wide" style="padding-bottom:3rem;">
 
@@ -185,7 +229,7 @@
   {# ── Summary cards ── #}
   {% set trend_icon = {'up': '▲', 'down': '▼', 'same': '●'} %}
   {% set trend_color = {'up': '#22c55e', 'down': '#ef4444', 'same': 'var(--text-muted)'} %}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem;">
+  <div class="pi-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem;">
     {% set lost_count = intel.village_timeline | selectattr('is_active','equalto',false) | list | length %}
     {% for label, val in [
       ('Tribe',      tribe_icons.get(intel.tribe,'?') ~ ' ' ~ tribe_names.get(intel.tribe,'?')),
@@ -223,10 +267,10 @@
     {% endif %}
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start;">
+  <div class="pi-main-grid">
 
     {# ═══ LEFT COLUMN ═══ #}
-    <div style="min-width:0;">
+    <div style="min-width:0;overflow:hidden;">
 
       {# ── Alliance history ── #}
       {% if intel.alliance_history | length > 1 %}
@@ -251,7 +295,7 @@
           <span>🏘️ Villages &amp; Development</span>
           <span style="font-size:.72rem;color:var(--text-muted);">Ø/Tag = Durchschnittliches Wachstum pro Tag über den Zeitraum</span>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="pi-table-wrap">
           <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
             <thead>
               <tr style="background:var(--bg-main);">
@@ -367,7 +411,7 @@
     </div>{# end left #}
 
     {# ═══ RIGHT COLUMN — mini map ═══ #}
-    <div style="position:sticky;top:1rem;">
+    <div class="pi-map-col">
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
         <div style="padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.88rem;">🗺️ Village Map</div>
         <canvas id="miniMap" width="340" height="340" style="display:block;width:100%;background:#2d5a1e;cursor:crosshair;"></canvas>
