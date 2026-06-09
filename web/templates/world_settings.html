@@ -15,6 +15,83 @@
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Settings gespeichert.</div>
   {% endif %}
 
+  {# ── Snapshot loading banner (shown when ?loading=1, hides automatically when done) ── #}
+  {% if request.query_params.get('loading') %}
+  <div id="snapshotBanner" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.35);
+       border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:.85rem;">
+    <div id="snapshotSpinner" style="width:22px;height:22px;border:3px solid rgba(99,102,241,.3);
+         border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;"></div>
+    <div style="flex:1;">
+      <div style="font-weight:700;color:#a5b4fc;margin-bottom:.2rem;">
+        🗺️ Karten-Snapshot wird geladen…
+      </div>
+      <div id="snapshotMsg" style="font-size:.82rem;color:var(--text-muted);">
+        map.sql wird von Travian heruntergeladen und verarbeitet. Das dauert normalerweise 10–30 Sekunden.
+      </div>
+      <div id="snapshotElapsed" style="font-size:.75rem;color:rgba(165,180,252,.5);margin-top:.2rem;"></div>
+    </div>
+    <div id="snapshotDone" style="display:none;font-size:1.3rem;">✅</div>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  <script>
+  (function(){
+    var gid = '{{ guild.guild_id }}';
+    var banner = document.getElementById('snapshotBanner');
+    var msg    = document.getElementById('snapshotMsg');
+    var elapsed= document.getElementById('snapshotElapsed');
+    var spinner= document.getElementById('snapshotSpinner');
+    var done   = document.getElementById('snapshotDone');
+    var startedAt = Date.now();
+
+    function poll() {
+      fetch('/api/snapshot-status/' + gid)
+        .then(function(r){ return r.json(); })
+        .then(function(d) {
+          var secs = Math.round((Date.now() - startedAt) / 1000);
+          elapsed.textContent = secs + 's vergangen…';
+
+          if (d.error) {
+            spinner.style.display = 'none';
+            banner.style.borderColor = 'rgba(239,68,68,.4)';
+            banner.style.background  = 'rgba(239,68,68,.08)';
+            msg.style.color = '#f87171';
+            msg.textContent = '✗ Fehler: ' + d.error;
+            elapsed.textContent = '';
+            return; // stop polling
+          }
+
+          if (!d.running && d.has_data) {
+            // Done!
+            spinner.style.display = 'none';
+            done.style.display = 'block';
+            banner.style.borderColor = 'rgba(34,197,94,.4)';
+            banner.style.background  = 'rgba(34,197,94,.08)';
+            msg.style.color = '#4ade80';
+            msg.textContent = '✅ Snapshot geladen! Karte ist jetzt verfügbar.';
+            elapsed.textContent = 'Fertig nach ' + secs + 's';
+            // Redirect to map after short pause
+            setTimeout(function(){
+              window.location.href = '/guild/' + gid + '/map';
+            }, 1800);
+            return;
+          }
+
+          // Update message based on elapsed
+          if (secs > 5)  msg.textContent = 'Wird heruntergeladen… (' + secs + 's)';
+          if (secs > 20) msg.textContent = 'Große Karte — fast fertig… (' + secs + 's)';
+          if (secs > 45) msg.textContent = 'Dauert etwas länger als erwartet… (' + secs + 's)';
+
+          setTimeout(poll, 1500);
+        })
+        .catch(function(){ setTimeout(poll, 3000); });
+    }
+
+    // Start polling after short delay
+    setTimeout(poll, 800);
+  })();
+  </script>
+  {% endif %}
+
   {# ── Live Serverzeit ── #}
   {% set utc_offset = guild.server_utc_offset if guild.server_utc_offset is not none else 60 %}
   <div class="card" style="padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">

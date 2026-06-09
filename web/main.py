@@ -673,7 +673,7 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
     """Fetch map.sql for a world and save it once (shared across all guilds on that world)."""
     tw_world = tw_world.rstrip("/")
     url = tw_world + "/map.sql"
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         r = await client.get(url)
         r.raise_for_status()
     loop = asyncio.get_event_loop()
@@ -694,6 +694,22 @@ async def _fetch_and_save_snapshot(guild_id: str, tw_world: str):
                 asyncio.create_task(database.run_sector_scan(g["guild_id"]))
     except Exception:
         pass
+
+
+# ── Snapshot background-task tracker ─────────────────────────────────────────
+# Maps guild_id → {"running": bool, "error": str|None, "started_at": float}
+_snapshot_status: dict = {}
+
+async def _run_snapshot_background(guild_id: str, tw_world: str):
+    """Fire-and-forget wrapper: run snapshot, update _snapshot_status."""
+    import time as _time
+    _snapshot_status[guild_id] = {"running": True, "error": None, "started_at": _time.time()}
+    try:
+        await _fetch_and_save_snapshot(guild_id, tw_world)
+        _snapshot_status[guild_id]["running"] = False
+    except Exception as e:
+        _snapshot_status[guild_id]["running"] = False
+        _snapshot_status[guild_id]["error"] = str(e)[:120]
 
 
 @asynccontextmanager
@@ -3333,9 +3349,12 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
         return RedirectResponse(f"/guild/{guild_id}/map?error=invalid_url", status_code=303)
     await database.update_tw_world(guild_id, url)
+    # Auto-kick snapshot in background when world URL is saved
+    if url:
+        asyncio.create_task(_run_snapshot_background(guild_id, url))
     if next_url:
         return RedirectResponse(next_url, status_code=303)
-    return RedirectResponse(f"/guild/{guild_id}/map/world-settings?saved=1", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/map/world-settings?loading=1", status_code=303)
 
 
 @app.post("/guild/{guild_id}/map/trigger-snapshot")
@@ -3347,12 +3366,31 @@ async def guild_map_trigger_snapshot(request: Request, guild_id: str, next_url: 
     guild = await database.get_guild(guild_id)
     tw_world = (guild.get("tw_world") or "").strip() if guild else ""
     if tw_world:
-        try:
-            await _fetch_and_save_snapshot(guild_id, tw_world)
-        except Exception:
-            pass
-    redirect_to = next_url or f"/guild/{guild_id}/map"
+        status = _snapshot_status.get(guild_id, {})
+        if not status.get("running"):
+            asyncio.create_task(_run_snapshot_background(guild_id, tw_world))
+    # Redirect immediately — client polls /api/snapshot-status/:guild_id
+    redirect_to = next_url or f"/guild/{guild_id}/map/world-settings?loading=1"
     return RedirectResponse(redirect_to, status_code=303)
+
+
+@app.get("/api/snapshot-status/{guild_id}")
+async def api_snapshot_status(request: Request, guild_id: str):
+    """Poll endpoint — returns current snapshot loading state for a guild."""
+    session = _get_session(request)
+    if not session or not (can_access_guild(session, guild_id) or await can_access_guild_async(session, guild_id)):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    import time as _time
+    st = _snapshot_status.get(guild_id, {})
+    last_snap = await database.get_latest_snapshot_time(guild_id)
+    return JSONResponse({
+        "running":    st.get("running", False),
+        "error":      st.get("error"),
+        "started_at": st.get("started_at"),
+        "elapsed":    round(_time.time() - st["started_at"], 1) if st.get("started_at") else None,
+        "has_data":   bool(last_snap),
+        "last_snapshot": last_snap,
+    })
 
 
 @app.post("/guild/{guild_id}/map/world-timezone")
@@ -13869,7 +13907,9 @@ async def guild_set_world_inline(request: Request, guild_id: str):
     if not url or not re.match(r"^https?://[a-zA-Z0-9.\-]+(:[0-9]+)?$", url):
         return JSONResponse({"error": "Ungültige URL — bitte vollständige Welt-URL angeben (z.B. https://ts3.x1.travian.com)"}, status_code=422)
     await database.update_tw_world(guild_id, url)
-    return JSONResponse({"ok": True})
+    # Kick off first snapshot in background so data is ready ASAP
+    asyncio.create_task(_run_snapshot_background(guild_id, url))
+    return JSONResponse({"ok": True, "loading": True})
 
 
 @app.get("/guild/{guild_id}/intel/autocomplete")
