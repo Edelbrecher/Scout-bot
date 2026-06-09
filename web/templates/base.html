@@ -387,6 +387,8 @@ function escHtml(s) {
 
   <!-- Guild Sidebar Logic -->
   <script>
+  var _gsBadges = {};
+
   (function(){
     var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
     if (!m) return;
@@ -534,7 +536,6 @@ function escHtml(s) {
   }
 
   // ── Sidebar badges (sector monitor + my op plan) ─────────────────────
-  var _gsBadges = {};
   var _gsBadgeGid = null;
 
   function _loadBadges(gid) {
