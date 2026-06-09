@@ -185,17 +185,20 @@ body.sidebar-collapsed #guild-sidebar .gs-toggle { justify-content: center; }
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #4b5563;
-  padding: 1.1rem 1rem 0.3rem;
+  color: #6b7280;
+  padding: 0.45rem 1rem;
+  margin: 0.5rem 0 0.15rem;
   white-space: nowrap;
   overflow: hidden;
   opacity: 1;
   transition: opacity 0.15s;
   position: relative;
+  background: rgba(99, 102, 241, 0.07);
+  border-top: 1px solid rgba(99, 102, 241, 0.12);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.08);
 }
-.gs-group-label:not(:first-child) {
-  border-top: 1px solid rgba(255,255,255,0.045);
-  margin-top: 0.25rem;
+.gs-group-label:first-child {
+  margin-top: 0;
 }
 body.sidebar-collapsed .gs-group-label { opacity: 0; pointer-events: none; }
 
