@@ -6135,7 +6135,20 @@ async def _create_wewin_channel(discord_guild_id: str) -> tuple[str, str] | None
         r = await client.post(
             f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
             headers=headers,
-            json={"name": "we-win", "type": 0, "topic": "🏆 Server-Countdown — powered by TravOps"},
+            json={
+                "name": "we-win",
+                "type": 0,
+                "topic": "🏆 Server-Countdown — powered by TravOps",
+                # Explicitly allow @everyone to view and read
+                "permission_overwrites": [
+                    {
+                        "id": discord_guild_id,  # @everyone role has same ID as guild
+                        "type": 0,
+                        "allow": str(1024 + 65536),  # VIEW_CHANNEL + READ_MESSAGE_HISTORY
+                        "deny": "0",
+                    }
+                ],
+            },
         )
         if r.status_code in (200, 201):
             data = r.json()
