@@ -28,47 +28,132 @@
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
         <h1 style="margin:0;">Statistik</h1>
         <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:var(--text-muted);">
-          <span id="live-dot" style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:50%;"></span>
-          Live-Aktualisierung alle 30s
+          <span id="live-dot" style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:50%; transition:opacity .2s;"></span>
+          <span id="refresh-label">Live · alle 15s</span>
         </div>
       </div>
 
-      <!-- Section 1: Live users -->
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
-        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">
-          Live Nutzer <span id="live-count" style="font-size:0.82rem; color:var(--text-muted); font-weight:400;">({{ live_users|length }} aktiv)</span>
+      {# ── Heute-Übersicht ── #}
+      {% set ts = today_stats %}
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1rem; margin-bottom:1.5rem;">
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:.75rem; color:var(--text-muted); margin-bottom:.35rem;">🟢 Jetzt online</div>
+          <div id="stat-live" style="font-size:2rem; font-weight:700; color:#22c55e;">{{ live_users|length }}</div>
         </div>
-        <div id="live-table-wrap">
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:.75rem; color:var(--text-muted); margin-bottom:.35rem;">👤 Heute online</div>
+          <div style="font-size:2rem; font-weight:700;">{{ ts.unique_today }}</div>
+        </div>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:.75rem; color:var(--text-muted); margin-bottom:.35rem;">📄 Seitenaufrufe heute</div>
+          <div style="font-size:2rem; font-weight:700;">{{ ts.views_today }}</div>
+        </div>
+        {% if ts.daily %}
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem;">
+          <div style="font-size:.75rem; color:var(--text-muted); margin-bottom:.35rem;">📅 Ø letzte 7 Tage</div>
+          <div style="font-size:2rem; font-weight:700;">{{ (ts.daily | map(attribute='uniq') | sum / ts.daily|length) | round(0) | int }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      {# ── Live Nutzer ── #}
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600; display:flex; align-items:center; justify-content:space-between;">
+          <span>🟢 Live Nutzer <span id="live-count" style="font-size:0.82rem; color:var(--text-muted); font-weight:400;">({{ live_users|length }} aktiv, letzte 5 min)</span></span>
+        </div>
+        <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
           <thead>
             <tr style="background:var(--bg-main);">
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Nutzer</th>
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Aktuelle Seite</th>
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">IP</th>
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Zuletzt gesehen</th>
+              <th style="padding:0.55rem 1rem; text-align:left; color:var(--text-muted); font-weight:500; white-space:nowrap;">Nutzer</th>
+              <th style="padding:0.55rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Aktuelle Seite</th>
+              <th style="padding:0.55rem 1rem; text-align:left; color:var(--text-muted); font-weight:500; white-space:nowrap;">IP</th>
+              <th style="padding:0.55rem 1rem; text-align:right; color:var(--text-muted); font-weight:500; white-space:nowrap;">Zuletzt</th>
             </tr>
           </thead>
           <tbody id="live-tbody">
             {% for u in live_users %}
             <tr style="border-top:1px solid var(--border);">
-              <td style="padding:0.6rem 1rem; font-weight:600;">{{ u.username }}</td>
-              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.82rem;">{{ u.path }}</td>
-              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.82rem;">{{ u.ip }}</td>
-              <td style="padding:0.6rem 1rem; color:var(--text-muted);">
+              <td style="padding:0.5rem 1rem; font-weight:600; white-space:nowrap;">
+                <span style="display:inline-block; width:7px; height:7px; background:{% if u.seconds_ago < 60 %}#22c55e{% elif u.seconds_ago < 180 %}#f59e0b{% else %}#6b7280{% endif %}; border-radius:50%; margin-right:.4rem; vertical-align:middle;"></span>
+                {{ u.username }}
+              </td>
+              <td style="padding:0.5rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.8rem; max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <span style="color:{{ _page_color(u.path) if false else 'var(--accent)' }}">{{ _page_label(u.path) if false else '' }}</span>{{ u.path }}
+              </td>
+              <td style="padding:0.5rem 1rem; color:var(--text-muted); font-size:0.78rem; white-space:nowrap;">{{ u.ip }}</td>
+              <td style="padding:0.5rem 1rem; color:var(--text-muted); font-size:0.82rem; text-align:right; white-space:nowrap;">
                 {% if u.seconds_ago < 60 %}{{ u.seconds_ago }}s
-                {% else %}{{ (u.seconds_ago // 60) }}min {{ (u.seconds_ago % 60) }}s
-                {% endif %}
+                {% else %}{{ (u.seconds_ago // 60) }}min{% endif %}
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="4" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine aktiven Nutzer.</td></tr>
+            <tr><td colspan="4" style="padding:2rem; text-align:center; color:var(--text-muted);">Keine aktiven Nutzer.</td></tr>
             {% endfor %}
           </tbody>
         </table>
         </div>
       </div>
 
-      <!-- Section 2: Funnel -->
+      {# ── Top Seiten heute + 7-Tage-Verlauf ── #}
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+
+        {# Top pages #}
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+          <div style="padding:.9rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600; font-size:.9rem;">📄 Top Seiten heute</div>
+          <table style="width:100%; border-collapse:collapse; font-size:.82rem;">
+            <thead><tr style="background:var(--bg-main);">
+              <th style="padding:.4rem .9rem; text-align:left; color:var(--text-muted); font-weight:500;">Seite</th>
+              <th style="padding:.4rem .9rem; text-align:right; color:var(--text-muted); font-weight:500;">Aufrufe</th>
+              <th style="padding:.4rem .9rem; text-align:right; color:var(--text-muted); font-weight:500;">Nutzer</th>
+            </tr></thead>
+            <tbody>
+            {% for p in ts.top_pages %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:.4rem .9rem; font-family:monospace; font-size:.77rem; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ p.path }}</td>
+              <td style="padding:.4rem .9rem; text-align:right; font-weight:600;">{{ p.hits }}</td>
+              <td style="padding:.4rem .9rem; text-align:right; color:var(--text-muted);">{{ p.uniq }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine Daten.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {# 7-day history #}
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+          <div style="padding:.9rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600; font-size:.9rem;">📅 Letzte 7 Tage</div>
+          <table style="width:100%; border-collapse:collapse; font-size:.82rem;">
+            <thead><tr style="background:var(--bg-main);">
+              <th style="padding:.4rem .9rem; text-align:left; color:var(--text-muted); font-weight:500;">Tag</th>
+              <th style="padding:.4rem .9rem; text-align:right; color:var(--text-muted); font-weight:500;">Unique</th>
+              <th style="padding:.4rem .9rem; text-align:right; color:var(--text-muted); font-weight:500;">Views</th>
+              <th style="padding:.4rem .9rem; text-align:left; color:var(--text-muted); font-weight:500; width:80px;"></th>
+            </tr></thead>
+            <tbody>
+            {% set max_uniq = ts.daily | map(attribute='uniq') | max if ts.daily else 1 %}
+            {% for d in ts.daily %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:.4rem .9rem; color:var(--text-muted); white-space:nowrap;">{{ d.day }}</td>
+              <td style="padding:.4rem .9rem; text-align:right; font-weight:600;">{{ d.uniq }}</td>
+              <td style="padding:.4rem .9rem; text-align:right; color:var(--text-muted);">{{ d.views }}</td>
+              <td style="padding:.4rem .9rem;">
+                <div style="height:6px; background:rgba(99,102,241,.15); border-radius:3px; overflow:hidden;">
+                  <div style="height:100%; width:{{ ((d.uniq / max_uniq) * 100) | int }}%; background:#6366f1; border-radius:3px;"></div>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Noch keine Daten.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      {# ── Conversion Funnel ── #}
       {% set bv = funnel.billing_visits %}
       {% set cs = funnel.checkout_starts %}
       {% set cp = funnel.completed %}
@@ -76,66 +161,60 @@
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:1.5rem;">
         <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">Conversion Funnel (letzte 30 Tage)</div>
         <div style="padding:1.5rem; display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
-
           <div style="flex:1; min-width:120px; text-align:center;">
             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Billing-Seite besucht</div>
-            <div style="height:120px; display:flex; align-items:flex-end; overflow:hidden;">
-              <div style="width:100%; background:#3b82f6; border-radius:8px 8px 0 0; height:{{ [[((bv / max_val) * 120) | int, 4] | max, 120] | min }}px;"></div>
+            <div style="height:100px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#3b82f6; border-radius:8px 8px 0 0; height:{{ [[((bv / max_val) * 100) | int, 4] | max, 100] | min }}px;"></div>
             </div>
             <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
-              <div style="font-size:1.8rem; font-weight:700; color:#3b82f6;">{{ bv }}</div>
+              <div style="font-size:1.6rem; font-weight:700; color:#3b82f6;">{{ bv }}</div>
             </div>
           </div>
-
           <div style="font-size:1.5rem; color:var(--text-muted); padding-bottom:1rem;">→</div>
-
           <div style="flex:1; min-width:120px; text-align:center;">
             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Checkout gestartet</div>
-            <div style="height:120px; display:flex; align-items:flex-end; overflow:hidden;">
-              <div style="width:100%; background:#f59e0b; border-radius:8px 8px 0 0; height:{{ [[((cs / max_val) * 120) | int, 4] | max, 120] | min }}px;"></div>
+            <div style="height:100px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#f59e0b; border-radius:8px 8px 0 0; height:{{ [[((cs / max_val) * 100) | int, 4] | max, 100] | min }}px;"></div>
             </div>
             <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
-              <div style="font-size:1.8rem; font-weight:700; color:#f59e0b;">{{ cs }}</div>
+              <div style="font-size:1.6rem; font-weight:700; color:#f59e0b;">{{ cs }}</div>
               {% if bv > 0 %}<div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cs / bv) * 100)|round(1) }}%</div>{% endif %}
             </div>
           </div>
-
           <div style="font-size:1.5rem; color:var(--text-muted); padding-bottom:1rem;">→</div>
-
           <div style="flex:1; min-width:120px; text-align:center;">
             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Abonnement abgeschlossen</div>
-            <div style="height:120px; display:flex; align-items:flex-end; overflow:hidden;">
-              <div style="width:100%; background:#22c55e; border-radius:8px 8px 0 0; height:{{ [[((cp / max_val) * 120) | int, 4] | max, 120] | min }}px;"></div>
+            <div style="height:100px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; background:#22c55e; border-radius:8px 8px 0 0; height:{{ [[((cp / max_val) * 100) | int, 4] | max, 100] | min }}px;"></div>
             </div>
             <div style="background:var(--bg-main); padding:0.5rem; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;">
-              <div style="font-size:1.8rem; font-weight:700; color:#22c55e;">{{ cp }}</div>
+              <div style="font-size:1.6rem; font-weight:700; color:#22c55e;">{{ cp }}</div>
               {% if bv > 0 %}<div style="font-size:0.75rem; color:var(--text-muted);">{{ ((cp / bv) * 100)|round(1) }}%</div>{% endif %}
             </div>
           </div>
-
         </div>
       </div>
 
-      <!-- Section 3: Billing without subscription -->
+      {# ── Billing ohne Abo ── #}
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
         <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600;">Nutzer auf Billing-Seite ohne aktives Abonnement</div>
         <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
           <thead>
             <tr style="background:var(--bg-main);">
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Nutzer</th>
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Letzter Besuch (Seite)</th>
-              <th style="padding:0.6rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Letzter Besuch</th>
+              <th style="padding:0.55rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Nutzer</th>
+              <th style="padding:0.55rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Letzte Seite</th>
+              <th style="padding:0.55rem 1rem; text-align:left; color:var(--text-muted); font-weight:500;">Zuletzt</th>
             </tr>
           </thead>
           <tbody>
             {% for u in no_sub %}
             <tr style="border-top:1px solid var(--border);">
-              <td style="padding:0.6rem 1rem;">{{ u.username or u.user_id or '—' }}</td>
-              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.82rem;">{{ u.path }}</td>
-              <td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.82rem;">{{ (u.last_visit or '')[:19] }}</td>
+              <td style="padding:0.55rem 1rem;">{{ u.username or u.user_id or '—' }}</td>
+              <td style="padding:0.55rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.8rem;">{{ u.path }}</td>
+              <td style="padding:0.55rem 1rem; color:var(--text-muted); font-size:0.8rem;">{{ (u.last_visit or '')[:16] }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="3" style="padding:1.5rem; text-align:center; color:var(--text-muted);">No entries.</td></tr>
+            <tr><td colspan="3" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine Einträge.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -146,37 +225,59 @@
 </div>
 
 <script>
-// Only refresh the live users table via AJAX — no full page reload
 (function() {
-  var dot = document.getElementById('live-dot');
-  var interval = setInterval(function() {
+  var dot   = document.getElementById('live-dot');
+  var label = document.getElementById('refresh-label');
+  var countEl = document.getElementById('live-count');
+  var statLive = document.getElementById('stat-live');
+
+  function _ago(s) {
+    if (s < 60) return s + 's';
+    return Math.floor(s/60) + 'min';
+  }
+  function _dot_color(s) {
+    if (s < 60)  return '#22c55e';
+    if (s < 180) return '#f59e0b';
+    return '#6b7280';
+  }
+
+  function refresh() {
     fetch('/api/live-users')
       .then(function(r) { return r.json(); })
       .then(function(data) {
+        var users = data.users || [];
         var tbody = document.getElementById('live-tbody');
-        var countEl = document.getElementById('live-count');
         if (!tbody) return;
-        if (!data.users || data.users.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="padding:1.5rem; text-align:center; color:var(--text-muted);">Keine aktiven Nutzer.</td></tr>';
-          if (countEl) countEl.textContent = '(0 aktiv)';
-          return;
+
+        if (statLive) statLive.textContent = users.length;
+        if (countEl) countEl.textContent = '(' + users.length + ' aktiv, letzte 5 min)';
+
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="padding:2rem; text-align:center; color:var(--text-muted);">Keine aktiven Nutzer.</td></tr>';
+        } else {
+          tbody.innerHTML = users.map(function(u) {
+            return '<tr style="border-top:1px solid var(--border);">'
+              + '<td style="padding:.5rem 1rem; font-weight:600; white-space:nowrap;">'
+              +   '<span style="display:inline-block; width:7px; height:7px; background:' + _dot_color(u.seconds_ago) + '; border-radius:50%; margin-right:.4rem; vertical-align:middle;"></span>'
+              +   (u.username || '—')
+              + '</td>'
+              + '<td style="padding:.5rem 1rem; color:var(--text-muted); font-family:monospace; font-size:.8rem; max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'
+              +   (u.path || '')
+              + '</td>'
+              + '<td style="padding:.5rem 1rem; color:var(--text-muted); font-size:.78rem; white-space:nowrap;">' + (u.ip || '') + '</td>'
+              + '<td style="padding:.5rem 1rem; color:var(--text-muted); font-size:.82rem; text-align:right; white-space:nowrap;">' + _ago(u.seconds_ago) + '</td>'
+              + '</tr>';
+          }).join('');
         }
-        if (countEl) countEl.textContent = '(' + data.users.length + ' aktiv)';
-        tbody.innerHTML = data.users.map(function(u) {
-          var ago = u.seconds_ago < 60 ? u.seconds_ago + 's' : Math.floor(u.seconds_ago/60) + 'min ' + (u.seconds_ago%60) + 's';
-          return '<tr style="border-top:1px solid var(--border);">'
-            + '<td style="padding:0.6rem 1rem; font-weight:600;">' + (u.username || '—') + '</td>'
-            + '<td style="padding:0.6rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.82rem;">' + (u.path || '') + '</td>'
-            + '<td style="padding:0.6rem 1rem; color:var(--text-muted); font-size:0.82rem;">' + (u.ip || '') + '</td>'
-            + '<td style="padding:0.6rem 1rem; color:var(--text-muted);">' + ago + '</td>'
-            + '</tr>';
-        }).join('');
         // Blink dot
         dot.style.opacity = '0';
         setTimeout(function() { dot.style.opacity = '1'; }, 200);
+        label.textContent = 'Live · ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
       })
-      .catch(function() {});
-  }, 30000);
+      .catch(function() { label.textContent = 'Fehler beim Laden'; });
+  }
+
+  setInterval(refresh, 15000);
 })();
 </script>
 {% endblock %}

@@ -3735,6 +3735,50 @@ async def log_page_visit(
         await db.commit()
 
 
+async def get_today_online_stats() -> dict:
+    """Today's unique visitors, top pages, hourly distribution."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        # Unique users today
+        async with db.execute(
+            "SELECT COUNT(DISTINCT user_id) as cnt FROM page_visits WHERE date(created_at)=date('now') AND user_id IS NOT NULL"
+        ) as cur:
+            unique_today = (await cur.fetchone())["cnt"]
+        # Total page views today
+        async with db.execute(
+            "SELECT COUNT(*) as cnt FROM page_visits WHERE date(created_at)=date('now')"
+        ) as cur:
+            views_today = (await cur.fetchone())["cnt"]
+        # Top 10 pages today
+        async with db.execute(
+            """SELECT path, COUNT(*) as hits, COUNT(DISTINCT user_id) as uniq
+               FROM page_visits WHERE date(created_at)=date('now')
+               GROUP BY path ORDER BY hits DESC LIMIT 10"""
+        ) as cur:
+            top_pages = [dict(r) for r in await cur.fetchall()]
+        # Last 7 days unique visitors per day
+        async with db.execute(
+            """SELECT date(created_at) as day, COUNT(DISTINCT user_id) as uniq, COUNT(*) as views
+               FROM page_visits WHERE created_at >= datetime('now', '-7 days')
+               GROUP BY date(created_at) ORDER BY day DESC"""
+        ) as cur:
+            daily = [dict(r) for r in await cur.fetchall()]
+        # Hourly distribution today
+        async with db.execute(
+            """SELECT strftime('%H', created_at) as hour, COUNT(*) as hits
+               FROM page_visits WHERE date(created_at)=date('now')
+               GROUP BY hour ORDER BY hour"""
+        ) as cur:
+            hourly = [dict(r) for r in await cur.fetchall()]
+        return {
+            "unique_today": unique_today,
+            "views_today": views_today,
+            "top_pages": top_pages,
+            "daily": daily,
+            "hourly": hourly,
+        }
+
+
 async def get_funnel_stats() -> dict:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(

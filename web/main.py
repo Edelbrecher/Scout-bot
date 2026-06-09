@@ -215,8 +215,9 @@ class UserTrackingMiddleware(BaseHTTPMiddleware):
                 for k in list(_active_users.keys()):
                     if _active_users[k]["last_seen"] < cutoff:
                         del _active_users[k]
-                # Log billing page visits to DB
-                if "/billing" in path:
+                # Log all HTML page visits (skip API, static, assets)
+                _skip = ("/api/", "/static/", "/_", "/favicon", ".js", ".css", ".png", ".ico", ".woff")
+                if not any(path.startswith(s) or path.endswith(s) for s in _skip):
                     import asyncio as _aio
                     _aio.create_task(database.log_page_visit(uid, uname, path, ip))
         response = await call_next(request)
@@ -9878,12 +9879,16 @@ async def admin_stats(request: Request):
             "seconds_ago": int(now - entry.get("last_seen", now)),
         })
     live_users.sort(key=lambda x: x["seconds_ago"])
-    funnel = await database.get_funnel_stats()
-    no_sub = await database.get_billing_visitors_without_sub()
+    funnel, today_stats, no_sub = await asyncio.gather(
+        database.get_funnel_stats(),
+        database.get_today_online_stats(),
+        database.get_billing_visitors_without_sub(),
+    )
     return templates.TemplateResponse("admin_stats.html", {
         "request": request,
         "live_users": live_users,
         "funnel": funnel,
+        "today_stats": today_stats,
         "no_sub": no_sub,
         "session": session,
     })
