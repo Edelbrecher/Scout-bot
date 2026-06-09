@@ -829,6 +829,8 @@ async def generic_exception_handler(request: Request, exc: Exception):
 async def service_worker():
     return FileResponse("static/sw.js", media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
 templates = Jinja2Templates(directory="templates")
+POSTHOG_KEY = os.environ.get("POSTHOG_KEY", "")
+templates.env.globals["posthog_key"] = POSTHOG_KEY
 
 VIEW_CHANNEL = "1024"  # Discord permission bit
 
@@ -3775,6 +3777,22 @@ async def upgrade_page(request: Request, guild_id: str, plan: str = ""):
         "has_alliance_pro": has_alliance,
         "billing_url": billing_url,
         "plans": TIER_META,
+    })
+
+
+@app.get("/guild/{guild_id}/tutorial", response_class=HTMLResponse)
+async def tutorial_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    return templates.TemplateResponse("tutorial.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
     })
 
 

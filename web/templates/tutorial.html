@@ -1,0 +1,629 @@
+{% extends "base.html" %}
+{% block title %}Tutorial · TravOps{% endblock %}
+
+{% block content %}
+<style>
+/* ── Tutorial page ──────────────────────────────────────────────────────── */
+.tut-wrap { max-width: 960px; margin: 0 auto; padding-bottom: 4rem; }
+
+/* Language toggle */
+.lang-bar { display:flex; gap:.5rem; justify-content:flex-end; margin-bottom:1.5rem; }
+.lang-btn { padding:.35rem .9rem; border-radius:20px; font-size:.82rem; font-weight:600;
+  cursor:pointer; border:1px solid var(--border); background:var(--bg-card); color:var(--text-muted);
+  transition:all .15s; }
+.lang-btn.active { background:linear-gradient(135deg,#6366f1,#8b5cf6); border-color:#6366f1; color:#fff; }
+
+/* Chapter navigation */
+.tut-nav { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:2.5rem; padding:.85rem 1rem;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; }
+.tut-nav-btn { padding:.35rem .8rem; border-radius:8px; font-size:.8rem; font-weight:600;
+  cursor:pointer; border:none; background:transparent; color:var(--text-muted); transition:all .12s; }
+.tut-nav-btn:hover { background:rgba(255,255,255,.06); color:var(--text); }
+.tut-nav-btn.active { background:rgba(99,102,241,.2); color:#a5b4fc; }
+
+/* Chapter sections */
+.tut-chapter { margin-bottom:3rem; scroll-margin-top:1rem; }
+.tut-chapter-header { display:flex; align-items:center; gap:1rem; margin-bottom:1.75rem;
+  padding-bottom:.85rem; border-bottom:2px solid var(--border); }
+.tut-chapter-icon { font-size:2rem; flex-shrink:0; }
+.tut-chapter-num { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  color:#6366f1; margin-bottom:.15rem; }
+.tut-chapter-title { font-size:1.3rem; font-weight:800; margin:0; }
+.tut-chapter-sub { font-size:.85rem; color:var(--text-muted); margin-top:.2rem; }
+
+/* Steps */
+.tut-steps { display:flex; flex-direction:column; gap:1rem; }
+.tut-step { display:flex; gap:1.1rem; align-items:flex-start;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.1rem 1.25rem;
+  transition:border-color .15s; }
+.tut-step:hover { border-color:rgba(99,102,241,.4); }
+.tut-step-num { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  color:#fff; font-weight:800; font-size:.82rem; display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; margin-top:1px; }
+.tut-step-body { flex:1; min-width:0; }
+.tut-step-title { font-weight:700; font-size:.95rem; margin-bottom:.3rem; }
+.tut-step-desc { font-size:.84rem; color:var(--text-muted); line-height:1.6; }
+
+/* Callouts */
+.tut-tip { display:flex; gap:.75rem; align-items:flex-start; margin-top:.75rem; padding:.65rem .85rem;
+  background:rgba(99,102,241,.07); border:1px solid rgba(99,102,241,.2); border-radius:8px;
+  font-size:.81rem; color:#a5b4fc; line-height:1.5; }
+.tut-tip-icon { flex-shrink:0; font-size:1rem; }
+.tut-warn { display:flex; gap:.75rem; align-items:flex-start; margin-top:.75rem; padding:.65rem .85rem;
+  background:rgba(245,158,11,.07); border:1px solid rgba(245,158,11,.2); border-radius:8px;
+  font-size:.81rem; color:#fbbf24; line-height:1.5; }
+.tut-link { display:inline-flex; align-items:center; gap:.4rem; margin-top:.85rem; padding:.45rem .85rem;
+  background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.3); border-radius:8px;
+  font-size:.82rem; font-weight:600; color:#818cf8; text-decoration:none; transition:all .12s; }
+.tut-link:hover { background:rgba(99,102,241,.22); color:#a5b4fc; }
+
+/* Pro badge inline */
+.tut-pro { font-size:.68rem; padding:1px 6px; border-radius:4px; font-weight:700; vertical-align:middle;
+  margin-left:4px; }
+.tut-pro-p { background:#2563eb; color:#bfdbfe; }
+.tut-pro-a { background:#7c3aed; color:#e9d5ff; }
+.tut-free  { background:rgba(34,197,94,.15); color:#4ade80; border:1px solid rgba(34,197,94,.3); }
+
+/* i18n visibility */
+body.lang-de .en-only { display:none !important; }
+body.lang-en .de-only { display:none !important; }
+</style>
+
+<div class="tut-wrap">
+
+  {# ── Header ── #}
+  <div style="margin-bottom:2rem;">
+    <a href="/guild/{{ guild_id }}" class="back-link" data-no-history="1">← Dashboard</a>
+    <h1 style="font-size:1.8rem;font-weight:800;margin:.4rem 0 .3rem;display:flex;align-items:center;gap:.6rem;">
+      📖 <span class="en-only">TravOps Tutorial</span><span class="de-only">TravOps Anleitung</span>
+    </h1>
+    <p style="color:var(--text-muted);font-size:.9rem;margin:0;" class="en-only">Step-by-step guide to all features — from first login to full alliance coordination.</p>
+    <p style="color:var(--text-muted);font-size:.9rem;margin:0;" class="de-only">Schritt-für-Schritt-Anleitung zu allen Features — vom ersten Login bis zur vollständigen Allianz-Koordination.</p>
+  </div>
+
+  {# ── Language Toggle ── #}
+  <div class="lang-bar">
+    <button class="lang-btn active" id="btn-en" onclick="setLang('en')">🇬🇧 English</button>
+    <button class="lang-btn" id="btn-de" onclick="setLang('de')">🇩🇪 Deutsch</button>
+  </div>
+
+  {# ── Chapter Nav ── #}
+  <nav class="tut-nav" id="tut-nav">
+    <button class="tut-nav-btn active" onclick="scrollTo('ch1')">
+      <span class="en-only">1. Quick Start</span><span class="de-only">1. Schnellstart</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch2')">
+      <span class="en-only">2. My Account</span><span class="de-only">2. Mein Account</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch3')">
+      <span class="en-only">3. Farming</span><span class="de-only">3. Farming</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch4')">
+      <span class="en-only">4. Operations</span><span class="de-only">4. Operationen</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch5')">
+      <span class="en-only">5. Defense</span><span class="de-only">5. Verteidigung</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch6')">
+      <span class="en-only">6. Alliance</span><span class="de-only">6. Allianz</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch7')">
+      <span class="en-only">7. Analytics</span><span class="de-only">7. Statistiken</span>
+    </button>
+    <button class="tut-nav-btn" onclick="scrollTo('ch8')">
+      <span class="en-only">8. Discord Bot</span><span class="de-only">8. Discord Bot</span>
+    </button>
+  </nav>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 1 — QUICK START
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch1">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">🚀</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 1</div>
+        <h2 class="tut-chapter-title en-only">Quick Start — Up &amp; Running in 5 Minutes</h2>
+        <h2 class="tut-chapter-title de-only">Schnellstart — In 5 Minuten startklar</h2>
+        <div class="tut-chapter-sub en-only">Everything you need to do once to set up your workspace.</div>
+        <div class="tut-chapter-sub de-only">Alles was du einmalig tun musst, um deinen Workspace einzurichten.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Log in with Discord</div>
+          <div class="tut-step-title de-only">Mit Discord einloggen</div>
+          <div class="tut-step-desc en-only">Go to <strong>travops.online</strong>, click "Login with Discord" and authorize the app. TravOps only reads your username and server memberships — it never posts on your behalf.</div>
+          <div class="tut-step-desc de-only">Gehe zu <strong>travops.online</strong>, klicke auf „Mit Discord einloggen" und autorisiere die App. TravOps liest nur deinen Nutzernamen und Server-Mitgliedschaften — es postet nie in deinem Namen.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Select your server</div>
+          <div class="tut-step-title de-only">Server auswählen</div>
+          <div class="tut-step-desc en-only">After login you see the server dashboard. Click on your Discord server (or create a personal workspace if you don't use Discord). The guild page opens.</div>
+          <div class="tut-step-desc de-only">Nach dem Login siehst du das Server-Dashboard. Klicke auf deinen Discord-Server (oder erstelle einen persönlichen Workspace). Die Guild-Seite öffnet sich.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Configure your Travian world <span class="tut-free">Free</span></div>
+          <div class="tut-step-title de-only">Travian-Welt konfigurieren <span class="tut-free">Free</span></div>
+          <div class="tut-step-desc en-only">Navigate to <strong>World / Server</strong> in settings and paste your Travian server URL (e.g. <code>https://ts1.x1.international.travian.com</code>). This enables map snapshots and correct march time calculations.</div>
+          <div class="tut-step-desc de-only">Gehe zu <strong>World / Server</strong> in den Einstellungen und füge deine Travian-Server-URL ein (z.B. <code>https://ts1.x1.international.travian.com</code>). Das aktiviert Map-Snapshots und korrekte Laufzeitberechnungen.</div>
+          <a href="/guild/{{ guild_id }}/map/world-settings" class="tut-link">⚙️ <span class="en-only">Open World Settings</span><span class="de-only">World Settings öffnen</span></a>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">4</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Invite the Discord bot (optional)</div>
+          <div class="tut-step-title de-only">Discord-Bot einladen (optional)</div>
+          <div class="tut-step-desc en-only">For auto-notifications, attack detection and hero screenshots, invite the bot to your Discord server. Go to <strong>Server Settings → Server Management</strong> and follow the invite link. Web features work without the bot.</div>
+          <div class="tut-step-desc de-only">Für automatische Benachrichtigungen, Angriffsdetection und Helden-Screenshots lade den Bot in deinen Discord-Server ein. Gehe zu <strong>Server-Einstellungen → Serververwaltung</strong> und folge dem Einlade-Link. Web-Features funktionieren auch ohne Bot.</div>
+          <div class="tut-tip"><span class="tut-tip-icon">💡</span>
+            <span class="en-only">Bot features are marked with a <strong>🤖 Bot</strong> badge throughout the app.</span>
+            <span class="de-only">Bot-Features sind in der App mit einem <strong>🤖 Bot</strong>-Badge markiert.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 2 — MY ACCOUNT
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch2">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">🏰</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 2</div>
+        <h2 class="tut-chapter-title en-only">My Account — Import Villages &amp; Troops</h2>
+        <h2 class="tut-chapter-title de-only">Mein Account — Dörfer &amp; Truppen importieren</h2>
+        <div class="tut-chapter-sub en-only">Your village and troop data is the foundation for all personal features.</div>
+        <div class="tut-chapter-sub de-only">Deine Dorf- und Truppendaten sind die Grundlage für alle persönlichen Features.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Open My Account</div>
+          <div class="tut-step-title de-only">Mein Account öffnen</div>
+          <div class="tut-step-desc en-only">Click <strong>My Account</strong> in the sidebar. This is your personal data hub — all imported villages, troops and assigned operation waves are shown here.</div>
+          <div class="tut-step-desc de-only">Klicke auf <strong>Mein Account</strong> in der Sidebar. Das ist dein persönlicher Datenhub — alle importierten Dörfer, Truppen und zugewiesenen Operationswellen sind hier zu sehen.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Import your villages via the Chrome Extension</div>
+          <div class="tut-step-title de-only">Dörfer per Chrome Extension importieren</div>
+          <div class="tut-step-desc en-only">Install the <strong>TravOps Chrome Extension</strong>, log into your Travian account, then click the extension icon. It reads your village list and troop counts automatically and syncs them to TravOps.</div>
+          <div class="tut-step-desc de-only">Installiere die <strong>TravOps Chrome Extension</strong>, logge dich bei Travian ein und klicke dann auf das Extension-Icon. Sie liest deine Dorfliste und Truppenzahlen automatisch aus und synchronisiert sie mit TravOps.</div>
+          <div class="tut-tip"><span class="tut-tip-icon">💡</span>
+            <span class="en-only">Update your data regularly (at least once per day) to keep march times and troop projections accurate.</span>
+            <span class="de-only">Aktualisiere deine Daten regelmäßig (mindestens einmal täglich), damit Laufzeiten und Truppenprognosen stimmen.</span>
+          </div>
+          <a href="/extension" class="tut-link">🧩 <span class="en-only">Get Chrome Extension</span><span class="de-only">Chrome Extension holen</span></a>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Check assigned operation waves</div>
+          <div class="tut-step-title de-only">Zugewiesene Operationswellen prüfen</div>
+          <div class="tut-step-desc en-only">If an alliance leader has assigned you waves in an operation plan, they appear in the <strong>My Missions</strong> section. Confirm your wave to signal readiness.</div>
+          <div class="tut-step-desc de-only">Wenn ein Allianzführer dir Wellen in einem Operationsplan zugewiesen hat, erscheinen sie im Bereich <strong>Meine Missionen</strong>. Bestätige deine Welle, um Bereitschaft zu signalisieren.</div>
+          <a href="/guild/{{ guild_id }}/my-account" class="tut-link">🏰 <span class="en-only">Open My Account</span><span class="de-only">Mein Account öffnen</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 3 — FARMING INTELLIGENCE
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch3">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">⚜️</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 3</div>
+        <h2 class="tut-chapter-title en-only">Farming Intelligence <span class="tut-pro tut-pro-p">Player Pro</span></h2>
+        <h2 class="tut-chapter-title de-only">Farming Intelligence <span class="tut-pro tut-pro-p">Player Pro</span></h2>
+        <div class="tut-chapter-sub en-only">Automatically detect inactive villages near you and optimize your farm list.</div>
+        <div class="tut-chapter-sub de-only">Inaktive Dörfer in deiner Nähe automatisch erkennen und deine Farmliste optimieren.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">How map snapshots work</div>
+          <div class="tut-step-title de-only">Wie Map-Snapshots funktionieren</div>
+          <div class="tut-step-desc en-only">TravOps automatically fetches a full map snapshot from your Travian world every 15 minutes. A village with a <strong>stable population over multiple snapshots</strong> is classified as inactive — it hasn't trained troops or built buildings.</div>
+          <div class="tut-step-desc de-only">TravOps holt alle 15 Minuten einen vollständigen Map-Snapshot von deiner Travian-Welt. Ein Dorf mit <strong>gleichbleibender Bevölkerung über mehrere Snapshots</strong> gilt als inaktiv — es wurden keine Truppen ausgebildet oder Gebäude gebaut.</div>
+          <div class="tut-tip"><span class="tut-tip-icon">💡</span>
+            <span class="en-only">The more snapshots collected (1–3 days), the more accurate the inactive detection becomes.</span>
+            <span class="de-only">Je mehr Snapshots gesammelt werden (1–3 Tage), desto genauer wird die Inaktiv-Erkennung.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Use filters to find the best farms</div>
+          <div class="tut-step-title de-only">Filter verwenden um die besten Farmen zu finden</div>
+          <div class="tut-step-desc en-only">Open <strong>Farming Intelligence</strong> and use the filter panel: set max distance from your home village, filter by population range, tribe, or whether the player is already on your farm list. Sort by distance, population, or inactivity duration.</div>
+          <div class="tut-step-desc de-only">Öffne <strong>Farming Intelligence</strong> und nutze das Filter-Panel: Setze maximale Distanz von deinem Heimatdorf, filtere nach Bevölkerungsbereich, Stamm, oder ob der Spieler schon auf deiner Farmliste ist. Sortiere nach Distanz, Bevölkerung oder Inaktivitätsdauer.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Add farms to My Farms list</div>
+          <div class="tut-step-title de-only">Farmen zu Meine Farmen hinzufügen</div>
+          <div class="tut-step-desc en-only">Click the <strong>+</strong> button on any farm row to add it to your personal farm list. Farmed villages are highlighted separately so you always know what's been covered.</div>
+          <div class="tut-step-desc de-only">Klicke auf <strong>+</strong> bei einem Farmeintrag, um ihn zu deiner persönlichen Farmliste hinzuzufügen. Abgeerntete Dörfer werden separat hervorgehoben, sodass du immer weißt was schon erledigt ist.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">4</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Farmlist Analyst — grade your existing farms</div>
+          <div class="tut-step-title de-only">Farmlist Analyst — bestehende Farmen bewerten</div>
+          <div class="tut-step-desc en-only">Import your existing Travian farm list via the Chrome Extension. The <strong>Farmlist Analyst</strong> rates each farm as Good, Mediocre, or Poor based on population, activity, and distance — so you know which farms to keep and which to drop.</div>
+          <div class="tut-step-desc de-only">Importiere deine bestehende Travian-Farmliste per Chrome Extension. Der <strong>Farmlist Analyst</strong> bewertet jede Farm als Gut, Mittel oder Schlecht basierend auf Bevölkerung, Aktivität und Distanz — so weißt du welche Farmen du behalten und welche du aufgeben solltest.</div>
+          <a href="/guild/{{ guild_id }}/farming" class="tut-link">⚜️ <span class="en-only">Open Farming Intelligence</span><span class="de-only">Farming Intelligence öffnen</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 4 — OPERATION PLANNER
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch4">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">⚔️</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 4</div>
+        <h2 class="tut-chapter-title en-only">Operation Planner <span class="tut-pro tut-pro-a">Alliance</span></h2>
+        <h2 class="tut-chapter-title de-only">Operationsplaner <span class="tut-pro tut-pro-a">Alliance</span></h2>
+        <div class="tut-chapter-sub en-only">Plan coordinated alliance attacks — from target scouting to wave assignment.</div>
+        <div class="tut-chapter-sub de-only">Koordinierte Allianzangriffe planen — von der Zielaufklärung bis zur Wellenzuweisung.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Create a new operation plan</div>
+          <div class="tut-step-title de-only">Neuen Operationsplan erstellen</div>
+          <div class="tut-step-desc en-only">Open <strong>Operation Planner</strong> and click <strong>New Plan</strong>. Give it a name, set the operation type (hammer, siege, fake check) and set the landing time — TravOps automatically calculates send times for all waves from all villages.</div>
+          <div class="tut-step-desc de-only">Öffne den <strong>Operationsplaner</strong> und klicke auf <strong>Neuer Plan</strong>. Gib einen Namen ein, wähle den Operationstyp (Hammer, Belagerung, Fake-Check) und setze die Ankunftszeit — TravOps berechnet automatisch die Absendezeiten für alle Wellen aus allen Dörfern.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Add targets and assign waves</div>
+          <div class="tut-step-title de-only">Ziele hinzufügen und Wellen zuweisen</div>
+          <div class="tut-step-desc en-only">Add target villages by coordinate. For each target, create waves and assign them to specific members. Members see their assigned waves in <strong>My Account → My Missions</strong> and can confirm readiness.</div>
+          <div class="tut-step-desc de-only">Zieldörfer per Koordinate hinzufügen. Für jedes Ziel Wellen erstellen und einzelnen Mitgliedern zuweisen. Mitglieder sehen ihre Wellen in <strong>Mein Account → Meine Missionen</strong> und können ihre Bereitschaft bestätigen.</div>
+          <div class="tut-tip"><span class="tut-tip-icon">💡</span>
+            <span class="en-only">Use <strong>Troop Roles</strong> in settings to define which troops are OFF, DEF, or Siege — this improves wave suggestions.</span>
+            <span class="de-only">Nutze <strong>Troop Roles</strong> in den Einstellungen, um festzulegen welche Truppen OFF, DEF oder Belagerung sind — das verbessert Wellenvorschläge.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Fake check — identify non-real threats</div>
+          <div class="tut-step-title de-only">Fake-Check — echte von falschen Angriffen unterscheiden</div>
+          <div class="tut-step-desc en-only">Import enemy attack data via the bot or Chrome Extension. The Fake Check automatically flags suspicious waves based on troop speed, timing patterns, and village type — so defenders only react to real threats.</div>
+          <div class="tut-step-desc de-only">Importiere feindliche Angriffsdaten per Bot oder Chrome Extension. Der Fake-Check markiert automatisch verdächtige Wellen basierend auf Truppengeschwindigkeit, Zeitmustern und Dorftyp — damit Verteidiger nur auf echte Bedrohungen reagieren.</div>
+          <a href="/guild/{{ guild_id }}/operations" class="tut-link">⚔️ <span class="en-only">Open Operation Planner</span><span class="de-only">Operationsplaner öffnen</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 5 — DEFENSE
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch5">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">🛡️</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 5</div>
+        <h2 class="tut-chapter-title en-only">Defense Coordination</h2>
+        <h2 class="tut-chapter-title de-only">Verteidigungs-Koordination</h2>
+        <div class="tut-chapter-sub en-only">Respond fast to incoming attacks — coordinate your entire alliance in seconds.</div>
+        <div class="tut-chapter-sub de-only">Schnell auf eingehende Angriffe reagieren — deine gesamte Allianz in Sekunden koordinieren.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Import incoming attacks</div>
+          <div class="tut-step-title de-only">Eingehende Angriffe importieren</div>
+          <div class="tut-step-desc en-only">Any member can import their Rally Point data using the Chrome Extension. This sends the attack details to TravOps where they appear in <strong>Alliance Attacks</strong> — visible to all members with access.</div>
+          <div class="tut-step-desc de-only">Jedes Mitglied kann seine Sammelplatz-Daten per Chrome Extension importieren. Die Angriffsdetails erscheinen dann in <strong>Allianz-Angriffe</strong> — sichtbar für alle Mitglieder mit Zugriff.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Create a defense request</div>
+          <div class="tut-step-title de-only">Verteidigungsanfrage erstellen</div>
+          <div class="tut-step-desc en-only">Open <strong>Defense</strong> and create a request for a specific village. Add target coordinates, expected attack time, and how many troops are needed. Members see the request and can commit troops — all with calculated send times.</div>
+          <div class="tut-step-desc de-only">Öffne <strong>Verteidigung</strong> und erstelle eine Anfrage für ein bestimmtes Dorf. Zielkoordinaten, erwartete Angriffszeit und benötigte Truppenzahl angeben. Mitglieder sehen die Anfrage und können Truppen zusagen — alles mit berechneten Absendezeiten.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Sector Monitor — early threat detection</div>
+          <div class="tut-step-title de-only">Sektor-Monitor — frühe Bedrohungserkennung</div>
+          <div class="tut-step-desc en-only">Configure map sectors to monitor in <strong>Map → Sector Monitor</strong>. When the population of any village in a monitored sector changes significantly (troops moving out), you get an automatic notification — giving you more reaction time.</div>
+          <div class="tut-step-desc de-only">Konfiguriere zu überwachende Karten-Sektoren unter <strong>Karte → Sektor-Monitor</strong>. Wenn sich die Bevölkerung eines Dorfes im überwachten Sektor signifikant ändert (Truppen ausrücken), erhältst du eine automatische Benachrichtigung — mehr Reaktionszeit für dich.</div>
+          <a href="/guild/{{ guild_id }}/verteidigung" class="tut-link">🛡️ <span class="en-only">Open Defense</span><span class="de-only">Verteidigung öffnen</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 6 — ALLIANCE TOOLS
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch6">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">🤝</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 6</div>
+        <h2 class="tut-chapter-title en-only">Alliance Tools</h2>
+        <h2 class="tut-chapter-title de-only">Allianz-Tools</h2>
+        <div class="tut-chapter-sub en-only">Manage your alliance — members, hospital, enemy records, and scout tracking.</div>
+        <div class="tut-chapter-sub de-only">Allianz verwalten — Mitglieder, Hospital, Gegner-Kartei und Scout-Tracking.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Import your alliance member list</div>
+          <div class="tut-step-title de-only">Allianz-Mitgliederliste importieren</div>
+          <div class="tut-step-desc en-only">Go to <strong>Meta-Builder</strong> and paste your Travian alliance member list (copy it from the Travian website). TravOps parses the list and shows each member with tribe, population, village count, and points.</div>
+          <div class="tut-step-desc de-only">Gehe zum <strong>Meta-Builder</strong> und füge deine Travian-Allianz-Mitgliederliste ein (kopiere sie von der Travian-Website). TravOps parst die Liste und zeigt jedes Mitglied mit Stamm, Bevölkerung, Dörferanzahl und Punkten.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Alliance Hospital <span class="tut-pro tut-pro-a">Alliance</span></div>
+          <div class="tut-step-title de-only">Allianz-Lazarett <span class="tut-pro tut-pro-a">Alliance</span></div>
+          <div class="tut-step-desc en-only">After a big operation, track troop losses and healing across all members. Each member reports their hospital queue — you see the alliance-wide status at a glance and can coordinate resource support.</div>
+          <div class="tut-step-desc de-only">Nach einer großen Operation Truppenverluste und Heilung aller Mitglieder verfolgen. Jedes Mitglied meldet seine Lazarett-Warteschlange — du siehst den allianzweiten Status auf einen Blick und kannst Ressourcenunterstützung koordinieren.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Enemy Records <span class="tut-pro tut-pro-a">Alliance</span></div>
+          <div class="tut-step-title de-only">Gegner-Kartei <span class="tut-pro tut-pro-a">Alliance</span></div>
+          <div class="tut-step-desc en-only">Every time a member scouts an enemy village, the data is archived here. You can see the full scout history per enemy player — troops over time, resources, village count — all in one timeline. Invaluable for targeting decisions.</div>
+          <div class="tut-step-desc de-only">Jedes Mal wenn ein Mitglied ein feindliches Dorf scoutet, werden die Daten hier archiviert. Du siehst die vollständige Scout-Historie pro Gegner — Truppen über Zeit, Ressourcen, Dörferanzahl — alles in einer Zeitleiste. Unverzichtbar für Zielentscheidungen.</div>
+          <a href="/guild/{{ guild_id }}/enemies" class="tut-link">🎯 <span class="en-only">Open Enemy Records</span><span class="de-only">Gegner-Kartei öffnen</span></a>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">4</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Artifacts — track ownership and rotation</div>
+          <div class="tut-step-title de-only">Artefakte — Besitz und Rotation verfolgen</div>
+          <div class="tut-step-desc en-only">Use <strong>Artifacts</strong> to track which alliance holds which artifact, plan rotations, and set handover reminders. Never lose an artifact to bad timing again.</div>
+          <div class="tut-step-desc de-only">Nutze <strong>Artefakte</strong>, um zu verfolgen welche Allianz welches Artefakt hält, Rotationen zu planen und Übergabe-Erinnerungen zu setzen. Kein Artefakt mehr durch schlechtes Timing verlieren.</div>
+          <a href="/guild/{{ guild_id }}/artifacts" class="tut-link">🏺 <span class="en-only">Open Artifacts</span><span class="de-only">Artefakte öffnen</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 7 — ANALYTICS
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch7">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">📊</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 7</div>
+        <h2 class="tut-chapter-title en-only">Statistics &amp; Analytics</h2>
+        <h2 class="tut-chapter-title de-only">Statistiken &amp; Analytics</h2>
+        <div class="tut-chapter-sub en-only">Understand your server, track growth, and spot threats before they materialise.</div>
+        <div class="tut-chapter-sub de-only">Deinen Server verstehen, Wachstum verfolgen und Bedrohungen erkennen bevor sie entstehen.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Population growth tracking</div>
+          <div class="tut-step-title de-only">Bevölkerungswachstum verfolgen</div>
+          <div class="tut-step-desc en-only">The <strong>Dashboard</strong> shows the top 10 growing and shrinking players based on map snapshot comparison. For detailed analysis, open <strong>Ranking Import</strong> to see long-term farm, off, and def trends.</div>
+          <div class="tut-step-desc de-only">Das <strong>Dashboard</strong> zeigt die Top 10 wachsenden und schrumpfenden Spieler basierend auf Map-Snapshot-Vergleich. Für detaillierte Analyse öffne <strong>Ranking-Import</strong> für langfristige Farm-, Off- und Def-Trends.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Player Intelligence — search any player</div>
+          <div class="tut-step-title de-only">Player Intelligence — jeden Spieler suchen</div>
+          <div class="tut-step-desc en-only">Open <strong>Player Intelligence</strong> and search any player by name. You get their full village list, population history, settlement timeline (when did they settle new villages), and a mini-map. Great for evaluating potential targets or recruits.</div>
+          <div class="tut-step-desc de-only">Öffne <strong>Player Intelligence</strong> und suche jeden Spieler nach Name. Du erhältst seine vollständige Dorfliste, Bevölkerungshistorie, Siedlungs-Timeline (wann hat er neue Dörfer gegründet) und eine Mini-Karte. Ideal für die Bewertung potenzieller Ziele oder Rekruten.</div>
+          <a href="/guild/{{ guild_id }}/intel" class="tut-link">🔎 <span class="en-only">Open Player Intelligence</span><span class="de-only">Player Intelligence öffnen</span></a>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Hero Scout — track enemy heroes</div>
+          <div class="tut-step-title de-only">Hero Scout — feindliche Helden verfolgen</div>
+          <div class="tut-step-desc en-only">Configure a Discord channel where members post hero screenshots. The bot automatically detects equipment changes, XP jumps (hero was used in combat), and level-ups — building a timeline for every tracked enemy hero.</div>
+          <div class="tut-step-desc de-only">Konfiguriere einen Discord-Kanal, in dem Mitglieder Helden-Screenshots posten. Der Bot erkennt automatisch Ausrüstungsänderungen, XP-Sprünge (Held wurde im Kampf eingesetzt) und Level-Ups — und baut eine Zeitleiste für jeden überwachten Feindeshelden auf.</div>
+          <a href="/guild/{{ guild_id }}/defense/hero-scout" class="tut-link">🗡️ <span class="en-only">Open Hero Scout</span><span class="de-only">Hero Scout öffnen</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════════════════════
+     CHAPTER 8 — DISCORD BOT
+     ══════════════════════════════════════════════════════════════════ #}
+  <section class="tut-chapter" id="ch8">
+    <div class="tut-chapter-header">
+      <div class="tut-chapter-icon">🤖</div>
+      <div>
+        <div class="tut-chapter-num">Chapter 8</div>
+        <h2 class="tut-chapter-title en-only">Discord Bot Setup</h2>
+        <h2 class="tut-chapter-title de-only">Discord Bot Einrichtung</h2>
+        <div class="tut-chapter-sub en-only">The bot multiplies TravOps — auto-notifications, slash commands, and screenshot processing.</div>
+        <div class="tut-chapter-sub de-only">Der Bot multipliziert TravOps — automatische Benachrichtigungen, Slash-Commands und Screenshot-Verarbeitung.</div>
+      </div>
+    </div>
+    <div class="tut-steps">
+
+      <div class="tut-step">
+        <div class="tut-step-num">1</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Invite the bot to your server</div>
+          <div class="tut-step-title de-only">Bot in deinen Server einladen</div>
+          <div class="tut-step-desc en-only">In <strong>Server Management</strong>, click the invite link. Give the bot the requested permissions (read/send messages in configured channels). The bot appears in your server member list.</div>
+          <div class="tut-step-desc de-only">In der <strong>Serververwaltung</strong> auf den Einlade-Link klicken. Bot die angeforderten Berechtigungen erteilen (Nachrichten lesen/senden in konfigurierten Kanälen). Der Bot erscheint in deiner Server-Mitgliederliste.</div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">2</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Set up the Request Hub</div>
+          <div class="tut-step-title de-only">Request Hub einrichten</div>
+          <div class="tut-step-desc en-only">On the dashboard, click <strong>Create Hub Channel</strong>. The bot creates a dedicated Discord channel with buttons for Scout Request, Defense Request, Res-Push, and more. Members click buttons instead of typing commands.</div>
+          <div class="tut-step-desc de-only">Auf dem Dashboard auf <strong>Hub-Channel erstellen</strong> klicken. Der Bot erstellt einen dedizierten Discord-Kanal mit Buttons für Scout-Anfrage, Verteidigungs-Anfrage, Res-Push und mehr. Mitglieder klicken Buttons statt Befehle einzutippen.</div>
+          <div class="tut-tip"><span class="tut-tip-icon">💡</span>
+            <span class="en-only">All bot notifications (sector alerts, wave assignments, Res-Push requests) are sent to your configured channels automatically.</span>
+            <span class="de-only">Alle Bot-Benachrichtigungen (Sektor-Alerts, Wellenzuweisungen, Res-Push-Anfragen) werden automatisch in deine konfigurierten Kanäle gesendet.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tut-step">
+        <div class="tut-step-num">3</div>
+        <div class="tut-step-body">
+          <div class="tut-step-title en-only">Key bot slash commands</div>
+          <div class="tut-step-title de-only">Wichtige Bot-Slash-Commands</div>
+          <div class="tut-step-desc en-only">
+            <code>/digest #channel</code> — trigger weekly alliance report<br>
+            <code>/alert</code> — manual sector alert notification<br>
+            <code>/scout</code> — register a scout report for the archive<br>
+            <code>/attack</code> — report incoming attack from rally point
+          </div>
+          <div class="tut-step-desc de-only">
+            <code>/digest #channel</code> — Wöchentlichen Allianz-Report auslösen<br>
+            <code>/alert</code> — Manuellen Sektor-Alert auslösen<br>
+            <code>/scout</code> — Scout-Report für das Archiv registrieren<br>
+            <code>/attack</code> — Eingehenden Angriff vom Sammelplatz melden
+          </div>
+          <a href="/guild/{{ guild_id }}/settings" class="tut-link">⚙️ <span class="en-only">Server Management</span><span class="de-only">Serververwaltung</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  {# ── Bottom CTA ── #}
+  <div style="text-align:center;padding:2rem 1rem;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.05));border:1px solid rgba(99,102,241,.2);border-radius:16px;margin-top:1rem;">
+    <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;" class="en-only">Ready to get the full experience?</div>
+    <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;" class="de-only">Bereit für das volle Erlebnis?</div>
+    <div style="color:var(--text-muted);font-size:.875rem;margin-bottom:1.25rem;" class="en-only">Unlock Farming Intelligence, Operation Planner, and Alliance features with a Pro plan.</div>
+    <div style="color:var(--text-muted);font-size:.875rem;margin-bottom:1.25rem;" class="de-only">Farming Intelligence, Operationsplaner und Allianz-Features mit einem Pro-Plan freischalten.</div>
+    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+      <a href="/guild/{{ guild_id }}/upgrade" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:.65rem 1.5rem;border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem;">✨ <span class="en-only">Upgrade to Pro</span><span class="de-only">Auf Pro upgraden</span></a>
+      <a href="/guild/{{ guild_id }}" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);padding:.65rem 1.5rem;border-radius:10px;text-decoration:none;font-weight:600;font-size:.9rem;">← <span class="en-only">Back to Dashboard</span><span class="de-only">Zurück zum Dashboard</span></a>
+    </div>
+  </div>
+
+</div><!-- /tut-wrap -->
+
+<script>
+// ── Language switch ──────────────────────────────────────────────────────────
+var _lang = localStorage.getItem('tut_lang') || 'en';
+setLang(_lang, true);
+
+function setLang(l, init) {
+  _lang = l;
+  document.body.classList.toggle('lang-de', l === 'de');
+  document.body.classList.toggle('lang-en', l !== 'de');
+  document.getElementById('btn-en').classList.toggle('active', l === 'en');
+  document.getElementById('btn-de').classList.toggle('active', l === 'de');
+  if (!init) localStorage.setItem('tut_lang', l);
+}
+
+// ── Chapter nav highlight on scroll ─────────────────────────────────────────
+function scrollTo(id) {
+  var el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+var chapters = ['ch1','ch2','ch3','ch4','ch5','ch6','ch7','ch8'];
+var navBtns   = document.querySelectorAll('.tut-nav-btn');
+
+function updateNav() {
+  var best = 0;
+  chapters.forEach(function(id, i) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.getBoundingClientRect().top <= 120) best = i;
+  });
+  navBtns.forEach(function(b, i) { b.classList.toggle('active', i === best); });
+}
+window.addEventListener('scroll', updateNav, { passive: true });
+</script>
+{% endblock %}

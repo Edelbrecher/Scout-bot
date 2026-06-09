@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ guild.guild_name }} · TravOps{% endblock %}
 
+{% if player_growth %}
+{% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>{% endblock %}
+{% endif %}
+
 {% block content %}
 {% set is_premium = guild.subscription_status in ('active', 'trialing', 'past_due') %}
 {% set is_personal = guild.workspace_type == 'personal' %}
@@ -298,25 +302,45 @@
     {# ── RIGHT COLUMN ── #}
     <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
-      {# Player Growth Leaderboard #}
+      {# Player Growth Chart (ApexCharts) #}
       <div class="card">
         <div class="card-header">
           <span>📈 Population Growth</span>
           <a href="/guild/{{ guild.guild_id }}/travian-stats" class="card-link">Details →</a>
         </div>
         {% if player_growth %}
-        <div class="leaderboard">
-          {% for p in player_growth[:8] %}
-          {% set delta = p.delta if p.delta is defined else 0 %}
-          <div class="lb-row">
-            <div class="lb-rank">{{ loop.index }}</div>
-            <div class="lb-name">{{ p.player_name or '?' }}</div>
-            <div class="lb-val {% if delta >= 0 %}lb-pos{% else %}lb-neg{% endif %}">
-              {% if delta >= 0 %}+{% endif %}{{ delta | int }}
-            </div>
-          </div>
-          {% endfor %}
-        </div>
+        <div id="growthChart"></div>
+        <script>
+        (function(){
+          var data = {{ player_growth[:10] | tojson }};
+          var names  = data.map(function(p){ return p.player_name || '?'; }).reverse();
+          var deltas = data.map(function(p){ return p.delta || 0; }).reverse();
+          var colors = deltas.map(function(d){ return d >= 0 ? '#4ade80' : '#f87171'; });
+          var opts = {
+            chart: { type:'bar', height: names.length * 32 + 40, toolbar:{show:false},
+                     background:'transparent', sparkline:{enabled:false} },
+            theme: { mode:'dark' },
+            plotOptions: { bar:{ horizontal:true, borderRadius:4, barHeight:'65%',
+              dataLabels:{position:'right'} } },
+            dataLabels: { enabled:true, formatter:function(v){return (v>0?'+':'')+v;},
+              style:{fontSize:'11px', colors:['#9ca3af']}, offsetX:4 },
+            series: [{ name:'Pop Δ', data: deltas }],
+            xaxis: { categories: names, labels:{style:{colors:'#6b7280',fontSize:'11px'}} },
+            yaxis: { labels:{style:{colors:'#6b7280',fontSize:'11px'}} },
+            grid: { borderColor:'rgba(255,255,255,.06)', xaxis:{lines:{show:true}}, yaxis:{lines:{show:false}} },
+            colors: ['#6366f1'],
+            fill: { type:'gradient', gradient:{
+              type:'horizontal',
+              gradientToColors: deltas.map(function(d){ return d>=0?'#4ade80':'#ef4444'; }),
+              stops:[0,100]
+            }},
+            tooltip: { theme:'dark', y:{formatter:function(v){return (v>0?'+':'')+v+' pop';}} }
+          };
+          if (typeof ApexCharts !== 'undefined') {
+            new ApexCharts(document.getElementById('growthChart'), opts).render();
+          }
+        })();
+        </script>
         {% else %}
         <div class="empty-state">No growth data yet — import map snapshots to track population changes.</div>
         {% endif %}
