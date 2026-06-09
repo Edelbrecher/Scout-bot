@@ -6060,7 +6060,6 @@ async def meta_alliance_remove(request: Request, guild_id: str,
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#meta-alliances", status_code=303)
 
 
-@app.post("/guild/{guild_id}/my-ally/server-end")
 # ── Server-End Countdown helpers ─────────────────────────────────────────────
 
 def _build_countdown_embed(end_date_str: str, ally_name: str) -> tuple[dict, int, int, int]:
