@@ -34,6 +34,7 @@ class ScouterBot(commands.Bot):
         await self.load_extension("cogs.hero_scout")
         await self.load_extension("cogs.crop_tracker")
         await self.load_extension("cogs.digest")
+        await self.load_extension("cogs.wewin")
         await self.tree.sync()
         print("Slash commands synced.")
         self.loop.create_task(self.heartbeat_loop())

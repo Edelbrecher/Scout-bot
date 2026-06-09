@@ -6098,18 +6098,30 @@ def _build_countdown_embed(end_date_str: str, ally_name: str) -> tuple[dict, int
     return embed, days, hours, mins
 
 
+_WINNER_BUTTON_COMPONENT = {
+    "type": 1,
+    "components": [{
+        "type": 2,
+        "style": 4,           # DANGER (red)
+        "label": "🏆 WINNER",
+        "custom_id": "persistent:wewin_winner",
+    }]
+}
+
+
 async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, ally_name: str,
                                  existing_msg_id: str | None) -> str | None:
     """Post or edit countdown embed. Returns message_id or None on failure."""
     bot_token = os.environ.get("DISCORD_TOKEN", "")
     headers   = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
     embed, _, _, _ = _build_countdown_embed(end_date, ally_name)
+    payload = {"embeds": [embed], "components": [_WINNER_BUTTON_COMPONENT]}
 
     async with httpx.AsyncClient(timeout=15) as client:
         if existing_msg_id:
             r = await client.patch(
                 f"https://discord.com/api/v10/channels/{channel_id}/messages/{existing_msg_id}",
-                headers=headers, json={"embeds": [embed]}
+                headers=headers, json=payload,
             )
             if r.status_code in (200, 201):
                 return existing_msg_id
@@ -6117,7 +6129,7 @@ async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, a
 
         r = await client.post(
             f"https://discord.com/api/v10/channels/{channel_id}/messages",
-            headers=headers, json={"embeds": [embed]}
+            headers=headers, json=payload,
         )
         if r.status_code in (200, 201):
             return r.json().get("id")
