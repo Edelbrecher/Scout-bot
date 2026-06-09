@@ -88,9 +88,10 @@ class WinnerView(discord.ui.View):
         # Add any remaining congrats lines
         all_messages.extend(congrats_cycle)
 
-        # Final epic closer
+        # Final epic closer + music
         all_messages.append("🎊🎊🎊 **CONGRATULATIONS TO EVERY WARRIOR IN THIS ALLIANCE!** 🎊🎊🎊")
         all_messages.append("@here 🏆 **WE ARE THE CHAMPIONS!** 🏆 @here")
+        all_messages.append("🎵 **This one's for you, champions:** https://www.youtube.com/watch?v=04854XqcfBY")
 
         for msg_content in all_messages:
             try:
