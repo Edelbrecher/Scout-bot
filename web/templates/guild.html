@@ -333,36 +333,39 @@
         {# View: Alliance Top 10 #}
         <div id="widget-alliances" style="display:none;">
           {% if top_alliances %}
+          {# Show growth column only if at least one entry has a real non-zero delta #}
+          {% set has_growth = top_alliances | selectattr('pop_growth') | selectattr('pop_growth', 'ne', 0) | list | length > 0 %}
           <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
             <thead><tr style="background:var(--bg-main);">
               <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">#</th>
               <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">Allianz</th>
               <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Mitglieder</th>
               <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Ges. Pop</th>
-              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Wachstum</th>
-              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Dörfer</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Ø Pop/Spieler</th>
+              {% if has_growth %}
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Δ Wachstum</th>
+              {% endif %}
             </tr></thead>
             <tbody>
             {% for a in top_alliances %}
+            {% set avg_pop = (a.total_pop / a.member_count) | int if a.member_count else 0 %}
             <tr style="border-top:1px solid var(--border);">
               <td style="padding:.35rem .6rem;color:var(--text-muted);font-size:.75rem;">{{ loop.index }}</td>
               <td style="padding:.35rem .6rem;font-weight:500;">{{ a.alliance_name }}</td>
               <td style="padding:.35rem .6rem;text-align:right;">{{ a.member_count }}</td>
               <td style="padding:.35rem .6rem;text-align:right;font-family:monospace;font-size:.8rem;">{{ '{:,}'.format(a.total_pop or 0) }}</td>
+              <td style="padding:.35rem .6rem;text-align:right;font-family:monospace;font-size:.8rem;color:var(--text-muted);">{{ '{:,}'.format(avg_pop) }}</td>
+              {% if has_growth %}
               <td style="padding:.35rem .6rem;text-align:right;font-size:.8rem;">
-                {% if a.pop_growth is not none %}
-                  {% if a.pop_growth > 0 %}
-                    <span style="color:#22c55e;">+{{ '{:,}'.format(a.pop_growth) }}</span>
-                  {% elif a.pop_growth < 0 %}
-                    <span style="color:#ef4444;">{{ '{:,}'.format(a.pop_growth) }}</span>
-                  {% else %}
-                    <span style="color:var(--text-muted);">±0</span>
-                  {% endif %}
+                {% if a.pop_growth and a.pop_growth > 0 %}
+                  <span style="color:#22c55e;">+{{ '{:,}'.format(a.pop_growth) }}</span>
+                {% elif a.pop_growth and a.pop_growth < 0 %}
+                  <span style="color:#ef4444;">{{ '{:,}'.format(a.pop_growth) }}</span>
                 {% else %}
                   <span style="color:var(--text-muted);">—</span>
                 {% endif %}
               </td>
-              <td style="padding:.35rem .6rem;text-align:right;color:var(--text-muted);">{{ a.village_count }}</td>
+              {% endif %}
             </tr>
             {% endfor %}
             </tbody>
