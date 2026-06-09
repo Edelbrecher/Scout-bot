@@ -50,6 +50,18 @@
           var secs = Math.round((Date.now() - startedAt) / 1000);
           elapsed.textContent = secs + 's vergangen…';
 
+          // Hard timeout: 120s — show error and stop polling
+          if (secs > 120) {
+            spinner.style.display = 'none';
+            banner.style.borderColor = 'rgba(239,68,68,.4)';
+            banner.style.background  = 'rgba(239,68,68,.08)';
+            msg.style.color = '#f87171';
+            msg.innerHTML = '✗ Timeout — Travian antwortet nicht. '
+              + '<a href="?loading=1" style="color:#f87171;text-decoration:underline;">Erneut versuchen</a>';
+            elapsed.textContent = '';
+            return;
+          }
+
           if (d.error) {
             spinner.style.display = 'none';
             banner.style.borderColor = 'rgba(239,68,68,.4)';
@@ -69,7 +81,6 @@
             msg.style.color = '#4ade80';
             msg.textContent = '✅ Snapshot geladen! Karte ist jetzt verfügbar.';
             elapsed.textContent = 'Fertig nach ' + secs + 's';
-            // Redirect to map after short pause
             setTimeout(function(){
               window.location.href = '/guild/' + gid + '/map';
             }, 1800);

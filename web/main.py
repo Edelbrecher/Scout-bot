@@ -13896,8 +13896,11 @@ async def guild_set_world_inline(request: Request, guild_id: str):
     if err: return JSONResponse({"error": "Not authenticated"}, status_code=401)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "Access denied"}, status_code=403)
-    # Must be guild admin or platform admin
-    if not (_get_is_admin(request) or session.get("guild_role") == "admin"):
+    # Allow: platform admin, Discord guild admin, or personal workspace owner
+    is_platform_admin = _get_is_admin(request)
+    is_guild_admin    = session.get("guild_role") == "admin"
+    is_ws_owner       = guild_id.startswith("ws_") and session.get("uid") is not None
+    if not (is_platform_admin or is_guild_admin or is_ws_owner):
         return JSONResponse({"error": "Admin rights required"}, status_code=403)
     try:
         body = await request.json()
