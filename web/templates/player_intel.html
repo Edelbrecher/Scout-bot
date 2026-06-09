@@ -58,25 +58,66 @@
 
   {# ── No world configured banner ── #}
   {% if no_world %}
-  <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.4);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:flex-start;gap:.9rem;">
-    <span style="font-size:1.4rem;line-height:1;">⚙️</span>
-    <div>
-      <div style="font-weight:700;color:#fbbf24;margin-bottom:.3rem;">Keine Travian-Welt konfiguriert</div>
-      <div style="font-size:.85rem;color:var(--text-muted);line-height:1.55;">
-        Diesem Workspace ist noch keine Travian-Welt zugeordnet. Player Intelligence benötigt eine Welt-URL, um Spielerdaten aus Karten-Snapshots zu laden.
-      </div>
-      <div style="margin-top:.75rem;display:flex;gap:.6rem;flex-wrap:wrap;">
-        <a href="/guild/{{ guild.guild_id }}/admin"
-           style="display:inline-flex;align-items:center;gap:.35rem;padding:.4rem .9rem;background:#fbbf24;color:#1a1a2e;border-radius:7px;font-size:.82rem;font-weight:700;text-decoration:none;">
-          ⚙️ Jetzt konfigurieren
-        </a>
-        <a href="/guild/{{ guild.guild_id }}/map"
-           style="display:inline-flex;align-items:center;gap:.35rem;padding:.4rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;font-size:.82rem;color:var(--text);text-decoration:none;">
-          🗺️ Zur Karte
-        </a>
+  <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.4);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:flex-start;gap:.9rem;">
+      <span style="font-size:1.4rem;line-height:1.2;">⚙️</span>
+      <div style="flex:1;">
+        <div style="font-weight:700;color:#fbbf24;margin-bottom:.25rem;">Keine Travian-Welt konfiguriert</div>
+        <div style="font-size:.84rem;color:var(--text-muted);line-height:1.5;margin-bottom:.85rem;">
+          Trage die URL deiner Travian-Welt ein — das ist alles was du brauchst.<br>
+          <span style="font-size:.78rem;opacity:.7;">Beispiel: <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px;">https://ts3.x3.arabics.travian.com</code></span>
+        </div>
+        <form id="worldSetupForm" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+          <input id="worldUrlInput" type="url" placeholder="https://ts3.x1.travian.com" required
+            style="flex:1;min-width:260px;padding:.5rem .8rem;background:var(--bg-main);border:1px solid rgba(251,191,36,.5);
+                   border-radius:7px;color:var(--text);font-size:.85rem;outline:none;"
+            onfocus="this.style.borderColor='#fbbf24'" onblur="this.style.borderColor='rgba(251,191,36,.5)'">
+          <button type="submit" id="worldSaveBtn"
+            style="padding:.5rem 1.1rem;background:#fbbf24;color:#1a1a2e;border:none;border-radius:7px;
+                   font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s;">
+            ✓ Speichern &amp; suchen
+          </button>
+        </form>
+        <div id="worldSetupMsg" style="display:none;margin-top:.5rem;font-size:.8rem;"></div>
       </div>
     </div>
   </div>
+  <script>
+  document.getElementById('worldSetupForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var url = document.getElementById('worldUrlInput').value.trim().replace(/\/$/, '');
+    if (!url) return;
+    var btn = document.getElementById('worldSaveBtn');
+    var msg = document.getElementById('worldSetupMsg');
+    btn.disabled = true; btn.textContent = '⏳ Speichern…';
+    try {
+      var r = await fetch('/guild/{{ guild.guild_id }}/admin/set-world', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tw_world: url})
+      });
+      if (r.ok) {
+        msg.style.display = 'block';
+        msg.style.color = '#4ade80';
+        msg.textContent = '✓ Welt gespeichert! Seite wird neu geladen…';
+        // Reload so the search now works
+        var q = new URLSearchParams(window.location.search).get('q') || '';
+        setTimeout(function() { window.location.href = window.location.pathname + (q ? '?q=' + encodeURIComponent(q) : ''); }, 800);
+      } else {
+        var j = await r.json().catch(function(){return {};});
+        msg.style.display = 'block';
+        msg.style.color = '#f87171';
+        msg.textContent = '✗ ' + (j.detail || j.error || 'Fehler beim Speichern');
+        btn.disabled = false; btn.textContent = '✓ Speichern & suchen';
+      }
+    } catch(err) {
+      msg.style.display = 'block';
+      msg.style.color = '#f87171';
+      msg.textContent = '✗ Netzwerkfehler';
+      btn.disabled = false; btn.textContent = '✓ Speichern & suchen';
+    }
+  });
+  </script>
   {% endif %}
 
   {# ── Error / suggestions ── #}

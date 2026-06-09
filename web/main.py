@@ -13741,6 +13741,27 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
     })
 
 
+@app.post("/guild/{guild_id}/admin/set-world")
+async def guild_set_world_inline(request: Request, guild_id: str):
+    """Quick-setup endpoint: save tw_world URL without visiting the admin page."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "Not authenticated"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "Access denied"}, status_code=403)
+    # Must be guild admin or platform admin
+    if not (_get_is_admin(request) or session.get("guild_role") == "admin"):
+        return JSONResponse({"error": "Admin rights required"}, status_code=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    url = (body.get("tw_world") or "").strip().rstrip("/")
+    if not url or not re.match(r"^https?://[a-zA-Z0-9.\-]+(:[0-9]+)?$", url):
+        return JSONResponse({"error": "Ungültige URL — bitte vollständige Welt-URL angeben (z.B. https://ts3.x1.travian.com)"}, status_code=422)
+    await database.update_tw_world(guild_id, url)
+    return JSONResponse({"ok": True})
+
+
 @app.get("/guild/{guild_id}/intel/autocomplete")
 async def player_intel_autocomplete(request: Request, guild_id: str, q: str = ""):
     session = _get_session(request)
