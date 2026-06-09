@@ -183,6 +183,22 @@
                 </select>
                 <button type="submit" style="background:#3b82f6; border:none; border-radius:6px; padding:0.3rem 0.75rem; color:#fff; font-size:0.82rem; cursor:pointer; font-weight:600;">Save</button>
               </form>
+              <!-- Extend trial -->
+              <form method="post" action="/admin/customers/user/{{ uid }}/extend-trial"
+                    style="display:flex;gap:.35rem;align-items:center;margin-top:.4rem;">
+                <span style="font-size:.78rem;color:var(--text-muted);">⏱ Trial verlängern:</span>
+                <input type="number" name="days" value="7" min="1" max="365"
+                  style="width:52px;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;
+                         padding:.3rem .4rem;color:var(--text);font-size:.82rem;text-align:center;">
+                <span style="font-size:.78rem;color:var(--text-muted);">Tage</span>
+                <button type="submit"
+                  style="background:#f59e0b;border:none;border-radius:6px;padding:.3rem .7rem;color:#1a1a2e;font-size:.82rem;cursor:pointer;font-weight:700;">
+                  +Tage
+                </button>
+                {% if usub.expires_at %}
+                <span style="font-size:.72rem;color:var(--text-muted);">aktuell bis {{ usub.expires_at[:10] }}</span>
+                {% endif %}
+              </form>
             </div>
           </div>
 

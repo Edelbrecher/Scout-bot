@@ -302,49 +302,165 @@
     {# ── RIGHT COLUMN ── #}
     <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
-      {# Player Growth Chart (ApexCharts) #}
-      <div class="card">
-        <div class="card-header">
-          <span>📈 Population Growth</span>
-          <a href="/guild/{{ guild.guild_id }}/travian-stats" class="card-link">Details →</a>
+      {# ── Analytics widget with 3-way selector ── #}
+      <div class="card" id="analyticsWidget">
+        <div class="card-header" style="flex-wrap:wrap;gap:.5rem;">
+          <span id="widgetTitle">📈 Population Growth</span>
+          <div style="display:flex;gap:.3rem;margin-left:auto;">
+            <button onclick="switchWidget('growth')" id="wbtn-growth"
+              class="wbtn wbtn-active" title="Population Growth">📈 Growth</button>
+            <button onclick="switchWidget('raiders')" id="wbtn-raiders"
+              class="wbtn" title="Raider of the Week">🏆 Raiders</button>
+            <button onclick="switchWidget('alliances')" id="wbtn-alliances"
+              class="wbtn" title="Alliance Top 10">🛡️ Alliances</button>
+          </div>
+          <a id="widgetLink" href="/guild/{{ guild.guild_id }}/travian-stats" class="card-link">Details →</a>
         </div>
-        {% if player_growth %}
-        <div id="growthChart"></div>
-        <script>
-        (function(){
-          var data = {{ player_growth[:10] | tojson }};
-          var names  = data.map(function(p){ return p.player_name || '?'; }).reverse();
-          var deltas = data.map(function(p){ return p.delta || 0; }).reverse();
-          var colors = deltas.map(function(d){ return d >= 0 ? '#4ade80' : '#f87171'; });
-          var opts = {
-            chart: { type:'bar', height: names.length * 32 + 40, toolbar:{show:false},
-                     background:'transparent', sparkline:{enabled:false} },
-            theme: { mode:'dark' },
-            plotOptions: { bar:{ horizontal:true, borderRadius:4, barHeight:'65%',
-              dataLabels:{position:'right'} } },
-            dataLabels: { enabled:true, formatter:function(v){return (v>0?'+':'')+v;},
-              style:{fontSize:'11px', colors:['#9ca3af']}, offsetX:4 },
-            series: [{ name:'Pop Δ', data: deltas }],
-            xaxis: { categories: names, labels:{style:{colors:'#6b7280',fontSize:'11px'}} },
-            yaxis: { labels:{style:{colors:'#6b7280',fontSize:'11px'}} },
-            grid: { borderColor:'rgba(255,255,255,.06)', xaxis:{lines:{show:true}}, yaxis:{lines:{show:false}} },
-            colors: ['#6366f1'],
-            fill: { type:'gradient', gradient:{
-              type:'horizontal',
-              gradientToColors: deltas.map(function(d){ return d>=0?'#4ade80':'#ef4444'; }),
-              stops:[0,100]
-            }},
-            tooltip: { theme:'dark', y:{formatter:function(v){return (v>0?'+':'')+v+' pop';}} }
-          };
-          if (typeof ApexCharts !== 'undefined') {
-            new ApexCharts(document.getElementById('growthChart'), opts).render();
-          }
-        })();
-        </script>
-        {% else %}
-        <div class="empty-state">No growth data yet — import map snapshots to track population changes.</div>
-        {% endif %}
+        <style>
+          .wbtn{padding:.22rem .55rem;font-size:.72rem;border-radius:6px;border:1px solid var(--border);
+                background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s;}
+          .wbtn:hover{border-color:var(--accent);color:var(--text);}
+          .wbtn.wbtn-active{background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.5);color:#a5b4fc;font-weight:700;}
+        </style>
+
+        {# View: Population Growth #}
+        <div id="widget-growth">
+          {% if player_growth %}
+          <div id="growthChart"></div>
+          {% else %}
+          <div class="empty-state">No growth data yet — import map snapshots to track population changes.</div>
+          {% endif %}
+        </div>
+
+        {# View: Raiders of the Week #}
+        <div id="widget-raiders" style="display:none;">
+          {% if top_raiders %}
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead><tr style="background:var(--bg-main);">
+              <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">#</th>
+              <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">Spieler</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Raid-Punkte</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">+Gewinn</th>
+            </tr></thead>
+            <tbody>
+            {% for r in top_raiders %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:.35rem .6rem;color:var(--text-muted);font-size:.75rem;">
+                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+              </td>
+              <td style="padding:.35rem .6rem;font-weight:500;">
+                <a href="/guild/{{ guild.guild_id }}/intel?q={{ r.player_name | urlencode }}"
+                   style="color:inherit;text-decoration:none;border-bottom:1px dotted rgba(165,180,252,.3);">
+                  {{ r.player_name }}
+                </a>
+              </td>
+              <td style="padding:.35rem .6rem;text-align:right;font-family:monospace;font-size:.8rem;">{{ '{:,}'.format(r.raid_points or 0) }}</td>
+              <td style="padding:.35rem .6rem;text-align:right;font-size:.8rem;">
+                {% if r.raid_gain and r.raid_gain > 0 %}
+                  <span style="color:#22c55e;">+{{ '{:,}'.format(r.raid_gain) }}</span>
+                {% elif r.raid_gain and r.raid_gain < 0 %}
+                  <span style="color:#ef4444;">{{ '{:,}'.format(r.raid_gain) }}</span>
+                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">No raid data yet — import Travian Stats to track raiders.</div>
+          {% endif %}
+        </div>
+
+        {# View: Alliance Top 10 #}
+        <div id="widget-alliances" style="display:none;">
+          {% if top_alliances %}
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead><tr style="background:var(--bg-main);">
+              <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">#</th>
+              <th style="padding:.35rem .6rem;text-align:left;font-size:.68rem;color:var(--text-muted);">Allianz</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Mitglieder</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Ges. Pop</th>
+              <th style="padding:.35rem .6rem;text-align:right;font-size:.68rem;color:var(--text-muted);">Dörfer</th>
+            </tr></thead>
+            <tbody>
+            {% for a in top_alliances %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:.35rem .6rem;color:var(--text-muted);font-size:.75rem;">{{ loop.index }}</td>
+              <td style="padding:.35rem .6rem;font-weight:500;">{{ a.alliance_name }}</td>
+              <td style="padding:.35rem .6rem;text-align:right;">{{ a.member_count }}</td>
+              <td style="padding:.35rem .6rem;text-align:right;font-family:monospace;font-size:.8rem;">{{ '{:,}'.format(a.total_pop or 0) }}</td>
+              <td style="padding:.35rem .6rem;text-align:right;color:var(--text-muted);">{{ a.village_count }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">No map snapshot data yet.</div>
+          {% endif %}
+        </div>
       </div>
+
+      <script>
+      var _activeWidget = localStorage.getItem('dash_widget') || 'growth';
+      var _widgetLinks = {
+        growth:    '/guild/{{ guild.guild_id }}/travian-stats',
+        raiders:   '/guild/{{ guild.guild_id }}/travian-stats',
+        alliances: '/guild/{{ guild.guild_id }}/map',
+      };
+      var _widgetTitles = {
+        growth: '📈 Population Growth', raiders: '🏆 Raider der Woche', alliances: '🛡️ Alliance Top 10'
+      };
+      function switchWidget(name) {
+        ['growth','raiders','alliances'].forEach(function(w) {
+          var el = document.getElementById('widget-' + w);
+          var btn = document.getElementById('wbtn-' + w);
+          if (el) el.style.display = w === name ? '' : 'none';
+          if (btn) btn.classList.toggle('wbtn-active', w === name);
+        });
+        var title = document.getElementById('widgetTitle');
+        var link  = document.getElementById('widgetLink');
+        if (title) title.textContent = _widgetTitles[name] || '';
+        if (link)  link.href = _widgetLinks[name] || '#';
+        _activeWidget = name;
+        localStorage.setItem('dash_widget', name);
+      }
+      // Init
+      switchWidget(_activeWidget);
+
+      {% if player_growth %}
+      // Render growth chart only when visible
+      function _renderGrowth() {
+        if (document.getElementById('growthChart').children.length) return;
+        var data = {{ player_growth[:10] | tojson }};
+        var names  = data.map(function(p){ return p.player_name || '?'; }).reverse();
+        var deltas = data.map(function(p){ return p.delta || 0; }).reverse();
+        var opts = {
+          chart: { type:'bar', height: names.length * 32 + 40, toolbar:{show:false},
+                   background:'transparent' },
+          theme: { mode:'dark' },
+          plotOptions: { bar:{ horizontal:true, borderRadius:4, barHeight:'65%',
+            dataLabels:{position:'right'} } },
+          dataLabels: { enabled:true, formatter:function(v){return (v>0?'+':'')+v;},
+            style:{fontSize:'11px', colors:['#9ca3af']}, offsetX:4 },
+          series: [{ name:'Pop Δ', data: deltas }],
+          xaxis: { categories: names, labels:{style:{colors:'#6b7280',fontSize:'11px'}} },
+          yaxis: { labels:{style:{colors:'#6b7280',fontSize:'11px'}} },
+          grid: { borderColor:'rgba(255,255,255,.06)', xaxis:{lines:{show:true}}, yaxis:{lines:{show:false}} },
+          fill: { type:'gradient', gradient:{ type:'horizontal',
+            gradientToColors: deltas.map(function(d){ return d>=0?'#4ade80':'#ef4444'; }),
+            stops:[0,100] }},
+          tooltip: { theme:'dark', y:{formatter:function(v){return (v>0?'+':'')+v+' pop';}} }
+        };
+        if (typeof ApexCharts !== 'undefined') {
+          new ApexCharts(document.getElementById('growthChart'), opts).render();
+        }
+      }
+      // Render immediately if growth is the active tab, else lazy-render on first switch
+      if (_activeWidget === 'growth') _renderGrowth();
+      var _origSwitch = switchWidget;
+      switchWidget = function(name) { _origSwitch(name); if (name === 'growth') _renderGrowth(); };
+      {% endif %}
+      </script>
 
       {# Quick Actions #}
       <div class="card">

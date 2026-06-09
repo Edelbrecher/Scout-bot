@@ -1921,13 +1921,15 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
         preview_info = pplan
 
     uid = session.get("uid", "")
-    unread_notif, my_waves, farm_stats, recent_battles, recent_attacks, player_growth = await asyncio.gather(
+    unread_notif, my_waves, farm_stats, recent_battles, recent_attacks, player_growth, top_raiders, top_alliances = await asyncio.gather(
         database.count_unread_notifications(guild_id, uid),
         database.get_my_op_waves(guild_id, uid),
         database.get_farm_stats(guild_id),
         database.get_battle_reports(guild_id, limit=6),
         database.get_attack_reports(guild_id, limit=6),
         database.get_player_growth(guild_id, limit=8),
+        database.get_top_raiders(guild_id, limit=10),
+        database.get_top_alliances(guild_id, limit=10),
     )
     pending_waves = sum(1 for w in my_waves if not w.get("confirm_status") and w.get("send_time"))
 
@@ -1946,6 +1948,8 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
          "recent_battles": recent_battles,
          "recent_attacks": recent_attacks,
          "player_growth": player_growth,
+         "top_raiders": top_raiders,
+         "top_alliances": top_alliances,
          },
     )
 
@@ -9609,6 +9613,44 @@ async def admin_set_user_plan(
         plan = ""
     await database.update_user_subscription_admin(discord_user_id, status, plan)
     return RedirectResponse("/admin/customers?saved=1", status_code=303)
+
+
+@app.post("/admin/customers/user/{discord_user_id}/extend-trial")
+async def admin_extend_trial(request: Request, discord_user_id: str, days: int = Form(7)):
+    """Extend (or start) a user-level trial by N days from today or from current expires_at."""
+    session, err = _require_admin(request)
+    if err: return err
+    days = max(1, min(365, days))
+    import datetime as _dt
+    async with __import__("aiosqlite").connect(database.DB_PATH) as db:
+        # Get current expires_at
+        async with db.execute(
+            "SELECT subscription_expires_at, subscription_status FROM user_subscriptions WHERE discord_user_id=?",
+            (discord_user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        now = _dt.datetime.utcnow()
+        if row and row[0]:
+            try:
+                base = _dt.datetime.fromisoformat(row[0])
+                base = max(base, now)  # extend from future if already in future
+            except Exception:
+                base = now
+        else:
+            base = now
+        new_expires = (base + _dt.timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+        current_status = (row[1] if row else None) or "trialing"
+        new_status = current_status if current_status in ("active", "trialing") else "trialing"
+        await db.execute("""
+            INSERT INTO user_subscriptions (discord_user_id, subscription_status, subscription_expires_at, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(discord_user_id) DO UPDATE SET
+                subscription_status = ?,
+                subscription_expires_at = ?,
+                updated_at = datetime('now')
+        """, (discord_user_id, new_status, new_expires, new_status, new_expires))
+        await db.commit()
+    return RedirectResponse("/admin/customers?saved=1&extended=1", status_code=303)
 
 
 @app.get("/admin/trial-links", response_class=HTMLResponse)

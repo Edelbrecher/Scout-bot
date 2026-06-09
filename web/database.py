@@ -8041,15 +8041,23 @@ async def get_all_op_waves(plan_id: int) -> list[dict]:
 
 
 async def backfill_op_wave_discord_ids():
-    """One-time backfill: set attacker_discord_id on waves where it's missing but name matches member_troops."""
+    """Backfill attacker_discord_id on waves where it's missing — uses member_troops + ally_members."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        # Get all member_troops travian_name → discord_id mappings
+        # Source 1: member_troops travian_name → discord_id
         async with db.execute(
             "SELECT guild_id, travian_name, discord_id FROM member_troops WHERE travian_name != '' AND discord_id != ''"
         ) as cur:
-            rows = await cur.fetchall()
+            mt_rows = await cur.fetchall()
+        # Source 2: ally_members travian_name → discord_id (joined via invite link)
+        async with db.execute(
+            """SELECT ag.guild_id, am.travian_name, am.discord_id
+               FROM ally_members am
+               JOIN ally_groups ag ON ag.id = am.ally_group_id
+               WHERE am.travian_name != '' AND am.discord_id != '' AND am.status = 'approved'"""
+        ) as cur:
+            am_rows = await cur.fetchall()
         updated = 0
-        for guild_id, travian_name, discord_id in rows:
+        for guild_id, travian_name, discord_id in list(mt_rows) + list(am_rows):
             cur2 = await db.execute(
                 """UPDATE op_waves SET attacker_discord_id=?
                    WHERE guild_id=? AND attacker_name=?
@@ -8066,7 +8074,7 @@ async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
     """Return all waves assigned to a user across all active/draft plans, with plan + target info."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-        # Resolve travian name for fallback match
+        # Resolve travian name: check member_troops first, then ally_members
         travian_name = ""
         async with db.execute(
             "SELECT travian_name FROM member_troops WHERE guild_id=? AND discord_id=?",
@@ -8075,6 +8083,17 @@ async def get_my_op_waves(guild_id: str, discord_id: str) -> list[dict]:
             row2 = await cur2.fetchone()
             if row2 and row2[0]:
                 travian_name = row2[0]
+        if not travian_name:
+            async with db.execute(
+                """SELECT am.travian_name FROM ally_members am
+                   JOIN ally_groups ag ON ag.id = am.ally_group_id
+                   WHERE ag.guild_id=? AND am.discord_id=? AND am.travian_name != ''
+                   LIMIT 1""",
+                (guild_id, discord_id)
+            ) as cur3:
+                row3 = await cur3.fetchone()
+                if row3 and row3[0]:
+                    travian_name = row3[0]
         async with db.execute("""
             SELECT w.id, w.plan_id, w.target_id, w.attacker_name, w.origin_village,
                    w.origin_x, w.origin_y, w.wave_type, w.tribe, w.troop_json,
@@ -11789,6 +11808,48 @@ async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
                 ORDER BY member_count DESC, total_pop DESC
                 LIMIT ?
             """, (guild_id, latest, limit)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            return []
+
+
+async def get_top_raiders(guild_id: str, limit: int = 10) -> list[dict]:
+    """Top raiders by raid_points gain between the two most recent travian_stats snapshots."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            # Two most recent distinct snapshot_at values
+            async with db.execute(
+                "SELECT DISTINCT snapshot_at FROM travian_stats_entries WHERE guild_id=? ORDER BY snapshot_at DESC LIMIT 2",
+                (guild_id,)
+            ) as cur:
+                snaps = [r[0] for r in await cur.fetchall()]
+            if len(snaps) < 2:
+                # Only one snapshot — return top by absolute raid_points
+                async with db.execute(
+                    """SELECT player_name, raid_points, raid_rank FROM travian_stats_entries
+                       WHERE guild_id=? AND snapshot_at=(SELECT MAX(snapshot_at) FROM travian_stats_entries WHERE guild_id=?)
+                       ORDER BY raid_points DESC LIMIT ?""",
+                    (guild_id, guild_id, limit)
+                ) as cur:
+                    rows = [dict(r) for r in await cur.fetchall()]
+                return [{"player_name": r["player_name"], "raid_points": r["raid_points"],
+                         "raid_gain": 0, "raid_rank": r["raid_rank"]} for r in rows]
+            latest, prev = snaps[0], snaps[1]
+            async with db.execute(
+                """SELECT a.player_name,
+                          a.raid_points               AS raid_now,
+                          COALESCE(b.raid_points, 0)  AS raid_prev,
+                          a.raid_points - COALESCE(b.raid_points, 0) AS raid_gain,
+                          a.raid_rank
+                   FROM travian_stats_entries a
+                   LEFT JOIN travian_stats_entries b
+                          ON b.guild_id = a.guild_id AND b.player_name = a.player_name
+                             AND b.snapshot_at = ?
+                   WHERE a.guild_id=? AND a.snapshot_at=?
+                   ORDER BY raid_gain DESC LIMIT ?""",
+                (prev, guild_id, latest, limit)
+            ) as cur:
                 return [dict(r) for r in await cur.fetchall()]
         except Exception:
             return []
