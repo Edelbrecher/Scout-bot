@@ -10073,18 +10073,20 @@ async def api_sidebar_config(request: Request):
 
 @app.get("/guild/{guild_id}/api/sidebar-badges")
 async def sidebar_badges(request: Request, guild_id: str):
-    """Return notification counts for sidebar badges (sector monitor alerts + my op waves)."""
+    """Return notification counts for sidebar badges + player pro status."""
     session = get_session(request) or {}
     if not session.get("uid"):
-        return JSONResponse({"sector_monitor": 0, "my_operations": 0})
+        return JSONResponse({"sector_monitor": 0, "my_operations": 0, "has_player_pro": False})
     uid = session["uid"]
-    sector_count, waves = await asyncio.gather(
+    guild, sector_count, waves = await asyncio.gather(
+        database.get_guild(guild_id),
         _count_sector_alerts(guild_id),
         database.get_my_op_waves(guild_id, uid),
     )
     return JSONResponse({
         "sector_monitor": sector_count,
         "my_operations": len([w for w in waves if (w.get("plan_status") or "") in ("active", "draft")]),
+        "has_player_pro": _has_player_pro(guild or {}),
     })
 
 
@@ -10151,6 +10153,7 @@ async def admin_sidebar_save(request: Request):
                 "url_suffix":   str(item.get("url_suffix", ""))[:200],
                 "disabled":     bool(item.get("disabled", False)),
                 "border_color": bc if bc.startswith("#") or bc == "" else "",
+                "requires_pro": bool(item.get("requires_pro", False)),
             }
         if t == "submenu":
             children = [_clean_item(c) for c in (item.get("children") or []) if c.get("type") == "item"]

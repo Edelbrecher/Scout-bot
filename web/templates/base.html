@@ -506,13 +506,19 @@ function escHtml(s) {
       var badgeHtml = badgeCount > 0
         ? '<span class="gs-badge">'+(badgeCount > 99?'99+':badgeCount)+'</span>'
         : '';
+      var lockHtml = item.requires_pro
+        ? (_gsHasPro ? _LOCK_OPEN : _LOCK_CLOSED)
+        : '';
+      var reqPro = item.requires_pro ? ' data-requires-pro="1"' : '';
       return '<a class="gs-item'+extraCls+'"'
         +' href="'+(item.disabled?'javascript:void(0)':url)+'"'
         +' data-label="'+item.label+'"'
+        +reqPro
         +(extraStyle?' style="'+extraStyle+'"':'')+' >'
         +ico(item.icon||'home')
         +'<span class="gs-label">'+item.label+'</span>'
         +badgeHtml
+        +lockHtml
         +'</a>';
     }
     var html = '';
@@ -535,8 +541,9 @@ function escHtml(s) {
     if (window.innerWidth <= 768 && mobileBtn) mobileBtn.style.display = 'flex';
   }
 
-  // ── Sidebar badges (sector monitor + my op plan) ─────────────────────
+  // ── Sidebar badges + pro status ──────────────────────────────────────
   var _gsBadgeGid = null;
+  var _gsHasPro = false;
 
   function _loadBadges(gid) {
     _gsBadgeGid = gid;
@@ -548,7 +555,9 @@ function escHtml(s) {
           '/map/sector-monitor': data.sector_monitor || 0,
           '/my-operations':      data.my_operations  || 0,
         };
+        _gsHasPro = !!data.has_player_pro;
         _applyBadges();
+        _applyLocks();
       }).catch(function(){});
   }
 
@@ -575,6 +584,19 @@ function escHtml(s) {
       } else {
         if (existing) existing.remove();
       }
+    });
+  }
+
+  var _LOCK_OPEN   = '<svg class="gs-lock" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0"/></svg>';
+  var _LOCK_CLOSED = '<svg class="gs-lock gs-lock-closed" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>';
+
+  function _applyLocks() {
+    var nav = document.getElementById('gs-nav-items');
+    if (!nav) return;
+    nav.querySelectorAll('.gs-item[data-requires-pro]').forEach(function(el){
+      var existing = el.querySelector('.gs-lock');
+      if (existing) existing.remove();
+      el.insertAdjacentHTML('beforeend', _gsHasPro ? _LOCK_OPEN : _LOCK_CLOSED);
     });
   }
 

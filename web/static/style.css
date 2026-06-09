@@ -343,6 +343,22 @@ body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
 .gs-sub-item.active .gs-icon { color: #818cf8; }
 .gs-item-disabled { opacity: 0.35 !important; pointer-events: none !important; cursor: default !important; }
 
+/* ── Sidebar pro lock icon ── */
+.gs-lock {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #374151;
+  opacity: 0.45;
+  stroke: currentColor;
+}
+.gs-lock-closed {
+  color: #f97316;
+  opacity: 0.85;
+}
+.gs-item:hover .gs-lock-closed { opacity: 1; }
+
 /* ── Sidebar notification badge ── */
 .gs-badge {
   margin-left: auto;
