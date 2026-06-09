@@ -496,8 +496,13 @@ function escHtml(s) {
       } else {
         isActive = path.startsWith(url);
       }
-      return '<a class="gs-item'+(indent?' gs-sub-item':'')+''+(isActive?' active':'')
-        +'" href="'+url+'" data-label="'+item.label+'">'
+      var extraCls = (indent?' gs-sub-item':'')+(isActive?' active':'')+(item.disabled?' gs-item-disabled':'');
+      var extraStyle = '';
+      if (item.border_color) extraStyle += 'border-left:3px solid '+item.border_color+';padding-left:calc(0.85rem - 3px);';
+      return '<a class="gs-item'+extraCls+'"'
+        +' href="'+(item.disabled?'javascript:void(0)':url)+'"'
+        +' data-label="'+item.label+'"'
+        +(extraStyle?' style="'+extraStyle+'"':'')+' >'
         +ico(item.icon||'home')
         +'<span class="gs-label">'+item.label+'</span>'
         +'</a>';

@@ -338,6 +338,7 @@ body.sidebar-collapsed .gs-item:hover::after { opacity: 1; }
 .gs-sub-item .gs-icon { color: #374151; }
 .gs-sub-item:hover .gs-icon { color: #9ca3af; }
 .gs-sub-item.active .gs-icon { color: #818cf8; }
+.gs-item-disabled { opacity: 0.35 !important; pointer-events: none !important; cursor: default !important; }
 
 /* Vertical connecting line for submenu children */
 .gs-submenu-items {

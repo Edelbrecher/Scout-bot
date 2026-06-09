@@ -10117,11 +10117,14 @@ async def admin_sidebar_save(request: Request):
         if t == "group":
             return {"type": "group", "label": str(item.get("label", ""))[:60]}
         if t == "item":
+            bc = str(item.get("border_color", ""))[:20]
             return {
-                "type":       "item",
-                "icon":       str(item.get("icon", "home"))[:30],
-                "label":      str(item.get("label", ""))[:60],
-                "url_suffix": str(item.get("url_suffix", ""))[:200],
+                "type":         "item",
+                "icon":         str(item.get("icon", "home"))[:30],
+                "label":        str(item.get("label", ""))[:60],
+                "url_suffix":   str(item.get("url_suffix", ""))[:200],
+                "disabled":     bool(item.get("disabled", False)),
+                "border_color": bc if bc.startswith("#") or bc == "" else "",
             }
         if t == "submenu":
             children = [_clean_item(c) for c in (item.get("children") or []) if c.get("type") == "item"]

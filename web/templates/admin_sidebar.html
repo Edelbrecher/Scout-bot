@@ -145,6 +145,26 @@
 /* ── Delete btn ── */
 .sn-del { background:none; border:none; color:#6b7280; cursor:pointer; font-size:.9rem; padding:0 3px; line-height:1; }
 .sn-del:hover { color:#ef4444; }
+/* ── Disabled toggle ── */
+.sn-disabled-btn {
+  background:none; border:1px solid var(--border); border-radius:5px;
+  color:#6b7280; cursor:pointer; font-size:.78rem; padding:3px 7px; line-height:1;
+  white-space:nowrap; flex-shrink:0; transition:all .15s;
+}
+.sn-disabled-btn.on { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.4); color:#f87171; }
+/* ── Border color picker ── */
+.sn-color-wrap { display:flex; align-items:center; gap:3px; flex-shrink:0; }
+.sn-color-swatch {
+  width:24px; height:24px; border-radius:5px; border:1px solid var(--border);
+  cursor:pointer; flex-shrink:0; background:#444; position:relative; overflow:hidden;
+}
+.sn-color-swatch input[type=color] {
+  position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; border:none; padding:0;
+}
+.sn-color-clear {
+  background:none; border:none; color:#6b7280; cursor:pointer; font-size:.8rem; padding:0 2px; line-height:1;
+}
+.sn-color-clear:hover { color:#ef4444; }
 </style>
 
 <script>
@@ -310,6 +330,61 @@ if (!document.getElementById(dlId)) {
   document.body.appendChild(dl);
 }
 
+/* ── Disabled toggle ── */
+function makeDisabledToggle(isDisabled, onChange) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'sn-disabled-btn' + (isDisabled ? ' on' : '');
+  btn.title = isDisabled ? 'Aktivieren' : 'Deaktivieren';
+  btn.textContent = isDisabled ? '⊘ Off' : '● On';
+  btn.onclick = () => {
+    const now = !btn.classList.contains('on');
+    btn.classList.toggle('on', now);
+    btn.textContent = now ? '⊘ Off' : '● On';
+    btn.title = now ? 'Aktivieren' : 'Deaktivieren';
+    onChange(now);
+  };
+  return btn;
+}
+
+/* ── Border color picker ── */
+function makeColorPicker(currentColor, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sn-color-wrap';
+  wrap.title = 'Border-Farbe';
+
+  const swatch = document.createElement('div');
+  swatch.className = 'sn-color-swatch';
+  swatch.style.background = currentColor || '#444';
+  swatch.style.borderColor = currentColor ? currentColor : 'var(--border)';
+
+  const inp = document.createElement('input');
+  inp.type = 'color';
+  inp.value = currentColor || '#6366f1';
+  inp.oninput = () => {
+    swatch.style.background = inp.value;
+    swatch.style.borderColor = inp.value;
+    onChange(inp.value);
+  };
+  swatch.appendChild(inp);
+
+  const clr = document.createElement('button');
+  clr.type = 'button';
+  clr.className = 'sn-color-clear';
+  clr.title = 'Farbe entfernen';
+  clr.textContent = '×';
+  clr.onclick = () => {
+    swatch.style.background = '#444';
+    swatch.style.borderColor = 'var(--border)';
+    inp.value = '#6366f1';
+    onChange('');
+  };
+
+  wrap.appendChild(swatch);
+  wrap.appendChild(clr);
+  return wrap;
+}
+
 function makeUrlInput(val, onInput) {
   const inp = document.createElement('input');
   inp.type = 'text';
@@ -392,8 +467,10 @@ function render() {
       wrap.draggable = true;
       wrap.innerHTML = `<span class="sn-handle">⠿</span><span class="sn-type-badge item">Item</span>`;
       wrap.appendChild(makeIconPicker(item.icon||'home', v => { navData[i].icon = v; }));
-      wrap.appendChild(makeLabelInput(item.label, v => navData[i].label = v, '160px'));
+      wrap.appendChild(makeLabelInput(item.label, v => navData[i].label = v, '130px'));
       wrap.appendChild(makeUrlInput(item.url_suffix, v => navData[i].url_suffix = v));
+      wrap.appendChild(makeDisabledToggle(!!item.disabled, v => { navData[i].disabled = v; }));
+      wrap.appendChild(makeColorPicker(item.border_color||'', v => { navData[i].border_color = v; }));
       const del = document.createElement('button');
       del.className='sn-del'; del.title='Löschen'; del.textContent='✕';
       del.onclick = () => removeRow(i);
@@ -413,8 +490,10 @@ function makeChildRow(i, ci, child) {
   crow.dataset.cidx = ci;
   crow.innerHTML = `<span class="sn-handle" style="font-size:.85rem;color:var(--text-muted);">⠿</span><span class="sn-type-badge item" style="font-size:.63rem;">Item</span>`;
   crow.appendChild(makeIconPicker(child.icon||'home', v => { navData[i].children[ci].icon = v; }));
-  crow.appendChild(makeLabelInput(child.label, v => navData[i].children[ci].label = v, '140px'));
+  crow.appendChild(makeLabelInput(child.label, v => navData[i].children[ci].label = v, '110px'));
   crow.appendChild(makeUrlInput(child.url_suffix, v => navData[i].children[ci].url_suffix = v));
+  crow.appendChild(makeDisabledToggle(!!child.disabled, v => { navData[i].children[ci].disabled = v; }));
+  crow.appendChild(makeColorPicker(child.border_color||'', v => { navData[i].children[ci].border_color = v; }));
   const del = document.createElement('button');
   del.className='sn-del'; del.title='Löschen'; del.textContent='✕';
   del.onclick = () => removeChild(i, ci);
@@ -484,7 +563,7 @@ function addGroup() {
 }
 
 function addItem() {
-  navData.push({type:'item', icon:'home', label:'Neuer Eintrag', url_suffix:''});
+  navData.push({type:'item', icon:'home', label:'Neuer Eintrag', url_suffix:'', disabled:false, border_color:''});
   render();
 }
 
@@ -497,7 +576,7 @@ function addSubmenu() {
 
 function addChild(i) {
   if (!navData[i].children) navData[i].children = [];
-  navData[i].children.push({type:'item', icon:'home', label:'Neuer Eintrag', url_suffix:''});
+  navData[i].children.push({type:'item', icon:'home', label:'Neuer Eintrag', url_suffix:'', disabled:false, border_color:''});
   render();
 }
 
