@@ -13716,16 +13716,19 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
     intel = None
     suggestions = []
     error = ""
+    no_world = False
 
-    if q.strip():
+    tw_world = guild.get("tw_world", "") if isinstance(guild, dict) else getattr(guild, "tw_world", "")
+
+    if not tw_world:
+        no_world = True
+    elif q.strip():
         intel = await database.get_player_intel(guild_id, q.strip())
         if not intel:
             # Try autocomplete to give helpful suggestions
             suggestions = await database.search_players_in_snapshot(guild_id, q.strip(), limit=10)
             if not suggestions:
                 error = f"No player found matching '{q}'. Make sure a map snapshot has been loaded."
-
-    tw_world = guild.get("tw_world", "") if isinstance(guild, dict) else getattr(guild, "tw_world", "")
     return templates.TemplateResponse("player_intel.html", {
         "request": request,
         "guild": guild,
@@ -13733,6 +13736,7 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
         "intel": intel,
         "suggestions": suggestions,
         "error": error,
+        "no_world": no_world,
         "tw_world": (tw_world or "").rstrip("/"),
     })
 
