@@ -6075,21 +6075,21 @@ def _build_countdown_embed(end_date_str: str, ally_name: str) -> tuple[dict, int
 
     if total <= 0:
         embed = {
-            "title": "🏆 Der Server ist beendet!",
-            "description": f"**{ally_name}** hat den Server abgeschlossen!\n\n🎉 Glückwunsch an alle!\n\n📅 Serverzeit: {end_str}",
+            "title": "🏆 The server has ended!",
+            "description": f"**{ally_name}** has completed the server!\n\n🎉 Congratulations to everyone!\n\n📅 Server end: {end_str}",
             "color": 0xffd700,
             "footer": {"text": "TravOps · travops.online"},
             "timestamp": now.isoformat(),
         }
     else:
         embed = {
-            "title": f"⏳ Server-Countdown · {ally_name}",
+            "title": f"⏳ Server Countdown · {ally_name}",
             "description": (
                 f"```\n"
                 f"  {days:>3}d  {hours:02d}h  {mins:02d}m\n"
                 f"```\n"
-                f"📅 Server-Ende: **{end_str}**\n\n"
-                f"*Wird alle 5 Minuten automatisch aktualisiert.*"
+                f"📅 Server end: **{end_str}**\n\n"
+                f"*Automatically updated every 5 minutes.*"
             ),
             "color": 0x6366f1,
             "footer": {"text": "TravOps · travops.online"},
