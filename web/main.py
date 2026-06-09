@@ -804,6 +804,36 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(3600)
 
     asyncio.create_task(_trial_expiry_loop())
+
+    async def _wewin_countdown_loop():
+        """Every 5 minutes: update WE WIN countdown embeds for all guilds that have one."""
+        await asyncio.sleep(60)  # let app fully boot first
+        while True:
+            try:
+                guilds = await database.get_all_guilds()
+                for g in guilds:
+                    end_date   = g.get("server_end_date")
+                    channel_id = g.get("wewin_channel_id")
+                    msg_id     = g.get("wewin_message_id")
+                    if not end_date or not channel_id or not msg_id:
+                        continue
+                    # Fetch ally name
+                    try:
+                        ag = await database.get_ally_group_for_guild(g["guild_id"])
+                        ally_name = ag.get("ally_name", "Unsere Allianz") if ag else "Unsere Allianz"
+                    except Exception:
+                        ally_name = "Unsere Allianz"
+                    try:
+                        new_id = await _post_or_update_wewin(g["guild_id"], channel_id, end_date, ally_name, msg_id)
+                        if new_id and new_id != msg_id:
+                            await database.update_guild_server_end(g["guild_id"], wewin_message_id=new_id)
+                    except Exception as e:
+                        print(f"[wewin] update failed for {g['guild_id']}: {e}", flush=True)
+            except Exception as e:
+                print(f"[wewin] loop error: {e}", flush=True)
+            await asyncio.sleep(5 * 60)  # update every 5 minutes
+
+    asyncio.create_task(_wewin_countdown_loop())
     yield
 
 
@@ -6031,11 +6061,94 @@ async def meta_alliance_remove(request: Request, guild_id: str,
 
 
 @app.post("/guild/{guild_id}/my-ally/server-end")
+# ── Server-End Countdown helpers ─────────────────────────────────────────────
+
+def _build_countdown_embed(end_date_str: str, ally_name: str) -> tuple[dict, int, int, int]:
+    """Build Discord embed dict. Returns (embed, days, hours, minutes)."""
+    from datetime import datetime as _dt, timezone as _tz
+    end_dt = _dt.fromisoformat(end_date_str.replace("T", " ")).replace(tzinfo=_tz.utc)
+    now    = _dt.now(_tz.utc)
+    total  = int((end_dt - now).total_seconds())
+    days   = max(0, total // 86400)
+    hours  = max(0, (total % 86400) // 3600)
+    mins   = max(0, (total % 3600) // 60)
+    end_str = end_dt.strftime("%d.%m.%Y %H:%M UTC")
+
+    if total <= 0:
+        embed = {
+            "title": "🏆 Der Server ist beendet!",
+            "description": f"**{ally_name}** hat den Server abgeschlossen!\n\n🎉 Glückwunsch an alle!\n\n📅 Serverzeit: {end_str}",
+            "color": 0xffd700,
+            "footer": {"text": "TravOps · travops.online"},
+            "timestamp": now.isoformat(),
+        }
+    else:
+        embed = {
+            "title": f"⏳ Server-Countdown · {ally_name}",
+            "description": (
+                f"```\n"
+                f"  {days:>3}d  {hours:02d}h  {mins:02d}m\n"
+                f"```\n"
+                f"📅 Server-Ende: **{end_str}**\n\n"
+                f"*Wird alle 5 Minuten automatisch aktualisiert.*"
+            ),
+            "color": 0x6366f1,
+            "footer": {"text": "TravOps · travops.online"},
+            "timestamp": now.isoformat(),
+        }
+    return embed, days, hours, mins
+
+
+async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, ally_name: str,
+                                 existing_msg_id: str | None) -> str | None:
+    """Post or edit countdown embed. Returns message_id or None on failure."""
+    bot_token = os.environ.get("DISCORD_TOKEN", "")
+    headers   = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
+    embed, _, _, _ = _build_countdown_embed(end_date, ally_name)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        if existing_msg_id:
+            r = await client.patch(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages/{existing_msg_id}",
+                headers=headers, json={"embeds": [embed]}
+            )
+            if r.status_code in (200, 201):
+                return existing_msg_id
+            # 404 = deleted, fall through to create
+
+        r = await client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers=headers, json={"embeds": [embed]}
+        )
+        if r.status_code in (200, 201):
+            return r.json().get("id")
+        print(f"[wewin] Discord error {r.status_code}: {r.text[:200]}", flush=True)
+        return None
+
+
+async def _create_wewin_channel(discord_guild_id: str) -> tuple[str, str] | None:
+    """Create 'we-win' channel in Discord guild. Returns (channel_id, channel_name) or None."""
+    bot_token = os.environ.get("DISCORD_TOKEN", "")
+    if not bot_token or not discord_guild_id or discord_guild_id.startswith("ws_"):
+        return None
+    headers = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+            headers=headers,
+            json={"name": "we-win", "type": 0, "topic": "🏆 Server-Countdown — powered by TravOps"},
+        )
+        if r.status_code in (200, 201):
+            data = r.json()
+            return data["id"], data["name"]
+        print(f"[wewin] Channel create failed {r.status_code}: {r.text[:200]}", flush=True)
+        return None
+
+
+@app.post("/guild/{guild_id}/my-ally/server-end")
 async def my_ally_save_server_end(
     request: Request, guild_id: str,
     server_end_date: str = Form(""),
-    wewin_channel_id: str = Form(""),
-    wewin_channel_name: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -6045,29 +6158,48 @@ async def my_ally_save_server_end(
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
         return RedirectResponse(f"/guild/{guild_id}/my-ally", status_code=303)
-    # Validate ISO datetime format
+
+    # Validate datetime
     end_val = server_end_date.strip() or None
     if end_val:
         try:
             from datetime import datetime as _dt
-            # Accept "YYYY-MM-DDTHH:MM" (HTML datetime-local format)
             _dt.fromisoformat(end_val.replace("T", " "))
         except ValueError:
             end_val = None
-    async with __import__("aiosqlite").connect(__import__("database", fromlist=["DB_PATH"]).DB_PATH, timeout=30) as _db:
-        pass  # ensure migration ran
+
+    guild = await database.get_guild(guild_id)
+    channel_id   = guild.get("wewin_channel_id") if guild else None
+    channel_name = guild.get("wewin_channel_name") if guild else None
+    msg_id       = guild.get("wewin_message_id") if guild else None
+
+    # Auto-create channel if not yet set and this is a real Discord guild
+    if not channel_id and end_val and not guild_id.startswith("ws_"):
+        result = await _create_wewin_channel(guild_id)
+        if result:
+            channel_id, channel_name = result
+
+    # Save date + channel
     await database.update_guild_server_end(
         guild_id,
         server_end_date=end_val,
-        wewin_channel_id=wewin_channel_id.strip() or None,
-        wewin_channel_name=wewin_channel_name.strip() or None,
+        wewin_channel_id=channel_id,
+        wewin_channel_name=channel_name,
     )
+
+    # Post/update Discord embed immediately
+    if end_val and channel_id:
+        ally_name = ally_group.get("ally_name", "Unsere Allianz")
+        new_msg_id = await _post_or_update_wewin(guild_id, channel_id, end_val, ally_name, msg_id)
+        if new_msg_id and new_msg_id != msg_id:
+            await database.update_guild_server_end(guild_id, wewin_message_id=new_msg_id)
+
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=server_end_saved#einstellungen", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/server-end/post-discord")
 async def my_ally_post_server_end_discord(request: Request, guild_id: str):
-    """Post or update a countdown embed in the WE WIN channel."""
+    """Manually trigger a post/update of the countdown embed."""
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -6076,77 +6208,34 @@ async def my_ally_post_server_end_discord(request: Request, guild_id: str):
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
     if not ally_group:
         return JSONResponse({"error": "no ally group"}, status_code=403)
+
     guild = await database.get_guild(guild_id)
-    channel_id  = guild.get("wewin_channel_id")
-    end_date    = guild.get("server_end_date")
-    if not channel_id:
-        return JSONResponse({"error": "Kein Discord-Channel konfiguriert"}, status_code=400)
+    channel_id = guild.get("wewin_channel_id")
+    end_date   = guild.get("server_end_date")
+
     if not end_date:
         return JSONResponse({"error": "Kein Enddatum konfiguriert"}, status_code=400)
 
-    from datetime import datetime as _dt, timezone as _tz
-    try:
-        end_dt = _dt.fromisoformat(end_date.replace("T", " ")).replace(tzinfo=_tz.utc)
-    except ValueError:
-        return JSONResponse({"error": "Ungültiges Datum"}, status_code=400)
+    # Create channel on-the-fly if missing
+    if not channel_id and not guild_id.startswith("ws_"):
+        result = await _create_wewin_channel(guild_id)
+        if result:
+            channel_id, channel_name = result
+            await database.update_guild_server_end(guild_id, wewin_channel_id=channel_id, wewin_channel_name=channel_name)
+        else:
+            return JSONResponse({"error": "Channel konnte nicht erstellt werden"}, status_code=502)
 
-    now = _dt.now(_tz.utc)
-    delta = end_dt - now
-    total_seconds = int(delta.total_seconds())
-    days    = max(0, total_seconds // 86400)
-    hours   = max(0, (total_seconds % 86400) // 3600)
-    minutes = max(0, (total_seconds % 3600) // 60)
+    if not channel_id:
+        return JSONResponse({"error": "Kein Discord-Channel konfiguriert"}, status_code=400)
 
     ally_name = ally_group.get("ally_name", "Unsere Allianz")
-    end_str   = end_dt.strftime("%d.%m.%Y %H:%M UTC")
-
-    if total_seconds <= 0:
-        title       = "🏆 Der Server ist beendet!"
-        description = f"**{ally_name}** hat den Server abgeschlossen!\n\n🎉 Glückwunsch an alle!\n\n📅 Serverzeit: {end_str}"
-        color       = 0xffd700
-    else:
-        title       = f"⏳ Server-Countdown · {ally_name}"
-        description = (
-            f"**{days}** Tage · **{hours}** Stunden · **{minutes}** Minuten\n\n"
-            f"📅 Server-Ende: **{end_str}**\n\n"
-            f"*Zähler wird regelmäßig aktualisiert.*"
-        )
-        color = 0x6366f1
-
-    embed = {
-        "title": title,
-        "description": description,
-        "color": color,
-        "footer": {"text": "TravOps · travops.online"},
-        "timestamp": now.isoformat(),
-    }
-
-    bot_token = os.environ.get("DISCORD_TOKEN", "")
-    headers   = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
-    existing_msg_id = guild.get("wewin_message_id")
-
-    async with httpx.AsyncClient(timeout=15) as client:
-        if existing_msg_id:
-            # Try to edit existing message
-            r = await client.patch(
-                f"https://discord.com/api/v10/channels/{channel_id}/messages/{existing_msg_id}",
-                headers=headers, json={"embeds": [embed]}
-            )
-            if r.status_code == 404:
-                existing_msg_id = None  # message deleted — fall through to create
-
-        if not existing_msg_id:
-            r = await client.post(
-                f"https://discord.com/api/v10/channels/{channel_id}/messages",
-                headers=headers, json={"embeds": [embed]}
-            )
-            if r.status_code in (200, 201):
-                msg_id = r.json().get("id")
-                await database.update_guild_server_end(guild_id, wewin_message_id=msg_id)
-            else:
-                return JSONResponse({"error": f"Discord Fehler {r.status_code}: {r.text[:200]}"}, status_code=502)
-
-    return JSONResponse({"ok": True, "days": days, "hours": hours, "minutes": minutes})
+    embed, days, hours, mins = _build_countdown_embed(end_date, ally_name)
+    new_msg_id = await _post_or_update_wewin(guild_id, channel_id, end_date, ally_name, guild.get("wewin_message_id"))
+    if not new_msg_id:
+        return JSONResponse({"error": "Discord post fehlgeschlagen"}, status_code=502)
+    if new_msg_id != guild.get("wewin_message_id"):
+        await database.update_guild_server_end(guild_id, wewin_message_id=new_msg_id)
+    return JSONResponse({"ok": True, "days": days, "hours": hours, "minutes": mins})
 
 
 @app.get("/api/guild/{guild_id}/server-end")

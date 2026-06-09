@@ -1104,32 +1104,32 @@
         <h3 style="margin:0 0 .9rem;font-size:.95rem;">⏳ Server-Ende Countdown</h3>
         <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/server-end" style="display:flex;flex-direction:column;gap:.65rem;">
           <div>
-            <label class="d-label">Datum &amp; Uhrzeit (Serverzeit / UTC)</label>
+            <label class="d-label">Datum &amp; Uhrzeit des Server-Endes (UTC)</label>
             <input type="datetime-local" name="server_end_date"
                    value="{{ guild.server_end_date | replace(' ','T') if guild.server_end_date else '' }}"
                    style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
           </div>
-          <div>
-            <label class="d-label">Discord „WE WIN" Channel-ID</label>
-            <input type="text" name="wewin_channel_id" value="{{ guild.wewin_channel_id or '' }}"
-                   placeholder="z.B. 1234567890123456789"
-                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;font-family:monospace;">
-            <div style="font-size:.73rem;color:var(--text-muted);margin-top:.25rem;">Rechtsklick auf Channel → ID kopieren (Entwicklermodus)</div>
+
+          {% if guild.wewin_channel_id %}
+          <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;display:flex;align-items:center;gap:.5rem;">
+            <span style="color:#22c55e;">✅</span>
+            <span>Discord-Channel: <strong>#{{ guild.wewin_channel_name or guild.wewin_channel_id }}</strong> ist eingerichtet — Countdown wird alle 5 Minuten aktualisiert.</span>
           </div>
-          <div>
-            <label class="d-label">Channel-Name (optional, nur zur Anzeige)</label>
-            <input type="text" name="wewin_channel_name" value="{{ guild.wewin_channel_name or '' }}"
-                   placeholder="z.B. we-win"
-                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+          {% else %}
+          <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;">
+            💡 Beim Speichern wird automatisch ein <strong>#we-win</strong> Channel in deinem Discord erstellt und der Countdown dort gepostet.
           </div>
+          {% endif %}
+
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-            <button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern</button>
+            <button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern &amp; posten</button>
             {% if guild.server_end_date and guild.wewin_channel_id %}
             <button type="button" onclick="postCountdown()" class="btn" style="font-size:.85rem;background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.4);color:#a5b4fc;">
-              📣 Jetzt in Discord posten
+              🔄 Jetzt manuell updaten
             </button>
             {% endif %}
           </div>
+
           {% if guild.server_end_date %}
           <div id="cd-preview" style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.65rem 1rem;font-size:.85rem;">
             ⏳ Lädt…
