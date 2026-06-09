@@ -5723,9 +5723,6 @@ async def my_ally_page(request: Request, guild_id: str):
     if err: return err
     err = await _require_guild_async(session, guild_id)
     if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard")
     uid = session.get("uid", "")
 
     # If accessing via personal workspace but user has an ally membership elsewhere → redirect
@@ -5734,66 +5731,92 @@ async def my_ally_page(request: Request, guild_id: str):
         if real_guild_id:
             return RedirectResponse(f"/guild/{real_guild_id}/my-ally", status_code=302)
 
-    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
-    members = []
-    roles = []
-    if ally_group:
-        members = await database.get_ally_members(ally_group["id"])
-        roles   = await database.get_ally_roles(ally_group["id"])
+    # ── Wave 1: fully independent queries ────────────────────────────────
+    guild, ally_group, meta_alliances = await asyncio.gather(
+        database.get_guild(guild_id),
+        database.get_ally_group_for_owner(guild_id, uid),
+        database.get_meta_alliances(guild_id),
+    )
+    if not guild:
+        return RedirectResponse("/dashboard")
 
-    membership = await database.get_ally_membership(guild_id, uid) if not ally_group else None
-    # Check if guild already has a group (owned by someone else)
-    guild_group = await database.get_ally_group_for_guild(guild_id) if not ally_group else None
-    # For members: load the full member list so they can see their teammates
-    member_view_members = []
-    if membership and guild_group:
-        member_view_members = await database.get_ally_members(guild_group["id"])
+    # ── Wave 2: depends on ally_group ────────────────────────────────────
+    members: list = []
+    roles: list = []
+    bonuses: list = []
+    leaderboard: list = []
+    battle_groups: list = []
+    membership = None
+    guild_group = None
+    member_view_members: list = []
+    member_leaderboard: list = []
+
+    if ally_group:
+        members, roles, bonuses, leaderboard, battle_groups = await asyncio.gather(
+            database.get_ally_members(ally_group["id"]),
+            database.get_ally_roles(ally_group["id"]),
+            database.get_ally_bonuses(ally_group["id"]),
+            database.get_member_leaderboard(guild_id),
+            database.get_battle_groups(ally_group["id"]),
+        )
+    else:
+        membership, guild_group = await asyncio.gather(
+            database.get_ally_membership(guild_id, uid),
+            database.get_ally_group_for_guild(guild_id),
+        )
+        if membership and guild_group:
+            member_view_members, member_leaderboard = await asyncio.gather(
+                database.get_ally_members(guild_group["id"]),
+                database.get_member_leaderboard(guild_id),
+            )
 
     flash = request.query_params.get("flash", "")
-    leaderboard = await database.get_member_leaderboard(guild_id) if ally_group else []
-    member_leaderboard = await database.get_member_leaderboard(guild_id) if membership else []
-    meta_alliances = await database.get_meta_alliances(guild_id)
 
-    # EP indicator: who has active waves in op_plans
-    ep_members: set = set()
-    all_member_ids: list = []
-    growth_data: dict = {}
-
-    if ally_group and members:
-        ep_members = await database.get_active_ep_members(guild_id)
-        all_member_ids = [m["discord_id"] for m in members if m.get("discord_id")]
-        growth_data = await database.get_member_growth(guild_id, all_member_ids)
-    elif membership and member_view_members:
-        ep_members = await database.get_active_ep_members(guild_id)
-        all_member_ids = [m["discord_id"] for m in member_view_members if m.get("discord_id")]
-        growth_data = await database.get_member_growth(guild_id, all_member_ids)
-
-    bonuses = await database.get_ally_bonuses(ally_group["id"]) if ally_group else []
-
-    # Determine editor access: Lead (owns the group) OR has ally_manage permission (HC)
+    # ── Inline editor perm check (avoids redundant get_guild inside has_perm) ──
     is_lead = bool(ally_group)
-    is_editor = is_lead or await has_perm(request, guild_id, "ally_manage")
+    if is_lead or session.get("type") == "admin" or guild.get("owner_discord_id") == uid:
+        is_editor = True
+    else:
+        _perms = await database.get_member_permissions(guild_id, uid)
+        is_editor = "ally_manage" in _perms
 
-    # Load member troop data — cross-guild lookup by discord_id so members
-    # who uploaded in a different guild context still show up
-    all_member_discord_ids = (
-        [m["discord_id"] for m in members if m.get("discord_id")]
-        or [m["discord_id"] for m in member_view_members if m.get("discord_id")]
-    )
-    lb_by_discord: dict = await database.get_member_troops_for_discord_ids(all_member_discord_ids)
-    lb_by_travian: dict = {r["travian_name"]: r for r in lb_by_discord.values() if r.get("travian_name")}
-    battle_groups = await database.get_battle_groups(ally_group["id"]) if ally_group else []
-
-    # Alliance population history from map snapshots (for growth charts)
+    # ── Wave 3: depends on members list ──────────────────────────────────
     all_members_list = members or member_view_members or []
+    all_member_discord_ids = [m["discord_id"] for m in all_members_list if m.get("discord_id")]
     travian_names = [m["travian_name"] for m in all_members_list if m.get("travian_name")]
-    member_pop_history: dict = await database.get_all_members_pop_from_snapshot(guild_id, travian_names)
 
-    # Alliance-level pop history: use configured alliance name from ally_group or snapshot
+    ep_members: set = set()
+    growth_data: dict = {}
+    lb_by_discord: dict = {}
+    member_pop_history: dict = {}
     ally_name_for_pop = (ally_group or {}).get("ally_name", "") or ""
-    ally_pop_history: list = []
-    if ally_name_for_pop:
-        ally_pop_history = await database.get_alliance_pop_history(guild_id, ally_name_for_pop)
+
+    if all_members_list:
+        # Gather all member-dependent queries in parallel
+        async def _get_ally_pop():
+            if ally_name_for_pop:
+                return await database.get_alliance_pop_history(guild_id, ally_name_for_pop)
+            return []
+
+        (
+            ep_members,
+            growth_data,
+            lb_by_discord,
+            member_pop_history,
+            ally_pop_history,
+        ) = await asyncio.gather(
+            database.get_active_ep_members(guild_id),
+            database.get_member_growth(guild_id, all_member_discord_ids),
+            database.get_member_troops_for_discord_ids(all_member_discord_ids),
+            database.get_all_members_pop_from_snapshot(guild_id, travian_names),
+            _get_ally_pop(),
+        )
+    else:
+        ally_pop_history: list = []
+        if ally_name_for_pop:
+            ally_pop_history = await database.get_alliance_pop_history(guild_id, ally_name_for_pop)
+
+    lb_by_travian: dict = {r["travian_name"]: r for r in lb_by_discord.values() if r.get("travian_name")}
 
     # Members without upload: pull from latest map snapshot
     all_travian_names_set = {m["travian_name"] for m in all_members_list if m.get("travian_name")}
@@ -10007,7 +10030,10 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "wheat",     "label": "Grain Simulations",  "url_suffix": "/tools/grain-simulations"},
     # ── Allianz ───────────────────────────────────────────────────────────
     {"type": "group", "label": "Allianz"},
-    {"type": "item",  "icon": "castle",    "label": "My Alliance",        "url_suffix": "/my-ally"},
+    {"type": "submenu", "icon": "castle", "label": "My Alliance", "children": [
+        {"type": "item", "icon": "castle",  "label": "My Alliance", "url_suffix": "/my-ally"},
+        {"type": "item", "icon": "gear",    "label": "Settings",    "url_suffix": "/settings"},
+    ]},
     {"type": "item",  "icon": "users",     "label": "Members",            "url_suffix": "/allianz/mitglieder"},
     {"type": "item",  "icon": "shield",    "label": "Defense",            "url_suffix": "/verteidigung"},
     {"type": "item",  "icon": "skull",     "label": "Enemies",            "url_suffix": "/enemies"},
@@ -10027,7 +10053,6 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "group", "label": "Account"},
     {"type": "item",  "icon": "person",    "label": "My Account",         "url_suffix": "/my-account"},
     {"type": "item",  "icon": "bell",      "label": "Notifications",      "url_suffix": "/notifications"},
-    {"type": "item",  "icon": "gear",      "label": "Settings",           "url_suffix": "/settings"},
     {"type": "item",  "icon": "card",      "label": "Billing",            "url_suffix": "/billing"},
 ]
 
