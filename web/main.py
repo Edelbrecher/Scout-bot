@@ -824,7 +824,7 @@ async def lifespan(app: FastAPI):
                     except Exception:
                         ally_name = "Unsere Allianz"
                     try:
-                        new_id = await _post_or_update_wewin(g["guild_id"], channel_id, end_date, ally_name, msg_id, g.get("server_utc_offset", 60))
+                        new_id = await _post_or_update_wewin(g["guild_id"], channel_id, end_date, ally_name, msg_id, g.get("server_utc_offset", 60), g.get("wewin_button_tooltip"))
                         if new_id and new_id != msg_id:
                             await database.update_guild_server_end(g["guild_id"], wewin_message_id=new_id)
                     except Exception as e:
@@ -6062,7 +6062,7 @@ async def meta_alliance_remove(request: Request, guild_id: str,
 
 # ── Server-End Countdown helpers ─────────────────────────────────────────────
 
-def _build_countdown_embed(end_date_str: str, ally_name: str, utc_offset_minutes: int = 60) -> tuple[dict, int, int, int]:
+def _build_countdown_embed(end_date_str: str, ally_name: str, utc_offset_minutes: int = 60, button_tooltip: str | None = None) -> tuple[dict, int, int, int]:
     """Build Discord embed dict. Returns (embed, days, hours, minutes)."""
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     end_dt = _dt.fromisoformat(end_date_str.replace("T", " ")).replace(tzinfo=_tz.utc)
@@ -6087,15 +6087,18 @@ def _build_countdown_embed(end_date_str: str, ally_name: str, utc_offset_minutes
             "timestamp": now.isoformat(),
         }
     else:
+        description = (
+            f"```\n"
+            f"  {days:>3}d  {hours:02d}h  {mins:02d}m\n"
+            f"```\n"
+            f"📅 Server end: **{end_str}**\n\n"
+            f"*Automatically updated every 5 minutes.*"
+        )
+        if button_tooltip:
+            description += f"\n\n> {button_tooltip}"
         embed = {
             "title": f"⏳ Server Countdown · {ally_name}",
-            "description": (
-                f"```\n"
-                f"  {days:>3}d  {hours:02d}h  {mins:02d}m\n"
-                f"```\n"
-                f"📅 Server end: **{end_str}**\n\n"
-                f"*Automatically updated every 5 minutes.*"
-            ),
+            "description": description,
             "color": 0x6366f1,
             "footer": {"text": "TravOps · travops.online"},
             "timestamp": now.isoformat(),
@@ -6115,11 +6118,12 @@ _WINNER_BUTTON_COMPONENT = {
 
 
 async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, ally_name: str,
-                                 existing_msg_id: str | None, utc_offset: int = 60) -> str | None:
+                                 existing_msg_id: str | None, utc_offset: int = 60,
+                                 button_tooltip: str | None = None) -> str | None:
     """Post or edit countdown embed. Returns message_id or None on failure."""
     bot_token = os.environ.get("DISCORD_TOKEN", "")
     headers   = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
-    embed, _, _, _ = _build_countdown_embed(end_date, ally_name, utc_offset)
+    embed, _, _, _ = _build_countdown_embed(end_date, ally_name, utc_offset, button_tooltip)
     payload = {"embeds": [embed], "components": [_WINNER_BUTTON_COMPONENT]}
 
     async with httpx.AsyncClient(timeout=15) as client:
@@ -6180,6 +6184,7 @@ async def my_ally_save_server_end(
     server_end_date: str = Form(""),
     wewin_music_url: str = Form(""),
     wewin_winner_user_id: str = Form(""),
+    wewin_button_tooltip: str = Form(""),
     server_utc_offset: int = Form(60),
 ):
     session, err = _require_session(request)
@@ -6218,6 +6223,7 @@ async def my_ally_save_server_end(
     # Save date + channel + music url + winner user
     music_url      = wewin_music_url.strip() or None
     winner_user_id = wewin_winner_user_id.strip() or None
+    button_tooltip = wewin_button_tooltip.strip()[:200] or None
     await database.update_guild_server_end(
         guild_id,
         server_end_date=end_val,
@@ -6225,12 +6231,13 @@ async def my_ally_save_server_end(
         wewin_channel_name=channel_name,
         wewin_music_url=music_url,
         wewin_winner_user_id=winner_user_id,
+        wewin_button_tooltip=button_tooltip,
     )
 
     # Post/update Discord embed immediately
     if end_val and channel_id:
         ally_name = ally_group.get("ally_name", "Unsere Allianz")
-        new_msg_id = await _post_or_update_wewin(guild_id, channel_id, end_val, ally_name, msg_id, offset)
+        new_msg_id = await _post_or_update_wewin(guild_id, channel_id, end_val, ally_name, msg_id, offset, button_tooltip)
         if new_msg_id and new_msg_id != msg_id:
             await database.update_guild_server_end(guild_id, wewin_message_id=new_msg_id)
 
@@ -6270,8 +6277,9 @@ async def my_ally_post_server_end_discord(request: Request, guild_id: str):
 
     ally_name  = ally_group.get("ally_name", "Unsere Allianz")
     utc_offset = guild.get("server_utc_offset") or 60
-    embed, days, hours, mins = _build_countdown_embed(end_date, ally_name, utc_offset)
-    new_msg_id = await _post_or_update_wewin(guild_id, channel_id, end_date, ally_name, guild.get("wewin_message_id"), utc_offset)
+    tooltip    = guild.get("wewin_button_tooltip")
+    embed, days, hours, mins = _build_countdown_embed(end_date, ally_name, utc_offset, tooltip)
+    new_msg_id = await _post_or_update_wewin(guild_id, channel_id, end_date, ally_name, guild.get("wewin_message_id"), utc_offset, tooltip)
     if not new_msg_id:
         return JSONResponse({"error": "Discord post fehlgeschlagen"}, status_code=502)
     if new_msg_id != guild.get("wewin_message_id"):

@@ -1144,6 +1144,13 @@
           {% endif %}
 
           <div>
+            <label class="d-label">💬 Button-Tooltip (erscheint im Embed und bei gesperrtem Klick)</label>
+            <input type="text" name="wewin_button_tooltip" value="{{ guild.wewin_button_tooltip or '' }}"
+                   maxlength="200" placeholder="z.B. Only the Alliance Leader may press this button!"
+                   style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
+          </div>
+
+          <div>
             <label class="d-label">🏆 WINNER Button — Discord User-ID (nur diese Person kann klicken)</label>
             <input type="text" name="wewin_winner_user_id" value="{{ guild.wewin_winner_user_id or '' }}"
                    placeholder="z.B. 123456789012345678"

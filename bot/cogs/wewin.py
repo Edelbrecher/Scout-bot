@@ -73,9 +73,11 @@ class WinnerView(discord.ui.View):
                     h = int(remaining // 3600)
                     m = int((remaining % 3600) // 60)
                     s = int(remaining % 60)
+                    tooltip = guild_cfg.get("wewin_button_tooltip") if guild_cfg else None
+                    extra   = f"\n\n> {tooltip}" if tooltip else ""
                     await interaction.response.send_message(
                         f"⏳ The server hasn't ended yet!\n"
-                        f"**{h}h {m:02d}m {s:02d}s** remaining — hold your horses! 🐴",
+                        f"**{h}h {m:02d}m {s:02d}s** remaining — hold your horses! 🐴{extra}",
                         ephemeral=True,
                     )
                     return
