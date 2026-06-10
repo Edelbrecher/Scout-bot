@@ -8051,6 +8051,7 @@ async def farming_page(
     show_own_villages: bool = False,
     show_alliance_villages: bool = False,
     only_inactive_players: bool = False,
+    no_alliance: bool = False,
     _offset: int = 0,
 ):
     session, err = _require_session(request)
@@ -8188,6 +8189,8 @@ async def farming_page(
             ]
         if only_inactive_players:
             inactive_farms_fast = [v for v in inactive_farms_fast if (v.get("player_name") or "") in inactive_player_names_fast]
+        if no_alliance:
+            inactive_farms_fast = [v for v in inactive_farms_fast if not (v.get("alliance_name") or "").strip()]
 
         _PAGE_SIZE_FAST = 100
         inactive_farms_real_total_fast = len(inactive_farms_fast)
@@ -8340,6 +8343,10 @@ async def farming_page(
     if only_inactive_players:
         inactive_farms = [v for v in inactive_farms if (v.get("player_name") or "") in inactive_player_names]
 
+    # ── Players without an alliance ──────────────────────────────────────────
+    if no_alliance:
+        inactive_farms = [v for v in inactive_farms if not (v.get("alliance_name") or "").strip()]
+
     # ── Pagination: 100 per page (initial + AJAX) ────────────────────────────
     _PAGE_SIZE = 100
     inactive_farms_real_total = len(inactive_farms)
@@ -8411,6 +8418,7 @@ async def farming_page(
         "show_own_villages": show_own_villages,
         "show_alliance_villages": show_alliance_villages,
         "only_inactive_players": only_inactive_players,
+        "no_alliance": no_alliance,
         # Advanced filter values
         "ref_x": ref_x_i or 0, "ref_y": ref_y_i or 0,
         "min_dist": min_dist_f or 0, "max_dist": max_dist_f or "",
@@ -8428,7 +8436,7 @@ async def farming_page(
         "advanced": advanced or _advanced_active,
         "has_farmlist": has_farmlist,
         "alliance_names": [a["alliance_name"] for a in alliance_names],
-        "top_alliances": alliance_names[:10],
+        "top_alliances": alliance_names[:20],
     })
 
 
