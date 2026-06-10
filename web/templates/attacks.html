@@ -13,9 +13,9 @@
       <button class="btn btn-primary" onclick="openImportModal()" style="font-size:0.9rem;">
         &#x1F4CB; Rallyepunkt importieren
       </button>
-      <button class="btn btn-secondary" id="btnAllianceToggle" onclick="toggleAllianceView()" style="font-size:0.9rem;">
+      <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:0.9rem;">
         &#x1F50D; Allianz-Analyse
-      </button>
+      </a>
       <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
         &#x1F3F0; Own Villages
       </a>
@@ -277,30 +277,8 @@
   </div>
   {% endif %}
 
-  <div id="alliancePanel" style="display:none; margin-bottom:1.5rem;">
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
-        <h2 style="margin:0;">&#x1F50D; Allianz-Analyse — Alle eingehenden Attacke</h2>
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-          <label style="font-size:0.82rem; display:flex; align-items:center; gap:0.3rem;">
-            <input type="checkbox" id="filterNonFake" onchange="renderAlliance()"> Nur Nicht-Fake (Score &lt; 60)
-          </label>
-          <label style="font-size:0.82rem; display:flex; align-items:center; gap:0.3rem;">
-            <input type="checkbox" id="filterHidden" onchange="renderAlliance()"> Nur Verdeckt
-          </label>
-          <select id="allianceSort" onchange="renderAlliance()" style="font-size:0.82rem; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:0.2rem 0.4rem;">
-            <option value="arrival">Ankunft</option>
-            <option value="fake_score">Fake-Score</option>
-            <option value="own_village">Eigenes Dorf</option>
-          </select>
-          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.25rem 0.6rem;" onclick="loadAllianceAttacks()">&#x21BB; Aktualisieren</button>
-        </div>
-      </div>
-      <div id="allianceContent">
-        <div style="text-align:center; color:var(--text-muted); padding:2rem;">Klicke auf "Allianz-Analyse" um die Daten zu laden.</div>
-      </div>
-    </div>
-  </div>
+  <!-- Alliance analysis lives on its own page (/attacks/alliance-overview) —
+       the button above links there. The former in-page duplicate was removed. -->
 
   <!-- ===== ANALYSIS PANEL ===== -->
   <div id="analysisPanel" style="display:none;margin-bottom:1.25rem;">
@@ -770,8 +748,6 @@
   const CAN_LABEL   = {{ 'true' if can_label else 'false' }};
   const CAN_SEE_ALL = {{ 'true' if can_see_all else 'false' }};
   let parsedAttacks = [];
-  let allianceAttacks = [];
-  let allianceLoaded = false;
 
   // =========================================================
   // UNICODE CLEANUP + PARSER
@@ -2533,130 +2509,10 @@
     } catch(e) { if (row) row.style.opacity = '0.7'; }
   };
 
-  // =========================================================
-  // ALLIANCE VIEW
-  // =========================================================
-  let allianceVisible = false;
-
-  window.toggleAllianceView = async function() {
-    const panel = document.getElementById('alliancePanel');
-    allianceVisible = !allianceVisible;
-    panel.style.display = allianceVisible ? 'block' : 'none';
-    if (allianceVisible && !allianceLoaded) {
-      await loadAllianceAttacks();
-    }
-  };
-
-  window.loadAllianceAttacks = async function() {
-    const cont = document.getElementById('allianceContent');
-    cont.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>';
-    try {
-      const resp = await fetch('/guild/' + GUILD_ID + '/attacks/api/alliance');
-      if (!resp.ok) { cont.innerHTML = '<p class="hint">Error loading.</p>'; return; }
-      allianceAttacks = await resp.json();
-      allianceLoaded = true;
-      renderAlliance();
-    } catch(e) {
-      cont.innerHTML = '<p class="hint">Netzwerkfehler: ' + escHtml(e.message) + '</p>';
-    }
-  };
-
-  window.renderAlliance = function() {
-    const cont = document.getElementById('allianceContent');
-    let attacks = [...allianceAttacks];
-
-    const filterNonFake = document.getElementById('filterNonFake').checked;
-    const filterHidden  = document.getElementById('filterHidden').checked;
-    const sortBy        = document.getElementById('allianceSort').value;
-
-    if (filterNonFake) attacks = attacks.filter(a => (a.fake_score||50) < 60);
-    if (filterHidden)  attacks = attacks.filter(a => a.troops_hidden);
-
-    if (!attacks.length) {
-      cont.innerHTML = '<p class="empty" style="text-align:center;padding:1.5rem;">Keine Attacke gefunden.</p>';
-      return;
-    }
-
-    // Group by own village
-    const villageMap = {};
-    for (const a of attacks) {
-      const key = (a.own_village_name||'') + '|' + (a.own_village_x||'') + '|' + (a.own_village_y||'');
-      if (!villageMap[key]) villageMap[key] = {name: a.own_village_name, x: a.own_village_x, y: a.own_village_y, attacks: []};
-      villageMap[key].attacks.push(a);
-    }
-
-    // Sort village groups
-    let villageKeys = Object.keys(villageMap);
-    if (sortBy === 'arrival') {
-      villageKeys.sort((a,b) => {
-        const at = villageMap[a].attacks[0]?.arrival_time||'';
-        const bt = villageMap[b].attacks[0]?.arrival_time||'';
-        return at.localeCompare(bt);
-      });
-    } else {
-      villageKeys.sort();
-    }
-
-    // Detect coordinated attack: multiple different villages hit within 5-min window
-    const allArrTimes = attacks.map(a => new Date(a.arrival_time||0).getTime()).filter(t => t>0);
-    allArrTimes.sort((a,b) => a-b);
-    let coordWarning = '';
-    if (villageKeys.length > 1) {
-      const first = allArrTimes[0], last = allArrTimes[allArrTimes.length-1];
-      const windowMin = Math.round((last-first)/60000);
-      if (windowMin <= 30) {
-        coordWarning = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:6px;padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.83rem;color:#f87171;">
-          🚨 <strong>Coordinated large attack detected!</strong> ${villageKeys.length} villages will be attacked within ${windowMin} minutes.
-        </div>`;
-      }
-    }
-
-    let html = coordWarning;
-
-    for (const key of villageKeys) {
-      const g = villageMap[key];
-      const waves = groupIntoWaves(g.attacks);
-      const zwWarning = zwischendefWarning(waves);
-      const coords = g.x != null ? ` (${g.x}|${g.y})` : '';
-      const realCount = g.attacks.filter(a => (a.fake_score||50) < 60).length;
-
-      html += `<div class="village-card" style="margin-bottom:1rem;">
-        <div class="village-card-header">
-          🏰 ${escHtml(g.name||'')}${escHtml(coords)}
-          <span style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);font-weight:400;">
-            ${waves.length} Welle(n) · ${g.attacks.length} Attack(e)
-            ${realCount > 0 ? '<span style="color:#f87171;margin-left:0.3rem;">⚠️ '+realCount+' possibly real</span>' : ''}
-          </span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:0.4rem;">
-          ${zwWarning}`;
-
-      for (let wi = 0; wi < waves.length; wi++) {
-        if (waves.length > 1) {
-          html += `<div style="font-size:0.72rem;color:var(--text-muted);padding:0.15rem 0 0.1rem;border-top:1px solid var(--border);margin-top:0.2rem;">
-            ⚡ Welle ${wi+1} — ${fmtArrival(waves[wi][0].arrival_time)}
-          </div>`;
-        }
-        for (const a of waves[wi]) {
-          const troopStr = a.troops_hidden ? '<span style="color:#fbbf24;font-size:0.8rem;">❓ verdeckt</span>' : '<span style="font-size:0.8rem;">'+(a.troop_count||0)+' Einh.</span>';
-          html += `<div class="atk-row">
-            ${typeBadge(a.attack_type)}
-            <a class="player-link" onclick="openPlayerModal('${escHtml(a.attacker_player||'').replace(/'/g,"\\'")}')">
-              ${escHtml(a.attacker_player||'')}
-            </a>
-            <span style="color:var(--text-muted);font-size:0.78rem;">${escHtml(a.attacker_village_name||'')}${a.attacker_x!=null?' ('+a.attacker_x+'|'+a.attacker_y+')':''}</span>
-            <span style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;">
-              ${troopStr}
-              ${fakeBadge(a.fake_score||50)}
-              ${a.imported_by_name ? '<span style="color:var(--text-muted);font-size:0.72rem;">'+escHtml(a.imported_by_name)+'</span>' : ''}
-            </span>
-          </div>`;
-        }
-      }
-      html += '</div></div>';
-    }
-    cont.innerHTML = html;
-  };
+  // Alliance-wide incoming attacks now live on their own page
+  // (/attacks/alliance-overview); the former in-page panel + its
+  // toggleAllianceView / loadAllianceAttacks / renderAlliance code were removed
+  // to avoid duplicating the standalone view.
 
   function groupWaves(attacks, windowSec) {
     // Sort by arrival_time already done

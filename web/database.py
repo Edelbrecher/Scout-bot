@@ -1645,6 +1645,17 @@ async def get_attack_reports(guild_id: str, limit: int = 50) -> list[dict]:
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_attack_report_count(guild_id: str) -> int:
+    """Cheap count of bot-detected attack reports (for the alarm-config badge).
+    Avoids loading & aggregating every report just to show a number."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM attack_reports WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
 async def get_attack_stats(guild_id: str) -> dict:
     import json as _json
 

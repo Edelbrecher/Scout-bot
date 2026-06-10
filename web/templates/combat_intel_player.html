@@ -15,6 +15,11 @@
         </p>
       </div>
       <div style="display:flex;gap:.5rem;">
+        {% if is_enemy %}
+        <a href="/guild/{{ guild.guild_id }}/enemies/{{ profile.player_name | urlencode }}"
+           class="btn" style="font-size:.8rem;"
+           title="Gespeichertes Gegner-Profil: Scout-Historie, Truppen, Dörfer">🎯 Enemy-Profil</a>
+        {% endif %}
         <a href="/guild/{{ guild.guild_id }}/intel?q={{ profile.player_name | urlencode }}"
            class="btn" style="font-size:.8rem;">🔍 Player Intel</a>
       </div>

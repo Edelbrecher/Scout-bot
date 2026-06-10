@@ -5150,15 +5150,17 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     uid = session.get("uid", "")
     err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
-    attack_stats = await database.get_attack_stats(guild_id)
-    attack_reports = await database.get_attack_reports(guild_id, limit=50)
+    # The page renders the rally-import (incoming_attacks) flow; from the
+    # bot-alarm flow it only shows the report count as config feedback, so a
+    # cheap COUNT is enough (no full report load + aggregation).
+    attack_stats = {"total_reports": await database.get_attack_report_count(guild_id)}
     is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id")
     perms = await database.get_member_permissions(guild_id, uid)
     can_label   = is_admin or "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
     can_see_all = can_label or "ally_view" in perms or "defend_view" in perms
     return templates.TemplateResponse("attacks.html", {
         "request": request, "guild": guild, "guild_id": guild_id,
-        "attack_stats": attack_stats, "attack_reports": attack_reports,
+        "attack_stats": attack_stats,
         "is_admin": is_admin, "saved": saved,
         "can_label": can_label,
         "can_see_all": can_see_all,
@@ -10766,11 +10768,12 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "shield",    "label": "Hero Scout",         "url_suffix": "/defense/hero-scout"},
     {"type": "item",  "icon": "alert",     "label": "Scout Incidents",    "url_suffix": "/scout-incidents"},
     {"type": "item",  "icon": "radar",     "label": "Alliance Tracking",  "url_suffix": "/alliance-tracking"},
-    # ── Kämpfe ────────────────────────────────────────────────────────────
-    {"type": "group", "label": "Kämpfe"},
+    # ── Kampf & Verteidigung (Lebenszyklus: eingehend → Allianz → verteidigen → Nachbericht) ──
+    {"type": "group", "label": "Kampf & Verteidigung"},
     {"type": "item",  "icon": "sword",     "label": "Attacks",            "url_suffix": "/attacks"},
-    {"type": "item",  "icon": "scroll",    "label": "Battle Reports",     "url_suffix": "/reports"},
     {"type": "item",  "icon": "alert",     "label": "Alliance Attacks",   "url_suffix": "/attacks/alliance-overview"},
+    {"type": "item",  "icon": "shield",    "label": "Defense",            "url_suffix": "/verteidigung"},
+    {"type": "item",  "icon": "scroll",    "label": "Battle Reports",     "url_suffix": "/reports"},
     # ── Farming ───────────────────────────────────────────────────────────
     {"type": "group", "label": "Farming"},
     {"type": "item",  "icon": "wheat",     "label": "Farming Intel",      "url_suffix": "/farming"},
@@ -10783,7 +10786,6 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "group", "label": "Allianz"},
     {"type": "item",  "icon": "castle",    "label": "My Alliance",        "url_suffix": "/my-ally"},
     {"type": "item",  "icon": "users",     "label": "Members",            "url_suffix": "/allianz/mitglieder"},
-    {"type": "item",  "icon": "shield",    "label": "Defense",            "url_suffix": "/verteidigung"},
     {"type": "item",  "icon": "skull",     "label": "Enemies",            "url_suffix": "/enemies"},
     {"type": "item",  "icon": "cross",     "label": "Hospital",           "url_suffix": "/allianz/hospital"},
     {"type": "item",  "icon": "gear",      "label": "Operations",         "url_suffix": "/operations"},
@@ -14324,9 +14326,10 @@ async def combat_intel_page(request: Request, guild_id: str, q: str = ""):
                     r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
                 except Exception:
                     r[jf.replace("_json", "")] = {}
+        is_enemy = bool(await database.get_enemy(guild_id, q.strip()))
         return templates.TemplateResponse("combat_intel_player.html", {
             "request": request, "guild": guild,
-            "profile": profile, "q": q,
+            "profile": profile, "q": q, "is_enemy": is_enemy,
         })
 
     overview = await database.get_combat_intel_overview(guild_id)

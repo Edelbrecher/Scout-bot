@@ -15,6 +15,9 @@
       </p>
     </div>
     <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+      <a href="/guild/{{ guild.guild_id }}/reports/intel?q={{ enemy.player_name | urlencode }}"
+         class="btn" style="font-size:0.82rem;"
+         title="Kampfberichte, Win/Loss & gesehene Truppen gegen diesen Spieler">⚔️ Kampf-Historie</a>
       <form method="post"
             action="/guild/{{ guild.guild_id }}/enemies/{{ enemy.player_name | urlencode }}/delete"
             onsubmit="return confirm('Delete enemy?')" style="margin:0;">
