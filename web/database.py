@@ -1887,6 +1887,9 @@ async def _init_farming_tables():
             "CREATE INDEX IF NOT EXISTS idx_wsnap_url_xy     ON world_snapshots(world_url, x, y)",
             "CREATE INDEX IF NOT EXISTS idx_wsnap_url_ts_v   ON world_snapshots(world_url, fetched_at, village_id)",
             "CREATE INDEX IF NOT EXISTS idx_wsnap_player     ON world_snapshots(world_url, lower(player_name), fetched_at)",
+            # Speeds up the GROUP BY village_id aggregation in get_inactive_farms /
+            # search_inactive_advanced (Farming Intelligence "inactive" list).
+            "CREATE INDEX IF NOT EXISTS idx_wsnap_url_vid_ts ON world_snapshots(world_url, village_id, fetched_at, population)",
         ]:
             try:
                 await db.execute(idx_sql)

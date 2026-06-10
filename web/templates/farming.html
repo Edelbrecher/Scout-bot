@@ -33,6 +33,12 @@
     <div id="loadingBar" style="height:100%;width:0%;background:var(--primary);
          border-radius:2px;transition:width 0.5s ease;"></div>
   </div>
+
+  <!-- Progress log ("logfile") -->
+  <div id="loadingLog" style="width:340px;max-height:120px;overflow-y:auto;font-family:monospace;
+       font-size:0.7rem;line-height:1.5;color:#64748b;text-align:left;
+       background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;
+       padding:.5rem .65rem;"></div>
 </div>
 
 <style>
@@ -510,6 +516,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
         <div style="font-weight:600;font-size:0.95rem;">
           🏚️ Inactive Farms
+          <span id="inactiveFarmsTotal" data-total="{{ inactive_farms_total }}" style="display:none;"></span>
           {% if inactive_farms %}
           {# count missing via JS — badge updated dynamically #}
           <span style="font-size:0.8rem;font-weight:400;color:var(--text-muted);margin-left:0.4rem;">
@@ -1467,7 +1474,27 @@ const _QUOTES = [
   "Checking if anyone logged off to touch grass…",
   "Deploying scouts. ETA: right now, actually.",
 ];
-function _showLoading(title) {
+// Sequential "logfile" steps shown while the page reloads. Mirrors the
+// actual server-side work (snapshot lookup → inactive scan → cross-ref →
+// pop deltas → render first 100 rows) so the user sees *something* moving
+// instead of a frozen spinner.
+const _LOG_STEPS = [
+  'Lade Map-Snapshots…',
+  'Scanne Dörfer auf Inaktivität (≥ {days} Tage ohne Wachstum)…',
+  'Filtere eigene & Allianz-Dörfer…',
+  'Berechne Bevölkerungs-Deltas (1/2/3/5/7/14 Tage)…',
+  'Gleiche Farmlisten & Cross-Referenzen ab…',
+  'Sortiere & rendere erste 100 von {total} Einträgen…',
+];
+function _logLine(el, text) {
+  const ts = new Date().toLocaleTimeString('de-DE', {hour12:false});
+  const row = document.createElement('div');
+  row.textContent = `[${ts}] ${text}`;
+  el.appendChild(row);
+  el.scrollTop = el.scrollHeight;
+}
+function _showLoading(title, opts) {
+  opts = opts || {};
   const overlay = document.getElementById('loadingOverlay');
   overlay.style.display = 'flex';
   document.getElementById('loadingTitle').textContent = title || 'Scouting inactive targets…';
@@ -1480,6 +1507,23 @@ function _showLoading(title) {
     bar.style.width = pct + '%';
   }, 300);
   window._loadingIv = iv;
+
+  // Drive the logfile-style step list
+  const logEl = document.getElementById('loadingLog');
+  logEl.innerHTML = '';
+  const days = opts.days || document.querySelector('input[name="min_days"]')?.value || '1';
+  const total = opts.total != null ? opts.total
+    : (document.getElementById('inactiveFarmsTotal')?.dataset.total || '?');
+  const steps = (opts.steps || _LOG_STEPS).map(s =>
+    s.replace('{days}', days).replace('{total}', total)
+  );
+  let i = 0;
+  _logLine(logEl, steps[i++]);
+  const logIv = setInterval(() => {
+    if (i >= steps.length) { clearInterval(logIv); return; }
+    _logLine(logEl, steps[i++]);
+  }, 450);
+  window._loadingLogIv = logIv;
 }
 // Wire up filter form + search form
 document.addEventListener('DOMContentLoaded', () => {
