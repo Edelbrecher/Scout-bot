@@ -171,11 +171,17 @@
     </div>
   </div>
 
+  <!-- ── Beute-Trend (vs. frühere Analysen) ──────────────────────────── -->
+  <div id="trendCard" style="display:none;margin-bottom:1.25rem;"></div>
+
+  <!-- ── Listen-Effizienz (welche Travian-Liste farmt am besten) ──────── -->
+  <div id="listEffCard" class="card" style="display:none;margin-bottom:1.25rem;overflow-x:auto;"></div>
+
   <!-- ── Gruppen-Overview ────────────────────────────────────────────── -->
   {% if group_stats|length > 1 %}
   <div class="card" style="margin-bottom:1.25rem;overflow-x:auto;">
     <h3 style="margin:0 0 0.75rem;">📂 Gruppen-Overview</h3>
-    <table class="table" style="min-width:700px;">
+    <table class="table" style="min-width:760px;">
       <thead>
         <tr>
           <th>Gruppe</th>
@@ -185,6 +191,7 @@
           <th style="text-align:right;color:#ef4444;">🔴 Leer</th>
           <th style="text-align:right;">Natars</th>
           <th style="text-align:right;">Res letzter Raid</th>
+          <th style="text-align:right;" title="Veränderung der Beute (letzter Raid) gegenüber der vorherigen Analyse">Trend</th>
           <th style="text-align:right;">Res gesamt</th>
           <th style="text-align:right;">∅ Dist</th>
           <th>Listen</th>
@@ -200,6 +207,7 @@
           <td style="text-align:right;color:#ef4444;">{{ g.leer }}</td>
           <td style="text-align:right;color:var(--text-muted);">{{ g.natars }}</td>
           <td style="text-align:right;font-weight:700;">{{ "{:,}".format(g.res_last).replace(",",".") }}</td>
+          <td class="grp-trend" data-group="{{ g.name }}" style="text-align:right;font-size:0.78rem;">–</td>
           <td style="text-align:right;">{{ "{:,}".format(g.res_total).replace(",",".") }}</td>
           <td style="text-align:right;font-family:monospace;">{{ g.avg_dist }}</td>
           <td style="font-size:0.75rem;color:var(--text-muted);">{{ g.lists|join(', ') }}</td>
@@ -218,6 +226,8 @@
     <button class="filter-btn" onclick="applyFilter('rating','gut',this)">🟢 Gut ({{ stats.gut }})</button>
     <button class="filter-btn" onclick="applyFilter('rating','ok',this)">🟡 OK ({{ stats.ok }})</button>
     <button class="filter-btn" onclick="applyFilter('rating','leer',this)">🔴 Leer ({{ stats.leer }})</button>
+    <button class="filter-btn" id="topFilterBtn" onclick="applyFilter('rating','top',this)" style="display:none;"
+            title="Die effizientesten Ziele: hohe Beute pro Feld Distanz">⭐ Top-Ziele (<span id="topCount">0</span>)</button>
     <span style="color:var(--border);margin:0 0.25rem;">|</span>
     {% for g in group_stats %}
     <button class="filter-btn grp-btn" data-grp="{{ g.name }}"
@@ -258,6 +268,12 @@
      of rows is built into the DOM up front. #}
   <script id="farmsData" type="application/json">{{ farms | tojson }}</script>
 
+  {# Compact history of saved analyses (loot per analysis + per-group breakdown)
+     so the client can draw the loot trend and per-group change vs the previous
+     analysis without extra requests. #}
+  <script id="historyData" type="application/json">[{% for a in past %}{"id": {{ a.id | tojson }}, "created_at": {{ (a.created_at or '') | tojson }}, "total_res_last": {{ (a.total_res_last or 0) | tojson }}, "group_stats": {{ (a.group_stats_json or '[]') | from_json | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+  <script>window.__CURRENT_ID__ = {{ (opened_id if opened_id else (past[0].id if past else 0)) | tojson }};</script>
+
   {% endif %}
 </div>
 
@@ -285,6 +301,28 @@ try {
   ALL_FARMS = _el ? (JSON.parse(_el.textContent || '[]') || []) : [];
 } catch (e) { ALL_FARMS = []; }
 const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
+
+// History of saved analyses (newest-first) for the loot-trend + per-group change.
+let HISTORY = [];
+try {
+  const _h = document.getElementById('historyData');
+  HISTORY = _h ? (JSON.parse(_h.textContent || '[]') || []) : [];
+} catch (e) { HISTORY = []; }
+const CURRENT_ID = (typeof window.__CURRENT_ID__ !== 'undefined') ? window.__CURRENT_ID__ : null;
+
+// Best-target threshold: 85th percentile of efficiency among non-empty,
+// non-NPC farms. Anything at/above counts as a "Top-Ziel".
+let TOP_EFF = Infinity;
+(function() {
+  const effs = ALL_FARMS
+    .filter(f => !f.is_natar && !f.is_oasis && f.res_last > 0 && f.efficiency > 0)
+    .map(f => Number(f.efficiency)).sort((a, b) => a - b);
+  if (effs.length >= 5) TOP_EFF = effs[Math.floor(effs.length * 0.85)];
+})();
+function _isTop(f) {
+  return TOP_EFF !== Infinity && !f.is_natar && !f.is_oasis &&
+         f.res_last > 0 && Number(f.efficiency) >= TOP_EFF;
+}
 
 let activeRating = 'all';
 let activeGroup  = 'all';
@@ -332,7 +370,11 @@ function _rowHtml(f) {
   else if (f.rating === 'ok')  badge = '<span style="background:rgba(234,179,8,0.15);color:#eab308;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🟡 OK</span>';
   else badge = '<span style="background:rgba(239,68,68,0.15);color:#ef4444;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🔴 Leer</span>';
 
-  return '<tr class="farm-row" style="border-left:3px solid ' + border + ';">' +
+  const topMark = _isTop(f)
+    ? '<span title="Top-Ziel — hohe Beute pro Feld Distanz" style="margin-right:5px;">⭐</span>' : '';
+
+  return '<tr class="farm-row" style="border-left:3px solid ' + border + ';' +
+         (_isTop(f) ? 'background:rgba(129,140,248,0.06);' : '') + '">' +
     nameCell +
     '<td style="font-size:0.8rem;"><span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:0.72rem;">' + _esc(f.group) + '</span></td>' +
     '<td style="text-align:right;font-size:0.85rem;">' + _esc(f.population) + '</td>' +
@@ -342,14 +384,16 @@ function _rowHtml(f) {
     '<td style="text-align:right;font-weight:700;color:' + rlColor + ';">' + _esc(f.res_last) + '</td>' +
     '<td style="text-align:right;color:var(--text-muted);font-family:monospace;font-size:0.82rem;">' + (f.res_total ? _fmt(f.res_total) : '—') + '</td>' +
     '<td style="text-align:right;font-family:monospace;">' + (f.efficiency ? _esc(f.efficiency) : '—') + '</td>' +
-    '<td>' + badge + '</td>' +
+    '<td>' + topMark + badge + '</td>' +
   '</tr>';
 }
 
 function _filtered() {
   return ALL_FARMS.filter(f =>
-    (activeRating === 'all' || f.rating === activeRating) &&
-    (activeGroup  === 'all' || f.group  === activeGroup)
+    (activeRating === 'all' ? true
+      : activeRating === 'top' ? _isTop(f)
+      : f.rating === activeRating) &&
+    (activeGroup === 'all' || f.group === activeGroup)
   );
 }
 
@@ -417,6 +461,135 @@ function sortTable(col) {
   renderTable();
 }
 
-document.addEventListener('DOMContentLoaded', renderTable);
+// ── #2 Loot trend vs. previous analyses ──────────────────────────────────
+function _pct(cur, prev) {
+  if (!prev || prev <= 0) return null;
+  return Math.round(((cur - prev) / prev) * 100);
+}
+function _trendBadge(pct) {
+  if (pct === null || pct === undefined) return '<span style="color:var(--text-muted);">–</span>';
+  if (pct > 0) return '<span style="color:#22c55e;font-weight:700;">▲ +' + pct + '%</span>';
+  if (pct < 0) return '<span style="color:#ef4444;font-weight:700;">▼ ' + pct + '%</span>';
+  return '<span style="color:var(--text-muted);">→ 0%</span>';
+}
+function _sparkline(values, w, h) {
+  if (!values.length) return '';
+  const max = Math.max.apply(null, values), min = Math.min.apply(null, values);
+  const range = (max - min) || 1;
+  const n = values.length;
+  const step = n > 1 ? w / (n - 1) : 0;
+  const pts = values.map((v, i) =>
+    (i * step).toFixed(1) + ',' + (h - ((v - min) / range) * h).toFixed(1)).join(' ');
+  const lx = (n > 1 ? (n - 1) * step : 0).toFixed(1);
+  const ly = (h - ((values[n - 1] - min) / range) * h).toFixed(1);
+  return '<svg width="' + w + '" height="' + h + '" style="overflow:visible;display:block;">' +
+    '<polyline points="' + pts + '" fill="none" stroke="#818cf8" stroke-width="2" ' +
+    'stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + lx + '" cy="' + ly + '" r="3" fill="#818cf8"/></svg>';
+}
+function renderTrend() {
+  const card = document.getElementById('trendCard');
+  if (!card || HISTORY.length < 2) return;
+  let ci = HISTORY.findIndex(a => a.id === CURRENT_ID);
+  if (ci < 0) ci = 0;
+  const cur = HISTORY[ci], prev = HISTORY[ci + 1];
+  if (!prev) return;
+  const pct = _pct(cur.total_res_last, prev.total_res_last);
+  // chronological series ending at the current analysis (last 10 points)
+  const series = HISTORY.slice(ci).reverse().map(a => a.total_res_last);
+  card.style.display = '';
+  card.innerHTML =
+    '<div class="card" style="padding:0.9rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">' +
+      '<div>' +
+        '<div style="font-size:0.72rem;color:var(--text-muted);">📈 Beute-Trend (letzter Raid, Summe)</div>' +
+        '<div style="font-size:1.35rem;font-weight:800;">' + _fmt(cur.total_res_last) +
+          ' <span style="font-size:0.85rem;">' + _trendBadge(pct) + '</span></div>' +
+        '<div style="font-size:0.7rem;color:var(--text-muted);">vs. vorherige Analyse (' +
+          _fmt(prev.total_res_last) + ')</div>' +
+      '</div>' +
+      '<div style="margin-left:auto;text-align:right;">' + _sparkline(series.slice(-10), 170, 38) +
+        '<div style="font-size:0.62rem;color:var(--text-muted);margin-top:2px;">letzte ' +
+        Math.min(series.length, 10) + ' Analysen</div></div>' +
+    '</div>';
+
+  // Per-group change vs the previous analysis (matched by group name).
+  const prevG = {};
+  (prev.group_stats || []).forEach(g => { prevG[g.name] = g.res_last; });
+  const curG = {};
+  (cur.group_stats || []).forEach(g => { curG[g.name] = g.res_last; });
+  document.querySelectorAll('.grp-trend').forEach(td => {
+    const name = td.dataset.group;
+    const c = curG[name], p = prevG[name];
+    if (c !== undefined && p !== undefined) td.innerHTML = _trendBadge(_pct(c, p));
+    else td.innerHTML = '<span style="color:#818cf8;" title="In der vorherigen Analyse nicht vorhanden">neu</span>';
+  });
+}
+
+// ── #3 Per-list efficiency breakdown ─────────────────────────────────────
+function renderListEff() {
+  const card = document.getElementById('listEffCard');
+  if (!card) return;
+  const byList = {};
+  ALL_FARMS.forEach(f => {
+    if (f.is_natar || f.is_oasis) return;
+    const ln = f.list_name || '—';
+    const o = byList[ln] || (byList[ln] =
+      { name: ln, total: 0, gut: 0, ok: 0, leer: 0, res: 0, distSum: 0, effSum: 0, effN: 0 });
+    o.total++;
+    if (f.rating === 'gut') o.gut++; else if (f.rating === 'ok') o.ok++; else o.leer++;
+    o.res += (Number(f.res_last) || 0);
+    o.distSum += (Number(f.distance) || 0);
+    if (f.res_last > 0 && f.efficiency > 0) { o.effSum += Number(f.efficiency); o.effN++; }
+  });
+  const lists = Object.values(byList);
+  if (lists.length < 2) { card.style.display = 'none'; return; }
+  lists.forEach(o => {
+    o.avgRes = o.total ? Math.round(o.res / o.total) : 0;
+    o.avgDist = o.total ? o.distSum / o.total : 0;
+    o.avgEff = o.effN ? o.effSum / o.effN : 0;
+  });
+  lists.sort((a, b) => b.avgRes - a.avgRes);
+  let rows = '';
+  lists.forEach((o, i) => {
+    const best = (i === 0 && o.avgRes > 0);
+    rows += '<tr' + (best ? ' style="background:rgba(34,197,94,0.08);"' : '') + '>' +
+      '<td><strong>' + _esc(o.name) + '</strong>' +
+        (best ? ' <span style="font-size:0.66rem;color:#22c55e;">★ beste</span>' : '') + '</td>' +
+      '<td style="text-align:right;">' + o.total + '</td>' +
+      '<td style="text-align:right;color:#22c55e;">' + o.gut + '</td>' +
+      '<td style="text-align:right;color:#eab308;">' + o.ok + '</td>' +
+      '<td style="text-align:right;color:#ef4444;">' + o.leer + '</td>' +
+      '<td style="text-align:right;font-weight:700;">' + _fmt(o.res) + '</td>' +
+      '<td style="text-align:right;">' + _fmt(o.avgRes) + '</td>' +
+      '<td style="text-align:right;font-family:monospace;">' + o.avgDist.toFixed(1) + '</td>' +
+      '<td style="text-align:right;font-family:monospace;color:#93c5fd;">' + o.avgEff.toFixed(1) + '</td>' +
+    '</tr>';
+  });
+  card.style.display = '';
+  card.innerHTML =
+    '<h3 style="margin:0 0 0.75rem;">📑 Listen-Effizienz ' +
+      '<span style="font-size:0.75rem;font-weight:400;color:var(--text-muted);">— welche Travian-Liste am besten farmt</span></h3>' +
+    '<table class="table" style="min-width:640px;"><thead><tr>' +
+      '<th>Liste</th><th style="text-align:right;">Farmen</th>' +
+      '<th style="text-align:right;color:#22c55e;">🟢</th><th style="text-align:right;color:#eab308;">🟡</th>' +
+      '<th style="text-align:right;color:#ef4444;">🔴</th><th style="text-align:right;">Res Raid</th>' +
+      '<th style="text-align:right;">∅ Res/Farm</th><th style="text-align:right;">∅ Dist</th>' +
+      '<th style="text-align:right;" title="∅ Beute pro Feld Distanz">Eff</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<p style="font-size:0.72rem;color:var(--text-muted);margin:0.5rem 0 0;">' +
+      '∅ Res/Farm = Gesamtbeute letzter Raid ÷ Farmen · Eff = ∅ Beute pro Feld Distanz (NPC/Oasen ausgenommen)</p>';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const topN = ALL_FARMS.filter(_isTop).length;
+  const tb = document.getElementById('topFilterBtn');
+  if (tb && topN > 0) {
+    tb.style.display = '';
+    document.getElementById('topCount').textContent = topN;
+  }
+  renderListEff();
+  renderTrend();
+  renderTable();
+});
 </script>
 {% endblock %}
