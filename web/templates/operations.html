@@ -750,6 +750,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <div id="autoGenPreviewWrap" style="display:none;margin-top:.8rem;">
         <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem;">
           <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">Vorschau</div>
+          <div id="autoGenWaveCount" style="font-size:.75rem;color:var(--text-muted);"></div>
           <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;margin-left:.5rem;">
             <input type="checkbox" id="autoGenSelectAll" checked onchange="_autoGenToggleAll(this.checked)"> Alle
           </label>
@@ -2081,6 +2082,9 @@ function _buildPoolRowsForTarget(tx, ty, settings, sendWindow) {
       if (v.x == null || v.y == null) return;
       const role = classifyVillage(v, a.tribe);
       if (settings.onlyOff && role !== 'off') return;
+      // Skip villages with no troops at all — they can't send any wave (real or fake).
+      const troopTotal = Object.values(v.troops || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+      if (troopTotal <= 0) return;
       const dist = _torusDist(v.x, v.y, tx, ty);
       const ts = Math.max(0, Math.min(20, v.ts || 0));
       const travelSec = _travelSec(dist, settings, spd, ts);
@@ -2312,6 +2316,11 @@ async function generateAutoStack() {
 function renderAutoGenPreview() {
   const wrap = document.getElementById('autoGenPreviewWrap');
   wrap.style.display = autoGenPreview.length ? 'block' : 'none';
+  const includedCount = autoGenPreview.filter(r => r.include).length;
+  const targetCount = new Set(autoGenPreview.map(r => `${r.target?.x}|${r.target?.y}`)).size;
+  document.getElementById('autoGenWaveCount').textContent = autoGenPreview.length
+    ? `${includedCount}/${autoGenPreview.length} Wellen ausgewählt · ${targetCount} Ziel(e)`
+    : '';
   const lbl = {real: '⚔ Real', fake: '👻 Fake', cleaner1: '🧹 Cleaner'};
   let lastTargetKey = null;
   document.getElementById('autoGenPreviewBody').innerHTML = autoGenPreview.map((r, i) => {
