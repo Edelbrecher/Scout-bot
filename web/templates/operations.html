@@ -2074,7 +2074,7 @@ function _isTimeInWindow(date, fromHHMM, toHHMM) {
 // Build candidate attacker rows (our villages) for an arbitrary target coordinate.
 // If sendWindow is given ({from, to, landingBase}), villages whose computed send
 // time falls outside that daily time-of-day window are excluded.
-function _buildPoolRowsForTarget(tx, ty, settings, sendWindow) {
+function _buildPoolRowsForTarget(tx, ty, settings, sendWindow, fakeStyle) {
   const spd = parseFloat(activePlan?.server_speed) || 1;
   const rows = [];
   (attackers || []).forEach(a => {
@@ -2082,9 +2082,12 @@ function _buildPoolRowsForTarget(tx, ty, settings, sendWindow) {
       if (v.x == null || v.y == null) return;
       const role = classifyVillage(v, a.tribe);
       if (settings.onlyOff && role !== 'off') return;
-      // Skip villages with no troops at all — they can't send any wave (real or fake).
-      const troopTotal = Object.values(v.troops || {}).reduce((s, n) => s + (Number(n) || 0), 0);
-      if (troopTotal <= 0) return;
+      // Skip villages that don't even have the minimum troops required for the
+      // configured wave type (e.g. 1 offensive unit for a "minimal" fake, or
+      // 19 + catapult for "realistic") — checked up front so they're never
+      // picked and flagged with a warning afterwards.
+      const req = _fakeRequiredTroops(a.tribe, fakeStyle || 'minimal');
+      if (!_hasEnoughTroops(v.troops, req)) return;
       const dist = _torusDist(v.x, v.y, tx, ty);
       const ts = Math.max(0, Math.min(20, v.ts || 0));
       const travelSec = _travelSec(dist, settings, spd, ts);
@@ -2291,7 +2294,7 @@ async function generateAutoStack() {
   const preview = [];
   let skipped = 0;
   targets.forEach(t => {
-    let pool = _buildPoolRowsForTarget(t.x, t.y, settings, sendWindow);
+    let pool = _buildPoolRowsForTarget(t.x, t.y, settings, sendWindow, fakeStyle);
     if (manualPool) pool = pool.filter(r => manualPool.has(r.player_name));
     const waves = _genWaveRowsForTarget(pool, {realCount, fakeCount, fakeStyle, catBuilding, gapEnabled, gapSec, landingBase});
     if (!waves.length) { skipped++; return; }
