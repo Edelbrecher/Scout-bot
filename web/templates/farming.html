@@ -13,6 +13,21 @@
     if (saved) {
       var newSearch = '?' + saved;
       if (window.location.search !== newSearch) {
+        // Show a themed loading screen instead of a blank page while we
+        // redirect to the URL with the saved filters applied.
+        document.write(
+          '<div style="position:fixed;inset:0;z-index:99999;background:#0e0e12;' +
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">' +
+          '<div class="ld-cubes" style="display:grid;grid-template-columns:repeat(3,18px);grid-template-rows:repeat(3,18px);gap:5px;">' +
+          '<div class="ld-cube" style="--i:0;--j:0"></div><div class="ld-cube" style="--i:1;--j:0"></div><div class="ld-cube" style="--i:2;--j:0"></div>' +
+          '<div class="ld-cube" style="--i:0;--j:1"></div><div class="ld-cube" style="--i:1;--j:1"></div><div class="ld-cube" style="--i:2;--j:1"></div>' +
+          '<div class="ld-cube" style="--i:0;--j:2"></div><div class="ld-cube" style="--i:1;--j:2"></div><div class="ld-cube" style="--i:2;--j:2"></div>' +
+          '</div>' +
+          '<div style="color:#94a3b8;font-family:system-ui,-apple-system,sans-serif;font-size:0.85rem;">Loading saved filters…</div>' +
+          '<style>.ld-cube{width:18px;height:18px;border-radius:3px;background:#5865f2;animation:ldPop 1.2s ease-in-out infinite;' +
+          'animation-delay:calc((var(--i) + var(--j) * 3) * 0.1s);opacity:0.2;}' +
+          '@keyframes ldPop{0%,70%,100%{opacity:.15;transform:scale(.75);}35%{opacity:1;transform:scale(1);background:#818cf8;}}</style>'
+        );
         window.location.replace(window.location.pathname + newSearch);
       }
     }
