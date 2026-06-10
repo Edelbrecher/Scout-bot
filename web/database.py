@@ -8559,13 +8559,62 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
         """, (guild_id, guild_id))
         pop_map = {r["player_name"]: {"pop": r["pop"], "vcount": r["vcount"]} for r in pop_rows}
 
-        rows = await db.execute_fetchall(
-            "SELECT * FROM member_troops WHERE guild_id=? ORDER BY total_off DESC",
-            (guild_id,)
-        )
+        # Members upload their troops while in their personal workspace guild
+        # (ws_<discord_id>), not the shared alliance guild — so a plain
+        # "WHERE guild_id=?" only ever matches whoever happened to upload
+        # while viewing the alliance guild itself. Instead, resolve the
+        # alliance's member list and fetch each member's most recent
+        # member_troops entry across ALL guilds (same approach as
+        # get_all_member_troops_for_guild).
+        async with db.execute(
+            "SELECT id FROM ally_groups WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            ag_row = await cur.fetchone()
+
+        name_map: dict = {}
+        if ag_row:
+            async with db.execute(
+                "SELECT discord_id, discord_username, travian_name FROM ally_members WHERE ally_group_id=?",
+                (ag_row["id"],)
+            ) as cur:
+                am_rows = await cur.fetchall()
+            name_map = {r["discord_id"]: dict(r) for r in am_rows}
+
+        if name_map:
+            discord_ids = list(name_map.keys())
+            placeholders = ",".join("?" * len(discord_ids))
+            rows = await db.execute_fetchall(f"""
+                SELECT mt.*
+                FROM member_troops mt
+                INNER JOIN (
+                    SELECT discord_id, MAX(updated_at) AS max_updated
+                    FROM member_troops
+                    WHERE discord_id IN ({placeholders})
+                    GROUP BY discord_id
+                ) latest ON mt.discord_id = latest.discord_id
+                         AND mt.updated_at = latest.max_updated
+                ORDER BY mt.total_off DESC
+            """, discord_ids)
+        else:
+            # Fallback: no ally group found — use the old guild-scoped query
+            rows = await db.execute_fetchall(
+                "SELECT * FROM member_troops WHERE guild_id=? ORDER BY total_off DESC",
+                (guild_id,)
+            )
     result = []
+    seen = set()
     for r in rows:
         d = dict(r)
+        did = d.get("discord_id")
+        if did:
+            if did in seen:
+                continue
+            seen.add(did)
+            am = name_map.get(did, {})
+            if am.get("travian_name"):
+                d["travian_name"] = am["travian_name"]
+            if am.get("discord_username"):
+                d["discord_name"] = am["discord_username"]
         pdata = pop_map.get(d.get("travian_name") or "", {})
         pop = pdata.get("pop", 0) or 0
         vcount = pdata.get("vcount", 0) or 0
