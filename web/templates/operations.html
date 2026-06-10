@@ -1167,8 +1167,12 @@ function getTroopName(id, tribe) {
 // ══ Search ════════════════════════════════════════════════════════════════
 let alliancePanelOpen = false;
 
-function toggleAlliancePanel() {
-  if (!availableAlliances.length) return;
+async function toggleAlliancePanel() {
+  if (!availableAlliances.length) {
+    // Data not loaded yet (or load failed) — try loading now instead of doing nothing.
+    await loadAlliances();
+    if (!availableAlliances.length) return;
+  }
   alliancePanelOpen = !alliancePanelOpen;
   document.getElementById('allianceFilterRow').style.display = alliancePanelOpen ? 'block' : 'none';
 }

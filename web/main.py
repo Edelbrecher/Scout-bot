@@ -9126,23 +9126,31 @@ async def op_list_alliances(request: Request, guild_id: str):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     import aiosqlite as _aiosqlite_op
+    alliances = []
     async with _aiosqlite_op.connect(database.DB_PATH) as db:
         db.row_factory = _aiosqlite_op.Row
-        # Alliances sorted by total population desc (= world rank proxy)
-        async with db.execute("""
-            SELECT m.alliance_name,
-                   COUNT(DISTINCT m.player_name) AS player_count,
-                   SUM(m.population) AS total_pop
-            FROM map_snapshots m
-            INNER JOIN (
-                SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
-                WHERE guild_id=? GROUP BY guild_id
-            ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
-            WHERE m.guild_id=? AND m.alliance_name IS NOT NULL AND m.alliance_name != ''
-            GROUP BY m.alliance_name
-            ORDER BY total_pop DESC
-        """, (guild_id, guild_id)) as cur:
-            alliances = [{"name": r["alliance_name"], "players": r["player_count"], "pop": r["total_pop"]} for r in await cur.fetchall()]
+        # Resolve the guild's world_url, then look up the latest snapshot timestamp
+        # for that world directly (uses idx_wsnap_url_ts_v) instead of joining the
+        # map_snapshots view twice — the old view-based query took ~9s per call and
+        # could stack up to multi-minute delays under load with many concurrent users.
+        async with db.execute("SELECT tw_world FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            world_url = row["tw_world"] if row else None
+        if world_url:
+            async with db.execute("SELECT MAX(fetched_at) AS max_ts FROM world_snapshots WHERE world_url=?", (world_url,)) as cur:
+                row = await cur.fetchone()
+                max_ts = row["max_ts"] if row else None
+            if max_ts:
+                async with db.execute("""
+                    SELECT alliance_name,
+                           COUNT(DISTINCT player_name) AS player_count,
+                           SUM(population) AS total_pop
+                    FROM world_snapshots
+                    WHERE world_url=? AND fetched_at=? AND alliance_name IS NOT NULL AND alliance_name != ''
+                    GROUP BY alliance_name
+                    ORDER BY total_pop DESC
+                """, (world_url, max_ts)) as cur:
+                    alliances = [{"name": r["alliance_name"], "players": r["player_count"], "pop": r["total_pop"]} for r in await cur.fetchall()]
     # Meta groups
     meta_groups = await database.get_meta_groups(guild_id)
     return JSONResponse({"alliances": alliances, "meta_groups": meta_groups})
