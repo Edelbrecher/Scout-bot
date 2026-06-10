@@ -1573,9 +1573,12 @@ function _assignSettings() {
   };
 }
 
-function _travelSec(dist, settings, serverSpeed) {
+function _travelSec(dist, settings, serverSpeed, ts) {
   const spd = serverSpeed || 1;
-  const eff = settings.speed * spd;
+  // Each village has its own Tournament Square level (set in "Mein Account"),
+  // which gives +20% speed per level.
+  const tsBonus = 1 + (Math.max(0, Math.min(20, ts || 0)) * 0.2);
+  const eff = settings.speed * tsBonus * spd;
   return Math.round((dist / eff) * 3600);
 }
 
@@ -1613,7 +1616,8 @@ function _buildAssignRows(settings) {
       const hasTroopData = Object.values(v.troops || {}).some(c => c > 0);
       if (settings.onlyWithTroops && !hasTroopData) return;
       const dist = _torusDist(v.x, v.y, tx, ty);
-      const travelSec = _travelSec(dist, settings, spd);
+      const ts = Math.max(0, Math.min(20, v.ts || 0));
+      const travelSec = _travelSec(dist, settings, spd, ts);
       if (settings.maxRuntimeMin > 0 && travelSec > settings.maxRuntimeMin * 60) return;
       assignRows.push({
         player_name: a.player_name,
@@ -1623,6 +1627,7 @@ function _buildAssignRows(settings) {
         vx: v.x, vy: v.y,
         dist: dist.toFixed(1),
         travelSec,
+        ts,
         role,
         troops: v.troops || {},
         type: 'real',
@@ -1641,8 +1646,7 @@ function _renderAssignmentPanel(settings) {
   const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
   const spd = parseFloat(activePlan?.server_speed) || 1;
 
-  const effSpeed = settings.speed * spd;
-  const speedInfo = `${settings.speed} Fel/h → ${effSpeed.toFixed(1)} Fel/h effektiv (×${spd} Serverspeed)`
+  const speedInfo = `${settings.speed} Fel/h Basis × Serverspeed ${spd} · TS pro Dorf aus „Mein Account“`
     + (settings.maxRuntimeMin > 0 ? ` · max. Laufzeit ${settings.maxRuntimeMin} min` : '');
 
   const lbl = {real:'⚔ Real', fake:'👻 Fake', scout:'🔍 Scout', def:'🛡 Def'};
@@ -1727,7 +1731,7 @@ function _renderAssignmentPanel(settings) {
             <span class="atk-time">${fmtTravel(r.travelSec)}</span>
           </div>
           <div class="atk-village" style="display:flex;justify-content:space-between;align-items:center;">
-            <span>${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel</span>
+            <span>${escHtml(r.village_name)} (${r.vx}|${r.vy}) · ${r.dist} Fel${r.ts ? ` · 🏆TS${r.ts}` : ''}</span>
             <button onclick="toggleTroopRow(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem;padding:0 .2rem;" title="Troops anzeigen/ausblenden">
               🪖 <span id="troop-toggle-${i}">▲</span>
             </button>

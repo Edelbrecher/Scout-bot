@@ -9383,6 +9383,12 @@ async def op_attacker_list(request: Request, guild_id: str):
         if not snap_tribe.get(r["player_name"]):
             snap_tribe[r["player_name"]] = r["tribe"]
 
+    # Per-village Tournament Square (TS) levels, set by each player in "Mein Account"
+    discord_ids = {tr.get("discord_id") for tr in troop_rows.values() if tr.get("discord_id")}
+    ts_levels_by_user: dict = {}
+    for did in discord_ids:
+        ts_levels_by_user[did] = await database.get_village_ts_levels(did)
+
     # Build merged attacker list — only include players we actually know about
     all_names = (set(ally_members.keys()) | set(snap_villages.keys())
                  | set(troop_rows.keys()) | set(own_villages_by_player.keys()))
@@ -9415,6 +9421,13 @@ async def op_attacker_list(request: Request, guild_id: str):
         # Fallback 2: own villages imported via "Mein Account" (guild_own_villages)
         if not villages and name in own_villages_by_player:
             villages = own_villages_by_player[name]
+        # Attach each village's individually configured TS level (set in "Mein Account")
+        ts_levels = ts_levels_by_user.get(tr.get("discord_id", ""), {})
+        for v in villages:
+            if v.get("x") is not None and v.get("y") is not None:
+                v["ts"] = ts_levels.get(f"{v['x']}_{v['y']}", 0)
+            else:
+                v.setdefault("ts", 0)
         result.append({
             "player_name": name,
             "discord_id": tr.get("discord_id", ""),
