@@ -86,6 +86,26 @@ async def init_db():
             )
         """)
         await db.commit()
+        # Alliance meta-groups (created here once at startup so per-request
+        # CREATE TABLE IF NOT EXISTS calls don't contend for the write lock —
+        # those could block for ~30s while another writer holds a transaction).
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_meta_groups (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                meta_name   TEXT NOT NULL,
+                created_at  TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, meta_name)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_meta_members (
+                group_id        INTEGER NOT NULL REFERENCES alliance_meta_groups(id) ON DELETE CASCADE,
+                alliance_name   TEXT NOT NULL,
+                PRIMARY KEY (group_id, alliance_name)
+            )
+        """)
+        await db.commit()
 
     # Migrations
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -6021,25 +6041,10 @@ async def get_top_alliances_from_snapshot(guild_id: str, limit: int = 10) -> lis
 
 
 async def init_alliance_meta_table():
-    """Create alliance_meta_groups and alliance_meta_members tables."""
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS alliance_meta_groups (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id    TEXT NOT NULL,
-                meta_name   TEXT NOT NULL,
-                created_at  TEXT DEFAULT (datetime('now')),
-                UNIQUE(guild_id, meta_name)
-            )
-        """)
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS alliance_meta_members (
-                group_id        INTEGER NOT NULL REFERENCES alliance_meta_groups(id) ON DELETE CASCADE,
-                alliance_name   TEXT NOT NULL,
-                PRIMARY KEY (group_id, alliance_name)
-            )
-        """)
-        await db.commit()
+    """No-op: alliance_meta_groups/alliance_meta_members are now created once
+    at startup in init_db() to avoid per-request CREATE TABLE write-lock
+    contention (was causing ~30s delays loading the alliance filter)."""
+    pass
 
 
 async def get_meta_groups(guild_id: str) -> list[dict]:

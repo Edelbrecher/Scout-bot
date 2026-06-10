@@ -259,12 +259,25 @@
 
 .autogen-chip-box { display:flex; flex-wrap:wrap; gap:.4rem; max-height:110px; overflow-y:auto;
   border:1px solid var(--border); border-radius:8px; padding:.5rem; background:var(--bg-main); }
+#autoGenAllianceList.autogen-chip-box { max-height:170px; }
 .autogen-chip { display:inline-flex; align-items:center; gap:.3rem; font-size:.75rem; padding:.25rem .65rem;
   border-radius:20px; border:1px solid var(--border); cursor:pointer; transition:all .15s;
   background:var(--bg-card); color:var(--text-muted); user-select:none; }
 .autogen-chip:hover { border-color:#6366f1; color:var(--text); }
 .autogen-chip.active { background:rgba(99,102,241,.18); border-color:#6366f1; color:#a5b4fc; font-weight:600; }
 .autogen-chip-box:empty::before { content:'—'; color:var(--text-muted); font-size:.75rem; }
+
+.autogen-preview-table tbody tr { border-top:1px solid var(--border); transition:background .1s; }
+.autogen-preview-table tbody tr:hover { background:rgba(99,102,241,.07); }
+.autogen-preview-table tbody tr.autogen-target-first { border-top:2px solid #6366f1; }
+.autogen-preview-table tbody tr.autogen-warn { background:rgba(239,68,68,.08); }
+.autogen-preview-table tbody tr.autogen-warn:hover { background:rgba(239,68,68,.14); }
+.autogen-type-badge { display:inline-block; padding:.1rem .5rem; border-radius:10px; font-size:.7rem; font-weight:600; white-space:nowrap; }
+.autogen-type-badge.real { background:rgba(34,197,94,.18); color:#4ade80; }
+.autogen-type-badge.fake { background:rgba(168,85,247,.18); color:#c084fc; }
+.autogen-type-badge.cleaner1 { background:rgba(251,191,36,.18); color:#fbbf24; }
+.autogen-target-cell { font-weight:600; color:#a5b4fc; }
+.autogen-warn-icon { color:#f87171; }
 </style>
 
 <!-- Inject data for JS -->
@@ -612,7 +625,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 
 <!-- Auto-Stack Generator Modal -->
 <div class="op-modal-overlay" id="autoGenModal">
-  <div class="op-modal" style="width:min(900px,97vw);">
+  <div class="op-modal" style="width:min(1170px,97vw);max-height:97vh;">
     <div class="op-modal-header">
       <span style="font-weight:700;">🤖 Auto-Einsatzplan</span>
       <button class="btn-icon" onclick="closeModal('autoGenModal')">✕</button>
@@ -701,18 +714,18 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 
       <div id="autoGenPreviewWrap" style="display:none;margin-top:.8rem;">
         <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;margin-bottom:.3rem;">Vorschau</div>
-        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
-          <table style="width:100%;font-size:.75rem;border-collapse:collapse;">
-            <thead style="position:sticky;top:0;background:var(--bg-main);">
+        <div class="autogen-preview-box" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+          <table class="autogen-preview-table" style="width:100%;font-size:.75rem;border-collapse:collapse;">
+            <thead style="position:sticky;top:0;background:var(--bg-main);z-index:1;">
               <tr>
-                <th style="padding:.3rem .4rem;text-align:left;"></th>
-                <th style="padding:.3rem .4rem;text-align:left;">Ziel</th>
-                <th style="padding:.3rem .4rem;text-align:left;">Spieler</th>
-                <th style="padding:.3rem .4rem;text-align:left;">Dorf</th>
-                <th style="padding:.3rem .4rem;text-align:left;">Typ</th>
-                <th style="padding:.3rem .4rem;text-align:left;">Truppen</th>
-                <th style="padding:.3rem .4rem;text-align:left;">Laufzeit</th>
-                <th style="padding:.3rem .4rem;text-align:left;">Sendezeit</th>
+                <th style="padding:.4rem .5rem;text-align:left;width:30px;"></th>
+                <th style="padding:.4rem .5rem;text-align:left;">Ziel</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Spieler</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Dorf</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Typ</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Truppen</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Laufzeit</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Sendezeit</th>
               </tr>
             </thead>
             <tbody id="autoGenPreviewBody"></tbody>
@@ -2006,6 +2019,19 @@ function _buildPoolRowsForTarget(tx, ty, settings) {
   return rows;
 }
 
+// Required troop counts for a fake wave of a given style/tribe
+function _fakeRequiredTroops(tribe, fakeStyle) {
+  if (fakeStyle === 'realistic') {
+    return {[_autoGenOffUnit(tribe)]: 19, [_autoGenCatId(tribe)]: 1};
+  }
+  return {[_autoGenOffUnit(tribe)]: 1};
+}
+
+// Does this village have enough troops on hand to send the given composition?
+function _hasEnoughTroops(troops, required) {
+  return Object.entries(required).every(([unit, cnt]) => (troops?.[unit] || 0) >= cnt);
+}
+
 // Build the real/fake/gap wave rows for one target, drawing from a pool of attacker villages
 function _genWaveRowsForTarget(pool, opts) {
   const {realCount, fakeCount, fakeStyle, catBuilding, gapEnabled, gapSec, landingBase} = opts;
@@ -2022,18 +2048,43 @@ function _genWaveRowsForTarget(pool, opts) {
   if (total <= 0) return [];
 
   const rows = [];
+  let realIdx = 0, fakeIdx = 0;
   for (let i = 0; i < total; i++) {
-    const r = pool[i % pool.length]; // cycle through pool if not enough villages
     const isReal = i < realCount;
+    let r;
     let troops = {};
     let notes = '';
     let waveType = isReal ? 'real' : 'fake';
-    if (!isReal) {
+    let insufficientTroops = false;
+
+    if (isReal) {
+      r = pool[realIdx % pool.length]; // cycle through pool if not enough villages
+      realIdx++;
+    } else {
+      // Look for a village in the pool that actually has enough troops for this fake composition.
+      // Start searching from fakeIdx so different fake waves prefer different source villages.
+      let found = null;
+      for (let k = 0; k < pool.length; k++) {
+        const cand = pool[(fakeIdx + k) % pool.length];
+        const req = _fakeRequiredTroops(cand.tribe || 'romans', fakeStyle);
+        if (_hasEnoughTroops(cand.troops, req)) { found = cand; fakeIdx = (fakeIdx + k + 1) % pool.length; break; }
+      }
+      if (found) {
+        r = found;
+      } else {
+        // Nothing in the pool has enough troops — fall back to cycling, but flag it
+        r = pool[fakeIdx % pool.length];
+        fakeIdx++;
+        insufficientTroops = true;
+      }
       if (fakeStyle === 'realistic') {
         troops = {[_autoGenOffUnit(r.tribe)]: 19, [_autoGenCatId(r.tribe)]: 1};
         if (catBuilding) notes = `🎯 Kata-Ziel: ${catBuilding}`;
       } else {
         troops = {[_autoGenOffUnit(r.tribe)]: 1};
+      }
+      if (insufficientTroops) {
+        notes = (notes ? notes + ' | ' : '') + '⚠️ Nicht genug Truppen im Dorf';
       }
     }
     let landing = landingBase;
@@ -2048,7 +2099,8 @@ function _genWaveRowsForTarget(pool, opts) {
       village_name: r.village_name, vx: r.vx, vy: r.vy,
       tribe: r.tribe || 'romans', travelSec: r.travelSec,
       type: waveType, troops, notes, landing,
-      include: true,
+      insufficientTroops,
+      include: !insufficientTroops,
     });
   }
   return rows;
@@ -2157,6 +2209,7 @@ function renderAutoGenPreview() {
   const wrap = document.getElementById('autoGenPreviewWrap');
   wrap.style.display = autoGenPreview.length ? 'block' : 'none';
   const lbl = {real: '⚔ Real', fake: '👻 Fake', cleaner1: '🧹 Cleaner'};
+  let lastTargetKey = null;
   document.getElementById('autoGenPreviewBody').innerHTML = autoGenPreview.map((r, i) => {
     const troopStr = Object.entries(r.troops || {}).map(([id, c]) => {
       const tDef = (TROOPS_DEF[r.tribe] || []).find(t => t.id === id);
@@ -2168,15 +2221,22 @@ function renderAutoGenPreview() {
       return send.toISOString().replace('T', ' ').slice(0, 19);
     })() : '—';
     const t = r.target || {};
-    return `<tr style="opacity:${r.include ? 1 : .4};">
-      <td style="padding:.25rem .4rem;"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="autoGenPreview[${i}].include=this.checked;renderAutoGenPreview()"></td>
-      <td style="padding:.25rem .4rem;">${escHtml(t.player_name || '')} (${t.x}|${t.y})</td>
-      <td style="padding:.25rem .4rem;">${escHtml(r.player_name)}</td>
-      <td style="padding:.25rem .4rem;">${escHtml(r.village_name)} (${r.vx}|${r.vy})</td>
-      <td style="padding:.25rem .4rem;">${lbl[r.type] || r.type}</td>
-      <td style="padding:.25rem .4rem;">${escHtml(troopStr)}</td>
-      <td style="padding:.25rem .4rem;">${fmtTravel(r.travelSec)}</td>
-      <td style="padding:.25rem .4rem;">${escHtml(sendStr)}</td>
+    const targetKey = `${t.x}|${t.y}`;
+    const isFirstOfTarget = targetKey !== lastTargetKey;
+    lastTargetKey = targetKey;
+    const rowClasses = [];
+    if (isFirstOfTarget) rowClasses.push('autogen-target-first');
+    if (r.insufficientTroops) rowClasses.push('autogen-warn');
+    const warnIcon = r.insufficientTroops ? ' <span class="autogen-warn-icon" title="Nicht genug Truppen im Dorf für diese Fake-Welle">⚠️</span>' : '';
+    return `<tr class="${rowClasses.join(' ')}" style="opacity:${r.include ? 1 : .5};">
+      <td style="padding:.35rem .5rem;"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="autoGenPreview[${i}].include=this.checked;renderAutoGenPreview()"></td>
+      <td class="autogen-target-cell" style="padding:.35rem .5rem;">${isFirstOfTarget ? `${escHtml(t.player_name || '')} (${t.x}|${t.y})` : ''}</td>
+      <td style="padding:.35rem .5rem;">${escHtml(r.player_name)}</td>
+      <td style="padding:.35rem .5rem;">${escHtml(r.village_name)} (${r.vx}|${r.vy})</td>
+      <td style="padding:.35rem .5rem;"><span class="autogen-type-badge ${r.type}">${lbl[r.type] || r.type}</span></td>
+      <td style="padding:.35rem .5rem;">${escHtml(troopStr)}${warnIcon}</td>
+      <td style="padding:.35rem .5rem;">${fmtTravel(r.travelSec)}</td>
+      <td style="padding:.35rem .5rem;">${escHtml(sendStr)}</td>
     </tr>`;
   }).join('');
 }
