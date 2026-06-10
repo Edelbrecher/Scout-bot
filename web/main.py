@@ -8789,11 +8789,12 @@ async def op_add_wave(
     # Auto-notify the assigned player via Discord DM
     if attacker_discord_id:
         async def _auto_notify_wave():
+            entry = {"discord_id": attacker_discord_id, "name": attacker_name.strip(), "status": "error"}
             try:
                 plan = await database.get_op_plan_full(plan_id, guild_id)
                 if plan:
                     async with httpx.AsyncClient(timeout=8) as _hc:
-                        await _hc.post("http://bot:7777/api/op-wave-assigned", json={
+                        resp = await _hc.post("http://bot:7777/api/op-wave-assigned", json={
                             "guild_id": guild_id, "plan": plan,
                             "discord_id": attacker_discord_id,
                             "attacker_name": attacker_name.strip(),
@@ -8802,6 +8803,20 @@ async def op_add_wave(
                             "target_y": result.get("target_y"),
                             "send_time": result.get("send_time"),
                         })
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            entry["status"] = data.get("status", "error")
+                            if data.get("error"):
+                                entry["error"] = data["error"]
+                        else:
+                            entry["error"] = f"http {resp.status_code}"
+                else:
+                    entry["status"] = "error"
+                    entry["error"] = "plan not found"
+            except Exception as e:
+                entry["error"] = str(e)[:120]
+            try:
+                await database.save_op_notify_log(guild_id, plan_id, "", "wave_assigned", [entry])
             except Exception:
                 pass
         asyncio.create_task(_auto_notify_wave())

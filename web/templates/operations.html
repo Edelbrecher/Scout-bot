@@ -3029,6 +3029,8 @@ async function loadNotifyLog() {
       const failed  = entries.filter(e => e.status !== 'sent').length;
       const typeTag = log.trigger_type === 'auto'
         ? '<span style="background:rgba(99,102,241,.15);color:#a5b4fc;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🚀 Auto (Activeierung)</span>'
+        : log.trigger_type === 'wave_assigned'
+        ? '<span style="background:rgba(45,212,191,.12);color:#2dd4bf;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🎯 Welle zugewiesen</span>'
         : '<span style="background:rgba(245,158,11,.12);color:#fbbf24;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">📢 Manuell</span>';
 
       const rows = entries.length ? entries.map(e => `
