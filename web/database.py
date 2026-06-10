@@ -2825,11 +2825,13 @@ async def get_inactive_farms(
             if not details:
                 continue
             d = {**details, **agg}
-            # Filter WW villages (village_type=15) unless explicitly included
-            if not include_ww and int(d.get("village_type") or 0) == 15:
+            _vname = (d.get("village_name") or "").strip().lower()
+            _pname = (d.get("player_name") or "").strip().lower()
+            # Filter the "WW Village" (World Wonder construction site) unless explicitly included
+            if not include_ww and _vname == "ww village":
                 continue
-            # Filter Natar villages (tribe=4) unless explicitly included
-            if not include_natars and str(d.get("tribe") or "") in ("4", "4.0"):
+            # Filter Natar-owned villages unless explicitly included
+            if not include_natars and _pname == "natars":
                 continue
             d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
             try:
@@ -3060,12 +3062,12 @@ async def search_inactive_advanced(
         """
         params = [world_url, latest_ts, min_pop, max_pop]
 
-        # Natars filter in SQL
+        # Natars filter in SQL (Natar-owned villages, e.g. "Natars 74|-49")
         if not include_natars:
-            query += " AND tribe != 4 AND tribe != '4'"
-        # WW villages filter (village_type=15)
+            query += " AND lower(player_name) != 'natars'"
+        # WW village filter (the "WW Village" World Wonder construction site)
         if not include_ww:
-            query += " AND (village_type IS NULL OR village_type != 15)"
+            query += " AND lower(village_name) != 'ww village'"
 
         async with db.execute(query, params) as cur:
             cur.row_factory = aiosqlite.Row
