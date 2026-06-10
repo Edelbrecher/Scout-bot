@@ -242,70 +242,21 @@
           <th>Bewertung</th>
         </tr>
       </thead>
-      <tbody id="farmBody">
-        {% for f in farms %}
-        <tr class="farm-row"
-            data-rating="{{ f.rating }}"
-            data-group="{{ f.group }}"
-            data-village_name="{{ f.village_name }}"
-            data-population="{{ f.population }}"
-            data-distance="{{ f.distance }}"
-            data-res_last="{{ f.res_last }}"
-            data-res_total="{{ f.res_total }}"
-            data-efficiency="{{ f.efficiency }}"
-            style="{% if f.rating == 'gut' %}border-left:3px solid #22c55e;{% elif f.rating == 'ok' %}border-left:3px solid #eab308;{% elif f.is_natar or f.is_oasis %}border-left:3px solid #6b7280;{% else %}border-left:3px solid #ef4444;{% endif %}">
-          <td>
-            <strong>{{ f.village_name }}</strong>
-            {% if f.abandoned %}<span style="font-size:0.7rem;color:#f59e0b;margin-left:4px;">⚠️ Verlassen?</span>{% endif %}
-            {% if f.is_natar %}<span style="font-size:0.7rem;color:#6b7280;margin-left:4px;">NPC</span>{% endif %}
-            <div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;">
-              {% if f.x is defined and f.y is defined %}
-                {% if guild.tw_world %}
-                <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ f.x }}&amp;y={{ f.y }}"
-                   target="_blank" rel="noopener"
-                   style="font-family:monospace;color:#93c5fd;text-decoration:none;">{{ f.x }}|{{ f.y }}</a>
-                {% else %}
-                <span style="font-family:monospace;">{{ f.x }}|{{ f.y }}</span>
-                {% endif %}
-                <span>·</span>
-              {% endif %}
-              <span>{{ f.list_name }}</span>
-            </div>
-          </td>
-          <td style="font-size:0.8rem;">
-            <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:0.72rem;">{{ f.group }}</span>
-          </td>
-          <td style="text-align:right;font-size:0.85rem;">{{ f.population }}</td>
-          <td style="text-align:right;font-family:monospace;">{{ f.distance }}</td>
-          <td style="text-align:right;font-family:monospace;">{{ f.troops }}</td>
-          <td style="font-size:0.8rem;color:var(--text-muted);">{{ f.last_raid or '—' }}</td>
-          <td style="text-align:right;font-weight:700;
-              {% if f.res_last >= 100 %}color:#22c55e;{% elif f.res_last > 0 %}color:#eab308;{% else %}color:#ef4444;{% endif %}">
-            {{ f.res_last }}
-          </td>
-          <td style="text-align:right;color:var(--text-muted);font-family:monospace;font-size:0.82rem;">
-            {{ "{:,}".format(f.res_total).replace(",",".") if f.res_total else '—' }}
-          </td>
-          <td style="text-align:right;font-family:monospace;">
-            {{ f.efficiency if f.efficiency else '—' }}
-          </td>
-          <td>
-            {% if f.is_natar or f.is_oasis %}
-              <span style="font-size:0.75rem;color:#6b7280;">⬛ NPC</span>
-            {% elif f.rating == 'gut' %}
-              <span style="background:rgba(34,197,94,0.15);color:#22c55e;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🟢 Gut</span>
-            {% elif f.rating == 'ok' %}
-              <span style="background:rgba(234,179,8,0.15);color:#eab308;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🟡 OK</span>
-            {% else %}
-              <span style="background:rgba(239,68,68,0.15);color:#ef4444;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🔴 Leer</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody id="farmBody"><!-- rows rendered client-side from #farmsData --></tbody>
     </table>
     <div id="noResults" style="display:none;padding:1.5rem;text-align:center;color:var(--text-muted);">Keine Farmen gefunden.</div>
+    <div id="loadMoreWrap" style="display:none;padding:1rem;text-align:center;border-top:1px solid var(--border);">
+      <button id="loadMoreBtn" onclick="renderMore()" class="filter-btn" style="padding:6px 16px;">
+        ⬇ Weitere laden · <span id="loadMoreCount">0</span> verbleibend
+      </button>
+    </div>
   </div>
+
+  {# Farm rows are rendered on the client to keep the HTML payload small —
+     a large farmlist (2000+ rows) as server-rendered HTML was ~5 MB and slow
+     to transfer and parse. As JSON it is ~6x smaller and only the first page
+     of rows is built into the DOM up front. #}
+  <script id="farmsData" type="application/json">{{ farms | tojson }}</script>
 
   {% endif %}
 </div>
@@ -326,15 +277,125 @@
 </style>
 
 <script>
+// ── Client-side farm table (data-driven, paginated) ──────────────────────
+const PAGE_SIZE = 200;
+let ALL_FARMS = [];
+try {
+  const _el = document.getElementById('farmsData');
+  ALL_FARMS = _el ? (JSON.parse(_el.textContent || '[]') || []) : [];
+} catch (e) { ALL_FARMS = []; }
+const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
+
 let activeRating = 'all';
 let activeGroup  = 'all';
+let sortCol = null, sortAsc = true;
+let renderedCount = PAGE_SIZE;
+
+function _esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function _fmt(n) { return (Number(n) || 0).toLocaleString('de-DE'); }
+
+function _rowHtml(f) {
+  const isNpc = f.is_natar || f.is_oasis;
+  const border = f.rating === 'gut' ? '#22c55e'
+               : f.rating === 'ok'  ? '#eab308'
+               : isNpc              ? '#6b7280' : '#ef4444';
+
+  // village name cell (name + flags + coords/list)
+  let coords = '';
+  if (f.x !== undefined && f.x !== null && f.y !== undefined && f.y !== null) {
+    if (TW_WORLD) {
+      coords = '<a href="' + _esc(TW_WORLD.replace(/\/+$/, '')) + '/karte.php?x=' + f.x + '&amp;y=' + f.y +
+               '" target="_blank" rel="noopener" style="font-family:monospace;color:#93c5fd;text-decoration:none;">' +
+               f.x + '|' + f.y + '</a><span>·</span>';
+    } else {
+      coords = '<span style="font-family:monospace;">' + f.x + '|' + f.y + '</span><span>·</span>';
+    }
+  }
+  const nameCell =
+    '<td><strong>' + _esc(f.village_name) + '</strong>' +
+    (f.abandoned ? '<span style="font-size:0.7rem;color:#f59e0b;margin-left:4px;">⚠️ Verlassen?</span>' : '') +
+    (f.is_natar  ? '<span style="font-size:0.7rem;color:#6b7280;margin-left:4px;">NPC</span>' : '') +
+    '<div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;">' +
+    coords + '<span>' + _esc(f.list_name) + '</span></div></td>';
+
+  // res_last colour
+  const rlColor = f.res_last >= 100 ? '#22c55e' : f.res_last > 0 ? '#eab308' : '#ef4444';
+
+  // rating badge
+  let badge;
+  if (isNpc) badge = '<span style="font-size:0.75rem;color:#6b7280;">⬛ NPC</span>';
+  else if (f.rating === 'gut') badge = '<span style="background:rgba(34,197,94,0.15);color:#22c55e;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🟢 Gut</span>';
+  else if (f.rating === 'ok')  badge = '<span style="background:rgba(234,179,8,0.15);color:#eab308;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🟡 OK</span>';
+  else badge = '<span style="background:rgba(239,68,68,0.15);color:#ef4444;border-radius:4px;padding:2px 7px;font-size:0.75rem;font-weight:600;">🔴 Leer</span>';
+
+  return '<tr class="farm-row" style="border-left:3px solid ' + border + ';">' +
+    nameCell +
+    '<td style="font-size:0.8rem;"><span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:0.72rem;">' + _esc(f.group) + '</span></td>' +
+    '<td style="text-align:right;font-size:0.85rem;">' + _esc(f.population) + '</td>' +
+    '<td style="text-align:right;font-family:monospace;">' + _esc(f.distance) + '</td>' +
+    '<td style="text-align:right;font-family:monospace;">' + _esc(f.troops) + '</td>' +
+    '<td style="font-size:0.8rem;color:var(--text-muted);">' + (f.last_raid ? _esc(f.last_raid) : '—') + '</td>' +
+    '<td style="text-align:right;font-weight:700;color:' + rlColor + ';">' + _esc(f.res_last) + '</td>' +
+    '<td style="text-align:right;color:var(--text-muted);font-family:monospace;font-size:0.82rem;">' + (f.res_total ? _fmt(f.res_total) : '—') + '</td>' +
+    '<td style="text-align:right;font-family:monospace;">' + (f.efficiency ? _esc(f.efficiency) : '—') + '</td>' +
+    '<td>' + badge + '</td>' +
+  '</tr>';
+}
+
+function _filtered() {
+  return ALL_FARMS.filter(f =>
+    (activeRating === 'all' || f.rating === activeRating) &&
+    (activeGroup  === 'all' || f.group  === activeGroup)
+  );
+}
+
+function _sorted(arr) {
+  if (!sortCol) return arr;
+  const out = arr.slice();
+  out.sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (va === undefined || va === null) va = '';
+    if (vb === undefined || vb === null) vb = '';
+    const na = parseFloat(va), nb = parseFloat(vb);
+    let cmp = (isNaN(na) || isNaN(nb)) ? String(va).localeCompare(String(vb), 'de') : na - nb;
+    return sortAsc ? cmp : -cmp;
+  });
+  return out;
+}
+
+function renderTable() {
+  const data = _sorted(_filtered());
+  const slice = data.slice(0, renderedCount);
+  let html = '';
+  for (let i = 0; i < slice.length; i++) html += _rowHtml(slice[i]);
+  document.getElementById('farmBody').innerHTML = html;
+  document.getElementById('noResults').style.display = data.length === 0 ? '' : 'none';
+  const remaining = data.length - slice.length;
+  const wrap = document.getElementById('loadMoreWrap');
+  if (remaining > 0) {
+    wrap.style.display = '';
+    document.getElementById('loadMoreCount').textContent = remaining;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function renderMore() {
+  renderedCount += PAGE_SIZE;
+  renderTable();
+}
 
 function applyFilter(type, value, btn) {
   if (type === 'all')    { activeRating = 'all'; activeGroup = 'all'; }
   if (type === 'rating') { activeRating = value; activeGroup = 'all'; }
   if (type === 'group')  { activeGroup  = value; activeRating = 'all'; }
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+  renderedCount = PAGE_SIZE;
   renderTable();
 }
 
@@ -345,35 +406,17 @@ function filterGroup(grpName) {
   document.querySelectorAll('.grp-btn').forEach(b => {
     if (b.dataset.grp === grpName) b.classList.add('active');
   });
+  renderedCount = PAGE_SIZE;
   renderTable();
 }
 
-function renderTable() {
-  let visible = 0;
-  document.querySelectorAll('#farmBody .farm-row').forEach(row => {
-    const rOk = activeRating === 'all' || row.dataset.rating  === activeRating;
-    const gOk = activeGroup  === 'all' || row.dataset.group   === activeGroup;
-    row.style.display = (rOk && gOk) ? '' : 'none';
-    if (rOk && gOk) visible++;
-  });
-  document.getElementById('noResults').style.display = visible === 0 ? '' : 'none';
-}
-
-// Sorting
-let sortCol = null, sortAsc = true;
 function sortTable(col) {
   if (sortCol === col) sortAsc = !sortAsc;
   else { sortCol = col; sortAsc = (col === 'village_name' || col === 'group'); }
-  const tbody = document.getElementById('farmBody');
-  const rows  = Array.from(tbody.querySelectorAll('.farm-row'));
-  rows.sort((a, b) => {
-    let va = a.dataset[col] || '', vb = b.dataset[col] || '';
-    const na = parseFloat(va), nb = parseFloat(vb);
-    let cmp = isNaN(na) ? va.localeCompare(vb, 'de') : na - nb;
-    return sortAsc ? cmp : -cmp;
-  });
-  rows.forEach(r => tbody.appendChild(r));
+  renderedCount = PAGE_SIZE;
   renderTable();
 }
+
+document.addEventListener('DOMContentLoaded', renderTable);
 </script>
 {% endblock %}
