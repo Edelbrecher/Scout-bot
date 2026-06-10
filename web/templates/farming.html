@@ -2,6 +2,23 @@
 {% block title %}Farming Intelligence · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
+<script>
+// Restore the user's saved Farming-Intelligence filters (per guild) if this is
+// a "plain" page load with no filters in the URL yet. Saved on filterForm submit.
+(function() {
+  var LS_KEY = 'farmingFilters_{{ guild.guild_id }}';
+  var params = new URLSearchParams(window.location.search);
+  if (!params.has('advanced')) {
+    var saved = localStorage.getItem(LS_KEY);
+    if (saved) {
+      var newSearch = '?' + saved;
+      if (window.location.search !== newSearch) {
+        window.location.replace(window.location.pathname + newSearch);
+      }
+    }
+  }
+})();
+</script>
 <div class="container" style="max-width:100%;">
 
 <!-- ══ LOADING OVERLAY ══════════════════════════════════════════════════════ -->
@@ -401,9 +418,29 @@
                 </div>
                 <div>
                   <label class="fi-label">Exclude alliances</label>
-                  <input type="text" name="exclude_alliances" value="{{ exclude_alliances }}" class="fi-input" placeholder="Ally1, Ally2…"/>
+                  <input type="text" id="excludeAlliancesInput" name="exclude_alliances" value="{{ exclude_alliances }}" class="fi-input" placeholder="Ally1, Ally2…"/>
                 </div>
               </div>
+              {% if top_alliances %}
+              <div style="margin-top:.6rem;">
+                <div class="fi-label" style="margin-bottom:.3rem;">Top Alliances <span style="font-weight:400;color:#475569;">(klicken zum Aus-/Einblenden)</span></div>
+                <div style="display:flex;gap:.3rem;flex-wrap:wrap;" id="allianceChipsWrap">
+                  {% set _excl_list = (exclude_alliances|lower).split(',') | map('trim') | list %}
+                  {% for a in top_alliances %}
+                  {% set _aname = a.alliance_name %}
+                  {% set _is_excluded = (_aname|lower) in _excl_list %}
+                  <span class="alliance-chip {% if not _is_excluded %}active{% endif %}" data-alliance="{{ _aname }}"
+                        onclick="toggleAllianceChip(this)"
+                        style="display:inline-block;padding:.25rem .6rem;border-radius:20px;font-size:.72rem;cursor:pointer;
+                               border:1px solid {% if not _is_excluded %}var(--primary){% else %}var(--border){% endif %};
+                               background:{% if not _is_excluded %}rgba(88,101,242,.2){% else %}var(--bg-input){% endif %};
+                               color:{% if not _is_excluded %}#818cf8{% else %}var(--text-muted){% endif %};">
+                    {{ _aname }} <span style="opacity:.6;">({{ a.village_count }})</span>
+                  </span>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
             </div>
 
             {# Row 4: Tribes + Farmlist + Natars #}
@@ -477,7 +514,8 @@
 
             <div style="display:flex;gap:.5rem;padding-top:.75rem;border-top:1px solid #1e293b;margin-top:.75rem;">
               <button type="submit" class="btn btn-primary" style="font-size:.82rem;">🔍 Apply filters</button>
-              <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.82rem;color:#475569;">✕ Clear all</a>
+              <a href="/guild/{{ guild.guild_id }}/farming?tab=inactive" class="btn" style="font-size:.82rem;color:#475569;"
+                 onclick="localStorage.removeItem('farmingFilters_{{ guild.guild_id }}')">✕ Clear all</a>
             </div>
           </form>
         </div>
@@ -641,7 +679,7 @@
                 <div style="display:flex;align-items:center;gap:0.4rem;">
                   {% if guild.tw_world %}
                   <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ farm.x }}&amp;y={{ farm.y }}"
-                     target="_blank" rel="noopener"
+                     target="_blank" rel="noopener" onclick="markVisited('{{ farm.x }}|{{ farm.y }}','coord')"
                      style="font-family:monospace;font-weight:600;color:#93c5fd;">{{ farm.x }}|{{ farm.y }}</a>
                   {% else %}
                   <span style="font-family:monospace;font-weight:600;">{{ farm.x }}|{{ farm.y }}</span>
@@ -782,7 +820,7 @@
               <td style="white-space:nowrap;">
                 <div style="display:flex;gap:3px;align-items:center;">
                 {# + internal TravOps farmlist #}
-                <button onclick="addToMyFarms({{ farm.x }}, {{ farm.y }}, '{{ farm.village_name | e }}', '{{ farm.player_name | e }}', {{ farm.population or 0 }})"
+                <button onclick="addToMyFarms({{ farm.x }}, {{ farm.y }}, '{{ farm.village_name | e }}', '{{ farm.player_name | e }}', {{ farm.population or 0 }}); markVisited('{{ farm.x }}|{{ farm.y }}','farmlist')"
                         style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:0.75rem;padding:2px 6px;color:var(--text-muted);"
                         title="Add to TravOps farmlist">＋</button>
                 {% if guild.tw_world %}
@@ -793,7 +831,7 @@
                 {% else %}
                 <a href="{{ guild.tw_world.rstrip('/') }}/build.php?gid=16&tt=2&x={{ farm.x }}&y={{ farm.y }}&t4=1"
                 {% endif %}
-                   target="_blank" rel="noopener"
+                   target="_blank" rel="noopener" onclick="markVisited('{{ farm.x }}|{{ farm.y }}','scout')"
                    title="{% if scout_village %}Send scout from {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}Send scout — no scout village set{% endif %}"
                    style="display:inline-flex;align-items:center;
                           background:{% if scout_village %}rgba(99,102,241,.15){% else %}rgba(255,255,255,.05){% endif %};
@@ -919,7 +957,7 @@
           ? '<span style="font-size:.68rem;background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 5px;">✅ Farm list</span>'
           : '<span style="font-size:.68rem;background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.3);border-radius:4px;padding:1px 5px;">➕ Missing</span>';
         var coordCell = _twWorld
-          ? '<a href="'+_twWorld+'/karte.php?x='+f.x+'&y='+f.y+'" target="_blank" rel="noopener" style="font-family:monospace;font-weight:600;color:#93c5fd;">'+coords+'</a>'
+          ? '<a href="'+_twWorld+'/karte.php?x='+f.x+'&y='+f.y+'" target="_blank" rel="noopener" onclick="markVisited(\''+coords+'\',\'coord\')" style="font-family:monospace;font-weight:600;color:#93c5fd;">'+coords+'</a>'
           : '<span style="font-family:monospace;font-weight:600;">'+coords+'</span>';
         var flGroupsHtml = '';
         if (_hasFarmlist) {
@@ -967,8 +1005,8 @@
           '<td style="text-align:center;white-space:nowrap;">'+_troopsHtml(f.population)+'</td>'+
           (_hasFarmlist?'<td style="font-size:.72rem;">'+flGroupsHtml+'</td>':'')+
           '<td style="white-space:nowrap;"><div style="display:flex;gap:3px;align-items:center;">'+
-            '<button onclick="addToMyFarms('+f.x+','+f.y+',\''+vnameJs+'\''+',\''+pnameJs+'\','+f.population+')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:.75rem;padding:2px 6px;color:var(--text-muted);" title="Add to TravOps farmlist">＋</button>'+
-            (_twWorld?'<a href="'+scoutHref+'" target="_blank" rel="noopener" title="'+'Send scout'+'" style="display:inline-flex;align-items:center;'+scoutStyle+'border-radius:5px;font-size:.75rem;padding:2px 6px;color:#818cf8;text-decoration:none;">🔭</a>':'')+
+            '<button onclick="addToMyFarms('+f.x+','+f.y+',\''+vnameJs+'\''+',\''+pnameJs+'\','+f.population+'); markVisited(\''+coords+'\',\'farmlist\')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:.75rem;padding:2px 6px;color:var(--text-muted);" title="Add to TravOps farmlist">＋</button>'+
+            (_twWorld?'<a href="'+scoutHref+'" target="_blank" rel="noopener" onclick="markVisited(\''+coords+'\',\'scout\')" title="'+'Send scout'+'" style="display:inline-flex;align-items:center;'+scoutStyle+'border-radius:5px;font-size:.75rem;padding:2px 6px;color:#818cf8;text-decoration:none;">🔭</a>':'')+
           '</div></td>'+
           '</tr>';
       }
@@ -978,6 +1016,7 @@
         var html = '';
         farms.forEach(function(f, i){ html += _buildFarmRow(f, startRow+i); });
         try { tbody.insertAdjacentHTML('beforeend', html); } catch(e) { console.error('insertAdjacentHTML failed:', e); }
+        applyAllVisitedStyles();
       }
 
       function loadMoreFarms() {
@@ -1528,14 +1567,64 @@ function _showLoading(title, opts) {
 // Wire up filter form + search form
 document.addEventListener('DOMContentLoaded', () => {
   const ff = document.getElementById('filterForm');
-  if (ff) ff.addEventListener('submit', () => _showLoading('Filtering farms…'));
+  if (ff) {
+    ff.addEventListener('submit', () => {
+      _showLoading('Filtering farms…');
+      try {
+        const params = new URLSearchParams(new FormData(ff));
+        params.set('advanced', '1');
+        localStorage.setItem('farmingFilters_{{ guild.guild_id }}', params.toString());
+      } catch (e) { console.error('Could not save filters:', e); }
+    });
+  }
   const sf = document.getElementById('searchForm');
   if (sf) sf.addEventListener('submit', () => _showLoading('Searching map…'));
   // Also snapshot button
   document.querySelectorAll('form[action*="/farming/snapshot"]').forEach(f =>
     f.addEventListener('submit', () => _showLoading('Fetching snapshot…'))
   );
+  applyAllVisitedStyles();
 });
+
+// --- Visited-row markers ---------------------------------------------------
+// Tracks which rows the user already interacted with (coordinate link,
+// "add to farmlist" button, scout link) and shows a colored border so the
+// user can see at a glance where they already were.
+const _VISITED_LS_KEY = 'farmVisited_{{ guild.guild_id }}';
+
+function _loadVisited() {
+  try {
+    return JSON.parse(localStorage.getItem(_VISITED_LS_KEY) || '{}');
+  } catch (e) { return {}; }
+}
+
+function markVisited(coords, type) {
+  try {
+    const data = _loadVisited();
+    if (!data[coords]) data[coords] = {};
+    data[coords][type] = true;
+    localStorage.setItem(_VISITED_LS_KEY, JSON.stringify(data));
+    applyVisitedStyle(coords, data[coords]);
+  } catch (e) { console.error('markVisited failed:', e); }
+}
+
+function applyVisitedStyle(coords, info) {
+  const row = document.querySelector('#inactiveBody tr[data-coords="' + CSS.escape(coords) + '"]');
+  if (!row) return;
+  if (info.coord) {
+    row.style.borderLeft = '4px solid #3b82f6';
+  }
+  if (info.scout) {
+    row.style.borderRight = '4px solid #8b5cf6';
+  } else if (info.farmlist) {
+    row.style.borderRight = '4px solid #3b82f6';
+  }
+}
+
+function applyAllVisitedStyles() {
+  const data = _loadVisited();
+  Object.keys(data).forEach(coords => applyVisitedStyle(coords, data[coords]));
+}
 
 // Tab switching
 function switchTab(id) {
@@ -1598,6 +1687,31 @@ document.querySelectorAll('.tribe-chip').forEach(chip => {
     if (cb) { cb.checked = !cb.checked; updateTribeChips(); }
   });
 });
+
+// Top-Alliance chips: click toggles the alliance in/out of "exclude_alliances"
+// and immediately re-applies the filters.
+function toggleAllianceChip(chip) {
+  const name = chip.dataset.alliance;
+  const input = document.getElementById('excludeAlliancesInput');
+  let list = (input.value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const idx = list.findIndex(x => x.toLowerCase() === name.toLowerCase());
+  if (idx >= 0) {
+    list.splice(idx, 1);          // was excluded -> show it again
+    chip.classList.add('active');
+  } else {
+    list.push(name);              // was shown -> hide it
+    chip.classList.remove('active');
+  }
+  input.value = list.join(', ');
+  document.querySelectorAll('.alliance-chip').forEach(c => {
+    const on = c.classList.contains('active');
+    c.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
+    c.style.background  = on ? 'rgba(88,101,242,.2)' : 'var(--bg-input)';
+    c.style.color       = on ? '#818cf8' : 'var(--text-muted)';
+  });
+  const ff = document.getElementById('filterForm');
+  if (ff) { if (ff.requestSubmit) ff.requestSubmit(); else ff.submit(); }
+}
 
 // Copy coord to clipboard
 function copyCoord(coord, btn) {

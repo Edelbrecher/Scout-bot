@@ -8404,6 +8404,7 @@ async def farming_page(
         "advanced": advanced or _advanced_active,
         "has_farmlist": has_farmlist,
         "alliance_names": [a["alliance_name"] for a in alliance_names],
+        "top_alliances": alliance_names[:10],
     })
 
 
