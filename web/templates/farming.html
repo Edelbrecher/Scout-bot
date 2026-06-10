@@ -1688,8 +1688,8 @@ document.querySelectorAll('.tribe-chip').forEach(chip => {
   });
 });
 
-// Top-Alliance chips: click toggles the alliance in/out of "exclude_alliances"
-// and immediately re-applies the filters.
+// Top-Alliance chips: click toggles the alliance in/out of "exclude_alliances".
+// The filter is only applied once the user clicks "Apply filters".
 function toggleAllianceChip(chip) {
   const name = chip.dataset.alliance;
   const input = document.getElementById('excludeAlliancesInput');
@@ -1709,8 +1709,6 @@ function toggleAllianceChip(chip) {
     c.style.background  = on ? 'rgba(88,101,242,.2)' : 'var(--bg-input)';
     c.style.color       = on ? '#818cf8' : 'var(--text-muted)';
   });
-  const ff = document.getElementById('filterForm');
-  if (ff) { if (ff.requestSubmit) ff.requestSubmit(); else ff.submit(); }
 }
 
 // Copy coord to clipboard

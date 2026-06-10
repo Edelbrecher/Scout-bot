@@ -8242,6 +8242,11 @@ async def farming_page(
     cross_ref_coords = {(r["x"], r["y"]) for r in cross_reference}
     farm_list_coords = {(f["x"], f["y"]) for f in farm_list}
 
+    # On the very first visit (no filter form has ever been submitted), hide the
+    # top 10 alliances by default — the user can re-enable them via the chips.
+    if "exclude_alliances" not in request.query_params:
+        exclude_alliances = ", ".join(a["alliance_name"] for a in alliance_names[:10])
+
     # Farmlist cross-reference — use selected or most recent analysis
     _fl_id = farmlist_id or (farmlist_analyses[0]["id"] if farmlist_analyses else None)
     farmlist_xy = await database.get_farmlist_xy_lookup(guild_id, uid, analysis_id=_fl_id)
