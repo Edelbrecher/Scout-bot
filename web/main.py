@@ -9403,9 +9403,7 @@ async def op_attacker_list(request: Request, guild_id: str):
 
     # Per-village Tournament Square (TS) levels, set by each player in "Mein Account"
     discord_ids = {tr.get("discord_id") for tr in troop_rows.values() if tr.get("discord_id")}
-    ts_levels_by_user: dict = {}
-    for did in discord_ids:
-        ts_levels_by_user[did] = await database.get_village_ts_levels(did)
+    ts_levels_by_user: dict = await database.get_village_ts_levels_bulk(discord_ids)
 
     # Build merged attacker list — only include players we actually know about
     all_names = (set(ally_members.keys()) | set(snap_villages.keys())

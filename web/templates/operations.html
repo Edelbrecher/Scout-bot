@@ -256,6 +256,15 @@
 .ally-chip.active { background:rgba(99,102,241,.18); border-color:#6366f1; color:#a5b4fc; font-weight:600; }
 .ally-chip .chip-x { color:var(--text-muted); font-size:.7rem; }
 .ally-chip.active .chip-x { color:#a5b4fc; }
+
+.autogen-chip-box { display:flex; flex-wrap:wrap; gap:.4rem; max-height:110px; overflow-y:auto;
+  border:1px solid var(--border); border-radius:8px; padding:.5rem; background:var(--bg-main); }
+.autogen-chip { display:inline-flex; align-items:center; gap:.3rem; font-size:.75rem; padding:.25rem .65rem;
+  border-radius:20px; border:1px solid var(--border); cursor:pointer; transition:all .15s;
+  background:var(--bg-card); color:var(--text-muted); user-select:none; }
+.autogen-chip:hover { border-color:#6366f1; color:var(--text); }
+.autogen-chip.active { background:rgba(99,102,241,.18); border-color:#6366f1; color:#a5b4fc; font-weight:600; }
+.autogen-chip-box:empty::before { content:'—'; color:var(--text-muted); font-size:.75rem; }
 </style>
 
 <!-- Inject data for JS -->
@@ -613,7 +622,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <div class="form-row">
         <div class="form-group" style="flex:1;">
           <label>🏰 Ziel-Allianz(en)</label>
-          <div id="autoGenAllianceList" style="display:flex;flex-wrap:wrap;gap:.5rem;max-height:90px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:.4rem;background:var(--bg-main);"></div>
+          <div id="autoGenAllianceList" class="autogen-chip-box"></div>
         </div>
         <div class="form-group" style="max-width:140px;">
           <label>🎯 Anzahl Ziele</label>
@@ -640,9 +649,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </div>
       </div>
 
-      <div id="autoGenPlayerListWrap" style="display:none;margin-bottom:.6rem;">
-        <label>Spieler-Pool</label>
-        <div id="autoGenPlayerList" style="display:flex;flex-wrap:wrap;gap:.5rem;max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:.4rem;background:var(--bg-main);"></div>
+      <div id="autoGenPlayerListWrap" style="display:none;margin-bottom:.75rem;">
+        <label style="font-size:.78rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.25rem;">Spieler-Pool</label>
+        <div id="autoGenPlayerList" class="autogen-chip-box"></div>
       </div>
 
       <div class="form-row">
@@ -2045,34 +2054,38 @@ function _genWaveRowsForTarget(pool, opts) {
   return rows;
 }
 
+function _toggleChip(el) {
+  el.classList.toggle('active');
+}
+
 async function openAutoGenModal() {
   if (!activePlanId) { showToast('⚠️ Bitte zuerst einen Plan auswählen'); return; }
+  openModal('autoGenModal');
+  document.getElementById('autoGenAllianceList').innerHTML = '<span style="font-size:.75rem;color:var(--text-muted);">Lade…</span>';
+  document.getElementById('autoGenPlayerList').innerHTML = '<span style="font-size:.75rem;color:var(--text-muted);">Lade…</span>';
   if (!attackers.length) await loadAttackers();
   if (!availableAlliances.length) await loadAlliances();
 
-  // Alliance checkboxes — pre-check whichever alliances are active in the target filter
+  // Alliance chips — pre-select whichever alliances are active in the target filter
   document.getElementById('autoGenAllianceList').innerHTML = availableAlliances.map(a => `
-    <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;">
-      <input type="checkbox" class="autogen-alliance" value="${escJs(a.name)}" ${selectedAlliances.has(a.name) ? 'checked' : ''}> ${escHtml(a.name)}
-    </label>`).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Allianzen gefunden — Allianz-Filter links nutzen.</span>';
+    <span class="autogen-chip autogen-alliance${selectedAlliances.has(a.name) ? ' active' : ''}" data-value="${escJs(a.name)}" onclick="_toggleChip(this)">${escHtml(a.name)}</span>
+  `).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Allianzen gefunden — Allianz-Filter links nutzen.</span>';
 
-  // Player pool checkboxes (our own attackers)
+  // Player pool chips (our own attackers) — all selected by default
   const seen = new Set();
   const names = [];
   (attackers || []).forEach(a => { if (a.player_name && !seen.has(a.player_name)) { seen.add(a.player_name); names.push(a.player_name); } });
   document.getElementById('autoGenPlayerList').innerHTML = names.map(n => `
-    <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;">
-      <input type="checkbox" class="autogen-player" value="${escJs(n)}" checked> ${escHtml(n)}
-    </label>`).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Angreifer geladen.</span>';
+    <span class="autogen-chip autogen-player active" data-value="${escJs(n)}" onclick="_toggleChip(this)">${escHtml(n)}</span>
+  `).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Angreifer geladen.</span>';
 
   autoGenPreview = [];
   document.getElementById('autoGenPreviewWrap').style.display = 'none';
   document.getElementById('autoGenApplyBtn').style.display = 'none';
-  openModal('autoGenModal');
 }
 
 async function generateAutoStack() {
-  const allianceNames = [...document.querySelectorAll('.autogen-alliance:checked')].map(el => el.value);
+  const allianceNames = [...document.querySelectorAll('.autogen-alliance.active')].map(el => el.dataset.value);
   if (!allianceNames.length) { showToast('⚠️ Bitte mindestens eine Ziel-Allianz auswählen'); return; }
 
   const targetCount = Math.max(1, Math.min(20, parseInt(document.getElementById('autoGenTargetCount').value) || 3));
@@ -2114,7 +2127,7 @@ async function generateAutoStack() {
   const settings = ASSIGN_DEFAULTS;
   let manualPool = null;
   if (poolMode === 'manual') {
-    manualPool = new Set([...document.querySelectorAll('.autogen-player:checked')].map(el => el.value));
+    manualPool = new Set([...document.querySelectorAll('.autogen-player.active')].map(el => el.dataset.value));
   }
 
   const preview = [];

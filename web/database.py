@@ -6264,16 +6264,6 @@ async def clear_stale_channel_refs(guild_id: str, stale_ids: set):
 async def get_village_ts_levels(discord_id: str) -> dict:
     """Return {'{x}_{y}': ts_level} for a user's saved tournament square levels."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS village_ts_levels (
-                discord_id TEXT NOT NULL,
-                x INTEGER NOT NULL,
-                y INTEGER NOT NULL,
-                ts_level INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (discord_id, x, y)
-            )
-        """)
-        await db.commit()
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT x, y, ts_level FROM village_ts_levels WHERE discord_id=?", (discord_id,)
@@ -6282,14 +6272,26 @@ async def get_village_ts_levels(discord_id: str) -> dict:
     return {f"{r['x']}_{r['y']}": r["ts_level"] for r in rows}
 
 
+async def get_village_ts_levels_bulk(discord_ids) -> dict:
+    """Return {discord_id: {'{x}_{y}': ts_level}} for multiple users in a single query."""
+    discord_ids = [d for d in discord_ids if d]
+    if not discord_ids:
+        return {}
+    result: dict = {d: {} for d in discord_ids}
+    placeholders = ",".join("?" * len(discord_ids))
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            f"SELECT discord_id, x, y, ts_level FROM village_ts_levels WHERE discord_id IN ({placeholders})",
+            discord_ids
+        ) as cur:
+            for r in await cur.fetchall():
+                result.setdefault(r["discord_id"], {})[f"{r['x']}_{r['y']}"] = r["ts_level"]
+    return result
+
+
 async def save_village_ts_level(discord_id: str, x: int, y: int, ts_level: int):
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS village_ts_levels (
-                discord_id TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
-                ts_level INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (discord_id, x, y)
-            )
-        """)
         await db.execute("""
             INSERT INTO village_ts_levels (discord_id, x, y, ts_level)
             VALUES (?,?,?,?)
@@ -7794,6 +7796,15 @@ async def _init_op_tables():
         async with db.execute("SELECT id FROM op_waves WHERE public_code IS NULL OR public_code=''") as cur:
             for row in await cur.fetchall():
                 await db.execute("UPDATE op_waves SET public_code=? WHERE id=?", (_gen_public_code(5), row[0]))
+        await db.commit()
+        # village_ts_levels: ensure table exists once at startup so per-request
+        # lookups (e.g. op_attacker_list) don't pay a CREATE TABLE+commit each time.
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS village_ts_levels (
+                discord_id TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
+                ts_level INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (discord_id, x, y)
+            )
+        """)
         await db.commit()
         # Migration: wave confirmation status
         try:
