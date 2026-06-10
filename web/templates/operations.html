@@ -347,6 +347,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 👥 Player <span id="pbOpenCount"></span>
               </button>
               <button class="btn btn-secondary" style="font-size:.8rem;" onclick="openManualTargetModal()">+ Manuell</button>
+              <button class="btn btn-primary" style="font-size:.8rem;" onclick="openAutoGenModal()">🤖 Auto-Plan</button>
             </div>
 
             <!-- Alliance filter panel (floating dropdown) -->
@@ -602,20 +603,32 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 
 <!-- Auto-Stack Generator Modal -->
 <div class="op-modal-overlay" id="autoGenModal">
-  <div class="op-modal" style="width:min(820px,97vw);">
+  <div class="op-modal" style="width:min(900px,97vw);">
     <div class="op-modal-header">
-      <span style="font-weight:700;">🤖 Auto-Einsatzplan — <span id="autoGenTargetLabel"></span></span>
+      <span style="font-weight:700;">🤖 Auto-Einsatzplan</span>
       <button class="btn-icon" onclick="closeModal('autoGenModal')">✕</button>
     </div>
     <div class="op-modal-body">
 
       <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label>🏰 Ziel-Allianz(en)</label>
+          <div id="autoGenAllianceList" style="display:flex;flex-wrap:wrap;gap:.5rem;max-height:90px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:.4rem;background:var(--bg-main);"></div>
+        </div>
+        <div class="form-group" style="max-width:140px;">
+          <label>🎯 Anzahl Ziele</label>
+          <input id="autoGenTargetCount" type="number" min="1" max="20" step="1" value="3">
+          <span style="font-size:.68rem;color:var(--text-muted);">größte Dörfer zuerst</span>
+        </div>
+      </div>
+
+      <div class="form-row">
         <div class="form-group" style="max-width:130px;">
-          <label>⚔ Real-Wellen</label>
+          <label>⚔ Real-Wellen / Ziel</label>
           <input id="autoGenRealCount" type="number" min="0" step="1" value="2">
         </div>
         <div class="form-group" style="max-width:130px;">
-          <label>👻 Fake-Wellen</label>
+          <label>👻 Fake-Wellen / Ziel</label>
           <input id="autoGenFakeCount" type="number" min="0" step="1" value="3">
         </div>
         <div class="form-group" style="flex:1;">
@@ -684,6 +697,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
             <thead style="position:sticky;top:0;background:var(--bg-main);">
               <tr>
                 <th style="padding:.3rem .4rem;text-align:left;"></th>
+                <th style="padding:.3rem .4rem;text-align:left;">Ziel</th>
                 <th style="padding:.3rem .4rem;text-align:left;">Spieler</th>
                 <th style="padding:.3rem .4rem;text-align:left;">Dorf</th>
                 <th style="padding:.3rem .4rem;text-align:left;">Typ</th>
@@ -699,7 +713,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
     </div>
     <div class="op-modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('autoGenModal')">Schließen</button>
-      <button class="btn btn-primary" id="autoGenApplyBtn" style="display:none;" onclick="applyAutoGenPlan()">✓ Wellen übernehmen</button>
+      <button class="btn btn-primary" id="autoGenApplyBtn" style="display:none;" onclick="applyAutoGenPlan()">✓ Ziele &amp; Wellen übernehmen</button>
     </div>
   </div>
 </div>
@@ -1761,10 +1775,7 @@ function _renderAssignmentPanel(settings) {
 
   panel.innerHTML = `
     <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;">
-        <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">🎯 Schnellzuweisung</div>
-        <button class="btn btn-primary" style="font-size:.7rem;padding:.25rem .5rem;" onclick="openAutoGenModal()">🤖 Auto-Stack</button>
-      </div>
+      <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">🎯 Schnellzuweisung</div>
       <div style="font-size:.72rem;color:var(--text-muted);">${escHtml(tp)} · ${escHtml(tv||'')} (${tx}|${ty})</div>
     </div>
 
@@ -1962,44 +1973,36 @@ function _isoAddSeconds(iso, sec) {
   return d.toISOString().replace('T', ' ').slice(0, 19).replace(' ', 'T');
 }
 
-function openAutoGenModal() {
-  if (!assignTarget) { showToast('⚠️ Bitte zuerst ein Ziel auswählen'); return; }
-  if (!assignRows.length) rebuildAssignPanel();
-  document.getElementById('autoGenTargetLabel').textContent =
-    `${assignTarget.player || ''} · ${assignTarget.village || ''} (${assignTarget.x}|${assignTarget.y})`;
-  // Player pool checkboxes (deduped, sorted by travel time)
-  const seen = new Set();
-  const names = [];
-  assignRows.forEach(r => { if (!seen.has(r.player_name)) { seen.add(r.player_name); names.push(r.player_name); } });
-  document.getElementById('autoGenPlayerList').innerHTML = names.map(n => `
-    <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;">
-      <input type="checkbox" class="autogen-player" value="${escJs(n)}" checked> ${escHtml(n)}
-    </label>`).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Angreifer geladen.</span>';
-  autoGenPreview = [];
-  document.getElementById('autoGenPreviewWrap').style.display = 'none';
-  document.getElementById('autoGenApplyBtn').style.display = 'none';
-  openModal('autoGenModal');
+// Build candidate attacker rows (our villages) for an arbitrary target coordinate
+function _buildPoolRowsForTarget(tx, ty, settings) {
+  const spd = parseFloat(activePlan?.server_speed) || 1;
+  const rows = [];
+  (attackers || []).forEach(a => {
+    (a.villages || []).forEach(v => {
+      if (v.x == null || v.y == null) return;
+      const role = classifyVillage(v, a.tribe);
+      if (settings.onlyOff && role !== 'off') return;
+      const dist = _torusDist(v.x, v.y, tx, ty);
+      const ts = Math.max(0, Math.min(20, v.ts || 0));
+      const travelSec = _travelSec(dist, settings, spd, ts);
+      if (settings.maxRuntimeMin > 0 && travelSec > settings.maxRuntimeMin * 60) return;
+      rows.push({
+        player_name: a.player_name, discord_id: a.discord_id || '', discord_name: a.discord_name || '',
+        tribe: a.tribe, village_name: v.name || v.village_name || '',
+        vx: v.x, vy: v.y, dist, travelSec, ts, role, troops: v.troops || {},
+      });
+    });
+  });
+  rows.sort((a, b) => a.travelSec - b.travelSec);
+  return rows;
 }
 
-function generateAutoStack() {
-  if (!assignTarget) return;
-  const poolMode  = document.getElementById('autoGenPoolMode').value;
-  const realCount = Math.max(0, parseInt(document.getElementById('autoGenRealCount').value) || 0);
-  const fakeCount = Math.max(0, parseInt(document.getElementById('autoGenFakeCount').value) || 0);
-  const fakeStyle = document.getElementById('autoGenFakeStyle').value;
-  const catBuilding = document.getElementById('autoGenCatBuilding').value;
-  const gapEnabled = document.getElementById('autoGenGapEnabled').checked;
-  const gapSec = Math.max(1, Math.min(10, parseInt(document.getElementById('autoGenGapSec').value) || 3));
+// Build the real/fake/gap wave rows for one target, drawing from a pool of attacker villages
+function _genWaveRowsForTarget(pool, opts) {
+  const {realCount, fakeCount, fakeStyle, catBuilding, gapEnabled, gapSec, landingBase} = opts;
+  if (!pool.length) return [];
 
-  let pool = assignRows.slice();
-  if (poolMode === 'manual') {
-    const selected = new Set([...document.querySelectorAll('.autogen-player:checked')].map(el => el.value));
-    pool = pool.filter(r => selected.has(r.player_name));
-  }
-  if (!pool.length) { showToast('⚠️ Keine passenden Dörfer im Pool'); return; }
-
-  // Prefer villages classified as OFF, then by travel time (closest first)
-  pool.sort((a, b) => {
+  pool = pool.slice().sort((a, b) => {
     const aOff = a.role === 'off' ? 0 : 1;
     const bOff = b.role === 'off' ? 0 : 1;
     if (aOff !== bOff) return aOff - bOff;
@@ -2007,9 +2010,8 @@ function generateAutoStack() {
   });
 
   const total = realCount + fakeCount;
-  if (total <= 0) { showToast('⚠️ Mindestens eine Welle angeben'); return; }
+  if (total <= 0) return [];
 
-  const landingBase = activePlan?.landing_time || '';
   const rows = [];
   for (let i = 0; i < total; i++) {
     const r = pool[i % pool.length]; // cycle through pool if not enough villages
@@ -2040,7 +2042,96 @@ function generateAutoStack() {
       include: true,
     });
   }
-  autoGenPreview = rows;
+  return rows;
+}
+
+async function openAutoGenModal() {
+  if (!activePlanId) { showToast('⚠️ Bitte zuerst einen Plan auswählen'); return; }
+  if (!attackers.length) await loadAttackers();
+  if (!availableAlliances.length) await loadAlliances();
+
+  // Alliance checkboxes — pre-check whichever alliances are active in the target filter
+  document.getElementById('autoGenAllianceList').innerHTML = availableAlliances.map(a => `
+    <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;">
+      <input type="checkbox" class="autogen-alliance" value="${escJs(a.name)}" ${selectedAlliances.has(a.name) ? 'checked' : ''}> ${escHtml(a.name)}
+    </label>`).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Allianzen gefunden — Allianz-Filter links nutzen.</span>';
+
+  // Player pool checkboxes (our own attackers)
+  const seen = new Set();
+  const names = [];
+  (attackers || []).forEach(a => { if (a.player_name && !seen.has(a.player_name)) { seen.add(a.player_name); names.push(a.player_name); } });
+  document.getElementById('autoGenPlayerList').innerHTML = names.map(n => `
+    <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;">
+      <input type="checkbox" class="autogen-player" value="${escJs(n)}" checked> ${escHtml(n)}
+    </label>`).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Angreifer geladen.</span>';
+
+  autoGenPreview = [];
+  document.getElementById('autoGenPreviewWrap').style.display = 'none';
+  document.getElementById('autoGenApplyBtn').style.display = 'none';
+  openModal('autoGenModal');
+}
+
+async function generateAutoStack() {
+  const allianceNames = [...document.querySelectorAll('.autogen-alliance:checked')].map(el => el.value);
+  if (!allianceNames.length) { showToast('⚠️ Bitte mindestens eine Ziel-Allianz auswählen'); return; }
+
+  const targetCount = Math.max(1, Math.min(20, parseInt(document.getElementById('autoGenTargetCount').value) || 3));
+  const poolMode  = document.getElementById('autoGenPoolMode').value;
+  const realCount = Math.max(0, parseInt(document.getElementById('autoGenRealCount').value) || 0);
+  const fakeCount = Math.max(0, parseInt(document.getElementById('autoGenFakeCount').value) || 0);
+  const fakeStyle = document.getElementById('autoGenFakeStyle').value;
+  const catBuilding = document.getElementById('autoGenCatBuilding').value;
+  const gapEnabled = document.getElementById('autoGenGapEnabled').checked;
+  const gapSec = Math.max(1, Math.min(10, parseInt(document.getElementById('autoGenGapSec').value) || 3));
+  const landingBase = activePlan?.landing_time || '';
+
+  if (realCount + fakeCount <= 0) { showToast('⚠️ Mindestens eine Welle angeben'); return; }
+
+  // Fetch enemy villages for the selected alliance(s)
+  let enemyPlayers = [];
+  try {
+    const data = await apiFetch(`/players-by-alliance?alliances=${encodeURIComponent(allianceNames.join(','))}`);
+    enemyPlayers = data.players || [];
+  } catch (e) {
+    showToast('⚠️ Fehler beim Laden der Allianz-Dörfer: ' + e.message);
+    return;
+  }
+
+  // Flatten to villages, sort by population (biggest first), take top N
+  const enemyVillages = [];
+  enemyPlayers.forEach(p => (p.villages || []).forEach(v => {
+    if (v.x == null || v.y == null) return;
+    enemyVillages.push({
+      player_name: p.player_name, alliance_name: p.alliance_name || '',
+      village_name: v.name || v.village_name || '', x: v.x, y: v.y, pop: v.population || 0,
+    });
+  }));
+  enemyVillages.sort((a, b) => (b.pop || 0) - (a.pop || 0));
+  const targets = enemyVillages.slice(0, targetCount);
+
+  if (!targets.length) { showToast('⚠️ Keine Dörfer in der gewählten Allianz gefunden'); return; }
+
+  const settings = ASSIGN_DEFAULTS;
+  let manualPool = null;
+  if (poolMode === 'manual') {
+    manualPool = new Set([...document.querySelectorAll('.autogen-player:checked')].map(el => el.value));
+  }
+
+  const preview = [];
+  let skipped = 0;
+  targets.forEach(t => {
+    let pool = _buildPoolRowsForTarget(t.x, t.y, settings);
+    if (manualPool) pool = pool.filter(r => manualPool.has(r.player_name));
+    const waves = _genWaveRowsForTarget(pool, {realCount, fakeCount, fakeStyle, catBuilding, gapEnabled, gapSec, landingBase});
+    if (!waves.length) { skipped++; return; }
+    waves.forEach(w => w.target = t);
+    preview.push(...waves);
+  });
+
+  if (!preview.length) { showToast('⚠️ Keine Angreifer-Dörfer im Pool gefunden'); return; }
+  if (skipped) showToast(`ℹ️ ${skipped} Ziel(e) ohne passende Angreifer übersprungen`);
+
+  autoGenPreview = preview;
   renderAutoGenPreview();
   document.getElementById('autoGenApplyBtn').style.display = '';
 
@@ -2063,8 +2154,10 @@ function renderAutoGenPreview() {
       const send = new Date(land.getTime() - r.travelSec * 1000);
       return send.toISOString().replace('T', ' ').slice(0, 19);
     })() : '—';
+    const t = r.target || {};
     return `<tr style="opacity:${r.include ? 1 : .4};">
       <td style="padding:.25rem .4rem;"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="autoGenPreview[${i}].include=this.checked;renderAutoGenPreview()"></td>
+      <td style="padding:.25rem .4rem;">${escHtml(t.player_name || '')} (${t.x}|${t.y})</td>
       <td style="padding:.25rem .4rem;">${escHtml(r.player_name)}</td>
       <td style="padding:.25rem .4rem;">${escHtml(r.village_name)} (${r.vx}|${r.vy})</td>
       <td style="padding:.25rem .4rem;">${lbl[r.type] || r.type}</td>
@@ -2078,44 +2171,55 @@ function renderAutoGenPreview() {
 async function applyAutoGenPlan() {
   const rows = autoGenPreview.filter(r => r.include);
   if (!rows.length) { showToast('⚠️ Keine Wellen ausgewählt'); return; }
-  if (!activePlanId || !assignTarget) return;
-
-  await reloadActivePlan();
-  const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
-  let target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
-  if (!target) {
-    try {
-      await apiPost(`/plans/${activePlanId}/targets`, {
-        player_name: tp, village_name: tv, x: tx, y: ty, population: 0, notes: ''
-      });
-      await reloadActivePlan();
-      target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
-    } catch (e) { /* ignore */ }
-  }
-  if (!target) { showToast('⚠️ Ziel konnte nicht angelegt werden'); return; }
+  if (!activePlanId) return;
 
   const applyBtn = document.getElementById('autoGenApplyBtn');
-  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '⏳ Erstelle Wellen…'; }
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '⏳ Erstelle Ziele & Wellen…'; }
+
+  await reloadActivePlan();
+
+  // Group rows by target coordinate
+  const groups = new Map();
+  rows.forEach(r => {
+    const t = r.target || {};
+    const key = `${t.x}|${t.y}`;
+    if (!groups.has(key)) groups.set(key, {target: t, waves: []});
+    groups.get(key).waves.push(r);
+  });
 
   let ok = 0, fail = 0;
-  for (const r of rows) {
-    try {
-      await apiPost(`/targets/${target.id}/waves`, {
-        plan_id: activePlanId,
-        attacker_name: r.player_name,
-        origin_village: r.village_name,
-        origin_x: r.vx, origin_y: r.vy,
-        wave_type: r.type,
-        tribe: r.tribe || 'romans',
-        troop_json: JSON.stringify(r.troops || {}),
-        landing_time: r.landing || activePlan?.landing_time || '',
-        server_speed: activePlan?.server_speed || 1,
-        notes: r.notes || '',
-      });
-      ok++;
-    } catch (e) { fail++; }
+  for (const {target: t, waves} of groups.values()) {
+    let target = activePlan?.targets?.find(tt => tt.x == t.x && tt.y == t.y);
+    if (!target) {
+      try {
+        await apiPost(`/plans/${activePlanId}/targets`, {
+          player_name: t.player_name || '', village_name: t.village_name || '',
+          x: t.x, y: t.y, population: t.pop || 0, notes: ''
+        });
+        await reloadActivePlan();
+        target = activePlan?.targets?.find(tt => tt.x == t.x && tt.y == t.y);
+      } catch (e) { /* ignore */ }
+    }
+    if (!target) { fail += waves.length; continue; }
+    for (const r of waves) {
+      try {
+        await apiPost(`/targets/${target.id}/waves`, {
+          plan_id: activePlanId,
+          attacker_name: r.player_name,
+          origin_village: r.village_name,
+          origin_x: r.vx, origin_y: r.vy,
+          wave_type: r.type,
+          tribe: r.tribe || 'romans',
+          troop_json: JSON.stringify(r.troops || {}),
+          landing_time: r.landing || activePlan?.landing_time || '',
+          server_speed: activePlan?.server_speed || 1,
+          notes: r.notes || '',
+        });
+        ok++;
+      } catch (e) { fail++; }
+    }
   }
-  if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = '✓ Wellen übernehmen'; }
+  if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = '✓ Ziele & Wellen übernehmen'; }
   showToast(`✅ ${ok} Wellen erstellt${fail ? `, ${fail} Fehler` : ''}`);
   await reloadActivePlan();
   closeModal('autoGenModal');
