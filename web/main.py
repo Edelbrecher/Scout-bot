@@ -5907,10 +5907,12 @@ async def my_ally_page(request: Request, guild_id: str):
     if is_lead or session.get("type") == "admin" or guild.get("owner_discord_id") == uid:
         is_editor = True
         can_view_members = True
+        can_view_rank = True
     else:
         _perms = await database.get_member_permissions(guild_id, uid)
         is_editor = "ally_manage" in _perms
         can_view_members = is_editor or "ally_view_members" in _perms
+        can_view_rank = can_view_members or "ally_view_rank" in _perms
 
     # ── Wave 3: depends on members list ──────────────────────────────────
     all_members_list = members or member_view_members or []
@@ -5986,6 +5988,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "bonuses": bonuses,
         "is_editor": is_editor,
         "can_view_members": can_view_members,
+        "can_view_rank": can_view_rank,
         "is_lead": is_lead,
         "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
@@ -6436,7 +6439,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     form = await request.form()
     color = form.get("color") or None
     ALL_FLAGS = [
-        "ally_manage", "ally_view_members",
+        "ally_manage", "ally_view_members", "ally_view_rank",
         "defend_view", "defend_manage",
         "ep_manage", "ep_view", "ep_notify",
         "attack_manage", "attack_view",
@@ -6452,7 +6455,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         selected = ALL_FLAGS[:]
     elif preset == "officer":
         selected = [
-            "ally_view_members",
+            "ally_view_members", "ally_view_rank",
             "defend_view", "defend_manage",
             "ep_manage", "ep_view", "ep_notify",
             "attack_manage", "attack_view",
@@ -6462,7 +6465,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
             "sector_view", "hospital_view",
         ]
     elif preset == "mitglied":
-        selected = ["defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view"]
+        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)

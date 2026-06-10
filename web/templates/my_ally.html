@@ -784,6 +784,7 @@
                   ("⚙️ Alliance", [
                     ("ally_manage","Manage Alliance","Full alliance administration: approve members, edit settings, manage roles and invite tokens."),
                     ("ally_view_members","View Member Troops","Can view other members' troop counts in the leaderboard and their detail pages. Without this, members only see their own data."),
+                    ("ally_view_rank","View Own Ranking","Can see their own actual rank/position in the alliance rankings, without seeing other members' troop data."),
                   ]),
                   ("🛡️ Defense", [
                     ("defend_view","View Defense","Can see the defense board and channel summaries."),
@@ -1326,26 +1327,30 @@
     <div>
       {% set lb_map = {} %}
       {% for row in member_leaderboard %}{% if row.travian_name %}{% set _ = lb_map.update({row.travian_name: row}) %}{% endif %}{% endfor %}
-      {% set all_rows = [] %}
+      {% set all_rows_full = [] %}
       {% for m in approved %}
         {% set is_me = m.discord_id == session.get('uid') %}
-        {% if can_view_members or is_me %}
         {% set stats = lb_map.get(m.travian_name or '', {}) %}
-        {% set _ = all_rows.append({'name': m.travian_name or m.discord_username, 'is_me': is_me,
+        {% set _ = all_rows_full.append({'name': m.travian_name or m.discord_username, 'is_me': is_me,
           'total_troops': stats.get('total_troops',0) or 0, 'total_off': stats.get('total_off',0) or 0,
           'total_def': stats.get('total_def',0) or 0, 'population': stats.get('population',0) or 0,
           'avg_population': stats.get('avg_population',0) or 0}) %}
-        {% endif %}
       {% endfor %}
+      {% if can_view_members %}
+        {% set all_rows = all_rows_full %}
+      {% else %}
+        {% set all_rows = all_rows_full | selectattr('is_me') | list %}
+      {% endif %}
 
       <h3 style="margin:0 0 .75rem;font-size:.95rem;">📊 Allianz-Rankings</h3>
       {% if not can_view_members %}
-      <div style="font-size:.75rem;color:var(--text-muted);margin:-.4rem 0 .75rem;">🔒 Du siehst hier nur deine eigenen Werte. Truppendaten anderer Mitglieder sind nicht freigegeben.</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin:-.4rem 0 .75rem;">🔒 Du siehst hier nur deine eigenen Werte{% if can_view_rank %} und deine Platzierung{% endif %}. Truppendaten anderer Mitglieder sind nicht freigegeben.</div>
       {% endif %}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;">
         {% macro rankcard(title, icon, field, color, fmt) %}
         {% set sorted_rows = all_rows | sort(attribute=field, reverse=True) %}
-        {% set top_val = (sorted_rows | map(attribute=field) | max) if sorted_rows else 1 %}
+        {% set full_sorted_names = (all_rows_full | sort(attribute=field, reverse=True) | map(attribute='name') | list) %}
+        {% set top_val = (all_rows_full | map(attribute=field) | max) if all_rows_full else 1 %}
         {% set top_val = top_val if top_val > 0 else 1 %}
         <div class="card" style="margin-bottom:0;">
           <h3 style="margin:0 0 .75rem;font-size:.88rem;">{{ icon }} {{ title }}</h3>
@@ -1353,14 +1358,26 @@
             {% for row in sorted_rows %}
             {% set val = row[field] or 0 %}
             {% set pct = ((val / top_val) * 100) | round | int %}
+            {% if can_view_members %}
+              {% set rank_display = loop.index %}
+            {% elif can_view_rank %}
+              {% set rank_display = full_sorted_names.index(row.name) + 1 %}
+            {% else %}
+              {% set rank_display = '—' %}
+            {% endif %}
             <div style="display:flex;align-items:center;gap:.5rem;">
-              <span style="font-size:.68rem;color:var(--text-muted);width:1.1rem;text-align:right;flex-shrink:0;">{{ loop.index }}</span>
+              <span style="font-size:.68rem;color:var(--text-muted);width:1.5rem;text-align:right;flex-shrink:0;">{{ rank_display }}</span>
               <span style="font-size:.78rem;font-weight:{% if row.is_me %}700{% else %}400{% endif %};color:{% if row.is_me %}#a5b4fc{% else %}var(--text-primary){% endif %};width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ row.name }}">{{ row.name }}</span>
+              {% if can_view_members %}
               <div style="flex:1;background:rgba(255,255,255,.06);border-radius:3px;height:7px;overflow:hidden;">
                 <div style="height:7px;border-radius:3px;background:{{ color }};width:{{ pct }}%;"></div>
               </div>
+              {% else %}
+              <div style="flex:1;"></div>
+              {% endif %}
               <span style="font-size:.7rem;color:{% if val==0 %}var(--text-muted){% else %}var(--text-primary){% endif %};width:52px;text-align:right;flex-shrink:0;">
-                {% if val==0 %}—{% elif fmt=='k' and val>=1000 %}{{ (val/1000)|round(1) }}k{% else %}{{ '{:,}'.format(val) }}{% endif %}
+                {% if not can_view_members %}🔒
+                {% elif val==0 %}—{% elif fmt=='k' and val>=1000 %}{{ (val/1000)|round(1) }}k{% else %}{{ '{:,}'.format(val) }}{% endif %}
               </span>
             </div>
             {% endfor %}
