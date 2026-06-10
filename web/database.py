@@ -2996,12 +2996,23 @@ async def search_inactive_advanced(
 
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
 
+        # Resolve the world for this guild so we can query world_snapshots directly
+        # (map_snapshots is a VIEW that joins guild_configs on every row, which is
+        # extremely expensive for the multi-snapshot CTE below on large worlds).
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return {"villages": [], "snap_dates": [], "total": 0}
+
         # Last 8 distinct snapshot timestamps
         async with db.execute("""
-            SELECT DISTINCT fetched_at FROM map_snapshots
-            WHERE guild_id = ?
+            SELECT DISTINCT fetched_at FROM world_snapshots
+            WHERE world_url = ?
             ORDER BY fetched_at DESC LIMIT 8
-        """, (guild_id,)) as cur:
+        """, (world_url,)) as cur:
             snap_dates = [r[0] for r in await cur.fetchall()]
 
         if len(snap_dates) < 2:
@@ -3017,44 +3028,56 @@ async def search_inactive_advanced(
 
         snap_placeholders = ",".join("?" * len(snap_dates))
 
-        # CTE: per-village stats across all tracked snapshots (no self-join)
-        # Then join latest snapshot for village details
-        query = f"""
-            WITH stats AS (
-                SELECT guild_id, x, y,
-                       MAX(population) - MIN(population) AS pop_range,
-                       COUNT(DISTINCT fetched_at)         AS snap_count,
-                       MIN(fetched_at)                    AS first_seen,
-                       MAX(fetched_at)                    AS last_seen
-                FROM map_snapshots
-                WHERE guild_id = ?
-                  AND fetched_at IN ({snap_placeholders})
-                GROUP BY guild_id, x, y
-            )
-            SELECT v.x, v.y, v.village_name, v.player_name,
-                   v.alliance_name, v.population, v.tribe,
-                   v.is_capital, v.village_type,
-                   s.pop_range, s.snap_count, s.first_seen, s.last_seen
-            FROM map_snapshots v
-            JOIN stats s ON s.guild_id = v.guild_id AND s.x = v.x AND s.y = v.y
-            WHERE v.guild_id = ?
-              AND v.fetched_at = ?
-              AND s.snap_count >= 2
-              AND s.pop_range <= ?
-              AND v.population >= ? AND v.population <= ?
+        # Step 1: per-village stats across the tracked snapshots, grouped by
+        # village_id. This is a single covering-index scan (idx_wsnap_url_vid_ts)
+        # — much cheaper than the previous x/y self-join, which degenerated into
+        # a nested-loop join over tens of thousands of rows on large worlds.
+        async with db.execute(f"""
+            SELECT village_id,
+                   MAX(population) - MIN(population) AS pop_range,
+                   COUNT(*)                           AS snap_count,
+                   MIN(fetched_at)                    AS first_seen,
+                   MAX(fetched_at)                    AS last_seen
+            FROM world_snapshots
+            WHERE world_url = ?
+              AND fetched_at IN ({snap_placeholders})
+            GROUP BY village_id
+        """, [world_url, *snap_dates]) as cur:
+            cur.row_factory = aiosqlite.Row
+            stats_by_vid = {r["village_id"]: dict(r) for r in await cur.fetchall()}
+
+        if not stats_by_vid:
+            return {"villages": [], "snap_dates": snap_dates, "total": 0}
+
+        # Step 2: latest snapshot details, with population/natar/ww filters in SQL.
+        query = """
+            SELECT village_id, x, y, village_name, player_name,
+                   alliance_name, population, tribe, is_capital, village_type
+            FROM world_snapshots
+            WHERE world_url = ?
+              AND fetched_at = ?
+              AND population >= ? AND population <= ?
         """
-        params = [guild_id, *snap_dates, guild_id, latest_ts, max_pop_increase, min_pop, max_pop]
+        params = [world_url, latest_ts, min_pop, max_pop]
 
         # Natars filter in SQL
         if not include_natars:
-            query += " AND v.tribe != 4 AND v.tribe != '4'"
+            query += " AND tribe != 4 AND tribe != '4'"
         # WW villages filter (village_type=15)
         if not include_ww:
-            query += " AND (v.village_type IS NULL OR v.village_type != 15)"
+            query += " AND (village_type IS NULL OR village_type != 15)"
 
         async with db.execute(query, params) as cur:
             cur.row_factory = aiosqlite.Row
-            raw = [dict(r) for r in await cur.fetchall()]
+            latest_rows = [dict(r) for r in await cur.fetchall()]
+
+        # Join the stats onto the latest-snapshot rows in Python (cheap dict lookups)
+        raw = []
+        for v in latest_rows:
+            s = stats_by_vid.get(v["village_id"])
+            if not s or s["snap_count"] < 2 or s["pop_range"] > max_pop_increase:
+                continue
+            raw.append({**v, **{k: s[k] for k in ("pop_range", "snap_count", "first_seen", "last_seen")}})
 
         if not raw:
             return {"villages": [], "snap_dates": snap_dates, "total": 0}
@@ -3062,9 +3085,9 @@ async def search_inactive_advanced(
         # Player total pop from latest snapshot
         async with db.execute("""
             SELECT player_name, SUM(population) as total_pop
-            FROM map_snapshots WHERE guild_id=? AND fetched_at=?
+            FROM world_snapshots WHERE world_url=? AND fetched_at=?
             GROUP BY player_name
-        """, (guild_id, latest_ts)) as cur:
+        """, (world_url, latest_ts)) as cur:
             player_pop = {r[0]: r[1] for r in await cur.fetchall()}
 
         # Collect only the xy coords that pass text/distance filters first
@@ -3112,28 +3135,27 @@ async def search_inactive_advanced(
             return {"villages": [], "snap_dates": snap_dates, "total": 0}
 
         # Fetch pop history only for the villages in the result set
-        xy_set = {(v["x"], v["y"]) for v in filtered}
-        xy_placeholders = ",".join("(?,?)" for _ in xy_set)
-        xy_flat = [val for xy in xy_set for val in xy]
+        vid_set = {v["village_id"] for v in filtered}
+        vid_placeholders = ",".join("?" * len(vid_set))
 
         pop_lookup: dict = {}
         async with db.execute(f"""
-            SELECT x, y, fetched_at, population
-            FROM map_snapshots
-            WHERE guild_id = ?
+            SELECT village_id, fetched_at, population
+            FROM world_snapshots
+            WHERE world_url = ?
               AND fetched_at IN ({snap_placeholders})
-              AND (x, y) IN ({xy_placeholders})
-        """, [guild_id, *snap_dates, *xy_flat]) as cur:
+              AND village_id IN ({vid_placeholders})
+        """, [world_url, *snap_dates, *vid_set]) as cur:
             for r in await cur.fetchall():
-                pop_lookup[(r[0], r[1], r[2])] = r[3]
+                pop_lookup[(r[0], r[1])] = r[2]
 
         villages = []
         for v in filtered:
-            x, y = v["x"], v["y"]
+            vid = v["village_id"]
             pop_history = []
             for i, ts in enumerate(snap_dates):
-                pop_now  = pop_lookup.get((x, y, ts))
-                pop_prev = pop_lookup.get((x, y, snap_dates[i+1])) if i+1 < len(snap_dates) else None
+                pop_now  = pop_lookup.get((vid, ts))
+                pop_prev = pop_lookup.get((vid, snap_dates[i+1])) if i+1 < len(snap_dates) else None
                 if pop_now is None:
                     pop_history.append(None)
                 elif pop_prev is None:
