@@ -2526,9 +2526,10 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
         await db.commit()
     # Invalidate all cached results for all guilds on this world
     cache_invalidate_guild(guild_id)
-    # Drop the world-level snapshot-times cache (keyed by world_url, shared
-    # across guilds) so the freshly-saved snapshot is picked up immediately.
+    # Drop the world-level caches (keyed by world_url, shared across guilds) so
+    # the freshly-saved snapshot is picked up immediately.
     _CACHE.pop(f"snap_times:{world_url}", None)
+    _CACHE.pop(f"inactive_base:{world_url}", None)
 
 
 async def get_latest_snapshot_time(guild_id: str) -> str | None:
@@ -2812,6 +2813,87 @@ async def get_snapshot_count(guild_id: str) -> int:
     return result
 
 
+async def _inactive_base(world_url: str) -> list[dict]:
+    """All 'stable' villages for a world — seen in ≥2 sampled snapshots with
+    population varying by ≤5 — together with their per-village stats and latest
+    display columns (x/y, names, tribe, …).
+
+    This is the expensive half of inactive-farm detection and is INDEPENDENT of
+    the min_days / min_pop / max_pop / include_* filters (those are applied in
+    Python by get_inactive_farms). Computing it once per world and caching it
+    means every caller and every filter combination shares a single scan instead
+    of each kicking off its own multi-second aggregation — which, run
+    concurrently in the page's query batch, used to thrash into ~25s cold loads.
+    A per-world lock collapses concurrent cold builds into one."""
+    ck = f"inactive_base:{world_url}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+    lock = _snap_times_locks.setdefault("base:" + world_url, _asyncio.Lock())
+    async with lock:
+        cached = _cache_get(ck)  # re-check after acquiring the lock
+        if cached is not None:
+            return cached
+
+        all_snaps = await _world_snapshot_times(world_url)
+        if len(all_snaps) < 2:
+            _cache_set(ck, [])
+            return []
+        snap_sample = _sample_snapshots(all_snaps, 16)
+        latest_ts = all_snaps[0]
+        _ph = ",".join("?" * len(snap_sample))
+
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+            db.row_factory = aiosqlite.Row
+            # Per-village aggregation over the sampled snapshots. INDEXED BY
+            # idx_wsnap_url_ts seeks just those timestamps (~160k rows) instead of
+            # scanning the whole world_url range of the covering index (millions).
+            async with db.execute(f"""
+                SELECT village_id,
+                       MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
+                       COUNT(*) as snapshot_count,
+                       MIN(population) as min_pop_val, MAX(population) as max_pop_val
+                FROM world_snapshots INDEXED BY idx_wsnap_url_ts
+                WHERE world_url = ? AND fetched_at IN ({_ph})
+                GROUP BY village_id
+                HAVING snapshot_count >= 2
+                   AND CAST(max_pop_val AS REAL) - CAST(min_pop_val AS REAL) <= 5
+            """, (world_url, *snap_sample)) as cur:
+                agg_rows = {r["village_id"]: dict(r) for r in await cur.fetchall()}
+
+            if not agg_rows:
+                _cache_set(ck, [])
+                return []
+
+            # Display columns for the candidate villages, from the latest snapshot.
+            async with db.execute("""
+                SELECT village_id, x, y, village_name, player_name, tribe,
+                       alliance_name, village_type, is_capital
+                FROM world_snapshots
+                WHERE world_url = ? AND fetched_at = ?
+            """, (world_url, latest_ts)) as cur:
+                latest_rows = {r["village_id"]: dict(r) for r in await cur.fetchall()}
+
+        from datetime import datetime as _dt
+        base = []
+        for vid, agg in agg_rows.items():
+            details = latest_rows.get(vid)
+            if not details:
+                continue
+            d = {**details, **agg}
+            d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
+            try:
+                fs = _dt.fromisoformat(d["first_seen"])
+                ls = _dt.fromisoformat(d["last_seen"])
+                d["days_tracked"] = (ls - fs).days
+            except Exception:
+                d["days_tracked"] = 0
+            base.append(d)
+        base.sort(key=lambda d: d.get("max_pop_val", 0), reverse=True)
+        _cache_set(ck, base)
+        return base
+
+
 async def get_inactive_farms(
     guild_id: str,
     min_days: int = 3,
@@ -2824,94 +2906,36 @@ async def get_inactive_farms(
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        db.row_factory = aiosqlite.Row
 
-        # Resolve the world for this guild so we can query world_snapshots directly
-        # (map_snapshots is a VIEW that joins guild_configs on every row, which
-        # is fine for small result sets but expensive for a full-table aggregation).
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
             "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
         ) as cur:
             wrow = await cur.fetchone()
-        world_url = wrow["tw_world"] if wrow else None
-        if not world_url:
-            _cache_set(cache_key, [])
-            return []
+    world_url = wrow[0] if wrow else None
+    if not world_url:
+        _cache_set(cache_key, [])
+        return []
 
-        # Sample a spread of snapshots instead of aggregating the full history.
-        # A busy world keeps a snapshot every ~15-20 min (~250 over a few days =
-        # millions of rows); ~16 evenly-spread snapshots classify villages as
-        # inactive/active identically (verified) while letting the aggregation
-        # seek just those timestamps via idx_wsnap_url_ts (≈4x faster). The
-        # distinct-timestamp list is cached & shared across callers.
-        all_snaps = await _world_snapshot_times(world_url)
-        if len(all_snaps) < 2:
-            _cache_set(cache_key, [])
-            return []
-        snap_sample = _sample_snapshots(all_snaps, 16)
-        _ph = ",".join("?" * len(snap_sample))
-
-        # Step 1: per-village aggregation over the sampled snapshots only.
-        # (COUNT(*) is equivalent to COUNT(DISTINCT fetched_at) since there are no
-        # duplicate (village_id, fetched_at) rows.)
-        async with db.execute(f"""
-            SELECT village_id,
-                   MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
-                   COUNT(*) as snapshot_count,
-                   MIN(population) as min_pop_val, MAX(population) as max_pop_val
-            FROM world_snapshots INDEXED BY idx_wsnap_url_ts
-            WHERE world_url = ? AND fetched_at IN ({_ph})
-            GROUP BY village_id
-            HAVING snapshot_count >= 2
-               AND CAST(max_pop_val AS REAL) - CAST(min_pop_val AS REAL) <= 5
-               AND julianday(last_seen) - julianday(first_seen) >= ?
-               AND max_pop_val >= ? AND min_pop_val <= ?
-        """, (world_url, *snap_sample, min_days, min_pop, max_pop)) as cur:
-            agg_rows = {r["village_id"]: dict(r) for r in await cur.fetchall()}
-
-        if not agg_rows:
-            _cache_set(cache_key, [])
-            return []
-
-        # Step 2: fetch display columns (x, y, name, player, alliance, tribe, type, ...)
-        # only for the candidate villages, from the most recent snapshot —
-        # a single small read instead of scanning the whole history table.
-        async with db.execute("""
-            SELECT village_id, x, y, village_name, player_name, tribe,
-                   alliance_name, village_type, is_capital
-            FROM world_snapshots
-            WHERE world_url = ?
-              AND fetched_at = (SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url = ?)
-        """, (world_url, world_url)) as cur:
-            latest_rows = {r["village_id"]: dict(r) for r in await cur.fetchall()}
-
-        from datetime import datetime as _dt
-        result = []
-        for vid, agg in agg_rows.items():
-            details = latest_rows.get(vid)
-            if not details:
-                continue
-            d = {**details, **agg}
-            _vname = (d.get("village_name") or "").strip().lower()
-            _pname = (d.get("player_name") or "").strip().lower()
-            # Filter the "WW Village" (World Wonder construction site) unless explicitly included
-            if not include_ww and _vname == "ww village":
-                continue
-            # Filter Natar-owned villages unless explicitly included
-            if not include_natars and _pname == "natars":
-                continue
-            d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
-            try:
-                fs = _dt.fromisoformat(d["first_seen"])
-                ls = _dt.fromisoformat(d["last_seen"])
-                d["days_tracked"] = (ls - fs).days
-            except Exception:
-                d["days_tracked"] = 0
-            result.append(d)
-        result.sort(key=lambda d: d.get("max_pop_val", 0), reverse=True)
-        _cache_set(cache_key, result)
-        return result
+    # Apply the cheap per-request filters in Python over the shared cached base.
+    # For an integer min_days, floor(day-span) >= min_days is equivalent to the
+    # original julianday(last)-julianday(first) >= min_days SQL filter.
+    base = await _inactive_base(world_url)
+    result = []
+    for d in base:
+        if d.get("days_tracked", 0) < min_days:
+            continue
+        if d.get("max_pop_val", 0) < min_pop or d.get("min_pop_val", 0) > max_pop:
+            continue
+        _vname = (d.get("village_name") or "").strip().lower()
+        _pname = (d.get("player_name") or "").strip().lower()
+        if not include_ww and _vname == "ww village":
+            continue
+        if not include_natars and _pname == "natars":
+            continue
+        result.append(d)
+    _cache_set(cache_key, result)
+    return result
 
 
 async def get_inactive_player_names(guild_id: str, min_days: int = 1) -> set[str]:
