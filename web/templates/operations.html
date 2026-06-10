@@ -600,6 +600,110 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
   </div>
 </div>
 
+<!-- Auto-Stack Generator Modal -->
+<div class="op-modal-overlay" id="autoGenModal">
+  <div class="op-modal" style="width:min(820px,97vw);">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">🤖 Auto-Einsatzplan — <span id="autoGenTargetLabel"></span></span>
+      <button class="btn-icon" onclick="closeModal('autoGenModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+
+      <div class="form-row">
+        <div class="form-group" style="max-width:130px;">
+          <label>⚔ Real-Wellen</label>
+          <input id="autoGenRealCount" type="number" min="0" step="1" value="2">
+        </div>
+        <div class="form-group" style="max-width:130px;">
+          <label>👻 Fake-Wellen</label>
+          <input id="autoGenFakeCount" type="number" min="0" step="1" value="3">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>Angreifer-Pool</label>
+          <select id="autoGenPoolMode" onchange="document.getElementById('autoGenPlayerListWrap').style.display=this.value==='manual'?'block':'none';">
+            <option value="auto">🤖 Automatisch (nächstgelegene Dörfer)</option>
+            <option value="manual">✋ Manuell (Auswahl unten)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="autoGenPlayerListWrap" style="display:none;margin-bottom:.6rem;">
+        <label>Spieler-Pool</label>
+        <div id="autoGenPlayerList" style="display:flex;flex-wrap:wrap;gap:.5rem;max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:.4rem;background:var(--bg-main);"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label>Fake-Stil</label>
+          <select id="autoGenFakeStyle" onchange="document.getElementById('autoGenCatBuildingWrap').style.display=this.value==='realistic'?'block':'none';">
+            <option value="minimal">🥚 Minimal (1 Einheit)</option>
+            <option value="realistic">🎯 Realistisch (19 Truppen + 1 Katapult)</option>
+          </select>
+        </div>
+        <div class="form-group" id="autoGenCatBuildingWrap" style="flex:1;display:none;">
+          <label>Katapult-Ziel</label>
+          <select id="autoGenCatBuilding">
+            <option value="">— kein festes Ziel —</option>
+            <option value="Lagerhaus">Lagerhaus</option>
+            <option value="Kornkammer">Kornkammer</option>
+            <option value="Hauptgebäude">Hauptgebäude</option>
+            <option value="Rathaus">Rathaus</option>
+            <option value="Residenz/Palast">Residenz/Palast</option>
+            <option value="Stadtmauer">Stadtmauer</option>
+            <option value="Heldenburg">Heldenburg</option>
+            <option value="Schmiede">Schmiede</option>
+            <option value="Werkstatt">Werkstatt</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" style="align-items:center;">
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;">
+          <input type="checkbox" id="autoGenGapEnabled" onchange="document.getElementById('autoGenGapWrap').style.display=this.checked?'flex':'none';">
+          🕳️ Snipe-Lücke einbauen
+        </label>
+        <div id="autoGenGapWrap" style="display:none;align-items:center;gap:.4rem;">
+          <label style="font-size:.8rem;">Versatz:</label>
+          <input id="autoGenGapSec" type="number" min="1" max="10" step="1" value="3" style="width:60px;">
+          <span style="font-size:.75rem;color:var(--text-muted);">Sek. — letzte Welle landet versetzt als 🧹 Cleaner und deckt das Snipe-Fenster ab</span>
+        </div>
+      </div>
+
+      <div class="form-row" style="align-items:center;border-top:1px solid var(--border);padding-top:.6rem;margin-top:.4rem;">
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;">
+          <input type="checkbox" id="autoGenDirect">
+          ⚡ Direkt erstellen (ohne Vorschau-Bestätigung)
+        </label>
+        <button class="btn btn-primary" style="margin-left:auto;" onclick="generateAutoStack()">🤖 Generieren</button>
+      </div>
+
+      <div id="autoGenPreviewWrap" style="display:none;margin-top:.8rem;">
+        <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;margin-bottom:.3rem;">Vorschau</div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+          <table style="width:100%;font-size:.75rem;border-collapse:collapse;">
+            <thead style="position:sticky;top:0;background:var(--bg-main);">
+              <tr>
+                <th style="padding:.3rem .4rem;text-align:left;"></th>
+                <th style="padding:.3rem .4rem;text-align:left;">Spieler</th>
+                <th style="padding:.3rem .4rem;text-align:left;">Dorf</th>
+                <th style="padding:.3rem .4rem;text-align:left;">Typ</th>
+                <th style="padding:.3rem .4rem;text-align:left;">Truppen</th>
+                <th style="padding:.3rem .4rem;text-align:left;">Laufzeit</th>
+                <th style="padding:.3rem .4rem;text-align:left;">Sendezeit</th>
+              </tr>
+            </thead>
+            <tbody id="autoGenPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('autoGenModal')">Schließen</button>
+      <button class="btn btn-primary" id="autoGenApplyBtn" style="display:none;" onclick="applyAutoGenPlan()">✓ Wellen übernehmen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add/Edit Wave Modal -->
 <div class="op-modal-overlay" id="waveModal">
   <div class="op-modal" style="width:min(760px,97vw);">
@@ -1657,7 +1761,10 @@ function _renderAssignmentPanel(settings) {
 
   panel.innerHTML = `
     <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);">
-      <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">🎯 Schnellzuweisung</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;">
+        <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">🎯 Schnellzuweisung</div>
+        <button class="btn btn-primary" style="font-size:.7rem;padding:.25rem .5rem;" onclick="openAutoGenModal()">🤖 Auto-Stack</button>
+      </div>
       <div style="font-size:.72rem;color:var(--text-muted);">${escHtml(tp)} · ${escHtml(tv||'')} (${tx}|${ty})</div>
     </div>
 
@@ -1831,6 +1938,187 @@ function resetAtkRow(i) {
     <button class="atk-type-btn sel-fake"  onclick="addAtkWave(${i},'fake',this)">👻 Fake</button>
     <button class="atk-type-btn sel-scout" onclick="addAtkWave(${i},'scout',this)">🔍 Scout</button>
   `;
+}
+
+// ── Auto-Stack Generator ─────────────────────────────────────────────────────
+let autoGenPreview = [];
+
+function _autoGenCatId(tribe) {
+  return {gauls: 'trebuchet', teutons: 'catapult', huns: 'hun_cat', egyptians: 'stone_cat'}[tribe] || 'fire_cat';
+}
+
+function _autoGenOffUnit(tribe) {
+  const list = TROOPS_DEF[tribe] || TROOPS_DEF.romans;
+  const catId = _autoGenCatId(tribe);
+  const off = list.find(t => !t.scout && (t.attack || 0) > 40 && t.id !== catId);
+  return (off || list[0]).id;
+}
+
+function _isoAddSeconds(iso, sec) {
+  if (!iso) return iso;
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return iso;
+  d.setSeconds(d.getSeconds() + sec);
+  return d.toISOString().replace('T', ' ').slice(0, 19).replace(' ', 'T');
+}
+
+function openAutoGenModal() {
+  if (!assignTarget) { showToast('⚠️ Bitte zuerst ein Ziel auswählen'); return; }
+  if (!assignRows.length) rebuildAssignPanel();
+  document.getElementById('autoGenTargetLabel').textContent =
+    `${assignTarget.player || ''} · ${assignTarget.village || ''} (${assignTarget.x}|${assignTarget.y})`;
+  // Player pool checkboxes (deduped, sorted by travel time)
+  const seen = new Set();
+  const names = [];
+  assignRows.forEach(r => { if (!seen.has(r.player_name)) { seen.add(r.player_name); names.push(r.player_name); } });
+  document.getElementById('autoGenPlayerList').innerHTML = names.map(n => `
+    <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;">
+      <input type="checkbox" class="autogen-player" value="${escJs(n)}" checked> ${escHtml(n)}
+    </label>`).join('') || '<span style="font-size:.75rem;color:var(--text-muted);">Keine Angreifer geladen.</span>';
+  autoGenPreview = [];
+  document.getElementById('autoGenPreviewWrap').style.display = 'none';
+  document.getElementById('autoGenApplyBtn').style.display = 'none';
+  openModal('autoGenModal');
+}
+
+function generateAutoStack() {
+  if (!assignTarget) return;
+  const poolMode  = document.getElementById('autoGenPoolMode').value;
+  const realCount = Math.max(0, parseInt(document.getElementById('autoGenRealCount').value) || 0);
+  const fakeCount = Math.max(0, parseInt(document.getElementById('autoGenFakeCount').value) || 0);
+  const fakeStyle = document.getElementById('autoGenFakeStyle').value;
+  const catBuilding = document.getElementById('autoGenCatBuilding').value;
+  const gapEnabled = document.getElementById('autoGenGapEnabled').checked;
+  const gapSec = Math.max(1, Math.min(10, parseInt(document.getElementById('autoGenGapSec').value) || 3));
+
+  let pool = assignRows.slice();
+  if (poolMode === 'manual') {
+    const selected = new Set([...document.querySelectorAll('.autogen-player:checked')].map(el => el.value));
+    pool = pool.filter(r => selected.has(r.player_name));
+  }
+  if (!pool.length) { showToast('⚠️ Keine passenden Dörfer im Pool'); return; }
+
+  // Prefer villages classified as OFF, then by travel time (closest first)
+  pool.sort((a, b) => {
+    const aOff = a.role === 'off' ? 0 : 1;
+    const bOff = b.role === 'off' ? 0 : 1;
+    if (aOff !== bOff) return aOff - bOff;
+    return a.travelSec - b.travelSec;
+  });
+
+  const total = realCount + fakeCount;
+  if (total <= 0) { showToast('⚠️ Mindestens eine Welle angeben'); return; }
+
+  const landingBase = activePlan?.landing_time || '';
+  const rows = [];
+  for (let i = 0; i < total; i++) {
+    const r = pool[i % pool.length]; // cycle through pool if not enough villages
+    const isReal = i < realCount;
+    let troops = {};
+    let notes = '';
+    let waveType = isReal ? 'real' : 'fake';
+    if (!isReal) {
+      if (fakeStyle === 'realistic') {
+        troops = {[_autoGenOffUnit(r.tribe)]: 19, [_autoGenCatId(r.tribe)]: 1};
+        if (catBuilding) notes = `🎯 Kata-Ziel: ${catBuilding}`;
+      } else {
+        troops = {[_autoGenOffUnit(r.tribe)]: 1};
+      }
+    }
+    let landing = landingBase;
+    // Last wave landing slightly offset = "Cleaner" covering the snipe window
+    if (gapEnabled && total > 1 && i === total - 1) {
+      landing = _isoAddSeconds(landingBase, gapSec);
+      waveType = 'cleaner1';
+      notes = (notes ? notes + ' | ' : '') + `🕳️ Snipe-Fenster +${gapSec}s`;
+    }
+    rows.push({
+      player_name: r.player_name, discord_id: r.discord_id,
+      village_name: r.village_name, vx: r.vx, vy: r.vy,
+      tribe: r.tribe || 'romans', travelSec: r.travelSec,
+      type: waveType, troops, notes, landing,
+      include: true,
+    });
+  }
+  autoGenPreview = rows;
+  renderAutoGenPreview();
+  document.getElementById('autoGenApplyBtn').style.display = '';
+
+  if (document.getElementById('autoGenDirect').checked) {
+    applyAutoGenPlan();
+  }
+}
+
+function renderAutoGenPreview() {
+  const wrap = document.getElementById('autoGenPreviewWrap');
+  wrap.style.display = autoGenPreview.length ? 'block' : 'none';
+  const lbl = {real: '⚔ Real', fake: '👻 Fake', cleaner1: '🧹 Cleaner'};
+  document.getElementById('autoGenPreviewBody').innerHTML = autoGenPreview.map((r, i) => {
+    const troopStr = Object.entries(r.troops || {}).map(([id, c]) => {
+      const tDef = (TROOPS_DEF[r.tribe] || []).find(t => t.id === id);
+      return `${tDef ? tDef.name : id}: ${c}`;
+    }).join(', ') || '—';
+    const sendStr = r.landing ? (() => {
+      const land = new Date(r.landing.includes('T') ? r.landing : r.landing.replace(' ', 'T'));
+      const send = new Date(land.getTime() - r.travelSec * 1000);
+      return send.toISOString().replace('T', ' ').slice(0, 19);
+    })() : '—';
+    return `<tr style="opacity:${r.include ? 1 : .4};">
+      <td style="padding:.25rem .4rem;"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="autoGenPreview[${i}].include=this.checked;renderAutoGenPreview()"></td>
+      <td style="padding:.25rem .4rem;">${escHtml(r.player_name)}</td>
+      <td style="padding:.25rem .4rem;">${escHtml(r.village_name)} (${r.vx}|${r.vy})</td>
+      <td style="padding:.25rem .4rem;">${lbl[r.type] || r.type}</td>
+      <td style="padding:.25rem .4rem;">${escHtml(troopStr)}</td>
+      <td style="padding:.25rem .4rem;">${fmtTravel(r.travelSec)}</td>
+      <td style="padding:.25rem .4rem;">${escHtml(sendStr)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function applyAutoGenPlan() {
+  const rows = autoGenPreview.filter(r => r.include);
+  if (!rows.length) { showToast('⚠️ Keine Wellen ausgewählt'); return; }
+  if (!activePlanId || !assignTarget) return;
+
+  await reloadActivePlan();
+  const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
+  let target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
+  if (!target) {
+    try {
+      await apiPost(`/plans/${activePlanId}/targets`, {
+        player_name: tp, village_name: tv, x: tx, y: ty, population: 0, notes: ''
+      });
+      await reloadActivePlan();
+      target = activePlan?.targets?.find(t => t.x == tx && t.y == ty);
+    } catch (e) { /* ignore */ }
+  }
+  if (!target) { showToast('⚠️ Ziel konnte nicht angelegt werden'); return; }
+
+  const applyBtn = document.getElementById('autoGenApplyBtn');
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '⏳ Erstelle Wellen…'; }
+
+  let ok = 0, fail = 0;
+  for (const r of rows) {
+    try {
+      await apiPost(`/targets/${target.id}/waves`, {
+        plan_id: activePlanId,
+        attacker_name: r.player_name,
+        origin_village: r.village_name,
+        origin_x: r.vx, origin_y: r.vy,
+        wave_type: r.type,
+        tribe: r.tribe || 'romans',
+        troop_json: JSON.stringify(r.troops || {}),
+        landing_time: r.landing || activePlan?.landing_time || '',
+        server_speed: activePlan?.server_speed || 1,
+        notes: r.notes || '',
+      });
+      ok++;
+    } catch (e) { fail++; }
+  }
+  if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = '✓ Wellen übernehmen'; }
+  showToast(`✅ ${ok} Wellen erstellt${fail ? `, ${fail} Fehler` : ''}`);
+  await reloadActivePlan();
+  closeModal('autoGenModal');
 }
 
 async function doSearch(q) {
