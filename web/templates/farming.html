@@ -230,7 +230,7 @@
   <div id="tab-inactive" class="fi-panel" {% if tab != 'inactive' %}style="display:none;"{% endif %}>
 
     <!-- Filter + Farmlist Import -->
-    {% set _filter_active = advanced or player_filter or alliance_filter or exclude_players or exclude_alliances or ref_x or ref_y or min_dist or max_dist or tribes or in_farmlist %}
+    {% set _filter_active = advanced or player_filter or alliance_filter or exclude_players or exclude_alliances or ref_x or ref_y or min_dist or max_dist or tribes or in_farmlist or show_own_villages or show_alliance_villages or only_inactive_players %}
     <div style="margin-bottom:1rem;display:grid;grid-template-columns:1fr {% if inactive_farms %}minmax(0,300px){% endif %};gap:1rem;align-items:start;">
     <div><!-- filter-left -->
       <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
@@ -445,7 +445,7 @@
                 <div style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem;">⚠ No farmlist imported yet</div>
                 {% endif %}
               </div>
-              <div style="display:flex;align-items:center;gap:1rem;margin-top:1.2rem;">
+              <div style="display:flex;align-items:center;gap:1rem;margin-top:1.2rem;flex-wrap:wrap;">
                 <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
                   <input type="checkbox" name="include_natars" value="1" {% if include_natars %}checked{% endif %}>
                   Include Natars
@@ -453,6 +453,18 @@
                 <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
                   <input type="checkbox" name="include_ww" value="1" {% if include_ww %}checked{% endif %}>
                   Include WW villages
+                </label>
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
+                  <input type="checkbox" name="show_own_villages" value="1" {% if show_own_villages %}checked{% endif %}>
+                  Eigene Dörfer anzeigen
+                </label>
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
+                  <input type="checkbox" name="show_alliance_villages" value="1" {% if show_alliance_villages %}checked{% endif %}>
+                  Allianzmitglieder anzeigen
+                </label>
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:#64748b;">
+                  <input type="checkbox" name="only_inactive_players" value="1" {% if only_inactive_players %}checked{% endif %}>
+                  Nur inaktive Spieler (&lt; 1 Pop Wachstum)
                 </label>
               </div>
             </div>

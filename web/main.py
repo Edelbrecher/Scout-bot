@@ -8021,6 +8021,9 @@ async def farming_page(
     in_farmlist: str = "",
     advanced: bool = False,
     farmlist_id: Optional[int] = None,
+    show_own_villages: bool = False,
+    show_alliance_villages: bool = False,
+    only_inactive_players: bool = False,
     _offset: int = 0,
 ):
     session, err = _require_session(request)
@@ -8082,6 +8085,7 @@ async def farming_page(
         farmlist_analyses,
         alliance_names,
         growth_data,
+        tw_alliance_name,
     ) = await _asyncio.gather(
         database.get_farm_stats(guild_id),
         database.get_snapshot_pop_range(guild_id),
@@ -8092,7 +8096,16 @@ async def farming_page(
         database.get_farmlist_analyses(guild_id, uid, limit=20),
         database.get_alliance_names_from_snapshot(guild_id),
         database.get_player_growth(guild_id, limit=100),
+        database.get_tw_alliance_name(guild_id),
     )
+
+    # Villages belonging to the current user (for "Eigene Dörfer anzeigen" filter)
+    own_coords = {(v["x"], v["y"]) for v in own_village_ids if v.get("x") is not None}
+    tw_alliance_lc = (tw_alliance_name or "").strip().lower()
+
+    inactive_player_names: set = set()
+    if only_inactive_players:
+        inactive_player_names = await database.get_inactive_player_names(guild_id, min_days=min_days_i)
 
     # Enrich scout village with Travian village_id for newdid= links
     if scout_village and scout_village.get("x") is not None:
@@ -8161,6 +8174,19 @@ async def farming_page(
             inactive_farms = [v for v in inactive_farms_raw if v["farmlist_groups"]]
         else:
             inactive_farms = inactive_farms_raw
+
+    # ── Hide own villages / alliance members by default ─────────────────────
+    if not show_own_villages:
+        inactive_farms = [v for v in inactive_farms if (v["x"], v["y"]) not in own_coords]
+    if not show_alliance_villages and tw_alliance_lc:
+        inactive_farms = [
+            v for v in inactive_farms
+            if (v.get("alliance_name") or "").strip().lower() != tw_alliance_lc
+        ]
+
+    # ── Only inactive players (player gained < 1 pop over tracked period) ───
+    if only_inactive_players:
+        inactive_farms = [v for v in inactive_farms if (v.get("player_name") or "") in inactive_player_names]
 
     # ── Pagination: 100 per page (initial + AJAX) ────────────────────────────
     _PAGE_SIZE = 100
@@ -8260,6 +8286,9 @@ async def farming_page(
         "own_village_ids": own_village_ids,
         "farmlist_analyses": farmlist_analyses,
         "farmlist_id": _fl_id,
+        "show_own_villages": show_own_villages,
+        "show_alliance_villages": show_alliance_villages,
+        "only_inactive_players": only_inactive_players,
         # Advanced filter values
         "ref_x": ref_x_i or 0, "ref_y": ref_y_i or 0,
         "min_dist": min_dist_f or 0, "max_dist": max_dist_f or "",

@@ -2799,6 +2799,53 @@ async def get_inactive_farms(
         return result
 
 
+async def get_inactive_player_names(guild_id: str, min_days: int = 1) -> set[str]:
+    """Return player_names whose total population (summed across all their
+    villages) grew by less than 1 between the earliest and latest tracked
+    snapshot, provided that span covers at least `min_days` days."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT MIN(fetched_at) as first_snap, MAX(fetched_at) as last_snap "
+            "FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+        )
+        row = await cur.fetchone()
+        if not row or not row["first_snap"] or row["first_snap"] == row["last_snap"]:
+            return set()
+        first_snap, last_snap = row["first_snap"], row["last_snap"]
+
+        from datetime import datetime as _dt
+        try:
+            span_days = (_dt.fromisoformat(last_snap) - _dt.fromisoformat(first_snap)).days
+        except Exception:
+            span_days = 0
+        if span_days < min_days:
+            return set()
+
+        cur = await db.execute(
+            """SELECT player_name, SUM(population) as pop FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND player_name IS NOT NULL AND player_name != ''
+               GROUP BY player_name""", (guild_id, first_snap))
+        first = {r["player_name"]: r["pop"] or 0 for r in await cur.fetchall()}
+
+        cur = await db.execute(
+            """SELECT player_name, SUM(population) as pop FROM map_snapshots
+               WHERE guild_id = ? AND fetched_at = ?
+                 AND player_name IS NOT NULL AND player_name != ''
+               GROUP BY player_name""", (guild_id, last_snap))
+        last_rows = await cur.fetchall()
+
+        result = set()
+        for r in last_rows:
+            pname = r["player_name"]
+            pop_now = r["pop"] or 0
+            pop_before = first.get(pname, pop_now)
+            if (pop_now - pop_before) < 1:
+                result.add(pname)
+        return result
+
+
 async def get_village_id_by_xy(guild_id: str, x: int, y: int) -> str | None:
     """Return Travian village_id for a given coordinate from the latest snapshot."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
