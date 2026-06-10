@@ -9268,6 +9268,27 @@ async def op_attacker_list(request: Request, guild_id: str):
         ) as cur:
             troop_rows = {r["travian_name"] or r["discord_name"]: dict(r) for r in await cur.fetchall()}
 
+        # Members often import their troops into their own personal workspace
+        # (workspace_type='personal') instead of this alliance's Discord guild.
+        # Pull in any such uploads for the same game world whose travian_name
+        # matches one of our alliance members, so they appear in Schnellzuweisung.
+        async with db.execute("SELECT tw_world FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            this_world = row["tw_world"] if row else None
+        if this_world and ally_members:
+            placeholders = ",".join("?" * len(ally_members))
+            async with db.execute(f"""
+                SELECT mt.discord_id, mt.discord_name, mt.travian_name, mt.tribe, mt.villages_json
+                FROM member_troops mt
+                JOIN guild_configs gc ON gc.guild_id = mt.guild_id
+                WHERE gc.workspace_type='personal' AND gc.tw_world=?
+                  AND mt.travian_name IN ({placeholders})
+            """, [this_world, *ally_members.keys()]) as cur:
+                for r in await cur.fetchall():
+                    key = r["travian_name"] or r["discord_name"]
+                    if key and key not in troop_rows:
+                        troop_rows[key] = dict(r)
+
         # Own villages imported via "Mein Account" — always include regardless of snapshot.
         # Join with member_troops to resolve discord_id → travian_name (guild_own_villages
         # has no travian_name column — it only stores discord_id).
