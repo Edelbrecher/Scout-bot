@@ -335,13 +335,24 @@
             <div class="fi-section">
               <div class="fi-section-label">📍 Radius filter</div>
               <div class="fi-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr));">
+                {% if own_village_ids %}
+                <div style="grid-column:span 2;min-width:200px;">
+                  <label class="fi-label">Eigenes Dorf als Zentrum</label>
+                  <select class="fi-input" onchange="if(this.value){var c=this.value.split('|');document.getElementById('refXInput').value=c[0];document.getElementById('refYInput').value=c[1];}">
+                    <option value="">— Dorf wählen —</option>
+                    {% for v in own_village_ids %}
+                    <option value="{{ v.x }}|{{ v.y }}" {% if ref_x == v.x and ref_y == v.y %}selected{% endif %}>{{ v.village_name }} ({{ v.x }}|{{ v.y }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                {% endif %}
                 <div>
                   <label class="fi-label">Center X</label>
-                  <input type="number" name="ref_x" value="{{ ref_x or '' }}" class="fi-input" placeholder="0"/>
+                  <input type="number" id="refXInput" name="ref_x" value="{{ ref_x or '' }}" class="fi-input" placeholder="0"/>
                 </div>
                 <div>
                   <label class="fi-label">Center Y</label>
-                  <input type="number" name="ref_y" value="{{ ref_y or '' }}" class="fi-input" placeholder="0"/>
+                  <input type="number" id="refYInput" name="ref_y" value="{{ ref_y or '' }}" class="fi-input" placeholder="0"/>
                 </div>
                 <div>
                   <label class="fi-label">Min distance</label>
