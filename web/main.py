@@ -8165,7 +8165,8 @@ async def farming_page(
             inactive_farms = inactive_farms_raw
     else:
         inactive_farms_raw = await database.get_inactive_farms(
-            guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i, include_ww=include_ww)
+            guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i,
+            include_ww=include_ww, include_natars=include_natars)
         for v in inactive_farms_raw:
             v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
         if in_farmlist == "no":

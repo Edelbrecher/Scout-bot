@@ -2756,8 +2756,9 @@ async def get_inactive_farms(
     min_pop: int = 0,
     max_pop: int = 9999,
     include_ww: bool = False,
+    include_natars: bool = False,
 ) -> list[dict]:
-    cache_key = f"inactive_farms:{guild_id}:{min_days}:{min_pop}:{max_pop}:{include_ww}"
+    cache_key = f"inactive_farms:{guild_id}:{min_days}:{min_pop}:{max_pop}:{include_ww}:{include_natars}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
@@ -2785,6 +2786,9 @@ async def get_inactive_farms(
             d = dict(r)
             # Filter WW villages (village_type=15) unless explicitly included
             if not include_ww and int(d.get("village_type") or 0) == 15:
+                continue
+            # Filter Natar villages (tribe=4) unless explicitly included
+            if not include_natars and str(d.get("tribe") or "") in ("4", "4.0"):
                 continue
             d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
             try:
