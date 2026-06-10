@@ -258,7 +258,19 @@
             <strong>{{ f.village_name }}</strong>
             {% if f.abandoned %}<span style="font-size:0.7rem;color:#f59e0b;margin-left:4px;">⚠️ Verlassen?</span>{% endif %}
             {% if f.is_natar %}<span style="font-size:0.7rem;color:#6b7280;margin-left:4px;">NPC</span>{% endif %}
-            <div style="font-size:0.7rem;color:var(--text-muted);">{{ f.list_name }}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;">
+              {% if f.x is defined and f.y is defined %}
+                {% if guild.tw_world %}
+                <a href="{{ guild.tw_world.rstrip('/') }}/karte.php?x={{ f.x }}&amp;y={{ f.y }}"
+                   target="_blank" rel="noopener"
+                   style="font-family:monospace;color:#93c5fd;text-decoration:none;">{{ f.x }}|{{ f.y }}</a>
+                {% else %}
+                <span style="font-family:monospace;">{{ f.x }}|{{ f.y }}</span>
+                {% endif %}
+                <span>·</span>
+              {% endif %}
+              <span>{{ f.list_name }}</span>
+            </div>
           </td>
           <td style="font-size:0.8rem;">
             <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:0.72rem;">{{ f.group }}</span>

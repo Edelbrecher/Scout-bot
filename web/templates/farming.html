@@ -115,7 +115,7 @@
       </p>
     </div>
     {% if guild.tw_world %}
-    <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshot" style="margin:0;align-self:flex-end;">
+    <form method="post" action="/guild/{{ guild.guild_id }}/farming/snapshot" data-no-loader style="margin:0;align-self:flex-end;">
       <button type="submit" class="btn btn-primary" style="display:flex;align-items:center;gap:0.4rem;">
         <span data-i18n="farming.snapshot.btn">🔄 Fetch Snapshot</span>
         {% if farm_stats.latest_snapshot %}
@@ -327,7 +327,7 @@
       {# ── Filter Panel ── #}
       <div id="filterPanel" style="display:{% if _filter_active %}block{% else %}none{% endif %};margin-top:.25rem;">
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;">
-          <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="filterForm">
+          <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="filterForm" data-no-loader>
             <input type="hidden" name="tab" value="inactive" />
             <input type="hidden" name="advanced" value="1" />
 
@@ -1323,7 +1323,7 @@
           ⚠️ No snapshot yet. The first search automatically loads the map data — this may take <strong>10–30 seconds</strong>.
         </div>
         {% endif %}
-        <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="searchForm" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;">
+        <form method="get" action="/guild/{{ guild.guild_id }}/farming" id="searchForm" data-no-loader style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;">
           <input type="hidden" name="tab" value="search" />
           <input type="hidden" name="min_days" value="{{ min_days }}" />
           <div class="form-group" style="margin:0;flex:1;min-width:220px;">

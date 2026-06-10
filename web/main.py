@@ -7738,6 +7738,23 @@ def parse_farmlist(text: str) -> list[dict]:
     return farms
 
 
+async def _attach_farm_coords(guild_id: str, farms: list[dict]) -> None:
+    """Mutates `farms` in place: adds "x"/"y" keys (matched by village_name
+    against the latest map snapshot) so the template can link to the village
+    on the map and display its coordinates."""
+    if not farms:
+        return
+    coords_lookup = await database.get_village_coords_by_names(guild_id)
+    if not coords_lookup:
+        return
+    for f in farms:
+        vname_lower = (f.get("village_name") or "").strip().lower()
+        c = coords_lookup.get(vname_lower)
+        if c:
+            f["x"] = c["x"]
+            f["y"] = c["y"]
+
+
 @app.get("/guild/{guild_id}/farmlist-analyst", response_class=HTMLResponse)
 async def farmlist_analyst_page(request: Request, guild_id: str):
     session, err = _require_session(request)
@@ -7778,6 +7795,7 @@ async def farmlist_analyst_post(
     if err: return err
 
     farms = parse_farmlist(farmlist_text)
+    await _attach_farm_coords(guild_id, farms)
 
     # ── overall stats ──────────────────────────────────────────────────────
     gut     = [f for f in farms if f["rating"] == "gut"]
@@ -7859,6 +7877,7 @@ async def farmlist_analysis_open(request: Request, guild_id: str, analysis_id: i
     farms      = _json.loads(row.get("farms_json") or "[]")
     group_stats = _json.loads(row.get("group_stats_json") or "[]")
     past       = await database.get_farmlist_analyses(guild_id, session.get("uid", ""))
+    await _attach_farm_coords(guild_id, farms)
 
     stats = {
         "total":          row["total_farms"],

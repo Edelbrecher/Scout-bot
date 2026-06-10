@@ -5561,13 +5561,28 @@ async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str, analysis_i
                 name_to_lists[vname].append(lname)
         if not name_to_lists:
             return {}
-        # Get latest snapshot coords, match by village_name
+        # Get latest snapshot coords, match by village_name.
+        # Resolve the world for this guild and query world_snapshots directly
+        # (map_snapshots is a VIEW that joins guild_configs on every row, which
+        # makes the MAX(fetched_at) subquery pattern very slow on large tables).
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow["tw_world"] if wrow else None
+        if not world_url:
+            return {}
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url = ?", (world_url,)
+        ) as cur:
+            mrow = await cur.fetchone()
+        latest = mrow[0] if mrow else None
+        if not latest:
+            return {}
         async with db.execute("""
-            SELECT DISTINCT village_name, x, y FROM map_snapshots
-            WHERE guild_id = ? AND fetched_at = (
-                SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id = ?
-            )
-        """, (guild_id, guild_id)) as cur:
+            SELECT DISTINCT village_name, x, y FROM world_snapshots
+            WHERE world_url = ? AND fetched_at = ?
+        """, (world_url, latest)) as cur:
             snapshot_rows = await cur.fetchall()
     result: dict = {}
     for r in snapshot_rows:
@@ -5575,6 +5590,39 @@ async def get_farmlist_xy_lookup(guild_id: str, discord_user_id: str, analysis_i
         if vname_lower in name_to_lists:
             key = (r["x"], r["y"])
             result[key] = name_to_lists[vname_lower]
+    return result
+
+
+async def get_village_coords_by_names(guild_id: str) -> dict:
+    """Returns {village_name_lower: {"x": x, "y": y}} from the latest snapshot
+    for the guild's world — used to attach coordinates / map links to entries
+    that only have a village name (e.g. pasted Travian farmlists)."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow["tw_world"] if wrow else None
+        if not world_url:
+            return {}
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url = ?", (world_url,)
+        ) as cur:
+            mrow = await cur.fetchone()
+        latest = mrow[0] if mrow else None
+        if not latest:
+            return {}
+        async with db.execute("""
+            SELECT DISTINCT village_name, x, y FROM world_snapshots
+            WHERE world_url = ? AND fetched_at = ?
+        """, (world_url, latest)) as cur:
+            rows = await cur.fetchall()
+    result: dict = {}
+    for r in rows:
+        vname_lower = (r["village_name"] or "").strip().lower()
+        if vname_lower and vname_lower not in result:
+            result[vname_lower] = {"x": r["x"], "y": r["y"]}
     return result
 
 
