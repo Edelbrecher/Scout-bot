@@ -2017,19 +2017,35 @@ function _autoGenOffUnit(tribe) {
   return (off || list[0]).id;
 }
 
-function _isoAddSeconds(iso, sec) {
-  if (!iso) return iso;
-  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
-  if (isNaN(d.getTime())) return iso;
-  d.setSeconds(d.getSeconds() + sec);
-  return d.toISOString().replace('T', ' ').slice(0, 19).replace(' ', 'T');
+// Plan timestamps (landing_time etc.) are naive "game server time" strings
+// (this game world runs UTC+1) with no timezone suffix. Parsing them as plain
+// `new Date(...)` interprets them as the BROWSER's local time, which silently
+// shifts everything when the browser isn't in the same zone as the game
+// server, and `.toISOString()` then converts back to true UTC — causing the
+// displayed send time and the send-window check to disagree. To avoid this,
+// always force these strings to be interpreted as UTC (append 'Z') and use
+// the UTC getters/setters everywhere, so all arithmetic stays in the game
+// server's own time frame.
+function _toGameDate(iso) {
+  if (!iso) return null;
+  let s = iso.includes('T') ? iso : iso.replace(' ', 'T');
+  if (!/Z|[+-]\d\d:\d\d$/.test(s)) s += 'Z';
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
 }
 
-// Returns true if a Date's local time-of-day falls within [fromHHMM, toHHMM].
+function _isoAddSeconds(iso, sec) {
+  const d = _toGameDate(iso);
+  if (!d) return iso;
+  d.setUTCSeconds(d.getUTCSeconds() + sec);
+  return d.toISOString().slice(0, 19);
+}
+
+// Returns true if a Date's game-server time-of-day falls within [fromHHMM, toHHMM].
 // Handles windows that wrap past midnight (e.g. 22:00 - 02:00).
 function _isTimeInWindow(date, fromHHMM, toHHMM) {
   if (!fromHHMM || !toHHMM) return true;
-  const minsOfDay = date.getHours() * 60 + date.getMinutes();
+  const minsOfDay = date.getUTCHours() * 60 + date.getUTCMinutes();
   const [fh, fm] = fromHHMM.split(':').map(Number);
   const [th, tm] = toHHMM.split(':').map(Number);
   const from = fh * 60 + fm, to = th * 60 + tm;
@@ -2054,8 +2070,8 @@ function _buildPoolRowsForTarget(tx, ty, settings, sendWindow) {
       const travelSec = _travelSec(dist, settings, spd, ts);
       if (settings.maxRuntimeMin > 0 && travelSec > settings.maxRuntimeMin * 60) return;
       if (sendWindow && sendWindow.landingBase) {
-        const land = new Date(sendWindow.landingBase.includes('T') ? sendWindow.landingBase : sendWindow.landingBase.replace(' ', 'T'));
-        if (!isNaN(land.getTime())) {
+        const land = _toGameDate(sendWindow.landingBase);
+        if (land) {
           const send = new Date(land.getTime() - travelSec * 1000);
           if (!_isTimeInWindow(send, sendWindow.from, sendWindow.to)) return;
         }
@@ -2281,7 +2297,8 @@ function renderAutoGenPreview() {
     }).join(', ') || '—';
     const landStr = r.landing ? r.landing.replace('T', ' ').slice(0, 19) : '—';
     const sendStr = r.landing ? (() => {
-      const land = new Date(r.landing.includes('T') ? r.landing : r.landing.replace(' ', 'T'));
+      const land = _toGameDate(r.landing);
+      if (!land) return '—';
       const send = new Date(land.getTime() - r.travelSec * 1000);
       return send.toISOString().replace('T', ' ').slice(0, 19);
     })() : '—';
