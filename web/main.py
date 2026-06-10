@@ -8082,6 +8082,125 @@ async def farming_page(
 
     import asyncio as _asyncio
 
+    # ── AJAX "load more" fast path ───────────────────────────────────────────
+    # The load-more button only needs the (paginated) inactive-farms list, not
+    # the full dashboard metadata (farm stats, player growth, cross reference,
+    # etc.) — fetching all of that on every page-2/3/... request made the
+    # button feel broken because it took as long as a full page load. Compute
+    # only what's needed for the JSON response here.
+    if request.query_params.get("_ajax") == "1":
+        (
+            farm_list_fast,
+            own_village_ids_fast,
+            farmlist_analyses_fast,
+            tw_alliance_name_fast,
+            snap_pop_range_fast,
+        ) = await _asyncio.gather(
+            database.get_farm_list(guild_id),
+            database.get_own_village_ids(guild_id, uid),
+            database.get_farmlist_analyses(guild_id, uid, limit=20),
+            database.get_tw_alliance_name(guild_id),
+            database.get_snapshot_pop_range(guild_id),
+        )
+        own_coords_fast = {(v["x"], v["y"]) for v in own_village_ids_fast if v.get("x") is not None}
+        tw_alliance_lc_fast = (tw_alliance_name_fast or "").strip().lower()
+        farm_list_coords_fast = {(f["x"], f["y"]) for f in farm_list_fast}
+
+        inactive_player_names_fast: set = set()
+        if only_inactive_players:
+            inactive_player_names_fast = await database.get_inactive_player_names(guild_id, min_days=min_days_i)
+
+        _fl_id_fast = farmlist_id or (farmlist_analyses_fast[0]["id"] if farmlist_analyses_fast else None)
+        farmlist_xy_fast = await database.get_farmlist_xy_lookup(guild_id, uid, analysis_id=_fl_id_fast)
+
+        _advanced_active_fast = any([
+            ref_x_i is not None, ref_y_i is not None,
+            min_dist_f is not None, max_dist_f is not None,
+            min_player_pop_i is not None, max_player_pop_i is not None,
+            max_pop_inc_i is not None,
+            player_filter.strip(), alliance_filter.strip(),
+            exclude_players.strip(), exclude_alliances.strip(),
+            include_natars, include_ww, tribes, in_farmlist,
+        ])
+
+        if _advanced_active_fast:
+            adv_result = await database.search_inactive_advanced(
+                guild_id=guild_id,
+                ref_x=ref_x_i or 0,
+                ref_y=ref_y_i or 0,
+                max_pop_increase=max_pop_inc_i if max_pop_inc_i is not None else 999,
+                min_pop=min_pop_i,
+                max_pop=max_pop_i if max_pop_i < 9999 else (snap_pop_range_fast.get("max_pop", 9999) if snap_pop_range_fast else 9999),
+                min_player_pop=min_player_pop_i or 0,
+                max_player_pop=max_player_pop_i if max_player_pop_i is not None else 999999,
+                min_distance=min_dist_f or 0.0,
+                max_distance=max_dist_f if max_dist_f is not None else 9999.0,
+                player_filter=player_filter,
+                alliance_filter=alliance_filter,
+                exclude_players=exclude_players,
+                exclude_alliances=exclude_alliances,
+                include_natars=include_natars,
+                include_ww=include_ww,
+                tribes=tribes or [],
+                limit=500,
+            )
+            inactive_farms_fast = adv_result.get("villages", [])
+            for v in inactive_farms_fast:
+                v["farmlist_groups"] = farmlist_xy_fast.get((v["x"], v["y"]), [])
+                v.setdefault("days_tracked", 0)
+        else:
+            inactive_farms_fast = await database.get_inactive_farms(
+                guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i,
+                include_ww=include_ww, include_natars=include_natars)
+            for v in inactive_farms_fast:
+                v["farmlist_groups"] = farmlist_xy_fast.get((v["x"], v["y"]), [])
+
+        if in_farmlist == "no":
+            inactive_farms_fast = [v for v in inactive_farms_fast if not v["farmlist_groups"]]
+        elif in_farmlist == "yes":
+            inactive_farms_fast = [v for v in inactive_farms_fast if v["farmlist_groups"]]
+
+        if not show_own_villages:
+            inactive_farms_fast = [v for v in inactive_farms_fast if (v["x"], v["y"]) not in own_coords_fast]
+        if not show_alliance_villages and tw_alliance_lc_fast:
+            inactive_farms_fast = [
+                v for v in inactive_farms_fast
+                if (v.get("alliance_name") or "").strip().lower() != tw_alliance_lc_fast
+            ]
+        if only_inactive_players:
+            inactive_farms_fast = [v for v in inactive_farms_fast if (v.get("player_name") or "") in inactive_player_names_fast]
+
+        _PAGE_SIZE_FAST = 100
+        inactive_farms_real_total_fast = len(inactive_farms_fast)
+        page = inactive_farms_fast[_offset:_offset + _PAGE_SIZE_FAST]
+
+        ajax_farms = []
+        for f in page:
+            coords = (f["x"], f["y"])
+            ajax_farms.append({
+                "x": f["x"], "y": f["y"],
+                "village_name": f.get("village_name") or "",
+                "player_name": f.get("player_name") or "",
+                "alliance_name": f.get("alliance_name") or "",
+                "tribe": f.get("tribe") or 0,
+                "population": f.get("population") or 0,
+                "days_tracked": f.get("days_tracked") or 0,
+                "is_capital": 1 if f.get("is_capital") else 0,
+                "village_type": int(f.get("village_type") or 0),
+                "is_cross": coords in farm_list_coords_fast,
+                "is_on_list": coords in farm_list_coords_fast,
+                "farmlist_groups": f.get("farmlist_groups") or [],
+                "acc_delta": None,
+                "d1": None, "d2": None, "d3": None, "d5": None,
+                "d7": None, "d14": None,
+            })
+        return JSONResponse({
+            "farms": ajax_farms,
+            "total": inactive_farms_real_total_fast,
+            "offset": _offset,
+            "has_more": (_offset + _PAGE_SIZE_FAST) < inactive_farms_real_total_fast,
+        })
+
     # ── Parallel batch 1: all independent metadata queries ──────────────────
     (
         farm_stats,
@@ -8201,36 +8320,6 @@ async def farming_page(
     _PAGE_SIZE = 100
     inactive_farms_real_total = len(inactive_farms)
     inactive_farms = inactive_farms[_offset:_offset + _PAGE_SIZE]
-
-    # ── AJAX mode: return JSON only (for load-more button) ───────────────────
-    if request.query_params.get("_ajax") == "1":
-        import json as _json
-        ajax_farms = []
-        for f in inactive_farms:
-            coords = (f["x"], f["y"])
-            ajax_farms.append({
-                "x": f["x"], "y": f["y"],
-                "village_name": f.get("village_name") or "",
-                "player_name": f.get("player_name") or "",
-                "alliance_name": f.get("alliance_name") or "",
-                "tribe": f.get("tribe") or 0,
-                "population": f.get("population") or 0,
-                "days_tracked": f.get("days_tracked") or 0,
-                "is_capital": 1 if f.get("is_capital") else 0,
-                "village_type": int(f.get("village_type") or 0),
-                "is_cross": coords in cross_ref_coords,
-                "is_on_list": coords in farm_list_coords,
-                "farmlist_groups": f.get("farmlist_groups") or [],
-                "acc_delta": None,
-                "d1": None, "d2": None, "d3": None, "d5": None,
-                "d7": None, "d14": None,
-            })
-        return JSONResponse({
-            "farms": ajax_farms,
-            "total": inactive_farms_real_total,
-            "offset": _offset,
-            "has_more": (_offset + _PAGE_SIZE) < inactive_farms_real_total,
-        })
 
     # ── Parallel batch 2: per-village stats (depend on inactive_farms result) ─
     _INITIAL_RENDER = 100  # rows rendered as Jinja HTML (= _PAGE_SIZE, no split needed)

@@ -2850,14 +2850,19 @@ async def get_inactive_player_names(guild_id: str, min_days: int = 1) -> set[str
     snapshot, provided that span covers at least `min_days` days."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        # NOTE: SQLite can only optimize a single MIN()/MAX() aggregate via the
+        # index (O(log n)); combining MIN(fetched_at) and MAX(fetched_at) in one
+        # query forces a full table scan. Run them as two separate queries instead.
         cur = await db.execute(
-            "SELECT MIN(fetched_at) as first_snap, MAX(fetched_at) as last_snap "
-            "FROM map_snapshots WHERE guild_id = ?", (guild_id,)
-        )
-        row = await cur.fetchone()
-        if not row or not row["first_snap"] or row["first_snap"] == row["last_snap"]:
+            "SELECT MIN(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,))
+        first_row = await cur.fetchone()
+        cur = await db.execute(
+            "SELECT MAX(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,))
+        last_row = await cur.fetchone()
+        first_snap = first_row["t"] if first_row else None
+        last_snap = last_row["t"] if last_row else None
+        if not first_snap or first_snap == last_snap:
             return set()
-        first_snap, last_snap = row["first_snap"], row["last_snap"]
 
         from datetime import datetime as _dt
         try:
@@ -2940,12 +2945,20 @@ async def get_snapshot_pop_range(guild_id: str) -> dict:
     if cached is not None:
         return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        # NOTE: a single MIN(population)+MAX(population) query can't use the index
+        # for both bounds at once and forces a full scan; run as two queries instead.
         async with db.execute(
-            "SELECT MIN(population), MAX(population) FROM map_snapshots WHERE guild_id=? AND population > 0",
-            (guild_id,)
+            "SELECT MIN(population) FROM map_snapshots WHERE guild_id=? AND population > 0", (guild_id,)
         ) as cur:
-            row = await cur.fetchone()
-            result = {"min_pop": row[0] or 0, "max_pop": row[1] or 9999} if row else {"min_pop": 0, "max_pop": 9999}
+            min_row = await cur.fetchone()
+        async with db.execute(
+            "SELECT MAX(population) FROM map_snapshots WHERE guild_id=? AND population > 0", (guild_id,)
+        ) as cur:
+            max_row = await cur.fetchone()
+        result = {
+            "min_pop": (min_row[0] if min_row else 0) or 0,
+            "max_pop": (max_row[0] if max_row else 9999) or 9999,
+        }
     _cache_set(ck, result)
     return result
 
@@ -3200,15 +3213,19 @@ async def get_player_growth(guild_id: str, limit: int = 50) -> list[dict]:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         # We need first and last snapshot times
+        # NOTE: SQLite can only optimize a single MIN()/MAX() aggregate via the
+        # index (O(log n)); combining MIN(fetched_at) and MAX(fetched_at) in one
+        # query forces a full table scan. Run them as two separate queries instead.
         cur = await db.execute(
-            "SELECT MIN(fetched_at) as first_snap, MAX(fetched_at) as last_snap "
-            "FROM map_snapshots WHERE guild_id = ?", (guild_id,)
-        )
-        row = await cur.fetchone()
-        if not row or not row["first_snap"] or row["first_snap"] == row["last_snap"]:
+            "SELECT MIN(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,))
+        first_row = await cur.fetchone()
+        cur = await db.execute(
+            "SELECT MAX(fetched_at) as t FROM map_snapshots WHERE guild_id = ?", (guild_id,))
+        last_row = await cur.fetchone()
+        first_snap = first_row["t"] if first_row else None
+        last_snap = last_row["t"] if last_row else None
+        if not first_snap or first_snap == last_snap:
             return []
-        first_snap = row["first_snap"]
-        last_snap  = row["last_snap"]
 
         # Sum population per player at first snapshot
         cur = await db.execute(
