@@ -6790,6 +6790,10 @@ async def my_ally_member_detail(request: Request, guild_id: str, discord_id: str
     # Editor check
     is_editor = bool(ally_group) or await has_perm(request, guild_id, "ally_manage")
 
+    # Regular members may only view their own troop details, not other members'.
+    if not is_editor and discord_id != uid:
+        return RedirectResponse(f"/guild/{guild_id}/my-ally")
+
     # Growth history
     growth = await database.get_member_growth(guild_id, [discord_id])
     growth_data = growth.get(discord_id, [])

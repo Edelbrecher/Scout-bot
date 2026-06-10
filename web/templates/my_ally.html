@@ -255,10 +255,12 @@
               <td style="font-size:.78rem;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
                   title="{{ m.note or '' }}">{{ m.note or '—' }}</td>
               <td style="white-space:nowrap;">
+                {% if is_editor or m.discord_id == session.get('uid') %}
                 <a href="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/detail"
                    style="padding:.2rem .45rem;border-radius:5px;font-size:.72rem;text-decoration:none;
                           background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399;"
                    title="Detailansicht">🔍</a>
+                {% endif %}
                 {% if is_editor %}
                 <button onclick="openEditMember('{{ m.discord_id }}','{{ (m.travian_name or '')|e }}','{{ (m.note or '')|e }}','{{ m.role_id or '' }}','{{ m.wing }}')"
                         style="padding:.2rem .45rem;border-radius:5px;font-size:.72rem;cursor:pointer;
