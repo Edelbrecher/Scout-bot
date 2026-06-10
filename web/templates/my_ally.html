@@ -255,7 +255,7 @@
               <td style="font-size:.78rem;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
                   title="{{ m.note or '' }}">{{ m.note or '—' }}</td>
               <td style="white-space:nowrap;">
-                {% if is_editor or m.discord_id == session.get('uid') %}
+                {% if can_view_members or m.discord_id == session.get('uid') %}
                 <a href="/guild/{{ guild.guild_id }}/my-ally/member/{{ m.discord_id }}/detail"
                    style="padding:.2rem .45rem;border-radius:5px;font-size:.72rem;text-decoration:none;
                           background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399;"
@@ -783,6 +783,7 @@
                 {% set perm_groups = [
                   ("⚙️ Alliance", [
                     ("ally_manage","Manage Alliance","Full alliance administration: approve members, edit settings, manage roles and invite tokens."),
+                    ("ally_view_members","View Member Troops","Can view other members' troop counts in the leaderboard and their detail pages. Without this, members only see their own data."),
                   ]),
                   ("🛡️ Defense", [
                     ("defend_view","View Defense","Can see the defense board and channel summaries."),
@@ -1327,14 +1328,20 @@
       {% for row in member_leaderboard %}{% if row.travian_name %}{% set _ = lb_map.update({row.travian_name: row}) %}{% endif %}{% endfor %}
       {% set all_rows = [] %}
       {% for m in approved %}
+        {% set is_me = m.discord_id == session.get('uid') %}
+        {% if can_view_members or is_me %}
         {% set stats = lb_map.get(m.travian_name or '', {}) %}
-        {% set _ = all_rows.append({'name': m.travian_name or m.discord_username, 'is_me': m.discord_id == session.get('uid'),
+        {% set _ = all_rows.append({'name': m.travian_name or m.discord_username, 'is_me': is_me,
           'total_troops': stats.get('total_troops',0) or 0, 'total_off': stats.get('total_off',0) or 0,
           'total_def': stats.get('total_def',0) or 0, 'population': stats.get('population',0) or 0,
           'avg_population': stats.get('avg_population',0) or 0}) %}
+        {% endif %}
       {% endfor %}
 
       <h3 style="margin:0 0 .75rem;font-size:.95rem;">📊 Allianz-Rankings</h3>
+      {% if not can_view_members %}
+      <div style="font-size:.75rem;color:var(--text-muted);margin:-.4rem 0 .75rem;">🔒 Du siehst hier nur deine eigenen Werte. Truppendaten anderer Mitglieder sind nicht freigegeben.</div>
+      {% endif %}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;">
         {% macro rankcard(title, icon, field, color, fmt) %}
         {% set sorted_rows = all_rows | sort(attribute=field, reverse=True) %}

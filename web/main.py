@@ -5906,9 +5906,11 @@ async def my_ally_page(request: Request, guild_id: str):
     is_lead = bool(ally_group)
     if is_lead or session.get("type") == "admin" or guild.get("owner_discord_id") == uid:
         is_editor = True
+        can_view_members = True
     else:
         _perms = await database.get_member_permissions(guild_id, uid)
         is_editor = "ally_manage" in _perms
+        can_view_members = is_editor or "ally_view_members" in _perms
 
     # ── Wave 3: depends on members list ──────────────────────────────────
     all_members_list = members or member_view_members or []
@@ -5983,6 +5985,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "growth_data": growth_data,
         "bonuses": bonuses,
         "is_editor": is_editor,
+        "can_view_members": can_view_members,
         "is_lead": is_lead,
         "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
@@ -6433,7 +6436,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     form = await request.form()
     color = form.get("color") or None
     ALL_FLAGS = [
-        "ally_manage",
+        "ally_manage", "ally_view_members",
         "defend_view", "defend_manage",
         "ep_manage", "ep_view", "ep_notify",
         "attack_manage", "attack_view",
@@ -6449,6 +6452,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         selected = ALL_FLAGS[:]
     elif preset == "officer":
         selected = [
+            "ally_view_members",
             "defend_view", "defend_manage",
             "ep_manage", "ep_view", "ep_notify",
             "attack_manage", "attack_view",
@@ -6789,9 +6793,11 @@ async def my_ally_member_detail(request: Request, guild_id: str, discord_id: str
 
     # Editor check
     is_editor = bool(ally_group) or await has_perm(request, guild_id, "ally_manage")
+    can_view_members = is_editor or await has_perm(request, guild_id, "ally_view_members")
 
-    # Regular members may only view their own troop details, not other members'.
-    if not is_editor and discord_id != uid:
+    # Regular members may only view their own troop details, not other members',
+    # unless their role grants the "View Member Troops" permission.
+    if not can_view_members and discord_id != uid:
         return RedirectResponse(f"/guild/{guild_id}/my-ally")
 
     # Growth history
