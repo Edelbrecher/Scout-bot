@@ -653,10 +653,15 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <label>👻 Fake-Wellen / Ziel</label>
           <input id="autoGenFakeCount" type="number" min="0" step="1" value="3">
         </div>
-        <div class="form-group" style="max-width:140px;">
+        <div class="form-group" style="max-width:190px;">
           <label>⏱ Max. Laufzeit</label>
-          <input id="autoGenMaxRuntime" type="number" min="0" step="1" placeholder="∞">
-          <span style="font-size:.68rem;color:var(--text-muted);">Minuten, leer = unbegrenzt</span>
+          <div style="display:flex;gap:.35rem;align-items:center;">
+            <input id="autoGenMaxRuntimeH" type="number" min="0" step="1" placeholder="0" style="width:72px;padding-right:.35rem;">
+            <span style="font-size:.78rem;color:var(--text-muted);">Std.</span>
+            <input id="autoGenMaxRuntimeM" type="number" min="0" max="59" step="1" placeholder="0" style="width:72px;padding-right:.35rem;">
+            <span style="font-size:.78rem;color:var(--text-muted);">Min.</span>
+          </div>
+          <span style="font-size:.68rem;color:var(--text-muted);">leer/0 = unbegrenzt</span>
         </div>
         <div class="form-group" style="flex:1;">
           <label>Angreifer-Pool</label>
@@ -704,7 +709,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </label>
         <div id="autoGenGapWrap" style="display:none;align-items:center;gap:.4rem;">
           <label style="font-size:.8rem;">Vorlauf:</label>
-          <input id="autoGenGapSec" type="number" min="1" max="10" step="1" value="3" style="width:60px;">
+          <input id="autoGenGapSec" type="number" min="1" max="10" step="1" value="3" style="width:72px;padding-right:.35rem;">
           <span style="font-size:.75rem;color:var(--text-muted);">Sek. — Cleaner landet als erste Welle vor der Hauptwelle und räumt die Verteidigung</span>
         </div>
       </div>
@@ -739,7 +744,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           </label>
           <div style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;margin-left:auto;">
             <label>🕐 Impact verschieben:</label>
-            <input id="autoGenShiftSec" type="number" step="1" value="0" style="width:70px;" placeholder="Sek.">
+            <input id="autoGenShiftSec" type="number" step="1" value="0" style="width:84px;padding-right:.35rem;" placeholder="Sek.">
             <button class="btn btn-secondary" style="font-size:.7rem;padding:.2rem .6rem;" onclick="_autoGenShiftSelected()">Anwenden (Auswahl)</button>
           </div>
         </div>
@@ -2220,7 +2225,9 @@ async function generateAutoStack() {
   const catBuilding = document.getElementById('autoGenCatBuilding').value;
   const gapEnabled = document.getElementById('autoGenGapEnabled').checked;
   const gapSec = Math.max(1, Math.min(10, parseInt(document.getElementById('autoGenGapSec').value) || 3));
-  const maxRuntimeMin = Math.max(0, parseFloat(document.getElementById('autoGenMaxRuntime').value) || 0);
+  const maxRuntimeH = Math.max(0, parseFloat(document.getElementById('autoGenMaxRuntimeH').value) || 0);
+  const maxRuntimeM = Math.max(0, parseFloat(document.getElementById('autoGenMaxRuntimeM').value) || 0);
+  const maxRuntimeMin = maxRuntimeH * 60 + maxRuntimeM;
   const sendWindowEnabled = document.getElementById('autoGenSendWindowEnabled').checked;
   const sendFrom = document.getElementById('autoGenSendFrom').value;
   const sendTo = document.getElementById('autoGenSendTo').value;
@@ -2270,6 +2277,8 @@ async function generateAutoStack() {
     const waves = _genWaveRowsForTarget(pool, {realCount, fakeCount, fakeStyle, catBuilding, gapEnabled, gapSec, landingBase});
     if (!waves.length) { skipped++; return; }
     waves.forEach(w => w.target = t);
+    // Standard order: cleaner first, then by impact (landing) time ascending
+    waves.sort((a, b) => (_toGameDate(a.landing)?.getTime() || 0) - (_toGameDate(b.landing)?.getTime() || 0));
     preview.push(...waves);
   });
 
