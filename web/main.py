@@ -423,7 +423,12 @@ def _has_alliance_pro(guild: dict) -> bool:
 
 async def _enrich_guild_subscription(guild: dict) -> dict:
     """For personal workspaces, inject the owner's user-subscription status into the guild dict
-    so all feature-gates work correctly regardless of which route calls them."""
+    so all feature-gates work correctly regardless of which route calls them.
+
+    The guild's own subscription_status (e.g. set directly via a trial-link
+    activation on guild_configs) is preserved if it already grants premium —
+    only overwritten by the owner's user_subscriptions record when that
+    record grants *more* access, so neither source can downgrade the other."""
     if not guild:
         return guild
     if guild.get("workspace_type") == "personal":
@@ -431,9 +436,12 @@ async def _enrich_guild_subscription(guild: dict) -> dict:
         if owner:
             user_sub = await database.get_user_subscription(owner)
             if user_sub:
-                guild = dict(guild)
-                guild["subscription_status"] = user_sub.get("subscription_status", "free")
-                guild["subscription_plan"]   = user_sub.get("plan", "")
+                guild_already_premium = guild.get("subscription_status") in PREMIUM_STATUSES
+                user_is_premium = user_sub.get("subscription_status") in PREMIUM_STATUSES
+                if not guild_already_premium or user_is_premium:
+                    guild = dict(guild)
+                    guild["subscription_status"] = user_sub.get("subscription_status", "free")
+                    guild["subscription_plan"]   = user_sub.get("plan", "")
     return guild
 
 
