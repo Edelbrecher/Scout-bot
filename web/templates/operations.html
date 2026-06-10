@@ -727,15 +727,15 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
 
       <div class="form-row" style="align-items:center;">
         <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;">
-          <input type="checkbox" id="autoGenSendWindowEnabled" onchange="document.getElementById('autoGenSendWindowWrap').style.display=this.checked?'flex':'none';">
+          <input type="checkbox" id="autoGenSendWindowEnabled" checked onchange="document.getElementById('autoGenSendWindowWrap').style.display=this.checked?'flex':'none';">
           🕒 Sendezeit-Fenster einschränken
         </label>
-        <div id="autoGenSendWindowWrap" style="display:none;align-items:center;gap:.4rem;">
+        <div id="autoGenSendWindowWrap" style="display:flex;align-items:center;gap:.4rem;">
           <label style="font-size:.8rem;">von</label>
           <input id="autoGenSendFrom" type="time" value="06:00" style="width:110px;">
           <label style="font-size:.8rem;">bis</label>
           <input id="autoGenSendTo" type="time" value="23:00" style="width:110px;">
-          <span style="font-size:.75rem;color:var(--text-muted);">nur Angreifer, deren Sendezeit in diesem Fenster liegt</span>
+          <span style="font-size:.75rem;color:var(--text-muted);">nur Angreifer, deren Sendezeit in diesem Fenster liegt — sonst wird das Ziel übersprungen</span>
         </div>
       </div>
 
@@ -2245,6 +2245,10 @@ async function generateAutoStack() {
   const landingBase = activePlan?.landing_time || '';
 
   if (realCount + fakeCount <= 0) { showToast('⚠️ Mindestens eine Welle angeben'); return; }
+  if (sendWindowEnabled && !landingBase) {
+    showToast('⚠️ Bitte zuerst eine Impact-/Landezeit für den Plan setzen, damit das Sendezeit-Fenster geprüft werden kann');
+    return;
+  }
 
   // Fetch enemy villages for the selected alliance(s)
   let enemyPlayers = [];
