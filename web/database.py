@@ -2770,26 +2770,61 @@ async def get_inactive_farms(
         return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+
+        # Resolve the world for this guild so we can query world_snapshots directly
+        # (map_snapshots is a VIEW that joins guild_configs on every row, which
+        # is fine for small result sets but expensive for a full-table aggregation).
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow["tw_world"] if wrow else None
+        if not world_url:
+            _cache_set(cache_key, [])
+            return []
+
+        # Step 1: cheap aggregation over the indexed (world_url, village_id, fetched_at,
+        # population) columns only — this is a covering-index scan, no row lookups.
+        # (COUNT(*) is equivalent to COUNT(DISTINCT fetched_at) since there are no
+        # duplicate (village_id, fetched_at) rows.)
         async with db.execute("""
-            SELECT village_id, x, y, village_name, player_name, tribe,
-                   MAX(alliance_name) as alliance_name,
+            SELECT village_id,
                    MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
-                   COUNT(DISTINCT fetched_at) as snapshot_count,
-                   MIN(population) as min_pop_val, MAX(population) as max_pop_val,
-                   MAX(village_type) as village_type, MAX(is_capital) as is_capital
-            FROM map_snapshots
-            WHERE guild_id = ?
+                   COUNT(*) as snapshot_count,
+                   MIN(population) as min_pop_val, MAX(population) as max_pop_val
+            FROM world_snapshots
+            WHERE world_url = ?
             GROUP BY village_id
             HAVING snapshot_count >= 2
                AND CAST(max_pop_val AS REAL) - CAST(min_pop_val AS REAL) <= 5
                AND julianday(last_seen) - julianday(first_seen) >= ?
                AND max_pop_val >= ? AND min_pop_val <= ?
-            ORDER BY max_pop_val DESC
-        """, (guild_id, min_days, min_pop, max_pop)) as cur:
-            rows = await cur.fetchall()
+        """, (world_url, min_days, min_pop, max_pop)) as cur:
+            agg_rows = {r["village_id"]: dict(r) for r in await cur.fetchall()}
+
+        if not agg_rows:
+            _cache_set(cache_key, [])
+            return []
+
+        # Step 2: fetch display columns (x, y, name, player, alliance, tribe, type, ...)
+        # only for the candidate villages, from the most recent snapshot —
+        # a single small read instead of scanning the whole history table.
+        async with db.execute("""
+            SELECT village_id, x, y, village_name, player_name, tribe,
+                   alliance_name, village_type, is_capital
+            FROM world_snapshots
+            WHERE world_url = ?
+              AND fetched_at = (SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url = ?)
+        """, (world_url, world_url)) as cur:
+            latest_rows = {r["village_id"]: dict(r) for r in await cur.fetchall()}
+
+        from datetime import datetime as _dt
         result = []
-        for r in rows:
-            d = dict(r)
+        for vid, agg in agg_rows.items():
+            details = latest_rows.get(vid)
+            if not details:
+                continue
+            d = {**details, **agg}
             # Filter WW villages (village_type=15) unless explicitly included
             if not include_ww and int(d.get("village_type") or 0) == 15:
                 continue
@@ -2798,13 +2833,13 @@ async def get_inactive_farms(
                 continue
             d["population"] = d.get("max_pop_val", 0)  # use latest/max as display value
             try:
-                from datetime import datetime as _dt
                 fs = _dt.fromisoformat(d["first_seen"])
                 ls = _dt.fromisoformat(d["last_seen"])
                 d["days_tracked"] = (ls - fs).days
             except Exception:
                 d["days_tracked"] = 0
             result.append(d)
+        result.sort(key=lambda d: d.get("max_pop_val", 0), reverse=True)
         _cache_set(cache_key, result)
         return result
 
