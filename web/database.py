@@ -7696,6 +7696,14 @@ def _calc_travel_seconds(x1: int, y1: int, x2: int, y2: int,
     return int(hours * 3600)
 
 
+_PUBLIC_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0/O/1/I/L to avoid confusion
+
+def _gen_public_code(length: int = 5) -> str:
+    """Random short reference code for ops/waves, e.g. 'QW32D'."""
+    import random as _random
+    return "".join(_random.choice(_PUBLIC_CODE_ALPHABET) for _ in range(length))
+
+
 async def _init_op_tables():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         # Operation plan header
@@ -7768,6 +7776,25 @@ async def _init_op_tables():
             await db.commit()
         except Exception:
             pass
+        # Migration: public reference codes (e.g. "QW32D-SDAO9") for plans + waves
+        try:
+            await db.execute("ALTER TABLE op_plans ADD COLUMN public_code TEXT")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE op_waves ADD COLUMN public_code TEXT")
+            await db.commit()
+        except Exception:
+            pass
+        # Backfill missing codes for existing rows
+        async with db.execute("SELECT id FROM op_plans WHERE public_code IS NULL OR public_code=''") as cur:
+            for row in await cur.fetchall():
+                await db.execute("UPDATE op_plans SET public_code=? WHERE id=?", (_gen_public_code(5), row[0]))
+        async with db.execute("SELECT id FROM op_waves WHERE public_code IS NULL OR public_code=''") as cur:
+            for row in await cur.fetchall():
+                await db.execute("UPDATE op_waves SET public_code=? WHERE id=?", (_gen_public_code(5), row[0]))
+        await db.commit()
         # Migration: wave confirmation status
         try:
             await db.execute("ALTER TABLE op_waves ADD COLUMN confirm_status TEXT DEFAULT ''")
@@ -7935,10 +7962,10 @@ async def create_op_plan(guild_id: str, name: str, landing_time: str,
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO op_plans (guild_id, name, status, landing_time, server_speed,
-                                   target_ally, notes, created_by)
-            VALUES (?,?,?,?,?,?,?,?)
+                                   target_ally, notes, created_by, public_code)
+            VALUES (?,?,?,?,?,?,?,?,?)
         """, (guild_id, name[:120], "draft", landing_time, server_speed,
-              target_ally[:100], notes[:500], created_by))
+              target_ally[:100], notes[:500], created_by, _gen_public_code(5)))
         await db.commit()
         return cur.lastrowid
 
@@ -8054,13 +8081,14 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
             "SELECT COALESCE(MAX(order_idx)+1,0) FROM op_waves WHERE target_id=?", (target_id,)
         ) as cur:
             idx = (await cur.fetchone())[0]
+        wave_code = _gen_public_code(5)
         cur = await db.execute("""
             INSERT INTO op_waves
                 (target_id, plan_id, guild_id, attacker_discord_id, attacker_name,
                  origin_village, origin_x, origin_y, wave_type, tribe, troop_json,
                  slowest_unit, slowest_speed, travel_seconds, send_time, arrival_time,
-                 notes, order_idx, tournament_square)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 notes, order_idx, tournament_square, public_code)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (target_id, plan_id, guild_id,
               attacker_discord_id, attacker_name[:80],
               origin_village[:80], origin_x, origin_y,
@@ -8068,14 +8096,15 @@ async def add_op_wave(target_id: int, plan_id: int, guild_id: str,
               _json_op.dumps(troops),
               slowest_id, slowest_speed, travel_sec,
               send_time, landing_time,
-              notes[:300], idx, max(0, min(tournament_square, 20))))
+              notes[:300], idx, max(0, min(tournament_square, 20)), wave_code))
         wave_id = cur.lastrowid
         await db.commit()
 
     return {"id": wave_id, "send_time": send_time, "travel_seconds": travel_sec,
             "slowest_unit": slowest_id, "slowest_speed": slowest_speed,
             "target_x": trow["x"] if trow else None,
-            "target_y": trow["y"] if trow else None}
+            "target_y": trow["y"] if trow else None,
+            "public_code": wave_code}
 
 
 async def update_op_wave(wave_id: int, guild_id: str, **kwargs):
@@ -8108,7 +8137,7 @@ async def get_all_op_waves(plan_id: int) -> list[dict]:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, attacker_discord_id, send_time, arrival_time, wave_type, order_idx "
+            "SELECT id, attacker_discord_id, attacker_name, send_time, arrival_time, wave_type, order_idx, public_code "
             "FROM op_waves WHERE plan_id=? ORDER BY attacker_discord_id, send_time",
             (plan_id,)
         ) as cur:

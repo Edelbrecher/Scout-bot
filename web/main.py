@@ -8638,6 +8638,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         payload = {
             "guild_id": guild_id,
             "plan_name": plan_name,
+            "plan_code": plan.get("public_code", ""),
             "landing_time": landing,
             "plan_url": plan_url,
             "poll_channel_id": "",
@@ -8802,6 +8803,8 @@ async def op_add_wave(
                             "target_x": result.get("target_x"),
                             "target_y": result.get("target_y"),
                             "send_time": result.get("send_time"),
+                            "plan_code": plan.get("public_code", ""),
+                            "wave_code": result.get("public_code", ""),
                         })
                         if resp.status_code == 200:
                             data = resp.json()

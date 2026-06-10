@@ -732,6 +732,7 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
         return aiohttp_web.json_response({"ok":False,"error":"guild not found"}, status=404)
 
     plan_name = plan.get("name","Einsatz")
+    plan_code = plan.get("public_code","")
     landing   = (plan.get("landing_time") or "")[:16].replace("T"," ")
     ally      = plan.get("target_ally") or ""
 
@@ -750,6 +751,7 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
                 "target": f"{player} {coords}",
                 "origin": w.get("origin_village","?"),
                 "travel": w.get("travel_seconds",0),
+                "code": w.get("public_code",""),
             })
 
     results = []
@@ -774,9 +776,10 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
                 f"  {_icons.get(w['type'],'⚔')} **{_labels.get(w['type'],w['type'].upper())}** → {w['target']}"
                 + ("\n    ⚠️ **Cleaner — arrive BEFORE main attacks!**" if w['type'] in ('cleaner1','cleaner2') else "")
                 + f"\n    📤 Send: **{w['send_time']}** | 🕐 March: {w['travel']//3600}h{(w['travel']%3600)//60}m | From: {w['origin']}"
+                + (f" | 🔖 `{plan_code}-{w['code']}`" if w.get('code') else "")
                 for w in waves
             ])
-            msg = (f"⚔️ **Einsatz: {plan_name}**\n"
+            msg = (f"⚔️ **Einsatz: {plan_name}**" + (f" `[{plan_code}]`" if plan_code else "") + "\n"
                    f"{'🎯 Ziel-Allianz: ' + ally + chr(10) if ally else ''}"
                    f"🕐 Ankunftszeit: **{landing}**\n\n"
                    f"**Deine Wellen:**\n{wave_lines}\n\n"
@@ -805,6 +808,8 @@ async def handle_op_wave_assigned(request: aiohttp_web.Request) -> aiohttp_web.R
         plan         = data.get("plan", {})
         plan_name    = plan.get("name", "Operation")
         landing      = (plan.get("landing_time") or "")[:16].replace("T", " ")
+        plan_code    = data.get("plan_code", "")
+        wave_code    = data.get("wave_code", "")
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
 
@@ -824,12 +829,13 @@ async def handle_op_wave_assigned(request: aiohttp_web.Request) -> aiohttp_web.R
     target_str = f"({target_x}|{target_y})" if target_x is not None else "?"
     try:
         msg = (
-            f"⚔️ **You've been assigned a wave — {plan_name}**\n"
+            f"⚔️ **You've been assigned a wave — {plan_name}**" + (f" `[{plan_code}]`" if plan_code else "") + "\n"
             f"🕐 Landing: **{landing}**\n\n"
             f"{type_icon} **{type_label}** → {target_str}\n"
             + (f"⚠️ **You are a Cleaner — your wave must arrive BEFORE the main attacks!**\n" if wave_type in ('cleaner1','cleaner2') else "")
-            + f"📤 Send time: **{send_time}**\n\n"
-            + f"➡️ See your full plan: TravOps → My Op Plan"
+            + f"📤 Send time: **{send_time}**\n"
+            + (f"🔖 Code: `{plan_code}-{wave_code}`\n" if plan_code and wave_code else "")
+            + f"\n➡️ See your full plan: TravOps → My Op Plan"
         )
         await member.send(msg)
         return aiohttp_web.json_response({"ok": True, "status": "sent"})
@@ -896,6 +902,7 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
         data = await request.json()
         guild_id   = str(data.get("guild_id", ""))
         plan_name  = str(data.get("plan_name", "Einsatz"))
+        plan_code  = str(data.get("plan_code", ""))
         landing    = str(data.get("landing_time", "")).replace("T", " ")[:16]
         plan_url   = str(data.get("plan_url", ""))
         poll_channel_id = str(data.get("poll_channel_id", ""))
@@ -922,7 +929,7 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
             try:
                 import discord as _discord
                 embed = _discord.Embed(
-                    title=f"⚔️ Neuer aktiver Einsatzplan: {plan_name}",
+                    title=f"⚔️ Neuer aktiver Einsatzplan: {plan_name}" + (f" [{plan_code}]" if plan_code else ""),
                     description=f"Ein neuer Einsatz wurde aktiviert.\nBitte öffne den Plan, prüfe deine Wellen und bestätige deine Teilnahme.",
                     color=0xED4245,
                 )
@@ -975,7 +982,7 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
                     if unix_ts else ""
                 )
             dm_text = (
-                f"⚔️ **Neuer Einsatz: {plan_name}**\n"
+                f"⚔️ **Neuer Einsatz: {plan_name}**" + (f" `[{plan_code}]`" if plan_code else "") + "\n"
                 f"{('🕐 Einschlag: **' + landing + '**') if landing else ''}"
                 f"{countdown_line}\n\n"
                 f"{'Du bist für diesen Einsatz eingeplant.' if wave_iso else 'Du könntest für diesen Einsatz eingeplant sein.'}\n"

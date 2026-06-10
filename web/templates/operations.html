@@ -844,7 +844,7 @@ function renderEditor() {
   document.getElementById('opEditor').style.display='block';
   document.getElementById('opTopbar').style.display='flex';
 
-  document.getElementById('topPlanName').textContent = p.name;
+  document.getElementById('topPlanName').textContent = p.name + (p.public_code ? ` [${p.public_code}]` : '');
   const sb = document.getElementById('topPlanStatus');
   sb.textContent = statusLabel(p.status);
   sb.className = `status-badge status-${p.status}`;
