@@ -2945,14 +2945,22 @@ async def get_snapshot_pop_range(guild_id: str) -> dict:
     if cached is not None:
         return cached
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        # NOTE: a single MIN(population)+MAX(population) query can't use the index
-        # for both bounds at once and forces a full scan; run as two queries instead.
+        # NOTE: population isn't indexed, so MIN/MAX(population) over the whole
+        # history table forces a multi-million-row scan. Restrict to the latest
+        # snapshot only (~20k rows) — good enough for a UI slider's bounds.
         async with db.execute(
-            "SELECT MIN(population) FROM map_snapshots WHERE guild_id=? AND population > 0", (guild_id,)
+            "SELECT MAX(fetched_at) FROM map_snapshots WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            latest_row = await cur.fetchone()
+        latest_ts = latest_row[0] if latest_row else None
+        async with db.execute(
+            "SELECT MIN(population) FROM map_snapshots WHERE guild_id=? AND fetched_at=? AND population > 0",
+            (guild_id, latest_ts)
         ) as cur:
             min_row = await cur.fetchone()
         async with db.execute(
-            "SELECT MAX(population) FROM map_snapshots WHERE guild_id=? AND population > 0", (guild_id,)
+            "SELECT MAX(population) FROM map_snapshots WHERE guild_id=? AND fetched_at=? AND population > 0",
+            (guild_id, latest_ts)
         ) as cur:
             max_row = await cur.fetchone()
         result = {
