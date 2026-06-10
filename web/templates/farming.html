@@ -1010,7 +1010,7 @@
           .catch(function(e) {
             console.error('AJAX farm load failed:', e);
             _farmLoadingAjax = false;
-            if (btn) btn.innerHTML = '⬇ Weitere 100 laden · <span id="loadMoreCount">' + (_farmServerTotal - document.querySelectorAll(\'#inactiveBody tr\').length) + '</span> verbleibend';
+            if (btn) btn.innerHTML = '⬇ Weitere 100 laden · <span id="loadMoreCount">' + (_farmServerTotal - document.querySelectorAll('#inactiveBody tr').length) + '</span> verbleibend';
           });
       }
       </script>

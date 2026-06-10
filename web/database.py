@@ -2447,8 +2447,11 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
             )
             for v in villages
         ])
-        # Retention cleanup: run at most once per hour per world to avoid slow DELETEs on every scan
-        now_ts = _time.monotonic()
+        # Retention cleanup: run at most once per hour per world to avoid slow DELETEs on every scan.
+        # NOTE: must use wall-clock time(), not monotonic() — monotonic() restarts near 0 on every
+        # process restart, so "now - 0 > 3600" was false for an hour after every deploy and this
+        # cleanup effectively never ran, letting world_snapshots grow unbounded (4M+ rows).
+        now_ts = _time.time()
         last_run = _last_retention_run.get(world_url, 0)
         if now_ts - last_run > 3600:
             _last_retention_run[world_url] = now_ts
