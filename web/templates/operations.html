@@ -2119,8 +2119,17 @@ function _fakeRequiredTroops(tribe, fakeStyle) {
 }
 
 // Does this village have enough troops on hand to send the given composition?
-function _hasEnoughTroops(troops, required) {
-  return Object.entries(required).every(([unit, cnt]) => (troops?.[unit] || 0) >= cnt);
+// `required` is keyed by canonical TROOPS_DEF id (e.g. "swordsman"), but troop
+// counts parsed from in-game reports are keyed by the German unit name (e.g.
+// "Schwertkämpfer") — so look up each unit's display name for the village's
+// tribe and check both forms.
+function _hasEnoughTroops(troops, required, tribe) {
+  const list = TROOPS_DEF[tribe] || TROOPS_DEF.romans;
+  return Object.entries(required).every(([unit, cnt]) => {
+    const def = list.find(t => t.id === unit);
+    const have = (troops?.[unit] || 0) || (def && troops?.[def.name]) || 0;
+    return have >= cnt;
+  });
 }
 
 // Build the real/fake/gap wave rows for one target, drawing from a pool of attacker villages
@@ -2163,7 +2172,7 @@ function _genWaveRowsForTarget(pool, opts) {
       for (let k = 0; k < pool.length; k++) {
         const cand = pool[(fakeIdx + k) % pool.length];
         const req = _fakeRequiredTroops(cand.tribe || 'romans', fakeStyle);
-        if (_hasEnoughTroops(cand.troops, req)) { found = cand; fakeIdx = (fakeIdx + k + 1) % pool.length; break; }
+        if (_hasEnoughTroops(cand.troops, req, cand.tribe || 'romans')) { found = cand; fakeIdx = (fakeIdx + k + 1) % pool.length; break; }
       }
       if (found) {
         r = found;
