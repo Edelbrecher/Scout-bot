@@ -9141,15 +9141,11 @@ async def op_delete_favorite(request: Request, guild_id: str, fav_id: int):
 @app.get("/guild/{guild_id}/operations/api/alliances")
 async def op_list_alliances(request: Request, guild_id: str):
     """Return alliances sorted by total population (strength), plus meta groups."""
-    import time as _time_op
-    _t0 = _time_op.perf_counter()
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
-    _t1 = _time_op.perf_counter()
     import aiosqlite as _aiosqlite_op
     alliances = []
     async with _aiosqlite_op.connect(database.DB_PATH, timeout=30) as db:
-        _t2 = _time_op.perf_counter()
         db.row_factory = _aiosqlite_op.Row
         # Resolve the guild's world_url, then look up the latest snapshot timestamp
         # for that world directly (uses idx_wsnap_url_ts_v) instead of joining the
@@ -9158,7 +9154,6 @@ async def op_list_alliances(request: Request, guild_id: str):
         async with db.execute("SELECT tw_world FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
             row = await cur.fetchone()
             world_url = row["tw_world"] if row else None
-        _t3 = _time_op.perf_counter()
         if world_url:
             async with db.execute("SELECT MAX(fetched_at) AS max_ts FROM world_snapshots WHERE world_url=?", (world_url,)) as cur:
                 row = await cur.fetchone()
@@ -9174,11 +9169,8 @@ async def op_list_alliances(request: Request, guild_id: str):
                     ORDER BY total_pop DESC
                 """, (world_url, max_ts)) as cur:
                     alliances = [{"name": r["alliance_name"], "players": r["player_count"], "pop": r["total_pop"]} for r in await cur.fetchall()]
-    _t4 = _time_op.perf_counter()
     # Meta groups
     meta_groups = await database.get_meta_groups(guild_id)
-    _t5 = _time_op.perf_counter()
-    print(f"[alliances-timing] guard={_t1-_t0:.3f}s connect={_t2-_t1:.3f}s world_url={_t3-_t2:.3f}s alliances_query={_t4-_t3:.3f}s meta_groups={_t5-_t4:.3f}s total={_t5-_t0:.3f}s", flush=True)
     return JSONResponse({"alliances": alliances, "meta_groups": meta_groups})
 
 
@@ -9366,37 +9358,40 @@ async def op_attacker_list(request: Request, guild_id: str):
                         "tribe": "", "villages_json": None
                     }
 
-        # Their villages from latest map snapshot (own alliance villages)
+        # Their villages from latest map snapshot (own alliance villages).
+        # Query world_snapshots directly (not via the map_snapshots VIEW) using
+        # world_url + fetched_at — the view-joined "MAX(fetched_at) GROUP BY
+        # guild_id" subquery forced a full scan/join of world_snapshots and was
+        # taking ~9-10s per call.
         tw_name = await database.get_tw_alliance_name(guild_id)
-        snap_params = [guild_id, guild_id]
         ally_clause = ""
-        known_names = set(ally_members.keys()) | set(troop_rows.keys())
+        extra_params: list = []
         if tw_name:
-            ally_clause = " AND m.alliance_name = ?"
-            snap_params.append(tw_name)
+            ally_clause = " AND alliance_name = ?"
+            extra_params.append(tw_name)
         elif ally_members:
             placeholders = ",".join("?" * len(ally_members))
-            ally_clause = f" AND m.player_name IN ({placeholders})"
-            snap_params.extend(ally_members.keys())
+            ally_clause = f" AND player_name IN ({placeholders})"
+            extra_params.extend(ally_members.keys())
         elif troop_rows:
             # Fallback: filter snapshot by known travian names from troop uploads
             placeholders = ",".join("?" * len(troop_rows))
-            ally_clause = f" AND m.player_name IN ({placeholders})"
-            snap_params.extend(troop_rows.keys())
+            ally_clause = f" AND player_name IN ({placeholders})"
+            extra_params.extend(troop_rows.keys())
 
         snap_rows = []
-        if ally_clause or tw_name:  # only query if we have a filter (avoid full scan)
-            async with db.execute(f"""
-                SELECT m.player_name, m.village_name, m.x, m.y, m.population, m.tribe
-                FROM map_snapshots m
-                INNER JOIN (
-                    SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
-                    WHERE guild_id=? GROUP BY guild_id
-                ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
-                WHERE m.guild_id=? {ally_clause}
-                ORDER BY m.player_name, m.population DESC
-            """, snap_params) as cur:
-                snap_rows = await cur.fetchall()
+        if this_world and (ally_clause or tw_name):  # only query if we have a filter (avoid full scan)
+            async with db.execute("SELECT MAX(fetched_at) AS max_ts FROM world_snapshots WHERE world_url=?", (this_world,)) as cur:
+                row = await cur.fetchone()
+                max_ts = row["max_ts"] if row else None
+            if max_ts:
+                async with db.execute(f"""
+                    SELECT player_name, village_name, x, y, population, tribe
+                    FROM world_snapshots
+                    WHERE world_url=? AND fetched_at=? {ally_clause}
+                    ORDER BY player_name, population DESC
+                """, [this_world, max_ts, *extra_params]) as cur:
+                    snap_rows = await cur.fetchall()
 
     # Group snap villages by player
     from collections import defaultdict
