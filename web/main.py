@@ -9413,26 +9413,33 @@ async def op_players_by_alliance(request: Request, guild_id: str, alliances: str
     if err: return err
     alliance_filter = [a.strip() for a in alliances.split(",") if a.strip()] if alliances else []
     import aiosqlite as _aiosqlite_op
+    rows = []
     async with _aiosqlite_op.connect(database.DB_PATH) as db:
         db.row_factory = _aiosqlite_op.Row
-        params: list = [guild_id, guild_id]
-        alliance_clause = ""
-        if alliance_filter:
-            placeholders = ",".join("?" * len(alliance_filter))
-            alliance_clause = f" AND m.alliance_name IN ({placeholders})"
-            params.extend(alliance_filter)
-        async with db.execute(f"""
-            SELECT m.player_name, m.alliance_name,
-                   m.village_name, m.x, m.y, m.population
-            FROM map_snapshots m
-            INNER JOIN (
-                SELECT guild_id, MAX(fetched_at) as max_ts FROM map_snapshots
-                WHERE guild_id=? GROUP BY guild_id
-            ) lts ON m.guild_id=lts.guild_id AND m.fetched_at=lts.max_ts
-            WHERE m.guild_id=? {alliance_clause}
-            ORDER BY m.alliance_name, m.player_name, m.population DESC
-        """, params) as cur:
-            rows = await cur.fetchall()
+        # Resolve world_url + latest snapshot timestamp directly (avoids the
+        # expensive double join over the map_snapshots view, see op_list_alliances).
+        async with db.execute("SELECT tw_world FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+            row = await cur.fetchone()
+            world_url = row["tw_world"] if row else None
+        if world_url:
+            async with db.execute("SELECT MAX(fetched_at) AS max_ts FROM world_snapshots WHERE world_url=?", (world_url,)) as cur:
+                row = await cur.fetchone()
+                max_ts = row["max_ts"] if row else None
+            if max_ts:
+                params: list = [world_url, max_ts]
+                alliance_clause = ""
+                if alliance_filter:
+                    placeholders = ",".join("?" * len(alliance_filter))
+                    alliance_clause = f" AND alliance_name IN ({placeholders})"
+                    params.extend(alliance_filter)
+                async with db.execute(f"""
+                    SELECT player_name, alliance_name,
+                           village_name, x, y, population
+                    FROM world_snapshots
+                    WHERE world_url=? AND fetched_at=? {alliance_clause}
+                    ORDER BY alliance_name, player_name, population DESC
+                """, params) as cur:
+                    rows = await cur.fetchall()
     # Group by player
     from collections import OrderedDict
     players: dict = OrderedDict()
