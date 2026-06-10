@@ -1493,11 +1493,12 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
 let assignTarget = null;
 let assignRows   = [];
 // Panel-wide settings (read from DOM when rendering)
-const GUILD_DEFAULT_TS = {{ default_ts | default(0) }};
-const _lsTS = parseInt(localStorage.getItem('assign_ts'));
+const _lsSpeed = parseFloat(localStorage.getItem('assign_speed'));
+const _lsMaxRuntime = parseFloat(localStorage.getItem('assign_max_runtime'));
 const ASSIGN_DEFAULTS = {
-  ts: isNaN(_lsTS) ? GUILD_DEFAULT_TS : _lsTS,
-  heroEnabled: true, heroBonus: 5, onlyOff: false, onlyWithTroops: false
+  speed: isNaN(_lsSpeed) ? 6 : _lsSpeed,
+  maxRuntimeMin: isNaN(_lsMaxRuntime) ? 0 : _lsMaxRuntime, // 0 = no limit
+  onlyOff: false, onlyWithTroops: false
 };
 
 function _torusDist(x1, y1, x2, y2) {
@@ -1506,8 +1507,19 @@ function _torusDist(x1, y1, x2, y2) {
   return Math.sqrt(dx*dx+dy*dy);
 }
 
-// Catapult speed = 3 for all tribes (Feuerkatapult/Katapult/Trebuchet all = 3)
-const CAT_BASE_SPEED = 3;
+// Build a list of distinct unit speeds across all tribes for the speed dropdown,
+// e.g. "3 Fel/h (Katapult, Rammbock...)"
+const _SPEED_OPTIONS = (() => {
+  const map = {};
+  Object.values(TROOPS_DEF).forEach(troops => (troops||[]).forEach(t => {
+    if (t.speed == null) return;
+    if (!map[t.speed]) map[t.speed] = new Set();
+    map[t.speed].add(t.name);
+  }));
+  return Object.keys(map).map(Number).sort((a,b)=>a-b).map(spd => ({
+    speed: spd, names: [...map[spd]].slice(0,3).join(', ')
+  }));
+})();
 
 // ── Troop colour classification ───────────────────────────────────────────────
 // Primary source: troop_roles (guild-configured, same as used everywhere else)
@@ -1554,18 +1566,17 @@ function _troopColor(name) {
 
 function _assignSettings() {
   return {
-    ts:          Math.max(0, Math.min(20, parseInt(document.getElementById('assignTS')?.value)||0)),
-    heroEnabled: document.getElementById('assignHero')?.checked ?? true,
-    heroBonus:   parseFloat(document.getElementById('assignHeroBonus')?.value)||5,
+    speed:        Math.max(0.1, parseFloat(document.getElementById('assignSpeed')?.value) || 6),
+    maxRuntimeMin: Math.max(0, parseFloat(document.getElementById('assignMaxRuntime')?.value) || 0), // 0 = no limit
     onlyOff:        document.getElementById('assignOnlyOff')?.checked ?? false,
     onlyWithTroops: document.getElementById('assignOnlyWithTroops')?.checked ?? false,
   };
 }
 
-function _catTravelSec(dist, settings, serverSpeed) {
+function _travelSec(dist, settings, serverSpeed) {
   const spd = serverSpeed || 1;
-  const eff = CAT_BASE_SPEED * (1 + settings.ts * 0.2) + (settings.heroEnabled ? settings.heroBonus : 0);
-  return Math.round((dist / (eff * spd)) * 3600);
+  const eff = settings.speed * spd;
+  return Math.round((dist / eff) * 3600);
 }
 
 function _sendTimeStr(travelSec) {
@@ -1602,7 +1613,8 @@ function _buildAssignRows(settings) {
       const hasTroopData = Object.values(v.troops || {}).some(c => c > 0);
       if (settings.onlyWithTroops && !hasTroopData) return;
       const dist = _torusDist(v.x, v.y, tx, ty);
-      const travelSec = _catTravelSec(dist, settings, spd);
+      const travelSec = _travelSec(dist, settings, spd);
+      if (settings.maxRuntimeMin > 0 && travelSec > settings.maxRuntimeMin * 60) return;
       assignRows.push({
         player_name: a.player_name,
         discord_name: a.discord_name,
@@ -1629,8 +1641,9 @@ function _renderAssignmentPanel(settings) {
   const {x: tx, y: ty, player: tp, village: tv} = assignTarget;
   const spd = parseFloat(activePlan?.server_speed) || 1;
 
-  const effSpeed = (CAT_BASE_SPEED * (1 + settings.ts * 0.2) + (settings.heroEnabled ? settings.heroBonus : 0)) * spd;
-  const speedInfo = `Kata ${CAT_BASE_SPEED} → ${effSpeed.toFixed(1)} Fel/h (×${spd})`;
+  const effSpeed = settings.speed * spd;
+  const speedInfo = `${settings.speed} Fel/h → ${effSpeed.toFixed(1)} Fel/h effektiv (×${spd} Serverspeed)`
+    + (settings.maxRuntimeMin > 0 ? ` · max. Laufzeit ${settings.maxRuntimeMin} min` : '');
 
   const lbl = {real:'⚔ Real', fake:'👻 Fake', scout:'🔍 Scout', def:'🛡 Def'};
   const roleTag = {off:'<span style="color:#f87171;font-size:.68rem;">⚔ OFF</span>',
@@ -1660,24 +1673,27 @@ function _renderAssignmentPanel(settings) {
         </button>
         <input type="checkbox" id="assignOnlyWithTroops" style="display:none;" ${settings.onlyWithTroops?'checked':''} onchange="rebuildAssignPanel()">
       </div>
-      <!-- Row 2: TS + hero + only-off -->
+      <!-- Row 2: speed + max runtime + only-off -->
       <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
         <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;">
-          🏆 TS:
-          <input id="assignTS" type="number" min="0" max="20" value="${settings.ts}"
-            style="width:38px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
-            oninput="localStorage.setItem('assign_ts',this.value);rebuildAssignPanel()">
-          <button onclick="saveGuildDefaultTS()" title="Save as guild default"
-            style="background:none;border:none;color:#6366f1;cursor:pointer;font-size:.72rem;padding:0 2px;">💾</button>
+          🐎 Speed:
+          <select id="assignSpeedSelect"
+            style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;"
+            onchange="if(this.value){document.getElementById('assignSpeed').value=this.value;localStorage.setItem('assign_speed',this.value);rebuildAssignPanel();}">
+            <option value="">Custom…</option>
+            ${_SPEED_OPTIONS.map(o => `<option value="${o.speed}" ${Number(settings.speed)===o.speed?'selected':''}>${o.speed} Fel/h (${escHtml(o.names)})</option>`).join('')}
+          </select>
+          <input id="assignSpeed" type="number" min="0.1" step="0.1" value="${settings.speed}"
+            style="width:48px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
+            oninput="document.getElementById('assignSpeedSelect').value='';localStorage.setItem('assign_speed',this.value);rebuildAssignPanel()">
+          Fel/h
         </label>
-        <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.25rem;">
-          <input id="assignHero" type="checkbox" class="atk-include" ${settings.heroEnabled?'checked':''}
-            onchange="rebuildAssignPanel()">
-          Hero&nbsp;+&nbsp;Bonus:
-          <input id="assignHeroBonus" type="number" min="0" max="30" step="0.5" value="${settings.heroBonus}"
-            style="width:38px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
-            oninput="rebuildAssignPanel()">
-          t/h
+        <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.3rem;">
+          ⏱ Max. Laufzeit:
+          <input id="assignMaxRuntime" type="number" min="0" step="1" placeholder="∞" value="${settings.maxRuntimeMin || ''}"
+            style="width:48px;background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .3rem;color:var(--text);font-size:.75rem;text-align:center;"
+            oninput="localStorage.setItem('assign_max_runtime',this.value);rebuildAssignPanel()">
+          min
         </label>
         <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.25rem;margin-left:auto;">
           <input id="assignOnlyOff" type="checkbox" class="atk-include" ${settings.onlyOff?'checked':''}
@@ -1746,22 +1762,6 @@ function rebuildAssignPanel() {
   _renderAssignmentPanel(settings);
 }
 
-async function saveGuildDefaultTS() {
-  const ts = parseInt(document.getElementById('assignTS')?.value) || 0;
-  if (!activePlanId) return;
-  try {
-    const r = await fetch(`/guild/{{ guild.guild_id }}/operations/api/save-default-ts`, {
-      method: 'POST',
-      headers: {'Content-Typee':'application/json'},
-      body: JSON.stringify({ts})
-    });
-    if (r.ok) {
-      const btn = event.target;
-      btn.textContent = '✅'; setTimeout(() => btn.textContent = '💾', 1500);
-    }
-  } catch(e) { console.error(e); }
-}
-
 async function addAtkWave(i, type, btn) {
   if (!activePlanId || !assignTarget) return;
   const r = assignRows[i];
@@ -1806,7 +1806,6 @@ async function addAtkWave(i, type, btn) {
       landing_time: activePlan?.landing_time || '',
       server_speed: activePlan?.server_speed || 1,
       notes: '',
-      tournament_square: settings.ts,
     });
     // Visual feedback: show checkmark + re-enable
     if (btnsEl) {
