@@ -201,6 +201,9 @@
   padding:.4rem .7rem; color:var(--text); font-size:.88rem; width:100%;
   color-scheme: dark; /* keep native spinner/date/time controls dark-themed instead of a clashing white box */
 }
+.form-group input[type=number] {
+  padding-right:1.6rem; /* keep native up/down spinner clear of the digits */
+}
 .form-group input:focus, .form-group select:focus {
   outline:none; border-color:#f59e0b; box-shadow:0 0 0 2px rgba(245,158,11,.15);
 }
@@ -634,10 +637,13 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
     <div class="op-modal-body">
 
       <div class="form-row">
-        <div class="form-group" style="flex:1;">
+        <div class="form-group">
           <label>🏰 Ziel-Allianz(en)</label>
           <div id="autoGenAllianceList" class="autogen-chip-box"></div>
         </div>
+      </div>
+
+      <div class="form-row">
         <div class="form-group" style="max-width:140px;">
           <label>🎯 Anzahl Ziele</label>
           <input id="autoGenTargetCount" type="number" min="1" max="20" step="1" value="3">
@@ -657,9 +663,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div class="form-group" style="max-width:190px;">
           <label>⏱ Max. Laufzeit</label>
           <div style="display:flex;gap:.35rem;align-items:center;">
-            <input id="autoGenMaxRuntimeH" type="number" min="0" step="1" placeholder="0" style="width:72px;padding-right:.35rem;">
+            <input id="autoGenMaxRuntimeH" type="number" min="0" step="1" placeholder="0" style="width:72px;">
             <span style="font-size:.78rem;color:var(--text-muted);">Std.</span>
-            <input id="autoGenMaxRuntimeM" type="number" min="0" max="59" step="1" placeholder="0" style="width:72px;padding-right:.35rem;">
+            <input id="autoGenMaxRuntimeM" type="number" min="0" max="59" step="1" placeholder="0" style="width:72px;">
             <span style="font-size:.78rem;color:var(--text-muted);">Min.</span>
           </div>
           <span style="font-size:.68rem;color:var(--text-muted);">leer/0 = unbegrenzt</span>
@@ -710,7 +716,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </label>
         <div id="autoGenGapWrap" style="display:none;align-items:center;gap:.4rem;">
           <label style="font-size:.8rem;">Vorlauf:</label>
-          <input id="autoGenGapSec" type="number" min="1" max="10" step="1" value="3" style="width:72px;padding-right:.35rem;">
+          <input id="autoGenGapSec" type="number" min="1" max="10" step="1" value="3" style="width:72px;">
           <span style="font-size:.75rem;color:var(--text-muted);">Sek. — Cleaner landet als erste Welle vor der Hauptwelle und räumt die Verteidigung</span>
         </div>
       </div>
@@ -745,7 +751,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           </label>
           <div style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;margin-left:auto;">
             <label>🕐 Impact verschieben:</label>
-            <input id="autoGenShiftSec" type="number" step="1" value="0" style="width:84px;padding-right:.35rem;" placeholder="Sek.">
+            <input id="autoGenShiftSec" type="number" step="1" value="0" style="width:84px;" placeholder="Sek.">
             <button class="btn btn-secondary" style="font-size:.7rem;padding:.2rem .6rem;" onclick="_autoGenShiftSelected()">Anwenden (Auswahl)</button>
           </div>
         </div>
