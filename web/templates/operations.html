@@ -653,6 +653,11 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <label>👻 Fake-Wellen / Ziel</label>
           <input id="autoGenFakeCount" type="number" min="0" step="1" value="3">
         </div>
+        <div class="form-group" style="max-width:140px;">
+          <label>⏱ Max. Laufzeit</label>
+          <input id="autoGenMaxRuntime" type="number" min="0" step="1" placeholder="∞">
+          <span style="font-size:.68rem;color:var(--text-muted);">Minuten, leer = unbegrenzt</span>
+        </div>
         <div class="form-group" style="flex:1;">
           <label>Angreifer-Pool</label>
           <select id="autoGenPoolMode" onchange="document.getElementById('autoGenPlayerListWrap').style.display=this.value==='manual'?'block':'none';">
@@ -713,7 +718,17 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       </div>
 
       <div id="autoGenPreviewWrap" style="display:none;margin-top:.8rem;">
-        <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;margin-bottom:.3rem;">Vorschau</div>
+        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem;">
+          <div style="font-size:.78rem;font-weight:700;color:#a5b4fc;">Vorschau</div>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;margin-left:.5rem;">
+            <input type="checkbox" id="autoGenSelectAll" checked onchange="_autoGenToggleAll(this.checked)"> Alle
+          </label>
+          <div style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;margin-left:auto;">
+            <label>🕐 Impact verschieben:</label>
+            <input id="autoGenShiftSec" type="number" step="1" value="0" style="width:70px;" placeholder="Sek.">
+            <button class="btn btn-secondary" style="font-size:.7rem;padding:.2rem .6rem;" onclick="_autoGenShiftSelected()">Anwenden (Auswahl)</button>
+          </div>
+        </div>
         <div class="autogen-preview-box" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
           <table class="autogen-preview-table" style="width:100%;font-size:.75rem;border-collapse:collapse;">
             <thead style="position:sticky;top:0;background:var(--bg-main);z-index:1;">
@@ -725,6 +740,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <th style="padding:.4rem .5rem;text-align:left;">Typ</th>
                 <th style="padding:.4rem .5rem;text-align:left;">Truppen</th>
                 <th style="padding:.4rem .5rem;text-align:left;">Laufzeit</th>
+                <th style="padding:.4rem .5rem;text-align:left;">Impact</th>
                 <th style="padding:.4rem .5rem;text-align:left;">Sendezeit</th>
               </tr>
             </thead>
@@ -2050,11 +2066,16 @@ function _genWaveRowsForTarget(pool, opts) {
   const rows = [];
   let realIdx = 0, fakeIdx = 0;
   for (let i = 0; i < total; i++) {
-    const isReal = i < realCount;
+    // The last wave, when a snipe gap is enabled, becomes the "Cleaner" — a real
+    // wave (troops left empty for manual entry, like other real waves) landing
+    // slightly offset to cover the snipe window. A 1-unit fake wouldn't actually
+    // clean anything, so cleaners are always drawn from the real-wave pool.
+    const isCleaner = gapEnabled && total > 1 && i === total - 1;
+    const isReal = (i < realCount && !isCleaner) || isCleaner;
     let r;
     let troops = {};
     let notes = '';
-    let waveType = isReal ? 'real' : 'fake';
+    let waveType = isCleaner ? 'cleaner1' : (isReal ? 'real' : 'fake');
     let insufficientTroops = false;
 
     if (isReal) {
@@ -2088,10 +2109,9 @@ function _genWaveRowsForTarget(pool, opts) {
       }
     }
     let landing = landingBase;
-    // Last wave landing slightly offset = "Cleaner" covering the snipe window
-    if (gapEnabled && total > 1 && i === total - 1) {
+    // Cleaner wave lands slightly offset to cover the snipe window
+    if (isCleaner) {
       landing = _isoAddSeconds(landingBase, gapSec);
-      waveType = 'cleaner1';
       notes = (notes ? notes + ' | ' : '') + `🕳️ Snipe-Fenster +${gapSec}s`;
     }
     rows.push({
@@ -2148,6 +2168,7 @@ async function generateAutoStack() {
   const catBuilding = document.getElementById('autoGenCatBuilding').value;
   const gapEnabled = document.getElementById('autoGenGapEnabled').checked;
   const gapSec = Math.max(1, Math.min(10, parseInt(document.getElementById('autoGenGapSec').value) || 3));
+  const maxRuntimeMin = Math.max(0, parseFloat(document.getElementById('autoGenMaxRuntime').value) || 0);
   const landingBase = activePlan?.landing_time || '';
 
   if (realCount + fakeCount <= 0) { showToast('⚠️ Mindestens eine Welle angeben'); return; }
@@ -2176,7 +2197,7 @@ async function generateAutoStack() {
 
   if (!targets.length) { showToast('⚠️ Keine Dörfer in der gewählten Allianz gefunden'); return; }
 
-  const settings = ASSIGN_DEFAULTS;
+  const settings = {...ASSIGN_DEFAULTS, maxRuntimeMin};
   let manualPool = null;
   if (poolMode === 'manual') {
     manualPool = new Set([...document.querySelectorAll('.autogen-player.active')].map(el => el.dataset.value));
@@ -2215,6 +2236,7 @@ function renderAutoGenPreview() {
       const tDef = (TROOPS_DEF[r.tribe] || []).find(t => t.id === id);
       return `${tDef ? tDef.name : id}: ${c}`;
     }).join(', ') || '—';
+    const landStr = r.landing ? r.landing.replace('T', ' ').slice(0, 19) : '—';
     const sendStr = r.landing ? (() => {
       const land = new Date(r.landing.includes('T') ? r.landing : r.landing.replace(' ', 'T'));
       const send = new Date(land.getTime() - r.travelSec * 1000);
@@ -2229,16 +2251,35 @@ function renderAutoGenPreview() {
     if (r.insufficientTroops) rowClasses.push('autogen-warn');
     const warnIcon = r.insufficientTroops ? ' <span class="autogen-warn-icon" title="Nicht genug Truppen im Dorf für diese Fake-Welle">⚠️</span>' : '';
     return `<tr class="${rowClasses.join(' ')}" style="opacity:${r.include ? 1 : .5};">
-      <td style="padding:.35rem .5rem;"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="autoGenPreview[${i}].include=this.checked;renderAutoGenPreview()"></td>
+      <td style="padding:.35rem .5rem;"><input type="checkbox" class="autogen-row-check" ${r.include ? 'checked' : ''} onchange="autoGenPreview[${i}].include=this.checked;renderAutoGenPreview()"></td>
       <td class="autogen-target-cell" style="padding:.35rem .5rem;">${isFirstOfTarget ? `${escHtml(t.player_name || '')} (${t.x}|${t.y})` : ''}</td>
       <td style="padding:.35rem .5rem;">${escHtml(r.player_name)}</td>
       <td style="padding:.35rem .5rem;">${escHtml(r.village_name)} (${r.vx}|${r.vy})</td>
       <td style="padding:.35rem .5rem;"><span class="autogen-type-badge ${r.type}">${lbl[r.type] || r.type}</span></td>
       <td style="padding:.35rem .5rem;">${escHtml(troopStr)}${warnIcon}</td>
       <td style="padding:.35rem .5rem;">${fmtTravel(r.travelSec)}</td>
+      <td style="padding:.35rem .5rem;">${escHtml(landStr)}</td>
       <td style="padding:.35rem .5rem;">${escHtml(sendStr)}</td>
     </tr>`;
   }).join('');
+}
+
+function _autoGenToggleAll(checked) {
+  autoGenPreview.forEach(r => r.include = checked);
+  renderAutoGenPreview();
+}
+
+// Bulk: shift the impact (landing) time of all currently selected rows by N seconds
+function _autoGenShiftSelected() {
+  const sec = parseInt(document.getElementById('autoGenShiftSec').value) || 0;
+  if (!sec) { showToast('⚠️ Bitte eine Verschiebung in Sekunden angeben'); return; }
+  let count = 0;
+  autoGenPreview.forEach(r => {
+    if (r.include && r.landing) { r.landing = _isoAddSeconds(r.landing, sec); count++; }
+  });
+  if (!count) { showToast('⚠️ Keine ausgewählten Wellen mit Impact-Zeit'); return; }
+  renderAutoGenPreview();
+  showToast(`✅ Impact-Zeit von ${count} Welle(n) um ${sec}s verschoben`);
 }
 
 async function applyAutoGenPlan() {
