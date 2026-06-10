@@ -523,45 +523,11 @@ class ResPushChannelView(discord.ui.View):
             await interaction.response.send_message("⚠️ Request not found.", ephemeral=True)
             return
 
-        await database.update_res_request_status(req["answer_message_id"], "inactive")
-
-        contribs = await database.get_res_contributions(req["id"])
-        inactive_embed = _build_push_embed(req, contribs, status="inactive")
-        await interaction.response.edit_message(
-            content=f"🔒 Set inactive by {interaction.user.mention}",
-            embed=inactive_embed,
-            view=_disabled_push_view("Inactive"),
+        await interaction.response.send_message(
+            "📦 Set inactive and archive this channel?",
+            view=ConfirmResPushView(action="inactive", original_message=interaction.message, req=req),
+            ephemeral=True,
         )
-        # Move channel to archive
-        try:
-            guild = interaction.guild
-            ARCHIVE_NAME = "📦 Archive-Pushes"
-            archive_cat = None
-            for cat in guild.categories:
-                if cat.name == ARCHIVE_NAME:
-                    archive_cat = cat
-                    break
-            if not archive_cat:
-                archive_cat = await guild.create_category(
-                    ARCHIVE_NAME,
-                    overwrites={
-                        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
-                    },
-                    reason="Res-Push archive auto-created",
-                )
-            channel = interaction.channel
-            overwrites = {}
-            for target, ow in channel.overwrites.items():
-                allow, deny = ow.pair()
-                new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
-                new_ow.update(send_messages=False, add_reactions=False)
-                overwrites[target] = new_ow
-            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False, send_messages=False)
-            overwrites[guild.me] = discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
-            await channel.edit(category=archive_cat, overwrites=overwrites, reason="Res-Push channel archived")
-        except Exception as e:
-            print(f"[res_push] archive error: {e}")
 
     @discord.ui.button(
         label="Remove Channel", style=discord.ButtonStyle.danger,
@@ -571,12 +537,84 @@ class ResPushChannelView(discord.ui.View):
         if not await _check_auth(interaction):
             return
 
-        await interaction.response.send_message("🗑️ Deleting channel in 5 seconds...", ephemeral=False)
-        await asyncio.sleep(5)
-        try:
-            await interaction.channel.delete(reason=f"Res-Push removed by {interaction.user}")
-        except discord.NotFound:
-            pass
+        await interaction.response.send_message(
+            "🗑️ Really delete this channel? This cannot be undone.",
+            view=ConfirmResPushView(action="remove", original_message=interaction.message, req=None),
+            ephemeral=True,
+        )
+
+
+async def _do_set_inactive(interaction: discord.Interaction, original_message: discord.Message, req: dict):
+    await database.update_res_request_status(req["answer_message_id"], "inactive")
+
+    contribs = await database.get_res_contributions(req["id"])
+    inactive_embed = _build_push_embed(req, contribs, status="inactive")
+    await original_message.edit(
+        content=f"🔒 Set inactive by {interaction.user.mention}",
+        embed=inactive_embed,
+        view=_disabled_push_view("Inactive"),
+    )
+    # Move channel to archive
+    try:
+        guild = interaction.guild
+        ARCHIVE_NAME = "📦 Archive-Pushes"
+        archive_cat = None
+        for cat in guild.categories:
+            if cat.name == ARCHIVE_NAME:
+                archive_cat = cat
+                break
+        if not archive_cat:
+            archive_cat = await guild.create_category(
+                ARCHIVE_NAME,
+                overwrites={
+                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
+                },
+                reason="Res-Push archive auto-created",
+            )
+        channel = interaction.channel
+        overwrites = {}
+        for target, ow in channel.overwrites.items():
+            allow, deny = ow.pair()
+            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
+            new_ow.update(send_messages=False, add_reactions=False)
+            overwrites[target] = new_ow
+        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False, send_messages=False)
+        overwrites[guild.me] = discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
+        await channel.edit(category=archive_cat, overwrites=overwrites, reason="Res-Push channel archived")
+    except Exception as e:
+        print(f"[res_push] archive error: {e}")
+
+
+async def _do_remove_channel(interaction: discord.Interaction):
+    await interaction.channel.send("🗑️ Deleting channel in 5 seconds...")
+    await asyncio.sleep(5)
+    try:
+        await interaction.channel.delete(reason=f"Res-Push removed by {interaction.user}")
+    except discord.NotFound:
+        pass
+
+
+class ConfirmResPushView(discord.ui.View):
+    """Generic Yes/No confirmation shown ephemeral before changing a res-push channel."""
+
+    def __init__(self, action: str, original_message: discord.Message, req: dict | None):
+        super().__init__(timeout=60)
+        self.action = action
+        self.original_message = original_message
+        self.req = req
+
+    @discord.ui.button(label="✅ Yes", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="⏳ Processing…", view=None)
+        if self.action == "inactive":
+            await _do_set_inactive(interaction, self.original_message, self.req)
+        elif self.action == "remove":
+            await _do_remove_channel(interaction)
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="Cancelled.", view=None)
 
 
 # ---------------------------------------------------------------------------
