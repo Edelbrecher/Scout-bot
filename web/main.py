@@ -9141,11 +9141,15 @@ async def op_delete_favorite(request: Request, guild_id: str, fav_id: int):
 @app.get("/guild/{guild_id}/operations/api/alliances")
 async def op_list_alliances(request: Request, guild_id: str):
     """Return alliances sorted by total population (strength), plus meta groups."""
+    import time as _time_op
+    _t0 = _time_op.perf_counter()
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
+    _t1 = _time_op.perf_counter()
     import aiosqlite as _aiosqlite_op
     alliances = []
-    async with _aiosqlite_op.connect(database.DB_PATH) as db:
+    async with _aiosqlite_op.connect(database.DB_PATH, timeout=30) as db:
+        _t2 = _time_op.perf_counter()
         db.row_factory = _aiosqlite_op.Row
         # Resolve the guild's world_url, then look up the latest snapshot timestamp
         # for that world directly (uses idx_wsnap_url_ts_v) instead of joining the
@@ -9154,6 +9158,7 @@ async def op_list_alliances(request: Request, guild_id: str):
         async with db.execute("SELECT tw_world FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
             row = await cur.fetchone()
             world_url = row["tw_world"] if row else None
+        _t3 = _time_op.perf_counter()
         if world_url:
             async with db.execute("SELECT MAX(fetched_at) AS max_ts FROM world_snapshots WHERE world_url=?", (world_url,)) as cur:
                 row = await cur.fetchone()
@@ -9169,8 +9174,11 @@ async def op_list_alliances(request: Request, guild_id: str):
                     ORDER BY total_pop DESC
                 """, (world_url, max_ts)) as cur:
                     alliances = [{"name": r["alliance_name"], "players": r["player_count"], "pop": r["total_pop"]} for r in await cur.fetchall()]
+    _t4 = _time_op.perf_counter()
     # Meta groups
     meta_groups = await database.get_meta_groups(guild_id)
+    _t5 = _time_op.perf_counter()
+    print(f"[alliances-timing] guard={_t1-_t0:.3f}s connect={_t2-_t1:.3f}s world_url={_t3-_t2:.3f}s alliances_query={_t4-_t3:.3f}s meta_groups={_t5-_t4:.3f}s total={_t5-_t0:.3f}s", flush=True)
     return JSONResponse({"alliances": alliances, "meta_groups": meta_groups})
 
 
