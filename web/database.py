@@ -1,4 +1,5 @@
 import aiosqlite
+import asyncio as _asyncio
 import bcrypt
 import os
 import time as _time
@@ -42,6 +43,38 @@ def _sample_snapshots(snaps: list, target: int = 16) -> list:
         return snaps
     idxs = sorted({round(i * (n - 1) / (target - 1)) for i in range(target)})
     return [snaps[i] for i in idxs]
+
+
+_snap_times_locks: dict = {}  # world_url -> asyncio.Lock (avoids thundering herd)
+
+async def _world_snapshot_times(world_url: str) -> list:
+    """Cached, newest-first list of distinct snapshot timestamps for a world.
+
+    Enumerating DISTINCT fetched_at scans the entire (world_url) index range
+    (~0.7s on a busy world with hundreds of snapshots), so the result is cached
+    and shared by every caller (inactive-farm sampling, snapshot count, …). A
+    per-world lock collapses concurrent cold lookups into one query instead of
+    several contending scans. The entry is dropped in save_map_snapshot when a
+    new snapshot lands."""
+    if not world_url:
+        return []
+    ck = f"snap_times:{world_url}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+    lock = _snap_times_locks.setdefault(world_url, _asyncio.Lock())
+    async with lock:
+        cached = _cache_get(ck)  # re-check: another coroutine may have filled it
+        if cached is not None:
+            return cached
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+            async with db.execute(
+                "SELECT DISTINCT fetched_at FROM world_snapshots WHERE world_url = ? "
+                "ORDER BY fetched_at DESC", (world_url,)
+            ) as cur:
+                times = [r[0] for r in await cur.fetchall()]
+        _cache_set(ck, times)
+        return times
 
 
 async def init_db():
@@ -2493,6 +2526,9 @@ async def save_map_snapshot(guild_id: str, villages: list[dict]):
         await db.commit()
     # Invalidate all cached results for all guilds on this world
     cache_invalidate_guild(guild_id)
+    # Drop the world-level snapshot-times cache (keyed by world_url, shared
+    # across guilds) so the freshly-saved snapshot is picked up immediately.
+    _CACHE.pop(f"snap_times:{world_url}", None)
 
 
 async def get_latest_snapshot_time(guild_id: str) -> str | None:
@@ -2763,12 +2799,15 @@ async def get_snapshot_count(guild_id: str) -> int:
     cached = _cache_get(ck)
     if cached is not None:
         return cached
+    # Count distinct snapshots via the shared cached times list rather than a
+    # COUNT(DISTINCT fetched_at) over the map_snapshots VIEW (a multi-second scan).
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(
-            "SELECT COUNT(DISTINCT fetched_at) as cnt FROM map_snapshots WHERE guild_id = ?", (guild_id,)
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
         ) as cur:
-            row = await cur.fetchone()
-            result = row[0] if row else 0
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+    result = len(await _world_snapshot_times(world_url)) if world_url else 0
     _cache_set(ck, result)
     return result
 
@@ -2804,12 +2843,9 @@ async def get_inactive_farms(
         # A busy world keeps a snapshot every ~15-20 min (~250 over a few days =
         # millions of rows); ~16 evenly-spread snapshots classify villages as
         # inactive/active identically (verified) while letting the aggregation
-        # seek just those timestamps via idx_wsnap_url_ts (≈4x faster).
-        async with db.execute(
-            "SELECT DISTINCT fetched_at FROM world_snapshots WHERE world_url = ? "
-            "ORDER BY fetched_at DESC", (world_url,)
-        ) as cur:
-            all_snaps = [r[0] for r in await cur.fetchall()]
+        # seek just those timestamps via idx_wsnap_url_ts (≈4x faster). The
+        # distinct-timestamp list is cached & shared across callers.
+        all_snaps = await _world_snapshot_times(world_url)
         if len(all_snaps) < 2:
             _cache_set(cache_key, [])
             return []
@@ -3048,13 +3084,8 @@ async def search_inactive_advanced(
         if not world_url:
             return {"villages": [], "snap_dates": [], "total": 0}
 
-        # Last 8 distinct snapshot timestamps
-        async with db.execute("""
-            SELECT DISTINCT fetched_at FROM world_snapshots
-            WHERE world_url = ?
-            ORDER BY fetched_at DESC LIMIT 8
-        """, (world_url,)) as cur:
-            snap_dates = [r[0] for r in await cur.fetchall()]
+        # Last 8 distinct snapshot timestamps (from the shared cached list)
+        snap_dates = (await _world_snapshot_times(world_url))[:8]
 
         if len(snap_dates) < 2:
             return {"villages": [], "snap_dates": snap_dates, "total": 0}
