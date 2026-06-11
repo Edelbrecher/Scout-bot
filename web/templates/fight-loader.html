@@ -86,7 +86,7 @@
 }
 
 /* ── Lunge animation (same keyframe for both; right fighter's outer wrapper is scaleX(-1)) */
-.fl-lunge { animation: fl-lunge 1.5s cubic-bezier(0.45,0,0.55,1) infinite; }
+.fl-lunge { animation: fl-lunge 1s cubic-bezier(0.45,0,0.55,1) infinite; }
 
 @keyframes fl-lunge {
   0%,  100% { transform: translateX(0); }
@@ -102,7 +102,7 @@
   50%     { transform: translateY(-3px); }
 }
 
-#fl-spark { animation: fl-spark 1.5s cubic-bezier(0.45,0,0.55,1) infinite; }
+#fl-spark { animation: fl-spark 1s cubic-bezier(0.45,0,0.55,1) infinite; }
 
 #fl-caption {
   color: #4b5563;
@@ -375,7 +375,7 @@ function flHide() {
 
 /* ── Minimum display time ─────────────────────────────────────────────────── */
 var _flShownAt = 0;
-var _FL_MIN_MS = 4500;   // fight runs at least 4.5 s
+var _FL_MIN_MS = 1200;   // fight runs at least 1.2 s
 
 function flShowTimed() {
   _flShownAt = Date.now();
@@ -397,9 +397,9 @@ function flShouldShow(href) {
   // Normalise to a path string (strip origin if absolute)
   var path = href;
   try { path = new URL(href, location.href).pathname; } catch(e) {}
-  // Show only for: /guild/<id>  (dashboard, exact)  or  /guild/<id>/farming
-  // Matches /guild/123  /guild/123/  /guild/123/farming  /guild/123/farming?...
-  return /\/guild\/[^/]+(\/farming)?\/?$/.test(path);
+  // Show only for the Farmlist page: /guild/<id>/farming
+  // Matches /guild/123/farming  /guild/123/farming/  /guild/123/farming?...
+  return /\/guild\/[^/]+\/farming\/?$/.test(path);
 }
 
 /* ── Trigger on internal link clicks ──────────────────────────────────────── */
