@@ -463,6 +463,9 @@
           <a href="/guild/{{ guild.guild_id }}/intel" class="quick-link">🔎 Player Intelligence</a>
           <a href="/guild/{{ guild.guild_id }}/timer" class="quick-link">⏱️ Timer &amp; Reminders</a>
           <a href="/guild/{{ guild.guild_id }}/settings" class="quick-link">⚙️ Server Settings</a>
+          {% if not is_personal %}
+          <a href="/guild/{{ guild.guild_id }}/bot-settings" class="quick-link">🤖 Bot-Einstellungen</a>
+          {% endif %}
         </div>
       </div>
 
