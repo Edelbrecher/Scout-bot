@@ -12290,14 +12290,28 @@ async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
         if not world_url:
             return []
 
-        all_snaps = await _world_snapshot_times(world_url)
-        if not all_snaps:
-            return []
-        latest = all_snaps[0]
-        prev   = all_snaps[1] if len(all_snaps) > 1 else None
-
         async with aiosqlite.connect(DB_PATH, timeout=30) as db:
             db.row_factory = aiosqlite.Row
+
+            # Latest + previous snapshot timestamps via indexed MAX() lookups
+            # (fast O(log n) seeks) instead of enumerating every distinct
+            # fetched_at for the whole world (can be seconds on large worlds).
+            async with db.execute(
+                "SELECT MAX(fetched_at) FROM world_snapshots INDEXED BY idx_wsnap_url_ts WHERE world_url=?",
+                (world_url,)
+            ) as cur:
+                row = await cur.fetchone()
+            latest = row[0] if row else None
+            if not latest:
+                return []
+
+            async with db.execute(
+                "SELECT MAX(fetched_at) FROM world_snapshots INDEXED BY idx_wsnap_url_ts WHERE world_url=? AND fetched_at < ?",
+                (world_url, latest)
+            ) as cur:
+                row = await cur.fetchone()
+            prev = row[0] if row else None
+
             async with db.execute("""
                 SELECT alliance_name,
                        COUNT(DISTINCT player_name) as member_count,
