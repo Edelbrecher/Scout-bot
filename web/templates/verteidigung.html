@@ -2,6 +2,7 @@
 {% block title %}Defense · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
+{% from "_combat_flow.html" import combat_flow %}
 <div class="container" style="max-width:1100px;">
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
@@ -25,6 +26,8 @@
       </a>
     </div>
   </div>
+
+  {{ combat_flow(guild.guild_id, "defense") }}
 
   {% set bot_msg = request.query_params.get('bot','') %}
   {% if flash == 'closed' %}

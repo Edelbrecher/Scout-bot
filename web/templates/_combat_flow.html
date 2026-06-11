@@ -1,0 +1,40 @@
+{# ───────────────────────────────────────────────────────────────────────────
+   Combat & Defense workflow strip — the "roter Faden" shown on every page of
+   the combat lifecycle so users always see where they are and what comes next:
+
+     ⚔️ Attacks → 🚨 Alliance Attacks → 🛡️ Defense → 📜 Battle Reports
+       → 🧠 Combat Intel → ☠️ Enemies
+
+   Usage (inside a {% block content %}):
+     {% from "_combat_flow.html" import combat_flow %}
+     {{ combat_flow(guild.guild_id, "attacks") }}
+   The second arg is the active step key (attacks|alliance|defense|reports|intel|enemies).
+─────────────────────────────────────────────────────────────────────────── #}
+{% macro combat_flow(guild_id, active) %}
+{% set steps = [
+  ('attacks',  '⚔️',  'Attacks',          '/guild/' ~ guild_id ~ '/attacks'),
+  ('alliance', '🚨',  'Alliance Attacks', '/guild/' ~ guild_id ~ '/attacks/alliance-overview'),
+  ('defense',  '🛡️',  'Defense',          '/guild/' ~ guild_id ~ '/verteidigung'),
+  ('reports',  '📜',  'Battle Reports',   '/guild/' ~ guild_id ~ '/reports'),
+  ('intel',    '🧠',  'Combat Intel',     '/guild/' ~ guild_id ~ '/reports/intel'),
+  ('enemies',  '☠️',  'Enemies',          '/guild/' ~ guild_id ~ '/enemies')
+] %}
+<div title="Kampf- & Verteidigungs-Workflow"
+     style="display:flex;align-items:center;gap:.15rem;flex-wrap:wrap;margin-bottom:1.1rem;
+            font-size:.78rem;background:var(--bg-card);border:1px solid var(--border);
+            border-radius:8px;padding:.4rem .55rem;overflow-x:auto;">
+  {% for key, icon, label, url in steps %}
+    {% if key == active %}
+    <span style="display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .6rem;border-radius:6px;
+                 background:var(--primary);color:#fff;font-weight:700;white-space:nowrap;">{{ icon }} {{ label }}</span>
+    {% else %}
+    <a href="{{ url }}"
+       style="display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .6rem;border-radius:6px;
+              color:var(--text-muted);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s;"
+       onmouseover="this.style.background='var(--bg-main)';this.style.color='var(--text)';"
+       onmouseout="this.style.background='';this.style.color='var(--text-muted)';">{{ icon }} {{ label }}</a>
+    {% endif %}
+    {% if not loop.last %}<span style="color:var(--border);user-select:none;">›</span>{% endif %}
+  {% endfor %}
+</div>
+{% endmacro %}
