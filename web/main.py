@@ -9515,6 +9515,14 @@ async def op_search_villages(request: Request, guild_id: str, q: str = "", allia
     return JSONResponse({"results": rows})
 
 
+@app.get("/guild/{guild_id}/operations/api/village-id")
+async def op_village_id(request: Request, guild_id: str, x: int, y: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    village_id = await database.get_village_id_by_xy(guild_id, x, y)
+    return JSONResponse({"village_id": village_id})
+
+
 def _normalize_tribe(raw) -> str:
     """Convert any tribe representation to the JS TROOPS_DEF key (gauls/romans/teutons/huns/egyptians)."""
     _ID_MAP = {1: "romans", 2: "teutons", 3: "gauls", 5: "egyptians", 6: "huns"}

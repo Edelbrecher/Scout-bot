@@ -1185,7 +1185,7 @@ function renderWavesTable(t) {
         ${count > 1 || isSubrow ? `<button class="wave-action-btn" title="−1 remove this wave" onclick="deleteWave(${wv.id},${t.id},true)" style="font-weight:800;color:#f87171;border-color:rgba(248,113,113,.35);">−1</button>` : ''}
         <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
         <button class="wave-action-btn danger" title="Delete wave" onclick="deleteWave(${wv.id},${t.id})">🗑</button>
-        <button class="wave-action-btn" title="Rallypoint" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>`;
+        <button class="wave-action-btn" title="Rallypoint" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}',${wv.origin_x ?? 'null'},${wv.origin_y ?? 'null'})" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>`;
     }
 
     // Show troops: if all waves identical show chips, otherwise show "mixed"
@@ -1237,7 +1237,7 @@ function renderWavesTable(t) {
         <button class="wave-action-btn" title="Als Fake markieren + Preset setzen" onclick="applyFakePreset(${w.id},'${escJs(w.tribe||'romans')}')" style="color:#a78bfa;border-color:rgba(167,139,250,.35);">👻</button>
         <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${w.id},${t.id})">✏</button>
         <button class="wave-action-btn danger" title="${count>1?`Delete all ${count}`:'Delete'}" onclick="${count>1?`if(confirm('Delete ${count} waves?')){${ids.map(id=>`deleteWave(${id},${t.id},true)`).join(';')}}`:`deleteWave(${w.id},${t.id})`}">🗑${count>1?` ×${count}`:''}</button>
-        <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
+        <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(w.send_time||'')}',${w.origin_x ?? 'null'},${w.origin_y ?? 'null'})" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
       </td>
     </tr>`;
 
@@ -1274,7 +1274,7 @@ function renderWavesTable(t) {
           <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;padding:.35rem .4rem;">
             <button class="wave-action-btn" title="Edit" onclick="openWaveEditModal(${wv.id},${t.id})">✏</button>
             <button class="wave-action-btn danger" title="Delete" onclick="deleteWave(${wv.id},${t.id},true)">🗑</button>
-            <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}')" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
+            <button class="wave-action-btn" onclick="openRallypoint(${t.x},${t.y},'${escJs(wv.send_time||'')}',${wv.origin_x ?? 'null'},${wv.origin_y ?? 'null'})" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3);">🏹</button>
           </td>
         </tr>`;
       }).join('');
@@ -3095,11 +3095,22 @@ async function deleteWave(waveId, targetId, silent=false) {
   await reloadActivePlan();
 }
 
-function openRallypoint(tx, ty, sendTime) {
+async function openRallypoint(tx, ty, sendTime, ox=null, oy=null) {
   if (TW_WORLD) {
     const base = TW_WORLD.replace(/\/$/, '');
-    const url = `${base}/build.php?gid=16&tt=2&x=${tx}&y=${ty}`;
-    window.open(url, '_blank');
+    // Open a blank tab synchronously (within the click handler) to avoid popup blockers,
+    // then navigate it once we know the origin village's Travian id (newdid).
+    const win = window.open('', '_blank');
+    let newdid = '';
+    if (ox != null && oy != null) {
+      try {
+        const r = await apiGet(`/village-id?x=${ox}&y=${oy}`);
+        if (r && r.village_id) newdid = r.village_id;
+      } catch(e) { /* ignore — fall back to current village */ }
+    }
+    const url = `${base}/build.php?${newdid ? 'newdid='+newdid+'&' : ''}gid=16&tt=2&x=${tx}&y=${ty}`;
+    if (win) win.location.href = url;
+    else window.open(url, '_blank');
   } else {
     // Fallback: copy coords to clipboard
     const txt = `Target: ${tx}|${ty}\nSend time: ${sendTime || '—'}`;
