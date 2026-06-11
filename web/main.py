@@ -1148,6 +1148,26 @@ import datetime as _dt_global
 templates.env.filters["from_json"] = lambda s: _json.loads(s) if s else []
 templates.env.filters["fmt_duration"] = lambda s: _fmt_duration(int(s or 0))
 templates.env.filters["build_seconds"] = lambda troops: _build_seconds(troops or {})
+
+
+def _js_str(value) -> str:
+    """Escape a value for embedding inside a single-quoted JS string literal
+    that itself sits inside an HTML attribute, e.g. onclick="fn('...')".
+
+    Order matters: JS-escape special chars first (backslash, quote, newline),
+    THEN HTML-escape the result. The browser HTML-decodes attribute values
+    before handing them to the JS parser, so e.g. \\' (backslash + quote)
+    must survive that round trip as \\' — HTML-escaping the quote afterwards
+    (-> \\&#39;) achieves that, while escaping first (&#39; -> \\&#39;... no)
+    would not.
+    """
+    import html as _html
+    s = "" if value is None else str(value)
+    s = s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+    return _html.escape(s, quote=True)
+
+
+templates.env.filters["js_str"] = _js_str
 templates.env.globals["current_year"] = _dt_global.datetime.utcnow().year
 
 
