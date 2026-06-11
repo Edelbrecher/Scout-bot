@@ -1951,6 +1951,9 @@ async def _init_farming_tables():
             # Speeds up the GROUP BY village_id aggregation in get_inactive_farms /
             # search_inactive_advanced (Farming Intelligence "inactive" list).
             "CREATE INDEX IF NOT EXISTS idx_wsnap_url_vid_ts ON world_snapshots(world_url, village_id, fetched_at, population)",
+            # Speeds up alliance population history (My Alliance pop sparkline) —
+            # without it, filtering by alliance_name scans the whole date range.
+            "CREATE INDEX IF NOT EXISTS idx_wsnap_url_ally   ON world_snapshots(world_url, alliance_name, fetched_at)",
         ]:
             try:
                 await db.execute(idx_sql)
@@ -6190,18 +6193,28 @@ async def get_alliance_pop_history(guild_id: str, alliance_name: str, days: int 
     """Return aggregated population/village count per snapshot for a given alliance (last N days)."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        # Resolve the world and query world_snapshots directly via idx_wsnap_url_ally
+        # — map_snapshots is a VIEW (joins guild_configs per row) and has no
+        # alliance index, so the same query over it scans the whole date range (~12s).
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return []
         async with db.execute("""
             SELECT fetched_at,
-                   SUM(population)        AS total_pop,
-                   COUNT(DISTINCT player_id) AS player_count,
-                   COUNT(*)               AS village_count
-            FROM map_snapshots
-            WHERE guild_id = ?
+                   SUM(population)            AS total_pop,
+                   COUNT(DISTINCT player_id)  AS player_count,
+                   COUNT(*)                   AS village_count
+            FROM world_snapshots
+            WHERE world_url = ?
               AND alliance_name = ?
               AND fetched_at >= datetime('now', ? || ' days')
             GROUP BY fetched_at
             ORDER BY fetched_at ASC
-        """, (guild_id, alliance_name, f"-{days}")) as cur:
+        """, (world_url, alliance_name, f"-{days}")) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
 
@@ -6209,17 +6222,25 @@ async def get_player_pop_from_snapshot(guild_id: str, travian_name: str) -> list
     """Return per-snapshot population sum for a player (last 14 days)."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        # world_url + idx_wsnap_player instead of the map_snapshots VIEW.
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return []
         async with db.execute("""
             SELECT fetched_at,
                    SUM(population) AS total_pop,
                    COUNT(*)        AS village_count
-            FROM map_snapshots
-            WHERE guild_id = ?
-              AND player_name = ?
+            FROM world_snapshots
+            WHERE world_url = ?
+              AND lower(player_name) = ?
               AND fetched_at >= datetime('now', '-14 days')
             GROUP BY fetched_at
             ORDER BY fetched_at ASC
-        """, (guild_id, travian_name)) as cur:
+        """, (world_url, travian_name.lower())) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
 
@@ -6229,15 +6250,27 @@ async def get_all_members_pop_from_snapshot(guild_id: str, travian_names: list[s
         return {}
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-        ph = ",".join("?" * len(travian_names))
+        # Resolve the world and query world_snapshots directly via idx_wsnap_player
+        # (world_url, lower(player_name), fetched_at) — ~50x faster than the
+        # map_snapshots VIEW which can't use that index. lower() also makes the
+        # name match case-insensitive.
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return {}
+        lower_names = [n.lower() for n in travian_names]
+        ph = ",".join("?" * len(lower_names))
         async with db.execute(f"""
             SELECT player_name, fetched_at, SUM(population) AS total_pop
-            FROM map_snapshots
-            WHERE guild_id = ? AND player_name IN ({ph})
+            FROM world_snapshots
+            WHERE world_url = ? AND lower(player_name) IN ({ph})
               AND fetched_at >= datetime('now', '-14 days')
             GROUP BY player_name, fetched_at
             ORDER BY player_name, fetched_at ASC
-        """, [guild_id] + travian_names) as cur:
+        """, [world_url] + lower_names) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
     result: dict = {}
     for r in rows:
