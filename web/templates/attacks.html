@@ -733,11 +733,14 @@
 /* Bulk selection */
 .atk-row.selected  { background:rgba(99,102,241,.12) !important; border-color:rgba(99,102,241,.4) !important; }
 .bulk-bar {
-  display:none; position:sticky; top:0; z-index:200;
-  background:rgba(30,32,48,.97); border:1px solid rgba(99,102,241,.4);
-  border-radius:8px; padding:.55rem 1rem; margin-bottom:.75rem;
+  /* Floats over the content (fixed, bottom-centered) so toggling the selection
+     never pushes the attack list up/down — no layout jump. */
+  display:none; position:fixed; left:50%; bottom:1rem; transform:translateX(-50%);
+  z-index:500; max-width:calc(100vw - 1.5rem);
+  background:rgba(30,32,48,.98); border:1px solid rgba(99,102,241,.45);
+  border-radius:10px; padding:.55rem 1rem;
   align-items:center; gap:.6rem; flex-wrap:wrap;
-  backdrop-filter:blur(6px);
+  backdrop-filter:blur(6px); box-shadow:0 8px 28px rgba(0,0,0,.45);
 }
 .bulk-bar.visible { display:flex; }
 .atk-checkbox { width:15px; height:15px; cursor:pointer; accent-color:#6366f1; flex-shrink:0; }

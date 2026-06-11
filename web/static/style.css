@@ -25,6 +25,10 @@ html, body {
   font-size: 15px;
   line-height: 1.5;
 }
+/* Always reserve space for the vertical scrollbar so the viewport width never
+   changes when a scrollbar appears/disappears (e.g. opening a tall panel).
+   This stops flex-wrap toolbars/headers from reflowing & jumping. */
+html { scrollbar-gutter: stable; }
 
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
