@@ -53,6 +53,9 @@
       try{var s=localStorage.getItem('travops_tour');if(s){var st=JSON.parse(s);if(st&&st.name){var style=document.createElement('style');style.id='tt-nav-shield';style.textContent='body::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99998;pointer-events:none;}';document.head.appendChild(style);}}}catch(e){}
       // Mark reloads so CSS can skip the page-enter animation
       try{var nav=performance.getEntriesByType('navigation')[0];if(nav&&nav.type==='reload')document.documentElement.classList.add('is-reload');}catch(e){}
+      // Skip the page-enter fade for in-app tab/section switches (e.g. combat workflow strip)
+      // so navigating between tabs feels instant instead of "flickering".
+      try{if(sessionStorage.getItem('tt_skip_anim')==='1'){document.documentElement.classList.add('is-reload');sessionStorage.removeItem('tt_skip_anim');}}catch(e){}
       // Pre-apply sidebar layout before first paint to avoid layout shift
       try{
         var gm=location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
@@ -279,12 +282,17 @@ function escHtml(s) {
   (function(){
     var loader = document.getElementById('page-loader');
     var hideTimer = null;
+    var showTimer = null;
 
     function showLoader() {
       clearTimeout(hideTimer);
-      loader.classList.add('visible');
+      // Delay showing the overlay slightly — most navigations on TravOps now
+      // complete in well under 200ms, and flashing the spinner on/off for an
+      // instant looks like a "flicker". Only show it for genuinely slow loads.
+      showTimer = setTimeout(function(){ loader.classList.add('visible'); }, 200);
     }
     function hideLoader() {
+      clearTimeout(showTimer);
       loader.classList.remove('visible');
     }
 
@@ -302,6 +310,11 @@ function escHtml(s) {
         var url = new URL(href, location.origin);
         if (url.origin !== location.origin) return;
       } catch(e) { return; }
+      // Same-page tab/section switches (e.g. combat workflow strip) skip the
+      // page-enter fade so they feel instant rather than a full reload.
+      if (a.getAttribute('data-tab-nav')) {
+        try { sessionStorage.setItem('tt_skip_anim', '1'); } catch(e){}
+      }
       showLoader();
     });
 
