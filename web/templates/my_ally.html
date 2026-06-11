@@ -54,6 +54,7 @@
   {# ── Tab nav ── #}
   <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
     <button class="ma-tab active" onclick="showTab('mitglieder',this)">👥 Members ({{ (members | rejectattr("status","equalto","pending") | list)|length }})</button>
+    {% if can_view_guide %}<button class="ma-tab" onclick="showTab('anleitung',this)" style="color:#fbbf24;">📖 Anleitung</button>{% endif %}
     <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Invitations</button>
     <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Member Roles</button>
     <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Roles & Permissions</button>
@@ -65,6 +66,93 @@
     <button class="ma-tab" onclick="showTab('leaderboard',this)">🏆 Leaderboard</button>
     {% endif %}
   </div>
+
+  {# ══════════════════════════════ TAB: ANLEITUNG (Playbook) ══════════════════════════════ #}
+  {% if can_view_guide %}
+  <div id="tab-anleitung" class="ma-tab-panel" style="display:none;">
+    {% set gid = guild.guild_id %}
+
+    <div style="margin-bottom:1.25rem;">
+      <h2 style="margin:0 0 .25rem;font-size:1.25rem;">📖 Anleitung — Eingehende Angriffe verarbeiten & Def-Calls erstellen</h2>
+      <p style="margin:0;color:var(--text-muted);font-size:.88rem;">
+        Das Playbook für den Ernstfall. Ziel: aus jedem eingehenden Angriff <strong>alle</strong> Infos rausholen,
+        echte Bedrohungen von Fakes trennen und schnell genug Verteidigung organisieren.
+      </p>
+    </div>
+
+    {# Workflow-Überblick #}
+    <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;margin-bottom:1.5rem;padding:.6rem .8rem;
+                background:var(--bg-card);border:1px solid var(--border);border-radius:8px;font-size:.8rem;font-weight:600;">
+      <span style="color:#f87171;">⚔️ Erfassen</span><span style="color:var(--border);">›</span>
+      <span style="color:#fbbf24;">🎭 Fakes filtern</span><span style="color:var(--border);">›</span>
+      <span style="color:#fb923c;">🚨 Allianz-Lage</span><span style="color:var(--border);">›</span>
+      <span style="color:#818cf8;">🛡️ Def-Call</span><span style="color:var(--border);">›</span>
+      <span style="color:#4ade80;">📊 Deckung</span><span style="color:var(--border);">›</span>
+      <span style="color:#93c5fd;">📜 Nachbericht</span>
+    </div>
+
+    {% set steps = [
+      ('1','⚔️','#f87171','Angriff erfassen (Attacks)',
+        'In Travian den <strong>Rallyepunkt</strong> öffnen → Reiter „eingehende Truppen" → alles markieren (<kbd>Strg+A</kbd>), kopieren (<kbd>Strg+C</kbd>). Auf der <a href="/guild/'~gid~'/attacks" style="color:#818cf8;">Attacks-Seite</a> auf <strong>„📋 Rallyepunkt importieren"</strong>, einfügen, Vorschau prüfen, importieren.',
+        ['So bekommen wir automatisch: Angreifer, Herkunftsdorf, Koordinaten, Ankunftszeit und – wenn sichtbar – die Truppenzahl.','Auch <strong>verdeckte</strong> Angriffe importieren: Sie zählen für die Wellen- & Koordinations-Erkennung.','Mehrere Mitglieder können importieren – alles läuft in der Allianz-Ansicht zusammen.']),
+      ('2','🎭','#fbbf24','Fakes von echten Angriffen trennen',
+        'Jeder Angriff bekommt automatisch einen <strong>Fake-Score</strong> (0–100). Niedrig = wahrscheinlich echt, hoch = wahrscheinlich Fake. Nutze den Filter <strong>„Nur Nicht-Fake"</strong>, um die echten Bedrohungen zu sehen.',
+        ['Verdeckte Truppen = unbekannt → im Zweifel als <strong>echt</strong> behandeln.','Faustregel: lieber einmal zu viel verteidigen als ein echtes Off durchlassen.']),
+      ('3','🚨','#fb923c','Allianz-Lage prüfen (Alliance Attacks)',
+        'Auf <a href="/guild/'~gid~'/attacks/alliance-overview" style="color:#818cf8;">Alliance Attacks</a> laufen <strong>alle</strong> eingehenden Angriffe der ganzen Allianz zusammen – gruppiert nach verteidigtem Dorf und in <strong>Wellen</strong>.',
+        ['Achte auf die <strong>🚨 Koordinations-Warnung</strong>: Werden mehrere Dörfer in kurzem Zeitfenster getroffen, ist es ein großer abgestimmter Angriff – Prioritäten setzen.','Hier siehst du auch den Import-Status der Mitglieder.']),
+      ('4','🛡️','#818cf8','Def-Call erstellen',
+        'Beim relevanten echten Angriff auf <strong>„Defense-Call"</strong> klicken. Das erstellt automatisch einen <strong>Defense-Channel</strong> (in Discord) mit Angreifer, Koordinaten und Ankunftszeit. Er erscheint auf der <a href="/guild/'~gid~'/verteidigung" style="color:#818cf8;">Defense-Seite</a>.',
+        ['Ein Call pro bedrohtem Dorf – nicht pro einzelner Welle.','Nur echte / unklare Angriffe callen, keine bestätigten Fakes.']),
+      ('5','🎯','#a78bfa','Bedarf festlegen (Ziel in Crop)',
+        'Im Defense-Channel auf <strong>„✏️ Edit"</strong> und das Feld <strong>„🎯 Ziel (Crop / Getreide)"</strong> setzen – wie viel Verteidigung (gemessen in Crop-Verbrauch) gebraucht wird.',
+        ['Format: <code>300000</code> oder <code>300k</code> – beides funktioniert.','Ohne Ziel kann die Deckung nicht berechnet werden – also immer setzen.']),
+      ('6','📊','#4ade80','Verteidigung koordinieren & Deckung verfolgen',
+        'Jedes Mitglied trägt seine gesendeten Truppen ein (Menge + Typ). Der <strong>Deckungsgrad-Balken</strong> zeigt live „gesendetes Crop / Ziel · %". Oben auf der Defense-Seite siehst du die Gesamtlage: <strong>„X Calls unterdeckt · Y Crop fehlen"</strong>.',
+        ['Ziel: <strong>100% Deckung vor Ankunft</strong> (grüner Balken).','Mit „Laufzeiten berechnen" prüfen, ob die Def rechtzeitig ankommt.','Ist der Call gedeckt & vorbei → auf „✅ Close" schließen.']),
+      ('7','📜','#93c5fd','Nach dem Kampf auswerten',
+        'Kampfbericht aus Travian kopieren und auf <a href="/guild/'~gid~'/reports" style="color:#818cf8;">Battle Reports</a> einfügen. <a href="/guild/'~gid~'/reports/intel" style="color:#818cf8;">Combat Intel</a> baut daraus automatisch Gegner-Profile.',
+        ['So lernen wir die Truppenstärke & -typen des Gegners für das nächste Mal.','Verluste & Beute werden mitgeschrieben.']),
+    ] %}
+
+    <div style="display:flex;flex-direction:column;gap:.85rem;">
+      {% for num, icon, col, title, body, tips in steps %}
+      <div class="card" style="padding:1rem 1.2rem;border-left:3px solid {{ col }};">
+        <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.5rem;">
+          <span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:{{ col }}22;color:{{ col }};
+                       display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;">{{ num }}</span>
+          <h3 style="margin:0;font-size:1rem;">{{ icon }} {{ title }}</h3>
+        </div>
+        <p style="margin:0 0 .55rem;font-size:.86rem;line-height:1.5;">{{ body | safe }}</p>
+        <ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.2rem;">
+          {% for t in tips %}
+          <li style="font-size:.8rem;color:var(--text-muted);line-height:1.45;">{{ t | safe }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# Schnell-Checkliste #}
+    <div class="card" style="margin-top:1.25rem;padding:1rem 1.2rem;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.3);">
+      <h3 style="margin:0 0 .6rem;font-size:1rem;">✅ Schnell-Checkliste (Ernstfall)</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.35rem .9rem;font-size:.84rem;line-height:1.5;">
+        <div>☐ Rallyepunkt importieren (auch verdeckte)</div>
+        <div>☐ Fakes filtern – echte Bedrohung finden</div>
+        <div>☐ Allianz-Lage & Koordinations-Warnung prüfen</div>
+        <div>☐ Def-Call für bedrohte Dörfer erstellen</div>
+        <div>☐ Ziel (Crop) im Channel setzen</div>
+        <div>☐ Truppen senden &amp; eintragen → 100% Deckung</div>
+        <div>☐ Laufzeit prüfen – kommt Def rechtzeitig an?</div>
+        <div>☐ Nach dem Kampf: Bericht einfügen</div>
+      </div>
+    </div>
+
+    <p style="margin-top:1rem;font-size:.74rem;color:var(--text-muted);">
+      💡 Dieser Tab ist über die Berechtigung <code>guide_view</code> steuerbar (Tab „🛡️ Roles &amp; Permissions" → „📖 Anleitung").
+    </p>
+  </div>
+  {% endif %}
 
   {# ══════════════════════════════ TAB: MITGLIEDER ══════════════════════════════ #}
   <div id="tab-mitglieder" class="ma-tab-panel">
@@ -830,6 +918,9 @@
                   ]),
                   ("📐 Blueprints", [
                     ("blueprint_view","View Blueprints","Can view and use building blueprints / action plans."),
+                  ]),
+                  ("📖 Anleitung", [
+                    ("guide_view","View Guide","Can open the Guide tab — the alliance playbook for handling incoming attacks & creating defense calls."),
                   ]),
                 ] %}
 

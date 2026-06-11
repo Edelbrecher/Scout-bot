@@ -5928,11 +5928,13 @@ async def my_ally_page(request: Request, guild_id: str):
         is_editor = True
         can_view_members = True
         can_view_rank = True
+        can_view_guide = True
     else:
         _perms = await database.get_member_permissions(guild_id, uid)
         is_editor = "ally_manage" in _perms
         can_view_members = is_editor or "ally_view_members" in _perms
         can_view_rank = can_view_members or "ally_view_rank" in _perms
+        can_view_guide = is_editor or "guide_view" in _perms
 
     # ── Wave 3: depends on members list ──────────────────────────────────
     all_members_list = members or member_view_members or []
@@ -6009,6 +6011,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "is_editor": is_editor,
         "can_view_members": can_view_members,
         "can_view_rank": can_view_rank,
+        "can_view_guide": can_view_guide,
         "is_lead": is_lead,
         "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
@@ -6460,13 +6463,16 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     color = form.get("color") or None
     ALL_FLAGS = [
         "ally_manage", "ally_view_members", "ally_view_rank",
-        "defend_view", "defend_manage",
+        "defend_view", "defend_manage", "defend_edit",
         "ep_manage", "ep_view", "ep_notify",
         "attack_manage", "attack_view",
         "scout_manage", "scout_view",
         "map_manage", "map_view",
         "res_push_view", "res_push_manage",
         "sector_view", "hospital_view",
+        "poll_view", "poll_manage",
+        "hero_scout_view", "stats_view", "blueprint_view",
+        "guide_view",
     ]
     selected = [f for f in ALL_FLAGS if form.get(f) == "1"]
     # Apply preset shortcut
@@ -6476,16 +6482,18 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     elif preset == "officer":
         selected = [
             "ally_view_members", "ally_view_rank",
-            "defend_view", "defend_manage",
+            "defend_view", "defend_manage", "defend_edit",
             "ep_manage", "ep_view", "ep_notify",
             "attack_manage", "attack_view",
             "scout_manage", "scout_view",
             "map_view", "map_manage",
             "res_push_view", "res_push_manage",
             "sector_view", "hospital_view",
+            "poll_view", "poll_manage", "hero_scout_view", "stats_view", "blueprint_view",
+            "guide_view",
         ]
     elif preset == "mitglied":
-        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view"]
+        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view", "guide_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)
