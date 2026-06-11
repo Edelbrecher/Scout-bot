@@ -11999,6 +11999,23 @@ async def clear_stale_channels(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}?saved=channels_cleaned", status_code=303)
 
 
+def _parse_def_goal(s) -> int:
+    """Parse a defend-channel goal (crop/grain target) from free text into an int.
+    Handles plain numbers, thousands separators and k/m suffixes:
+    '300000' '300.000' '850k' '1,2m' → 300000 300000 850000 1200000."""
+    if not s:
+        return 0
+    t = str(s).strip().lower().replace(" ", "")
+    try:
+        if t.endswith("k"):
+            return int(float(t[:-1].replace(",", ".")) * 1_000)
+        if t.endswith("m"):
+            return int(float(t[:-1].replace(",", ".")) * 1_000_000)
+        return int(t.replace(".", "").replace(",", ""))
+    except (ValueError, TypeError):
+        return 0
+
+
 # ── Verteidigung ──────────────────────────────────────────────────────────────
 @app.get("/guild/{guild_id}/verteidigung", response_class=HTMLResponse)
 async def verteidigung_page(request: Request, guild_id: str):
@@ -12038,6 +12055,26 @@ async def verteidigung_page(request: Request, guild_id: str):
         or "ally_manage"   in await database.get_member_permissions(guild_id, uid)
     )
     contributions = await database.get_defend_contributions_for_guild(guild_id)
+
+    # ── Defense coverage (sufficiency): pledged crop vs each call's goal ──────
+    # goal = crop/grain target (free text); compare against grain pledged so far.
+    defense_summary = {"open_total": 0, "open_under": 0, "shortfall": 0}
+    for ch in channels:
+        contribs = contributions.get(ch.get("channel_id"), [])
+        grain_sent  = int(sum(c.get("total_grain")  or 0 for c in contribs))
+        troops_sent = int(sum(c.get("total_troops") or 0 for c in contribs))
+        goal_val = _parse_def_goal(ch.get("goal"))
+        ch["goal_parsed"]  = goal_val
+        ch["grain_sent"]   = grain_sent
+        ch["troops_sent"]  = troops_sent
+        ch["defenders"]    = len(contribs)
+        ch["coverage_pct"] = int(grain_sent * 100 / goal_val) if goal_val > 0 else None
+        if ch.get("status") != "closed" and goal_val > 0:
+            defense_summary["open_total"] += 1
+            if grain_sent < goal_val:
+                defense_summary["open_under"] += 1
+                defense_summary["shortfall"] += (goal_val - grain_sent)
+
     my_villages = await database.get_my_villages_for_travel(guild_id, uid)
     perms = await database.get_member_permissions(guild_id, uid)
     can_edit_all = (
@@ -12061,6 +12098,7 @@ async def verteidigung_page(request: Request, guild_id: str):
         "show": show,
         "total_open":   sum(1 for c in all_channels if c.get("status") != "closed"),
         "total_closed": sum(1 for c in all_channels if c.get("status") == "closed"),
+        "defense_summary": defense_summary,
         "saved": request.query_params.get("saved", ""),
         "flash": request.query_params.get("flash", ""),
         "can_close": can_close,
