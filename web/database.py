@@ -50,12 +50,19 @@ _snap_times_locks: dict = {}  # world_url -> asyncio.Lock (avoids thundering her
 async def _world_snapshot_times(world_url: str) -> list:
     """Cached, newest-first list of distinct snapshot timestamps for a world.
 
-    Enumerating DISTINCT fetched_at scans the entire (world_url) index range
-    (~0.7s on a busy world with hundreds of snapshots), so the result is cached
-    and shared by every caller (inactive-farm sampling, snapshot count, …). A
-    per-world lock collapses concurrent cold lookups into one query instead of
-    several contending scans. The entry is dropped in save_map_snapshot when a
-    new snapshot lands."""
+    A naive `SELECT DISTINCT fetched_at ... ORDER BY fetched_at DESC` forces
+    SQLite to scan the *entire* (world_url) index range even though it's a
+    covering index — on big/old worlds (millions of rows) that alone takes
+    10+ seconds. Instead we use a "loose index scan" via a recursive CTE：
+    starting from MIN(fetched_at), repeatedly seek the next-greater distinct
+    value using the (world_url, fetched_at) index. This visits only the ~200
+    distinct timestamps (each an O(log n) index seek) instead of every row,
+    cutting cold lookups from ~12s to a few ms.
+
+    The result is cached and shared by every caller (inactive-farm sampling,
+    snapshot count, …). A per-world lock collapses concurrent cold lookups
+    into one query instead of several contending scans. The entry is dropped
+    in save_map_snapshot when a new snapshot lands."""
     if not world_url:
         return []
     ck = f"snap_times:{world_url}"
@@ -69,8 +76,17 @@ async def _world_snapshot_times(world_url: str) -> list:
             return cached
         async with aiosqlite.connect(DB_PATH, timeout=30) as db:
             async with db.execute(
-                "SELECT DISTINCT fetched_at FROM world_snapshots WHERE world_url = ? "
-                "ORDER BY fetched_at DESC", (world_url,)
+                """
+                WITH RECURSIVE t(fa) AS (
+                  SELECT MIN(fetched_at) FROM world_snapshots WHERE world_url = ?
+                  UNION ALL
+                  SELECT (SELECT fetched_at FROM world_snapshots
+                          WHERE world_url = ? AND fetched_at > t.fa
+                          ORDER BY world_url, fetched_at LIMIT 1)
+                  FROM t WHERE t.fa IS NOT NULL
+                )
+                SELECT fa FROM t WHERE fa IS NOT NULL ORDER BY fa DESC
+                """, (world_url, world_url)
             ) as cur:
                 times = [r[0] for r in await cur.fetchall()]
         _cache_set(ck, times)
