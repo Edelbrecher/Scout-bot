@@ -768,3 +768,80 @@ html.is-reload .page-main-anim {
   animation: none;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Soft micro-interactions (Claude-style):
+   subtle, springy hover/press feedback on buttons & cards, smoother color
+   transitions everywhere, and a small fade-in utility for content that's
+   inserted dynamically (e.g. AJAX-loaded rows). Kept understated on purpose —
+   short durations, gentle easing, no layout-shifting effects.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --ease-soft: cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Respect users who prefer fewer animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+a, .nav-links a, .nav-profile-btn, .lang-btn {
+  transition: color .15s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease;
+}
+
+/* Buttons: gentle lift on hover, quick press-down on click */
+.btn,
+.btn-secondary,
+.btn-danger,
+.btn-discord,
+.btn-action,
+.role-toggle,
+.nav-profile-btn,
+.guild-card {
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease,
+              box-shadow .18s var(--ease-soft), transform .15s var(--ease-soft);
+}
+.btn:hover,
+.btn-secondary:hover,
+.btn-danger:hover,
+.btn-discord:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
+}
+.btn:active,
+.btn-secondary:active,
+.btn-danger:active,
+.btn-discord:active,
+.btn-action:active,
+.role-toggle:active {
+  transform: translateY(0) scale(.97);
+  transition-duration: .08s;
+  box-shadow: none;
+}
+.btn-action:hover { transform: translateY(-1px); }
+
+/* Cards: subtle lift for clickable cards (guild grid etc.) */
+.guild-card { transition: border-color .2s ease, transform .2s var(--ease-soft), box-shadow .2s var(--ease-soft); }
+.guild-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+
+/* Table rows: smoother hover background */
+.table tr td { transition: background-color .15s ease; }
+
+/* Inputs: smoother, slightly glowing focus state */
+input[type="text"], input[type="password"], textarea, select {
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 3px rgba(88,101,242,.15);
+}
+
+/* Badges & chips: gentle scale feedback when clickable */
+.badge, .top-chip, .role-toggle { transition: transform .12s var(--ease-soft), background-color .15s ease, color .15s ease, border-color .15s ease; }
+[onclick].badge:hover, .top-chip:hover { transform: translateY(-1px) scale(1.03); cursor: pointer; }
+
+/* Fade-in utility for dynamically inserted content (e.g. "load more" rows) */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeInUp .25s var(--ease-soft) both; }
+

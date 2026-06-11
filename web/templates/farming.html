@@ -983,7 +983,7 @@
         var vnameJs = vname.replace(/"/g,'&quot;').replace(/'/g,"\\'");
         var pnameJs = pname.replace(/"/g,'&quot;').replace(/'/g,"\\'");
 
-        return '<tr data-population="'+f.population+'" data-days="'+f.days_tracked+'" data-score="'+score+'"'+
+        return '<tr class="fade-in" data-population="'+f.population+'" data-days="'+f.days_tracked+'" data-score="'+score+'"'+
           ' data-d7="'+(f.d7!==null&&f.d7!==undefined?f.d7:9999)+'" data-d14="'+(f.d14!==null&&f.d14!==undefined?f.d14:9999)+'"'+
           ' data-acc_delta="'+(f.acc_delta||0)+'" data-coords="'+coords+'" data-on-list="'+(f.is_on_list?'true':'false')+'"'+
           (f.is_cross?' style="background:rgba(34,197,94,0.06);"':'')+'>'+
