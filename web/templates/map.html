@@ -278,7 +278,16 @@
     <div id="coordDisplay">—|—</div>
   </div>
   <div id="mapResizeHandle" title="Drag to enlarge"></div>
-  <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scroll = Zoom &nbsp;·&nbsp; Drag = Pan &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Double-click = Center &nbsp;·&nbsp; Handle = Resize</p>
+  <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scroll = Zoom &nbsp;·&nbsp; Drag = Pan &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Klick = Account/Spieler/Dorf-Infos &nbsp;·&nbsp; Double-click = Center &nbsp;·&nbsp; Handle = Resize</p>
+
+  <!-- Village/Player/Account details panel (shown after left-click on a village) -->
+  <div id="villageDetails" class="card" style="display:none; margin-top:0.6rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+      <h3 id="vdTitle" style="margin:0 0 0.5rem;font-size:1rem;"></h3>
+      <button onclick="closeVillageDetails()" class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.55rem;">✕</button>
+    </div>
+    <div id="vdContent" style="display:flex;flex-wrap:wrap;gap:1.5rem;font-size:0.85rem;"></div>
+  </div>
   {% endif %}
 </div>
 
@@ -849,12 +858,21 @@ canvas.addEventListener('wheel', e => {
   draw();
 }, {passive:false});
 
+let mouseDownPos = null;
 canvas.addEventListener('mousedown', e => {
   if(e.button!==0) return;
   dragging=true; dragSX=e.clientX; dragSY=e.clientY; camSX=camX; camSY=camY;
+  mouseDownPos = {x:e.clientX, y:e.clientY};
   canvas.style.cursor='grabbing';
 });
-window.addEventListener('mouseup', ()=>{ dragging=false; canvas.style.cursor='crosshair'; });
+window.addEventListener('mouseup', e => {
+  dragging=false; canvas.style.cursor='crosshair';
+  if (mouseDownPos) {
+    const moved = Math.hypot(e.clientX-mouseDownPos.x, e.clientY-mouseDownPos.y);
+    if (moved < 4) handleMapClick(e);
+    mouseDownPos = null;
+  }
+});
 window.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
   const cx = (e.clientX-rect.left)*(canvas.width/rect.width);
@@ -902,6 +920,86 @@ canvas.addEventListener('dblclick', e => {
   const [wx,wy]=canvasToWorld((e.clientX-rect.left)*(canvas.width/rect.width),(e.clientY-rect.top)*(canvas.height/rect.height));
   camX=wx; camY=wy; draw();
 });
+
+// ── Village/Player/Account details panel ──────────────────────────────────────
+function handleMapClick(e) {
+  if (drawEnabled) return; // don't interfere with drawing mode
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX-rect.left)*(canvas.width/rect.width);
+  const cy = (e.clientY-rect.top)*(canvas.height/rect.height);
+  const [wx,wy] = canvasToWorld(cx,cy);
+  const snap = Math.max(1.5, 12/scale);
+  let best=null, bestD=Infinity;
+  for (const v of villages) {
+    const d=Math.hypot(v.x-wx,v.y-wy);
+    if(d<snap&&d<bestD){bestD=d;best=v;}
+  }
+  if (best) showVillageDetails(best);
+}
+
+function closeVillageDetails() {
+  document.getElementById('villageDetails').style.display = 'none';
+}
+
+async function showVillageDetails(v) {
+  const panel   = document.getElementById('villageDetails');
+  const titleEl = document.getElementById('vdTitle');
+  const content = document.getElementById('vdContent');
+
+  const col = getVillageColor(v);
+  titleEl.innerHTML = `<span style="color:${col};">●</span> ${escHtml(v.name||'?')} <span style="color:var(--text-muted);font-weight:400;">(${v.x}|${v.y})</span>`;
+
+  // ── Dorf section ──
+  let villageHtml = `<div style="min-width:180px;">
+    <div style="font-weight:600;margin-bottom:0.3rem;">🏘️ Dorf</div>
+    <div>📍 Koordinaten: <strong>${v.x}|${v.y}</strong></div>
+    <div>👥 Bevölkerung: <strong>${(v.pop||0).toLocaleString()}</strong></div>
+    <div>⚔️ Stamm: <strong>${v.isNatar?'Natars':(TRIBE_NAME[v.tribe]||'?')}</strong></div>
+    ${v.isCapital ? '<div>👑 Hauptstadt</div>' : ''}
+  </div>`;
+
+  // ── Spieler / Allianz section ──
+  let playerHtml = `<div style="min-width:180px;">
+    <div style="font-weight:600;margin-bottom:0.3rem;">👤 Spieler</div>
+    <div>Name: <strong>${v.player ? escHtml(v.player) : '—'}</strong></div>
+    <div>🛡️ Allianz: <strong>${v.alliance ? escHtml(v.alliance) : '—'}</strong></div>
+  </div>`;
+
+  // ── Account section (placeholder until fetched) ──
+  let accountHtml = `<div id="vdAccount" style="min-width:220px;">
+    <div style="font-weight:600;margin-bottom:0.3rem;">📊 Account</div>
+    <div style="color:var(--text-muted);">${v.player ? '⏳ Lade…' : 'Kein Spieler (Natar / unbewohnt)'}</div>
+  </div>`;
+
+  content.innerHTML = villageHtml + playerHtml + accountHtml;
+  panel.style.display = 'block';
+
+  if (!v.player) return;
+
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/api/player-info?player=${encodeURIComponent(v.player)}`);
+    const data = await r.json();
+    const acc = document.getElementById('vdAccount');
+    if (!acc) return; // panel may have been replaced by a newer click
+    if (!data) {
+      acc.innerHTML = `<div style="font-weight:600;margin-bottom:0.3rem;">📊 Account</div>
+        <div style="color:var(--text-muted);">Keine zusätzlichen Account-Daten verfügbar.</div>`;
+      return;
+    }
+    const villagesList = (data.villages||[])
+      .slice().sort((a,b)=>(b.population||0)-(a.population||0))
+      .map(vv => `<div style="font-size:0.79rem;color:var(--text-muted);">• ${escHtml(vv.village_name||'?')} (${vv.x}|${vv.y}) — ${(vv.population||0).toLocaleString()} 🏘️</div>`)
+      .join('');
+    acc.innerHTML = `<div style="font-weight:600;margin-bottom:0.3rem;">📊 Account</div>
+      <div>🏰 Dörfer gesamt: <strong>${data.village_count||0}</strong></div>
+      <div>👥 Bevölkerung gesamt: <strong>${(data.total_pop||0).toLocaleString()}</strong></div>
+      <div style="margin-top:0.35rem;max-height:140px;overflow-y:auto;">${villagesList}</div>`;
+  } catch(e) {
+    const acc = document.getElementById('vdAccount');
+    if (acc) acc.innerHTML = `<div style="font-weight:600;margin-bottom:0.3rem;">📊 Account</div>
+      <div style="color:#f87171;">Fehler beim Laden: ${escHtml(e.message)}</div>`;
+  }
+}
 
 // ── Parser ────────────────────────────────────────────────────────────────────
 function parseTuple(s) {
