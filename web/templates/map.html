@@ -35,7 +35,10 @@
 #allianceList div { font-size:0.79rem; padding:0.12rem 0; display:flex; align-items:center; gap:0.5rem; cursor:pointer; }
 #allianceList div:hover { color:var(--accent); }
 /* Filter tags */
-.filter-tags { display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.35rem; min-height:0; }
+/* Reserve space for one row of tags so adding the first player/alliance
+   filter (via the input or right-click on the map) doesn't shift the
+   control bar height and make the map below jump down. */
+.filter-tags { display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.35rem; min-height:1.65rem; }
 .filter-tag {
   display:inline-flex; align-items:center; gap:4px; padding:2px 8px 2px 10px;
   border-radius:12px; font-size:0.75rem; font-weight:600; cursor:default;
