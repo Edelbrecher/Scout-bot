@@ -304,7 +304,7 @@ function updateNextWaveBanner() {
         ${next.target_player ? ` · ${escHtml(next.target_player)}` : ''}</div>
       <div style="font-size:.78rem;color:#fbbf24;font-family:monospace;margin-top:.15rem;">📤 ${fmtSendTime(next.send_time)}</div>
     </div>
-    ${TW_WORLD ? `<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Send troops" style="width:34px;height:34px;">${ICO.rally}</a>` : ''}
+    ${TW_WORLD ? `<button onclick="openMopRally(${next.target_x},${next.target_y},${next.origin_x ?? 'null'},${next.origin_y ?? 'null'})" class="mop-icon-btn mop-icon-btn-send" title="Send troops" style="width:34px;height:34px;">${ICO.rally}</button>` : ''}
   `;
 }
 
@@ -331,12 +331,26 @@ function fmtTravel(secs) {
   return `${s}s`;
 }
 
-function rallyLink(w) {
-  if (!TW_WORLD) return '';
-  // Travian rally point: /build.php?gid=16&tt=2&t[n][x]=X&t[n][y]=Y
+// Opens the rally point's "send troops" screen, switched to the wave's own
+// origin village (via Travian's newdid= param) and with the enemy target
+// coordinates pre-filled.
+async function openMopRally(tx, ty, ox, oy) {
+  if (!TW_WORLD) return;
   const base = TW_WORLD.replace(/\/$/, '');
-  const url = `${base}/build.php?gid=16&tt=2`;
-  return `<a href="${url}" target="_blank" class="mop-rally" title="Open Travian rally point">⚔ Send troops</a>`;
+  // Open a blank tab synchronously (within the click handler) to avoid popup blockers,
+  // then navigate it once we know the origin village's Travian id (newdid).
+  const win = window.open('', '_blank');
+  let newdid = '';
+  if (ox != null && oy != null) {
+    try {
+      const r = await fetch(`/guild/${GUILD_ID}/operations/api/village-id?x=${ox}&y=${oy}`);
+      const d = await r.json();
+      if (d && d.village_id) newdid = d.village_id;
+    } catch(e) { /* ignore — fall back to current village */ }
+  }
+  const url = `${base}/build.php?${newdid ? 'newdid='+newdid+'&' : ''}gid=16&tt=2&x=${tx}&y=${ty}`;
+  if (win) win.location.href = url;
+  else window.open(url, '_blank');
 }
 
 function rowClass(w, secsLeft) {
@@ -373,7 +387,6 @@ function iconBtn(ico, cls, title, onclick, extraStyle='') {
 
 function confirmBtns(w) {
   const id = w.id;
-  const wd = JSON.stringify({attacker_name:w.attacker_name,plan_name:w.plan_name,plan_id:w.plan_id,target_x:w.target_x,target_y:w.target_y});
   if (w.confirm_status) {
     const delta = w.confirm_status === 'late' && w.confirm_delta_seconds
       ? ` (+${Math.abs(w.confirm_delta_seconds)}s)` : '';
@@ -387,12 +400,12 @@ function confirmBtns(w) {
   const isPast = cd.secsLeft !== null && cd.secsLeft < 0;
   if (isPast) {
     return `<div style="display:flex;gap:.25rem;align-items:center;">
-      ${iconBtn(ICO.check, 'mop-icon-btn-ok',   'Sent on time',  `doConfirm(${id},'on_time',0,${wd})`)}
-      ${iconBtn(ICO.clock, 'mop-icon-btn-late', 'Sent late',     `openDelta(${id},${wd})`)}
-      ${iconBtn(ICO.x,     'mop-icon-btn-no',   'Not sent',      `doConfirm(${id},'not_sent',0,${wd})`)}
+      ${iconBtn(ICO.check, 'mop-icon-btn-ok',   'Sent on time',  `doConfirm(${id},'on_time',0)`)}
+      ${iconBtn(ICO.clock, 'mop-icon-btn-late', 'Sent late',     `openDelta(${id})`)}
+      ${iconBtn(ICO.x,     'mop-icon-btn-no',   'Not sent',      `doConfirm(${id},'not_sent',0)`)}
     </div>`;
   }
-  return iconBtn(ICO.ban, 'mop-icon-btn-cant', "Can't send", `doConfirm(${id},'cant_send',0,${wd})`);
+  return iconBtn(ICO.ban, 'mop-icon-btn-cant', "Can't send", `doConfirm(${id},'cant_send',0)`);
 }
 
 // ── Troop chips ───────────────────────────────────────────────────
@@ -528,7 +541,7 @@ function render() {
           <td>${w.notes ? `<span class="mop-note" title="${escHtml(w.notes)}">${escHtml(w.notes)}</span>` : ''}</td>
           <td style="min-width:150px;">${confirmBtns(w)}</td>
           <td style="white-space:nowrap;display:flex;gap:.25rem;align-items:center;">
-            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Open rally point">${ICO.rally}</a>`:''}
+            ${TW_WORLD?`<button onclick="openMopRally(${w.target_x},${w.target_y},${w.origin_x ?? 'null'},${w.origin_y ?? 'null'})" class="mop-icon-btn mop-icon-btn-send" title="Open rally point">${ICO.rally}</button>`:''}
             ${cnt>1?`<button id="expand-${w.id}" class="mop-icon-btn mop-icon-btn-expand" title="Expand individual waves" onclick="
               const rows=this.closest('table').querySelectorAll('[data-subgroup=\\'mop-${w.id}\\']');
               const open=rows[0]?.style.display!=='none';
@@ -548,7 +561,7 @@ function render() {
           <td style="color:var(--text-muted);font-size:.75rem;">${fmtTravel(wv.travel_seconds)}</td>
           <td style="font-size:.75rem;color:#fbbf24;">${wv.notes?escHtml(wv.notes):''}</td>
           <td>${confirmBtns(wv)}</td>
-          <td>${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Rally point">${ICO.rally}</a>`:''}</td>
+          <td>${TW_WORLD?`<button onclick="openMopRally(${wv.target_x},${wv.target_y},${wv.origin_x ?? 'null'},${wv.origin_y ?? 'null'})" class="mop-icon-btn mop-icon-btn-send" title="Rally point">${ICO.rally}</button>`:''}</td>
         </tr>`).join(''):''}`;
       }).join('');
 
@@ -596,7 +609,7 @@ function render() {
           ${w.notes?`<div style="font-size:.78rem;color:#fbbf24;font-style:italic;margin-bottom:.4rem;">📝 ${escHtml(w.notes)}</div>`:''}
           <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
             ${confirmBtns(w)}
-            ${TW_WORLD?`<a href="${TW_WORLD.replace(/\/$/,'')}/build.php?gid=16&tt=2" target="_blank" class="mop-icon-btn mop-icon-btn-send" title="Rally point">${ICO.rally}</a>`:''}
+            ${TW_WORLD?`<button onclick="openMopRally(${w.target_x},${w.target_y},${w.origin_x ?? 'null'},${w.origin_y ?? 'null'})" class="mop-icon-btn mop-icon-btn-send" title="Rally point">${ICO.rally}</button>`:''}
           </div>
         </div>`;
       }).join('');
@@ -668,10 +681,10 @@ function tick() {
 }
 
 // ── Confirm / Delta ──────────────────────────────────────────────
-let _deltaWaveId = null, _deltaWaveData = null;
+let _deltaWaveId = null;
 
-function openDelta(id, waveData) {
-  _deltaWaveId = id; _deltaWaveData = waveData;
+function openDelta(id) {
+  _deltaWaveId = id;
   document.getElementById('mopDeltaModal').classList.add('open');
 }
 function closeDeltaModal() {
@@ -679,11 +692,12 @@ function closeDeltaModal() {
 }
 function submitDelta(secs) {
   closeDeltaModal();
-  doConfirm(_deltaWaveId, 'late', secs, _deltaWaveData);
+  doConfirm(_deltaWaveId, 'late', secs);
 }
 
-async function doConfirm(id, status, delta, waveData) {
+async function doConfirm(id, status, delta) {
   try {
+    const waveData = WAVES_DATA.find(x => x.id === id);
     const fd = new FormData();
     fd.append('status', status);
     fd.append('delta_seconds', delta);
@@ -754,7 +768,12 @@ function toggleAlarm() {
     btn.classList.remove('off');
     btn.textContent = '🔔 Active';
     status.textContent = 'You will be warned before each send time.';
-    if (_audioCtx) _audioCtx.resume();
+    // Create/resume the AudioContext *now* while we have a user gesture —
+    // browsers block audio from contexts created later inside a timer.
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    // Quick confirmation beep so the user knows sound works.
+    playBeep(880, 0.15, 0.4);
   } else {
     btn.classList.add('off');
     btn.textContent = 'Activate';
