@@ -6028,7 +6028,7 @@ async def my_ally_page(request: Request, guild_id: str):
         can_view_guide = is_editor or "guide_view" in _perms
         can_manage_map = is_editor or "map_manage" in _perms
         can_manage_map_meta = is_editor or "map_meta_manage" in _perms
-    can_view_karte_tab = can_manage_map or can_manage_map_meta
+    can_view_map_tab = can_manage_map_meta
     has_map_meta_premium = _has_alliance_pro(await _enrich_guild_subscription(guild)) if guild else False
 
     # ── Wave 3: depends on members list ──────────────────────────────────
@@ -6104,7 +6104,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "snapshot_alliances": snapshot_alliances,
         "can_manage_map": can_manage_map,
         "can_manage_map_meta": can_manage_map_meta,
-        "can_view_karte_tab": can_view_karte_tab,
+        "can_view_map_tab": can_view_map_tab,
         "has_map_meta_premium": has_map_meta_premium,
         "ep_members": list(ep_members),
         "growth_data": growth_data,
@@ -6189,7 +6189,7 @@ async def meta_alliance_add(request: Request, guild_id: str,
     name = alliance_name.strip()[:80]
     if name:
         await database.add_meta_alliance(guild_id, name, color)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#karte", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#map", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/meta-alliance/remove")
@@ -6200,7 +6200,7 @@ async def meta_alliance_remove(request: Request, guild_id: str,
     err = _require_guild(session, guild_id)
     if err: return err
     await database.remove_meta_alliance(guild_id, alliance_name)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#karte", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#map", status_code=303)
 
 
 # ── Server-End Countdown helpers ─────────────────────────────────────────────
