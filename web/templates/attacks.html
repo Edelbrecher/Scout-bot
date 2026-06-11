@@ -543,6 +543,29 @@
 
   </div>
 
+  {% if attack_reports %}
+  <!-- ===== BOT-DETECTED ATTACKS (Discord alarm flow) ===== -->
+  <div class="card" style="margin-top:1.5rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+      <h2 style="margin:0;font-size:1rem;">&#x1F916; Discord-Alarm — automatisch erkannte Meldungen</h2>
+      <span style="font-size:.74rem;color:var(--text-muted);">Aus dem Alarm-Kanal geparst · ergänzt den Rallyepunkt-Import oben</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.4rem;">
+      {% for r in attack_reports %}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;
+                  padding:.4rem .65rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;">
+        <div style="font-size:.82rem;">
+          <strong>{{ r.attack_count }}</strong> Angriff(e)
+          <span style="color:var(--text-muted);">· gemeldet von {{ r.reporter_name or '—' }}{% if r.created_at %} · {{ r.created_at[:16].replace('T',' ') }} UTC{% endif %}</span>
+        </div>
+        <a href="/guild/{{ guild.guild_id }}/attacks/{{ r.id }}/analyse"
+           class="btn btn-secondary" style="font-size:.78rem;padding:.2rem .6rem;flex-shrink:0;">&#x1F52C; Analyse</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ===== CONFIG SECTION (collapsed) ===== -->
   <details style="margin-top:1.5rem;">
     <summary style="cursor:pointer; font-size:0.9rem; color:var(--text-muted); padding:0.5rem 0;">

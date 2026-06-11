@@ -5150,10 +5150,19 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     uid = session.get("uid", "")
     err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
-    # The page renders the rally-import (incoming_attacks) flow; from the
-    # bot-alarm flow it only shows the report count as config feedback, so a
-    # cheap COUNT is enough (no full report load + aggregation).
+    # Two attack sources run side by side: the rally-import (incoming_attacks,
+    # the primary list further down the page) and the Discord-alarm flow the bot
+    # parses into attack_reports. Surface the latter as a visible list (with a
+    # link to each report's analysis) so both sources visibly come together,
+    # instead of the bot flow only showing up as a hidden count.
+    import json as _json_ar
     attack_stats = {"total_reports": await database.get_attack_report_count(guild_id)}
+    attack_reports = await database.get_attack_reports(guild_id, limit=20)
+    for _r in attack_reports:
+        try:
+            _r["attack_count"] = len(_json_ar.loads(_r.get("attacks_json") or "[]"))
+        except Exception:
+            _r["attack_count"] = 0
     is_admin = session.get("type") == "admin" or uid == guild.get("owner_discord_id")
     perms = await database.get_member_permissions(guild_id, uid)
     can_label   = is_admin or "ally_manage" in perms or "defend_manage" in perms or "attack_manage" in perms
@@ -5161,6 +5170,7 @@ async def attacks_page(request: Request, guild_id: str, saved: str = ""):
     return templates.TemplateResponse("attacks.html", {
         "request": request, "guild": guild, "guild_id": guild_id,
         "attack_stats": attack_stats,
+        "attack_reports": attack_reports,
         "is_admin": is_admin, "saved": saved,
         "can_label": can_label,
         "can_see_all": can_see_all,
