@@ -278,7 +278,7 @@
     <div id="coordDisplay">—|—</div>
   </div>
   <div id="mapResizeHandle" title="Drag to enlarge"></div>
-  <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scroll = Zoom &nbsp;·&nbsp; Drag = Pan &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Klick = Account/Spieler/Dorf-Infos &nbsp;·&nbsp; Double-click = Center &nbsp;·&nbsp; Handle = Resize</p>
+  <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scroll = Zoom &nbsp;·&nbsp; Drag = Pan &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Klick = Account/Spieler/Dorf-Infos &nbsp;·&nbsp; Rechtsklick = Spieler-Dörfer markieren &nbsp;·&nbsp; Double-click = Center &nbsp;·&nbsp; Handle = Resize</p>
 
   <!-- Village/Player/Account details panel (shown after left-click on a village) -->
   <div id="villageDetails" class="card" style="display:none; margin-top:0.6rem;">
@@ -788,7 +788,7 @@ document.getElementById('searchAlliance').addEventListener('keydown', e => e.key
 document.getElementById('jumpX').addEventListener('keydown', e => e.key==='Enter' && jumpToCoords());
 document.getElementById('jumpY').addEventListener('keydown', e => e.key==='Enter' && jumpToCoords());
 
-function doSearch() {
+function doSearch(opts) {
   highlighted.clear();
   const info = document.getElementById('searchInfo');
   if (!playerFilters.length && !allianceFilters.length) { info.textContent=''; draw(); return; }
@@ -816,7 +816,7 @@ function doSearch() {
   total = highlighted.size;
   info.textContent = `${total.toLocaleString()} Villages`;
 
-  if (total && total <= 8000) {
+  if (total && total <= 8000 && !(opts && opts.noPan)) {
     const keys = [...highlighted.keys()].map(k => { const [x,y]=k.split('|'); return {x:+x,y:+y}; });
     const ax = Math.round(keys.reduce((s,v)=>s+v.x,0)/keys.length);
     const ay = Math.round(keys.reduce((s,v)=>s+v.y,0)/keys.length);
@@ -919,6 +919,31 @@ canvas.addEventListener('dblclick', e => {
   const rect=canvas.getBoundingClientRect();
   const [wx,wy]=canvasToWorld((e.clientX-rect.left)*(canvas.width/rect.width),(e.clientY-rect.top)*(canvas.height/rect.height));
   camX=wx; camY=wy; draw();
+});
+
+// ── Right-click: highlight/unhighlight all villages of this player ────────────
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (drawEnabled) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX-rect.left)*(canvas.width/rect.width);
+  const cy = (e.clientY-rect.top)*(canvas.height/rect.height);
+  const [wx,wy] = canvasToWorld(cx,cy);
+  const snap = Math.max(1.5, 12/scale);
+  let best=null, bestD=Infinity;
+  for (const v of villages) {
+    const d=Math.hypot(v.x-wx,v.y-wy);
+    if(d<snap&&d<bestD){bestD=d;best=v;}
+  }
+  if (!best || !best.player) return;
+  const idx = playerFilters.findIndex(f => f.name.toLowerCase() === best.player.toLowerCase());
+  if (idx >= 0) {
+    playerFilters.splice(idx,1);
+  } else {
+    playerFilters.push({name: best.player, color: nextTagColor()});
+  }
+  renderTags();
+  doSearch({noPan:true});
 });
 
 // ── Village/Player/Account details panel ──────────────────────────────────────
