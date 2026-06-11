@@ -8183,11 +8183,19 @@ async def farming_page(
                 include_ww=include_ww,
                 tribes=tribes or [],
                 limit=500,
+                no_alliance=no_alliance,
+                exclude_coords=None if show_own_villages else own_coords_fast,
+                exclude_alliance_lc=None if (show_alliance_villages or not tw_alliance_lc_fast) else tw_alliance_lc_fast,
+                inactive_player_names=inactive_player_names_fast if only_inactive_players else None,
             )
             inactive_farms_fast = adv_result.get("villages", [])
             for v in inactive_farms_fast:
                 v["farmlist_groups"] = farmlist_xy_fast.get((v["x"], v["y"]), [])
                 v.setdefault("days_tracked", 0)
+            if in_farmlist == "no":
+                inactive_farms_fast = [v for v in inactive_farms_fast if not v["farmlist_groups"]]
+            elif in_farmlist == "yes":
+                inactive_farms_fast = [v for v in inactive_farms_fast if v["farmlist_groups"]]
         else:
             inactive_farms_fast = await database.get_inactive_farms(
                 guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i,
@@ -8195,22 +8203,22 @@ async def farming_page(
             for v in inactive_farms_fast:
                 v["farmlist_groups"] = farmlist_xy_fast.get((v["x"], v["y"]), [])
 
-        if in_farmlist == "no":
-            inactive_farms_fast = [v for v in inactive_farms_fast if not v["farmlist_groups"]]
-        elif in_farmlist == "yes":
-            inactive_farms_fast = [v for v in inactive_farms_fast if v["farmlist_groups"]]
+            if in_farmlist == "no":
+                inactive_farms_fast = [v for v in inactive_farms_fast if not v["farmlist_groups"]]
+            elif in_farmlist == "yes":
+                inactive_farms_fast = [v for v in inactive_farms_fast if v["farmlist_groups"]]
 
-        if not show_own_villages:
-            inactive_farms_fast = [v for v in inactive_farms_fast if (v["x"], v["y"]) not in own_coords_fast]
-        if not show_alliance_villages and tw_alliance_lc_fast:
-            inactive_farms_fast = [
-                v for v in inactive_farms_fast
-                if (v.get("alliance_name") or "").strip().lower() != tw_alliance_lc_fast
-            ]
-        if only_inactive_players:
-            inactive_farms_fast = [v for v in inactive_farms_fast if (v.get("player_name") or "") in inactive_player_names_fast]
-        if no_alliance:
-            inactive_farms_fast = [v for v in inactive_farms_fast if not (v.get("alliance_name") or "").strip()]
+            if not show_own_villages:
+                inactive_farms_fast = [v for v in inactive_farms_fast if (v["x"], v["y"]) not in own_coords_fast]
+            if not show_alliance_villages and tw_alliance_lc_fast:
+                inactive_farms_fast = [
+                    v for v in inactive_farms_fast
+                    if (v.get("alliance_name") or "").strip().lower() != tw_alliance_lc_fast
+                ]
+            if only_inactive_players:
+                inactive_farms_fast = [v for v in inactive_farms_fast if (v.get("player_name") or "") in inactive_player_names_fast]
+            if no_alliance:
+                inactive_farms_fast = [v for v in inactive_farms_fast if not (v.get("alliance_name") or "").strip()]
 
         _PAGE_SIZE_FAST = 100
         inactive_farms_real_total_fast = len(inactive_farms_fast)
@@ -8326,6 +8334,10 @@ async def farming_page(
             include_ww=include_ww,
             tribes=tribes or [],
             limit=500,
+            no_alliance=no_alliance,
+            exclude_coords=None if show_own_villages else own_coords,
+            exclude_alliance_lc=None if (show_alliance_villages or not tw_alliance_lc) else tw_alliance_lc,
+            inactive_player_names=inactive_player_names if only_inactive_players else None,
         )
         inactive_farms_raw = adv_result.get("villages", [])
         for v in inactive_farms_raw:
@@ -8350,22 +8362,22 @@ async def farming_page(
         else:
             inactive_farms = inactive_farms_raw
 
-    # ── Hide own villages / alliance members by default ─────────────────────
-    if not show_own_villages:
-        inactive_farms = [v for v in inactive_farms if (v["x"], v["y"]) not in own_coords]
-    if not show_alliance_villages and tw_alliance_lc:
-        inactive_farms = [
-            v for v in inactive_farms
-            if (v.get("alliance_name") or "").strip().lower() != tw_alliance_lc
-        ]
+        # ── Hide own villages / alliance members by default ─────────────────
+        if not show_own_villages:
+            inactive_farms = [v for v in inactive_farms if (v["x"], v["y"]) not in own_coords]
+        if not show_alliance_villages and tw_alliance_lc:
+            inactive_farms = [
+                v for v in inactive_farms
+                if (v.get("alliance_name") or "").strip().lower() != tw_alliance_lc
+            ]
 
-    # ── Only inactive players (player gained < 1 pop over tracked period) ───
-    if only_inactive_players:
-        inactive_farms = [v for v in inactive_farms if (v.get("player_name") or "") in inactive_player_names]
+        # ── Only inactive players (player gained < 1 pop over tracked period) ─
+        if only_inactive_players:
+            inactive_farms = [v for v in inactive_farms if (v.get("player_name") or "") in inactive_player_names]
 
-    # ── Players without an alliance ──────────────────────────────────────────
-    if no_alliance:
-        inactive_farms = [v for v in inactive_farms if not (v.get("alliance_name") or "").strip()]
+        # ── Players without an alliance ──────────────────────────────────────
+        if no_alliance:
+            inactive_farms = [v for v in inactive_farms if not (v.get("alliance_name") or "").strip()]
 
     # ── Pagination: 100 per page (initial + AJAX) ────────────────────────────
     _PAGE_SIZE = 100

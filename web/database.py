@@ -3106,6 +3106,10 @@ async def search_inactive_advanced(
     include_ww: bool = False,
     max_pop_increase: int = 0,
     limit: int = 300,
+    no_alliance: bool = False,
+    exclude_coords: set | None = None,
+    exclude_alliance_lc: str | None = None,
+    inactive_player_names: set | None = None,
 ) -> dict:
     import math
 
@@ -3215,6 +3219,18 @@ async def search_inactive_advanced(
             if excl_players and any(f in pname for f in excl_players):
                 continue
             if excl_alliances and any(f in aname for f in excl_alliances):
+                continue
+            # Players without an alliance
+            if no_alliance and aname:
+                continue
+            # Own villages (hidden unless show_own_villages is set)
+            if exclude_coords and (v["x"], v["y"]) in exclude_coords:
+                continue
+            # Own alliance's villages (hidden unless show_alliance_villages is set)
+            if exclude_alliance_lc and aname == exclude_alliance_lc:
+                continue
+            # Only players whose total pop barely grew (only_inactive_players)
+            if inactive_player_names is not None and (v["player_name"] or "") not in inactive_player_names:
                 continue
             pp = player_pop.get(pname, 0) or 0
             if pp < min_player_pop or pp > max_player_pop:
