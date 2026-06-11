@@ -7,8 +7,8 @@
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}/reports" class="back-link">← Battle Reports</a>
-      <h1 style="margin:.2rem 0 .15rem;">🧠 Combat Intel</h1>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">🧠 Combat Intel</h1>
       <p class="subtitle" style="margin:0;">Spieler-Profile aus Kampfberichten · Schaden, Verluste &amp; Bauzeit-Analyse</p>
     </div>
     <form method="get" action="/guild/{{ guild.guild_id }}/reports/intel"

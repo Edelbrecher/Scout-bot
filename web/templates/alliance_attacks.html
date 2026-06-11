@@ -4,13 +4,13 @@
 {% block content %}
 {% from "_combat_flow.html" import combat_flow %}
 <div class="container-wide" style="padding-bottom:3rem;">
-  <a href="/guild/{{ guild.guild_id }}/attacks" class="back-link">← Attacks</a>
+  <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
 
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
     <div>
-      <h1 style="margin:0;font-size:1.5rem;">🚨 Allianz-Angriffe</h1>
-      <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Alle eingehenden Angriffe der Allianz auf einen Blick — koordinierte Wellen erkennen</p>
+      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">🚨 Allianz-Angriffe</h1>
+      <p class="subtitle" style="margin:0;">Alle eingehenden Angriffe der Allianz auf einen Blick — koordinierte Wellen erkennen</p>
     </div>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
       <span id="lastRefresh" style="font-size:.75rem;color:var(--text-muted);"></span>
