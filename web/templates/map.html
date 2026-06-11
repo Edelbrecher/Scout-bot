@@ -367,6 +367,7 @@ function nextTagColor() {
   return TAG_COLORS[tagColorIdx++ % TAG_COLORS.length];
 }
 let allianceColorMap = new Map();  // alliance name → color
+let hiddenAlliances  = new Set();  // lowercase alliance names hidden from the alliance heatmap
 let playerColorMap   = new Map();  // player name → color
 let maxPop = 1;
 let farmHeatMap = new Map();  // "x|y" → resource value
@@ -531,6 +532,10 @@ function draw() {
     const isHL     = !!hlColor;
     const dim      = hasFilter && !isHL && !isScouted;
 
+    // In alliance heatmap mode, skip villages of alliances the user hid via the legend
+    if (viewMode === 'alliance' && !isHL && !isScouted && v.alliance &&
+        hiddenAlliances.has(v.alliance.toLowerCase())) continue;
+
     ctx.globalAlpha = dim ? 0.08 : 1;
     ctx.shadowBlur  = 0;
 
@@ -659,15 +664,23 @@ function buildAllianceLegend() {
   }
   const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,30);
   const aList = document.getElementById('allianceList');
-  let html = '<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Top Allianzen — klicken zum Filtern:</div>';
+  let html = `<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+    <span>Top Allianzen — klicken zum Filtern, 👁 zum Ausblenden:</span>
+    ${hiddenAlliances.size ? `<span onclick="resetHiddenAlliances()" style="cursor:pointer; color:var(--accent);">${hiddenAlliances.size} ausgeblendet · zurücksetzen</span>` : ''}
+  </div>`;
   html += '<div style="display:flex; flex-wrap:wrap; gap:0.4rem;">';
   for (const [name, count] of sorted) {
     if (!allianceColorMap.has(name)) allianceColorMap.set(name, hashColor(name));
     const col = allianceColorMap.get(name);
-    html += `<span onclick="filterAlliance('${name.replace(/'/g,"\\'")}'))"
-      style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; padding:2px 8px; border-radius:12px; border:1px solid ${col}; font-size:0.75rem; color:${col}; background:${col}18;">
-      <span style="width:8px;height:8px;background:${col};border-radius:2px;display:inline-block;"></span>
-      ${name} (${count})
+    const esc = name.replace(/'/g,"\\'");
+    const isHidden = hiddenAlliances.has(name.toLowerCase());
+    html += `<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px 2px 8px; border-radius:12px; border:1px solid ${col}; font-size:0.75rem; color:${col}; background:${col}${isHidden?'08':'18'}; opacity:${isHidden?0.5:1};">
+      <span onclick="filterAlliance('${esc}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Klicken zum Filtern/Hervorheben">
+        <span style="width:8px;height:8px;background:${col};border-radius:2px;display:inline-block;"></span>
+        ${escHtml(name)} (${count})
+      </span>
+      <button onclick="toggleAllianceVisibility('${esc}')" title="${isHidden ? 'Wieder einblenden' : 'Ausblenden'}"
+        style="background:none;border:none;cursor:pointer;padding:0;font-size:0.8rem;line-height:1;color:${col};opacity:0.85;">${isHidden ? '🚫' : '👁️'}</button>
     </span>`;
   }
   html += '</div>';
@@ -677,6 +690,20 @@ function buildAllianceLegend() {
 
 function filterAlliance(name) {
   addAllianceFilterValue(name, nextTagColor());
+}
+
+function toggleAllianceVisibility(name) {
+  const key = name.toLowerCase();
+  if (hiddenAlliances.has(key)) hiddenAlliances.delete(key);
+  else hiddenAlliances.add(key);
+  buildAllianceLegend();
+  draw();
+}
+
+function resetHiddenAlliances() {
+  hiddenAlliances.clear();
+  buildAllianceLegend();
+  draw();
 }
 
 // ── Multi-filter tag system ───────────────────────────────────────────────────
@@ -827,10 +854,12 @@ function doSearch(opts) {
 
 function clearSearch() {
   playerFilters = []; allianceFilters = []; tagColorIdx = 0;
+  hiddenAlliances.clear();
   document.getElementById('searchPlayer').value   = '';
   document.getElementById('searchAlliance').value = '';
   document.getElementById('searchInfo').textContent = '';
   renderTags();
+  if (viewMode === 'alliance') buildAllianceLegend();
   highlighted.clear();
   draw();
 }
