@@ -3495,7 +3495,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
                       MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
                       MIN(population) as min_pop, MAX(population) as max_pop,
                       COUNT(DISTINCT fetched_at) as snap_count
-               FROM world_snapshots
+               FROM world_snapshots INDEXED BY idx_wsnap_player
                WHERE world_url = ? AND lower(player_name) = ?
                GROUP BY x, y""",
             (world_url, pname_lower)
@@ -3545,7 +3545,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         if needed_ts:
             ph = ",".join("?" * len(needed_ts))
             async with db.execute(
-                f"""SELECT x, y, fetched_at, population FROM world_snapshots
+                f"""SELECT x, y, fetched_at, population FROM world_snapshots INDEXED BY idx_wsnap_player
                     WHERE world_url = ? AND lower(player_name) = ? AND fetched_at IN ({ph})""",
                 [world_url, pname_lower] + needed_ts
             ) as cur:
@@ -3607,7 +3607,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         # Alliance history (one query, grouped)
         async with db.execute(
             """SELECT fetched_at, MAX(alliance_name) as alliance_name
-               FROM world_snapshots
+               FROM world_snapshots INDEXED BY idx_wsnap_player
                WHERE world_url = ? AND lower(player_name) = ?
                GROUP BY fetched_at
                ORDER BY fetched_at""",
@@ -3626,7 +3626,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         # Total population per snapshot (growth chart — one query)
         async with db.execute(
             """SELECT fetched_at, SUM(population) as total_pop, COUNT(*) as village_count
-               FROM world_snapshots
+               FROM world_snapshots INDEXED BY idx_wsnap_player
                WHERE world_url = ? AND lower(player_name) = ?
                GROUP BY fetched_at
                ORDER BY fetched_at""",
