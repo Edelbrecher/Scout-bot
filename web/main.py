@@ -3224,10 +3224,12 @@ async def guild_map(request: Request, guild_id: str):
     # Ally-specific data only for actual guild members — hide from external share viewers
     ally_group = await database.get_ally_group_for_guild(guild_id) if is_member else None
 
-    # Meta-alliances (quick-filter buttons) are a premium feature
+    # Meta-alliances (quick-filter buttons) are a premium feature, and can additionally
+    # be restricted per-role via the "map_meta_view" permission flag.
     has_premium = _has_alliance_pro(await _enrich_guild_subscription(guild)) if guild else False
-    meta_alliances = await database.get_meta_alliances(guild_id) if (is_member and has_premium) else []
-    meta_groups    = await database.get_meta_groups(guild_id)    if (is_member and has_premium) else []
+    can_view_meta = has_premium and is_member and await has_perm(request, guild_id, "map_meta_view")
+    meta_alliances = await database.get_meta_alliances(guild_id) if can_view_meta else []
+    meta_groups    = await database.get_meta_groups(guild_id)    if can_view_meta else []
 
     return templates.TemplateResponse("map.html", {
         "request": request,
@@ -3239,6 +3241,7 @@ async def guild_map(request: Request, guild_id: str):
         "meta_groups": meta_groups,
         "is_share_viewer": not is_member,
         "has_meta_premium": has_premium,
+        "can_view_meta": can_view_meta,
     })
 
 
@@ -5966,10 +5969,12 @@ async def my_ally_page(request: Request, guild_id: str):
             return RedirectResponse(f"/guild/{real_guild_id}/my-ally", status_code=302)
 
     # ── Wave 1: fully independent queries ────────────────────────────────
-    guild, ally_group, meta_alliances = await asyncio.gather(
+    guild, ally_group, meta_alliances, meta_groups, snapshot_alliances = await asyncio.gather(
         database.get_guild(guild_id),
         database.get_ally_group_for_owner(guild_id, uid),
         database.get_meta_alliances(guild_id),
+        database.get_meta_groups(guild_id),
+        database.get_alliance_names_from_snapshot(guild_id),
     )
     if not guild:
         return RedirectResponse("/dashboard")
@@ -6013,12 +6018,18 @@ async def my_ally_page(request: Request, guild_id: str):
         can_view_members = True
         can_view_rank = True
         can_view_guide = True
+        can_manage_map = True
+        can_manage_map_meta = True
     else:
         _perms = await database.get_member_permissions(guild_id, uid)
         is_editor = "ally_manage" in _perms
         can_view_members = is_editor or "ally_view_members" in _perms
         can_view_rank = can_view_members or "ally_view_rank" in _perms
         can_view_guide = is_editor or "guide_view" in _perms
+        can_manage_map = is_editor or "map_manage" in _perms
+        can_manage_map_meta = is_editor or "map_meta_manage" in _perms
+    can_view_karte_tab = can_manage_map or can_manage_map_meta
+    has_map_meta_premium = _has_alliance_pro(await _enrich_guild_subscription(guild)) if guild else False
 
     # ── Wave 3: depends on members list ──────────────────────────────────
     all_members_list = members or member_view_members or []
@@ -6089,6 +6100,12 @@ async def my_ally_page(request: Request, guild_id: str):
         "flash": flash, "base_url": str(request.base_url).rstrip("/"),
         "leaderboard": leaderboard,
         "meta_alliances": meta_alliances,
+        "meta_groups": meta_groups,
+        "snapshot_alliances": snapshot_alliances,
+        "can_manage_map": can_manage_map,
+        "can_manage_map_meta": can_manage_map_meta,
+        "can_view_karte_tab": can_view_karte_tab,
+        "has_map_meta_premium": has_map_meta_premium,
         "ep_members": list(ep_members),
         "growth_data": growth_data,
         "bonuses": bonuses,
@@ -6172,7 +6189,7 @@ async def meta_alliance_add(request: Request, guild_id: str,
     name = alliance_name.strip()[:80]
     if name:
         await database.add_meta_alliance(guild_id, name, color)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#meta-alliances", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#karte", status_code=303)
 
 
 @app.post("/guild/{guild_id}/my-ally/meta-alliance/remove")
@@ -6183,7 +6200,7 @@ async def meta_alliance_remove(request: Request, guild_id: str,
     err = _require_guild(session, guild_id)
     if err: return err
     await database.remove_meta_alliance(guild_id, alliance_name)
-    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#meta-alliances", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#karte", status_code=303)
 
 
 # ── Server-End Countdown helpers ─────────────────────────────────────────────
@@ -6551,7 +6568,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         "ep_manage", "ep_view", "ep_notify",
         "attack_manage", "attack_view",
         "scout_manage", "scout_view",
-        "map_manage", "map_view",
+        "map_manage", "map_view", "map_meta_view", "map_meta_manage",
         "res_push_view", "res_push_manage",
         "sector_view", "hospital_view",
         "poll_view", "poll_manage",
@@ -6570,14 +6587,14 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
             "ep_manage", "ep_view", "ep_notify",
             "attack_manage", "attack_view",
             "scout_manage", "scout_view",
-            "map_view", "map_manage",
+            "map_view", "map_manage", "map_meta_view", "map_meta_manage",
             "res_push_view", "res_push_manage",
             "sector_view", "hospital_view",
             "poll_view", "poll_manage", "hero_scout_view", "stats_view", "blueprint_view",
             "guide_view",
         ]
     elif preset == "mitglied":
-        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "res_push_view", "hospital_view", "guide_view"]
+        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "map_meta_view", "res_push_view", "hospital_view", "guide_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)
@@ -12797,35 +12814,45 @@ async def set_member_note(
     return JSONResponse({"ok": True})
 
 
+def _meta_redirect_target(guild_id: str, redirect_to: str) -> str:
+    """Allow meta-group endpoints to redirect back to either the standalone
+    Meta-Builder page or the new 'Karte' tab in My Ally, depending on origin."""
+    if redirect_to and redirect_to.startswith(f"/guild/{guild_id}/"):
+        return redirect_to
+    return f"/guild/{guild_id}/allianz/mitglieder"
+
+
 @app.post("/guild/{guild_id}/allianz/meta/create")
-async def meta_create(request: Request, guild_id: str, meta_name: str = Form("")):
+async def meta_create(request: Request, guild_id: str, meta_name: str = Form(""), redirect_to: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    target = _meta_redirect_target(guild_id, redirect_to)
     meta_name = meta_name.strip()[:64]
     if meta_name:
         result = await database.create_meta_group(guild_id, meta_name)
         if result is None:
-            return RedirectResponse(
-                f"/guild/{guild_id}/allianz/mitglieder?meta_error=limit", status_code=303
-            )
-    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+            base, _, frag = target.partition("#")
+            sep = "&" if "?" in base else "?"
+            frag = f"#{frag}" if frag else ""
+            return RedirectResponse(f"{base}{sep}meta_error=limit{frag}", status_code=303)
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/guild/{guild_id}/allianz/meta/{group_id}/delete")
-async def meta_delete(request: Request, guild_id: str, group_id: int):
+async def meta_delete(request: Request, guild_id: str, group_id: int, redirect_to: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     await database.delete_meta_group(guild_id, group_id)
-    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+    return RedirectResponse(_meta_redirect_target(guild_id, redirect_to), status_code=303)
 
 
 @app.post("/guild/{guild_id}/allianz/meta/{group_id}/add-alliance")
 async def meta_add_alliance(
-    request: Request, guild_id: str, group_id: int, alliance_name: str = Form("")
+    request: Request, guild_id: str, group_id: int, alliance_name: str = Form(""), redirect_to: str = Form("")
 ):
     session, err = _require_session(request)
     if err: return err
@@ -12833,12 +12860,12 @@ async def meta_add_alliance(
     if err: return err
     if alliance_name:
         await database.add_alliance_to_meta(guild_id, group_id, alliance_name)
-    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+    return RedirectResponse(_meta_redirect_target(guild_id, redirect_to), status_code=303)
 
 
 @app.post("/guild/{guild_id}/allianz/meta/{group_id}/remove-alliance")
 async def meta_remove_alliance(
-    request: Request, guild_id: str, group_id: int, alliance_name: str = Form("")
+    request: Request, guild_id: str, group_id: int, alliance_name: str = Form(""), redirect_to: str = Form("")
 ):
     session, err = _require_session(request)
     if err: return err
@@ -12846,7 +12873,7 @@ async def meta_remove_alliance(
     if err: return err
     if alliance_name:
         await database.remove_alliance_from_meta(guild_id, group_id, alliance_name)
-    return RedirectResponse(f"/guild/{guild_id}/allianz/mitglieder", status_code=303)
+    return RedirectResponse(_meta_redirect_target(guild_id, redirect_to), status_code=303)
 
 
 @app.get("/guild/{guild_id}/allianz/meta/{group_id}/stats")

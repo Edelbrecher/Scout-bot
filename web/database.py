@@ -5510,7 +5510,8 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
     ALL_PERMS = {
         "ally_manage", "ep_manage", "ep_view", "ep_notify",
         "attack_manage", "attack_view", "scout_manage", "scout_view",
-        "map_manage", "map_view", "sector_view", "hospital_view",
+        "map_manage", "map_view", "map_meta_view", "map_meta_manage",
+        "sector_view", "hospital_view",
         "res_push_view", "res_push_manage",
         "hero_scout_view", "stats_view", "blueprint_view",
         "poll_view", "poll_manage", "defend_view", "defend_manage",

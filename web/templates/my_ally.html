@@ -58,6 +58,7 @@
     <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Invitations</button>
     <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Member Roles</button>
     <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Roles & Permissions</button>
+    {% if can_view_karte_tab %}<button class="ma-tab" onclick="showTab('karte',this)" id="tab-btn-karte">🗺️ Karte</button>{% endif %}
     {% if is_editor %}<button class="ma-tab" onclick="showTab('battlegroups',this)">⚔️ Battlegroups</button>{% endif %}
     <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Alliance Bonus</button>
     <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Settings</button>
@@ -552,7 +553,7 @@
 
   {# ══════════════════════════════ TAB: EINLADUNGEN ══════════════════════════════ #}
   <div id="tab-einladungen" class="ma-tab-panel" style="display:none;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+    <div style="display:grid;grid-template-columns:1fr;gap:1rem;align-items:start;max-width:560px;">
 
       {# Invite links #}
       <div class="card">
@@ -586,33 +587,6 @@
         </div>
       </div>
 
-      {# Meta-alliances #}
-      <div class="card" id="meta-alliances">
-        <h3 style="margin:0 0 .25rem;font-size:.95rem;">🗺️ Karten-Quickbuttons</h3>
-        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Weitere Allianzen als Quickbuttons auf der Karte.</p>
-        {% if meta_alliances %}
-        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.65rem;">
-          {% for ma in meta_alliances %}
-          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/meta-alliance/remove" style="margin:0;">
-            <input type="hidden" name="alliance_name" value="{{ ma.alliance_name }}">
-            <span style="display:flex;align-items:center;gap:.35rem;background:rgba(0,0,0,.2);border:1px solid {{ ma.color }};border-radius:20px;padding:3px 10px;font-size:.78rem;font-weight:600;color:{{ ma.color }};">
-              <span style="width:8px;height:8px;border-radius:50%;background:{{ ma.color }};flex-shrink:0;"></span>
-              {{ ma.alliance_name }}
-              <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;line-height:1;" title="Entfernen">✕</button>
-            </span>
-          </form>
-          {% endfor %}
-        </div>
-        {% endif %}
-        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/meta-alliance/add"
-              style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-          <input type="text" name="alliance_name" placeholder="Allianzname" required maxlength="80"
-                 style="flex:1;min-width:120px;padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
-          <input type="color" name="color" value="#94a3b8"
-                 style="width:34px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;">
-          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕</button>
-        </form>
-      </div>
     </div>
   </div>
 
@@ -895,6 +869,8 @@
                   ("🗺️ Map", [
                     ("map_view","View Map","Can access the alliance map."),
                     ("map_manage","Manage Map","Can update map settings, world data, and sector monitors."),
+                    ("map_meta_view","View Map-Meta","Can see and use the 'Meta' quick-filter buttons on the map (requires Alliance-Pro)."),
+                    ("map_meta_manage","Manage Map-Meta","Can create/edit Meta-Alliances and Meta-Groups in the Karte tab."),
                   ]),
                   ("📦 Resource Push", [
                     ("res_push_view","View Requests","Can view all resource push requests on the board."),
@@ -1030,6 +1006,7 @@
               ("⚔️ Attacks","attack_view / attack_manage","View or manage incoming attack reports."),
               ("🔍 Scouting","scout_view / scout_manage","View enemy scouts; manage scout assignments & enemy troop entries."),
               ("🗺️ Map","map_view / map_manage","Access the map; manage world data and sector settings."),
+              ("🏰 Map-Meta","map_meta_view / map_meta_manage","See/use the Meta quick-filter buttons on the map; create & manage Meta-Alliances/Gruppen."),
               ("📦 Res-Push","res_push_view / res_push_manage","View resource requests; accept, archive and manage push channels."),
               ("📡 Sector","sector_view","View sector monitoring."),
               ("🏥 Hospital","hospital_view","View troop recovery tracker."),
@@ -1053,6 +1030,201 @@
       </div>
     </div>
   </div>
+
+  {# ══════════════════════════════ TAB: KARTE ══════════════════════════════ #}
+  {% if can_view_karte_tab %}
+  <div id="tab-karte" class="ma-tab-panel" style="display:none;">
+
+    {% if can_manage_map %}
+    {% set utc_offset = guild.server_utc_offset if guild.server_utc_offset is not none else 60 %}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;margin-bottom:1rem;">
+
+      {# Travian Server URL #}
+      <div class="card">
+        <h3 style="margin:0 0 .5rem;font-size:.95rem;">🌐 Travian-Server</h3>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Diese URL wird für Karten-Snapshots, Farm-Analyse und alle Deep-Links benötigt.</p>
+        <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:220px;">
+            <label class="d-label">Travian World URL</label>
+            <input type="url" name="server_url" required
+              placeholder="https://ts2.x1.europe.travian.com"
+              list="karteWorldlist"
+              value="{{ guild.tw_world or '' }}"
+              style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid {% if not guild.tw_world %}#f59e0b{% else %}var(--border){% endif %};border-radius:6px;font-size:.85rem;">
+            <datalist id="karteWorldlist">
+              <option value="https://ts1.x1.europe.travian.com">
+              <option value="https://ts2.x1.europe.travian.com">
+              <option value="https://ts3.x1.europe.travian.com">
+              <option value="https://ts1.x3.europe.travian.com">
+              <option value="https://ts1.x5.europe.travian.com">
+              <option value="https://ts1.x1.international.travian.com">
+              <option value="https://ts1.x1.de.travian.com">
+              <option value="https://ts1.x1.arabia.travian.com">
+            </datalist>
+          </div>
+          <button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern</button>
+        </form>
+        {% if guild.tw_world %}
+        <p style="margin-top:.6rem;font-size:.78rem;color:#4caf82;">✅ Aktuell: <code>{{ guild.tw_world }}</code> — Karten-Snapshot alle 6 h</p>
+        {% endif %}
+        <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+          <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="btn btn-secondary" style="font-size:.78rem;text-decoration:none;">⚙️ Erweiterte Server-Einstellungen</a>
+          <a href="/guild/{{ guild.guild_id }}/map/sector-monitor" class="btn btn-secondary" style="font-size:.78rem;text-decoration:none;">📡 Sector-Monitoring</a>
+        </div>
+      </div>
+
+      {# Server Timezone #}
+      <div class="card">
+        <h3 style="margin:0 0 .5rem;font-size:.95rem;">⏰ Travian Serverzeit</h3>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">
+          Alle Zeiten in TravOps (Operationsplanung, Landezeiten, Angriffserkennung) basieren auf dieser Zeitzone.
+        </p>
+        <form method="post" action="/guild/{{ guild.guild_id }}/map/world-timezone" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:200px;">
+            <label class="d-label">UTC-Offset (Minuten)</label>
+            <select name="server_utc_offset"
+                    style="background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;font-size:.85rem;width:100%;">
+              <option value="-120" {% if utc_offset == -120 %}selected{% endif %}>UTC−2 (−120 min)</option>
+              <option value="-60"  {% if utc_offset == -60  %}selected{% endif %}>UTC−1 (−60 min)</option>
+              <option value="0"    {% if utc_offset == 0    %}selected{% endif %}>UTC±0 (0 min)</option>
+              <option value="60"   {% if utc_offset == 60   %}selected{% endif %}>UTC+1 (60 min) — Europa (CET) ⭐</option>
+              <option value="120"  {% if utc_offset == 120  %}selected{% endif %}>UTC+2 (120 min) — Europa Sommer (CEST) ⭐</option>
+              <option value="180"  {% if utc_offset == 180  %}selected{% endif %}>UTC+3 (180 min) — Türkei, Arabien</option>
+              <option value="240"  {% if utc_offset == 240  %}selected{% endif %}>UTC+4 (240 min)</option>
+              <option value="300"  {% if utc_offset == 300  %}selected{% endif %}>UTC+5 (300 min)</option>
+              <option value="360"  {% if utc_offset == 360  %}selected{% endif %}>UTC+6 (360 min)</option>
+              <option value="420"  {% if utc_offset == 420  %}selected{% endif %}>UTC+7 (420 min)</option>
+              <option value="480"  {% if utc_offset == 480  %}selected{% endif %}>UTC+8 (480 min) — China, Singapur</option>
+              <option value="540"  {% if utc_offset == 540  %}selected{% endif %}>UTC+9 (540 min) — Japan, Korea</option>
+              <option value="600"  {% if utc_offset == 600  %}selected{% endif %}>UTC+10 (600 min) — Australien Ost</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="font-size:.85rem;">💾 Speichern</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if can_manage_map_meta %}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+
+      {# Meta-alliances (quick-filter pills) #}
+      <div class="card" id="meta-alliances">
+        <h3 style="margin:0 0 .25rem;font-size:.95rem;">🏰 Karten-Quickbuttons</h3>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .75rem;">Weitere Allianzen als Quickbuttons auf der Karte.</p>
+        {% if meta_alliances %}
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.65rem;">
+          {% for ma in meta_alliances %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/meta-alliance/remove" style="margin:0;">
+            <input type="hidden" name="alliance_name" value="{{ ma.alliance_name }}">
+            <span style="display:flex;align-items:center;gap:.35rem;background:rgba(0,0,0,.2);border:1px solid {{ ma.color }};border-radius:20px;padding:3px 10px;font-size:.78rem;font-weight:600;color:{{ ma.color }};">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ ma.color }};flex-shrink:0;"></span>
+              {{ ma.alliance_name }}
+              <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;line-height:1;" title="Entfernen">✕</button>
+            </span>
+          </form>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/meta-alliance/add"
+              style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+          <input type="text" name="alliance_name" placeholder="Allianzname" required maxlength="80"
+                 style="flex:1;min-width:120px;padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+          <input type="color" name="color" value="#94a3b8"
+                 style="width:34px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--bg-main);cursor:pointer;">
+          <button type="submit" class="btn btn-secondary" style="font-size:.82rem;">➕</button>
+        </form>
+        {% if not has_map_meta_premium %}
+        <p style="font-size:.75rem;color:#fbbf24;margin:.65rem 0 0;">⭐ Quickbuttons werden auf der Karte nur mit Alliance-Pro angezeigt.</p>
+        {% endif %}
+      </div>
+
+      {# Meta-Gruppen builder #}
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem;">
+          <h3 style="margin:0;font-size:.95rem;">🤝 Meta-Gruppen <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(max. 10 · je 3 Allianzen)</span></h3>
+          {% if meta_groups | length < 10 %}
+          <button type="button" class="btn btn-secondary" style="font-size:.78rem;"
+                  onclick="document.getElementById('newMetaGroupForm').style.display=document.getElementById('newMetaGroupForm').style.display==='none'?'flex':'none'">
+            ＋ Neue Meta
+          </button>
+          {% endif %}
+        </div>
+
+        {% if request.query_params.get('meta_error') == 'limit' %}
+        <div style="background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:6px;padding:.5rem .75rem;margin-bottom:.65rem;color:#f87171;font-size:.82rem;">
+          ⚠️ Maximal 10 Meta-Gruppen pro Server erlaubt.
+        </div>
+        {% endif %}
+
+        <form id="newMetaGroupForm" method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/create"
+              style="display:none;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.65rem;">
+          <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#karte">
+          <input type="text" name="meta_name" placeholder="Meta-Name (z.B. Freunde, Feinde …)" maxlength="64" required
+                 style="flex:1;min-width:140px;padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
+          <button type="submit" class="btn btn-primary" style="font-size:.82rem;">Erstellen</button>
+        </form>
+
+        {% if not meta_groups %}
+        <p style="color:var(--text-muted);font-size:.82rem;">Noch keine Meta-Gruppen erstellt.</p>
+        {% endif %}
+
+        {% for g in meta_groups %}
+        <div style="border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;margin-bottom:.55rem;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;">
+            <strong style="font-size:.88rem;">{{ g.meta_name }}</strong>
+            <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
+                  style="margin:0;" onsubmit="return confirm('Meta-Gruppe »{{ g.meta_name }}« wirklich löschen?')">
+              <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#karte">
+              <button type="submit" style="font-size:.74rem;padding:.2rem .55rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);border-radius:6px;color:#f87171;cursor:pointer;">🗑️ Löschen</button>
+            </form>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem;">
+            {% for a in g.alliances %}
+            <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/remove-alliance" style="margin:0;">
+              <input type="hidden" name="alliance_name" value="{{ a }}">
+              <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#karte">
+              <button type="submit" style="display:flex;align-items:center;gap:.3rem;padding:.25rem .55rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.4);border-radius:20px;color:var(--text);font-size:.78rem;cursor:pointer;">
+                {{ a }} <span style="color:#f87171;font-weight:bold;">✕</span>
+              </button>
+            </form>
+            {% endfor %}
+            {% if g.alliances | length == 0 %}
+            <span style="color:var(--text-muted);font-size:.78rem;">Noch keine Allianzen hinzugefügt.</span>
+            {% endif %}
+          </div>
+          {% if g.alliances | length < 3 and snapshot_alliances %}
+          <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/add-alliance"
+                style="display:flex;gap:.4rem;align-items:center;margin-top:.5rem;flex-wrap:wrap;">
+            <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#karte">
+            <select name="alliance_name" style="flex:1;min-width:140px;padding:.3rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.78rem;">
+              <option value="">— Allianz wählen —</option>
+              {% for a in snapshot_alliances %}
+              {% if a.alliance_name not in g.alliances %}
+              <option value="{{ a.alliance_name }}">{{ a.alliance_name }} ({{ a.member_count }} Spieler)</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;">+</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <p style="font-size:.75rem;color:var(--text-muted);margin:.5rem 0 0;">
+          📊 Detaillierte Meta-Statistiken findest du im <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" style="color:#818cf8;">🏗️ Meta-Builder</a>.
+        </p>
+      </div>
+    </div>
+
+    <p style="font-size:.78rem;color:var(--text-muted);margin-top:.85rem;">
+      ℹ️ Wer die <strong>🏰 Meta</strong>-Quickbuttons auf der Karte sehen und nutzen darf, legst du unter
+      <a href="#" onclick="showTab('rollen',document.querySelector('[onclick*=rollen]'));return false;" style="color:#818cf8;">🛡️ Roles &amp; Permissions</a> → 🗺️ Map fest (<code>map_meta_view</code> / <code>map_meta_manage</code>).
+    </p>
+    {% endif %}
+
+  </div>
+  {% endif %}
 
   {# ══════════════════════════════ TAB: BATTLEGROUPS ══════════════════════════════ #}
   <div id="tab-battlegroups" class="ma-tab-panel" style="display:none;">
@@ -1617,6 +1789,7 @@ function doJoinCode() {
 @media (max-width:800px) {
   #tab-mitglieder > div[style*="grid-template-columns:1fr 1fr"],
   #tab-rollen     > div[style*="grid-template-columns:1fr 1fr"],
+  #tab-karte      div[style*="grid-template-columns:1fr 1fr"],
   #tab-einladungen> div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
   div[style*="grid-template-columns:320px 1fr"] { grid-template-columns:1fr !important; }
 }
