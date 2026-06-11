@@ -2373,7 +2373,7 @@
     try {
       const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-archive`, { method: 'POST' });
       const d = await r.json();
-      if (d.ok) { await loadAttacks(); alert(`✅ ${d.count} Angriffe archiviert.`); }
+      if (d.ok) { await loadOwnAttacks(); alert(`✅ ${d.count} Angriffe archiviert.`); }
       else alert('Fehler beim Archivieren.');
     } catch(e) { alert('Netzwerkfehler: ' + e.message); }
   };
@@ -2385,7 +2385,7 @@
     try {
       const r = await fetch(`/guild/${GUILD_ID}/attacks/bulk-delete`, { method: 'POST' });
       const d = await r.json();
-      if (d.ok) { await loadAttacks(); alert(`🗑️ ${d.count} Angriffe gelöscht.`); }
+      if (d.ok) { await loadOwnAttacks(); alert(`🗑️ ${d.count} Angriffe gelöscht.`); }
       else alert('Fehler beim Löschen.');
     } catch(e) { alert('Netzwerkfehler: ' + e.message); }
   };
