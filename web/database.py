@@ -3575,7 +3575,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
                 params += [x, y]
             async with db.execute(
                 f"""SELECT x, y, player_name, alliance_name, population, fetched_at
-                    FROM world_snapshots
+                    FROM world_snapshots INDEXED BY idx_wsnap_url_xy
                     WHERE world_url = ? AND lower(player_name) != ? AND player_name != '' AND player_name IS NOT NULL
                       AND (x, y) IN ({placeholders})
                     ORDER BY fetched_at DESC""",
