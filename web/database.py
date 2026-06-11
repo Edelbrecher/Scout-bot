@@ -12639,87 +12639,115 @@ async def get_alliance_player_flows(guild_id: str, alliance_name: str) -> dict:
 
 
 async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
-    """Full tracking data for one alliance from map_snapshots."""
+    """Full tracking data for one alliance.
+
+    Rewritten to pull the alliance's entire history in ONE indexed query and do
+    the per-snapshot join/leave detection in Python, instead of the old pattern
+    that ran a query per snapshot date (200+ round-trips → ~7s). Uses the exact
+    alliance name so idx_wsnap_url_ally can seek (lower(alliance_name) can't use
+    the index); falls back to a case-insensitive scan only if the exact name
+    finds nothing."""
+    from collections import defaultdict
+    _empty = {"dates": [], "members": {}, "events": [], "current": [], "pop_history": []}
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return _empty
 
-        # All snapshot dates for this alliance
-        async with db.execute("""
-            SELECT DISTINCT fetched_at FROM map_snapshots
-            WHERE guild_id=? AND lower(alliance_name)=lower(?)
-            ORDER BY fetched_at
-        """, (guild_id, alliance_name)) as cur:
-            dates = [r[0] for r in await cur.fetchall()]
+        # One query for the whole alliance history (exact name → index seek).
+        async def _fetch(where_alliance, param):
+            async with db.execute(f"""
+                SELECT fetched_at, player_name, population, tribe
+                FROM world_snapshots INDEXED BY idx_wsnap_url_ally
+                WHERE world_url = ? AND {where_alliance}
+            """, (world_url, param)) as cur:
+                return await cur.fetchall()
+        rows = await _fetch("alliance_name = ?", alliance_name)
+        if not rows:  # case mismatch / disbanded → slower case-insensitive fallback
+            async with db.execute("""
+                SELECT fetched_at, player_name, population, tribe
+                FROM world_snapshots
+                WHERE world_url = ? AND lower(alliance_name) = lower(?)
+            """, (world_url, alliance_name)) as cur:
+                rows = await cur.fetchall()
+        if not rows:
+            return _empty
 
-        if not dates:
-            return {"dates": [], "members": {}, "events": [], "current": [], "pop_history": []}
+        # Aggregate per date → per player in Python.
+        by_date_player: dict = defaultdict(lambda: defaultdict(lambda: [0, 0, 0]))  # date→player→[pop,villages,tribe]
+        date_players: dict = defaultdict(set)
+        for r in rows:
+            d, p = r["fetched_at"], r["player_name"]
+            agg = by_date_player[d][p]
+            agg[0] += r["population"] or 0
+            agg[1] += 1
+            agg[2] = max(agg[2], r["tribe"] or 0)
+            date_players[d].add(p)
 
+        dates = sorted(date_players)
         latest = dates[-1]
 
-        # Current members (latest snapshot)
-        async with db.execute("""
-            SELECT player_name, SUM(population) as total_pop, COUNT(*) as villages,
-                   MAX(tribe) as tribe
-            FROM map_snapshots
-            WHERE guild_id=? AND fetched_at=? AND lower(alliance_name)=lower(?)
-            GROUP BY player_name
-            ORDER BY total_pop DESC
-        """, (guild_id, latest, alliance_name)) as cur:
-            current_members = [dict(r) for r in await cur.fetchall()]
+        current_members = sorted((
+            {"player_name": p, "total_pop": v[0], "villages": v[1], "tribe": v[2]}
+            for p, v in by_date_player[latest].items()
+        ), key=lambda m: -m["total_pop"])
 
-        # Population history per snapshot
-        async with db.execute("""
-            SELECT fetched_at,
-                   COUNT(DISTINCT player_name) as member_count,
-                   SUM(population) as total_pop,
-                   COUNT(*) as village_count
-            FROM map_snapshots
-            WHERE guild_id=? AND lower(alliance_name)=lower(?)
-            GROUP BY fetched_at
-            ORDER BY fetched_at
-        """, (guild_id, alliance_name)) as cur:
-            pop_history = [dict(r) for r in await cur.fetchall()]
+        pop_history = [{
+            "fetched_at": d,
+            "member_count": len(by_date_player[d]),
+            "total_pop": sum(v[0] for v in by_date_player[d].values()),
+            "village_count": sum(v[1] for v in by_date_player[d].values()),
+        } for d in dates]
 
-        # Detect join/leave events by comparing consecutive snapshots
-        # For each date, get set of player_names
+        # Join/leave events from consecutive snapshots (Python set diffs).
         events = []
-        prev_members = None
-        for i, date in enumerate(dates):
-            async with db.execute("""
-                SELECT DISTINCT player_name FROM map_snapshots
-                WHERE guild_id=? AND fetched_at=? AND lower(alliance_name)=lower(?)
-            """, (guild_id, date, alliance_name)) as cur:
-                current_set = {r[0] for r in await cur.fetchall()}
+        left_pairs = []   # (full_date, player) → needs an existence check
+        prev = None
+        for d in dates:
+            cur_set = date_players[d]
+            if prev is not None:
+                for p in sorted(cur_set - prev):
+                    events.append({"date": d, "type": "join", "player": p})
+                for p in sorted(prev - cur_set):
+                    events.append({"date": d, "type": "leave", "player": p})
+                    left_pairs.append((d, p))
+            prev = cur_set
 
-            if prev_members is not None:
-                joined  = current_set - prev_members
-                left    = prev_members - current_set
-                for p in sorted(joined):
-                    events.append({"date": date[:10], "type": "join", "player": p})
-                for p in sorted(left):
-                    # Check if player still exists anywhere in this snapshot
-                    async with db.execute("""
-                        SELECT COUNT(*) FROM map_snapshots
-                        WHERE guild_id=? AND fetched_at=? AND lower(player_name)=lower(?)
-                    """, (guild_id, date, p)) as cur2:
-                        still_exists = (await cur2.fetchone())[0] > 0
-                    events.append({
-                        "date": date[:10],
-                        "type": "leave" if still_exists else "deleted",
-                        "player": p
-                    })
-            prev_members = current_set
+        # Batch: did each leaver still exist in the world on that date? (leave vs deleted)
+        existing: set = set()
+        if left_pairs:
+            ld = sorted({d for d, _ in left_pairs})
+            lp = sorted({p.lower() for _, p in left_pairs})
+            phd = ",".join("?" * len(ld))
+            php = ",".join("?" * len(lp))
+            async with db.execute(f"""
+                SELECT DISTINCT fetched_at, lower(player_name) AS pl
+                FROM world_snapshots INDEXED BY idx_wsnap_player
+                WHERE world_url = ? AND lower(player_name) IN ({php}) AND fetched_at IN ({phd})
+            """, [world_url] + lp + ld) as cur:
+                existing = {(r["fetched_at"], r["pl"]) for r in await cur.fetchall()}
 
-        events.reverse()  # newest first
+    out_events = []
+    for e in events:
+        etype = e["type"]
+        if etype == "leave" and (e["date"], e["player"].lower()) not in existing:
+            etype = "deleted"
+        out_events.append({"date": e["date"][:10], "type": etype, "player": e["player"]})
+    out_events.reverse()  # newest first
 
-        return {
-            "dates": dates,
-            "current": current_members,
-            "pop_history": pop_history,
-            "events": events,
-            "snapshot_count": len(dates),
-            "latest": latest,
-        }
+    return {
+        "dates": dates,
+        "current": current_members,
+        "pop_history": pop_history,
+        "events": out_events,
+        "snapshot_count": len(dates),
+        "latest": latest,
+    }
 
 
 # ── Grain Supply Simulations ──────────────────────────────────────────────────
