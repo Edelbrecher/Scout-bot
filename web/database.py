@@ -8993,6 +8993,14 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
         d["avg_population"] = round(pop / vcount) if vcount > 0 else 0
         d["total_troops"] = (d.get("total_off") or 0) + (d.get("total_def") or 0)
         d["tq"] = tq
+        # Best single village's off-score (not summed across the whole account) —
+        # used for the "Off-Score" leaderboard, since a player's raid power is
+        # determined by their strongest off village, not their account-wide total.
+        try:
+            villages = _json_op.loads(d.get("villages_json") or "[]")
+        except Exception:
+            villages = []
+        d["top_village_off"] = max((v.get("off_score", 0) or 0 for v in villages), default=0)
         result.append(d)
     return result
 

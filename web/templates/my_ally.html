@@ -1302,14 +1302,14 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
         {% set by_pop    = leaderboard | sort(attribute='population',   reverse=True) %}
         {% set by_units  = leaderboard | sort(attribute='total_units',  reverse=True) %}
-        {% set by_off    = leaderboard | sort(attribute='total_off',    reverse=True) %}
+        {% set by_off    = leaderboard | sort(attribute='top_village_off', reverse=True) %}
         {% set by_def    = leaderboard | sort(attribute='total_def',    reverse=True) %}
         {% set by_scouts = leaderboard | sort(attribute='total_scouts', reverse=True) %}
         {% set by_tq     = leaderboard | selectattr("tq","ne",None) | sort(attribute='tq', reverse=True) | list %}
         {% for title, rows, color, field in [
           ('🏘️ Einwohner', by_pop,    '',        'population'),
           ('⚔️ Troops',   by_units,  '',        'total_units'),
-          ('🗡️ Off-Score', by_off,    '#f87171', 'total_off'),
+          ('🗡️ Off-Score (bestes Dorf)', by_off, '#f87171', 'top_village_off'),
           ('🛡️ Def-Score', by_def,    '#4ade80', 'total_def'),
           ('🔍 Scouts',    by_scouts, '#a78bfa', 'total_scouts'),
         ] %}
