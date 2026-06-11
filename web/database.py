@@ -12375,195 +12375,165 @@ async def get_top_raiders(guild_id: str, limit: int = 10) -> list[dict]:
 
 
 async def get_meta_combined_tracking(guild_id: str, alliance_names: list[str]) -> dict:
-    """
-    Combined tracking data for a list of alliances (a meta group).
-    Returns per-alliance stats + combined pop history + cross-meta events.
-    """
-    if not alliance_names:
-        return {"alliances": [], "pop_history": [], "events": [], "total_members": 0, "total_pop": 0}
+    """Combined tracking for a meta group (multiple alliances).
 
+    Rewritten to pull the meta's full history in a couple of indexed queries and
+    compute the boundary/internal join-leave events in Python — the old version
+    ran several queries per snapshot date through the map_snapshots VIEW (~12s).
+    Uses exact (canonical) alliance names so idx_wsnap_url_ally can seek."""
+    from collections import defaultdict
+    _empty = {"alliances": [], "pop_history": [], "events": [], "total_members": 0, "total_pop": 0}
+    if not alliance_names:
+        return _empty
     lower_names = {n.lower() for n in alliance_names}
 
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-
-        # Latest snapshot date
-        async with db.execute(
-            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id=?", (guild_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            latest = row[0] if row else None
+        async with db.execute("SELECT tw_world FROM guild_configs WHERE guild_id=?", (guild_id,)) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return _empty
+        async with db.execute("SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url=?", (world_url,)) as cur:
+            mrow = await cur.fetchone()
+        latest = mrow[0] if mrow else None
         if not latest:
-            return {"alliances": [], "pop_history": [], "events": [], "total_members": 0, "total_pop": 0}
+            return _empty
 
-        # Per-alliance current stats
-        ph_list = "(" + ",".join("?" * len(alliance_names)) + ")"
-        lower_list = [n.lower() for n in alliance_names]
+        # Canonical alliance names (exact case) from the latest snapshot → index seek.
+        async with db.execute(
+            "SELECT DISTINCT alliance_name FROM world_snapshots INDEXED BY idx_wsnap_url_ts "
+            "WHERE world_url=? AND fetched_at=? AND lower(alliance_name) IN (%s)"
+            % ",".join("?" * len(lower_names)),
+            [world_url, latest] + sorted(lower_names)
+        ) as cur:
+            canon = [r[0] for r in await cur.fetchall()]
+
+        if canon:
+            async with db.execute(
+                "SELECT fetched_at, player_name, alliance_name, population "
+                "FROM world_snapshots INDEXED BY idx_wsnap_url_ally "
+                "WHERE world_url=? AND alliance_name IN (%s)" % ",".join("?" * len(canon)),
+                [world_url] + canon
+            ) as cur:
+                meta_rows = await cur.fetchall()
+        else:
+            async with db.execute(
+                "SELECT fetched_at, player_name, alliance_name, population "
+                "FROM world_snapshots WHERE world_url=? AND lower(alliance_name) IN (%s)"
+                % ",".join("?" * len(lower_names)),
+                [world_url] + sorted(lower_names)
+            ) as cur:
+                meta_rows = await cur.fetchall()
+        if not meta_rows:
+            return _empty
+
+        # date -> player -> meta alliance_name ; date -> ally_lower -> [players, pop, villages]
+        meta_player_ally: dict = defaultdict(dict)
+        per_date_ally: dict = defaultdict(lambda: defaultdict(lambda: [set(), 0, 0]))
+        date_players: dict = defaultdict(set)
+        for r in meta_rows:
+            d = r["fetched_at"]; p = r["player_name"]; a = r["alliance_name"] or ""
+            meta_player_ally[d][p] = a
+            date_players[d].add(p)
+            agg = per_date_ally[d][a.lower()]
+            agg[0].add(p); agg[1] += r["population"] or 0; agg[2] += 1
+
+        dates = sorted(date_players)
+        latest_d = dates[-1]
 
         alliances_data = []
         for aname in alliance_names:
-            async with db.execute("""
-                SELECT COUNT(DISTINCT player_name) as members,
-                       SUM(population) as total_pop,
-                       COUNT(*) as villages
-                FROM map_snapshots
-                WHERE guild_id=? AND fetched_at=? AND lower(alliance_name)=lower(?)
-            """, (guild_id, latest, aname)) as cur:
-                row = await cur.fetchone()
+            agg = per_date_ally[latest_d].get(aname.lower())
             alliances_data.append({
                 "name": aname,
-                "members":   row["members"]   if row else 0,
-                "total_pop": row["total_pop"] or 0 if row else 0,
-                "villages":  row["villages"]  if row else 0,
+                "members": len(agg[0]) if agg else 0,
+                "total_pop": agg[1] if agg else 0,
+                "villages": agg[2] if agg else 0,
             })
 
-        # Combined population history (sum across all alliances per snapshot date)
-        async with db.execute(f"""
-            SELECT fetched_at,
-                   COUNT(DISTINCT player_name) as member_count,
-                   SUM(population) as total_pop,
-                   COUNT(*) as village_count
-            FROM map_snapshots
-            WHERE guild_id=? AND lower(alliance_name) IN {ph_list}
-            GROUP BY fetched_at
-            ORDER BY fetched_at
-        """, [guild_id] + lower_list) as cur:
-            pop_history = [dict(r) for r in await cur.fetchall()]
+        pop_history = [{
+            "fetched_at": d,
+            "member_count": len(date_players[d]),
+            "total_pop": sum(v[1] for v in per_date_ally[d].values()),
+            "village_count": sum(v[2] for v in per_date_ally[d].values()),
+        } for d in dates]
 
-        # Events: joins/leaves crossing meta boundary (from/to alliances outside the meta)
-        # Get all snapshot dates
-        async with db.execute(
-            "SELECT DISTINCT fetched_at FROM map_snapshots WHERE guild_id=? ORDER BY fetched_at",
-            (guild_id,)
-        ) as cur:
-            all_dates = [r[0] for r in await cur.fetchall()]
-
-        events = []
-        prev_meta_members: set[str] = set()
-        for i, date in enumerate(all_dates):
-            async with db.execute(f"""
-                SELECT DISTINCT player_name FROM map_snapshots
-                WHERE guild_id=? AND fetched_at=? AND lower(alliance_name) IN {ph_list}
-            """, [guild_id, date] + lower_list) as cur:
-                cur_meta = {r[0] for r in await cur.fetchall()}
-
-            if i > 0:
-                joined_meta = cur_meta - prev_meta_members
-                left_meta   = prev_meta_members - cur_meta
-
-                for p in sorted(joined_meta):
-                    # Where did they come from?
-                    async with db.execute("""
-                        SELECT alliance_name FROM map_snapshots
-                        WHERE guild_id=? AND lower(player_name)=lower(?) AND fetched_at=?
-                        LIMIT 1
-                    """, (guild_id, p, all_dates[i-1])) as cur2:
-                        row = await cur2.fetchone()
-                    src = (row[0] or "").strip() if row else ""
-                    # Find which meta alliance they joined
-                    async with db.execute(f"""
-                        SELECT alliance_name FROM map_snapshots
-                        WHERE guild_id=? AND fetched_at=? AND lower(player_name)=lower(?)
-                          AND lower(alliance_name) IN {ph_list}
-                        LIMIT 1
-                    """, [guild_id, date, p] + lower_list) as cur2:
-                        row2 = await cur2.fetchone()
-                    dst_ally = row2[0] if row2 else "?"
-                    events.append({"date": date[:10], "type": "join", "player": p,
-                                   "from_alliance": src or "(unknown)", "to_alliance": dst_ally})
-
-                for p in sorted(left_meta):
-                    async with db.execute("""
-                        SELECT alliance_name FROM map_snapshots
-                        WHERE guild_id=? AND lower(player_name)=lower(?) AND fetched_at=?
-                        LIMIT 1
-                    """, (guild_id, p, date)) as cur2:
-                        row = await cur2.fetchone()
-                    dst = (row[0] or "").strip() if row else ""
-                    # Came from which meta alliance?
-                    async with db.execute(f"""
-                        SELECT alliance_name FROM map_snapshots
-                        WHERE guild_id=? AND fetched_at=? AND lower(player_name)=lower(?)
-                          AND lower(alliance_name) IN {ph_list}
-                        LIMIT 1
-                    """, [guild_id, all_dates[i-1], p] + lower_list) as cur2:
-                        row2 = await cur2.fetchone()
-                    src_ally = row2[0] if row2 else "?"
-                    events.append({"date": date[:10], "type": "leave", "player": p,
-                                   "from_alliance": src_ally,
-                                   "to_alliance": dst if dst and dst.lower() not in lower_names else "(deleted)"})
-
-            prev_meta_members = cur_meta
-
-        events.reverse()
-
-        # ── Internal transfers (player moves between meta alliances) ──────────
-        internal_events = []
-        async with db.execute(
-            "SELECT DISTINCT fetched_at FROM map_snapshots WHERE guild_id=? ORDER BY fetched_at",
-            (guild_id,)
-        ) as cur:
-            all_dates2 = [r[0] for r in await cur.fetchall()]
-
-        # For each player who was in meta at both snapshots, check if alliance changed
-        for i in range(1, len(all_dates2)):
-            prev_d = all_dates2[i - 1]
-            curr_d = all_dates2[i]
-            async with db.execute(f"""
-                SELECT p.player_name,
-                       p.alliance_name as prev_ally,
-                       c.alliance_name as curr_ally
-                FROM (
-                    SELECT DISTINCT player_name, alliance_name
-                    FROM map_snapshots
-                    WHERE guild_id=? AND fetched_at=? AND lower(alliance_name) IN {ph_list}
-                ) p
-                JOIN (
-                    SELECT DISTINCT player_name, alliance_name
-                    FROM map_snapshots
-                    WHERE guild_id=? AND fetched_at=? AND lower(alliance_name) IN {ph_list}
-                ) c ON lower(p.player_name) = lower(c.player_name)
-                WHERE lower(p.alliance_name) != lower(c.alliance_name)
-            """, [guild_id, prev_d] + lower_list + [guild_id, curr_d] + lower_list) as cur:
-                for row in await cur.fetchall():
-                    internal_events.append({
-                        "date": curr_d[:10],
-                        "player": row["player_name"],
-                        "from_alliance": row["prev_ally"],
-                        "to_alliance":   row["curr_ally"],
-                    })
-
-        internal_events.reverse()
-
-        # ── Per-alliance population history ───────────────────────────────────
         ally_pop_history = {}
         for aname in alliance_names:
-            async with db.execute("""
-                SELECT fetched_at,
-                       COUNT(DISTINCT player_name) as member_count,
-                       SUM(population) as total_pop
-                FROM map_snapshots
-                WHERE guild_id=? AND lower(alliance_name)=lower(?)
-                GROUP BY fetched_at
-                ORDER BY fetched_at
-            """, (guild_id, aname)) as cur:
-                ally_pop_history[aname] = [dict(r) for r in await cur.fetchall()]
+            al = aname.lower()
+            ally_pop_history[aname] = [
+                {"fetched_at": d, "member_count": len(per_date_ally[d][al][0]), "total_pop": per_date_ally[d][al][1]}
+                for d in dates if al in per_date_ally[d]
+            ]
 
-        total_members  = sum(a["members"]   for a in alliances_data)
-        total_pop      = sum(a["total_pop"] for a in alliances_data)
-        total_villages = sum(a["villages"]  for a in alliances_data)
+        # Boundary join/leave events + collect (date, player) needing an alliance lookup.
+        events_raw = []     # (date, type, player, prev_date)
+        need = set()
+        prev = None
+        for idx, d in enumerate(dates):
+            cur_set = date_players[d]
+            if prev is not None:
+                d_prev = dates[idx - 1]
+                for p in sorted(cur_set - prev):
+                    events_raw.append((d, "join", p, d_prev)); need.add((d_prev, p.lower()))
+                for p in sorted(prev - cur_set):
+                    events_raw.append((d, "leave", p, d_prev)); need.add((d, p.lower()))
+            prev = cur_set
 
-        return {
-            "alliances":         alliances_data,
-            "pop_history":       pop_history,
-            "ally_pop_history":  ally_pop_history,
-            "events":            events,
-            "internal_events":   internal_events,
-            "total_members":     total_members,
-            "total_pop":         total_pop,
-            "total_villages":    total_villages,
-            "latest":            latest,
-        }
+        resolved = {}
+        if need:
+            nd = sorted({d for d, _ in need}); npl = sorted({p for _, p in need})
+            async with db.execute(
+                "SELECT fetched_at, lower(player_name) pl, MAX(alliance_name) a "
+                "FROM world_snapshots INDEXED BY idx_wsnap_player "
+                "WHERE world_url=? AND lower(player_name) IN (%s) AND fetched_at IN (%s) "
+                "GROUP BY fetched_at, lower(player_name)"
+                % (",".join("?" * len(npl)), ",".join("?" * len(nd))),
+                [world_url] + npl + nd
+            ) as cur:
+                for r in await cur.fetchall():
+                    resolved[(r["fetched_at"], r["pl"])] = r["a"] or ""
+
+        events = []
+        for d, typ, p, d_prev in events_raw:
+            if typ == "join":
+                src = resolved.get((d_prev, p.lower()), "")
+                events.append({"date": d[:10], "type": "join", "player": p,
+                               "from_alliance": src or "(unknown)",
+                               "to_alliance": meta_player_ally[d].get(p, "?")})
+            else:
+                dst = resolved.get((d, p.lower()), "")
+                events.append({"date": d[:10], "type": "leave", "player": p,
+                               "from_alliance": meta_player_ally[d_prev].get(p, "?"),
+                               "to_alliance": dst if dst and dst.lower() not in lower_names else "(deleted)"})
+        events.reverse()
+
+        # Internal transfers between meta alliances.
+        internal_events = []
+        for idx in range(1, len(dates)):
+            prevm = meta_player_ally[dates[idx - 1]]; curm = meta_player_ally[dates[idx]]
+            for p, a in curm.items():
+                pa = prevm.get(p)
+                if pa is not None and (pa or "").lower() != (a or "").lower():
+                    internal_events.append({"date": dates[idx][:10], "player": p,
+                                            "from_alliance": pa, "to_alliance": a})
+        internal_events.reverse()
+
+    total_members = sum(a["members"] for a in alliances_data)
+    total_pop = sum(a["total_pop"] for a in alliances_data)
+    total_villages = sum(a["villages"] for a in alliances_data)
+    return {
+        "alliances": alliances_data,
+        "pop_history": pop_history,
+        "ally_pop_history": ally_pop_history,
+        "events": events,
+        "internal_events": internal_events,
+        "total_members": total_members,
+        "total_pop": total_pop,
+        "total_villages": total_villages,
+        "latest": latest_d,
+    }
 
 
 async def get_alliance_player_flows(guild_id: str, alliance_name: str) -> dict:
