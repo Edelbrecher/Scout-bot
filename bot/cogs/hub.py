@@ -1793,8 +1793,28 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
 
 
 class RequestHubView(discord.ui.View):
-    def __init__(self):
+    # Maps each persistent button's custom_id suffix to its i18n label key.
+    _LABEL_KEYS = {
+        "persistent:hub_scout":           "hub.btn.scout",
+        "persistent:hub_corn":            "hub.btn.corn",
+        "persistent:hub_perm_scout":      "hub.btn.perm_scout",
+        "persistent:hub_res_push":        "hub.btn.res_push",
+        "persistent:hub_defend":          "hub.btn.defend",
+        "persistent:hub_timed_defend":    "hub.btn.timed_defend",
+        "persistent:hub_hero_scout":      "hub.btn.hero_scout",
+        "persistent:hub_private_channel": "hub.btn.private_channel",
+        "persistent:hub_enemy_scout":     "hub.btn.enemy_scout",
+        "persistent:hub_poll":            "hub.btn.poll",
+        "persistent:hub_battle_report":   "hub.btn.battle_report",
+    }
+
+    def __init__(self, lang: str = "de"):
         super().__init__(timeout=None)
+        # Translate button labels into the guild's configured bot language.
+        for child in self.children:
+            key = self._LABEL_KEYS.get(getattr(child, "custom_id", ""))
+            if key:
+                child.label = t(lang, key)
 
     @discord.ui.button(
         label="Scout", emoji="🔍", style=discord.ButtonStyle.primary,

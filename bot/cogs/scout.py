@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 import database
@@ -744,33 +743,6 @@ class ScoutRequestView(discord.ui.View):
 class Scout(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
-    @app_commands.command(name="setup-scout", description="Post the Scout Request button in this channel")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def setup_scout(self, interaction: discord.Interaction):
-        if not await require_premium(interaction):
-            return
-        lang = await get_guild_lang(str(interaction.guild.id))
-        config = await database.get_guild_config(str(interaction.guild.id))
-        if not config or not config.get("category_id") or not config.get("archive_channel_id"):
-            await interaction.response.send_message(
-                t(lang, "scout.setup_missing"),
-                ephemeral=True,
-            )
-            return
-
-        embed = discord.Embed(
-            title=t(lang, "scout.title"),
-            description=t(lang, "scout.embed.description"),
-            color=discord.Color.blurple(),
-        )
-        msg = await interaction.channel.send(embed=embed, view=ScoutRequestView())
-        await database.update_scout_channel_and_button(
-            guild_id=str(interaction.guild.id),
-            scout_channel_id=str(interaction.channel.id),
-            button_message_id=str(msg.id),
-        )
-        await interaction.response.send_message(t(lang, "scout.setup_done"), ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

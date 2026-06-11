@@ -20,7 +20,6 @@ from pathlib import Path
 
 import aiosqlite
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 try:
@@ -724,31 +723,6 @@ class HeroScoutCog(commands.Cog):
                 f"📦 {result['downloaded']}/{result['total']} Icons geladen · "
                 f"❌ {result['failed']} fehlgeschlagen"
             ))
-
-    @app_commands.command(
-        name="hero-scout-setup",
-        description="Legt den Channel fest, in dem Helden-Screenshots gepostet werden."
-    )
-    @app_commands.describe(channel="Der Channel für Helden-Screenshots")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def hero_scout_setup(
-        self,
-        interaction: discord.Interaction,
-        channel: discord.TextChannel,
-    ):
-        guild_id = str(interaction.guild_id)
-        await set_hero_scout_channel(
-            guild_id,
-            str(channel.id),
-            channel.name,
-            str(interaction.user.id),
-        )
-        await interaction.response.send_message(
-            f"✅ Helden-Scout Channel gesetzt: {channel.mention}\n"
-            f"Postet jetzt Helden-Screenshots dort — der Bot liest sie automatisch aus.",
-            ephemeral=True,
-        )
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(HeroScoutCog(bot))

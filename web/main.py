@@ -2487,7 +2487,7 @@ async def res_post_button(request: Request, guild_id: str):
 
 
 @app.post("/guild/{guild_id}/res-push/auto-setup")
-async def res_auto_setup(request: Request, guild_id: str):
+async def res_auto_setup(request: Request, guild_id: str, next: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -2535,7 +2535,8 @@ async def res_auto_setup(request: Request, guild_id: str):
 
     await database.update_res_config(guild_id=guild_id, res_request_channel_id=res_request_channel_id, res_answer_channel_id=res_answer_channel_id, res_push_category_id=category_id, res_manager_role_ids=guild.get("res_manager_role_ids") or "")
     await database.update_res_button(guild_id, res_request_channel_id, res_button_message_id)
-    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
+    target = next or f"/guild/{guild_id}/res-push?flash=status_changed"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.get("/guild/{guild_id}/res-push/stats", response_class=HTMLResponse)
@@ -3880,6 +3881,9 @@ async def bot_settings_page(request: Request, guild_id: str):
                 pass
 
     request_hub = await database.get_request_hub(guild_id)
+    hero_scout_channel_id = None
+    if not is_personal:
+        hero_scout_channel_id = await _get_hero_scout_channel(guild_id)
 
     return templates.TemplateResponse("bot_settings.html", {
         "request": request,
@@ -3887,6 +3891,7 @@ async def bot_settings_page(request: Request, guild_id: str):
         "is_personal": is_personal,
         "channel_names": channel_names,
         "request_hub": request_hub,
+        "hero_scout_channel_id": hero_scout_channel_id,
         "flash": flash,
         "saved": request.query_params.get("saved", ""),
         "error": request.query_params.get("error", ""),
@@ -5265,23 +5270,26 @@ async def attacks_config(request: Request, guild_id: str,
 
 
 @app.post("/guild/{guild_id}/attacks/auto-setup")
-async def attacks_auto_setup(request: Request, guild_id: str):
+async def attacks_auto_setup(request: Request, guild_id: str, next: str = Form("")):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post("http://bot:7777/api/create-report-channel",
+            resp = await client.post("http://bot:7777/api/create-attack-channel",
                                      json={"guild_id": guild_id})
             data = resp.json() if resp.status_code == 200 else {}
-            if data.get("channel_id"):
+            if data.get("ok") and data.get("channel_id"):
                 await database.set_attack_channel_web(
                     guild_id, data["channel_id"],
                     data.get("message_id", ""))
+            elif data.get("error"):
+                print(f"[attacks-auto-setup] bot error: {data['error']}")
     except Exception as e:
         print(f"[attacks-auto-setup] error: {e}")
-    return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
+    target = next or f"/guild/{guild_id}/attacks?saved=1"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/guild/{guild_id}/attacks/reset")

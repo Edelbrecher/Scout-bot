@@ -287,6 +287,77 @@ async def handle_create_report_channel(request: aiohttp_web.Request) -> aiohttp_
     })
 
 
+async def handle_create_attack_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Called by the web container to set up the '⚔️ Angriff melden' alert channel
+    (category + channel + persistent report button). Equivalent of the former
+    /attack-setup slash command, now triggered only via the web dashboard."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not guild_id:
+        return aiohttp_web.json_response({"ok": False, "error": "guild_id required"}, status=400)
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    bot_member = guild.get_member(bot.user.id)
+    bot_overwrite = discord.PermissionOverwrite(
+        view_channel=True, send_messages=True, embed_links=True,
+        attach_files=True, read_message_history=True,
+    )
+
+    # Reuse an existing "Angriff-Detection" category if present (idempotent).
+    category = discord.utils.get(guild.categories, name="Angriff-Detection")
+    if not category:
+        try:
+            category = await guild.create_category(
+                "Angriff-Detection",
+                overwrites={
+                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    bot_member: bot_overwrite,
+                },
+            )
+        except discord.Forbidden:
+            return aiohttp_web.json_response(
+                {"ok": False, "error": "missing permission to create category"}, status=403
+            )
+
+    channel = await guild.create_text_channel(
+        "angriff-alarm", category=category,
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            bot_member: bot_overwrite,
+        },
+    )
+
+    from cogs.attacks import AttackReportView
+    view = AttackReportView(alert_channel_id=str(channel.id))
+    embed = discord.Embed(
+        title="⚔️ Angriff-Meldung",
+        description=(
+            "Siehst du eingehende Angriffe im Truppenplatz?\n\n"
+            "**So meldest du einen Angriff:**\n"
+            "1. Öffne den Truppenplatz in Travian\n"
+            "2. Markiere alles (Strg+A) und kopiere (Strg+C)\n"
+            "3. Klicke den Button unten und füge den Text ein\n"
+        ),
+        color=0xe74c3c,
+    )
+    msg = await channel.send(embed=embed, view=view)
+    bot.add_view(view, message_id=msg.id)
+
+    return aiohttp_web.json_response({
+        "ok": True,
+        "channel_id": str(channel.id),
+        "channel_name": channel.name,
+        "message_id": str(msg.id),
+    })
+
+
 async def _get_or_create_category(guild: discord.Guild, config: dict | None) -> discord.CategoryChannel:
     """Return configured category (by ID or name), or create a default 'TravOps' category."""
     if config and config.get("category_id"):
@@ -369,7 +440,7 @@ async def handle_create_request_hub(request: aiohttp_web.Request) -> aiohttp_web
         description=t(lang, "hub.description"),
         color=discord.Color.blurple(),
     )
-    msg = await channel.send(embed=embed, view=RequestHubView())
+    msg = await channel.send(embed=embed, view=RequestHubView(lang=lang))
 
     await database.set_request_hub(guild_id, str(channel.id), channel.name, str(msg.id))
 
@@ -461,7 +532,7 @@ async def handle_refresh_request_hub(request: aiohttp_web.Request) -> aiohttp_we
             pass
 
     try:
-        new_msg = await channel.send(embed=embed, view=RequestHubView())
+        new_msg = await channel.send(embed=embed, view=RequestHubView(lang=lang))
         await database.set_request_hub(guild_id, str(channel.id), channel.name, str(new_msg.id))
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
@@ -1420,6 +1491,7 @@ async def handle_create_defend_channel(request: aiohttp_web.Request):
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
+    app.router.add_post("/api/create-attack-channel", handle_create_attack_channel)
     app.router.add_post("/api/create-request-hub", handle_create_request_hub)
     app.router.add_post("/api/check-permissions", handle_check_permissions)
     app.router.add_post("/api/set-hero-scout-channel", handle_set_hero_scout_channel)

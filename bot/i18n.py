@@ -168,11 +168,7 @@ _STRINGS: dict[str, dict[str, str]] = {
             "🪖 **Res-Push** — Ressourcen anfordern\n"
             "🛡️ **Defend** — Verteidigung koordinieren\n"
             "⏱️ **Timed-Defend** — Getimte Verteidigung koordinieren\n"
-            "🔒 **Privater Channel** — Eigener permanenter Channel, nur für dich & die Leads\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🗡️ **Helden-Scout** — Screenshots von Gegner-Helden in einem dedizierten Channel posten. "
-            "Der Bot erkennt automatisch Ausrüstungswechsel & XP-Sprünge.\n"
-            "→ Setup: `/hero-scout-setup #channel` oder [travops.online](https://travops.online)"
+            "🔒 **Privater Channel** — Eigener permanenter Channel, nur für dich & die Leads"
         ),
         "en": (
             "Click a button to create a channel:\n\n"
@@ -182,11 +178,7 @@ _STRINGS: dict[str, dict[str, str]] = {
             "🪖 **Res Push** — Request resources\n"
             "🛡️ **Defend** — Coordinate defense\n"
             "⏱️ **Timed Defend** — Coordinate timed defense\n"
-            "🔒 **Private Channel** — Your own permanent channel, visible only to you & the leads\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🗡️ **Hero Scout** — Post enemy hero screenshots in a dedicated channel. "
-            "The bot automatically detects equipment changes & XP jumps.\n"
-            "→ Setup: `/hero-scout-setup #channel` or [travops.online](https://travops.online)"
+            "🔒 **Private Channel** — Your own permanent channel, visible only to you & the leads"
         ),
     },
     "hub.channel_topic": {
@@ -196,6 +188,52 @@ _STRINGS: dict[str, dict[str, str]] = {
     "hub.channel_name": {
         "de": "travops-anfragen",
         "en": "travops-requests",
+    },
+
+    # ── Hub button labels ────────────────────────────────────────────────────
+    "hub.btn.scout": {
+        "de": "Scout",
+        "en": "Scout",
+    },
+    "hub.btn.corn": {
+        "de": "Kornspäh",
+        "en": "Corn Scout",
+    },
+    "hub.btn.perm_scout": {
+        "de": "Permanent-Scout",
+        "en": "Permanent Scout",
+    },
+    "hub.btn.res_push": {
+        "de": "Res-Push",
+        "en": "Res Push",
+    },
+    "hub.btn.defend": {
+        "de": "Defend",
+        "en": "Defend",
+    },
+    "hub.btn.timed_defend": {
+        "de": "Timed-Defend",
+        "en": "Timed Defend",
+    },
+    "hub.btn.hero_scout": {
+        "de": "Helden-Scout",
+        "en": "Hero Scout",
+    },
+    "hub.btn.private_channel": {
+        "de": "Privater Channel",
+        "en": "Private Channel",
+    },
+    "hub.btn.enemy_scout": {
+        "de": "Gegner-Scout",
+        "en": "Enemy Scout",
+    },
+    "hub.btn.poll": {
+        "de": "Poll",
+        "en": "Poll",
+    },
+    "hub.btn.battle_report": {
+        "de": "Kampfbericht",
+        "en": "Battle Report",
     },
 
     # ── Defend ────────────────────────────────────────────────────────────────

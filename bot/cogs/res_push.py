@@ -2,7 +2,6 @@ from utils import travops_footer
 import asyncio
 import re
 import discord
-from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 
@@ -624,30 +623,6 @@ class ConfirmResPushView(discord.ui.View):
 class ResPush(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
-    @app_commands.command(name="setup-res", description="Post the Res-Push Request button in this channel")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def setup_res(self, interaction: discord.Interaction):
-        config = await database.get_guild_config(str(interaction.guild.id))
-        if not config or not config.get("res_answer_channel_id") or not config.get("res_push_category_id"):
-            await interaction.response.send_message(
-                "⚠️ Please configure all Res-Push settings in the web admin panel first.",
-                ephemeral=True,
-            )
-            return
-
-        embed = discord.Embed(
-            title="🪖 Res-Push Request",
-            description="Click the button below to submit a resource push request.",
-            color=discord.Color.blurple(),
-        )
-        msg = await interaction.channel.send(embed=embed, view=ResRequestView())
-        await database.update_res_button(
-            guild_id=str(interaction.guild.id),
-            res_request_channel_id=str(interaction.channel.id),
-            res_button_message_id=str(msg.id),
-        )
-        await interaction.response.send_message("✅ Res-Push Request button posted!", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

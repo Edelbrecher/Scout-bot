@@ -3,11 +3,10 @@ import re
 from datetime import datetime
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 import database
-from utils import require_premium, PREMIUM_STATUSES, travops_footer
+from utils import PREMIUM_STATUSES, travops_footer
 
 
 # ---------------------------------------------------------------------------
@@ -470,71 +469,6 @@ class AttacksCog(commands.Cog):
                 print(f"[attacks] Failed to restore view for guild {guild_id}: {e}")
 
         print(f"[attacks] Restored persistent views for {len(rows)} guild(s).")
-
-    @app_commands.command(name="attack-setup", description="Richtet den Angriff-Detection-Kanal ein (Admin)")
-    @app_commands.default_permissions(administrator=True)
-    async def attack_setup(self, interaction: discord.Interaction):
-        if not await require_premium(interaction):
-            return
-        await interaction.response.defer(ephemeral=True)
-
-        guild = interaction.guild
-        guild_id = str(guild.id)
-        bot_member = guild.get_member(self.bot.user.id)
-
-        # Create category
-        bot_overwrite = discord.PermissionOverwrite(
-            view_channel=True, send_messages=True, embed_links=True, attach_files=True, read_message_history=True
-        )
-        overwrites_category = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            bot_member: bot_overwrite,
-        }
-        try:
-            category = await guild.create_category(
-                "Angriff-Detection", overwrites=overwrites_category
-            )
-        except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ Fehlende Berechtigungen um Kategorie zu erstellen.", ephemeral=True
-            )
-            return
-
-        # Create alert channel inside category
-        overwrites_channel = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            bot_member: bot_overwrite,
-        }
-        channel = await guild.create_text_channel(
-            "angriff-alarm", category=category, overwrites=overwrites_channel
-        )
-
-        # Post persistent button
-        view = AttackReportView(alert_channel_id=str(channel.id))
-        embed = discord.Embed(
-            title="⚔️ Angriff-Meldung",
-            description=(
-                "Siehst du eingehende Angriffe im Truppenplatz?\n\n"
-                "**So meldest du einen Angriff:**\n"
-                "1. Öffne den Truppenplatz in Travian\n"
-                "2. Markiere alles (Strg+A) und kopiere (Strg+C)\n"
-                "3. Klicke den Button unten und füge den Text ein\n"
-            ),
-            color=0xe74c3c,
-        )
-        msg = await channel.send(embed=embed, view=view)
-
-        # Save to DB
-        await database.set_attack_channel(guild_id, str(channel.id), str(msg.id))
-        self.bot.add_view(view, message_id=msg.id)
-
-        await interaction.followup.send(
-            f"✅ Angriff-Detection eingerichtet!\n"
-            f"Kanal: {channel.mention}\n"
-            f"Kategorie: **{category.name}**",
-            ephemeral=True,
-        )
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AttacksCog(bot))
