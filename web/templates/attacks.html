@@ -577,7 +577,7 @@
         <form method="post" action="/guild/{{ guild.guild_id }}/attacks/config">
           <div class="form-group">
             <label for="attack_channel_id">Alarm-Kanal ID</label>
-            <p class="field-hint">Channel wo Attack-Meldungen gepostet werden.</p>
+            <p class="field-hint">Channel für eingehende <strong>Angriffs-Alarme</strong> — nicht der Battle-Report-Kanal (Enemies-Seite).</p>
             <input type="text" id="attack_channel_id" name="attack_channel_id"
               value="{{ guild.attack_channel_id or '' }}"
               placeholder="z.B. 1234567890123456789" />

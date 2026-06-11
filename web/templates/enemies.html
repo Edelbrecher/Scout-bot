@@ -131,10 +131,14 @@
 
   <!-- Report Channel Card -->
   <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
-    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
       <span style="font-size:1.1rem;">📋</span>
       <strong style="font-size:1rem;" data-i18n="enemies.report_channel">Battle Report Channel</strong>
     </div>
+    <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 0.75rem;">
+      Für Kampf- &amp; Spähberichte zur Gegner-Auswertung — <strong>nicht</strong> der Angriffs-Alarm
+      (das ist der „Alarm-Kanal" auf der <a href="/guild/{{ guild.guild_id }}/attacks" style="color:#818cf8;">Attacks-Seite</a>).
+    </p>
 
     {% if report_channel and report_channel.channel_id %}
     <!-- Active channel -->
@@ -237,18 +241,8 @@
                  style="font-weight:600;color:#f87171;text-decoration:none;">
                 🎯 {{ e.player_name }}
               </a>
-              {% if e.danger_level == 'critical' %}<span style="font-size:.65rem;font-weight:700;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);color:#f87171;border-radius:4px;padding:1px 5px;">💀 CRITICAL</span>
-              {% elif e.danger_level == 'high' %}<span style="font-size:.65rem;font-weight:700;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.4);color:#fb923c;border-radius:4px;padding:1px 5px;">🔴 HIGH</span>
-              {% elif e.danger_level == 'medium' %}<span style="font-size:.65rem;font-weight:700;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.35);color:#fbbf24;border-radius:4px;padding:1px 5px;">🟡 MEDIUM</span>
-              {% elif e.danger_level == 'low' %}<span style="font-size:.65rem;font-weight:700;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:4px;padding:1px 5px;">🟢 LOW</span>
-              {% endif %}
             </div>
             {% if e.alliance_name %}<div style="font-size:.7rem;color:var(--text-muted);">[{{ e.alliance_name }}]</div>{% endif %}
-            {% if e.tags %}
-            <div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.15rem;">
-              {% for tag in e.tags.split(',') %}{% if tag.strip() %}<span style="font-size:.65rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;border-radius:10px;padding:1px 6px;">{{ tag.strip() }}</span>{% endif %}{% endfor %}
-            </div>
-            {% endif %}
           </td>
           <td style="font-family:monospace;font-size:0.85rem;color:#93c5fd;">
             {{ e.coordinates or '—' }}

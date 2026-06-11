@@ -12447,23 +12447,6 @@ async def enemy_village_detail_save(request: Request, guild_id: str, player_name
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
-@app.post("/guild/{guild_id}/enemies/{player_name}/meta")
-async def enemy_update_meta(request: Request, guild_id: str, player_name: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    form = await request.form()
-    danger_level = (form.get("danger_level") or "").strip()
-    tags_raw     = (form.get("tags") or "").strip()
-    # Normalise tags: split on comma/space, dedupe, rejoin
-    tags = ",".join(t.strip() for t in re.split(r"[,\s]+", tags_raw) if t.strip())
-    await database.update_enemy_meta(guild_id, player_name, danger_level, tags)
-    return RedirectResponse(
-        f"/guild/{guild_id}/enemies/{player_name}?flash=meta_saved", status_code=303
-    )
-
-
 @app.post("/guild/{guild_id}/enemies/{player_name}/delete")
 async def enemy_delete(request: Request, guild_id: str, player_name: str):
     session, err = _require_session(request)
@@ -14247,8 +14230,7 @@ async def reports_page(request: Request, guild_id: str,
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
-    reports = await database.get_battle_reports(guild_id, limit=100,
-                                                player_name=q, report_type=rtype)
+    reports = await database.get_battle_reports(guild_id, limit=100, player_name=q)
     import json as _json
     for r in reports:
         for jf in ("troops_sent_json", "troops_lost_json", "def_troops_json",
@@ -14257,21 +14239,10 @@ async def reports_page(request: Request, guild_id: str,
                 r[jf.replace("_json", "")] = _json.loads(r.get(jf) or "{}")
             except Exception:
                 r[jf.replace("_json", "")] = {}
-        override = r.get("fake_override")
-        if override == "fake":
-            r["fake_confidence"] = "high"
-            r["fake_reason"]     = "Manually marked as fake"
-        elif override == "real":
-            r["fake_confidence"] = "none"
-            r["fake_reason"]     = ""
-        else:
-            fake = _detect_fake(r.get("troops_sent") or {})
-            r["fake_confidence"] = fake["fake_confidence"]
-            r["fake_reason"]     = fake["fake_reason"]
 
     return templates.TemplateResponse("reports.html", {
         "request": request, "guild": guild,
-        "reports": reports, "q": q, "rtype": rtype,
+        "reports": reports, "q": q,
     })
 
 
@@ -14410,38 +14381,11 @@ async def report_detail(request: Request, guild_id: str, report_id: int, duplica
         r["buildings_hit"] = _json.loads(r.get("buildings_hit_json") or "[]")
     except Exception:
         r["buildings_hit"] = []
-    override = r.get("fake_override")  # 'fake', 'real', or None
-    if override == "fake":
-        r["fake_confidence"] = "high"
-        r["fake_reason"]     = "Manually marked as fake"
-        r["fake_override"]   = "fake"
-    elif override == "real":
-        r["fake_confidence"] = "none"
-        r["fake_reason"]     = ""
-        r["fake_override"]   = "real"
-    else:
-        fake = _detect_fake(r.get("troops_sent") or {})
-        r["fake_confidence"] = fake["fake_confidence"]
-        r["fake_reason"]     = fake["fake_reason"]
-        r["fake_override"]   = None
 
     return templates.TemplateResponse("report_detail.html", {
         "request": request, "guild": guild, "report": r,
         "duplicate_warning": bool(duplicate),
     })
-
-
-@app.post("/guild/{guild_id}/reports/{report_id}/set-fake")
-async def report_set_fake(request: Request, guild_id: str, report_id: int,
-                          override: str = Form("")):
-    """Toggle fake override: 'fake', 'real', or '' (auto)."""
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    val = override.strip() if override.strip() in ("fake", "real") else None
-    await database.set_fake_override(report_id, guild_id, val)
-    return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/reports/{report_id}/delete")
