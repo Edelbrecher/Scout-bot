@@ -4,40 +4,39 @@
 {% block content %}
 {% from "_combat_flow.html" import combat_flow %}
 <div class="container">
-  <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem;">
-    <div>
-      <a href="/guild/{{ guild.guild_id }}" class="back-link">&larr; {{ guild.guild_name }}</a>
-      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">&#x2694;&#xFE0F; Attacks</h1>
-      <p class="subtitle" style="margin:0;">Eingehende Angriffe per Rallyepunkt erfassen · Fakes erkennen · Verteidigung anstoßen</p>
-    </div>
-    <div style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.25rem; flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="openImportModal()" style="font-size:0.9rem;">
-        &#x1F4CB; Rallyepunkt importieren
-      </button>
-      <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:0.9rem;">
-        &#x1F50D; Allianz-Analyse
-      </a>
-      <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
-        &#x1F3F0; Own Villages
-      </a>
-      <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:0.9rem;">
-        📊 Analyse
-      </button>
-      {% if can_label %}
-      <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:0.9rem;">
-        📁 Archiv
-      </button>
-      <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:0.9rem;color:#a5b4fc;">
-        📦 Alle archivieren
-      </button>
-      <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:0.9rem;color:#f87171;">
-        🗑️ Alle löschen
-      </button>
-      {% endif %}
-    </div>
+  <div class="page-header">
+    <a href="/guild/{{ guild.guild_id }}" class="back-link">&larr; {{ guild.guild_name }}</a>
+    <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">&#x2694;&#xFE0F; Attacks</h1>
+    <p class="subtitle" style="margin:0;">Eingehende Angriffe per Rallyepunkt erfassen · Fakes erkennen · Verteidigung anstoßen</p>
   </div>
 
   {{ combat_flow(guild.guild_id, "attacks") }}
+
+  <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1.1rem;">
+    <button class="btn btn-primary" onclick="openImportModal()" style="font-size:0.9rem;">
+      &#x1F4CB; Rallyepunkt importieren
+    </button>
+    <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:0.9rem;">
+      &#x1F50D; Allianz-Analyse
+    </a>
+    <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
+      &#x1F3F0; Own Villages
+    </a>
+    <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:0.9rem;">
+      📊 Analyse
+    </button>
+    {% if can_label %}
+    <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:0.9rem;">
+      📁 Archiv
+    </button>
+    <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:0.9rem;color:#a5b4fc;">
+      📦 Alle archivieren
+    </button>
+    <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:0.9rem;color:#f87171;">
+      🗑️ Alle löschen
+    </button>
+    {% endif %}
+  </div>
 
   <!-- ===== IMPORT MODAL ===== -->
   <div id="importModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; overflow-y:auto;">
