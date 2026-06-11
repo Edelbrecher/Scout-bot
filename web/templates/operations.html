@@ -338,7 +338,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
               style="font-size:.82rem;color:#fbbf24;font-family:monospace;cursor:pointer;padding:.2rem .4rem;border-radius:4px;"
               onmouseenter="this.style.background='rgba(251,191,36,.12)'" onmouseleave="this.style.background=''"
               onclick="openInlineLandingEditor()"></span>
-        <input type="datetime-local" id="inlineLandingInput"
+        <input type="datetime-local" id="inlineLandingInput" step="1"
                style="display:none;font-size:.8rem;background:var(--bg-card);color:var(--text);border:1px solid #fbbf24;border-radius:6px;padding:.2rem .4rem;"
                onblur="saveInlineLanding()" onkeydown="if(event.key==='Enter')saveInlineLanding();if(event.key==='Escape')closeInlineLanding()">
         <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openOpMap()">🗺️ Karte</button>
@@ -553,7 +553,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <div class="form-row">
         <div class="form-group">
           <label>Arrival time (Serverzeit)</label>
-          <input id="pmLanding" type="datetime-local">
+          <input id="pmLanding" type="datetime-local" step="1">
         </div>
         <div class="form-group" style="max-width:120px;">
           <label>Server-Speed</label>
@@ -1117,7 +1117,7 @@ function renderTargetCard(t) {
         <div class="target-player">${escHtml(t.player_name)||'Unbekannt'}</div>
         <div class="target-village">
           ${escHtml(t.village_name)||''} ${t.population?'· '+t.population+' Pop':''}
-          ${activePlan?.landing_time ? `<span style="margin-left:.4rem;font-size:.7rem;color:#fbbf24;font-family:monospace;">🕐 ${fmtDatetimeShort(activePlan.landing_time)}</span>` : ''}
+          ${activePlan?.landing_time ? `<span style="margin-left:.4rem;font-size:.7rem;color:#fbbf24;font-family:monospace;">🕐 ${fmtDatetime(activePlan.landing_time)}</span>` : ''}
         </div>
       </div>
       <div style="display:flex;gap:.3rem;align-items:center;">
@@ -3479,7 +3479,7 @@ async function deleteHeroAction(actionId) {
 function openInlineLandingEditor() {
   const span = document.getElementById('topLandingTime');
   const inp  = document.getElementById('inlineLandingInput');
-  inp.value = (activePlan?.landing_time||'').slice(0,16);
+  inp.value = (activePlan?.landing_time||'').slice(0,19);
   span.style.display = 'none';
   inp.style.display  = 'inline-block';
   inp.focus();
@@ -3691,7 +3691,7 @@ function openEditPlanModal() {
   document.getElementById('planModalTitle').textContent = 'Operation bearbeiten';
   document.getElementById('pmName').value = activePlan.name||'';
   document.getElementById('pmStatus').value = activePlan.status||'draft';
-  document.getElementById('pmLanding').value = (activePlan.landing_time||'').slice(0,16);
+  document.getElementById('pmLanding').value = (activePlan.landing_time||'').slice(0,19);
   document.getElementById('pmSpeed').value = String(activePlan.server_speed||1);
   document.getElementById('pmAlly').value = activePlan.target_ally||'';
   document.getElementById('pmNotes').value = activePlan.notes||'';

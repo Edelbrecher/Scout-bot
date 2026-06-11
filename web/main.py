@@ -8904,7 +8904,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
             await database.save_op_notify_log(guild_id, plan_id, "", "auto",
                 [{"discord_id": "", "name": "System", "status": "error", "error": "Plan not found"}])
             return
-        landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
+        landing = (plan.get("landing_time") or "").replace("T", " ")[:19]
         plan_name = plan.get("name", "Einsatzplan")
         server_host = os.environ.get("SERVER_HOST", "https://travops.online")
         plan_url = f"{server_host}/guild/{guild_id}/operations"
@@ -9366,7 +9366,7 @@ async def op_launch_poll(request: Request, guild_id: str, plan_id: int):
     if not plan:
         return JSONResponse({"error": "Plan nicht gefunden."}, status_code=404)
     title = f"⚔️ EP: {plan['name']}"
-    landing = (plan.get("landing_time") or "").replace("T", " ")[:16]
+    landing = (plan.get("landing_time") or "").replace("T", " ")[:19]
     description = f"Bist du für diesen Einsatz verfügbar?\n🕐 Einschlag: **{landing}**" if landing else "Bist du für diesen Einsatz verfügbar?"
     poll_id = await database.create_ep_poll(guild_id, plan_id, title, description, plan.get("landing_time") or "")
     # Post to Discord

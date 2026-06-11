@@ -804,7 +804,7 @@ async def handle_op_notify(request: aiohttp_web.Request) -> aiohttp_web.Response
 
     plan_name = plan.get("name","Einsatz")
     plan_code = plan.get("public_code","")
-    landing   = (plan.get("landing_time") or "")[:16].replace("T"," ")
+    landing   = (plan.get("landing_time") or "")[:19].replace("T"," ")
     ally      = plan.get("target_ally") or ""
 
     # Build per-attacker message
@@ -875,10 +875,10 @@ async def handle_op_wave_assigned(request: aiohttp_web.Request) -> aiohttp_web.R
         wave_type    = data.get("wave_type", "real")
         target_x     = data.get("target_x")
         target_y     = data.get("target_y")
-        send_time    = (data.get("send_time") or "—")[:16].replace("T", " ")
+        send_time    = (data.get("send_time") or "—")[:19].replace("T", " ")
         plan         = data.get("plan", {})
         plan_name    = plan.get("name", "Operation")
-        landing      = (plan.get("landing_time") or "")[:16].replace("T", " ")
+        landing      = (plan.get("landing_time") or "")[:19].replace("T", " ")
         plan_code    = data.get("plan_code", "")
         wave_code    = data.get("wave_code", "")
     except Exception:
@@ -925,7 +925,7 @@ async def handle_op_hero_action(request: aiohttp_web.Request) -> aiohttp_web.Res
         item_name   = data.get("item_name", "")
         notes       = data.get("notes", "")
         plan_name   = data.get("plan_name", "Operation")
-        landing     = str(data.get("landing_time", "")).replace("T", " ")[:16]
+        landing     = str(data.get("landing_time", "")).replace("T", " ")[:19]
         player_name = data.get("player_name", "")
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
@@ -974,7 +974,7 @@ async def handle_announce_ep(request: aiohttp_web.Request) -> aiohttp_web.Respon
         guild_id   = str(data.get("guild_id", ""))
         plan_name  = str(data.get("plan_name", "Einsatz"))
         plan_code  = str(data.get("plan_code", ""))
-        landing    = str(data.get("landing_time", "")).replace("T", " ")[:16]
+        landing    = str(data.get("landing_time", "")).replace("T", " ")[:19]
         plan_url   = str(data.get("plan_url", ""))
         poll_channel_id = str(data.get("poll_channel_id", ""))
         member_ids = data.get("member_discord_ids", [])   # list of discord id strings
