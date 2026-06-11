@@ -14,26 +14,26 @@
 
   <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1.1rem;">
     <button class="btn btn-primary" onclick="openImportModal()" style="font-size:0.9rem;">
-      &#x1F4CB; Rallyepunkt importieren
+      Rallyepunkt importieren
     </button>
     <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:0.9rem;">
-      &#x1F50D; Allianz-Analyse
+      Allianz-Analyse
     </a>
-    <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.85rem;">
-      &#x1F3F0; Own Villages
+    <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.9rem;">
+      Own Villages
     </a>
     <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:0.9rem;">
-      📊 Analyse
+      Analyse
     </button>
     {% if can_label %}
     <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:0.9rem;">
-      📁 Archiv
+      Archiv
     </button>
     <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:0.9rem;color:#a5b4fc;">
-      📦 Alle archivieren
+      Alle archivieren
     </button>
     <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:0.9rem;color:#f87171;">
-      🗑️ Alle löschen
+      Alle löschen
     </button>
     {% endif %}
   </div>
