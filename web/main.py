@@ -8163,6 +8163,7 @@ async def farming_page(
             include_natars, include_ww, tribes, in_farmlist,
         ])
 
+        _PAGE_SIZE_FAST = 100
         if _advanced_active_fast:
             adv_result = await database.search_inactive_advanced(
                 guild_id=guild_id,
@@ -8182,20 +8183,20 @@ async def farming_page(
                 include_natars=include_natars,
                 include_ww=include_ww,
                 tribes=tribes or [],
-                limit=500,
+                limit=_PAGE_SIZE_FAST,
+                offset=_offset,
                 no_alliance=no_alliance,
                 exclude_coords=None if show_own_villages else own_coords_fast,
                 exclude_alliance_lc=None if (show_alliance_villages or not tw_alliance_lc_fast) else tw_alliance_lc_fast,
                 inactive_player_names=inactive_player_names_fast if only_inactive_players else None,
+                farmlist_coords=set(farmlist_xy_fast.keys()),
+                in_farmlist=in_farmlist,
             )
-            inactive_farms_fast = adv_result.get("villages", [])
-            for v in inactive_farms_fast:
+            page = adv_result.get("villages", [])
+            for v in page:
                 v["farmlist_groups"] = farmlist_xy_fast.get((v["x"], v["y"]), [])
                 v.setdefault("days_tracked", 0)
-            if in_farmlist == "no":
-                inactive_farms_fast = [v for v in inactive_farms_fast if not v["farmlist_groups"]]
-            elif in_farmlist == "yes":
-                inactive_farms_fast = [v for v in inactive_farms_fast if v["farmlist_groups"]]
+            inactive_farms_real_total_fast = adv_result.get("total", 0)
         else:
             inactive_farms_fast = await database.get_inactive_farms(
                 guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i,
@@ -8220,9 +8221,8 @@ async def farming_page(
             if no_alliance:
                 inactive_farms_fast = [v for v in inactive_farms_fast if not (v.get("alliance_name") or "").strip()]
 
-        _PAGE_SIZE_FAST = 100
-        inactive_farms_real_total_fast = len(inactive_farms_fast)
-        page = inactive_farms_fast[_offset:_offset + _PAGE_SIZE_FAST]
+            inactive_farms_real_total_fast = len(inactive_farms_fast)
+            page = inactive_farms_fast[_offset:_offset + _PAGE_SIZE_FAST]
 
         ajax_farms = []
         for f in page:
@@ -8313,6 +8313,9 @@ async def farming_page(
         include_natars, include_ww, tribes, in_farmlist,
     ])
 
+    # ── Pagination: 100 per page (initial + AJAX) ────────────────────────────
+    _PAGE_SIZE = 100
+
     # Choose query: advanced (search_inactive_advanced) or basic (get_inactive_farms)
     if _advanced_active and farm_stats.get("snapshot_count", 0) >= 2:
         adv_result = await database.search_inactive_advanced(
@@ -8333,22 +8336,20 @@ async def farming_page(
             include_natars=include_natars,
             include_ww=include_ww,
             tribes=tribes or [],
-            limit=500,
+            limit=_PAGE_SIZE,
+            offset=_offset,
             no_alliance=no_alliance,
             exclude_coords=None if show_own_villages else own_coords,
             exclude_alliance_lc=None if (show_alliance_villages or not tw_alliance_lc) else tw_alliance_lc,
             inactive_player_names=inactive_player_names if only_inactive_players else None,
+            farmlist_coords=set(farmlist_xy.keys()),
+            in_farmlist=in_farmlist,
         )
-        inactive_farms_raw = adv_result.get("villages", [])
-        for v in inactive_farms_raw:
+        inactive_farms = adv_result.get("villages", [])
+        for v in inactive_farms:
             v["farmlist_groups"] = farmlist_xy.get((v["x"], v["y"]), [])
             v.setdefault("days_tracked", 0)
-        if in_farmlist == "no":
-            inactive_farms = [v for v in inactive_farms_raw if not v["farmlist_groups"]]
-        elif in_farmlist == "yes":
-            inactive_farms = [v for v in inactive_farms_raw if v["farmlist_groups"]]
-        else:
-            inactive_farms = inactive_farms_raw
+        inactive_farms_real_total = adv_result.get("total", 0)
     else:
         inactive_farms_raw = await database.get_inactive_farms(
             guild_id, min_days=min_days_i, min_pop=min_pop_i, max_pop=max_pop_i,
@@ -8379,10 +8380,8 @@ async def farming_page(
         if no_alliance:
             inactive_farms = [v for v in inactive_farms if not (v.get("alliance_name") or "").strip()]
 
-    # ── Pagination: 100 per page (initial + AJAX) ────────────────────────────
-    _PAGE_SIZE = 100
-    inactive_farms_real_total = len(inactive_farms)
-    inactive_farms = inactive_farms[_offset:_offset + _PAGE_SIZE]
+        inactive_farms_real_total = len(inactive_farms)
+        inactive_farms = inactive_farms[_offset:_offset + _PAGE_SIZE]
 
     # ── Parallel batch 2: per-village stats (depend on inactive_farms result) ─
     _INITIAL_RENDER = 100  # rows rendered as Jinja HTML (= _PAGE_SIZE, no split needed)

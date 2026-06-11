@@ -3110,6 +3110,9 @@ async def search_inactive_advanced(
     exclude_coords: set | None = None,
     exclude_alliance_lc: str | None = None,
     inactive_player_names: set | None = None,
+    farmlist_coords: set | None = None,
+    in_farmlist: str = "",
+    offset: int = 0,
 ) -> dict:
     import math
 
@@ -3232,6 +3235,12 @@ async def search_inactive_advanced(
             # Only players whose total pop barely grew (only_inactive_players)
             if inactive_player_names is not None and (v["player_name"] or "") not in inactive_player_names:
                 continue
+            # Farm-list cross reference (yes = only villages already on a farm
+            # list, no = only villages NOT yet on any farm list)
+            if in_farmlist == "yes" and (v["x"], v["y"]) not in (farmlist_coords or set()):
+                continue
+            if in_farmlist == "no" and (v["x"], v["y"]) in (farmlist_coords or set()):
+                continue
             pp = player_pop.get(pname, 0) or 0
             if pp < min_player_pop or pp > max_player_pop:
                 continue
@@ -3255,10 +3264,10 @@ async def search_inactive_advanced(
 
         total = len(filtered)
         filtered.sort(key=lambda v: v["distance"])
-        filtered = filtered[:limit]
+        filtered = filtered[offset:offset + limit]
 
         if not filtered:
-            return {"villages": [], "snap_dates": snap_dates, "total": 0}
+            return {"villages": [], "snap_dates": snap_dates, "total": total}
 
         # Fetch pop history only for the villages in the result set
         vid_set = {v["village_id"] for v in filtered}
