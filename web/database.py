@@ -12280,45 +12280,49 @@ async def unwatch_alliance(guild_id: str, alliance_name: str) -> bool:
 
 async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
     """Top alliances by total population from latest map snapshot, with pop growth vs previous snapshot."""
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        db.row_factory = aiosqlite.Row
-        try:
-            # Two most recent distinct snapshot dates
+    try:
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
             async with db.execute(
-                "SELECT DISTINCT fetched_at FROM map_snapshots WHERE guild_id=? ORDER BY fetched_at DESC LIMIT 2",
-                (guild_id,)
+                "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
             ) as cur:
-                snaps = [r[0] for r in await cur.fetchall()]
-            if not snaps:
-                return []
-            latest = snaps[0]
-            prev   = snaps[1] if len(snaps) > 1 else None
+                row = await cur.fetchone()
+        world_url = row[0] if row else None
+        if not world_url:
+            return []
 
+        all_snaps = await _world_snapshot_times(world_url)
+        if not all_snaps:
+            return []
+        latest = all_snaps[0]
+        prev   = all_snaps[1] if len(all_snaps) > 1 else None
+
+        async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+            db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT alliance_name,
                        COUNT(DISTINCT player_name) as member_count,
                        SUM(population) as total_pop,
                        COUNT(*) as village_count
-                FROM map_snapshots
-                WHERE guild_id=? AND fetched_at=?
+                FROM world_snapshots INDEXED BY idx_wsnap_url_ts
+                WHERE world_url=? AND fetched_at=?
                   AND alliance_name IS NOT NULL AND alliance_name != ''
                 GROUP BY alliance_name
                 ORDER BY total_pop DESC
                 LIMIT ?
-            """, (guild_id, latest, limit)) as cur:
+            """, (world_url, latest, limit)) as cur:
                 rows = [dict(r) for r in await cur.fetchall()]
 
-            if prev:
+            if prev and rows:
                 # Fetch previous total_pop per alliance in one query
                 ally_names = [r["alliance_name"] for r in rows]
                 placeholders = ",".join("?" * len(ally_names))
                 async with db.execute(f"""
                     SELECT alliance_name, SUM(population) as total_pop
-                    FROM map_snapshots
-                    WHERE guild_id=? AND fetched_at=?
+                    FROM world_snapshots INDEXED BY idx_wsnap_url_ts
+                    WHERE world_url=? AND fetched_at=?
                       AND alliance_name IN ({placeholders})
                     GROUP BY alliance_name
-                """, [guild_id, prev] + ally_names) as cur:
+                """, [world_url, prev] + ally_names) as cur:
                     prev_map = {r["alliance_name"]: r["total_pop"] for r in await cur.fetchall()}
                 for r in rows:
                     prev_pop = prev_map.get(r["alliance_name"])
@@ -12328,8 +12332,8 @@ async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
                     r["pop_growth"] = None
 
             return rows
-        except Exception:
-            return []
+    except Exception:
+        return []
 
 
 async def get_top_raiders(guild_id: str, limit: int = 10) -> list[dict]:
