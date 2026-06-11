@@ -610,6 +610,26 @@
         </div>
       </div>
 
+      {# Farm Score threshold settings (collapsed by default) #}
+      <div id="scoreSettingsPanel" style="display:none;align-items:center;gap:.75rem;flex-wrap:wrap;
+                  padding:.6rem 1rem;border-bottom:1px solid var(--border);background:rgba(251,191,36,.05);font-size:.82rem;">
+        <strong style="color:#fbbf24;">⚙️ Farm-Score Schwellenwerte</strong>
+        <span style="color:var(--text-muted);">Lege selbst fest, ab welchem Score eine Farm 🟢 gut, 🟡 ok oder 🔴 schlecht ist.</span>
+        <label style="display:flex;align-items:center;gap:.35rem;">
+          🟢 Gut ab
+          <input type="number" id="scoreGoodInput" value="{{ farm_score_good }}" min="0" max="100"
+                 style="width:62px;padding:.25rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;">
+          🟡 OK ab
+          <input type="number" id="scoreOkInput" value="{{ farm_score_ok }}" min="0" max="100"
+                 style="width:62px;padding:.25rem .4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+        </label>
+        <span style="color:var(--text-muted);font-size:.75rem;">🔴 darunter = schlecht</span>
+        <button type="button" onclick="saveScoreSettings()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .75rem;">💾 Speichern</button>
+        <button type="button" onclick="resetScoreSettings()" class="btn" style="font-size:.78rem;padding:.3rem .75rem;">↺ Standard (75/50)</button>
+      </div>
+
       {% if farm_stats.snapshot_count < 2 %}
       <div style="padding:2rem;text-align:center;">
         <div style="font-size:2.5rem;margin-bottom:0.75rem;">{% if farm_stats.snapshot_count == 0 %}📸{% else %}⏳{% endif %}</div>
@@ -656,8 +676,11 @@
               <th class="sortable-th" onclick="sortInactive('d14')" style="color:var(--text-muted);font-size:.72rem;" title="Sort by Δ14d">Δ14d <span class="sort-arrow" data-col="d14">↕</span></th>
               <th class="sortable-th" onclick="sortInactive('score')"
                   style="color:#fbbf24;font-size:.72rem;cursor:pointer;"
-                  title="Farm Score 0–100&#10;&#10;Up to 40 pts: days inactive (2 pts/day)&#10;Up to 30 pts: pop trend (↓ = good, ↑ = risky)&#10;Up to 20 pts: population sweet spot (50–600)&#10;&#10;🟢 75+ great farm  🟡 50–74 ok  🔴 &lt;50 risky">
+                  title="Farm Score 0–100&#10;&#10;Up to 40 pts: days inactive (2 pts/day)&#10;Up to 30 pts: pop trend (↓ = good, ↑ = risky)&#10;Up to 20 pts: population sweet spot (50–600)&#10;&#10;🟢 {{ farm_score_good }}+ great farm  🟡 {{ farm_score_ok }}–{{ farm_score_good - 1 }} ok  🔴 &lt;{{ farm_score_ok }} risky">
                 Score ⓘ <span class="sort-arrow" data-col="score">↕</span>
+                <button type="button" onclick="event.stopPropagation();toggleScoreSettings()"
+                        title="Score-Schwellenwerte anpassen"
+                        style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.78rem;padding:0 0 0 2px;vertical-align:middle;">⚙️</button>
               </th>
               <th style="color:var(--text-muted);font-size:.72rem;" title="Estimated troops for raiding this inactive village&#10;Assumes no wall / no defense&#10;Rule of thumb: pop × 0.15 to pop × 0.3">Troops est.</th>
               {% if has_farmlist %}<th>📋 Lists</th>{% endif %}
@@ -795,8 +818,8 @@
               {% set trend_score = 30 if (fd7 is not none and fd7 <= 0) else (0 if fd7 is none else [30 - fd7, 0] | max) %}
               {% set pop_score = 20 if (farm.population >= 50 and farm.population <= 600) else (10 if farm.population > 0 else 0) %}
               {% set farm_score = days_score + trend_score + pop_score %}
-              {% if farm_score >= 75 %}{% set sc="#22c55e" %}{% set sb="rgba(34,197,94,.15)" %}
-              {% elif farm_score >= 50 %}{% set sc="#f59e0b" %}{% set sb="rgba(245,158,11,.15)" %}
+              {% if farm_score >= farm_score_good %}{% set sc="#22c55e" %}{% set sb="rgba(34,197,94,.15)" %}
+              {% elif farm_score >= farm_score_ok %}{% set sc="#f59e0b" %}{% set sb="rgba(245,158,11,.15)" %}
               {% else %}{% set sc="#ef4444" %}{% set sb="rgba(239,68,68,.1)" %}{% endif %}
               <td style="text-align:center;">
                 <span style="background:{{ sb }};color:{{ sc }};border-radius:5px;padding:2px 6px;font-size:.75rem;font-weight:700;">
@@ -908,6 +931,35 @@
         </table>
       </div>
 
+      <script>
+      var FARM_SCORE_GOOD = {{ farm_score_good }};
+      var FARM_SCORE_OK = {{ farm_score_ok }};
+      var _guildId = '{{ guild.guild_id }}';
+      function toggleScoreSettings() {
+        var el = document.getElementById('scoreSettingsPanel');
+        if (!el) return;
+        el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+      }
+      async function saveScoreSettings() {
+        var good = parseInt(document.getElementById('scoreGoodInput').value, 10);
+        var ok = parseInt(document.getElementById('scoreOkInput').value, 10);
+        if (isNaN(good) || isNaN(ok)) { alert('Bitte gültige Zahlen eingeben.'); return; }
+        if (good < ok) { alert('"Gut ab" muss größer oder gleich "OK ab" sein.'); return; }
+        const fd = new FormData();
+        fd.append('farm_score_good', good);
+        fd.append('farm_score_ok', ok);
+        try {
+          const r = await fetch(`/guild/${_guildId}/farming/score-settings`, {method:'POST', body: fd});
+          if (!r.ok) throw new Error('Speichern fehlgeschlagen');
+          location.reload();
+        } catch(e) { alert('Fehler: ' + e.message); }
+      }
+      function resetScoreSettings() {
+        document.getElementById('scoreGoodInput').value = 75;
+        document.getElementById('scoreOkInput').value = 50;
+      }
+      </script>
+
       {% if inactive_farms_has_more %}
       <div id="loadMoreWrap" style="padding:1rem;text-align:center;border-top:1px solid var(--border);">
         <button id="loadMoreBtn" onclick="loadMoreFarms()"
@@ -925,7 +977,6 @@
       var _hasFarmlist = {{ 'true' if has_farmlist else 'false' }};
       var _scoutVillageId = {{ ('"' + scout_village.travian_village_id|string + '"') if scout_village and scout_village.travian_village_id else 'null' }};
       var _scoutLabel = {{ ('"' + scout_village.village_name|e + ' (' + scout_village.x|string + '|' + scout_village.y|string + ')"') if scout_village else '"no scout village"' }};
-      var _guildId = '{{ guild.guild_id }}';
 
       function _deltaHtml(dv) {
         if (dv === null || dv === undefined) return '<span style="color:#1e293b;font-size:.75rem;">—</span>';
@@ -940,8 +991,8 @@
         return '<span style="color:var(--text-muted);font-size:.78rem;">'+dv+'</span>';
       }
       function _scoreHtml(sc) {
-        var bg = sc>=75?'rgba(34,197,94,.15)':sc>=50?'rgba(245,158,11,.15)':'rgba(239,68,68,.1)';
-        var col = sc>=75?'#22c55e':sc>=50?'#f59e0b':'#ef4444';
+        var bg = sc>=FARM_SCORE_GOOD?'rgba(34,197,94,.15)':sc>=FARM_SCORE_OK?'rgba(245,158,11,.15)':'rgba(239,68,68,.1)';
+        var col = sc>=FARM_SCORE_GOOD?'#22c55e':sc>=FARM_SCORE_OK?'#f59e0b':'#ef4444';
         return '<span style="background:'+bg+';color:'+col+';border-radius:5px;padding:2px 6px;font-size:.75rem;font-weight:700;">'+sc+'</span>';
       }
       function _troopsHtml(pop) {

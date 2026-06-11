@@ -7687,7 +7687,7 @@ def _parse_battle_report(text: str) -> dict:
 # Routes — Farmlist-Analyst (Feature 4)
 # ---------------------------------------------------------------------------
 
-def parse_farmlist(text: str) -> list[dict]:
+def parse_farmlist(text: str, good_threshold: int = 100, ok_threshold: int = 1) -> list[dict]:
     """Parse Travian farmlist copy-paste (single or multi-list) into structured farm dicts.
 
     Schema per entry (after header line with village+pop+dist):
@@ -7822,9 +7822,9 @@ def parse_farmlist(text: str) -> list[dict]:
 
                 # Rating based on last-raid loot and efficiency
                 efficiency = round(res_last / distance, 1) if distance > 0 else 0.0
-                if res_last >= 100:
+                if res_last >= good_threshold:
                     rating = "gut"
-                elif res_last > 0:
+                elif res_last >= ok_threshold:
                     rating = "ok"
                 else:
                     rating = "leer"   # empty last raid
@@ -7896,6 +7896,8 @@ async def farmlist_analyst_page(request: Request, guild_id: str):
         "group_stats": [],
         "past":        past,
         "raw_text":    "",
+        "farmlist_score_good": guild.get("farmlist_score_good") if guild.get("farmlist_score_good") is not None else 100,
+        "farmlist_score_ok": guild.get("farmlist_score_ok") if guild.get("farmlist_score_ok") is not None else 1,
     })
 
 
@@ -7915,7 +7917,9 @@ async def farmlist_analyst_post(
     err = await _require_premium(guild, guild_id)
     if err: return err
 
-    farms = parse_farmlist(farmlist_text)
+    fl_good = guild.get("farmlist_score_good") if guild.get("farmlist_score_good") is not None else 100
+    fl_ok = guild.get("farmlist_score_ok") if guild.get("farmlist_score_ok") is not None else 1
+    farms = parse_farmlist(farmlist_text, good_threshold=fl_good, ok_threshold=fl_ok)
     await _attach_farm_coords(guild_id, farms)
 
     # ── overall stats ──────────────────────────────────────────────────────
@@ -7977,6 +7981,8 @@ async def farmlist_analyst_post(
         "group_stats":  group_stats,
         "past":         past,
         "raw_text":     farmlist_text,
+        "farmlist_score_good": fl_good,
+        "farmlist_score_ok": fl_ok,
     })
 
 
@@ -8021,7 +8027,27 @@ async def farmlist_analysis_open(request: Request, guild_id: str, analysis_id: i
         "past":        past,
         "raw_text":    "",
         "opened_id":   analysis_id,
+        "farmlist_score_good": guild.get("farmlist_score_good") if guild.get("farmlist_score_good") is not None else 100,
+        "farmlist_score_ok": guild.get("farmlist_score_ok") if guild.get("farmlist_score_ok") is not None else 1,
     })
+
+
+@app.post("/guild/{guild_id}/farmlist-analyst/score-settings")
+async def farmlist_analyst_score_settings(
+    request: Request, guild_id: str,
+    farmlist_score_good: int = Form(100),
+    farmlist_score_ok: int = Form(1),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    good = max(0, farmlist_score_good)
+    ok = max(0, farmlist_score_ok)
+    if ok > good:
+        ok = good
+    await database.update_guild_config_fields(guild_id, farmlist_score_good=good, farmlist_score_ok=ok)
+    return JSONResponse({"ok": True, "farmlist_score_good": good, "farmlist_score_ok": ok})
 
 
 @app.post("/guild/{guild_id}/farmlist-analyst/{analysis_id}/delete")
@@ -8569,6 +8595,8 @@ async def farming_page(
         "has_farmlist": has_farmlist,
         "alliance_names": [a["alliance_name"] for a in alliance_names],
         "top_alliances": alliance_names[:20],
+        "farm_score_good": guild.get("farm_score_good") if guild.get("farm_score_good") is not None else 75,
+        "farm_score_ok": guild.get("farm_score_ok") if guild.get("farm_score_ok") is not None else 50,
     })
 
 
@@ -8584,7 +8612,9 @@ async def farming_import_farmlist(
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
-    farms = parse_farmlist(farmlist_text)
+    fl_good = guild.get("farmlist_score_good") if guild.get("farmlist_score_good") is not None else 100
+    fl_ok = guild.get("farmlist_score_ok") if guild.get("farmlist_score_ok") is not None else 1
+    farms = parse_farmlist(farmlist_text, good_threshold=fl_good, ok_threshold=fl_ok)
     if not farms:
         return RedirectResponse(f"/guild/{guild_id}/farming?tab=inactive&saved=farmlist_empty", status_code=303)
     # Compute stats and save as farmlist analysis
@@ -8624,6 +8654,25 @@ async def farming_import_farmlist(
         f"/guild/{guild_id}/farming?tab=inactive&saved=farmlist_imported&advanced=1",
         status_code=303
     )
+
+
+@app.post("/guild/{guild_id}/farming/score-settings")
+async def farming_score_settings(
+    request: Request, guild_id: str,
+    farm_score_good: int = Form(75),
+    farm_score_ok: int = Form(50),
+):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    # Clamp to sane 0-100 range and ensure good > ok
+    good = max(0, min(100, farm_score_good))
+    ok = max(0, min(100, farm_score_ok))
+    if ok > good:
+        ok = good
+    await database.update_guild_config_fields(guild_id, farm_score_good=good, farm_score_ok=ok)
+    return JSONResponse({"ok": True, "farm_score_good": good, "farm_score_ok": ok})
 
 
 @app.post("/guild/{guild_id}/farming/snapshot")

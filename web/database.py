@@ -536,7 +536,11 @@ async def init_db():
     # New column migrations
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         for col in ["alliance_manager_role_ids TEXT", "tw_alliance_name TEXT",
-                    "server_utc_offset INTEGER DEFAULT 60"]:
+                    "server_utc_offset INTEGER DEFAULT 60",
+                    "farm_score_good INTEGER DEFAULT 75",
+                    "farm_score_ok INTEGER DEFAULT 50",
+                    "farmlist_score_good INTEGER DEFAULT 100",
+                    "farmlist_score_ok INTEGER DEFAULT 1"]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
@@ -638,7 +642,9 @@ async def update_guild_config_fields(guild_id: str, **fields):
     if not fields:
         return
     allowed = {"server_utc_offset", "tw_alliance_name", "alliance_manager_role_ids",
-               "bot_language", "poll_channel_id", "digest_channel_id"}
+               "bot_language", "poll_channel_id", "digest_channel_id",
+               "farm_score_good", "farm_score_ok",
+               "farmlist_score_good", "farmlist_score_ok"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return

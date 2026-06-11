@@ -92,9 +92,12 @@
   {% endif %}
 
   <!-- Eingabe-Button -->
-  <div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;">
+  <div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
     <button onclick="document.getElementById('fl-modal').style.display='flex'" class="btn btn-primary">
       📋 Neue Analyse
+    </button>
+    <button type="button" onclick="toggleFlScoreSettings()" class="btn" style="font-size:0.82rem;">
+      ⚙️ Bewertungs-Schwellenwerte
     </button>
     {% if stats %}
     <span style="color:var(--text-muted);font-size:0.85rem;">
@@ -102,6 +105,55 @@
     </span>
     {% endif %}
   </div>
+
+  <!-- Score threshold settings (collapsed by default) -->
+  <div id="fl-score-settings" class="card" style="display:none;margin-bottom:1.25rem;padding:0.85rem 1rem;
+              align-items:center;gap:0.75rem;flex-wrap:wrap;font-size:0.85rem;background:rgba(251,191,36,.05);">
+    <strong style="color:#fbbf24;">⚙️ Bewertungs-Schwellenwerte</strong>
+    <span style="color:var(--text-muted);font-size:0.8rem;">
+      Lege selbst fest, ab wie viel Beute (letzter Raid) eine Farm 🟢 gut, 🟡 ok oder 🔴 leer ist.
+    </span>
+    <label style="display:flex;align-items:center;gap:0.35rem;">
+      🟢 Gut ab
+      <input type="number" id="flScoreGoodInput" value="{{ farmlist_score_good }}" min="0"
+             style="width:80px;padding:0.25rem 0.4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+      Res
+    </label>
+    <label style="display:flex;align-items:center;gap:0.35rem;">
+      🟡 OK ab
+      <input type="number" id="flScoreOkInput" value="{{ farmlist_score_ok }}" min="0"
+             style="width:80px;padding:0.25rem 0.4rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+      Res
+    </label>
+    <span style="color:var(--text-muted);font-size:0.75rem;">🔴 darunter = leer</span>
+    <button type="button" onclick="saveFlScoreSettings()" class="btn btn-primary" style="font-size:0.78rem;padding:0.3rem 0.75rem;">💾 Speichern</button>
+    <button type="button" onclick="resetFlScoreSettings()" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">↺ Standard (100/1)</button>
+  </div>
+  <script>
+    function toggleFlScoreSettings() {
+      var el = document.getElementById('fl-score-settings');
+      if (!el) return;
+      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+    async function saveFlScoreSettings() {
+      var good = parseInt(document.getElementById('flScoreGoodInput').value, 10);
+      var ok = parseInt(document.getElementById('flScoreOkInput').value, 10);
+      if (isNaN(good) || isNaN(ok)) { alert('Bitte gültige Zahlen eingeben.'); return; }
+      if (good < ok) { alert('"Gut ab" muss größer oder gleich "OK ab" sein.'); return; }
+      const fd = new FormData();
+      fd.append('farmlist_score_good', good);
+      fd.append('farmlist_score_ok', ok);
+      try {
+        const r = await fetch(`/guild/{{ guild.guild_id }}/farmlist-analyst/score-settings`, {method:'POST', body: fd});
+        if (!r.ok) throw new Error('Speichern fehlgeschlagen');
+        location.reload();
+      } catch(e) { alert('Fehler: ' + e.message); }
+    }
+    function resetFlScoreSettings() {
+      document.getElementById('flScoreGoodInput').value = 100;
+      document.getElementById('flScoreOkInput').value = 1;
+    }
+  </script>
 
   <!-- Modal -->
   <div id="fl-modal" style="display:{% if not stats and not opened_id %}flex{% else %}none{% endif %};
@@ -143,15 +195,15 @@
     </div>
     <div class="card" style="padding:0.75rem;text-align:center;border-color:rgba(34,197,94,0.4);">
       <div style="font-size:1.6rem;font-weight:800;color:#22c55e;">{{ stats.gut }}</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);">🟢 Gut (≥100 Res)</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);">🟢 Gut (≥{{ farmlist_score_good }} Res)</div>
     </div>
     <div class="card" style="padding:0.75rem;text-align:center;border-color:rgba(234,179,8,0.4);">
       <div style="font-size:1.6rem;font-weight:800;color:#eab308;">{{ stats.ok }}</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);">🟡 OK (1–99 Res)</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);">🟡 OK ({{ farmlist_score_ok }}–{{ farmlist_score_good - 1 }} Res)</div>
     </div>
     <div class="card" style="padding:0.75rem;text-align:center;border-color:rgba(239,68,68,0.4);">
       <div style="font-size:1.6rem;font-weight:800;color:#ef4444;">{{ stats.leer }}</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);">🔴 Leer (0 Res)</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);">🔴 Leer (&lt;{{ farmlist_score_ok }} Res)</div>
     </div>
     <div class="card" style="padding:0.75rem;text-align:center;">
       <div style="font-size:1.6rem;font-weight:800;">{{ "{:,}".format(stats.total_res_last).replace(",",".")  }}</div>
@@ -360,8 +412,8 @@ function _rowHtml(f) {
     '<div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;">' +
     coords + '<span>' + _esc(f.list_name) + '</span></div></td>';
 
-  // res_last colour
-  const rlColor = f.res_last >= 100 ? '#22c55e' : f.res_last > 0 ? '#eab308' : '#ef4444';
+  // res_last colour — based on the server-computed rating (uses configurable thresholds)
+  const rlColor = f.rating === 'gut' ? '#22c55e' : f.rating === 'ok' ? '#eab308' : '#ef4444';
 
   // rating badge
   let badge;
