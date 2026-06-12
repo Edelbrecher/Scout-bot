@@ -7143,6 +7143,8 @@ _UNIT_MAP: dict[str, str] = {
     "druide": "druidrider", "druidenreiter": "druidrider", "druid rider": "druidrider",
     "haeduer": "haeduan", "haeduan": "haeduan",
     "trebuchet": "trebuchet", "trebusche": "trebuchet",
+    "theutates thunder": "theutates_thunder", "theutates blitz": "theutates_thunder",
+    "theutates-blitz": "theutates_thunder",
     # Huns
     "mercenary": "mercenary", "söldner": "mercenary",
     "bowman": "bowman", "bogenschütze": "bowman",
@@ -7199,6 +7201,7 @@ _TROOP_BUILD_SECONDS: dict[str, int] = {
     "thureophor":          720,
     "druidrider":          1008,
     "haeduan":             1440,
+    "theutates_thunder":   1440,
     "trebuchet":           3240,
     "chieftain":           25344,
     # Huns
@@ -7327,7 +7330,7 @@ def _parse_battle_report(text: str) -> dict:
 
     # ── Report type ────────────────────────────────────────────────────────
     for kw, rt in [
-        (["spionage", "espionage", "spy report", "spionbericht"], "spy"),
+        (["spionage", "espionage", "spy report", "spionbericht", "spion"], "spy"),
         (["angriff", "attack", "raid report"], "attack"),
         (["verteidigung", "defense", "defence", "defending"], "defense"),
         (["marktbericht", "market report", "trade report"], "market"),
@@ -7341,6 +7344,19 @@ def _parse_battle_report(text: str) -> dict:
 
     # ── Clean text: strip Unicode direction marks, normalise whitespace ───────
     text_clean = re.sub(r'[‎‏‪-‮⁦-⁩­]', '', text)
+
+    # ── Scout/spy override ────────────────────────────────────────────────
+    # An "Information" block listing building levels (e.g. "Residence level 7" /
+    # "Rally Point level 14" / "Kornspeicher Stufe 10") only ever appears in a
+    # scouting report — the "Attacker"/"Defender" headers used there are
+    # identical to a normal attack report, which would otherwise misclassify
+    # it as "attack" (since "attack" is a substring of "Attacker").
+    _SCOUT_INFO_RE = re.compile(
+        r'(?im)^[ \t]*Information(?:en)?[ \t]*\r?\n'
+        r'(?:[ \t]*\S[^\n]*?\b(?:level|stufe)\s+\d+[^\n]*\r?\n?)+'
+    )
+    if _SCOUT_INFO_RE.search(text_clean):
+        result["report_type"] = "spy"
 
     # ── Date ───────────────────────────────────────────────────────────────
     # Handles: 04.06.2026 23:04:02  and  04.06.26, 23:04:02
@@ -7451,7 +7467,7 @@ def _parse_battle_report(text: str) -> dict:
         is_spy = any(k in ctx for k in ["spion", "spy", "rohstoff", "resource", "im dorf", "in village"])
         if is_spy:
             result["spy_resources"] = {"wood": w, "clay": c, "iron": i, "crop": g, "total": w+c+i+g}
-            if result["report_type"] == "unknown": result["report_type"] = "spy"
+            if result["report_type"] in ("unknown", "attack"): result["report_type"] = "spy"
         else:
             result["plunder"] = {"wood": w, "clay": c, "iron": i, "crop": g}
             result["plunder_total"] = w + c + i + g
