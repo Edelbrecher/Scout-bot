@@ -1075,31 +1075,31 @@
       {# Meta-Gruppen builder #}
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem;">
-          <h3 style="margin:0;font-size:.95rem;">🤝 Meta-Gruppen <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(max. 10 · je 3 Allianzen)</span></h3>
+          <h3 style="margin:0;font-size:.95rem;">🤝 Meta Groups <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(max. 10 · 3 alliances each)</span></h3>
           {% if meta_groups | length < 10 %}
           <button type="button" class="btn btn-secondary" style="font-size:.78rem;"
                   onclick="document.getElementById('newMetaGroupForm').style.display=document.getElementById('newMetaGroupForm').style.display==='none'?'flex':'none'">
-            ＋ Neue Meta
+            ＋ New Meta
           </button>
           {% endif %}
         </div>
 
         {% if request.query_params.get('meta_error') == 'limit' %}
         <div style="background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:6px;padding:.5rem .75rem;margin-bottom:.65rem;color:#f87171;font-size:.82rem;">
-          ⚠️ Maximal 10 Meta-Gruppen pro Server erlaubt.
+          ⚠️ Maximum of 10 meta groups per server allowed.
         </div>
         {% endif %}
 
         <form id="newMetaGroupForm" method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/create"
               style="display:none;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.65rem;">
           <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
-          <input type="text" name="meta_name" placeholder="Meta-Name (z.B. Freunde, Feinde …)" maxlength="64" required
+          <input type="text" name="meta_name" placeholder="Meta name (e.g. Friends, Enemies …)" maxlength="64" required
                  style="flex:1;min-width:140px;padding:.35rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
-          <button type="submit" class="btn btn-primary" style="font-size:.82rem;">Erstellen</button>
+          <button type="submit" class="btn btn-primary" style="font-size:.82rem;">Create</button>
         </form>
 
         {% if not meta_groups %}
-        <p style="color:var(--text-muted);font-size:.82rem;">Noch keine Meta-Gruppen erstellt.</p>
+        <p style="color:var(--text-muted);font-size:.82rem;">No meta groups created yet.</p>
         {% endif %}
 
         {% for g in meta_groups %}
@@ -1107,10 +1107,10 @@
           <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;flex-wrap:wrap;">
             <strong style="font-size:.8rem;">{{ g.meta_name }}</strong>
             <div style="display:flex;gap:.3rem;">
-              <button type="button" onclick="openMetaMembers({{ g.id }}, {{ g.meta_name|tojson }})"
-                      style="font-size:.68rem;padding:.15rem .5rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);border-radius:6px;color:#a5b4fc;cursor:pointer;">👁️ Mitglieder</button>
+              <button type="button" onclick='openMetaMembers({{ g.id }}, {{ g.meta_name|tojson }})'
+                      style="font-size:.68rem;padding:.15rem .5rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);border-radius:6px;color:#a5b4fc;cursor:pointer;">👁️ Members</button>
               <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
-                    style="margin:0;" onsubmit="return confirm('Meta-Gruppe »{{ g.meta_name }}« wirklich löschen?')">
+                    style="margin:0;" onsubmit="return confirm('Really delete meta group »{{ g.meta_name }}«?')">
                 <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
                 <button type="submit" style="font-size:.68rem;padding:.15rem .5rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);border-radius:6px;color:#f87171;cursor:pointer;">🗑️</button>
               </form>
@@ -1127,7 +1127,7 @@
             </form>
             {% endfor %}
             {% if g.alliances | length == 0 %}
-            <span style="color:var(--text-muted);font-size:.72rem;">Noch keine Allianzen hinzugefügt.</span>
+            <span style="color:var(--text-muted);font-size:.72rem;">No alliances added yet.</span>
             {% endif %}
           </div>
           {% if g.alliances | length < 3 and snapshot_alliances %}
@@ -1135,10 +1135,10 @@
                 style="display:flex;gap:.3rem;align-items:center;margin-top:.35rem;flex-wrap:wrap;">
             <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
             <select name="alliance_name" style="flex:1;min-width:120px;padding:.2rem .4rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.72rem;">
-              <option value="">— Allianz wählen —</option>
+              <option value="">— Select alliance —</option>
               {% for a in snapshot_alliances %}
               {% if a.alliance_name not in g.alliances %}
-              <option value="{{ a.alliance_name }}">{{ a.alliance_name }} ({{ a.member_count }} Spieler)</option>
+              <option value="{{ a.alliance_name }}">{{ a.alliance_name }} ({{ a.member_count }} players)</option>
               {% endif %}
               {% endfor %}
             </select>
@@ -1951,10 +1951,10 @@ async function openMetaMembers(groupId, metaName) {
   const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;" id="metaMembersOverlay" onclick="if(event.target===this)closeMetaMembers()">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.5rem;width:100%;max-width:760px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
-        <h3 style="margin:0;font-size:1rem;">👥 Mitglieder — ${escHtml(metaName)}</h3>
+        <h3 style="margin:0;font-size:1rem;">👥 Members — ${escHtml(metaName)}</h3>
         <button onclick="closeMetaMembers()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">×</button>
       </div>
-      <input type="text" id="metaMembersFilter" placeholder="🔍 Spieler oder Allianz suchen…" oninput="_renderMetaMembers()"
+      <input type="text" id="metaMembersFilter" placeholder="🔍 Search player or alliance…" oninput="_renderMetaMembers()"
              style="width:100%;padding:.4rem .7rem;margin-bottom:.6rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:.85rem;box-sizing:border-box;">
       <div style="overflow:auto;flex:1;">
         <table style="width:100%;font-size:.8rem;border-collapse:collapse;">
@@ -1967,7 +1967,7 @@ async function openMetaMembers(groupId, metaName) {
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
   document.getElementById('metaMembersBody').innerHTML =
-    `<tr><td style="padding:1rem;text-align:center;color:var(--text-muted);">Lade…</td></tr>`;
+    `<tr><td style="padding:1rem;text-align:center;color:var(--text-muted);">Loading…</td></tr>`;
   try {
     const r = await fetch(`/guild/${GUILD_ID_JS}/allianz/meta/${groupId}/members`);
     const data = await r.json();
@@ -1975,15 +1975,15 @@ async function openMetaMembers(groupId, metaName) {
     if (!_metaMembers.length) {
       document.getElementById('metaMembersEmpty').style.display = 'block';
       document.getElementById('metaMembersEmpty').innerHTML = !data.snapshot_at
-        ? `Noch keine Rangliste importiert. <a href="/guild/${GUILD_ID_JS}/travian-stats" style="color:#818cf8;">Jetzt importieren →</a>`
-        : 'Keine Mitglieder für diese Allianzen in der letzten Rangliste gefunden.';
+        ? `No ranking data imported yet. <a href="/guild/${GUILD_ID_JS}/travian-stats" style="color:#818cf8;">Import now →</a>`
+        : 'No members found for these alliances in the latest ranking.';
     } else {
       document.getElementById('metaMembersEmpty').style.display = 'none';
     }
     _renderMetaMembers();
   } catch (e) {
     document.getElementById('metaMembersBody').innerHTML =
-      `<tr><td style="padding:1rem;text-align:center;color:#f87171;">Fehler beim Laden.</td></tr>`;
+      `<tr><td style="padding:1rem;text-align:center;color:#f87171;">Error loading data.</td></tr>`;
   }
 }
 
@@ -1993,14 +1993,14 @@ function closeMetaMembers() {
 }
 
 const META_MEMBER_COLS = [
-  { key: 'player_name',  label: 'Spieler',           sort: 'string' },
-  { key: 'alliance_name', label: 'Allianz',          sort: 'string' },
-  { key: 'population',   label: '👥 Bevölkerung',    sort: 'number' },
+  { key: 'player_name',  label: 'Player',            sort: 'string' },
+  { key: 'alliance_name', label: 'Alliance',         sort: 'string' },
+  { key: 'population',   label: '👥 Population',     sort: 'number' },
   { key: 'pop_rank',     label: '#',                 sort: 'number', asc: true },
-  { key: 'off_points',   label: '⚔️ Angreifer-Pkt',  sort: 'number' },
-  { key: 'off_rank',     label: '⚔️ Rang',           sort: 'number', asc: true },
-  { key: 'def_points',   label: '🛡️ Verteidiger-Pkt', sort: 'number' },
-  { key: 'def_rank',     label: '🛡️ Rang',          sort: 'number', asc: true },
+  { key: 'off_points',   label: '⚔️ Attack Pts',     sort: 'number' },
+  { key: 'off_rank',     label: '⚔️ Rank',           sort: 'number', asc: true },
+  { key: 'def_points',   label: '🛡️ Defense Pts',    sort: 'number' },
+  { key: 'def_rank',     label: '🛡️ Rank',           sort: 'number', asc: true },
 ];
 
 function _metaSortBy(key, asc) {
@@ -2045,7 +2045,7 @@ function _renderMetaMembers() {
   });
 
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="${META_MEMBER_COLS.length}" style="padding:1rem;text-align:center;color:var(--text-muted);">Keine Treffer.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${META_MEMBER_COLS.length}" style="padding:1rem;text-align:center;color:var(--text-muted);">No matches.</td></tr>`;
     return;
   }
 
