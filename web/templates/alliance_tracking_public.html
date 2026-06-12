@@ -1,8 +1,37 @@
-{% extends "base.html" %}
-{% block title %}{{ alliance_name }} · Alliance Tracking · TravOps{% endblock %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ alliance_name }} · Alliance Tracking · TravOps</title>
+<meta property="og:title" content="{{ alliance_name }} · Alliance Tracking">
+<meta property="og:description" content="Shared alliance tracking view — TravOps">
+<meta property="og:image" content="https://travops.online/static/logo.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#0f172a; --bg-card:#1e293b; --bg-main:#0f172a;
+  --text:#e2e8f0; --text-muted:#64748b; --border:#334155; --accent:#6366f1;
+}
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
+
+#topbar {
+  display:flex; align-items:center; gap:.75rem; padding:.6rem 1rem;
+  background:var(--bg-card); border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+#topbar .logo { font-size:.9rem; font-weight:700; color:var(--accent); opacity:.85; }
+#topbar .badge {
+  font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:20px;
+  background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); color:#a5b4fc;
+}
+#topbar .spacer { flex:1; }
+#topbar .hint { font-size:.72rem; color:var(--text-muted); }
+
 .section-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.35rem; margin-bottom:1.25rem; }
 .section-title { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); margin-bottom:.9rem; }
 .event-row { display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; border-radius:8px; margin-bottom:.3rem; font-size:.84rem; }
@@ -27,7 +56,6 @@
   border-radius:10px; padding:.5rem .85rem;
   font-size:.8rem; font-weight:700;
   border:1px solid; cursor:default;
-  transition:opacity .15s;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   max-width:200px;
 }
@@ -43,61 +71,29 @@
 .cnt-in  { background:rgba(34,197,94,.2);  color:#4ade80; }
 .cnt-out { background:rgba(239,68,68,.2);  color:#f87171; }
 </style>
+</head>
+<body>
 
-<style>
-.nav-sidebar { display:flex; flex-direction:column; gap:.3rem; position:sticky; top:1rem; }
-.nav-sb-label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); padding:.4rem .6rem .2rem; }
-.nav-sb-item {
-  display:flex; align-items:center; justify-content:space-between; gap:.4rem;
-  padding:.45rem .7rem; border-radius:9px; font-size:.8rem; font-weight:600;
-  text-decoration:none; color:var(--text-muted);
-  border:1px solid transparent;
-  transition:all .12s;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.nav-sb-item:hover { background:rgba(255,255,255,.05); color:var(--text); border-color:var(--border); }
-.nav-sb-item.active { background:rgba(99,102,241,.15); color:#c4b5fd; border-color:rgba(99,102,241,.35); }
-.nav-sb-item.active-meta { background:rgba(245,158,11,.12); color:#fbbf24; border-color:rgba(245,158,11,.3); }
-.nav-sb-badge { font-size:.58rem; font-weight:700; padding:.08rem .38rem; border-radius:6px; flex-shrink:0; }
-.badge-meta   { background:rgba(245,158,11,.18); color:#fbbf24; border:1px solid rgba(245,158,11,.3); }
-.badge-single { background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.28); }
-.nav-sb-divider { height:1px; background:var(--border); margin:.35rem .6rem; }
-</style>
+<div id="topbar">
+  <span class="logo">TravOps</span>
+  <span class="badge">👁️ Read-only · Public View</span>
+  <span class="spacer"></span>
+  <span class="hint">Shared alliance tracking — no information about the sharer is included</span>
+</div>
 
-{% set _has_own_nav = ally_group and (ally_group.ally_name or ally_group.wing1_name) %}
+<div style="max-width:1100px;margin:0 auto;padding:1.5rem 1.25rem 3rem;">
 
-<div style="max-width:1400px;margin:0 auto;padding:0 1.25rem 3rem;display:grid;grid-template-columns:1fr 192px;gap:1.5rem;align-items:start;">
-
-<!-- ── MAIN CONTENT ── -->
-<div>
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Alliance Tracking</a>
-
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin:1rem 0 1.5rem;">
-    <div>
-      <h1 style="margin:0;">🏰 {{ alliance_name }}</h1>
-      <p class="subtitle" style="margin:.2rem 0 0;">
-        {% if data.snapshot_count %}{{ data.snapshot_count }} snapshots · latest: {{ data.latest[:16].replace('T',' ') if data.latest else '—' }}{% else %}No data{% endif %}
-      </p>
-    </div>
-    <div style="display:flex;gap:.5rem;">
-      <button type="button" class="btn btn-secondary" onclick="shareAllianceTracking(this)">🔗 Share</button>
-      {% if is_watched %}
-      <form method="POST" action="/guild/{{ guild.guild_id }}/alliance-tracking/{{ alliance_name | urlencode }}/unwatch">
-        <button type="submit" class="btn btn-secondary">✕ Stop Watching</button>
-      </form>
-      {% else %}
-      <form method="POST" action="/guild/{{ guild.guild_id }}/alliance-tracking/watch">
-        <input type="hidden" name="alliance_name" value="{{ alliance_name }}">
-        <button type="submit" class="btn btn-primary">🔭 Watch</button>
-      </form>
-      {% endif %}
-    </div>
+  <div style="margin:0 0 1.5rem;">
+    <h1 style="margin:0;font-size:1.6rem;">🏰 {{ alliance_name }}</h1>
+    <p style="margin:.2rem 0 0;color:var(--text-muted);font-size:.85rem;">
+      {% if data.snapshot_count %}{{ data.snapshot_count }} snapshots · latest: {{ data.latest[:16].replace('T',' ') if data.latest else '—' }}{% else %}No data{% endif %}
+    </p>
   </div>
 
   {% if not data.current %}
   <div style="text-align:center;padding:4rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;">🔭</div>
-    <p style="margin-top:.75rem;">No map data found for <strong>{{ alliance_name }}</strong>.</p>
+    <p style="margin-top:.75rem;">No tracking data available for <strong>{{ alliance_name }}</strong>.</p>
   </div>
   {% else %}
 
@@ -133,10 +129,8 @@
     <div class="section-title">🔀 Player Movements — Source &amp; Destination</div>
 
     <div id="flowWrap" style="display:flex;align-items:flex-start;justify-content:center;gap:0;min-height:120px;padding:1rem 0;">
-      <!-- SVG for bezier arrows (positioned absolute, sized by JS) -->
       <svg id="flowSvg" xmlns="http://www.w3.org/2000/svg"></svg>
 
-      <!-- Inflows column (left) -->
       <div class="flow-col" id="colIn" style="flex:1;align-items:flex-end;padding-right:60px;">
         {% if flows.inflows %}
           {% for f in flows.inflows %}
@@ -152,15 +146,13 @@
         {% endif %}
       </div>
 
-      <!-- Center node -->
       <div style="display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0 10px;">
         <div class="flow-node-center" id="centerNode">
           🏰 {{ alliance_name }}
-          <div style="font-size:.72rem;font-weight:500;opacity:.7;margin-top:.15rem;">{{ cur|length }} Mitglieder</div>
+          <div style="font-size:.72rem;font-weight:500;opacity:.7;margin-top:.15rem;">{{ cur|length }} Members</div>
         </div>
       </div>
 
-      <!-- Outflows column (right) -->
       <div class="flow-col" id="colOut" style="flex:1;align-items:flex-start;padding-left:60px;">
         {% if flows.outflows %}
           {% for f in flows.outflows %}
@@ -177,7 +169,6 @@
       </div>
     </div>
 
-    <!-- Player tooltip popup -->
     <div id="flowTooltip" style="display:none;position:fixed;z-index:9999;background:#1e293b;border:1px solid rgba(99,102,241,.4);border-radius:10px;padding:.75rem 1rem;font-size:.8rem;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:auto;"></div>
 
     <div style="font-size:.72rem;color:var(--text-muted);margin-top:.5rem;text-align:center;">Click an alliance to see players · Line thickness = player count</div>
@@ -198,7 +189,7 @@
     <div class="section-card">
       <div class="section-title">📋 Events ({{ data.events|length }})</div>
       {% if not data.events %}
-      <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">Keine Änderungen — mehr Snapshots nötig.</p>
+      <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">No changes yet — more snapshots needed.</p>
       {% else %}
       <div style="max-height:480px;overflow-y:auto;padding-right:.25rem;">
         {% for ev in data.events %}
@@ -222,11 +213,8 @@
         {% for m in cur %}
         <div class="member-row">
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:600;font-size:.87rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              <a href="/guild/{{ guild.guild_id }}/intel?q={{ m.player_name | urlencode }}"
-                 style="color:inherit;text-decoration:none;" target="_blank">{{ m.player_name }}</a>
-            </div>
-            <div style="font-size:.7rem;color:var(--text-muted);">{{ m.villages }} Dörfer</div>
+            <div style="font-weight:600;font-size:.87rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ m.player_name }}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);">{{ m.villages }} villages</div>
           </div>
           <div style="min-width:78px;text-align:right;font-size:.78rem;font-weight:700;color:#a5b4fc;">
             {{ "{:,}".format(m.total_pop).replace(",",".") }}
@@ -241,42 +229,7 @@
   </div>
   {% endif %}
 
-</div><!-- end main content -->
-
-<!-- ── RIGHT SIDEBAR ── -->
-<aside class="nav-sidebar" style="padding-top:2.75rem;">
-  {% if _has_own_nav or meta_groups %}
-  <div class="nav-sb-label">⭐ Meta Groups</div>
-  {% if _has_own_nav %}
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/own"
-     class="nav-sb-item">
-    <span style="overflow:hidden;text-overflow:ellipsis;">Own Meta</span>
-    <span class="nav-sb-badge badge-meta">Meta</span>
-  </a>
-  {% endif %}
-  {% for g in meta_groups %}
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ g.id }}"
-     class="nav-sb-item">
-    <span style="overflow:hidden;text-overflow:ellipsis;">{{ g.meta_name }}</span>
-    <span class="nav-sb-badge badge-meta">Meta</span>
-  </a>
-  {% endfor %}
-  {% if watched %}<div class="nav-sb-divider"></div>{% endif %}
-  {% endif %}
-
-  {% if watched %}
-  <div class="nav-sb-label">📌 Alliances</div>
-  {% for w in watched %}
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
-     class="nav-sb-item {% if w.alliance_name == alliance_name %}active{% endif %}">
-    <span style="overflow:hidden;text-overflow:ellipsis;">{{ w.alliance_name }}</span>
-    <span class="nav-sb-badge badge-single">Single</span>
-  </a>
-  {% endfor %}
-  {% endif %}
-</aside>
-
-</div><!-- end grid -->
+</div>
 
 <!-- Chart.js -->
 {% if data.pop_history|length > 1 %}
@@ -340,7 +293,6 @@ function drawFlows() {
   const maxOut = FLOWS.outflows.reduce((m,f) => Math.max(m,f.count), 1);
   const maxAll = Math.max(maxIn, maxOut);
 
-  // Draw inflow arrows (left nodes → center left edge)
   document.querySelectorAll('[data-side="in"]').forEach(el => {
     const idx = parseInt(el.dataset.idx);
     const f   = FLOWS.inflows[idx];
@@ -348,7 +300,6 @@ function drawFlows() {
     const N   = rel(el);
     const sw  = Math.max(2, Math.round(f.count / maxAll * 14));
 
-    // From right edge of node → left edge of center
     const x1 = N.x + N.w, y1 = N.my;
     const x2 = C.x,        y2 = C.my;
     const cx1 = x1 + (x2-x1)*0.55, cy1 = y1;
@@ -363,7 +314,6 @@ function drawFlows() {
     svg.appendChild(path);
   });
 
-  // Draw outflow arrows (center right edge → right nodes)
   document.querySelectorAll('[data-side="out"]').forEach(el => {
     const idx = parseInt(el.dataset.idx);
     const f   = FLOWS.outflows[idx];
@@ -386,8 +336,6 @@ function drawFlows() {
   });
 }
 
-// Click on node → show player list with links
-const GUILD_ID_AT = "{{ guild.guild_id }}";
 let activeNode = null;
 
 function showFlowTooltip(el, f, side) {
@@ -396,24 +344,19 @@ function showFlowTooltip(el, f, side) {
   const ally = side === 'in' ? f.from_alliance : f.to_alliance;
   const color = side === 'in' ? '#4ade80' : '#f87171';
 
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
   tooltip.innerHTML =
     `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;gap:.75rem;">
-       <div style="font-weight:700;">${dir} <span style="color:${color};">${ally}</span></div>
+       <div style="font-weight:700;">${dir} <span style="color:${color};">${escHtml(ally)}</span></div>
        <span onclick="tooltip.style.display='none'" style="cursor:pointer;color:#64748b;font-size:1rem;line-height:1;">✕</span>
      </div>`
-    + players.map(p => {
-        const url = `/guild/${GUILD_ID_AT}/intel?q=${encodeURIComponent(p)}`;
-        return `<div style="padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.06);">
-          <a href="${url}" target="_blank"
-             style="color:#a5b4fc;text-decoration:none;font-size:.82rem;display:block;"
-             onmouseover="this.style.color='#c4b5fd'" onmouseout="this.style.color='#a5b4fc'">
-            👤 ${p}
-          </a>
-        </div>`;
-      }).join('')
-    + `<div style="margin-top:.5rem;font-size:.7rem;color:#475569;">Click a name to open Player Intel</div>`;
+    + players.map(p =>
+        `<div style="padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.82rem;">👤 ${escHtml(p)}</div>`
+      ).join('');
 
-  // Position near the clicked node
   const rect = el.getBoundingClientRect();
   const left = side === 'in' ? rect.right + 10 : rect.left - 300;
   tooltip.style.left = Math.max(8, left) + 'px';
@@ -438,37 +381,15 @@ document.querySelectorAll('.flow-node').forEach(el => {
   });
 });
 
-// Close tooltip on outside click
 document.addEventListener('click', e => {
   if (!tooltip.contains(e.target)) {
     tooltip.style.display = 'none'; activeNode = null;
   }
 });
 
-// Draw after layout, redraw on resize
 window.addEventListener('load',   () => setTimeout(drawFlows, 80));
 window.addEventListener('resize', drawFlows);
 setTimeout(drawFlows, 200);
-
-// ── Anonymized public share link ────────────────────────────────────────────
-async function shareAllianceTracking(btn) {
-  const orig = btn.textContent;
-  btn.textContent = '⏳';
-  btn.disabled = true;
-  try {
-    const resp = await fetch(`/guild/{{ guild.guild_id }}/alliance-tracking/{{ alliance_name | urlencode }}/share`, {
-      method: 'POST',
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.url) throw new Error(data.error || 'Error');
-    await navigator.clipboard.writeText(data.url).catch(() => prompt('Copy link:', data.url));
-    btn.textContent = '✅ Public link copied!';
-    btn.style.color = '#4ade80';
-    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 2500);
-  } catch (e) {
-    btn.textContent = '❌ Error';
-    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
-  }
-}
 </script>
-{% endblock %}
+</body>
+</html>

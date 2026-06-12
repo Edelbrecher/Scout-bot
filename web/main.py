@@ -12063,6 +12063,45 @@ async def alliance_tracking_detail(request: Request, guild_id: str, alliance_nam
     })
 
 
+@app.post("/guild/{guild_id}/alliance-tracking/{alliance_name}/share")
+async def alliance_tracking_create_share(request: Request, guild_id: str, alliance_name: str):
+    """Create (or re-use) an anonymized public read-only share link for this alliance's
+    tracking data. The link contains no guild/Discord-identifying information."""
+    from urllib.parse import unquote
+    alliance_name = unquote(alliance_name)
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    short_id = await database.create_alliance_tracking_share(
+        guild_id, alliance_name, created_by=session.get("username", "")
+    )
+    base = str(request.base_url).rstrip("/")
+    url = f"{base}/alliance-tracking/open/{short_id}"
+    return JSONResponse({"short_id": short_id, "url": url})
+
+
+@app.get("/alliance-tracking/open/{short_id}", response_class=HTMLResponse)
+async def alliance_tracking_public_view(request: Request, short_id: str):
+    """Public, anonymized read-only view of one alliance's tracking data.
+    No auth required, no guild/Discord identity is exposed."""
+    share = await database.get_alliance_tracking_share(short_id)
+    if not share:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;color:#ccc;background:#0f172a;'>"
+            "<h2>🔒 This link is invalid or has expired.</h2></body></html>",
+            status_code=404,
+        )
+    alliance_name = share["alliance_name"]
+    data = await database.get_alliance_tracking_data(share["guild_id"], alliance_name)
+    flows = await database.get_alliance_player_flows(share["guild_id"], alliance_name)
+    return templates.TemplateResponse("alliance_tracking_public.html", {
+        "request": request,
+        "alliance_name": alliance_name,
+        "data": data, "flows": flows,
+    })
+
+
 @app.get("/guild/{guild_id}/enemies", response_class=HTMLResponse)
 async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)

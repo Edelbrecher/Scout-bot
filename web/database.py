@@ -11397,6 +11397,66 @@ async def get_map_share(short_id: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Alliance Tracking Share Links (anonymized public read-only view)
+# ---------------------------------------------------------------------------
+
+async def _init_alliance_tracking_share_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_tracking_share_links (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id      TEXT NOT NULL,
+                alliance_name TEXT NOT NULL,
+                short_id      TEXT UNIQUE NOT NULL,
+                created_by    TEXT DEFAULT '',
+                created_at    TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, alliance_name)
+            )
+        """)
+        await db.commit()
+
+
+async def create_alliance_tracking_share(guild_id: str, alliance_name: str, created_by: str = "") -> str:
+    """Return a (re-used or freshly created) anonymized short_id for an alliance-tracking
+    public view. Re-using existing links per (guild, alliance) keeps the URL stable."""
+    import secrets
+    await _init_alliance_tracking_share_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT short_id FROM alliance_tracking_share_links WHERE guild_id=? AND alliance_name=?",
+            (guild_id, alliance_name)
+        ) as cur:
+            row = await cur.fetchone()
+        if row:
+            return row["short_id"]
+
+        short_id = secrets.token_urlsafe(6)
+        for _ in range(5):
+            try:
+                await db.execute("""
+                    INSERT INTO alliance_tracking_share_links (guild_id, alliance_name, short_id, created_by)
+                    VALUES (?,?,?,?)
+                """, (guild_id, alliance_name, short_id, created_by))
+                await db.commit()
+                return short_id
+            except Exception:
+                short_id = secrets.token_urlsafe(6)
+        return short_id
+
+
+async def get_alliance_tracking_share(short_id: str) -> dict | None:
+    await _init_alliance_tracking_share_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM alliance_tracking_share_links WHERE short_id=?", (short_id,)
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
+# ---------------------------------------------------------------------------
 # Map Presets
 # ---------------------------------------------------------------------------
 
