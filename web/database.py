@@ -3325,6 +3325,89 @@ async def search_inactive_advanced(
         return {"villages": villages, "snap_dates": snap_dates, "total": total}
 
 
+# ---------------------------------------------------------------------------
+# Field distribution tags (manual, crowd-sourced "9er/15er/etc." info per tile)
+# ---------------------------------------------------------------------------
+
+async def _init_field_distribution_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS field_distribution_tags (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                world_url    TEXT NOT NULL,
+                x            INTEGER NOT NULL,
+                y            INTEGER NOT NULL,
+                distribution TEXT NOT NULL,
+                tagged_by    TEXT DEFAULT '',
+                tagged_at    TEXT DEFAULT (datetime('now')),
+                UNIQUE(world_url, x, y)
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_fdt_world_xy ON field_distribution_tags(world_url, x, y)")
+        await db.commit()
+
+
+def _parse_crop_count(distribution: str) -> int | None:
+    """Parse the crop-field count from a 'w-c-i-r' distribution string (e.g.
+    '4-4-4-6' -> 6, '3-3-3-9' -> 9, '1-1-1-15' -> 15). Returns None if the
+    string doesn't match the expected 4-number format."""
+    if not distribution:
+        return None
+    parts = distribution.replace(" ", "").split("-")
+    if len(parts) != 4:
+        return None
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return None
+    if sum(nums) != 18 or any(n < 0 for n in nums):
+        return None
+    return nums[-1]
+
+
+async def set_field_distribution(world_url: str, x: int, y: int, distribution: str, tagged_by: str = "") -> None:
+    """Save (or clear, if distribution is empty) a manually-tagged field distribution
+    for a coordinate. Shared per world across all guilds tracking that world."""
+    await _init_field_distribution_table()
+    distribution = (distribution or "").strip()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        if not distribution:
+            await db.execute(
+                "DELETE FROM field_distribution_tags WHERE world_url=? AND x=? AND y=?",
+                (world_url, x, y)
+            )
+        else:
+            await db.execute("""
+                INSERT INTO field_distribution_tags (world_url, x, y, distribution, tagged_by, tagged_at)
+                VALUES (?,?,?,?,?, datetime('now'))
+                ON CONFLICT(world_url, x, y) DO UPDATE SET
+                    distribution=excluded.distribution,
+                    tagged_by=excluded.tagged_by,
+                    tagged_at=excluded.tagged_at
+            """, (world_url, x, y, distribution, tagged_by))
+        await db.commit()
+
+
+async def get_field_distributions(world_url: str, coords: list[tuple[int, int]]) -> dict:
+    """Return {(x,y): distribution_string} for any of the given coordinates that
+    have a manually-tagged field distribution."""
+    if not coords:
+        return {}
+    await _init_field_distribution_table()
+    xs = [c[0] for c in coords]
+    ys = [c[1] for c in coords]
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT x, y, distribution FROM field_distribution_tags "
+            "WHERE world_url=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?",
+            (world_url, min(xs), max(xs), min(ys), max(ys))
+        ) as cur:
+            rows = await cur.fetchall()
+    coord_set = set(coords)
+    return {(r["x"], r["y"]): r["distribution"] for r in rows if (r["x"], r["y"]) in coord_set}
+
+
 async def get_free_spots(guild_id: str, cx: int, cy: int, radius: int) -> dict:
     """Return unoccupied map tiles within `radius` of (cx,cy) for the guild's world,
     based on the latest world_snapshots data — candidate free settlement spots.
@@ -3388,12 +3471,21 @@ async def get_free_spots(guild_id: str, cx: int, cy: int, radius: int) -> dict:
             spots.append({"x": x, "y": y, "distance": round(dist, 1)})
 
     spots.sort(key=lambda s: s["distance"])
+
+    # Attach any manually-tagged field distributions ("9er"/"15er"/etc.)
+    distributions = await get_field_distributions(world_url, [(s["x"], s["y"]) for s in spots])
+    for s in spots:
+        dist_str = distributions.get((s["x"], s["y"]))
+        s["distribution"] = dist_str
+        s["crop"] = _parse_crop_count(dist_str) if dist_str else None
+
     return {
         "spots": spots,
         "center": {"x": cx, "y": cy},
         "radius": radius,
         "latest": latest_ts,
         "bounds": {"min_x": min_x, "max_x": max_x, "min_y": min_y, "max_y": max_y},
+        "world_url": world_url,
     }
 
 

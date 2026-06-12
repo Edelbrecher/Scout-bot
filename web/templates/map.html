@@ -197,6 +197,18 @@
     </div>
     <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.4rem;">
       Zeigt Felder ohne Dorf in der letzten Karten-Erfassung (max. Radius 20). Hinweis: Oasen-Belegung wird nicht berücksichtigt — manche freien Felder können Oasen sein.
+      Die Feldverteilung (z.B. "9er"/"15er") ist Travian-intern nicht abrufbar — könnt ihr aber manuell eintragen (🏷️), sobald ihr sie im Spiel gesehen habt; sie wird dauerhaft für alle gespeichert.
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.4rem;">
+      <label style="font-size:.78rem;color:var(--text-muted);">Filter:</label>
+      <select id="fsCropFilter" onchange="renderFreeSpots()" style="font-size:.78rem;padding:.2rem .4rem;">
+        <option value="0">Alle Felder</option>
+        <option value="6">6er+ Crop</option>
+        <option value="7">7er+ Crop</option>
+        <option value="9">9er+ Crop</option>
+        <option value="15">15er (1-1-1-15)</option>
+        <option value="tagged">Nur getaggte Felder</option>
+      </select>
     </div>
     <div id="freeSpotsResult" style="display:flex;flex-direction:column;gap:.25rem;max-height:260px;overflow-y:auto;">
       <span style="font-size:.78rem;color:var(--text-muted);">Koordinaten eingeben und „Suchen“ klicken.</span>
@@ -1572,6 +1584,8 @@ function useMapCenterForFreeSpots() {
   document.getElementById('fsY').value = Math.round(camY);
 }
 
+let _freeSpotsData = null;
+
 async function searchFreeSpots() {
   const resultEl = document.getElementById('freeSpotsResult');
   const cx = parseInt(document.getElementById('fsX').value);
@@ -1591,20 +1605,85 @@ async function searchFreeSpots() {
       resultEl.innerHTML = `<span style="font-size:.78rem;color:#f87171;">${data.error}</span>`;
       return;
     }
-    const spots = data.spots || [];
-    if (!spots.length) {
-      resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Keine freien Felder in diesem Radius gefunden.</span>';
-      return;
-    }
-    let html = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">${spots.length} freie Felder gefunden (Radius ${data.radius}):</div>`;
-    html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;">';
-    for (const s of spots) {
-      html += `<button class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="panTo(${s.x},${s.y},Math.max(scale,10))" title="Auf der Karte anzeigen">(${s.x}|${s.y}) · ${s.distance}</button>`;
-    }
-    html += '</div>';
-    resultEl.innerHTML = html;
+    _freeSpotsData = data;
+    renderFreeSpots();
   } catch (e) {
     resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler bei der Suche.</span>';
+  }
+}
+
+function renderFreeSpots() {
+  const resultEl = document.getElementById('freeSpotsResult');
+  if (!_freeSpotsData) return;
+  const data = _freeSpotsData;
+  let spots = data.spots || [];
+  if (!spots.length) {
+    resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Keine freien Felder in diesem Radius gefunden.</span>';
+    return;
+  }
+  const filter = document.getElementById('fsCropFilter').value;
+  let filtered = spots;
+  if (filter === 'tagged') {
+    filtered = spots.filter(s => s.distribution);
+  } else if (filter === '15') {
+    filtered = spots.filter(s => s.crop === 15);
+  } else if (filter !== '0') {
+    const minCrop = parseInt(filter);
+    filtered = spots.filter(s => s.crop !== null && s.crop !== undefined && s.crop >= minCrop);
+  }
+  if (!filtered.length) {
+    resultEl.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">0 von ${spots.length} freien Feldern passen zum Filter (Radius ${data.radius}).</div>`;
+    return;
+  }
+  let html = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">${filtered.length} von ${spots.length} freien Feldern (Radius ${data.radius}):</div>`;
+  html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;">';
+  for (const s of filtered) {
+    const label = s.distribution ? `${s.distribution} (${s.crop}er)` : '❓';
+    html += `<span style="display:inline-flex;align-items:center;gap:.15rem;border:1px solid var(--border);border-radius:6px;overflow:hidden;">`
+          + `<button class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;border:none;border-radius:0;" onclick="panTo(${s.x},${s.y},Math.max(scale,10))" title="Auf der Karte anzeigen">(${s.x}|${s.y}) · ${s.distance} · ${label}</button>`
+          + `<button class="btn btn-secondary" style="font-size:.7rem;padding:.2rem .35rem;border:none;border-left:1px solid var(--border);border-radius:0;" onclick="tagFreeSpot(${s.x},${s.y})" title="Feldverteilung eintragen/ändern">🏷️</button>`
+          + `</span>`;
+  }
+  html += '</div>';
+  resultEl.innerHTML = html;
+}
+
+async function tagFreeSpot(x, y) {
+  const current = (_freeSpotsData.spots.find(s => s.x === x && s.y === y) || {}).distribution || '';
+  const input = prompt(
+    `Feldverteilung für (${x}|${y}) eintragen (Format: Holz-Lehm-Eisen-Crop, Summe = 18, z.B. "4-4-4-6" oder "3-3-3-9" für "9er").\nLeer lassen, um den Tag zu entfernen.`,
+    current
+  );
+  if (input === null) return; // cancelled
+  const dist = input.trim();
+  if (dist && !/^\d{1,2}-\d{1,2}-\d{1,2}-\d{1,2}$/.test(dist)) {
+    alert('Ungültiges Format. Bitte 4 Zahlen mit "-" getrennt eingeben, z.B. 4-4-4-6.');
+    return;
+  }
+  if (dist) {
+    const sum = dist.split('-').reduce((a,b) => a + parseInt(b), 0);
+    if (sum !== 18) {
+      alert(`Die 4 Zahlen müssen in Summe 18 ergeben (aktuell ${sum}).`);
+      return;
+    }
+  }
+  try {
+    const fd = new FormData();
+    fd.append('x', x); fd.append('y', y); fd.append('distribution', dist);
+    const res = await fetch(`/guild/${GUILD_ID}/map/free-spots/tag`, {method: 'POST', body: fd, credentials: 'same-origin'});
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      alert('Fehler beim Speichern: ' + (data.error || res.status));
+      return;
+    }
+    const spot = _freeSpotsData.spots.find(s => s.x === x && s.y === y);
+    if (spot) {
+      spot.distribution = data.distribution;
+      spot.crop = data.crop;
+    }
+    renderFreeSpots();
+  } catch (e) {
+    alert('Fehler beim Speichern.');
   }
 }
 

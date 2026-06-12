@@ -3760,6 +3760,38 @@ async def map_free_spots(request: Request, guild_id: str, cx: int = 0, cy: int =
     return JSONResponse(result)
 
 
+@app.post("/guild/{guild_id}/map/free-spots/tag")
+async def map_free_spots_tag(request: Request, guild_id: str):
+    """Save (or clear) a manually-tagged field distribution (e.g. '4-4-4-6', '3-3-3-9')
+    for a coordinate. Shared per world across guilds tracking that world."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    form = await request.form()
+    try:
+        x = int(form.get("x"))
+        y = int(form.get("y"))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "invalid_coords"}, status_code=400)
+    distribution = (form.get("distribution") or "").strip()
+
+    if distribution and not re.match(r"^\d{1,2}-\d{1,2}-\d{1,2}-\d{1,2}$", distribution):
+        return JSONResponse({"error": "invalid_format"}, status_code=400)
+    if distribution and database._parse_crop_count(distribution) is None:
+        return JSONResponse({"error": "invalid_distribution"}, status_code=400)
+
+    guild = await database.get_guild(guild_id)
+    world_url = (guild or {}).get("tw_world", "")
+    if not world_url:
+        return JSONResponse({"error": "no_world"}, status_code=400)
+
+    await database.set_field_distribution(world_url, x, y, distribution, tagged_by=session.get("username", ""))
+    return JSONResponse({"ok": True, "x": x, "y": y, "distribution": distribution or None,
+                          "crop": database._parse_crop_count(distribution) if distribution else None})
+
+
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")
 async def res_request_remove(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
