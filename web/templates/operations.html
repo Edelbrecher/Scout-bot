@@ -415,7 +415,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('hero',this);loadHeroActions()">🦸 Hero</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="openLivePopup()">🔴 Live ↗</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('report',this);loadReport()">📊 Report</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('msglog',this);loadNotifyLog()" id="tab-msglog">📨 Log</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="openNotifyLogModal()" id="tab-msglog">📨 Log</div>
               </div>
 
               <!-- Plan info -->
@@ -493,17 +493,6 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                   <button class="btn btn-secondary" style="font-size:.72rem;padding:.15rem .5rem;" onclick="loadReport()">🔄</button>
                 </div>
                 <div id="reportContent"><div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">No data yet.</div></div>
-              </div>
-
-              <!-- Msg Log -->
-              <div class="op-panel-body" id="panel-msglog" style="display:none;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
-                  <span style="font-size:.8rem;color:var(--text-muted);">Discord-Benachrichtigungslog</span>
-                  <button class="btn btn-secondary" style="font-size:.72rem;padding:.15rem .5rem;" onclick="loadNotifyLog()">🔄</button>
-                </div>
-                <div id="notifyLogContent">
-                  <div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">⏳ Loading…</div>
-                </div>
               </div>
             </div>
 
@@ -916,6 +905,26 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notify-Log Modal -->
+<div class="op-modal-overlay" id="notifyLogModal">
+  <div class="op-modal" style="width:min(720px,95vw);">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">📨 Benachrichtigungs-Log</span>
+      <button class="btn-icon" onclick="closeModal('notifyLogModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.4rem;">✅ Wellen-Status</div>
+      <div id="notifyLogWaveStatus" style="margin-bottom:1rem;"></div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.4rem;">📨 Benachrichtigungen</div>
+      <div id="notifyLogContent"></div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="openNotifyLogModal()">🔄 Aktualisieren</button>
+      <button class="btn btn-secondary" onclick="closeModal('notifyLogModal')">Schließen</button>
     </div>
   </div>
 </div>
@@ -3613,70 +3622,104 @@ async function sendNotify() {
   if (!confirm('Plan als Discord-Nachricht an alle betroffenen Members senden?')) return;
   try {
     const r = await apiPost(`/plans/${activePlanId}/notify`);
-    // Always switch to log tab — success or failure
-    const logTab = document.getElementById('tab-msglog');
-    if (logTab) { switchPanel('msglog', logTab); }
-    await loadNotifyLog();
+    await openNotifyLogModal();
     showToast(r.ok ? '✅ Benachrichtigung gesendet — Log aktualisiert.' : '⚠️ Benachrichtigung fehlgeschlagen — siehe Log.');
   } catch(e) {
     showToast('❌ Fehler: ' + e.message);
-    const logTab = document.getElementById('tab-msglog');
-    if (logTab) { switchPanel('msglog', logTab); loadNotifyLog(); }
+    await openNotifyLogModal();
   }
 }
 
-// ══ Notify Log ════════════════════════════════════════════════════════════
-async function loadNotifyLog() {
+// ══ Notify Log Modal ════════════════════════════════════════════════════════
+// Aggregate wave confirm-status per attacker across all targets of a plan.
+// Returns { name: { total, sent, late, not_sent, pending } } — `sent` includes `late`.
+function buildPlayerWaveSummary(targets) {
+  const byPlayer = {};
+  (targets || []).forEach(t => (t.waves || []).forEach(w => {
+    const name = w.attacker_name || '?';
+    if (!byPlayer[name]) byPlayer[name] = { total:0, sent:0, late:0, not_sent:0, pending:0 };
+    const p = byPlayer[name];
+    p.total++;
+    if (w.confirm_status === 'on_time') { p.sent++; }
+    else if (w.confirm_status === 'late') { p.sent++; p.late++; }
+    else if (w.confirm_status === 'not_sent' || w.confirm_status === 'cant_send') { p.not_sent++; }
+    else { p.pending++; }
+  }));
+  return byPlayer;
+}
+
+// Renders the "✅ Wellen-Status" section — per attacker, whether they have
+// sent all of their assigned waves yet.
+function renderWaveStatusSummary(targets) {
+  const byPlayer = buildPlayerWaveSummary(targets);
+  const names = Object.keys(byPlayer);
+  if (!names.length) {
+    return '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:.5rem 0;">Noch keine Wellen in diesem Plan.</div>';
+  }
+  return '<div style="display:flex;flex-direction:column;gap:2px;">' + names.sort((a,b)=>a.localeCompare(b)).map(name => {
+    const p = byPlayer[name];
+    const allSent = p.total > 0 && p.sent === p.total;
+    const color = p.not_sent > 0 ? '#f87171' : allSent ? '#4ade80' : '#fbbf24';
+    const statusTxt = allSent
+      ? '✅ Alle Wellen abgeschickt'
+      : `${p.sent}/${p.total} abgeschickt`
+        + (p.not_sent ? `, ${p.not_sent} nicht abgeschickt` : '')
+        + (p.pending ? `, ${p.pending} offen` : '');
+    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem;background:rgba(255,255,255,.03);border-radius:5px;">
+      <span style="flex:1;font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span>
+      <span style="font-size:.74rem;color:${color};">${statusTxt}</span>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// Opens the Notify-Log modal: shows per-player wave-send status plus a
+// readable history of who was notified, how, and when.
+async function openNotifyLogModal() {
   if (!activePlanId) return;
-  const el = document.getElementById('notifyLogContent');
-  if (!el) return;
+  const wsEl = document.getElementById('notifyLogWaveStatus');
+  const logEl = document.getElementById('notifyLogContent');
+  if (wsEl) wsEl.innerHTML = activePlan ? renderWaveStatusSummary(activePlan.targets) : '';
+  if (logEl) logEl.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">⏳ Loading…</div>';
+  openModal('notifyLogModal');
+  if (!logEl) return;
   try {
     const data = await apiGet(`/plans/${activePlanId}/notify-log`);
     const logs = data.logs || [];
     if (!logs.length) {
-      el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">No notifications for this plan yet.</div>';
+      logEl.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:1rem;">Noch keine Benachrichtigungen für diesen Plan.</div>';
       return;
     }
-    const statusLabel = s => ({
-      sent:          '<span style="color:#4ade80;font-size:.72rem;">✅ Gesendet</span>',
-      dm_blocked:    '<span style="color:#f87171;font-size:.72rem;">🔒 DM blockiert</span>',
-      not_in_server: '<span style="color:#f59e0b;font-size:.72rem;">⚠️ Nicht auf Server</span>',
-      no_discord_id: '<span style="color:#9ca3af;font-size:.72rem;">❓ No Discord ID</span>',
-      error:         '<span style="color:#f87171;font-size:.72rem;">❌ Fehler</span>',
-    }[s] || `<span style="color:var(--text-muted);font-size:.72rem;">${s}</span>`);
+    const typeLabel = t => ({
+      auto:          '🚀 Automatisch (Operation aktiviert)',
+      wave_assigned: '🎯 Welle zugewiesen',
+    }[t] || '📢 Manuell gesendet');
 
-    el.innerHTML = logs.map(log => {
+    // One readable sentence per recipient: what happened, to whom, and when.
+    const lineFor = (e, when) => {
+      const name = escHtml(e.name || e.discord_id || '—');
+      switch (e.status) {
+        case 'sent':         return `✅ ${name} wurde per Discord-DM benachrichtigt — ${when}`;
+        case 'dm_blocked':   return `🔒 DM an ${name} konnte nicht zugestellt werden (DMs blockiert) — ${when}`;
+        case 'not_in_server':return `⚠️ ${name} ist nicht (mehr) auf dem Discord-Server — ${when}`;
+        case 'no_discord_id':return `❓ ${name} hat keine verknüpfte Discord-ID — ${when}`;
+        case 'error':        return `❌ Fehler bei ${name}${e.error ? `: ${escHtml(e.error)}` : ''} — ${when}`;
+        default:             return `${name}: ${escHtml(e.status)} — ${when}`;
+      }
+    };
+
+    logEl.innerHTML = logs.map(log => {
       const entries = log.entries || [];
-      const sent    = entries.filter(e => e.status === 'sent').length;
-      const failed  = entries.filter(e => e.status !== 'sent').length;
-      const typeTag = log.trigger_type === 'auto'
-        ? '<span style="background:rgba(99,102,241,.15);color:#a5b4fc;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🚀 Auto (Activeierung)</span>'
-        : log.trigger_type === 'wave_assigned'
-        ? '<span style="background:rgba(45,212,191,.12);color:#2dd4bf;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">🎯 Welle zugewiesen</span>'
-        : '<span style="background:rgba(245,158,11,.12);color:#fbbf24;font-size:.65rem;border-radius:4px;padding:1px 5px;font-weight:600;">📢 Manuell</span>';
-
-      const rows = entries.length ? entries.map(e => `
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.28rem .55rem;border-bottom:1px solid rgba(255,255,255,.04);">
-          <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;" title="${e.discord_id||''}">
-            ${e.name || e.discord_id || '—'}
-          </span>
-          <span style="flex-shrink:0;">${statusLabel(e.status)}</span>
-          ${e.error ? `<span style="font-size:.67rem;color:#f87171;flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.error}">${e.error}</span>` : ''}
-        </div>`).join('')
-        : '<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ No waves with Discord ID or no ally member found.</div>';
-
+      const when = (log.triggered_at||'').slice(0,16).replace('T',' ') + ' UTC';
+      const rows = entries.length
+        ? entries.map(e => `<div style="font-size:.78rem;padding:.28rem .55rem;border-bottom:1px solid rgba(255,255,255,.04);">${lineFor(e, when)}</div>`).join('')
+        : `<div style="font-size:.78rem;color:var(--text-muted);padding:.4rem .55rem;">⚠️ Keine betroffenen Spieler — ${when}</div>`;
       return `<div style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden;">
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;border-bottom:1px solid var(--border);">
-          ${typeTag}
-          <span style="font-size:.72rem;color:var(--text-muted);flex:1;">${(log.triggered_at||'').slice(0,16).replace('T',' ')} UTC</span>
-          <span style="font-size:.72rem;color:#4ade80;">✅ ${sent}</span>
-          ${failed ? `<span style="font-size:.72rem;color:#f87171;">❌ ${failed}</span>` : ''}
-        </div>
+        <div style="font-size:.72rem;color:var(--text-muted);padding:.4rem .7rem;border-bottom:1px solid var(--border);">${typeLabel(log.trigger_type)}</div>
         ${rows}
       </div>`;
     }).join('');
   } catch(e) {
-    el.innerHTML = `<div style="color:#f87171;font-size:.82rem;">Fehler: ${e.message}</div>`;
+    logEl.innerHTML = `<div style="color:#f87171;font-size:.82rem;">Fehler: ${e.message}</div>`;
   }
 }
 
@@ -3809,7 +3852,7 @@ async function refreshPlanList() {
 
 function switchPanel(name, el) {
   document.querySelectorAll('.op-panel-tab').forEach(t=>t.classList.remove('active'));
-  ['info','favs','members','check','hero','stats','live','report','msglog'].forEach(n => {
+  ['info','favs','members','check','hero','stats','live','report'].forEach(n => {
     const p = document.getElementById('panel-'+n);
     if (p) p.style.display = n===name ? 'block' : 'none';
   });
@@ -4519,16 +4562,7 @@ function buildReport(data) {
   const sentPct    = total ? Math.round(sent / total * 100) : 0;
 
   // Per-player breakdown
-  const byPlayer = {};
-  allWaves.forEach(w => {
-    if (!byPlayer[w.attacker_name]) byPlayer[w.attacker_name] = { total:0, sent:0, late:0, not_sent:0, pending:0 };
-    const p = byPlayer[w.attacker_name];
-    p.total++;
-    if (w.confirm_status === 'on_time') { p.sent++; }
-    else if (w.confirm_status === 'late') { p.sent++; p.late++; }
-    else if (w.confirm_status === 'not_sent' || w.confirm_status === 'cant_send') { p.not_sent++; }
-    else { p.pending++; }
-  });
+  const byPlayer = buildPlayerWaveSummary(targets);
 
   // Per-target coverage
   const byTarget = targets.map(t => {

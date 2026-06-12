@@ -8942,6 +8942,39 @@ async def op_update_plan(
     return JSONResponse({"ok": True})
 
 
+async def _get_plan_attacker_wave_times(guild_id: str, plan_id: int) -> dict[str, str]:
+    """Return {discord_id: earliest_send_time} for every attacker with at least
+    one wave in this plan — i.e. the participants who should receive
+    plan-related Discord DMs/notifications. discord_id is resolved either from
+    op_waves.attacker_discord_id directly, or as a fallback via the
+    travian_name → discord_id mapping in member_troops."""
+    waves = await database.get_all_op_waves(plan_id)
+    name_to_discord: dict[str, str] = {}
+    async with __import__('aiosqlite').connect(database.DB_PATH) as _db:
+        async with _db.execute(
+            "SELECT travian_name, discord_id FROM member_troops WHERE guild_id=? AND travian_name != ''",
+            (guild_id,)
+        ) as _cur:
+            for _row in await _cur.fetchall():
+                if _row[0] and _row[1]:
+                    name_to_discord[_row[0]] = _row[1]
+    member_wave_times: dict[str, str] = {}
+    for w in (waves or []):
+        disc_id = str(w.get("attacker_discord_id") or "").strip()
+        # Fallback: resolve by travian name if discord_id missing
+        if not disc_id:
+            aname = str(w.get("attacker_name") or "").strip()
+            disc_id = name_to_discord.get(aname, "")
+        if not disc_id:
+            continue
+        st = str(w.get("send_time") or "").strip()
+        if disc_id not in member_wave_times:
+            member_wave_times[disc_id] = st
+        elif st and (not member_wave_times[disc_id] or st < member_wave_times[disc_id]):
+            member_wave_times[disc_id] = st
+    return member_wave_times
+
+
 async def _announce_plan_via_bot(guild_id: str, plan_id: int):
     """Send Discord DMs + internal notifications when a plan goes active."""
     dm_results: list = []
@@ -8959,31 +8992,7 @@ async def _announce_plan_via_bot(guild_id: str, plan_id: int):
         plan_url = f"{server_host}/guild/{guild_id}/operations"
 
         # Only notify members who have waves assigned in this plan
-        waves = await database.get_all_op_waves(plan_id)
-        # Build travian_name → discord_id lookup for fallback
-        name_to_discord: dict[str, str] = {}
-        async with __import__('aiosqlite').connect(database.DB_PATH) as _db:
-            async with _db.execute(
-                "SELECT travian_name, discord_id FROM member_troops WHERE guild_id=? AND travian_name != ''",
-                (guild_id,)
-            ) as _cur:
-                for _row in await _cur.fetchall():
-                    if _row[0] and _row[1]:
-                        name_to_discord[_row[0]] = _row[1]
-        member_wave_times: dict[str, str] = {}
-        for w in (waves or []):
-            disc_id = str(w.get("attacker_discord_id") or "").strip()
-            # Fallback: resolve by travian name if discord_id missing
-            if not disc_id:
-                aname = str(w.get("attacker_name") or "").strip()
-                disc_id = name_to_discord.get(aname, "")
-            if not disc_id:
-                continue
-            st = str(w.get("send_time") or "").strip()
-            if disc_id not in member_wave_times:
-                member_wave_times[disc_id] = st
-            elif st and (not member_wave_times[disc_id] or st < member_wave_times[disc_id]):
-                member_wave_times[disc_id] = st
+        member_wave_times = await _get_plan_attacker_wave_times(guild_id, plan_id)
         member_ids = list(member_wave_times.keys())
 
         ally_group = await database.get_ally_group_for_guild(guild_id)
@@ -9036,11 +9045,9 @@ async def _announce_plan_cancelled_via_bot(guild_id: str, plan_id: int):
         plan_url = f"{server_host}/guild/{guild_id}/operations"
 
         ally_group = await database.get_ally_group_for_guild(guild_id)
-        member_ids = []
-        if ally_group:
-            members = await database.get_ally_members(ally_group["id"])
-            member_ids = [str(m["discord_id"]) for m in members
-                          if m.get("discord_id") and m.get("status", "approved") == "approved"]
+        # Only notify members who actually have waves assigned in this plan —
+        # not the whole alliance.
+        member_ids = list((await _get_plan_attacker_wave_times(guild_id, plan_id)).keys())
 
         payload = {
             "guild_id": guild_id,
