@@ -335,18 +335,20 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <span id="topPlanStatus" class="status-badge"></span>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-        <span id="topCountdown" style="font-size:.8rem;font-family:monospace;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:6px;padding:.15rem .5rem;display:none;"></span>
-        <span id="topLandingTime" title="Click to change landing time"
-              style="font-size:.82rem;color:#fbbf24;font-family:monospace;cursor:pointer;padding:.2rem .4rem;border-radius:4px;"
-              onmouseenter="this.style.background='rgba(251,191,36,.12)'" onmouseleave="this.style.background=''"
-              onclick="openInlineLandingEditor()"></span>
-        <input type="datetime-local" id="inlineLandingInput" step="1"
-               style="display:none;font-size:.8rem;background:var(--bg-card);color:var(--text);border:1px solid #fbbf24;border-radius:6px;padding:.2rem .4rem;"
-               onblur="saveInlineLanding()" onkeydown="if(event.key==='Enter')saveInlineLanding();if(event.key==='Escape')closeInlineLanding()">
-        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openOpMap()">🗺️ Karte</button>
-        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Check</button>
-        <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
-        <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
+        <div id="opTopbarLive" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+          <span id="topCountdown" style="font-size:.8rem;font-family:monospace;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:6px;padding:.15rem .5rem;display:none;"></span>
+          <span id="topLandingTime" title="Click to change landing time"
+                style="font-size:.82rem;color:#fbbf24;font-family:monospace;cursor:pointer;padding:.2rem .4rem;border-radius:4px;"
+                onmouseenter="this.style.background='rgba(251,191,36,.12)'" onmouseleave="this.style.background=''"
+                onclick="openInlineLandingEditor()"></span>
+          <input type="datetime-local" id="inlineLandingInput" step="1"
+                 style="display:none;font-size:.8rem;background:var(--bg-card);color:var(--text);border:1px solid #fbbf24;border-radius:6px;padding:.2rem .4rem;"
+                 onblur="saveInlineLanding()" onkeydown="if(event.key==='Enter')saveInlineLanding();if(event.key==='Escape')closeInlineLanding()">
+          <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openOpMap()">🗺️ Karte</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Check</button>
+          <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
+          <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
+        </div>
         <button class="btn-icon danger" onclick="deletePlan()">🗑</button>
       </div>
     </div>
@@ -365,7 +367,11 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         <div class="op-editor-grid">
 
           <!-- LEFT: Targets + Waves -->
-          <div style="position:relative;">
+          <div id="opArchivedNote" style="display:none;text-align:center;padding:2.5rem 1rem;color:var(--text-muted);font-size:.88rem;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
+            📦 Diese Operation ist archiviert — Targets &amp; Wellen sind ausgeblendet.<br>
+            <span style="font-size:.78rem;opacity:.75;">Über „↩ Aus Archiv wiederherstellen“ im Plan-Panel kannst du sie wieder bearbeiten.</span>
+          </div>
+          <div id="opTargetsColumn" style="position:relative;">
             <!-- Add target row -->
             <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
               <div style="font-size:.9rem;font-weight:700;flex:1;">🎯 Targets</div>
@@ -413,9 +419,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
                 <div class="op-panel-tab active" onclick="switchPanel('info',this)">📋 Plan</div>
                 <div class="op-panel-tab" onclick="switchPanel('favs',this)">⭐ Favorites</div>
                 <div class="op-panel-tab" onclick="switchPanel('members',this)">👥 Troops</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)">🔍 Check</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('hero',this);loadHeroActions()">🦸 Hero</div>
-                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="openLivePopup()">🔴 Live ↗</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('check',this)" id="tab-check">🔍 Check</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('hero',this);loadHeroActions()" id="tab-hero">🦸 Hero</div>
+                <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="openLivePopup()" id="tab-live">🔴 Live ↗</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="switchPanel('report',this);loadReport()">📊 Report</div>
                 <div class="op-panel-tab" style="border-top:1px solid var(--border);" onclick="openNotifyLogModal()" id="tab-msglog">📨 Log</div>
               </div>
@@ -1039,6 +1045,7 @@ async function loadPlan(id) {
 
 function renderEditor() {
   const p = activePlan;
+  const isArchived = p.status === 'archived';
   document.getElementById('opEmptyState').style.display='none';
   document.getElementById('opEditor').style.display='block';
   document.getElementById('opTopbar').style.display='flex';
@@ -1049,11 +1056,31 @@ function renderEditor() {
   sb.className = `status-badge status-${p.status}`;
   document.getElementById('topLandingTime').textContent =
     p.landing_time ? '🕐 ' + fmtDatetime(p.landing_time) : '';
-  startCountdown(p.landing_time);
-  loadPollAvailability();
+
+  // ── Archived plans: hide all "live operation" elements (cleanup) ─────────
+  document.getElementById('opTopbarLive').style.display = isArchived ? 'none' : 'flex';
+  document.getElementById('opTargetsColumn').style.display = isArchived ? 'none' : '';
+  document.getElementById('opArchivedNote').style.display = isArchived ? 'block' : 'none';
+  document.getElementById('homeTroopPanel').style.display = isArchived ? 'none' : '';
+  ['tab-check','tab-hero','tab-live'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isArchived ? 'none' : '';
+  });
+  if (isArchived) {
+    if (_countdownTimer) clearInterval(_countdownTimer);
+    document.getElementById('topCountdown').style.display = 'none';
+    // If a now-hidden tab is active, fall back to the Plan info tab
+    const activeTab = document.querySelector('.op-panel-tab.active');
+    if (activeTab && ['tab-check','tab-hero'].includes(activeTab.id)) {
+      switchPanel('info', document.querySelector('.op-panel-tab'));
+    }
+  } else {
+    startCountdown(p.landing_time);
+    loadPollAvailability();
+  }
 
   renderPlanInfo();
-  renderTargets();
+  if (!isArchived) renderTargets();
   renderFavs();
   renderMembers();
 }
@@ -1099,13 +1126,14 @@ function renderPlanInfo() {
         <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Operation aus dem Archiv wiederherstellen">
           ↩ Aus Archiv wiederherstellen
         </button>` : ''}
+      ${p.status !== 'archived' ? `
       <button class="btn btn-secondary" style="font-size:.78rem;" onclick="recalcTimes()" title="Alle Send timeen neu berechnen basierend auf aktueller Landing time">
         ⏱ Send timeen neu berechnen
       </button>
       <button class="btn btn-secondary" style="font-size:.78rem;" id="launchPollBtn" onclick="launchPoll()" title="Availablekeitsumfrage in Discord starten">
         📊 Umfrage starten
       </button>
-      <div id="pollStatusLine" style="font-size:.72rem;color:var(--text-muted);"></div>
+      <div id="pollStatusLine" style="font-size:.72rem;color:var(--text-muted);"></div>` : ''}
     </div>
   `;
 }
