@@ -232,13 +232,16 @@
     </div>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.4rem;">
       <label style="font-size:.78rem;color:var(--text-muted);">Filter:</label>
-      <select id="fsCropFilter" onchange="renderFreeSpots()" style="font-size:.78rem;padding:.2rem .4rem;">
+      <select id="fsCropFilter" onchange="renderFreeSpots()" style="font-size:.78rem;padding:.2rem .4rem;max-width:240px;">
         <option value="0">Alle Felder</option>
-        <option value="6">6er+ Crop</option>
-        <option value="7">7er+ Crop</option>
-        <option value="9">9er+ Crop</option>
-        <option value="15">15er (1-1-1-15)</option>
         <option value="tagged">Nur getaggte Felder</option>
+        <option value="untagged">Nur ungetaggte Felder ❓</option>
+        <optgroup label="Nach Getreidefeld (Crop)">
+          <option value="6">6er+ Crop</option>
+          <option value="7">7er+ Crop</option>
+          <option value="9">9er+ Crop</option>
+          <option value="15">15er (1-1-1-15)</option>
+        </optgroup>
       </select>
     </div>
     <div id="freeSpotsResult" style="display:flex;flex-direction:column;gap:.25rem;max-height:260px;overflow-y:auto;">
@@ -1749,10 +1752,54 @@ async function searchFreeSpots() {
       return;
     }
     _freeSpotsData = data;
+    populateCropFilterOptions(data.spots || []);
     renderFreeSpots();
   } catch (e) {
     resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler bei der Suche.</span>';
   }
+}
+
+// Rebuild the "Felderart" filter dropdown based on the distributions actually
+// tagged within the current search results, so users can search for any
+// specific village/field type (e.g. 3-4-4-7, 4-3-4-7, 3-4-5-6, ...) and not
+// just a generic "9er+" threshold.
+function populateCropFilterOptions(spots) {
+  const sel = document.getElementById('fsCropFilter');
+  if (!sel) return;
+  const counts = {};
+  let taggedCount = 0, untaggedCount = 0;
+  for (const s of spots) {
+    if (s.distribution) {
+      taggedCount++;
+      counts[s.distribution] = (counts[s.distribution] || 0) + 1;
+    } else {
+      untaggedCount++;
+    }
+  }
+  let html = `<option value="0">Alle Felder (${spots.length})</option>`;
+  html += `<option value="tagged">Nur getaggte Felder (${taggedCount})</option>`;
+  html += `<option value="untagged">Nur ungetaggte Felder ❓ (${untaggedCount})</option>`;
+  html += '<optgroup label="Nach Getreidefeld (Crop)">'
+        + '<option value="6">6er+ Crop</option>'
+        + '<option value="7">7er+ Crop</option>'
+        + '<option value="9">9er+ Crop</option>'
+        + '<option value="15">15er (1-1-1-15)</option>'
+        + '</optgroup>';
+  const dists = Object.keys(counts).sort((a, b) => {
+    const cropA = parseInt(a.split('-')[3]) || 0;
+    const cropB = parseInt(b.split('-')[3]) || 0;
+    if (cropA !== cropB) return cropB - cropA;
+    return a.localeCompare(b);
+  });
+  if (dists.length) {
+    html += '<optgroup label="Dorfarten (getaggt)">';
+    for (const d of dists) {
+      html += `<option value="dist:${d}">${d} (${counts[d]}x)</option>`;
+    }
+    html += '</optgroup>';
+  }
+  sel.innerHTML = html;
+  sel.value = '0';
 }
 
 function renderFreeSpots() {
@@ -1767,12 +1814,31 @@ function renderFreeSpots() {
     return;
   }
   const filter = document.getElementById('fsCropFilter').value;
+
+  // "Alle Felder" would highlight every empty tile in the radius (often
+  // hundreds/thousands) which just looks like a solid green blob. Instead,
+  // show a summary and ask the user to pick a specific Felderart/Filter.
+  if (filter === '0') {
+    _freeSpotsOverlay = [];
+    draw();
+    const taggedCount = spots.filter(s => s.distribution).length;
+    resultEl.innerHTML = `<div style="font-size:.78rem;color:var(--text-muted);">`
+      + `${spots.length} freie Felder im Radius ${data.radius} gefunden (${taggedCount} davon getaggt).<br>`
+      + `Wähle oben einen Filter bzw. eine Dorfart aus, um passende Felder auf der Karte zu sehen.</div>`;
+    return;
+  }
+
   let filtered = spots;
   if (filter === 'tagged') {
     filtered = spots.filter(s => s.distribution);
+  } else if (filter === 'untagged') {
+    filtered = spots.filter(s => !s.distribution);
+  } else if (filter.startsWith('dist:')) {
+    const wanted = filter.slice(5);
+    filtered = spots.filter(s => s.distribution === wanted);
   } else if (filter === '15') {
     filtered = spots.filter(s => s.crop === 15);
-  } else if (filter !== '0') {
+  } else {
     const minCrop = parseInt(filter);
     filtered = spots.filter(s => s.crop !== null && s.crop !== undefined && s.crop >= minCrop);
   }
@@ -1789,7 +1855,7 @@ function renderFreeSpots() {
   if (!filtered.length) {
     const taggedCount = spots.filter(s => s.distribution).length;
     let extra = '';
-    if (filter !== '0' && filter !== 'tagged' && taggedCount === 0) {
+    if (filter !== 'tagged' && filter !== 'untagged' && !filter.startsWith('dist:') && taggedCount === 0) {
       extra = ' Hinweis: Es wurde im Suchbereich noch kein Feld mit Feldverteilung getaggt (🏷️) — daher liefert dieser Filter aktuell keine Treffer.';
     } else if (filter === 'tagged' && taggedCount === 0) {
       extra = ' Hinweis: Im Suchbereich wurde noch kein Feld getaggt.';
@@ -1881,6 +1947,11 @@ async function saveFieldTag(dist) {
       spot.crop = data.crop;
     }
     closeFieldTagModal();
+    const prevFilter = document.getElementById('fsCropFilter').value;
+    populateCropFilterOptions(_freeSpotsData.spots);
+    // Keep the user on the same exact-distribution filter if it still exists
+    const sel = document.getElementById('fsCropFilter');
+    if ([...sel.options].some(o => o.value === prevFilter)) sel.value = prevFilter;
     renderFreeSpots();
   } catch (e) {
     alert('Fehler beim Speichern.');
