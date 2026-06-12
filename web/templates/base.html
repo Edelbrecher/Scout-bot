@@ -109,6 +109,11 @@
       <a href="/plans" data-i18n="nav.plans">Pricing</a>
       {% if _is_admin %}
       <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
+      <a id="admin-badge-online" href="/admin" title="Online now / total registered users"
+         style="display:none;align-items:center;gap:.25rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);
+                color:#86efac;border-radius:12px;padding:.15rem .55rem;font-size:.75rem;font-weight:700;text-decoration:none;">
+        🟢 <span id="admin-badge-online-count">0</span> / <span id="admin-badge-total-count">0</span>
+      </a>
       <a id="admin-badge-users" href="/admin/auths" title="New user(s) in the last 24h"
          style="display:none;align-items:center;gap:.25rem;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);
                 color:#4ade80;border-radius:12px;padding:.15rem .55rem;font-size:.75rem;font-weight:700;text-decoration:none;">
@@ -326,7 +331,8 @@ fetch('/api/my-alerts').then(function(r){ return r.json(); }).then(function(data
 (function() {
   var usersBadge = document.getElementById('admin-badge-users');
   var subsBadge  = document.getElementById('admin-badge-subs');
-  if (!usersBadge && !subsBadge) return; // not an admin
+  var onlineBadge = document.getElementById('admin-badge-online');
+  if (!usersBadge && !subsBadge && !onlineBadge) return; // not an admin
 
   function refreshAdminBadges() {
     fetch('/api/admin/activity-badges').then(function(r){ return r.json(); }).then(function(data){
@@ -339,6 +345,11 @@ fetch('/api/my-alerts').then(function(r){ return r.json(); }).then(function(data
         var m = data.new_subs_24h || 0;
         document.getElementById('admin-badge-subs-count').textContent = m;
         subsBadge.style.display = m > 0 ? 'inline-flex' : 'none';
+      }
+      if (onlineBadge) {
+        document.getElementById('admin-badge-online-count').textContent = data.online_now || 0;
+        document.getElementById('admin-badge-total-count').textContent = data.total_users || 0;
+        onlineBadge.style.display = 'inline-flex';
       }
     }).catch(function(){});
   }

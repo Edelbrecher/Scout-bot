@@ -4532,6 +4532,16 @@ async def get_admin_activity_badges() -> dict:
     return {"new_users_24h": new_users_24h, "new_subs_24h": new_subs_24h}
 
 
+async def get_total_user_count() -> int:
+    """Total distinct Discord users that have ever logged in successfully."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            "SELECT COUNT(DISTINCT discord_id) FROM auth_logs WHERE status='success'"
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
 async def _init_own_villages_table():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""

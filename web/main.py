@@ -195,20 +195,30 @@ class UserTrackingMiddleware(BaseHTTPMiddleware):
                 if isinstance(session_data, dict):
                     uid = session_data.get("uid") or session_data.get("username", "")
                     uname = session_data.get("username", "")
+                    sess_type = session_data.get("type", "")
+                    sess_guilds = session_data.get("guilds")
                 else:
                     uid = str(session_data)
                     uname = str(session_data)
+                    sess_type = ""
+                    sess_guilds = None
             except Exception:
                 uid = None
                 uname = None
+                sess_type = ""
+                sess_guilds = None
             ip = request.client.host if request.client else None
             if uid:
+                _existing = _active_users.get(token)
                 _active_users[token] = {
                     "user_id": uid,
                     "username": uname,
                     "path": path,
                     "last_seen": time.time(),
+                    "first_seen": _existing["first_seen"] if _existing else time.time(),
                     "ip": ip,
+                    "type": sess_type,
+                    "guild_count": len(sess_guilds) if sess_guilds is not None else None,
                 }
                 # Cleanup old entries
                 cutoff = time.time() - 300
@@ -10208,6 +10218,25 @@ def _require_admin(request: Request):
     return session, None
 
 
+def _build_live_users_list() -> list[dict]:
+    now = time.time()
+    live_users = []
+    for entry in _active_users.values():
+        live_users.append({
+            "user_id": entry.get("user_id") or "—",
+            "username": entry.get("username") or "—",
+            "path": entry.get("path") or "—",
+            "ip": entry.get("ip") or "—",
+            "type": entry.get("type") or "discord",
+            "guild_count": entry.get("guild_count"),
+            "seconds_ago": int(now - entry.get("last_seen", now)),
+            "online_since": int(now - entry.get("first_seen", now)),
+            "first_seen_at": time.strftime("%H:%M:%S", time.localtime(entry.get("first_seen", now))),
+        })
+    live_users.sort(key=lambda x: x["seconds_ago"])
+    return live_users
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
     session, err = _require_admin(request)
@@ -10225,6 +10254,13 @@ async def admin_dashboard(request: Request):
         if g.get("subscription_status") in ("active", "trialing")
     )
     recent = await database.get_recent_guilds(10)
+    total_users = await database.get_total_user_count()
+    live_users = _build_live_users_list()
+    funnel, today_stats, no_sub = await asyncio.gather(
+        database.get_funnel_stats(),
+        database.get_today_online_stats(),
+        database.get_billing_visitors_without_sub(),
+    )
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "total": total,
@@ -10233,6 +10269,11 @@ async def admin_dashboard(request: Request):
         "free": free,
         "mrr": round(mrr, 2),
         "recent": recent,
+        "total_users": total_users,
+        "live_users": live_users,
+        "funnel": funnel,
+        "today_stats": today_stats,
+        "no_sub": no_sub,
         "session": session,
     })
 
@@ -10285,10 +10326,15 @@ async def admin_worlds(request: Request):
 
 @app.get("/api/admin/activity-badges")
 async def api_admin_activity_badges(request: Request):
-    """Counts for the navbar admin badges: new users + new subscriptions in the last 24h."""
+    """Counts for the navbar admin badges: new users + new subscriptions in the last 24h,
+    plus how many users are currently online and how many total users exist."""
     session, err = _require_admin(request)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     badges = await database.get_admin_activity_badges()
+    now = time.time()
+    cutoff = now - 300
+    badges["online_now"] = sum(1 for e in _active_users.values() if e.get("last_seen", 0) >= cutoff)
+    badges["total_users"] = await database.get_total_user_count()
     return JSONResponse(badges)
 
 
@@ -10727,48 +10773,17 @@ async def admin_ideas_delete(request: Request, idea_id: int):
 
 @app.get("/admin/stats", response_class=HTMLResponse)
 async def admin_stats(request: Request):
+    """Statistik wurde in das Overview-Dashboard integriert."""
     session, err = _require_admin(request)
     if err: return err
-    now = time.time()
-    live_users = []
-    for entry in _active_users.values():
-        live_users.append({
-            "username": entry.get("username") or "—",
-            "path": entry.get("path") or "—",
-            "ip": entry.get("ip") or "—",
-            "seconds_ago": int(now - entry.get("last_seen", now)),
-        })
-    live_users.sort(key=lambda x: x["seconds_ago"])
-    funnel, today_stats, no_sub = await asyncio.gather(
-        database.get_funnel_stats(),
-        database.get_today_online_stats(),
-        database.get_billing_visitors_without_sub(),
-    )
-    return templates.TemplateResponse("admin_stats.html", {
-        "request": request,
-        "live_users": live_users,
-        "funnel": funnel,
-        "today_stats": today_stats,
-        "no_sub": no_sub,
-        "session": session,
-    })
+    return RedirectResponse("/admin", status_code=303)
 
 
 @app.get("/api/live-users")
 async def api_live_users(request: Request):
     session, err = _require_admin(request)
     if err: return {"users": []}
-    now = time.time()
-    users = []
-    for entry in _active_users.values():
-        users.append({
-            "username": entry.get("username") or "—",
-            "path": entry.get("path") or "—",
-            "ip": entry.get("ip") or "—",
-            "seconds_ago": int(now - entry.get("last_seen", now)),
-        })
-    users.sort(key=lambda x: x["seconds_ago"])
-    return {"users": users}
+    return {"users": _build_live_users_list()}
 
 
 # ---------------------------------------------------------------------------
