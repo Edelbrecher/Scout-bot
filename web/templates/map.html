@@ -54,6 +54,17 @@
   border:1px solid; background:transparent; transition:opacity .15s;
 }
 .meta-btn:hover { opacity:0.8; }
+/* Number inputs without native spinner arrows — used with .num-stepper +/- buttons */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.no-spin { -moz-appearance:textfield; appearance:textfield; }
+.num-stepper { display:inline-flex; align-items:center; gap:2px; }
+.num-stepper button {
+  width:22px; height:28px; padding:0; line-height:1; font-size:0.85rem;
+  border:1px solid var(--border); border-radius:5px; background:var(--bg);
+  color:var(--text-muted); cursor:pointer;
+}
+.num-stepper button:hover { color:var(--text); border-color:var(--accent); }
 </style>
 
 <div class="container">
@@ -187,11 +198,31 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
       <span style="font-size:.82rem;font-weight:600;color:var(--text);">🏠 Freie Siedlungsplätze in der Nähe</span>
       <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
-        <input type="number" id="fsX" placeholder="X" style="width:62px;" />
-        <input type="number" id="fsY" placeholder="Y" style="width:62px;" />
+        {% if own_villages %}
+        <select id="fsOwnVillage" onchange="selectOwnVillageForFreeSpots()" style="font-size:.78rem;padding:.3rem .4rem;max-width:180px;">
+          <option value="">🏠 Eigenes Dorf wählen…</option>
+          {% for v in own_villages %}
+          <option value="{{ v.x }}|{{ v.y }}">{{ v.village_name }} ({{ v.x }}|{{ v.y }})</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        <div class="num-stepper">
+          <button type="button" onclick="numStep('fsX',-1)" title="X -1">−</button>
+          <input type="number" id="fsX" placeholder="X" class="no-spin" style="width:56px;text-align:center;" />
+          <button type="button" onclick="numStep('fsX',1)" title="X +1">+</button>
+        </div>
+        <div class="num-stepper">
+          <button type="button" onclick="numStep('fsY',-1)" title="Y -1">−</button>
+          <input type="number" id="fsY" placeholder="Y" class="no-spin" style="width:56px;text-align:center;" />
+          <button type="button" onclick="numStep('fsY',1)" title="Y +1">+</button>
+        </div>
         <button onclick="useMapCenterForFreeSpots()" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .6rem;" title="Aktuelle Kartenmitte übernehmen">📍 Kartenmitte</button>
         <label style="font-size:.78rem;color:var(--text-muted);">Radius</label>
-        <input type="number" id="fsRadius" value="7" min="1" max="20" style="width:52px;" />
+        <div class="num-stepper">
+          <button type="button" onclick="numStep('fsRadius',-1,1,20)" title="Radius -1">−</button>
+          <input type="number" id="fsRadius" value="7" class="no-spin" style="width:46px;text-align:center;" />
+          <button type="button" onclick="numStep('fsRadius',1,1,20)" title="Radius +1">+</button>
+        </div>
         <button onclick="searchFreeSpots()" class="btn btn-primary" style="font-size:.78rem;padding:.25rem .7rem;">🔍 Suchen</button>
       </div>
     </div>
@@ -375,6 +406,7 @@ let camX = 0, camY = 0;
 let dragging   = false, dragSX = 0, dragSY = 0, camSX = 0, camSY = 0;
 let highlighted = new Map();   // "x|y" → highlight color
 let viewMode    = 'tribe';
+let _freeSpotsOverlay = [];    // free settlement spots shown on the map (from Free-Spots panel)
 
 // Multi-filter state
 let playerFilters   = [];   // [{name, color}]
@@ -625,6 +657,27 @@ function draw() {
         ctx.font = `bold ${Math.max(8, scale)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(t.level, cx, cy - r - 2);
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── Free settlement spots overlay ───────────────────────────────────────────
+  if (_freeSpotsOverlay.length) {
+    for (const s of _freeSpotsOverlay) {
+      if (s.x<vx0||s.x>vx1||s.y<vy1||s.y>vy0) continue;
+      const [cx, cy] = worldToCanvas(s.x, s.y);
+      const r = Math.max(3, tS*0.9);
+      ctx.save();
+      ctx.shadowColor = '#22c55e'; ctx.shadowBlur = scale>3?8:3;
+      ctx.strokeStyle = '#22c55e'; ctx.lineWidth = Math.max(1.5, scale*0.25);
+      ctx.strokeRect(cx-r, cy-r, r*2, r*2);
+      if (scale >= 4) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#22c55e';
+        ctx.font = `bold ${Math.max(8, scale*0.8)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(s.distribution ? `${s.crop}er` : '🏠', cx, cy-r-2);
       }
       ctx.restore();
     }
@@ -1576,12 +1629,37 @@ function toggleFreeSpotsPanel() {
       xEl.value = Math.round(camX);
       yEl.value = Math.round(camY);
     }
+  } else {
+    // Hide overlay markers on the map when the panel is closed
+    _freeSpotsOverlay = [];
+    draw();
   }
 }
 
 function useMapCenterForFreeSpots() {
   document.getElementById('fsX').value = Math.round(camX);
   document.getElementById('fsY').value = Math.round(camY);
+}
+
+// Increment/decrement a numeric input by `delta`, clamped to [min,max] if given.
+function numStep(id, delta, min, max) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let v = parseInt(el.value);
+  if (isNaN(v)) v = 0;
+  v += delta;
+  if (min !== undefined) v = Math.max(min, v);
+  if (max !== undefined) v = Math.min(max, v);
+  el.value = v;
+}
+
+// Populate fsX/fsY from the selected own-village dropdown
+function selectOwnVillageForFreeSpots() {
+  const sel = document.getElementById('fsOwnVillage');
+  if (!sel || !sel.value) return;
+  const [x, y] = sel.value.split('|');
+  document.getElementById('fsX').value = x;
+  document.getElementById('fsY').value = y;
 }
 
 let _freeSpotsData = null;
@@ -1619,6 +1697,8 @@ function renderFreeSpots() {
   let spots = data.spots || [];
   if (!spots.length) {
     resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Keine freien Felder in diesem Radius gefunden.</span>';
+    _freeSpotsOverlay = [];
+    draw();
     return;
   }
   const filter = document.getElementById('fsCropFilter').value;
@@ -1631,11 +1711,28 @@ function renderFreeSpots() {
     const minCrop = parseInt(filter);
     filtered = spots.filter(s => s.crop !== null && s.crop !== undefined && s.crop >= minCrop);
   }
+
+  // Highlight the (filtered) results directly on the map
+  _freeSpotsOverlay = filtered;
+  draw();
+  // Make sure the search area is actually visible
+  if (filtered.length) {
+    const fitScale = Math.min(20, Math.max(2, Math.floor(220 / Math.max(1, data.radius*2))));
+    panTo(data.center.x, data.center.y, Math.max(scale, fitScale));
+  }
+
   if (!filtered.length) {
-    resultEl.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">0 von ${spots.length} freien Feldern passen zum Filter (Radius ${data.radius}).</div>`;
+    const taggedCount = spots.filter(s => s.distribution).length;
+    let extra = '';
+    if (filter !== '0' && filter !== 'tagged' && taggedCount === 0) {
+      extra = ' Hinweis: Es wurde im Suchbereich noch kein Feld mit Feldverteilung getaggt (🏷️) — daher liefert dieser Filter aktuell keine Treffer.';
+    } else if (filter === 'tagged' && taggedCount === 0) {
+      extra = ' Hinweis: Im Suchbereich wurde noch kein Feld getaggt.';
+    }
+    resultEl.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">0 von ${spots.length} freien Feldern passen zum Filter (Radius ${data.radius}).${extra}</div>`;
     return;
   }
-  let html = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">${filtered.length} von ${spots.length} freien Feldern (Radius ${data.radius}):</div>`;
+  let html = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">${filtered.length} von ${spots.length} freien Feldern (Radius ${data.radius}) — grün auf der Karte markiert:</div>`;
   html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;">';
   for (const s of filtered) {
     const label = s.distribution ? `${s.distribution} (${s.crop}er)` : '❓';

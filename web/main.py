@@ -3253,6 +3253,9 @@ async def guild_map(request: Request, guild_id: str):
     meta_alliances = await database.get_meta_alliances(guild_id) if can_view_meta else []
     meta_groups    = await database.get_meta_groups(guild_id)    if can_view_meta else []
 
+    # Own villages — used to pre-fill coordinates in the "Freie Plätze" finder
+    own_villages = await database.get_own_village_ids(guild_id, session.get("uid", "")) if is_member else []
+
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
@@ -3264,6 +3267,7 @@ async def guild_map(request: Request, guild_id: str):
         "is_share_viewer": not is_member,
         "has_meta_premium": has_premium,
         "can_view_meta": can_view_meta,
+        "own_villages": own_villages,
     })
 
 
