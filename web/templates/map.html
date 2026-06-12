@@ -245,6 +245,34 @@
       <span style="font-size:.78rem;color:var(--text-muted);">Koordinaten eingeben und „Suchen“ klicken.</span>
     </div>
   </div>
+
+  <!-- Field distribution tag modal -->
+  <div id="fieldTagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;max-width:380px;width:90%;">
+      <div style="font-weight:600;margin-bottom:.6rem;color:var(--text);">🏷️ Feldverteilung für <span id="fieldTagCoord"></span></div>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem;">
+        Format: Holzfäller-Lehmgrube-Eisenmine-Getreidefeld, Summe = 18. Travian kennt sehr viele Kombinationen
+        (z.B. 4-4-4-6 "normal", 3-4-4-7 / 4-3-4-7 / 4-4-3-7 "7er", 3-3-3-9 "9er", 1-1-1-15 "15er") —
+        unten ein paar gängige als Schnellauswahl, oder einfach selbst eingeben, was ihr im Spiel seht.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.6rem;">
+        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset('4-4-4-6')">4-4-4-6</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset('3-4-4-7')">3-4-4-7</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset('4-3-4-7')">4-3-4-7</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset('4-4-3-7')">4-4-3-7</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset('3-3-3-9')">3-3-3-9 (9er)</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset('1-1-1-15')">1-1-1-15 (15er)</button>
+      </div>
+      <input type="text" id="fieldTagInput" placeholder="z.B. 4-4-4-6" style="width:100%;margin-bottom:.7rem;padding:.35rem .55rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;font-size:.85rem;box-sizing:border-box;" />
+      <div style="display:flex;justify-content:space-between;gap:.4rem;flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary" onclick="closeFieldTagModal()">Abbrechen</button>
+        <div style="display:flex;gap:.4rem;">
+          <button type="button" class="btn btn-secondary" style="color:#f87171;" onclick="saveFieldTag('')">🗑️ Entfernen</button>
+          <button type="button" class="btn btn-primary" onclick="saveFieldTag(undefined)">💾 Speichern</button>
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
 
   <!-- Meta-Allianz Schnellfilter -->
@@ -1745,14 +1773,30 @@ function renderFreeSpots() {
   resultEl.innerHTML = html;
 }
 
-async function tagFreeSpot(x, y) {
+// ── Field distribution tag modal ────────────────────────────────────────────
+let _fieldTagCoord = null;
+
+function tagFreeSpot(x, y) {
+  _fieldTagCoord = {x, y};
   const current = (_freeSpotsData.spots.find(s => s.x === x && s.y === y) || {}).distribution || '';
-  const input = prompt(
-    `Feldverteilung für (${x}|${y}) eintragen (Format: Holz-Lehm-Eisen-Crop, Summe = 18, z.B. "4-4-4-6" oder "3-3-3-9" für "9er").\nLeer lassen, um den Tag zu entfernen.`,
-    current
-  );
-  if (input === null) return; // cancelled
-  const dist = input.trim();
+  document.getElementById('fieldTagCoord').textContent = `(${x}|${y})`;
+  document.getElementById('fieldTagInput').value = current;
+  document.getElementById('fieldTagModal').style.display = 'flex';
+}
+
+function closeFieldTagModal() {
+  document.getElementById('fieldTagModal').style.display = 'none';
+  _fieldTagCoord = null;
+}
+
+function setFieldTagPreset(val) {
+  document.getElementById('fieldTagInput').value = val;
+}
+
+async function saveFieldTag(dist) {
+  if (!_fieldTagCoord) return;
+  const {x, y} = _fieldTagCoord;
+  dist = (dist === undefined ? document.getElementById('fieldTagInput').value : dist).trim();
   if (dist && !/^\d{1,2}-\d{1,2}-\d{1,2}-\d{1,2}$/.test(dist)) {
     alert('Ungültiges Format. Bitte 4 Zahlen mit "-" getrennt eingeben, z.B. 4-4-4-6.');
     return;
@@ -1778,6 +1822,7 @@ async function tagFreeSpot(x, y) {
       spot.distribution = data.distribution;
       spot.crop = data.crop;
     }
+    closeFieldTagModal();
     renderFreeSpots();
   } catch (e) {
     alert('Fehler beim Speichern.');
