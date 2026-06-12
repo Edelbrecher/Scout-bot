@@ -1,0 +1,38 @@
+{# ─────────────────────────────────────────────────────────────────────────
+   Persistent "My Ally" tab bar.
+   Shown on the My Ally page itself (is_my_ally_page=True) and on the three
+   settings pages (Server Management / Bot-Einstellungen / World-Settings),
+   so the alliance lead always has quick access to all alliance + settings areas.
+
+   Expected context vars:
+     guild                  – guild dict (needs guild_id)
+     ally_group             – dict or None; bar is hidden entirely if None
+     ally_members_count     – int, number of non-pending members
+     ally_can_view_guide    – bool
+     ally_can_view_map_tab  – bool
+     ally_is_editor         – bool
+     ally_has_leaderboard   – bool
+     ally_nav_active        – which tab is highlighted ('mitglieder', ..., 'bot-settings')
+     is_my_ally_page        – bool; if True, in-page tabs use showTab() instead of navigating
+───────────────────────────────────────────────────────────────────────── #}
+{% if ally_group %}
+{% set _gid = guild.guild_id %}
+{% macro ma_link(name, label, extra_style='') %}
+<a class="ma-tab{{ ' active' if ally_nav_active == name else '' }}" href="/guild/{{ _gid }}/my-ally#{{ name }}"
+   {% if is_my_ally_page %}onclick="showTab('{{ name }}',this);return false;"{% endif %}
+   {% if extra_style %}style="{{ extra_style }}"{% endif %}>{{ label }}</a>
+{% endmacro %}
+<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
+  {{ ma_link('mitglieder', '👥 Members (' ~ ally_members_count ~ ')') }}
+  {% if ally_can_view_guide %}{{ ma_link('anleitung', '📖 Anleitung', 'color:#fbbf24;') }}{% endif %}
+  {{ ma_link('einladungen', '🔗 Invitations') }}
+  {{ ma_link('rechte', '🔑 Member Roles') }}
+  {{ ma_link('rollen', '🛡️ Roles & Permissions') }}
+  {% if ally_can_view_map_tab %}{{ ma_link('map', '🗺️ Map') }}{% endif %}
+  {% if ally_is_editor %}{{ ma_link('battlegroups', '⚔️ Battlegroups') }}{% endif %}
+  {{ ma_link('bonus', '🎁 Alliance Bonus') }}
+  {{ ma_link('einstellungen', '⚙️ Settings') }}
+  <a class="ma-tab{{ ' active' if ally_nav_active == 'bot-settings' else '' }}" href="/guild/{{ _gid }}/settings#roles">🤖 Bot Settings</a>
+  {% if ally_has_leaderboard %}{{ ma_link('leaderboard', '🏆 Leaderboard') }}{% endif %}
+</div>
+{% endif %}

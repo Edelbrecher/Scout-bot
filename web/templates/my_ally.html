@@ -52,21 +52,7 @@
   </div>
 
   {# ── Tab nav ── #}
-  <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:.75rem;">
-    <button class="ma-tab active" onclick="showTab('mitglieder',this)">👥 Members ({{ (members | rejectattr("status","equalto","pending") | list)|length }})</button>
-    {% if can_view_guide %}<button class="ma-tab" onclick="showTab('anleitung',this)" style="color:#fbbf24;">📖 Anleitung</button>{% endif %}
-    <button class="ma-tab" onclick="showTab('einladungen',this)">🔗 Invitations</button>
-    <button class="ma-tab" onclick="showTab('rechte',this)" id="tab-btn-rechte">🔑 Member Roles</button>
-    <button class="ma-tab" onclick="showTab('rollen',this)">🛡️ Roles & Permissions</button>
-    {% if can_view_map_tab %}<button class="ma-tab" onclick="showTab('map',this)" id="tab-btn-map">🗺️ Map</button>{% endif %}
-    {% if is_editor %}<button class="ma-tab" onclick="showTab('battlegroups',this)">⚔️ Battlegroups</button>{% endif %}
-    <button class="ma-tab" onclick="showTab('bonus',this)" id="tab-btn-bonus">🎁 Alliance Bonus</button>
-    <button class="ma-tab" onclick="showTab('einstellungen',this)">⚙️ Settings</button>
-    <a class="ma-tab" href="/guild/{{ guild.guild_id }}/settings#roles" style="text-decoration:none;">🤖 Bot Settings</a>
-    {% if leaderboard %}
-    <button class="ma-tab" onclick="showTab('leaderboard',this)">🏆 Leaderboard</button>
-    {% endif %}
-  </div>
+  {% include "_ally_nav.html" %}
 
   {# ══════════════════════════════ TAB: ANLEITUNG (Playbook) ══════════════════════════════ #}
   {% if can_view_guide %}

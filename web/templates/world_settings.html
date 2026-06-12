@@ -11,6 +11,8 @@
   <h1 style="margin:.5rem 0 .25rem;" data-i18n="worldsettings.title">🌍 World / Server</h1>
   <p class="subtitle" style="margin:0 0 .5rem;" data-i18n="worldsettings.subtitle">Travian server URL und Bot-Settings</p>
 
+  {% include "_ally_nav.html" %}
+
   {% if guild.workspace_type != 'personal' %}
   <div class="settings-tabs">
     <a href="/guild/{{ guild.guild_id }}/settings" class="settings-tab">⚙️ Server Management</a>

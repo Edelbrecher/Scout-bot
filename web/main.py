@@ -367,6 +367,28 @@ async def _require_guild_async(session: dict, guild_id: str):
         return RedirectResponse("/dashboard", status_code=303)
 
 
+async def _get_ally_nav_context(guild_id: str, session: dict) -> dict:
+    """Lightweight context for the persistent 'My Ally' tab bar shown on the
+    My Ally page and on the three settings pages (Server Management /
+    Bot-Einstellungen / World-Settings). Returns {"ally_group": None} if the
+    current user is not the lead of an alliance hosted on this guild (the bar
+    is hidden entirely in that case)."""
+    uid = session.get("uid", "")
+    ally_group = await database.get_ally_group_for_owner(guild_id, uid)
+    if not ally_group:
+        return {"ally_group": None}
+    members = await database.get_ally_members(ally_group["id"])
+    leaderboard = await database.get_member_leaderboard(guild_id)
+    return {
+        "ally_group": ally_group,
+        "ally_members_count": len([m for m in members if m.get("status") != "pending"]),
+        "ally_can_view_guide": True,
+        "ally_can_view_map_tab": True,
+        "ally_is_editor": True,
+        "ally_has_leaderboard": bool(leaderboard),
+    }
+
+
 def is_guild_owner(session: dict, guild: dict) -> bool:
     """True if the logged-in user is the subscription owner of this guild."""
     if session.get("type") == "admin":
@@ -3399,8 +3421,12 @@ async def guild_world_settings_page(request: Request, guild_id: str):
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     saved = request.query_params.get("saved")
+    ally_nav = {"ally_group": None}
+    if guild.get("workspace_type") != "personal":
+        ally_nav = await _get_ally_nav_context(guild_id, session)
     return templates.TemplateResponse("world_settings.html", {
         "request": request, "guild": guild, "session": session, "saved": saved,
+        "is_my_ally_page": False, "ally_nav_active": "bot-settings", **ally_nav,
     })
 
 
@@ -3844,12 +3870,18 @@ async def guild_settings_page(request: Request, guild_id: str):
                     roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
         except Exception:
             pass
+    ally_nav = {"ally_group": None}
+    if guild.get("workspace_type") != "personal":
+        ally_nav = await _get_ally_nav_context(guild_id, session)
     return templates.TemplateResponse("guild_settings.html", {
         "request": request,
         "guild": guild,
         "is_owner": is_guild_owner(session, guild),
         "flash": flash,
         "roles": roles,
+        "is_my_ally_page": False,
+        "ally_nav_active": "bot-settings",
+        **ally_nav,
     })
 
 
@@ -3888,6 +3920,10 @@ async def bot_settings_page(request: Request, guild_id: str):
     if not is_personal:
         hero_scout_channel_id = await _get_hero_scout_channel(guild_id)
 
+    ally_nav = {"ally_group": None}
+    if not is_personal:
+        ally_nav = await _get_ally_nav_context(guild_id, session)
+
     return templates.TemplateResponse("bot_settings.html", {
         "request": request,
         "guild": guild,
@@ -3898,6 +3934,9 @@ async def bot_settings_page(request: Request, guild_id: str):
         "flash": flash,
         "saved": request.query_params.get("saved", ""),
         "error": request.query_params.get("error", ""),
+        "is_my_ally_page": False,
+        "ally_nav_active": "bot-settings",
+        **ally_nav,
     })
 
 
@@ -6127,6 +6166,13 @@ async def my_ally_page(request: Request, guild_id: str):
         "member_pop_history": member_pop_history,
         "ally_pop_history": ally_pop_history,
         "map_only_members": map_only_members,
+        "ally_members_count": len([m for m in members if m.get("status") != "pending"]),
+        "ally_can_view_guide": can_view_guide,
+        "ally_can_view_map_tab": can_view_map_tab,
+        "ally_is_editor": is_editor,
+        "ally_has_leaderboard": bool(leaderboard),
+        "is_my_ally_page": True,
+        "ally_nav_active": "mitglieder",
     })
 
 
