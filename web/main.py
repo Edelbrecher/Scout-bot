@@ -6565,7 +6565,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     ALL_FLAGS = [
         "ally_manage", "ally_view_members", "ally_view_rank",
         "defend_view", "defend_manage", "defend_edit",
-        "ep_manage", "ep_view", "ep_notify",
+        "ep_manage", "ep_view", "ep_notify", "ep_archive_view", "ep_archive_manage",
         "attack_manage", "attack_view",
         "scout_manage", "scout_view",
         "map_manage", "map_view", "map_meta_view", "map_meta_manage",
@@ -6584,7 +6584,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         selected = [
             "ally_view_members", "ally_view_rank",
             "defend_view", "defend_manage", "defend_edit",
-            "ep_manage", "ep_view", "ep_notify",
+            "ep_manage", "ep_view", "ep_notify", "ep_archive_view", "ep_archive_manage",
             "attack_manage", "attack_view",
             "scout_manage", "scout_view",
             "map_view", "map_manage", "map_meta_view", "map_meta_manage",
@@ -8869,7 +8869,11 @@ async def operations_page(request: Request, guild_id: str):
     err = await _require_alliance(guild, guild_id)
     if err: return err
     uid  = session.get("uid","")
+    can_view_archive   = await has_perm(request, guild_id, "ep_archive_view") or await has_perm(request, guild_id, "ep_archive_manage")
+    can_manage_archive = await has_perm(request, guild_id, "ep_archive_manage")
     plans = await database.get_op_plans(guild_id)
+    if not can_view_archive:
+        plans = [p for p in plans if p.get("status") != "archived"]
     favorites = await database.get_op_favorites(guild_id, uid)
     members   = await database.get_member_troops(guild_id)
     troop_roles = await database.get_troop_roles(guild_id)
@@ -8883,6 +8887,8 @@ async def operations_page(request: Request, guild_id: str):
         "troops_def": database.TRAVIAN_TROOPS,
         "troop_roles": troop_roles,
         "default_ts": guild.get("default_tournament_square") or 0,
+        "can_view_archive":   can_view_archive,
+        "can_manage_archive": can_manage_archive,
     })
 
 
@@ -8913,6 +8919,9 @@ async def op_plan_list(request: Request, guild_id: str):
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
     plans = await database.get_op_plans(guild_id)
+    can_view_archive = await has_perm(request, guild_id, "ep_archive_view") or await has_perm(request, guild_id, "ep_archive_manage")
+    if not can_view_archive:
+        plans = [p for p in plans if p.get("status") != "archived"]
     return JSONResponse(plans)
 
 
@@ -8923,6 +8932,9 @@ async def op_get_plan(request: Request, guild_id: str, plan_id: int):
     plan = await database.get_op_plan_full(plan_id, guild_id)
     if not plan:
         return JSONResponse({"error": "not found"}, status_code=404)
+    if plan.get("status") == "archived":
+        if not (await has_perm(request, guild_id, "ep_archive_view") or await has_perm(request, guild_id, "ep_archive_manage")):
+            return JSONResponse({"error": "no_access"}, status_code=403)
     return JSONResponse(plan)
 
 
@@ -8945,7 +8957,12 @@ async def op_update_plan(
         kwargs["status"] = status
     # Detect status transitions that require Discord notifications
     new_status = kwargs.get("status")
-    old_plan = await database.get_op_plan(plan_id, guild_id) if new_status in ("active", "cancelled") else None
+    current_plan = await database.get_op_plan(plan_id, guild_id) if new_status else None
+    if new_status and (new_status == "archived" or (current_plan and current_plan.get("status") == "archived")):
+        # Archiving or restoring from the archive requires a dedicated permission
+        if not await has_perm(request, guild_id, "ep_archive_manage"):
+            return JSONResponse({"error": "no_permission"}, status_code=403)
+    old_plan = current_plan if new_status in ("active", "cancelled") else None
     await database.update_op_plan(plan_id, guild_id, **kwargs)
     if old_plan and new_status:
         old_status = old_plan.get("status")
@@ -13001,6 +13018,16 @@ async def meta_group_stats(request: Request, guild_id: str, group_id: int):
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     stats = await database.get_meta_group_stats(guild_id, group_id)
     return JSONResponse({"stats": stats})
+
+
+@app.get("/guild/{guild_id}/allianz/meta/{group_id}/members")
+async def meta_group_members(request: Request, guild_id: str, group_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    data = await database.get_meta_group_members(guild_id, group_id)
+    return JSONResponse(data)
 
 
 @app.post("/guild/{guild_id}/allianz/mitglieder/clear")

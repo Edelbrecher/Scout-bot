@@ -857,6 +857,8 @@
                     ("ep_view","View Ops","Can view planned operations (Operation planning)."),
                     ("ep_manage","Manage Ops","Can create, edit and delete operations."),
                     ("ep_notify","Op Notifications","Receives Discord notifications when new operations are posted."),
+                    ("ep_archive_view","View Archive","Can see archived operations (📦 Archiv filter)."),
+                    ("ep_archive_manage","Manage Archive","Can archive operations and restore them from the archive."),
                   ]),
                   ("⚔️ Attacks", [
                     ("attack_view","View Attacks","Can view incoming attack reports and the attack board."),
@@ -1003,6 +1005,7 @@
               ("⚙️ Alliance","ally_manage","Manage alliance: approve members, change settings, manage roles."),
               ("🛡️ Defense","defend_view / defend_manage","View: see defense board. Manage: close & archive defense channels."),
               ("📋 Operations","ep_view / ep_manage / ep_notify","View ops, manage ops, or receive Discord notifications for new ops."),
+              ("📦 Op-Archiv","ep_archive_view / ep_archive_manage","View: see archived operations. Manage: archive ops & restore them."),
               ("⚔️ Attacks","attack_view / attack_manage","View or manage incoming attack reports."),
               ("🔍 Scouting","scout_view / scout_manage","View enemy scouts; manage scout assignments & enemy troop entries."),
               ("🗺️ Map","map_view / map_manage","Access the map; manage world data and sector settings."),
@@ -1100,34 +1103,38 @@
         {% endif %}
 
         {% for g in meta_groups %}
-        <div style="border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;margin-bottom:.55rem;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;">
-            <strong style="font-size:.88rem;">{{ g.meta_name }}</strong>
-            <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
-                  style="margin:0;" onsubmit="return confirm('Meta-Gruppe »{{ g.meta_name }}« wirklich löschen?')">
-              <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
-              <button type="submit" style="font-size:.74rem;padding:.2rem .55rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);border-radius:6px;color:#f87171;cursor:pointer;">🗑️ Löschen</button>
-            </form>
+        <div style="border:1px solid var(--border);border-radius:7px;padding:.4rem .55rem;margin-bottom:.35rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;flex-wrap:wrap;">
+            <strong style="font-size:.8rem;">{{ g.meta_name }}</strong>
+            <div style="display:flex;gap:.3rem;">
+              <button type="button" onclick="openMetaMembers({{ g.id }}, {{ g.meta_name|tojson }})"
+                      style="font-size:.68rem;padding:.15rem .5rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);border-radius:6px;color:#a5b4fc;cursor:pointer;">👁️ Mitglieder</button>
+              <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
+                    style="margin:0;" onsubmit="return confirm('Meta-Gruppe »{{ g.meta_name }}« wirklich löschen?')">
+                <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
+                <button type="submit" style="font-size:.68rem;padding:.15rem .5rem;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);border-radius:6px;color:#f87171;cursor:pointer;">🗑️</button>
+              </form>
+            </div>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem;">
+          <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.35rem;">
             {% for a in g.alliances %}
             <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/remove-alliance" style="margin:0;">
               <input type="hidden" name="alliance_name" value="{{ a }}">
               <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
-              <button type="submit" style="display:flex;align-items:center;gap:.3rem;padding:.25rem .55rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.4);border-radius:20px;color:var(--text);font-size:.78rem;cursor:pointer;">
+              <button type="submit" style="display:flex;align-items:center;gap:.25rem;padding:.12rem .45rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.4);border-radius:14px;color:var(--text);font-size:.72rem;cursor:pointer;">
                 {{ a }} <span style="color:#f87171;font-weight:bold;">✕</span>
               </button>
             </form>
             {% endfor %}
             {% if g.alliances | length == 0 %}
-            <span style="color:var(--text-muted);font-size:.78rem;">Noch keine Allianzen hinzugefügt.</span>
+            <span style="color:var(--text-muted);font-size:.72rem;">Noch keine Allianzen hinzugefügt.</span>
             {% endif %}
           </div>
           {% if g.alliances | length < 3 and snapshot_alliances %}
           <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/add-alliance"
-                style="display:flex;gap:.4rem;align-items:center;margin-top:.5rem;flex-wrap:wrap;">
+                style="display:flex;gap:.3rem;align-items:center;margin-top:.35rem;flex-wrap:wrap;">
             <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/my-ally#map">
-            <select name="alliance_name" style="flex:1;min-width:140px;padding:.3rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.78rem;">
+            <select name="alliance_name" style="flex:1;min-width:120px;padding:.2rem .4rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.72rem;">
               <option value="">— Allianz wählen —</option>
               {% for a in snapshot_alliances %}
               {% if a.alliance_name not in g.alliances %}
@@ -1135,7 +1142,7 @@
               {% endif %}
               {% endfor %}
             </select>
-            <button type="submit" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;">+</button>
+            <button type="submit" class="btn btn-primary" style="font-size:.72rem;padding:.2rem .5rem;">+</button>
           </form>
           {% endif %}
         </div>
@@ -1934,6 +1941,126 @@ function confirmRemoveMember(id) {
   f.action = `/guild/${GUILD_ID_JS}/my-ally/member/${id}/remove`;
   document.body.appendChild(f);
   f.submit();
+}
+
+// ── Meta-Gruppen Mitgliederliste (Modal) ──────────────────────────────────────
+let _metaMembers = [];
+let _metaSort = { key: 'population', dir: 'desc' };
+
+async function openMetaMembers(groupId, metaName) {
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;" id="metaMembersOverlay" onclick="if(event.target===this)closeMetaMembers()">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.5rem;width:100%;max-width:760px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+        <h3 style="margin:0;font-size:1rem;">👥 Mitglieder — ${escHtml(metaName)}</h3>
+        <button onclick="closeMetaMembers()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">×</button>
+      </div>
+      <input type="text" id="metaMembersFilter" placeholder="🔍 Spieler oder Allianz suchen…" oninput="_renderMetaMembers()"
+             style="width:100%;padding:.4rem .7rem;margin-bottom:.6rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:.85rem;box-sizing:border-box;">
+      <div style="overflow:auto;flex:1;">
+        <table style="width:100%;font-size:.8rem;border-collapse:collapse;">
+          <thead><tr id="metaMembersHead"></tr></thead>
+          <tbody id="metaMembersBody"></tbody>
+        </table>
+        <div id="metaMembersEmpty" style="display:none;text-align:center;color:var(--text-muted);font-size:.82rem;padding:1.5rem 0;"></div>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('metaMembersBody').innerHTML =
+    `<tr><td style="padding:1rem;text-align:center;color:var(--text-muted);">Lade…</td></tr>`;
+  try {
+    const r = await fetch(`/guild/${GUILD_ID_JS}/allianz/meta/${groupId}/members`);
+    const data = await r.json();
+    _metaMembers = data.members || [];
+    if (!_metaMembers.length) {
+      document.getElementById('metaMembersEmpty').style.display = 'block';
+      document.getElementById('metaMembersEmpty').innerHTML = !data.snapshot_at
+        ? `Noch keine Rangliste importiert. <a href="/guild/${GUILD_ID_JS}/travian-stats" style="color:#818cf8;">Jetzt importieren →</a>`
+        : 'Keine Mitglieder für diese Allianzen in der letzten Rangliste gefunden.';
+    } else {
+      document.getElementById('metaMembersEmpty').style.display = 'none';
+    }
+    _renderMetaMembers();
+  } catch (e) {
+    document.getElementById('metaMembersBody').innerHTML =
+      `<tr><td style="padding:1rem;text-align:center;color:#f87171;">Fehler beim Laden.</td></tr>`;
+  }
+}
+
+function closeMetaMembers() {
+  const el = document.getElementById('metaMembersOverlay');
+  if (el) el.remove();
+}
+
+const META_MEMBER_COLS = [
+  { key: 'player_name',  label: 'Spieler',           sort: 'string' },
+  { key: 'alliance_name', label: 'Allianz',          sort: 'string' },
+  { key: 'population',   label: '👥 Bevölkerung',    sort: 'number' },
+  { key: 'pop_rank',     label: '#',                 sort: 'number', asc: true },
+  { key: 'off_points',   label: '⚔️ Angreifer-Pkt',  sort: 'number' },
+  { key: 'off_rank',     label: '⚔️ Rang',           sort: 'number', asc: true },
+  { key: 'def_points',   label: '🛡️ Verteidiger-Pkt', sort: 'number' },
+  { key: 'def_rank',     label: '🛡️ Rang',          sort: 'number', asc: true },
+];
+
+function _metaSortBy(key, asc) {
+  if (_metaSort.key === key) {
+    _metaSort.dir = _metaSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _metaSort.key = key;
+    _metaSort.dir = asc ? 'asc' : 'desc';
+  }
+  _renderMetaMembers();
+}
+
+function _renderMetaMembers() {
+  const head = document.getElementById('metaMembersHead');
+  const body = document.getElementById('metaMembersBody');
+  if (!head || !body) return;
+
+  head.innerHTML = META_MEMBER_COLS.map(c => {
+    const active = _metaSort.key === c.key;
+    const arrow = active ? (_metaSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th onclick="_metaSortBy('${c.key}', ${!!c.asc})" style="position:sticky;top:0;background:var(--bg-card);cursor:pointer;text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap;color:${active?'#a5b4fc':'var(--text-muted)'};font-weight:${active?'700':'600'};">${c.label}${arrow}</th>`;
+  }).join('');
+
+  const q = (document.getElementById('metaMembersFilter')?.value || '').trim().toLowerCase();
+  let rows = _metaMembers;
+  if (q) {
+    rows = rows.filter(m =>
+      (m.player_name || '').toLowerCase().includes(q) ||
+      (m.alliance_name || '').toLowerCase().includes(q));
+  }
+
+  const { key, dir } = _metaSort;
+  rows = rows.slice().sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (typeof av === 'string' || typeof bv === 'string') {
+      av = (av || '').toString().toLowerCase();
+      bv = (bv || '').toString().toLowerCase();
+      return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    av = av ?? 0; bv = bv ?? 0;
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="${META_MEMBER_COLS.length}" style="padding:1rem;text-align:center;color:var(--text-muted);">Keine Treffer.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(m => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+      <td style="padding:.32rem .5rem;font-weight:600;">${escHtml(m.player_name || '')}</td>
+      <td style="padding:.32rem .5rem;color:var(--text-muted);">${escHtml(m.alliance_name || '')}</td>
+      <td style="padding:.32rem .5rem;">${(m.population || 0).toLocaleString()}</td>
+      <td style="padding:.32rem .5rem;color:var(--text-muted);">${m.pop_rank || '—'}</td>
+      <td style="padding:.32rem .5rem;">${(m.off_points || 0).toLocaleString()}</td>
+      <td style="padding:.32rem .5rem;color:var(--text-muted);">${m.off_rank || '—'}</td>
+      <td style="padding:.32rem .5rem;">${(m.def_points || 0).toLocaleString()}</td>
+      <td style="padding:.32rem .5rem;color:var(--text-muted);">${m.def_rank || '—'}</td>
+    </tr>
+  `).join('');
 }
 
 // ── Shuffle rows for non-editor members ──────────────────────────────────────

@@ -292,6 +292,8 @@
 <!-- Inject data for JS -->
 <script>
 const GUILD_ID = {{ guild.guild_id | tojson }};
+const CAN_VIEW_ARCHIVE   = {{ can_view_archive | tojson }};
+const CAN_MANAGE_ARCHIVE = {{ can_manage_archive | tojson }};
 const TROOPS_DEF = {{ troops_def | tojson }};
 const INIT_PLANS = {{ plans | tojson }};
 const INIT_FAVS  = {{ favorites | tojson }};
@@ -319,7 +321,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('draft')" id="filter-draft">Draft</button>
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('active')" id="filter-active">Active</button>
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('completed')" id="filter-completed">Fertig</button>
+      {% if can_view_archive %}
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('archived')" id="filter-archived">📦 Archiv</button>
+      {% endif %}
     </div>
 
     <div class="op-plan-list" id="planList"></div>
@@ -369,7 +373,9 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <!-- LEFT: Targets + Waves -->
           <div id="opArchivedNote" style="display:none;text-align:center;padding:2.5rem 1rem;color:var(--text-muted);font-size:.88rem;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
             📦 Diese Operation ist archiviert — Targets &amp; Wellen sind ausgeblendet.<br>
+            {% if can_manage_archive %}
             <span style="font-size:.78rem;opacity:.75;">Über „↩ Aus Archiv wiederherstellen“ im Plan-Panel kannst du sie wieder bearbeiten.</span>
+            {% endif %}
           </div>
           <div id="opTargetsColumn" style="position:relative;">
             <!-- Add target row -->
@@ -1118,11 +1124,11 @@ function renderPlanInfo() {
         <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Revert to draft">
           ↩ Revert to draft
         </button>` : ''}
-      ${p.status === 'draft' || p.status === 'completed' || p.status === 'cancelled' ? `
+      ${CAN_MANAGE_ARCHIVE && (p.status === 'draft' || p.status === 'completed' || p.status === 'cancelled') ? `
         <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('archived')" title="Operation archivieren (ausblenden, jederzeit wiederherstellbar)">
           📦 Archivieren
         </button>` : ''}
-      ${p.status === 'archived' ? `
+      ${CAN_MANAGE_ARCHIVE && p.status === 'archived' ? `
         <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Operation aus dem Archiv wiederherstellen">
           ↩ Aus Archiv wiederherstellen
         </button>` : ''}

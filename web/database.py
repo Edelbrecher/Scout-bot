@@ -5515,6 +5515,7 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
     await _init_ally_tables()
     ALL_PERMS = {
         "ally_manage", "ep_manage", "ep_view", "ep_notify",
+        "ep_archive_view", "ep_archive_manage",
         "attack_manage", "attack_view", "scout_manage", "scout_view",
         "map_manage", "map_view", "map_meta_view", "map_meta_manage",
         "sector_view", "hospital_view",
@@ -6439,6 +6440,44 @@ async def get_meta_groups(guild_id: str) -> list[dict]:
             ) as cur:
                 g["alliances"] = [r[0] for r in await cur.fetchall()]
         return groups
+
+
+async def get_meta_group_members(guild_id: str, group_id: int) -> dict:
+    """Return the member list (population, ranks, attacker/defender points) for all
+    alliances in the given meta group, sourced from the latest imported player-stats
+    snapshot ('Rangliste'). Returns {"alliances": [...], "snapshot_at": str|None, "members": [...]}.
+    """
+    await init_alliance_meta_table()
+    await _init_travian_stats_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT alliance_name FROM alliance_meta_members WHERE group_id = ?",
+            (group_id,)
+        ) as cur:
+            alliances = [r[0] for r in await cur.fetchall()]
+        if not alliances:
+            return {"alliances": [], "snapshot_at": None, "members": []}
+
+        async with db.execute("""
+            SELECT id, snapshot_at FROM travian_stats_snapshots
+            WHERE guild_id=? AND stats_type='player'
+            ORDER BY snapshot_at DESC LIMIT 1
+        """, (guild_id,)) as cur:
+            snap = await cur.fetchone()
+        if not snap:
+            return {"alliances": alliances, "snapshot_at": None, "members": []}
+
+        placeholders = ",".join("?" * len(alliances))
+        async with db.execute(f"""
+            SELECT player_name, alliance_name, population, pop_rank,
+                   off_points, off_rank, def_points, def_rank
+            FROM travian_stats_entries
+            WHERE guild_id=? AND snapshot_id=? AND alliance_name IN ({placeholders})
+            ORDER BY population DESC
+        """, (guild_id, snap["id"], *alliances)) as cur:
+            members = [dict(r) for r in await cur.fetchall()]
+        return {"alliances": alliances, "snapshot_at": snap["snapshot_at"], "members": members}
 
 
 async def create_meta_group(guild_id: str, meta_name: str) -> int | None:
