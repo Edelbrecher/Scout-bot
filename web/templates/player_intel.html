@@ -61,6 +61,13 @@
       <h1 style="margin:0;font-size:1.5rem;">🔎 Player Intelligence</h1>
       <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Search any player from your world — villages, history, mini-map</p>
     </div>
+    {% if intel %}
+    <button type="button" id="shareIntelBtn" onclick="shareIntel(this)"
+       style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;white-space:nowrap;transition:border-color .15s;cursor:pointer;"
+       onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      🔗 Public Link
+    </button>
+    {% endif %}
     {% if intel and tw_world and intel.player_id %}
     <a href="{{ tw_world }}/spieler.php?uid={{ intel.player_id }}" target="_blank" rel="noopener"
        style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text);text-decoration:none;font-size:.82rem;white-space:nowrap;transition:border-color .15s;"
@@ -506,6 +513,31 @@ function selectPlayer(name) {
   acDrop.style.display = 'none';
   document.getElementById('searchForm').submit();
 }
+
+{% if intel %}
+{# ── Anonymized public share link ── #}
+async function shareIntel(btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳';
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/guild/{{ guild.guild_id }}/intel/share', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({player_name: {{ intel.player_name | tojson }}})
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.url) throw new Error(data.error || 'Error');
+    await navigator.clipboard.writeText(data.url).catch(() => prompt('Copy link:', data.url));
+    btn.innerHTML = '✅ Link copied!';
+    btn.style.color = '#4ade80';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.disabled = false; }, 2500);
+  } catch (e) {
+    btn.innerHTML = '❌ Error';
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2500);
+  }
+}
+{% endif %}
 
 {% if intel %}
 

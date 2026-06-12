@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ intel.player_name }} · Player Intel · TravOps</title>
+<meta property="og:title" content="{{ intel.player_name }} · Player Intel">
+<meta property="og:description" content="Shared player intelligence — TravOps">
+<meta property="og:image" content="https://travops.online/static/logo.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#0f172a; --bg-card:#1e293b; --bg-main:#0f172a;
+  --text:#e2e8f0; --text-muted:#64748b; --border:#334155; --accent:#6366f1;
+}
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
+
+#topbar {
+  display:flex; align-items:center; gap:.75rem; padding:.6rem 1rem;
+  background:var(--bg-card); border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+#topbar .logo { font-size:.9rem; font-weight:700; color:var(--accent); opacity:.85; }
+#topbar .badge {
+  font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:20px;
+  background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); color:#a5b4fc;
+}
+#topbar .spacer { flex:1; }
+#topbar .hint { font-size:.72rem; color:var(--text-muted); }
+
+.pi-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.pi-map-col { position: sticky; top: 1rem; }
+.pi-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pi-table-wrap table { min-width: 820px; }
+
+@media (max-width: 860px) {
+  .pi-main-grid { grid-template-columns: 1fr; }
+  .pi-map-col { position: static; order: -1; }
+  .pi-map-col canvas { max-height: 260px; }
+}
+@media (max-width: 600px) {
+  .pi-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo">TravOps</span>
+  <span class="badge">👁️ Read-only · Public View</span>
+  <span class="spacer"></span>
+  <span class="hint">Shared player intelligence — no information about the sharer is included</span>
+</div>
+
+<div style="max-width:1300px;margin:0 auto;padding:1.5rem 1.25rem 3rem;">
+
+{% set tribe_names = {1:'Romans',2:'Teutons',3:'Gauls',4:'Natars',5:'Huns',6:'Egyptians',7:'Spartans'} %}
+{% set tribe_icons = {1:'🏛️',2:'⚔️',3:'🌿',4:'👾',5:'🏹',6:'🏺',7:'🛡️'} %}
+{% set vt_labels = {6:'6c',7:'7c',9:'9c',15:'15c'} %}
+
+<div style="margin:0 0 1.5rem;">
+  <h1 style="margin:0;font-size:1.6rem;">🔎 {{ intel.player_name }}</h1>
+  <p style="margin:.35rem 0 0;color:var(--text-muted);font-size:.85rem;">Player Intelligence — shared view</p>
+</div>
+
+{% set trend_icon = {'up': '▲', 'down': '▼', 'same': '●'} %}
+{% set trend_color = {'up': '#22c55e', 'down': '#ef4444', 'same': 'var(--text-muted)'} %}
+<div class="pi-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem;">
+  {% set lost_count = intel.village_timeline | selectattr('is_active','equalto',false) | list | length %}
+  {% for label, val in [
+    ('Tribe',      tribe_icons.get(intel.tribe,'?') ~ ' ' ~ tribe_names.get(intel.tribe,'?')),
+    ('Alliance',   intel.alliance_name or '—'),
+    ('Villages',   intel.village_count ~ ' active' ~ (' · ' ~ lost_count ~ ' lost' if lost_count else '')),
+    ('Total Pop',  '{:,}'.format(intel.total_pop)),
+    ('Snapshots',  intel.snapshot_count),
+    ('Last seen',  intel.latest_snapshot[:10] if intel.latest_snapshot else '—'),
+  ] %}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;">
+    <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">{{ label }}</div>
+    <div style="font-size:.9rem;font-weight:600;">{{ val }}</div>
+  </div>
+  {% endfor %}
+
+  {% if intel.rank_data %}
+  {% set rd = intel.rank_data %}
+  {% for rlabel, rval, rtrend in [
+    ('Pop Rank',  rd.pop_rank,  rd.pop_trend),
+    ('Off Rank',  rd.off_rank,  rd.off_trend),
+    ('Def Rank',  rd.def_rank,  rd.def_trend),
+    ('Raid Rank', rd.raid_rank, rd.raid_trend),
+  ] %}
+  {% if rval %}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;">
+    <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">{{ rlabel }}</div>
+    <div style="font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:.4rem;">
+      #{{ '{:,}'.format(rval) }}
+      <span style="font-size:.75rem;color:{{ trend_color[rtrend] }};" title="{{ 'Rank improved' if rtrend == 'up' else ('Rank dropped' if rtrend == 'down' else 'Unchanged') }}">{{ trend_icon[rtrend] }}</span>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+</div>
+
+<div class="pi-main-grid">
+
+  {# ═══ LEFT COLUMN ═══ #}
+  <div style="min-width:0;overflow:hidden;">
+
+    {% if intel.alliance_history | length > 1 %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1.25rem;">
+      <div style="font-weight:600;font-size:.88rem;margin-bottom:.6rem;">🛡️ Alliance History</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;">
+        {% for ah in intel.alliance_history %}
+        <div style="display:flex;align-items:center;gap:.3rem;">
+          {% if not loop.first %}<span style="color:var(--text-muted);font-size:.75rem;">→</span>{% endif %}
+          <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:6px;padding:.25rem .6rem;font-size:.8rem;">
+            <span style="color:var(--text-muted);font-size:.7rem;">{{ ah.date }}&nbsp;</span>{{ ah.alliance }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Village table ── #}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:1.25rem;overflow:hidden;">
+      <div style="padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+        <span>🏘️ Villages &amp; Development</span>
+        <span style="font-size:.72rem;color:var(--text-muted);">Ø/Tag = Durchschnittliches Wachstum pro Tag über den Zeitraum</span>
+      </div>
+      <div class="pi-table-wrap">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+          <thead>
+            <tr style="background:var(--bg-main);">
+              <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);white-space:nowrap;">Village</th>
+              <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Coords</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Jetzt</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);border-left:1px solid rgba(255,255,255,.07);" title="Gesamt seit erstem Snapshot">Δ Total</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 1 Tag">Ø 1d</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 2 Tage">Ø 2d</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 3 Tage">Ø 3d</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 5 Tage">Ø 5d</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 7 Tage">Ø 7d</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 14 Tage">Ø 14d</th>
+              <th style="padding:.4rem .6rem;text-align:right;font-size:.65rem;color:var(--text-muted);" title="Ø Wachstum/Tag über 30 Tage">Ø 30d</th>
+              <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-left:1px solid rgba(255,255,255,.07);">Origin</th>
+              <th style="padding:.4rem .6rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for vt in intel.village_timeline %}
+            {% set pi = vt.get('pop_intervals', {}) %}
+            {% set origin = vt.get('origin', {}) %}
+            {% if vt.is_active %}
+              {% set cur_v = intel.current_villages | selectattr('x','equalto',vt.x) | selectattr('y','equalto',vt.y) | first %}
+              {% set cur_pop = cur_v.population if cur_v else vt.max_pop %}
+            {% else %}
+              {% set cur_pop = vt.max_pop %}
+            {% endif %}
+
+            {% macro avg_day(old_pop, days) %}
+              {% if old_pop is not none and cur_pop is not none %}
+                {% set d = cur_pop - old_pop %}
+                {% set avg = (d / days) | round(1) %}
+                {% if avg > 0 %}<span style="color:#22c55e;" title="{{ '+' if d>0 else '' }}{{ '{:,}'.format(d) }} gesamt">+{{ avg }}</span>
+                {% elif avg < 0 %}<span style="color:#ef4444;" title="{{ '{:,}'.format(d) }} gesamt">{{ avg }}</span>
+                {% else %}<span style="color:var(--text-muted);">±0</span>{% endif %}
+              {% else %}<span style="color:rgba(255,255,255,.18);">—</span>{% endif %}
+            {% endmacro %}
+
+            {% macro delta_total(old_pop) %}
+              {% if old_pop is not none and cur_pop is not none %}
+                {% set d = cur_pop - old_pop %}
+                {% if d > 0 %}<span style="color:#22c55e;">+{{ '{:,}'.format(d) }}</span>
+                {% elif d < 0 %}<span style="color:#ef4444;">{{ '{:,}'.format(d) }}</span>
+                {% else %}<span style="color:var(--text-muted);">±0</span>{% endif %}
+              {% else %}—{% endif %}
+            {% endmacro %}
+
+            <tr style="border-top:1px solid var(--border);{% if not vt.is_active %}opacity:.45;{% endif %}">
+              <td style="padding:.4rem .6rem;font-weight:500;white-space:nowrap;">
+                {% if vt.is_active and cur_v and cur_v.get('is_capital') %}<span style="color:#f59e0b;">★</span> {% endif %}
+                {{ vt.village_name or '?' }}
+                {% if vt.is_active and cur_v %}
+                  {% set ft = vt_labels.get(cur_v.get('village_type',0)|int, '') %}
+                  {% if ft %}<span style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;">{{ ft }}</span>{% endif %}
+                {% endif %}
+              </td>
+              <td style="padding:.4rem .6rem;font-family:monospace;color:var(--text-muted);font-size:.72rem;">{{ vt.x }}|{{ vt.y }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;font-weight:600;">{{ '{:,}'.format(cur_pop) if cur_pop else '—' }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;border-left:1px solid rgba(255,255,255,.07);">{{ delta_total(pi.get('first')) }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d1'),  1)  }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d2'),  2)  }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d3'),  3)  }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d5'),  5)  }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d7'),  7)  }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d14'), 14) }}</td>
+              <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d30'), 30) }}</td>
+              <td style="padding:.4rem .6rem;white-space:nowrap;border-left:1px solid rgba(255,255,255,.07);">
+                {% if origin.type == 'conquered' %}
+                <span title="Conquered from {{ origin.from_player }}{% if origin.from_alliance %} [{{ origin.from_alliance }}]{% endif %}"
+                      style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;cursor:help;">
+                  ⚔️ {{ origin.from_player[:12] }}
+                </span>
+                {% else %}
+                <span style="background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:1px 5px;font-size:.68rem;">
+                  🏗️ Settled
+                </span>
+                {% endif %}
+              </td>
+              <td style="padding:.4rem .6rem;">
+                {% if vt.is_active %}
+                <span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 5px;font-size:.68rem;">Active</span>
+                {% else %}
+                <span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;" title="{{ vt.first_seen[:10] if vt.first_seen else '' }} – {{ vt.last_seen[:10] if vt.last_seen else '' }}">Lost</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ── Population history chart ── #}
+    {% if intel.pop_history | length >= 2 %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem;">
+      <div style="font-weight:600;font-size:.88rem;margin-bottom:.75rem;">📈 Total Population History</div>
+      <canvas id="popChart" height="90" style="width:100%;display:block;"></canvas>
+      <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">
+        <span>{{ intel.pop_history[0].fetched_at[:10] }}</span>
+        <span>{{ intel.pop_history[-1].fetched_at[:10] }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>{# end left #}
+
+  {# ═══ RIGHT COLUMN — mini map ═══ #}
+  <div class="pi-map-col">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:.88rem;">🗺️ Village Map</div>
+      <canvas id="miniMap" width="340" height="340" style="display:block;width:100%;background:#2d5a1e;cursor:crosshair;"></canvas>
+      <div id="mapTip" style="padding:.4rem .75rem;font-size:.75rem;color:var(--text-muted);min-height:1.6rem;border-top:1px solid var(--border);"></div>
+      <div style="padding:.5rem .75rem;display:flex;gap:.75rem;flex-wrap:wrap;border-top:1px solid var(--border);">
+        <span style="font-size:.72rem;"><span style="color:#f59e0b;">●</span> Capital</span>
+        <span style="font-size:.72rem;"><span style="color:#6366f1;">●</span> Village</span>
+        <span style="font-size:.72rem;"><span style="color:#475569;">●</span> Lost</span>
+        <span style="font-size:.72rem;"><span style="color:#f87171;">●</span> Conquered</span>
+      </div>
+    </div>
+  </div>
+
+</div>{# end grid #}
+
+</div>
+
+<script>
+{% if intel.pop_history | length >= 2 %}
+(function(){
+  const canvas = document.getElementById('popChart');
+  if (!canvas) return;
+  const data = {{ intel.pop_history | tojson }};
+  const pops = data.map(d => d.total_pop || 0);
+  const W = canvas.offsetWidth || 500;
+  const H = 90;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const minP = Math.min(...pops), maxP = Math.max(...pops, minP+1);
+  const pad = 10;
+  const xFor = i => pad + (i / (data.length-1)) * (W - pad*2);
+  const yFor = p => H - pad - ((p - minP) / (maxP - minP)) * (H - pad*2);
+  ctx.beginPath();
+  data.forEach((d,i) => i===0 ? ctx.moveTo(xFor(i),yFor(d.total_pop)) : ctx.lineTo(xFor(i),yFor(d.total_pop)));
+  ctx.lineTo(xFor(data.length-1), H-pad); ctx.lineTo(xFor(0), H-pad); ctx.closePath();
+  ctx.fillStyle = 'rgba(99,102,241,.18)'; ctx.fill();
+  ctx.beginPath();
+  data.forEach((d,i) => i===0 ? ctx.moveTo(xFor(i),yFor(d.total_pop)) : ctx.lineTo(xFor(i),yFor(d.total_pop)));
+  ctx.strokeStyle='#6366f1'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+  data.forEach((d,i) => {
+    ctx.beginPath(); ctx.arc(xFor(i), yFor(d.total_pop), 3, 0, Math.PI*2);
+    ctx.fillStyle='#818cf8'; ctx.fill();
+  });
+  const tip = document.createElement('div');
+  tip.style.cssText='position:fixed;background:rgba(0,0,0,.85);color:#fff;padding:4px 10px;border-radius:5px;font-size:.75rem;pointer-events:none;display:none;z-index:9999;';
+  document.body.appendChild(tip);
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const idx = Math.max(0, Math.min(data.length-1, Math.round((mx - pad) / (W - pad*2) * (data.length-1))));
+    const d = data[idx];
+    tip.textContent = `${d.fetched_at.slice(0,10)}: ${(d.total_pop||0).toLocaleString()} pop · ${d.village_count} villages`;
+    tip.style.display='block'; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY-28)+'px';
+  });
+  canvas.addEventListener('mouseleave', () => tip.style.display='none');
+})();
+{% endif %}
+
+(function(){
+  const canvas = document.getElementById('miniMap');
+  if (!canvas) return;
+  const mapTip = document.getElementById('mapTip');
+
+  const activeVillages = {{ intel.current_villages | tojson }};
+  const lostVillages   = {{ intel.village_timeline | selectattr('is_active','equalto',false) | list | tojson }};
+  const origins = {};
+  {% for vt in intel.village_timeline %}
+  origins["{{ vt.x }}|{{ vt.y }}"] = {{ vt.get('origin', {}) | tojson }};
+  {% endfor %}
+
+  const all = [
+    ...activeVillages.map(v => ({...v, active:true})),
+    ...lostVillages.map(v => ({...v, active:false, population: v.max_pop})),
+  ];
+  if (!all.length) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth || 340;
+  const cssH = cssW;
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+
+  const xs = all.map(v => v.x), ys = all.map(v => v.y);
+  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const pad = Math.max(15, (Math.max(x1-x0, y1-y0)) * 0.2 + 5);
+  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  const spanX = x1 - x0, spanY = y1 - y0;
+  const span = Math.max(spanX, spanY);
+  const midX = (x0+x1)/2, midY = (y0+y1)/2;
+  x0 = midX - span/2; x1 = midX + span/2;
+  y0 = midY - span/2; y1 = midY + span/2;
+
+  function toCanvas(wx, wy) {
+    return [((wx-x0)/span)*W, H - ((wy-y0)/span)*H];
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#1e3a14'; ctx.fillRect(0,0,W,H);
+
+    const gStep = span > 300 ? 100 : span > 100 ? 50 : span > 40 ? 20 : 10;
+    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+    for (let g = Math.ceil(x0/gStep)*gStep; g <= x1; g+=gStep) {
+      const [px]=toCanvas(g,0); ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
+    }
+    for (let g = Math.ceil(y0/gStep)*gStep; g <= y1; g+=gStep) {
+      const [,py]=toCanvas(0,g); ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W,py); ctx.stroke();
+    }
+    ctx.lineWidth=1;
+    if (x0<=0 && x1>=0) {
+      const [ax]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.2)';
+      ctx.beginPath(); ctx.moveTo(ax,0); ctx.lineTo(ax,H); ctx.stroke();
+    }
+    if (y0<=0 && y1>=0) {
+      const [,ay]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.2)';
+      ctx.beginPath(); ctx.moveTo(0,ay); ctx.lineTo(W,ay); ctx.stroke();
+    }
+
+    for (const v of lostVillages) {
+      const [px,py]=toCanvas(v.x,v.y);
+      const org = origins[`${v.x}|${v.y}`]||{};
+      ctx.fillStyle = org.type==='conquered' ? 'rgba(220,60,60,.4)' : 'rgba(100,116,139,.5)';
+      ctx.fillRect(px-3,py-3,6,6);
+    }
+
+    for (const v of activeVillages) {
+      const [px,py]=toCanvas(v.x,v.y);
+      const isCapital = v.is_capital;
+      const org = origins[`${v.x}|${v.y}`]||{};
+      const conquered = org.type==='conquered';
+      if (isCapital) {
+        ctx.fillStyle='#f59e0b';
+        ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.stroke();
+      } else {
+        ctx.fillStyle = conquered ? '#f87171' : '#818cf8';
+        ctx.beginPath(); ctx.arc(px,py,4,0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    ctx.font = '9px monospace'; ctx.fillStyle = 'rgba(255,255,255,.3)';
+    ctx.fillText(`${Math.round(x0)}|${Math.round(y1)}`, 3, 11);
+    ctx.fillText(`${Math.round(x1)}|${Math.round(y0)}`, W-55, H-4);
+  }
+
+  draw();
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX-rect.left);
+    const my = (e.clientY-rect.top);
+    let best=null, bestD=Infinity;
+    for (const v of all) {
+      const [px,py]=toCanvas(v.x,v.y);
+      const d=Math.hypot(px-mx,py-my);
+      if(d<bestD){bestD=d;best=v;}
+    }
+    if (best && bestD < 14) {
+      const org = origins[`${best.x}|${best.y}`]||{};
+      const originStr = org.type==='conquered' ? ` · conquered from ${org.from_player}` : ' · settled';
+      mapTip.textContent = `${best.village_name||'?'} (${best.x}|${best.y}) · ${(best.population||0).toLocaleString()} pop${best.active===false?' · lost':''}${originStr}`;
+    } else { mapTip.textContent=''; }
+  });
+  canvas.addEventListener('mouseleave', ()=> mapTip.textContent='');
+})();
+</script>
+</body>
+</html>

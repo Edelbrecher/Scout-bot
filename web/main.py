@@ -14985,6 +14985,56 @@ async def player_intel_batch_summary(request: Request, guild_id: str, names: str
     return JSONResponse(results)
 
 
+@app.post("/guild/{guild_id}/intel/share")
+async def player_intel_create_share(request: Request, guild_id: str):
+    """Create (or re-use) an anonymized public read-only share link for a player's
+    intel page. The link contains no guild/Discord-identifying information."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    body = await request.json()
+    player_name = (body.get("player_name") or "").strip()
+    if not player_name:
+        return JSONResponse({"error": "missing_player_name"}, status_code=400)
+
+    intel = await database.get_player_intel(guild_id, player_name)
+    if not intel:
+        return JSONResponse({"error": "not_found"}, status_code=404)
+
+    short_id = await database.create_player_intel_share(
+        guild_id, player_name, created_by=session.get("username", "")
+    )
+    base = str(request.base_url).rstrip("/")
+    url = f"{base}/intel/open/{short_id}"
+    return JSONResponse({"short_id": short_id, "url": url})
+
+
+@app.get("/intel/open/{short_id}", response_class=HTMLResponse)
+async def player_intel_public_view(request: Request, short_id: str):
+    """Public, anonymized read-only view of a player's intel data.
+    No auth required, no guild/Discord identity is exposed."""
+    share = await database.get_player_intel_share(short_id)
+    if not share:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;color:#ccc;background:#0f172a;'>"
+            "<h2>🔒 This link is invalid or has expired.</h2></body></html>",
+            status_code=404,
+        )
+    intel = await database.get_player_intel(share["guild_id"], share["player_name"])
+    if not intel:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;color:#ccc;background:#0f172a;'>"
+            "<h2>🔒 This player is no longer available.</h2></body></html>",
+            status_code=404,
+        )
+    return templates.TemplateResponse("player_intel_public.html", {
+        "request": request,
+        "intel": intel,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Routes — Scout Incidents (enemy scouted our members)
 # ---------------------------------------------------------------------------

@@ -11592,6 +11592,63 @@ async def get_alliance_tracking_meta_share(short_id: str) -> dict | None:
         return d
 
 
+async def _init_player_intel_share_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS player_intel_share_links (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                short_id    TEXT UNIQUE NOT NULL,
+                created_by  TEXT DEFAULT '',
+                created_at  TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, player_name)
+            )
+        """)
+        await db.commit()
+
+
+async def create_player_intel_share(guild_id: str, player_name: str, created_by: str = "") -> str:
+    """Return a (re-used or freshly created) anonymized short_id for a player's
+    intel public view. Re-using existing links per (guild, player_name) keeps the URL stable."""
+    import secrets
+    await _init_player_intel_share_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT short_id FROM player_intel_share_links WHERE guild_id=? AND player_name=?",
+            (guild_id, player_name)
+        ) as cur:
+            row = await cur.fetchone()
+        if row:
+            return row["short_id"]
+
+        short_id = secrets.token_urlsafe(6)
+        for _ in range(5):
+            try:
+                await db.execute("""
+                    INSERT INTO player_intel_share_links
+                        (guild_id, player_name, short_id, created_by)
+                    VALUES (?,?,?,?)
+                """, (guild_id, player_name, short_id, created_by))
+                await db.commit()
+                return short_id
+            except Exception:
+                short_id = secrets.token_urlsafe(6)
+        return short_id
+
+
+async def get_player_intel_share(short_id: str) -> dict | None:
+    await _init_player_intel_share_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM player_intel_share_links WHERE short_id=?", (short_id,)
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
 # ---------------------------------------------------------------------------
 # Map Presets
 # ---------------------------------------------------------------------------
