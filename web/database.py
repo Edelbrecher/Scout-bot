@@ -8253,6 +8253,19 @@ async def _init_op_tables():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_op_waves_target ON op_waves(target_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_op_waves_attacker ON op_waves(attacker_discord_id)")
+
+        # Reusable target+wave templates ("Vorlagen")
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS op_target_templates (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    TEXT NOT NULL,
+                name        TEXT NOT NULL DEFAULT 'Vorlage',
+                data_json   TEXT NOT NULL DEFAULT '[]',
+                created_by  TEXT NOT NULL DEFAULT '',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_op_target_templates_guild ON op_target_templates(guild_id)")
         # Migration: add tournament_square if not present
         try:
             await db.execute("ALTER TABLE op_waves ADD COLUMN tournament_square INTEGER DEFAULT 0")
@@ -8504,6 +8517,111 @@ async def update_op_plan(plan_id: int, guild_id: str, **kwargs):
 async def delete_op_plan(plan_id: int, guild_id: str):
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("DELETE FROM op_plans WHERE id=? AND guild_id=?", (plan_id, guild_id))
+        await db.commit()
+
+
+async def duplicate_op_plan(plan_id: int, guild_id: str, created_by: str, new_name: str = "") -> int | None:
+    """Create a copy of a plan (header + all targets + all waves) and return the new plan_id."""
+    plan = await get_op_plan(plan_id, guild_id)
+    if not plan:
+        return None
+    name = (new_name.strip() or f"{plan['name']} (Kopie)")[:120]
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("""
+            INSERT INTO op_plans (guild_id, name, status, landing_time, server_speed,
+                                   target_ally, notes, created_by, public_code)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (guild_id, name, "draft", plan["landing_time"], plan["server_speed"],
+              plan["target_ally"], plan["notes"], created_by, _gen_public_code(5)))
+        new_plan_id = cur.lastrowid
+
+        async with db.execute(
+            "SELECT * FROM op_targets WHERE plan_id=? ORDER BY order_idx", (plan_id,)
+        ) as c:
+            targets = [dict(r) for r in await c.fetchall()]
+        async with db.execute(
+            "SELECT * FROM op_waves WHERE plan_id=? ORDER BY target_id, order_idx", (plan_id,)
+        ) as c:
+            waves = [dict(r) for r in await c.fetchall()]
+
+        waves_by_target: dict[int, list] = {}
+        for w in waves:
+            waves_by_target.setdefault(w["target_id"], []).append(w)
+
+        for t in targets:
+            tcur = await db.execute("""
+                INSERT INTO op_targets (plan_id, guild_id, player_name, village_name, x, y, population, order_idx, notes)
+                VALUES (?,?,?,?,?,?,?,?,?)
+            """, (new_plan_id, guild_id, t["player_name"], t["village_name"], t["x"], t["y"],
+                  t["population"], t["order_idx"], t["notes"]))
+            new_target_id = tcur.lastrowid
+            for w in waves_by_target.get(t["id"], []):
+                await db.execute("""
+                    INSERT INTO op_waves
+                        (target_id, plan_id, guild_id, attacker_discord_id, attacker_name,
+                         origin_village, origin_x, origin_y, wave_type, tribe, troop_json,
+                         slowest_unit, slowest_speed, travel_seconds, send_time, arrival_time,
+                         notes, order_idx, tournament_square, public_code)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (new_target_id, new_plan_id, guild_id, w["attacker_discord_id"], w["attacker_name"],
+                      w["origin_village"], w["origin_x"], w["origin_y"], w["wave_type"], w["tribe"], w["troop_json"],
+                      w["slowest_unit"], w["slowest_speed"], w["travel_seconds"], w["send_time"], w["arrival_time"],
+                      w["notes"], w["order_idx"], w["tournament_square"], _gen_public_code(5)))
+
+        await db.commit()
+        return new_plan_id
+
+
+# ── op_target_templates CRUD ────────────────────────────────────────────────────
+
+async def create_op_target_template(guild_id: str, name: str, data: list, created_by: str) -> int:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO op_target_templates (guild_id, name, data_json, created_by)
+            VALUES (?,?,?,?)
+        """, (guild_id, name[:120], _json_op.dumps(data), created_by))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_op_target_templates(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM op_target_templates WHERE guild_id=? ORDER BY created_at DESC", (guild_id,)
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        try:
+            data = _json_op.loads(r.pop("data_json") or "[]")
+        except Exception:
+            data = []
+        r["target_count"] = len(data)
+        r["wave_count"] = sum(len(t.get("waves") or []) for t in data)
+    return rows
+
+
+async def get_op_target_template(template_id: int, guild_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM op_target_templates WHERE id=? AND guild_id=?", (template_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["targets"] = _json_op.loads(d.pop("data_json") or "[]")
+    except Exception:
+        d["targets"] = []
+    return d
+
+
+async def delete_op_target_template(template_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM op_target_templates WHERE id=? AND guild_id=?", (template_id, guild_id))
         await db.commit()
 
 

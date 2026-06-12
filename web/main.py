@@ -9176,6 +9176,136 @@ async def op_delete_plan(request: Request, guild_id: str, plan_id: int):
     return JSONResponse({"ok": True})
 
 
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/duplicate")
+async def op_duplicate_plan(request: Request, guild_id: str, plan_id: int, name: str = Form("")):
+    """Duplicate an entire operation (header + all targets + all waves) as a new draft plan."""
+    session, err = await _op_api_guard(request, guild_id, check_alliance=True)
+    if err: return err
+    new_id = await database.duplicate_op_plan(plan_id, guild_id, session.get("uid",""), name.strip())
+    if new_id is None:
+        return JSONResponse({"error": "plan not found"}, status_code=404)
+    return JSONResponse({"ok": True, "id": new_id})
+
+
+# ── Target templates ("Vorlagen") ─────────────────────────────────────────────
+
+@app.get("/guild/{guild_id}/operations/api/templates")
+async def op_list_templates(request: Request, guild_id: str):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    return JSONResponse(await database.get_op_target_templates(guild_id))
+
+
+@app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/save-template")
+async def op_save_template(
+    request: Request, guild_id: str, plan_id: int,
+    name: str = Form(...),
+    target_ids: str = Form(""),
+):
+    """Save (a subset of) this plan's targets — with their waves — as a reusable template."""
+    session, err = await _op_api_guard(request, guild_id, check_alliance=True)
+    if err: return err
+    plan = await database.get_op_plan_full(plan_id, guild_id)
+    if not plan:
+        return JSONResponse({"error": "plan not found"}, status_code=404)
+
+    selected = None
+    if target_ids.strip():
+        try:
+            selected = {int(t) for t in target_ids.split(",") if t.strip()}
+        except ValueError:
+            selected = None
+
+    data = []
+    for t in plan.get("targets", []):
+        if selected is not None and t["id"] not in selected:
+            continue
+        data.append({
+            "player_name": t.get("player_name", ""),
+            "village_name": t.get("village_name", ""),
+            "x": t.get("x"),
+            "y": t.get("y"),
+            "population": t.get("population", 0),
+            "notes": t.get("notes", ""),
+            "waves": [{
+                "attacker_discord_id": w.get("attacker_discord_id", ""),
+                "attacker_name": w.get("attacker_name", ""),
+                "origin_village": w.get("origin_village", ""),
+                "origin_x": w.get("origin_x"),
+                "origin_y": w.get("origin_y"),
+                "wave_type": w.get("wave_type", "real"),
+                "tribe": w.get("tribe", "romans"),
+                "troop_json": w.get("troop_json", {}),
+                "notes": w.get("notes", ""),
+                "tournament_square": w.get("tournament_square", 0),
+            } for w in t.get("waves", [])],
+        })
+
+    if not data:
+        return JSONResponse({"error": "no_targets"}, status_code=400)
+
+    template_id = await database.create_op_target_template(guild_id, name.strip() or "Vorlage", data, session.get("uid",""))
+    return JSONResponse({"ok": True, "id": template_id, "target_count": len(data)})
+
+
+@app.post("/guild/{guild_id}/operations/api/templates/{template_id}/delete")
+async def op_delete_template(request: Request, guild_id: str, template_id: int):
+    session, err = await _op_api_guard(request, guild_id)
+    if err: return err
+    await database.delete_op_target_template(template_id, guild_id)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/operations/api/templates/{template_id}/apply")
+async def op_apply_template(
+    request: Request, guild_id: str, template_id: int,
+    plan_id: int = Form(0),
+    name: str = Form(""),
+    landing_time: str = Form(""),
+    server_speed: float = Form(1.0),
+    target_ally: str = Form(""),
+    notes: str = Form(""),
+):
+    """Apply a saved target template onto an operation — either an existing one
+    (plan_id given) or a freshly created one (plan_id omitted/0)."""
+    session, err = await _op_api_guard(request, guild_id, check_alliance=True)
+    if err: return err
+    template = await database.get_op_target_template(template_id, guild_id)
+    if not template:
+        return JSONResponse({"error": "template not found"}, status_code=404)
+
+    if plan_id:
+        plan = await database.get_op_plan(plan_id, guild_id)
+        if not plan:
+            return JSONResponse({"error": "plan not found"}, status_code=404)
+    else:
+        plan_id = await database.create_op_plan(
+            guild_id, name.strip() or template["name"],
+            landing_time, max(0.5, min(server_speed, 10.0)),
+            target_ally.strip(), notes.strip(),
+            session.get("uid",""),
+        )
+        plan = await database.get_op_plan(plan_id, guild_id)
+
+    for t in template.get("targets", []):
+        tid = await database.add_op_target(
+            plan_id, guild_id,
+            t.get("player_name",""), t.get("village_name",""),
+            t.get("x",0), t.get("y",0), t.get("population",0), t.get("notes",""),
+        )
+        for w in t.get("waves", []):
+            await database.add_op_wave(
+                tid, plan_id, guild_id,
+                w.get("attacker_discord_id",""), w.get("attacker_name",""),
+                w.get("origin_village",""), w.get("origin_x"), w.get("origin_y"),
+                w.get("wave_type","real"), w.get("tribe","romans"), w.get("troop_json") or {},
+                plan.get("landing_time") or "", plan.get("server_speed") or 1.0,
+                w.get("notes",""), tournament_square=w.get("tournament_square",0),
+            )
+
+    return JSONResponse({"ok": True, "plan_id": plan_id, "target_count": len(template.get("targets", []))})
+
+
 # ── Targets ───────────────────────────────────────────────────────────────────
 
 @app.post("/guild/{guild_id}/operations/api/plans/{plan_id}/targets")

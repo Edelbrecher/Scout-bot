@@ -312,7 +312,10 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
         </div>
         <div style="font-weight:700;font-size:.95rem;margin-top:.1rem;" data-i18n="ops.title">⚔️ Operation planning</div>
       </div>
-      <button class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;" onclick="openNewPlanModal()">+ Neu</button>
+      <div style="display:flex;gap:.4rem;">
+        <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .65rem;" onclick="openTemplatesModal()">📋 Vorlagen</button>
+        <button class="btn btn-primary" style="font-size:.78rem;padding:.3rem .65rem;" onclick="openNewPlanModal()">+ Neu</button>
+      </div>
     </div>
 
     <!-- Filter chips -->
@@ -351,6 +354,8 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
           <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openOpMap()">🗺️ Karte</button>
           <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="runCheck()">🔍 Check</button>
           <button class="btn btn-primary"   style="font-size:.78rem;padding:.3rem .75rem;" onclick="sendNotify()">📢 Benachrichtigen</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="openSaveTemplateModal()">💾 Vorlage</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .75rem;" onclick="duplicatePlan()">🧬 Duplizieren</button>
           <button class="btn-icon" onclick="openEditPlanModal()">✏️</button>
         </div>
         <button class="btn-icon danger" onclick="deletePlan()">🗑</button>
@@ -583,6 +588,93 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
     <div class="op-modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('planModal')">Cancel</button>
       <button class="btn btn-primary" onclick="savePlan()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save targets as template -->
+<div class="op-modal-overlay" id="saveTemplateModal">
+  <div class="op-modal">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">💾 Als Vorlage speichern</span>
+      <button class="btn-icon" onclick="closeModal('saveTemplateModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+      <div class="form-group">
+        <label>Name der Vorlage</label>
+        <input id="stName" type="text" placeholder="z.B. Standard-Stack 9er" maxlength="100">
+      </div>
+      <div class="form-group">
+        <label>Targets (inkl. Wellen)</label>
+        <div id="stTargetList" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem;"></div>
+      </div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAsTemplate()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Templates list / apply -->
+<div class="op-modal-overlay" id="templatesModal">
+  <div class="op-modal" style="width:min(640px,95vw);">
+    <div class="op-modal-header">
+      <span style="font-weight:700;">📋 Vorlagen</span>
+      <button class="btn-icon" onclick="closeModal('templatesModal')">✕</button>
+    </div>
+    <div class="op-modal-body">
+      <div id="templatesList"></div>
+      <div id="templateApplyForm" style="display:none;margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border);">
+        <div style="font-weight:700;margin-bottom:.5rem;">📋 Anwenden: <span id="atfTemplateName"></span></div>
+        <div class="form-group">
+          <label>Ziel-Operation</label>
+          <select id="atfPlanSelect" onchange="toggleApplyDestFields()">
+            <option value="0">+ Neue Operation</option>
+          </select>
+        </div>
+        <div id="atfNewFields">
+          <div class="form-row">
+            <div class="form-group" style="flex:2;">
+              <label>Operationname</label>
+              <input id="atfName" type="text" placeholder="z.B. Op Sturmvogel" maxlength="100">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Arrival time (Serverzeit)</label>
+              <input id="atfLanding" type="datetime-local" step="1">
+            </div>
+            <div class="form-group" style="max-width:120px;">
+              <label>Server-Speed</label>
+              <select id="atfSpeed">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+                <option value="5">5x</option>
+                <option value="10">10x</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Angegriffene Allianz (optional)</label>
+              <input id="atfAlly" type="text" placeholder="z.B. ATTILA" maxlength="80">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Noteen</label>
+            <textarea id="atfNotes" rows="2" placeholder="Infos, Targets, Koordination…" style="resize:vertical;"></textarea>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.5rem;">
+          <button class="btn btn-secondary" onclick="document.getElementById('templateApplyForm').style.display='none';">Cancel</button>
+          <button class="btn btn-primary" onclick="applyTemplate()">📋 Anwenden</button>
+        </div>
+      </div>
+    </div>
+    <div class="op-modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('templatesModal')">Schließen</button>
     </div>
   </div>
 </div>
@@ -3829,6 +3921,120 @@ async function deletePlan() {
   document.getElementById('opEmptyState').style.display='block';
   document.getElementById('opEditor').style.display='none';
   document.getElementById('opTopbar').style.display='none';
+}
+
+// ══ Target Templates ("Vorlagen") ═══════════════════════════════════════════
+async function duplicatePlan() {
+  if (!activePlanId||!activePlan) return;
+  const name = prompt('Name der neuen Operation:', `${activePlan.name} (Kopie)`);
+  if (name === null) return;
+  try {
+    const r = await apiPost(`/plans/${activePlanId}/duplicate`, {name});
+    await refreshPlanList();
+    loadPlan(r.id);
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+function openSaveTemplateModal() {
+  if (!activePlan || !activePlan.targets?.length) { alert('Diese Operation hat keine Targets.'); return; }
+  document.getElementById('stName').value = activePlan.name ? `${activePlan.name} – Vorlage` : 'Vorlage';
+  const el = document.getElementById('stTargetList');
+  el.innerHTML = activePlan.targets.map(t => `
+    <label style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.85rem;cursor:pointer;">
+      <input type="checkbox" class="st-target-cb" value="${t.id}" checked>
+      <span>${escHtml(t.player_name||'?')} — ${escHtml(t.village_name||'')} (${t.x}|${t.y}) <span style="color:var(--text-muted);">· ${(t.waves||[]).length} Welle(n)</span></span>
+    </label>`).join('');
+  openModal('saveTemplateModal');
+}
+
+async function saveAsTemplate() {
+  const name = document.getElementById('stName').value.trim();
+  if (!name) { alert('Bitte einen Namen für die Vorlage angeben.'); return; }
+  const ids = Array.from(document.querySelectorAll('.st-target-cb:checked')).map(cb=>cb.value);
+  if (!ids.length) { alert('Bitte mindestens ein Target wählen.'); return; }
+  try {
+    const r = await apiPost(`/plans/${activePlanId}/save-template`, {name, target_ids: ids.join(',')});
+    closeModal('saveTemplateModal');
+    alert(`Vorlage "${name}" gespeichert (${r.target_count} Target(s)).`);
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+let _templates = [];
+async function openTemplatesModal() {
+  document.getElementById('templateApplyForm').style.display = 'none';
+  await refreshTemplatesList();
+  openModal('templatesModal');
+}
+
+async function refreshTemplatesList() {
+  _templates = await apiFetch('/templates');
+  const el = document.getElementById('templatesList');
+  if (!_templates.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.85rem;padding:1rem 0;">Noch keine Vorlagen gespeichert.</div>';
+    return;
+  }
+  el.innerHTML = _templates.map(t => `
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .2rem;border-bottom:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:.88rem;">${escHtml(t.name)}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);">${t.target_count||0} Target(s) · ${t.wave_count||0} Welle(n) · ${fmtDatetime(t.created_at)}</div>
+      </div>
+      <button class="btn btn-secondary" style="font-size:.78rem;" onclick="openApplyTemplateForm(${t.id})">📋 Anwenden</button>
+      <button class="btn-icon danger" onclick="deleteTemplate(${t.id})">🗑</button>
+    </div>`).join('');
+}
+
+function openApplyTemplateForm(templateId) {
+  const t = _templates.find(x=>x.id===templateId);
+  if (!t) return;
+  const form = document.getElementById('templateApplyForm');
+  form.dataset.templateId = templateId;
+  document.getElementById('atfTemplateName').textContent = t.name;
+
+  const sel = document.getElementById('atfPlanSelect');
+  sel.innerHTML = '<option value="0">+ Neue Operation</option>'
+    + plans.filter(p=>p.status!=='archived').map(p=>`<option value="${p.id}">${escHtml(p.name)} (${statusLabel(p.status)})</option>`).join('');
+  sel.value = activePlanId ? String(activePlanId) : '0';
+
+  document.getElementById('atfName').value = t.name;
+  document.getElementById('atfLanding').value = '';
+  document.getElementById('atfSpeed').value = '1';
+  document.getElementById('atfAlly').value = '';
+  document.getElementById('atfNotes').value = '';
+
+  form.style.display = 'block';
+  toggleApplyDestFields();
+}
+
+function toggleApplyDestFields() {
+  const isNew = document.getElementById('atfPlanSelect').value === '0';
+  document.getElementById('atfNewFields').style.display = isNew ? 'block' : 'none';
+}
+
+async function applyTemplate() {
+  const form = document.getElementById('templateApplyForm');
+  const templateId = form.dataset.templateId;
+  const planId = document.getElementById('atfPlanSelect').value;
+  const data = {plan_id: planId};
+  if (planId === '0') {
+    data.name = document.getElementById('atfName').value.trim() || 'Neuer Operation';
+    data.landing_time = document.getElementById('atfLanding').value;
+    data.server_speed = document.getElementById('atfSpeed').value;
+    data.target_ally = document.getElementById('atfAlly').value;
+    data.notes = document.getElementById('atfNotes').value;
+  }
+  try {
+    const r = await apiPost(`/templates/${templateId}/apply`, data);
+    closeModal('templatesModal');
+    await refreshPlanList();
+    loadPlan(r.plan_id);
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Vorlage unwiderruflich löschen?')) return;
+  await apiPost(`/templates/${id}/delete`);
+  await refreshTemplatesList();
 }
 
 // ══ Helpers ═══════════════════════════════════════════════════════════════
