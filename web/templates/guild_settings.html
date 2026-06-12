@@ -24,6 +24,17 @@
     </div>
   </div>
 
+  {% if guild.workspace_type != 'personal' %}
+  <!-- Hinweis: Bot-Einstellungen (Sprache, Benachrichtigungs-Kanäle, Request-Hub, Wochen-Digest) -->
+  <div class="card" style="margin-bottom:1rem;">
+    <h2 style="margin:0 0 0.5rem; font-size:1rem;">🤖 Bot-Einstellungen</h2>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
+      Sprache, Benachrichtigungs-Kanäle, Request-Hub und Wochen-Digest findest du auf der separaten Seite
+      <a href="/guild/{{ guild.guild_id }}/bot-settings">🤖 Bot-Einstellungen</a>.
+    </p>
+  </div>
+  {% endif %}
+
   <!-- Berechtigungen reparieren -->
   {% if guild.archive_channel_id %}
   <div class="card" style="margin-bottom:1rem; border-color:rgba(245,158,11,0.3);">
