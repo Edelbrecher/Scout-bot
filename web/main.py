@@ -3253,9 +3253,6 @@ async def guild_map(request: Request, guild_id: str):
     meta_alliances = await database.get_meta_alliances(guild_id) if can_view_meta else []
     meta_groups    = await database.get_meta_groups(guild_id)    if can_view_meta else []
 
-    # Own villages — used to pre-fill coordinates in the "Freie Plätze" finder
-    own_villages = await database.get_own_village_ids(guild_id, session.get("uid", "")) if is_member else []
-
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
@@ -3267,7 +3264,6 @@ async def guild_map(request: Request, guild_id: str):
         "is_share_viewer": not is_member,
         "has_meta_premium": has_premium,
         "can_view_meta": can_view_meta,
-        "own_villages": own_villages,
     })
 
 
@@ -3748,52 +3744,6 @@ async def guild_map_heatmap_data(request: Request, guild_id: str):
     uid = session.get("uid", "")
     data = await database.get_farmlist_heatmap(guild_id, uid)
     return JSONResponse({"data": data})
-
-
-@app.get("/guild/{guild_id}/map/free-spots")
-async def map_free_spots(request: Request, guild_id: str, cx: int = 0, cy: int = 0, radius: int = 7):
-    """Return unoccupied map tiles within `radius` of (cx,cy) — candidate free
-    settlement spots, based on the latest world_snapshots data."""
-    session, err = _require_session(request)
-    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = await _require_guild_async(session, guild_id)
-    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-
-    radius = max(1, min(radius, 20))
-    result = await database.get_free_spots(guild_id, cx, cy, radius)
-    return JSONResponse(result)
-
-
-@app.post("/guild/{guild_id}/map/free-spots/tag")
-async def map_free_spots_tag(request: Request, guild_id: str):
-    """Save (or clear) a manually-tagged field distribution (e.g. '4-4-4-6', '3-3-3-9')
-    for a coordinate. Shared per world across guilds tracking that world."""
-    session, err = _require_session(request)
-    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = await _require_guild_async(session, guild_id)
-    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-
-    form = await request.form()
-    try:
-        x = int(form.get("x"))
-        y = int(form.get("y"))
-    except (TypeError, ValueError):
-        return JSONResponse({"error": "invalid_coords"}, status_code=400)
-    distribution = (form.get("distribution") or "").strip()
-
-    if distribution and not re.match(r"^\d{1,2}-\d{1,2}-\d{1,2}-\d{1,2}$", distribution):
-        return JSONResponse({"error": "invalid_format"}, status_code=400)
-    if distribution and database._parse_crop_count(distribution) is None:
-        return JSONResponse({"error": "invalid_distribution"}, status_code=400)
-
-    guild = await database.get_guild(guild_id)
-    world_url = (guild or {}).get("tw_world", "")
-    if not world_url:
-        return JSONResponse({"error": "no_world"}, status_code=400)
-
-    await database.set_field_distribution(world_url, x, y, distribution, tagged_by=session.get("username", ""))
-    return JSONResponse({"ok": True, "x": x, "y": y, "distribution": distribution or None,
-                          "crop": database._parse_crop_count(distribution) if distribution else None})
 
 
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")

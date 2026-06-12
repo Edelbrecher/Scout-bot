@@ -54,17 +54,6 @@
   border:1px solid; background:transparent; transition:opacity .15s;
 }
 .meta-btn:hover { opacity:0.8; }
-/* Number inputs without native spinner arrows — used with .num-stepper +/- buttons */
-.no-spin::-webkit-outer-spin-button,
-.no-spin::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.no-spin { -moz-appearance:textfield; appearance:textfield; }
-.num-stepper { display:inline-flex; align-items:center; gap:2px; }
-.num-stepper button {
-  width:22px; height:28px; padding:0; line-height:1; font-size:0.85rem;
-  border:1px solid var(--border); border-radius:5px; background:var(--bg);
-  color:var(--text-muted); cursor:pointer;
-}
-.num-stepper button:hover { color:var(--text); border-color:var(--accent); }
 </style>
 
 <div class="container">
@@ -148,7 +137,6 @@
     <button onclick="shareMapView(this,true)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;color:#a5b4fc;border-color:rgba(99,102,241,.45);" title="Create a public link — anyone with the URL can view this map (read-only, no login required)">🌐 Public Link</button>
     {% if not is_share_viewer %}
     <button onclick="togglePresetPanel()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Kartenansichten speichern und laden">📁 Presets</button>
-    <button onclick="toggleFreeSpotsPanel()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Freie Felder in der Nähe einer Koordinate finden">🏠 Freie Plätze</button>
     {% endif %}
     <!-- Draw toolbar -->
     <div id="drawToolbar" style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;padding:0.25rem 0.5rem;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);">
@@ -188,129 +176,6 @@
     </div>
     <div id="presetList" style="display:flex;flex-direction:column;gap:.3rem;min-height:1.5rem;">
       <span style="font-size:.78rem;color:var(--text-muted);">Loading…</span>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Free Settlement Spots Panel -->
-  {% if not is_share_viewer %}
-  <div id="freeSpotsPanel" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;margin-bottom:.5rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
-      <span style="font-size:.82rem;font-weight:600;color:var(--text);">🏠 Freie Siedlungsplätze in der Nähe</span>
-      <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
-        {% if own_villages %}
-        <select id="fsOwnVillage" onchange="selectOwnVillageForFreeSpots()" style="font-size:.78rem;padding:.3rem .4rem;max-width:180px;">
-          <option value="">🏠 Eigenes Dorf wählen…</option>
-          {% for v in own_villages %}
-          <option value="{{ v.x }}|{{ v.y }}">{{ v.village_name }} ({{ v.x }}|{{ v.y }})</option>
-          {% endfor %}
-        </select>
-        {% endif %}
-        <div class="num-stepper">
-          <button type="button" onclick="numStep('fsX',-1); clearFreeSpotsOwnVillage();" title="X -1">−</button>
-          <input type="number" id="fsX" placeholder="X" class="no-spin" oninput="clearFreeSpotsOwnVillage()" style="width:56px;text-align:center;" />
-          <button type="button" onclick="numStep('fsX',1); clearFreeSpotsOwnVillage();" title="X +1">+</button>
-        </div>
-        <div class="num-stepper">
-          <button type="button" onclick="numStep('fsY',-1); clearFreeSpotsOwnVillage();" title="Y -1">−</button>
-          <input type="number" id="fsY" placeholder="Y" class="no-spin" oninput="clearFreeSpotsOwnVillage()" style="width:56px;text-align:center;" />
-          <button type="button" onclick="numStep('fsY',1); clearFreeSpotsOwnVillage();" title="Y +1">+</button>
-        </div>
-        <button onclick="useMapCenterForFreeSpots()" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .6rem;" title="Aktuelle Kartenmitte übernehmen">📍 Kartenmitte</button>
-        <label style="font-size:.78rem;color:var(--text-muted);">Radius</label>
-        <div class="num-stepper">
-          <button type="button" onclick="numStep('fsRadius',-1,1,20)" title="Radius -1">−</button>
-          <input type="number" id="fsRadius" value="7" class="no-spin" style="width:46px;text-align:center;" />
-          <button type="button" onclick="numStep('fsRadius',1,1,20)" title="Radius +1">+</button>
-        </div>
-        <button onclick="searchFreeSpots()" class="btn btn-primary" style="font-size:.78rem;padding:.25rem .7rem;">🔍 Suchen</button>
-      </div>
-    </div>
-    <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.4rem;">
-      Zeigt Felder ohne Dorf in der letzten Karten-Erfassung (max. Radius 20). Hinweis: Oasen-Belegung wird nicht berücksichtigt — manche freien Felder können Oasen sein.
-      Die Feldverteilung (z.B. "9er"/"15er") ist Travian-intern nicht abrufbar — könnt ihr aber manuell eintragen (🏷️), sobald ihr sie im Spiel gesehen habt; sie wird dauerhaft für alle gespeichert.
-    </div>
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.4rem;">
-      <label style="font-size:.78rem;color:var(--text-muted);">Filter:</label>
-      <select id="fsCropFilter" onchange="renderFreeSpots()" style="font-size:.78rem;padding:.2rem .4rem;max-width:240px;">
-        <option value="0">Alle Felder</option>
-        <option value="tagged">Nur getaggte Felder</option>
-        <option value="untagged">Nur ungetaggte Felder ❓</option>
-        <optgroup label="Nach Getreidefeld (Crop, exakt)">
-          <option value="6">6er (Crop = 6)</option>
-          <option value="7">7er (Crop = 7)</option>
-          <option value="9">9er (Crop = 9)</option>
-          <option value="15">15er (Crop = 15)</option>
-          <option value="other">Sonstige Crop-Werte</option>
-        </optgroup>
-      </select>
-    </div>
-    <div id="freeSpotsResult" style="display:flex;flex-direction:column;gap:.25rem;max-height:260px;overflow-y:auto;">
-      <span style="font-size:.78rem;color:var(--text-muted);">Koordinaten eingeben und „Suchen“ klicken.</span>
-    </div>
-  </div>
-
-  <!-- Field distribution tag modal -->
-  <div id="fieldTagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;max-width:420px;width:90%;">
-      <div style="font-weight:600;margin-bottom:.6rem;color:var(--text);">🏷️ Feldverteilung für <span id="fieldTagCoord"></span></div>
-      <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.6rem;">
-        Trag die 4 Werte ein, die ihr im Spiel auf diesem Feld seht (Holzfäller, Lehmgrube, Eisenmine, Getreidefeld).
-        Die Summe muss immer 18 ergeben — es gibt sehr viele gültige Kombinationen
-        (z.B. 4-4-4-6 "normal", 3-4-5-6 und alle Permutationen, 3-4-4-7 / 4-3-4-7 / 4-4-3-7 "7er", 3-3-3-9 "9er", 1-1-1-15 "15er").
-      </div>
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.5rem;">
-        <div>
-          <label style="font-size:.7rem;color:var(--text-muted);display:block;margin-bottom:2px;">🪵 Holz</label>
-          <div class="num-stepper">
-            <button type="button" onclick="numStep('fieldTagWood',-1,0,18); updateFieldTagSum();" title="-1">−</button>
-            <input type="number" id="fieldTagWood" class="no-spin" value="4" oninput="updateFieldTagSum()" style="width:46px;text-align:center;" />
-            <button type="button" onclick="numStep('fieldTagWood',1,0,18); updateFieldTagSum();" title="+1">+</button>
-          </div>
-        </div>
-        <div>
-          <label style="font-size:.7rem;color:var(--text-muted);display:block;margin-bottom:2px;">🧱 Lehm</label>
-          <div class="num-stepper">
-            <button type="button" onclick="numStep('fieldTagClay',-1,0,18); updateFieldTagSum();" title="-1">−</button>
-            <input type="number" id="fieldTagClay" class="no-spin" value="4" oninput="updateFieldTagSum()" style="width:46px;text-align:center;" />
-            <button type="button" onclick="numStep('fieldTagClay',1,0,18); updateFieldTagSum();" title="+1">+</button>
-          </div>
-        </div>
-        <div>
-          <label style="font-size:.7rem;color:var(--text-muted);display:block;margin-bottom:2px;">⛏️ Eisen</label>
-          <div class="num-stepper">
-            <button type="button" onclick="numStep('fieldTagIron',-1,0,18); updateFieldTagSum();" title="-1">−</button>
-            <input type="number" id="fieldTagIron" class="no-spin" value="4" oninput="updateFieldTagSum()" style="width:46px;text-align:center;" />
-            <button type="button" onclick="numStep('fieldTagIron',1,0,18); updateFieldTagSum();" title="+1">+</button>
-          </div>
-        </div>
-        <div>
-          <label style="font-size:.7rem;color:var(--text-muted);display:block;margin-bottom:2px;">🌾 Crop</label>
-          <div class="num-stepper">
-            <button type="button" onclick="numStep('fieldTagCrop',-1,0,18); updateFieldTagSum();" title="-1">−</button>
-            <input type="number" id="fieldTagCrop" class="no-spin" value="6" oninput="updateFieldTagSum()" style="width:46px;text-align:center;" />
-            <button type="button" onclick="numStep('fieldTagCrop',1,0,18); updateFieldTagSum();" title="+1">+</button>
-          </div>
-        </div>
-      </div>
-      <div id="fieldTagSum" style="font-size:.78rem;margin-bottom:.6rem;"></div>
-      <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.7rem;">
-        <span style="font-size:.7rem;color:var(--text-muted);align-self:center;">Schnellauswahl:</span>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(4,4,4,6)">4-4-4-6</button>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(3,4,5,6)">3-4-5-6</button>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(3,4,4,7)">3-4-4-7</button>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(4,3,4,7)">4-3-4-7</button>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(4,4,3,7)">4-4-3-7</button>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(3,3,3,9)">3-3-3-9 (9er)</button>
-        <button type="button" class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="setFieldTagPreset(1,1,1,15)">1-1-1-15 (15er)</button>
-      </div>
-      <div style="display:flex;justify-content:space-between;gap:.4rem;flex-wrap:wrap;">
-        <button type="button" class="btn btn-secondary" onclick="closeFieldTagModal()">Abbrechen</button>
-        <div style="display:flex;gap:.4rem;">
-          <button type="button" class="btn btn-secondary" style="color:#f87171;" onclick="saveFieldTag('')">🗑️ Entfernen</button>
-          <button type="button" class="btn btn-primary" id="fieldTagSaveBtn" onclick="saveFieldTag(undefined)">💾 Speichern</button>
-        </div>
-      </div>
     </div>
   </div>
   {% endif %}
@@ -474,8 +339,6 @@ let camX = 0, camY = 0;
 let dragging   = false, dragSX = 0, dragSY = 0, camSX = 0, camSY = 0;
 let highlighted = new Map();   // "x|y" → highlight color
 let viewMode    = 'tribe';
-let _freeSpotsOverlay = [];    // free settlement spots shown on the map (from Free-Spots panel)
-let _freeSpotsSearchArea = null; // {x,y,radius} of the last free-spots search, for the area outline
 
 // Multi-filter state
 let playerFilters   = [];   // [{name, color}]
@@ -648,9 +511,6 @@ function draw() {
   const [vx0,vy1]=canvasToWorld(-scale,H+scale);
   const [vx1,vy0]=canvasToWorld(W+scale,-scale);
   const hasFilter = highlighted.size > 0 || playerFilters.length > 0 || allianceFilters.length > 0;
-  // While a free-spots search is showing matching tiles, dim out all regular
-  // villages so only the matches stand out clearly on the map.
-  const freeSpotsActive = _freeSpotsOverlay.length > 0;
   const tS = Math.max(1,scale);
 
   // Label collision detection: track occupied screen regions
@@ -673,7 +533,7 @@ function draw() {
     const isScouted= scoutMap.has(key);
     const hlColor  = highlighted.get(key);
     const isHL     = !!hlColor;
-    const dim      = freeSpotsActive || (hasFilter && !isHL && !isScouted);
+    const dim      = hasFilter && !isHL && !isScouted;
 
     // In alliance heatmap mode, skip villages of alliances the user hid via the legend
     if (viewMode === 'alliance' && !isHL && !isScouted && v.alliance &&
@@ -710,7 +570,7 @@ function draw() {
   ctx.restore();
 
   // ── Treasury overlays ──────────────────────────────────────────────────────
-  if (!freeSpotsActive && _showTreasuries && _treasuries.length && scale >= 2) {
+  if (_showTreasuries && _treasuries.length && scale >= 2) {
     for (const t of _treasuries) {
       if (!t.x && !t.y) continue;
       const [cx, cy] = worldToCanvas(t.x, t.y);
@@ -732,37 +592,6 @@ function draw() {
       }
       ctx.restore();
     }
-  }
-
-  // ── Free settlement spots overlay ───────────────────────────────────────────
-  // While a free-spots search is active, only the matching tiles are shown as
-  // solid green squares (everything else above was already dimmed out via
-  // `freeSpotsActive`). Keep this minimal — no icons/labels cluttering the map.
-  if (_freeSpotsOverlay.length) {
-    for (const s of _freeSpotsOverlay) {
-      if (s.x<vx0||s.x>vx1||s.y<vy1||s.y>vy0) continue;
-      const [cx, cy] = worldToCanvas(s.x, s.y);
-      const r = Math.max(2.5, tS*0.85);
-      ctx.save();
-      ctx.shadowColor = '#22c55e'; ctx.shadowBlur = scale>3?6:2;
-      ctx.fillStyle = '#22c55e';
-      ctx.fillRect(cx-r, cy-r, r*2, r*2);
-      ctx.restore();
-    }
-  }
-
-  // Outline of the last searched area, so the user gets visual feedback even
-  // when "Alle Felder" / no markers are shown.
-  if (_freeSpotsSearchArea) {
-    const a = _freeSpotsSearchArea;
-    const [bx0, by0] = worldToCanvas(a.x - a.radius - 0.5, a.y + a.radius + 0.5);
-    const [bx1, by1] = worldToCanvas(a.x + a.radius + 0.5, a.y - a.radius - 0.5);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(34,197,94,0.6)';
-    ctx.lineWidth = Math.max(1, scale * 0.15);
-    ctx.setLineDash([6, 4]);
-    ctx.strokeRect(bx0, by0, bx1-bx0, by1-by0);
-    ctx.restore();
   }
 }
 
@@ -1696,309 +1525,6 @@ function togglePresetPanel() {
   _presetPanelOpen = !_presetPanelOpen;
   panel.style.display = _presetPanelOpen ? 'block' : 'none';
   if (_presetPanelOpen) loadPresets();
-}
-
-// ── Free Settlement Spots Finder ────────────────────────────────────────────
-let _freeSpotsPanelOpen = false;
-function toggleFreeSpotsPanel() {
-  const panel = document.getElementById('freeSpotsPanel');
-  if (!panel) return;
-  _freeSpotsPanelOpen = !_freeSpotsPanelOpen;
-  panel.style.display = _freeSpotsPanelOpen ? 'block' : 'none';
-  if (_freeSpotsPanelOpen) {
-    const xEl = document.getElementById('fsX'), yEl = document.getElementById('fsY');
-    if (xEl && yEl && xEl.value === '' && yEl.value === '') {
-      xEl.value = Math.round(camX);
-      yEl.value = Math.round(camY);
-    }
-  } else {
-    // Hide overlay markers and search-area outline on the map when the panel is closed
-    _freeSpotsOverlay = [];
-    _freeSpotsSearchArea = null;
-    draw();
-  }
-}
-
-function useMapCenterForFreeSpots() {
-  document.getElementById('fsX').value = Math.round(camX);
-  document.getElementById('fsY').value = Math.round(camY);
-  clearFreeSpotsOwnVillage();
-}
-
-// Reset the "Eigenes Dorf" dropdown back to the placeholder when the user
-// manually edits the coordinates, so the two inputs don't fight each other.
-function clearFreeSpotsOwnVillage() {
-  const sel = document.getElementById('fsOwnVillage');
-  if (sel) sel.value = '';
-}
-
-// Increment/decrement a numeric input by `delta`, clamped to [min,max] if given.
-function numStep(id, delta, min, max) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  let v = parseInt(el.value);
-  if (isNaN(v)) v = 0;
-  v += delta;
-  if (min !== undefined) v = Math.max(min, v);
-  if (max !== undefined) v = Math.min(max, v);
-  el.value = v;
-}
-
-// Populate fsX/fsY from the selected own-village dropdown
-function selectOwnVillageForFreeSpots() {
-  const sel = document.getElementById('fsOwnVillage');
-  if (!sel || !sel.value) return;
-  const [x, y] = sel.value.split('|');
-  document.getElementById('fsX').value = x;
-  document.getElementById('fsY').value = y;
-}
-
-let _freeSpotsData = null;
-
-async function searchFreeSpots() {
-  const resultEl = document.getElementById('freeSpotsResult');
-  // Safety net: if an own village is selected in the dropdown, make sure
-  // fsX/fsY actually reflect it (e.g. after browser form-state restore the
-  // dropdown can show a village while the coordinate fields are still 0/0).
-  const ownSel = document.getElementById('fsOwnVillage');
-  if (ownSel && ownSel.value) {
-    const [vx, vy] = ownSel.value.split('|');
-    document.getElementById('fsX').value = vx;
-    document.getElementById('fsY').value = vy;
-  }
-  const cx = parseInt(document.getElementById('fsX').value);
-  const cy = parseInt(document.getElementById('fsY').value);
-  let radius = parseInt(document.getElementById('fsRadius').value) || 7;
-  radius = Math.max(1, Math.min(radius, 20));
-  document.getElementById('fsRadius').value = radius;
-  document.getElementById('fsCropFilter').value = '0';
-  if (isNaN(cx) || isNaN(cy)) {
-    resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Bitte X und Y eingeben.</span>';
-    return;
-  }
-  resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Suche…</span>';
-  try {
-    const res = await fetch(`/guild/${GUILD_ID}/map/free-spots?cx=${cx}&cy=${cy}&radius=${radius}`, {credentials: 'same-origin'});
-    const data = await res.json();
-    if (data.error) {
-      resultEl.innerHTML = `<span style="font-size:.78rem;color:#f87171;">${data.error}</span>`;
-      return;
-    }
-    _freeSpotsData = data;
-    populateCropFilterOptions(data.spots || []);
-    _freeSpotsSearchArea = {x: data.center.x, y: data.center.y, radius: data.radius};
-    // Always jump the map to the searched area, even before any filter is applied.
-    const fitScale = Math.min(20, Math.max(2, Math.floor(220 / Math.max(1, data.radius*2))));
-    panTo(data.center.x, data.center.y, fitScale);
-    renderFreeSpots();
-  } catch (e) {
-    resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler bei der Suche.</span>';
-  }
-}
-
-// Rebuild the "Felderart" filter dropdown based on the distributions actually
-// tagged within the current search results, so users can search for any
-// specific village/field type (e.g. 3-4-4-7, 4-3-4-7, 3-4-5-6, ...) and not
-// just a generic "9er+" threshold.
-function populateCropFilterOptions(spots) {
-  const sel = document.getElementById('fsCropFilter');
-  if (!sel) return;
-  const counts = {};
-  let taggedCount = 0, untaggedCount = 0;
-  for (const s of spots) {
-    if (s.distribution) {
-      taggedCount++;
-      counts[s.distribution] = (counts[s.distribution] || 0) + 1;
-    } else {
-      untaggedCount++;
-    }
-  }
-  // Bucket tagged distributions by their crop value (last number), so each
-  // crop category (6er/7er/9er/15er/...) can list its own sub-variants
-  // (e.g. 6er: 4-4-4-6, 3-4-5-6, 3-5-4-6, ...).
-  const byCrop = {};
-  for (const d of Object.keys(counts)) {
-    const crop = parseInt(d.split('-')[3]);
-    if (isNaN(crop)) continue;
-    (byCrop[crop] = byCrop[crop] || []).push(d);
-  }
-  let html = `<option value="0">Alle Felder (${spots.length})</option>`;
-  html += `<option value="tagged">Nur getaggte Felder (${taggedCount})</option>`;
-  html += `<option value="untagged">Nur ungetaggte Felder ❓ (${untaggedCount})</option>`;
-  html += '<optgroup label="Nach Getreidefeld (Crop, exakt)">'
-        + '<option value="6">6er (Crop = 6)</option>'
-        + '<option value="7">7er (Crop = 7)</option>'
-        + '<option value="9">9er (Crop = 9)</option>'
-        + '<option value="15">15er (Crop = 15)</option>'
-        + '<option value="other">Sonstige Crop-Werte</option>'
-        + '</optgroup>';
-  const cropsSorted = Object.keys(byCrop).map(c => parseInt(c)).sort((a, b) => b - a);
-  for (const crop of cropsSorted) {
-    const dists = byCrop[crop].sort((a, b) => a.localeCompare(b));
-    html += `<optgroup label="${crop}er-Felder – Dorfarten (getaggt)">`;
-    for (const d of dists) {
-      html += `<option value="dist:${d}">${d} (${counts[d]}x)</option>`;
-    }
-    html += '</optgroup>';
-  }
-  sel.innerHTML = html;
-  sel.value = '0';
-}
-
-function renderFreeSpots() {
-  const resultEl = document.getElementById('freeSpotsResult');
-  if (!_freeSpotsData) return;
-  const data = _freeSpotsData;
-  let spots = data.spots || [];
-  if (!spots.length) {
-    resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Keine freien Felder in diesem Radius gefunden.</span>';
-    _freeSpotsOverlay = [];
-    draw();
-    return;
-  }
-  const filter = document.getElementById('fsCropFilter').value;
-
-  // "Alle Felder" would highlight every empty tile in the radius (often
-  // hundreds/thousands) which just looks like a solid green blob. Instead,
-  // show a summary and ask the user to pick a specific Felderart/Filter.
-  if (filter === '0') {
-    _freeSpotsOverlay = [];
-    draw();
-    const taggedCount = spots.filter(s => s.distribution).length;
-    resultEl.innerHTML = `<div style="font-size:.78rem;color:var(--text-muted);">`
-      + `${spots.length} freie Felder im Radius ${data.radius} gefunden (${taggedCount} davon getaggt).<br>`
-      + `Wähle oben einen Filter bzw. eine Dorfart aus, um passende Felder auf der Karte zu sehen.</div>`;
-    return;
-  }
-
-  let filtered = spots;
-  if (filter === 'tagged') {
-    filtered = spots.filter(s => s.distribution);
-  } else if (filter === 'untagged') {
-    filtered = spots.filter(s => !s.distribution);
-  } else if (filter.startsWith('dist:')) {
-    const wanted = filter.slice(5);
-    filtered = spots.filter(s => s.distribution === wanted);
-  } else if (filter === 'other') {
-    filtered = spots.filter(s => s.crop !== null && s.crop !== undefined && ![6, 7, 9, 15].includes(s.crop));
-  } else {
-    const exactCrop = parseInt(filter);
-    filtered = spots.filter(s => s.crop === exactCrop);
-  }
-
-  // Highlight the (filtered) results directly on the map
-  _freeSpotsOverlay = filtered;
-  draw();
-  // Make sure the search area is actually visible
-  if (filtered.length) {
-    const fitScale = Math.min(20, Math.max(2, Math.floor(220 / Math.max(1, data.radius*2))));
-    panTo(data.center.x, data.center.y, Math.max(scale, fitScale));
-  }
-
-  if (!filtered.length) {
-    const taggedCount = spots.filter(s => s.distribution).length;
-    let extra = '';
-    if (filter !== 'tagged' && filter !== 'untagged' && !filter.startsWith('dist:') && taggedCount === 0) {
-      extra = ' Hinweis: Es wurde im Suchbereich noch kein Feld mit Feldverteilung getaggt (🏷️) — daher liefert dieser Filter aktuell keine Treffer.';
-    } else if (filter === 'tagged' && taggedCount === 0) {
-      extra = ' Hinweis: Im Suchbereich wurde noch kein Feld getaggt.';
-    }
-    resultEl.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">0 von ${spots.length} freien Feldern passen zum Filter (Radius ${data.radius}).${extra}</div>`;
-    return;
-  }
-  let html = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">${filtered.length} von ${spots.length} freien Feldern (Radius ${data.radius}) — grün auf der Karte markiert:</div>`;
-  html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;">';
-  for (const s of filtered) {
-    const label = s.distribution ? `${s.distribution} (${s.crop}er)` : '❓';
-    html += `<span style="display:inline-flex;align-items:center;gap:.15rem;border:1px solid var(--border);border-radius:6px;overflow:hidden;">`
-          + `<button class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;border:none;border-radius:0;" onclick="panTo(${s.x},${s.y},Math.max(scale,10))" title="Auf der Karte anzeigen">(${s.x}|${s.y}) · ${s.distance} · ${label}</button>`
-          + `<button class="btn btn-secondary" style="font-size:.7rem;padding:.2rem .35rem;border:none;border-left:1px solid var(--border);border-radius:0;" onclick="tagFreeSpot(${s.x},${s.y})" title="Feldverteilung eintragen/ändern">🏷️</button>`
-          + `</span>`;
-  }
-  html += '</div>';
-  resultEl.innerHTML = html;
-}
-
-// ── Field distribution tag modal ────────────────────────────────────────────
-let _fieldTagCoord = null;
-
-function tagFreeSpot(x, y) {
-  _fieldTagCoord = {x, y};
-  const current = (_freeSpotsData.spots.find(s => s.x === x && s.y === y) || {}).distribution || '';
-  document.getElementById('fieldTagCoord').textContent = `(${x}|${y})`;
-  const parts = current ? current.split('-').map(n => parseInt(n)) : [4,4,4,6];
-  setFieldTagPreset(...(parts.length === 4 ? parts : [4,4,4,6]));
-  document.getElementById('fieldTagModal').style.display = 'flex';
-}
-
-function closeFieldTagModal() {
-  document.getElementById('fieldTagModal').style.display = 'none';
-  _fieldTagCoord = null;
-}
-
-function setFieldTagPreset(w, c, i, r) {
-  document.getElementById('fieldTagWood').value = w;
-  document.getElementById('fieldTagClay').value = c;
-  document.getElementById('fieldTagIron').value = i;
-  document.getElementById('fieldTagCrop').value = r;
-  updateFieldTagSum();
-}
-
-function updateFieldTagSum() {
-  const w = parseInt(document.getElementById('fieldTagWood').value) || 0;
-  const c = parseInt(document.getElementById('fieldTagClay').value) || 0;
-  const i = parseInt(document.getElementById('fieldTagIron').value) || 0;
-  const r = parseInt(document.getElementById('fieldTagCrop').value) || 0;
-  const sum = w + c + i + r;
-  const sumEl = document.getElementById('fieldTagSum');
-  const saveBtn = document.getElementById('fieldTagSaveBtn');
-  if (sum === 18) {
-    sumEl.innerHTML = `Summe: <strong style="color:#4ade80;">${sum} / 18 ✅</strong> &nbsp;→ ${w}-${c}-${i}-${r} (${r}er Crop)`;
-    if (saveBtn) saveBtn.disabled = false;
-  } else {
-    sumEl.innerHTML = `Summe: <strong style="color:#f87171;">${sum} / 18</strong> — muss genau 18 ergeben`;
-    if (saveBtn) saveBtn.disabled = true;
-  }
-}
-
-async function saveFieldTag(dist) {
-  if (!_fieldTagCoord) return;
-  const {x, y} = _fieldTagCoord;
-  if (dist === undefined) {
-    const w = parseInt(document.getElementById('fieldTagWood').value) || 0;
-    const c = parseInt(document.getElementById('fieldTagClay').value) || 0;
-    const i = parseInt(document.getElementById('fieldTagIron').value) || 0;
-    const r = parseInt(document.getElementById('fieldTagCrop').value) || 0;
-    if (w + c + i + r !== 18) {
-      alert(`Die 4 Werte müssen in Summe 18 ergeben (aktuell ${w+c+i+r}).`);
-      return;
-    }
-    dist = `${w}-${c}-${i}-${r}`;
-  }
-  try {
-    const fd = new FormData();
-    fd.append('x', x); fd.append('y', y); fd.append('distribution', dist);
-    const res = await fetch(`/guild/${GUILD_ID}/map/free-spots/tag`, {method: 'POST', body: fd, credentials: 'same-origin'});
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      alert('Fehler beim Speichern: ' + (data.error || res.status));
-      return;
-    }
-    const spot = _freeSpotsData.spots.find(s => s.x === x && s.y === y);
-    if (spot) {
-      spot.distribution = data.distribution;
-      spot.crop = data.crop;
-    }
-    closeFieldTagModal();
-    const prevFilter = document.getElementById('fsCropFilter').value;
-    populateCropFilterOptions(_freeSpotsData.spots);
-    // Keep the user on the same exact-distribution filter if it still exists
-    const sel = document.getElementById('fsCropFilter');
-    if ([...sel.options].some(o => o.value === prevFilter)) sel.value = prevFilter;
-    renderFreeSpots();
-  } catch (e) {
-    alert('Fehler beim Speichern.');
-  }
 }
 
 async function loadPresets() {
