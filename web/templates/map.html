@@ -647,6 +647,9 @@ function draw() {
   const [vx0,vy1]=canvasToWorld(-scale,H+scale);
   const [vx1,vy0]=canvasToWorld(W+scale,-scale);
   const hasFilter = highlighted.size > 0 || playerFilters.length > 0 || allianceFilters.length > 0;
+  // While a free-spots search is showing matching tiles, dim out all regular
+  // villages so only the matches stand out clearly on the map.
+  const freeSpotsActive = _freeSpotsOverlay.length > 0;
   const tS = Math.max(1,scale);
 
   // Label collision detection: track occupied screen regions
@@ -669,7 +672,7 @@ function draw() {
     const isScouted= scoutMap.has(key);
     const hlColor  = highlighted.get(key);
     const isHL     = !!hlColor;
-    const dim      = hasFilter && !isHL && !isScouted;
+    const dim      = freeSpotsActive || (hasFilter && !isHL && !isScouted);
 
     // In alliance heatmap mode, skip villages of alliances the user hid via the legend
     if (viewMode === 'alliance' && !isHL && !isScouted && v.alliance &&
@@ -706,7 +709,7 @@ function draw() {
   ctx.restore();
 
   // ── Treasury overlays ──────────────────────────────────────────────────────
-  if (_showTreasuries && _treasuries.length && scale >= 2) {
+  if (!freeSpotsActive && _showTreasuries && _treasuries.length && scale >= 2) {
     for (const t of _treasuries) {
       if (!t.x && !t.y) continue;
       const [cx, cy] = worldToCanvas(t.x, t.y);
@@ -731,22 +734,18 @@ function draw() {
   }
 
   // ── Free settlement spots overlay ───────────────────────────────────────────
+  // While a free-spots search is active, only the matching tiles are shown as
+  // solid green squares (everything else above was already dimmed out via
+  // `freeSpotsActive`). Keep this minimal — no icons/labels cluttering the map.
   if (_freeSpotsOverlay.length) {
     for (const s of _freeSpotsOverlay) {
       if (s.x<vx0||s.x>vx1||s.y<vy1||s.y>vy0) continue;
       const [cx, cy] = worldToCanvas(s.x, s.y);
-      const r = Math.max(3, tS*0.9);
+      const r = Math.max(2.5, tS*0.85);
       ctx.save();
-      ctx.shadowColor = '#22c55e'; ctx.shadowBlur = scale>3?8:3;
-      ctx.strokeStyle = '#22c55e'; ctx.lineWidth = Math.max(1.5, scale*0.25);
-      ctx.strokeRect(cx-r, cy-r, r*2, r*2);
-      if (scale >= 4) {
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#22c55e';
-        ctx.font = `bold ${Math.max(8, scale*0.8)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(s.distribution ? `${s.crop}er` : '🏠', cx, cy-r-2);
-      }
+      ctx.shadowColor = '#22c55e'; ctx.shadowBlur = scale>3?6:2;
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(cx-r, cy-r, r*2, r*2);
       ctx.restore();
     }
   }
