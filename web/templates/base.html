@@ -17,7 +17,7 @@
   <!-- Discord accent colour -->
   <meta name="theme-color"         content="#5865f2" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260611c" />
+  <link rel="stylesheet" href="/static/style.css?v=20260613a" />
   {% block extra_head %}{% endblock %}
   <style>
   /* Global modal input fix — applies dark theme to ALL .modal-box inputs site-wide */
@@ -83,10 +83,14 @@
       <div class="nav-server-menu" id="navServerMenu"></div>
     </div>
     <div class="nav-links" style="align-items:center;">
+      <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links-extra" id="navLinksExtra">
       {% if guild is defined and guild %}
         {% set _world_url = guild.tw_world or '' %}
         {% set _world_name = _world_url | replace('https://','') | replace('http://','') | replace('/','') if _world_url else '' %}
-        <div style="display:flex;align-items:center;gap:.35rem;padding:.2rem .7rem;
+        <div class="nav-guild-chip" style="display:flex;align-items:center;gap:.35rem;padding:.2rem .7rem;
                     background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);
                     border-radius:20px;font-size:.78rem;color:#a5b4fc;white-space:nowrap;max-width:220px;">
           <span style="font-size:.85rem;">🌍</span>
@@ -124,6 +128,7 @@
                display:flex;align-items:center;gap:0.3rem;transition:background 0.15s;">
         ❓ <span style="font-size:0.8rem;" data-i18n="nav.tour">Tour</span>
       </button>
+      </div>
       {% set _username = get_username(request) %}
       {% if _username %}
       <div class="nav-profile" id="navProfileWrap">
@@ -348,6 +353,21 @@ document.addEventListener('click', e => {
   const wrap = document.getElementById('navProfileWrap');
   if (wrap && !wrap.contains(e.target)) {
     document.getElementById('navProfileMenu')?.classList.remove('open');
+  }
+});
+
+// ── Mobile navbar menu ──────────────────────────────────────────────────────
+function toggleMobileNav() {
+  document.getElementById('navHamburger')?.classList.toggle('open');
+  document.getElementById('navLinksExtra')?.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const extra = document.getElementById('navLinksExtra');
+  const burger = document.getElementById('navHamburger');
+  if (!extra || !extra.classList.contains('open')) return;
+  if (!extra.contains(e.target) && !burger.contains(e.target)) {
+    extra.classList.remove('open');
+    burger.classList.remove('open');
   }
 });
 
