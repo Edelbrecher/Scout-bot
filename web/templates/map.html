@@ -475,6 +475,7 @@ let dragging   = false, dragSX = 0, dragSY = 0, camSX = 0, camSY = 0;
 let highlighted = new Map();   // "x|y" → highlight color
 let viewMode    = 'tribe';
 let _freeSpotsOverlay = [];    // free settlement spots shown on the map (from Free-Spots panel)
+let _freeSpotsSearchArea = null; // {x,y,radius} of the last free-spots search, for the area outline
 
 // Multi-filter state
 let playerFilters   = [];   // [{name, color}]
@@ -748,6 +749,20 @@ function draw() {
       ctx.fillRect(cx-r, cy-r, r*2, r*2);
       ctx.restore();
     }
+  }
+
+  // Outline of the last searched area, so the user gets visual feedback even
+  // when "Alle Felder" / no markers are shown.
+  if (_freeSpotsSearchArea) {
+    const a = _freeSpotsSearchArea;
+    const [bx0, by0] = worldToCanvas(a.x - a.radius - 0.5, a.y + a.radius + 0.5);
+    const [bx1, by1] = worldToCanvas(a.x + a.radius + 0.5, a.y - a.radius - 0.5);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34,197,94,0.6)';
+    ctx.lineWidth = Math.max(1, scale * 0.15);
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(bx0, by0, bx1-bx0, by1-by0);
+    ctx.restore();
   }
 }
 
@@ -1697,8 +1712,9 @@ function toggleFreeSpotsPanel() {
       yEl.value = Math.round(camY);
     }
   } else {
-    // Hide overlay markers on the map when the panel is closed
+    // Hide overlay markers and search-area outline on the map when the panel is closed
     _freeSpotsOverlay = [];
+    _freeSpotsSearchArea = null;
     draw();
   }
 }
@@ -1770,6 +1786,10 @@ async function searchFreeSpots() {
     }
     _freeSpotsData = data;
     populateCropFilterOptions(data.spots || []);
+    _freeSpotsSearchArea = {x: data.center.x, y: data.center.y, radius: data.radius};
+    // Always jump the map to the searched area, even before any filter is applied.
+    const fitScale = Math.min(20, Math.max(2, Math.floor(220 / Math.max(1, data.radius*2))));
+    panTo(data.center.x, data.center.y, fitScale);
     renderFreeSpots();
   } catch (e) {
     resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler bei der Suche.</span>';
