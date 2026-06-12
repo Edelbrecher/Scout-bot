@@ -5,7 +5,15 @@
 <div class="container" style="max-width:800px;">
 
   <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-  <h1 style="margin:0.5rem 0 1.5rem; font-size:1.5rem;" data-i18n="settings.title">⚙️ Server Management</h1>
+  <h1 style="margin:0.5rem 0 0.5rem; font-size:1.5rem;" data-i18n="settings.title">⚙️ Server Management</h1>
+
+  {% if guild.workspace_type != 'personal' %}
+  <div class="settings-tabs">
+    <a href="/guild/{{ guild.guild_id }}/settings" class="settings-tab active">⚙️ Server Management</a>
+    <a href="/guild/{{ guild.guild_id }}/bot-settings" class="settings-tab">🤖 Bot-Einstellungen</a>
+    <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="settings-tab">🌍 World / Server</a>
+  </div>
+  {% endif %}
 
   {% if flash %}
   <div style="padding:0.75rem 1rem; border-radius:8px; margin-bottom:1rem;
@@ -23,17 +31,6 @@
       <span style="color:#f59e0b;">💳 Subscription &amp; bot removal</span> is only available to the subscription owner.
     </div>
   </div>
-
-  {% if guild.workspace_type != 'personal' %}
-  <!-- Hinweis: Bot-Einstellungen (Sprache, Benachrichtigungs-Kanäle, Request-Hub, Wochen-Digest) -->
-  <div class="card" style="margin-bottom:1rem;">
-    <h2 style="margin:0 0 0.5rem; font-size:1rem;">🤖 Bot-Einstellungen</h2>
-    <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
-      Sprache, Benachrichtigungs-Kanäle, Request-Hub und Wochen-Digest findest du auf der separaten Seite
-      <a href="/guild/{{ guild.guild_id }}/bot-settings">🤖 Bot-Einstellungen</a>.
-    </p>
-  </div>
-  {% endif %}
 
   <!-- Berechtigungen reparieren -->
   {% if guild.archive_channel_id %}

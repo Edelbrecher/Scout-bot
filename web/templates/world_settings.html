@@ -9,7 +9,15 @@
     </a>
   </div>
   <h1 style="margin:.5rem 0 .25rem;" data-i18n="worldsettings.title">🌍 World / Server</h1>
-  <p class="subtitle" style="margin:0 0 1.5rem;" data-i18n="worldsettings.subtitle">Travian server URL und Bot-Settings</p>
+  <p class="subtitle" style="margin:0 0 .5rem;" data-i18n="worldsettings.subtitle">Travian server URL und Bot-Settings</p>
+
+  {% if guild.workspace_type != 'personal' %}
+  <div class="settings-tabs">
+    <a href="/guild/{{ guild.guild_id }}/settings" class="settings-tab">⚙️ Server Management</a>
+    <a href="/guild/{{ guild.guild_id }}/bot-settings" class="settings-tab">🤖 Bot-Einstellungen</a>
+    <a href="/guild/{{ guild.guild_id }}/map/world-settings" class="settings-tab active">🌍 World / Server</a>
+  </div>
+  {% endif %}
 
   {% if saved %}
   <div class="alert alert-success" style="margin-bottom:1rem;">✅ Settings gespeichert.</div>
@@ -236,10 +244,6 @@
       </div>
       <button type="submit" class="btn btn-primary">💾 Speichern</button>
     </form>
-    <p style="font-size:.78rem;color:var(--text-faint);margin:.75rem 0 0;">
-      💡 Weitere Bot-Einstellungen (Benachrichtigungs-Kanäle, Request-Hub, Wochen-Digest) findest du unter
-      <a href="/guild/{{ guild.guild_id }}/bot-settings">🤖 Bot-Einstellungen</a>.
-    </p>
   </div>
   {% endif %}
 </div>

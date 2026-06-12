@@ -263,6 +263,12 @@
   font-size: 0.82rem; color: var(--text-muted);
   letter-spacing: 0.04em;
 }
+
+/* ── Settings sub-page tab bar (Server Management / Bot-Settings / World) ─── */
+.settings-tabs { display:flex; gap:.35rem; flex-wrap:wrap; margin:.75rem 0 1.25rem; border-bottom:1px solid var(--border); padding-bottom:.75rem; }
+.settings-tab { font-size:.82rem; padding:.35rem .85rem; border-radius:8px; border:1px solid var(--border); background:var(--bg-main); color:var(--text-muted); cursor:pointer; transition:all .15s; white-space:nowrap; text-decoration:none; }
+.settings-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; font-weight:600; }
+.settings-tab:hover:not(.active) { border-color:#3b82f6; color:var(--text); }
 </style>
 <script>
 (function() {
