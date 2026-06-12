@@ -999,7 +999,8 @@ function debounceSearch(q) { clearTimeout(_searchTimer); _searchTimer = setTimeo
 // ══ Sidebar plan list ════════════════════════════════════════════════════
 function renderPlanList() {
   const el = document.getElementById('planList');
-  const filtered = planFilter==='all' ? plans : plans.filter(p=>p.status===planFilter);
+  const filtered = planFilter==='all' ? plans.filter(p=>p.status!=='archived')
+                                       : plans.filter(p=>p.status===planFilter);
   if (!filtered.length) {
     el.innerHTML = '<div style="padding:1.25rem;text-align:center;color:var(--text-muted);font-size:.82rem;">No plans.</div>';
     return;

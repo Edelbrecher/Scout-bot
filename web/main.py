@@ -11409,6 +11409,43 @@ async def api_me(request: Request):
     })
 
 
+@app.get("/api/my-servers")
+async def api_my_servers(request: Request):
+    """Returns the list of servers/workspaces the logged-in user can switch to
+    (used by the navbar server-switcher)."""
+    session = get_session(request)
+    if not session:
+        return JSONResponse({"servers": []})
+
+    owner_discord_id = session.get("uid", "")
+
+    personal_workspaces = await database.get_personal_workspaces(owner_discord_id) if owner_discord_id else []
+
+    all_guilds = await database.get_all_guilds()
+    if session["guilds"] is not None:
+        allowed = set(session["guilds"])
+        discord_guilds = [g for g in all_guilds if g["guild_id"] in allowed and g.get("workspace_type", "discord") == "discord"]
+    else:
+        discord_guilds = [g for g in all_guilds if g.get("workspace_type", "discord") == "discord"]
+
+    seen: set = set()
+    servers = []
+    for g in personal_workspaces + discord_guilds:
+        gid = g["guild_id"]
+        if gid in seen:
+            continue
+        seen.add(gid)
+        world_url = g.get("tw_world") or ""
+        world_name = world_url.replace("https://", "").replace("http://", "").rstrip("/")
+        servers.append({
+            "guild_id": gid,
+            "guild_name": g.get("guild_name") or gid,
+            "workspace_type": g.get("workspace_type", "discord"),
+            "world": world_name,
+        })
+    return JSONResponse({"servers": servers})
+
+
 @app.get("/api/my-alerts")
 async def api_my_alerts(request: Request):
     """Returns payment alerts for the logged-in user (used by nav profile dropdown)."""

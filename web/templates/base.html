@@ -75,6 +75,13 @@
       <img src="/static/logo.png" alt="TravOps" style="width:32px;height:32px;object-fit:cover;border-radius:50%;" />
       <span class="nav-brand">TravOps</span>
     </a>
+    <div class="nav-server-switcher" id="navServerSwitcher" style="display:none;">
+      <button class="nav-server-btn" id="navServerBtn" onclick="toggleServerMenu()">
+        <span id="navServerLabel">🌍 Server</span>
+        <span style="font-size:0.7rem; color:var(--text-muted);">▾</span>
+      </button>
+      <div class="nav-server-menu" id="navServerMenu"></div>
+    </div>
     <div class="nav-links" style="align-items:center;">
       {% if guild is defined and guild %}
         {% set _world_url = guild.tw_world or '' %}
@@ -189,6 +196,39 @@
 }
 .nav-profile-item:hover { background:var(--bg-main); color:var(--text); }
 
+/* ── Navbar server switcher ──────────────────────────────────────────────── */
+.nav-server-switcher { position:absolute; left:50%; transform:translateX(-50%); }
+.nav-server-btn {
+  display:flex; align-items:center; gap:0.5rem;
+  background:none; border:1px solid var(--border); border-radius:20px;
+  padding:0.3rem 0.9rem; cursor:pointer; color:var(--text); font-size:0.85rem;
+  max-width:240px; transition:background 0.15s, border-color 0.15s;
+}
+.nav-server-btn span:first-child {
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px;
+}
+.nav-server-btn:hover { background:var(--bg-card); border-color:#3b82f6; }
+.nav-server-menu {
+  display:none; position:absolute; left:50%; top:calc(100% + 8px);
+  transform:translateX(-50%);
+  background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
+  min-width:240px; max-width:320px; max-height:60vh; overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4); z-index:200;
+}
+.nav-server-menu.open { display:block; }
+.nav-server-item {
+  display:flex; align-items:center; gap:0.5rem;
+  padding:0.55rem 0.9rem; font-size:0.85rem; color:var(--text-muted);
+  text-decoration:none; transition:background 0.1s, color 0.1s;
+}
+.nav-server-item:hover { background:var(--bg-main); color:var(--text); }
+.nav-server-item.active { color:#a5b4fc; font-weight:600; background:rgba(99,102,241,.08); }
+.nav-server-item .nsi-world { font-size:0.7rem; color:var(--text-muted); margin-left:auto; padding-left:.5rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px; }
+
+@media(max-width:900px) {
+  .nav-server-switcher { display:none !important; }
+}
+
 /* ── Page loading overlay ───────────────────────────────────────────────── */
 #page-loader {
   position: fixed; inset: 0; z-index: 99999;
@@ -265,6 +305,40 @@ document.addEventListener('click', e => {
     document.getElementById('navProfileMenu')?.classList.remove('open');
   }
 });
+
+// ── Navbar server switcher ─────────────────────────────────────────────────
+function toggleServerMenu() {
+  document.getElementById('navServerMenu')?.classList.toggle('open');
+  document.getElementById('navProfileMenu')?.classList.remove('open');
+}
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('navServerSwitcher');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('navServerMenu')?.classList.remove('open');
+  }
+});
+(function() {
+  const switcher = document.getElementById('navServerSwitcher');
+  const label    = document.getElementById('navServerLabel');
+  const menu     = document.getElementById('navServerMenu');
+  if (!switcher || !label || !menu) return;
+  fetch('/api/my-servers').then(r => r.json()).then(data => {
+    const servers = data.servers || [];
+    if (servers.length < 2) return; // nothing to switch to
+    const m = window.location.pathname.match(/^\/guild\/([^\/]+)/);
+    const currentId = m ? m[1] : null;
+    const current = servers.find(s => s.guild_id === currentId);
+    label.textContent = '🌍 ' + (current ? current.guild_name : 'Server wechseln');
+    menu.innerHTML = servers.map(s => `
+      <a href="/guild/${encodeURIComponent(s.guild_id)}" class="nav-server-item ${s.guild_id===currentId?'active':''}">
+        <span>${s.guild_id===currentId?'✅':'🌍'}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(s.guild_name)}</span>
+        ${s.world ? `<span class="nsi-world">${escHtml(s.world)}</span>` : ''}
+      </a>
+    `).join('');
+    switcher.style.display = 'block';
+  }).catch(() => {});
+})();
 
 // ── Global utility functions (available on every page) ────────────────────
 function escHtml(s) {
