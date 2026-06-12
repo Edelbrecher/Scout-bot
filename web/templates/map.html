@@ -207,14 +207,14 @@
         </select>
         {% endif %}
         <div class="num-stepper">
-          <button type="button" onclick="numStep('fsX',-1)" title="X -1">−</button>
-          <input type="number" id="fsX" placeholder="X" class="no-spin" style="width:56px;text-align:center;" />
-          <button type="button" onclick="numStep('fsX',1)" title="X +1">+</button>
+          <button type="button" onclick="numStep('fsX',-1); clearFreeSpotsOwnVillage();" title="X -1">−</button>
+          <input type="number" id="fsX" placeholder="X" class="no-spin" oninput="clearFreeSpotsOwnVillage()" style="width:56px;text-align:center;" />
+          <button type="button" onclick="numStep('fsX',1); clearFreeSpotsOwnVillage();" title="X +1">+</button>
         </div>
         <div class="num-stepper">
-          <button type="button" onclick="numStep('fsY',-1)" title="Y -1">−</button>
-          <input type="number" id="fsY" placeholder="Y" class="no-spin" style="width:56px;text-align:center;" />
-          <button type="button" onclick="numStep('fsY',1)" title="Y +1">+</button>
+          <button type="button" onclick="numStep('fsY',-1); clearFreeSpotsOwnVillage();" title="Y -1">−</button>
+          <input type="number" id="fsY" placeholder="Y" class="no-spin" oninput="clearFreeSpotsOwnVillage()" style="width:56px;text-align:center;" />
+          <button type="button" onclick="numStep('fsY',1); clearFreeSpotsOwnVillage();" title="Y +1">+</button>
         </div>
         <button onclick="useMapCenterForFreeSpots()" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .6rem;" title="Aktuelle Kartenmitte übernehmen">📍 Kartenmitte</button>
         <label style="font-size:.78rem;color:var(--text-muted);">Radius</label>
@@ -1706,6 +1706,14 @@ function toggleFreeSpotsPanel() {
 function useMapCenterForFreeSpots() {
   document.getElementById('fsX').value = Math.round(camX);
   document.getElementById('fsY').value = Math.round(camY);
+  clearFreeSpotsOwnVillage();
+}
+
+// Reset the "Eigenes Dorf" dropdown back to the placeholder when the user
+// manually edits the coordinates, so the two inputs don't fight each other.
+function clearFreeSpotsOwnVillage() {
+  const sel = document.getElementById('fsOwnVillage');
+  if (sel) sel.value = '';
 }
 
 // Increment/decrement a numeric input by `delta`, clamped to [min,max] if given.
@@ -1733,6 +1741,15 @@ let _freeSpotsData = null;
 
 async function searchFreeSpots() {
   const resultEl = document.getElementById('freeSpotsResult');
+  // Safety net: if an own village is selected in the dropdown, make sure
+  // fsX/fsY actually reflect it (e.g. after browser form-state restore the
+  // dropdown can show a village while the coordinate fields are still 0/0).
+  const ownSel = document.getElementById('fsOwnVillage');
+  if (ownSel && ownSel.value) {
+    const [vx, vy] = ownSel.value.split('|');
+    document.getElementById('fsX').value = vx;
+    document.getElementById('fsY').value = vy;
+  }
   const cx = parseInt(document.getElementById('fsX').value);
   const cy = parseInt(document.getElementById('fsY').value);
   let radius = parseInt(document.getElementById('fsRadius').value) || 7;
