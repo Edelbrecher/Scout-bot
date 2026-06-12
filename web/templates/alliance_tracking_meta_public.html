@@ -1,16 +1,44 @@
-{% extends "base.html" %}
-{% block title %}{{ group.meta_name }} · Meta-Tracking · TravOps{% endblock %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ meta_name }} · Meta-Tracking · TravOps</title>
+<meta property="og:title" content="{{ meta_name }} · Meta-Tracking">
+<meta property="og:description" content="Shared meta-alliance tracking view — TravOps">
+<meta property="og:image" content="https://travops.online/static/logo.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#0f172a; --bg-card:#1e293b; --bg-main:#0f172a;
+  --text:#e2e8f0; --text-muted:#64748b; --border:#334155; --accent:#6366f1;
+}
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
+
+#topbar {
+  display:flex; align-items:center; gap:.75rem; padding:.6rem 1rem;
+  background:var(--bg-card); border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+#topbar .logo { font-size:.9rem; font-weight:700; color:var(--accent); opacity:.85; }
+#topbar .badge {
+  font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:20px;
+  background:rgba(99,102,241,.15); border:1px solid rgba(99,102,241,.3); color:#a5b4fc;
+}
+#topbar .spacer { flex:1; }
+#topbar .hint { font-size:.72rem; color:var(--text-muted); }
+
 .section-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.15rem 1.35rem; margin-bottom:1.1rem; }
 .section-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); margin-bottom:.85rem; }
 .kpi { border-radius:10px; padding:.6rem 1rem; min-width:0; flex:1; }
 .kpi-label { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.15rem; }
 .kpi-val   { font-size:1.1rem; font-weight:800; line-height:1.1; }
 .kpi-delta { font-size:.67rem; margin-top:.1rem; }
-.ally-row { display:grid; align-items:center; gap:.75rem; padding:.55rem .7rem; border-radius:9px; transition:background .12s; }
-.ally-row:hover { background:rgba(255,255,255,.035); }
+.ally-row { display:grid; align-items:center; gap:.75rem; padding:.55rem .7rem; border-radius:9px; }
 .bar-bg  { height:8px; background:rgba(255,255,255,.07); border-radius:4px; overflow:hidden; }
 .bar-fill{ height:100%; border-radius:4px; }
 .ev-row  { display:flex; align-items:center; gap:.55rem; padding:.42rem .55rem; border-radius:8px; margin-bottom:.28rem; font-size:.8rem; }
@@ -23,52 +51,35 @@
 .badge-leave    { background:rgba(239,68,68,.2);  color:#f87171; }
 .badge-internal { background:rgba(245,158,11,.18);color:#fbbf24; }
 .ally-chip { display:inline-block; padding:.18rem .55rem; border-radius:9px; font-size:.7rem; font-weight:600; background:rgba(255,255,255,.06); border:1px solid var(--border); color:var(--text-muted); }
-.chart-mini canvas { display:block; }
+.btn { display:inline-flex; align-items:center; gap:.3rem; border-radius:8px; padding:.18rem .55rem; font-size:.68rem; font-weight:600; border:1px solid var(--border); background:var(--bg-main); color:var(--text-muted); cursor:pointer; text-decoration:none; }
+.btn-primary { background:#3b82f6; border-color:#3b82f6; color:#fff; }
 </style>
+</head>
+<body>
 
-<style>
-.nav-sidebar { display:flex; flex-direction:column; gap:.3rem; position:sticky; top:1rem; }
-.nav-sb-label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); padding:.4rem .6rem .2rem; }
-.nav-sb-item {
-  display:flex; align-items:center; justify-content:space-between; gap:.4rem;
-  padding:.45rem .7rem; border-radius:9px; font-size:.8rem; font-weight:600;
-  text-decoration:none; color:var(--text-muted);
-  border:1px solid transparent; transition:all .12s;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.nav-sb-item:hover { background:rgba(255,255,255,.05); color:var(--text); border-color:var(--border); }
-.nav-sb-item.active-meta   { background:rgba(245,158,11,.12); color:#fbbf24; border-color:rgba(245,158,11,.3); }
-.nav-sb-item.active-single { background:rgba(99,102,241,.15); color:#c4b5fd; border-color:rgba(99,102,241,.35); }
-.nav-sb-badge { font-size:.58rem; font-weight:700; padding:.08rem .38rem; border-radius:6px; flex-shrink:0; }
-.badge-meta   { background:rgba(245,158,11,.18); color:#fbbf24; border:1px solid rgba(245,158,11,.3); }
-.badge-single { background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.28); }
-.nav-sb-divider { height:1px; background:var(--border); margin:.35rem .6rem; }
-</style>
+<div id="topbar">
+  <span class="logo">TravOps</span>
+  <span class="badge">👁️ Read-only · Public View</span>
+  <span class="spacer"></span>
+  <span class="hint">Shared meta-alliance tracking — no information about the sharer is included</span>
+</div>
 
-<div style="max-width:1400px;margin:0 auto;padding:0 1.25rem 3rem;display:grid;grid-template-columns:1fr 192px;gap:1.5rem;align-items:start;">
+<div style="max-width:1300px;margin:0 auto;padding:1.5rem 1.25rem 3rem;">
 
-<!-- ── MAIN CONTENT ── -->
-<div>
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="back-link">← Alliance Tracking</a>
-
-  <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin:.85rem 0 1rem;">
-    <div>
-      <h1 style="margin:0;font-size:1.5rem;">⭐ {{ group.meta_name }}</h1>
-      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.35rem;">
-        {% for a in group.alliances %}<span class="ally-chip">{{ a }}</span>{% endfor %}
-      </div>
+  <div style="margin:0 0 1.5rem;">
+    <h1 style="margin:0;font-size:1.6rem;">⭐ {{ meta_name }}</h1>
+    <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.35rem;">
+      {% for a in alliance_names %}<span class="ally-chip">{{ a }}</span>{% endfor %}
     </div>
-    <div style="display:flex;gap:.5rem;align-items:center;">
-      {% if data.latest %}<div style="font-size:.73rem;color:var(--text-muted);">Last snapshot: {{ data.latest[:16].replace('T',' ') }}</div>{% endif %}
-      <button type="button" class="btn btn-secondary" onclick="shareMetaTracking(this)">🔗 Share</button>
-    </div>
+    <p style="margin:.4rem 0 0;color:var(--text-muted);font-size:.85rem;">
+      {% if data.latest %}Last snapshot: {{ data.latest[:16].replace('T',' ') }}{% else %}No data{% endif %}
+    </p>
   </div>
 
   {% if not data.alliances or data.total_members == 0 %}
   <div style="text-align:center;padding:4rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;">🔭</div>
-    <p style="margin-top:.75rem;">No map data found for this meta.</p>
+    <p style="margin-top:.75rem;">No tracking data available for this meta.</p>
   </div>
   {% else %}
 
@@ -129,10 +140,9 @@
         {% set color = colors[loop.index0 % colors|length] %}
         <div>
           <div style="display:grid;grid-template-columns:1fr 80px 50px 55px;gap:.5rem;align-items:center;padding:.4rem .7rem;border-radius:8px;" class="ally-row">
-            <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ a.name | urlencode }}"
-               style="font-weight:700;font-size:.87rem;color:{{ color }};text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            <span style="font-weight:700;font-size:.87rem;color:{{ color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               {{ a.name }}
-            </a>
+            </span>
             <div style="text-align:right;font-size:.82rem;font-weight:700;color:{{ color }};">{{ "{:,}".format(a.total_pop).replace(",",".") }}</div>
             <div style="text-align:right;font-size:.8rem;color:var(--text-muted);">{{ a.members }}</div>
             <div style="text-align:right;font-size:.8rem;color:var(--text-muted);">{{ a.villages }}</div>
@@ -187,8 +197,8 @@
         <div class="section-title" style="margin:0;">🌍 External ({{ data.events|length }})</div>
         <div style="display:flex;gap:.35rem;">
           <button onclick="filterEvt('all','ext')"   id="extAll"   class="btn btn-primary"   style="font-size:.68rem;padding:.18rem .55rem;">All</button>
-          <button onclick="filterEvt('join','ext')"  id="extJoin"  class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .55rem;">➕</button>
-          <button onclick="filterEvt('leave','ext')" id="extLeave" class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .55rem;">➖</button>
+          <button onclick="filterEvt('join','ext')"  id="extJoin"  class="btn" style="font-size:.68rem;padding:.18rem .55rem;">➕</button>
+          <button onclick="filterEvt('leave','ext')" id="extLeave" class="btn" style="font-size:.68rem;padding:.18rem .55rem;">➖</button>
         </div>
       </div>
       {% if not data.events %}
@@ -199,9 +209,7 @@
         <div class="ev-row ev-{{ ev.type }}" data-type="{{ ev.type }}">
           <span class="ev-date">{{ ev.date }}</span>
           <span class="ev-badge badge-{{ ev.type }}">{% if ev.type=='join' %}➕{% else %}➖{% endif %}</span>
-          <a href="/guild/{{ guild.guild_id }}/intel?q={{ ev.player | urlencode }}" target="_blank"
-             style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;color:inherit;text-decoration:none;"
-             onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='inherit'">{{ ev.player }}</a>
+          <span style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;">{{ ev.player }}</span>
           <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             {{ ev.from_alliance }} → {{ ev.to_alliance }}
           </span>
@@ -222,9 +230,7 @@
         <div class="ev-row ev-internal">
           <span class="ev-date">{{ ev.date }}</span>
           <span class="ev-badge badge-internal">🔀</span>
-          <a href="/guild/{{ guild.guild_id }}/intel?q={{ ev.player | urlencode }}" target="_blank"
-             style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;color:inherit;text-decoration:none;"
-             onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='inherit'">{{ ev.player }}</a>
+          <span style="font-weight:700;min-width:100px;flex-shrink:0;font-size:.8rem;">{{ ev.player }}</span>
           <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">
             <span style="color:#f59e0b;">{{ ev.from_alliance }}</span>
             →
@@ -238,56 +244,15 @@
 
   </div>
   {% endif %}
-</div><!-- end main content -->
 
-<!-- ── RIGHT SIDEBAR ── -->
-<aside class="nav-sidebar" style="padding-top:2.75rem;">
-  {% if meta_groups %}
-  <div class="nav-sb-label">⭐ Meta Groups</div>
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/own"
-     class="nav-sb-item {% if group.id == 'own' %}active-meta{% endif %}">
-    <span style="overflow:hidden;text-overflow:ellipsis;">Own Meta</span>
-    <span class="nav-sb-badge badge-meta">Meta</span>
-  </a>
-  {% for g in meta_groups %}
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ g.id }}"
-     class="nav-sb-item {% if g.id == group.id %}active-meta{% endif %}">
-    <span style="overflow:hidden;text-overflow:ellipsis;">{{ g.meta_name }}</span>
-    <span class="nav-sb-badge badge-meta">Meta</span>
-  </a>
-  {% endfor %}
-  {% if watched %}<div class="nav-sb-divider"></div>{% endif %}
-  {% endif %}
+</div>
 
-  {% if watched %}
-  <div class="nav-sb-label">📌 Alliances</div>
-  {% for w in watched %}
-  <a href="/guild/{{ guild.guild_id }}/alliance-tracking/{{ w.alliance_name | urlencode }}"
-     class="nav-sb-item">
-    <span style="overflow:hidden;text-overflow:ellipsis;">{{ w.alliance_name }}</span>
-    <span class="nav-sb-badge badge-single">Single</span>
-  </a>
-  {% endfor %}
-  {% endif %}
-</aside>
-
-</div><!-- end grid -->
-
+<!-- Chart.js -->
+{% if data.pop_history|length > 1 %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const PH = {{ data.pop_history | tojson }};
 const ALLY_PH = {{ data.ally_pop_history | tojson }};
-const COLORS = ['#6366f1','#f59e0b','#22c55e','#ec4899','#06b6d4','#f97316','#a78bfa','#84cc16'];
-
-const commonOpts = (yColor) => ({
-  responsive: true,
-  interaction: { mode:'index', intersect:false },
-  plugins: { legend:{ display:false } },
-  scales: {
-    x: { ticks:{ color:'#64748b', maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,.05)' } },
-    y: { ticks:{ color: yColor }, grid:{ color:'rgba(255,255,255,.04)' } }
-  }
-});
 
 // Combined chart
 if (PH.length > 1 && document.getElementById('popChartCombined')) {
@@ -342,38 +307,21 @@ document.querySelectorAll('[id^="miniChart_"]').forEach((canvas, idx) => {
     }
   });
 });
+</script>
+{% endif %}
 
-// ── Anonymized public share link ────────────────────────────────────────────
-async function shareMetaTracking(btn) {
-  const orig = btn.textContent;
-  btn.textContent = '⏳';
-  btn.disabled = true;
-  try {
-    const resp = await fetch(`/guild/{{ guild.guild_id }}/alliance-tracking/meta/{{ group.id }}/share`, {
-      method: 'POST',
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.url) throw new Error(data.error || 'Error');
-    await navigator.clipboard.writeText(data.url).catch(() => prompt('Copy link:', data.url));
-    btn.textContent = '✅ Public link copied!';
-    btn.style.color = '#4ade80';
-    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 2500);
-  } catch (e) {
-    btn.textContent = '❌ Error';
-    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
-  }
-}
-
-// Event filter
+<!-- Event filter -->
+<script>
 function filterEvt(type, list) {
   if (list === 'ext') {
-    document.getElementById('extAll').className   = 'btn ' + (type==='all'   ? 'btn-primary' : 'btn-secondary');
-    document.getElementById('extJoin').className  = 'btn ' + (type==='join'  ? 'btn-primary' : 'btn-secondary');
-    document.getElementById('extLeave').className = 'btn ' + (type==='leave' ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('extAll').className   = 'btn ' + (type==='all'   ? 'btn-primary' : '');
+    document.getElementById('extJoin').className  = 'btn ' + (type==='join'  ? 'btn-primary' : '');
+    document.getElementById('extLeave').className = 'btn ' + (type==='leave' ? 'btn-primary' : '');
     document.querySelectorAll('#evtListExt .ev-row').forEach(r => {
       r.style.display = (type==='all' || r.dataset.type===type) ? '' : 'none';
     });
   }
 }
 </script>
-{% endblock %}
+</body>
+</html>

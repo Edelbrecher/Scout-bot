@@ -11509,6 +11509,90 @@ async def get_alliance_tracking_share(short_id: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Alliance Tracking Meta-Group Share Links (anonymized public read-only view
+# for "Own Meta" / named meta groups — combines multiple alliances)
+# ---------------------------------------------------------------------------
+
+async def _init_alliance_tracking_meta_share_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alliance_tracking_meta_share_links (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id       TEXT NOT NULL,
+                group_key      TEXT NOT NULL,
+                meta_name      TEXT DEFAULT '',
+                alliance_names TEXT DEFAULT '[]',
+                short_id       TEXT UNIQUE NOT NULL,
+                created_by     TEXT DEFAULT '',
+                created_at     TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, group_key)
+            )
+        """)
+        await db.commit()
+
+
+async def create_alliance_tracking_meta_share(
+    guild_id: str, group_key: str, meta_name: str, alliance_names: list[str], created_by: str = ""
+) -> str:
+    """Return a (re-used or freshly created) anonymized short_id for a meta-group's
+    combined tracking public view. Re-using existing links per (guild, group_key) keeps
+    the URL stable; meta_name/alliance_names are refreshed on each call in case the
+    group's composition changed since the link was first created."""
+    import secrets, json
+    await _init_alliance_tracking_meta_share_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT short_id FROM alliance_tracking_meta_share_links WHERE guild_id=? AND group_key=?",
+            (guild_id, group_key)
+        ) as cur:
+            row = await cur.fetchone()
+
+        names_json = json.dumps(alliance_names)
+        if row:
+            short_id = row["short_id"]
+            await db.execute(
+                "UPDATE alliance_tracking_meta_share_links SET meta_name=?, alliance_names=? WHERE short_id=?",
+                (meta_name, names_json, short_id)
+            )
+            await db.commit()
+            return short_id
+
+        short_id = secrets.token_urlsafe(6)
+        for _ in range(5):
+            try:
+                await db.execute("""
+                    INSERT INTO alliance_tracking_meta_share_links
+                        (guild_id, group_key, meta_name, alliance_names, short_id, created_by)
+                    VALUES (?,?,?,?,?,?)
+                """, (guild_id, group_key, meta_name, names_json, short_id, created_by))
+                await db.commit()
+                return short_id
+            except Exception:
+                short_id = secrets.token_urlsafe(6)
+        return short_id
+
+
+async def get_alliance_tracking_meta_share(short_id: str) -> dict | None:
+    import json
+    await _init_alliance_tracking_meta_share_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM alliance_tracking_meta_share_links WHERE short_id=?", (short_id,)
+        )
+        row = await cur.fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        try:
+            d["alliance_names"] = json.loads(d.get("alliance_names") or "[]")
+        except Exception:
+            d["alliance_names"] = []
+        return d
+
+
+# ---------------------------------------------------------------------------
 # Map Presets
 # ---------------------------------------------------------------------------
 

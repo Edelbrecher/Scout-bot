@@ -12163,6 +12163,68 @@ async def alliance_tracking_public_view(request: Request, short_id: str):
     })
 
 
+@app.post("/guild/{guild_id}/alliance-tracking/meta/{group_key}/share")
+async def alliance_tracking_meta_create_share(request: Request, guild_id: str, group_key: str):
+    """Create (or re-use) an anonymized public read-only share link for a meta group's
+    combined tracking data ("Own Meta" or a named meta group). The link contains no
+    guild/Discord-identifying information."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    if group_key == "own":
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        alliances = []
+        if ally_group:
+            for f in ("ally_name", "wing1_name", "wing2_name"):
+                v = ally_group.get(f, "") or ""
+                if v: alliances.append(v)
+        meta_name = "Eigene Meta"
+    else:
+        try:
+            gid_int = int(group_key)
+        except ValueError:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        meta_groups = await database.get_meta_groups(guild_id)
+        group = next((g for g in meta_groups if g["id"] == gid_int), None)
+        if not group:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        alliances = group["alliances"]
+        meta_name = group["meta_name"]
+
+    if not alliances:
+        return JSONResponse({"error": "no_alliances"}, status_code=400)
+
+    short_id = await database.create_alliance_tracking_meta_share(
+        guild_id, group_key, meta_name, alliances, created_by=session.get("username", "")
+    )
+    base = str(request.base_url).rstrip("/")
+    url = f"{base}/alliance-tracking/meta/open/{short_id}"
+    return JSONResponse({"short_id": short_id, "url": url})
+
+
+@app.get("/alliance-tracking/meta/open/{short_id}", response_class=HTMLResponse)
+async def alliance_tracking_meta_public_view(request: Request, short_id: str):
+    """Public, anonymized read-only view of a meta group's combined tracking data.
+    No auth required, no guild/Discord identity is exposed."""
+    share = await database.get_alliance_tracking_meta_share(short_id)
+    if not share:
+        return HTMLResponse(
+            "<html><body style='font-family:sans-serif;padding:2rem;color:#ccc;background:#0f172a;'>"
+            "<h2>🔒 This link is invalid or has expired.</h2></body></html>",
+            status_code=404,
+        )
+    alliance_names = share["alliance_names"]
+    data = await database.get_meta_combined_tracking(share["guild_id"], alliance_names)
+    return templates.TemplateResponse("alliance_tracking_meta_public.html", {
+        "request": request,
+        "meta_name": share["meta_name"],
+        "alliance_names": alliance_names,
+        "data": data,
+    })
+
+
 @app.get("/guild/{guild_id}/enemies", response_class=HTMLResponse)
 async def enemies_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
