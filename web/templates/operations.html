@@ -35,6 +35,7 @@
 .status-active    { background:rgba(234,179,8,.2);   color:#fbbf24; }
 .status-completed { background:rgba(34,197,94,.2);   color:#4ade80; }
 .status-cancelled { background:rgba(239,68,68,.2);   color:#f87171; }
+.status-archived  { background:rgba(148,163,184,.18); color:#94a3b8; }
 
 /* ── Main header ────────────────────────────────────────────── */
 .op-topbar {
@@ -318,6 +319,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('draft')" id="filter-draft">Draft</button>
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('active')" id="filter-active">Active</button>
       <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('completed')" id="filter-completed">Fertig</button>
+      <button class="btn-icon" style="font-size:.72rem;" onclick="filterPlans('archived')" id="filter-archived">📦 Archiv</button>
     </div>
 
     <div class="op-plan-list" id="planList"></div>
@@ -982,7 +984,7 @@ function fmtTravel(sec) {
   return [h?h+'h':'', m?m+'m':'', s2?s2+'s':''].filter(Boolean).join(' ');
 }
 function statusLabel(s) {
-  const m = {draft:'Draft',active:'Active',completed:'Completed',cancelled:'Cancelled'};
+  const m = {draft:'Draft',active:'Active',completed:'Completed',cancelled:'Cancelled',archived:'Archived'};
   return m[s]||s;
 }
 function waveTypeeLabel(t) {
@@ -1087,6 +1089,14 @@ function renderPlanInfo() {
       ${p.status === 'completed' || p.status === 'cancelled' ? `
         <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Revert to draft">
           ↩ Revert to draft
+        </button>` : ''}
+      ${p.status === 'draft' || p.status === 'completed' || p.status === 'cancelled' ? `
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('archived')" title="Operation archivieren (ausblenden, jederzeit wiederherstellbar)">
+          📦 Archivieren
+        </button>` : ''}
+      ${p.status === 'archived' ? `
+        <button class="btn btn-secondary" style="font-size:.78rem;" onclick="setPlanStatus('draft')" title="Operation aus dem Archiv wiederherstellen">
+          ↩ Aus Archiv wiederherstellen
         </button>` : ''}
       <button class="btn btn-secondary" style="font-size:.78rem;" onclick="recalcTimes()" title="Alle Send timeen neu berechnen basierend auf aktueller Landing time">
         ⏱ Send timeen neu berechnen
@@ -3521,7 +3531,7 @@ async function saveInlineLanding() {
 // ══ Recalc times ══════════════════════════════════════════════════════════
 async function setPlanStatus(newStatus) {
   if (!activePlanId) return;
-  const labels = { active: 'activate', completed: 'complete', cancelled: 'cancel', draft: 'reset' };
+  const labels = { active: 'activate', completed: 'complete', cancelled: 'cancel', draft: 'reset', archived: 'archive' };
   if (!confirm(`Operation wirklich ${labels[newStatus] || newStatus}?`)) return;
   try {
     await apiPost(`/plans/${activePlanId}/update`, { status: newStatus });

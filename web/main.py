@@ -8925,7 +8925,7 @@ async def op_update_plan(
     if server_speed is not None: kwargs["server_speed"]  = max(0.5, min(float(server_speed), 10.0))
     if target_ally  is not None: kwargs["target_ally"]   = target_ally.strip()[:100]
     if notes        is not None: kwargs["notes"]         = notes.strip()[:500]
-    if status       is not None and status in ("draft","active","completed","cancelled"):
+    if status       is not None and status in ("draft","active","completed","cancelled","archived"):
         kwargs["status"] = status
     # Detect status transitions that require Discord notifications
     new_status = kwargs.get("status")
