@@ -9282,7 +9282,7 @@ async def op_live_status(request: Request, guild_id: str, plan_id: int):
     """Lightweight live-status endpoint — returns wave statuses + send times only."""
     session, err = await _op_api_guard(request, guild_id)
     if err: return err
-    plan = await database.get_op_plan(plan_id, guild_id)
+    plan = await database.get_op_plan_full(plan_id, guild_id)
     if not plan:
         return JSONResponse({"error": "not found"}, status_code=404)
     now_utc = __import__('datetime').datetime.utcnow().isoformat()

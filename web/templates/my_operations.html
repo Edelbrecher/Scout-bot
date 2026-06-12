@@ -699,8 +699,8 @@ async function doConfirm(id, status, delta) {
   try {
     const waveData = WAVES_DATA.find(x => x.id === id);
     const fd = new FormData();
-    fd.append('status', status);
-    fd.append('delta_seconds', delta);
+    fd.append('confirm_status', status);
+    fd.append('confirm_delta_seconds', delta);
     const r = await fetch(`/guild/${GUILD_ID}/operations/api/waves/${id}/confirm`, {method:'POST', body:fd});
     const d = await r.json();
     if (!d.ok) { alert('Error confirming wave.'); return; }
