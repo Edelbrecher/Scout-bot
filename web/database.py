@@ -3325,6 +3325,78 @@ async def search_inactive_advanced(
         return {"villages": villages, "snap_dates": snap_dates, "total": total}
 
 
+async def get_free_spots(guild_id: str, cx: int, cy: int, radius: int) -> dict:
+    """Return unoccupied map tiles within `radius` of (cx,cy) for the guild's world,
+    based on the latest world_snapshots data — candidate free settlement spots.
+
+    A tile is considered "free" if no village currently occupies it (it may still be
+    an oasis — we don't have oasis data, see project notes). Tiles outside the
+    coordinate range actually seen in the latest snapshot (i.e. outside the map) are
+    excluded."""
+    import math
+    radius = max(1, min(int(radius), 20))
+
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            "SELECT tw_world FROM guild_configs WHERE guild_id = ?", (guild_id,)
+        ) as cur:
+            wrow = await cur.fetchone()
+        world_url = wrow[0] if wrow else None
+        if not world_url:
+            return {"spots": [], "center": {"x": cx, "y": cy}, "radius": radius, "latest": None}
+
+        async with db.execute(
+            "SELECT MAX(fetched_at) FROM world_snapshots WHERE world_url = ?", (world_url,)
+        ) as cur:
+            latest_row = await cur.fetchone()
+        latest_ts = latest_row[0] if latest_row else None
+        if not latest_ts:
+            return {"spots": [], "center": {"x": cx, "y": cy}, "radius": radius, "latest": None}
+
+        # Approximate map bounds from the coordinate range actually present in the
+        # latest snapshot, so we don't suggest tiles "beyond" the map edge.
+        async with db.execute(
+            "SELECT MIN(x), MAX(x), MIN(y), MAX(y) FROM world_snapshots "
+            "WHERE world_url=? AND fetched_at=?",
+            (world_url, latest_ts)
+        ) as cur:
+            brow = await cur.fetchone()
+        min_x = brow[0] if brow and brow[0] is not None else -400
+        max_x = brow[1] if brow and brow[1] is not None else 400
+        min_y = brow[2] if brow and brow[2] is not None else -400
+        max_y = brow[3] if brow and brow[3] is not None else 400
+
+        # Occupied (x,y) within the bounding box around the center
+        async with db.execute(
+            "SELECT x, y FROM world_snapshots INDEXED BY idx_wsnap_url_xy "
+            "WHERE world_url=? AND fetched_at=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?",
+            (world_url, latest_ts, cx - radius, cx + radius, cy - radius, cy + radius)
+        ) as cur:
+            occupied = {(r[0], r[1]) for r in await cur.fetchall()}
+
+    spots = []
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist > radius:
+                continue
+            x, y = cx + dx, cy + dy
+            if x < min_x or x > max_x or y < min_y or y > max_y:
+                continue
+            if (x, y) in occupied:
+                continue
+            spots.append({"x": x, "y": y, "distance": round(dist, 1)})
+
+    spots.sort(key=lambda s: s["distance"])
+    return {
+        "spots": spots,
+        "center": {"x": cx, "y": cy},
+        "radius": radius,
+        "latest": latest_ts,
+        "bounds": {"min_x": min_x, "max_x": max_x, "min_y": min_y, "max_y": max_y},
+    }
+
+
 async def add_farm_list_entry(
     guild_id: str,
     added_by_id: str,

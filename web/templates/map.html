@@ -137,6 +137,7 @@
     <button onclick="shareMapView(this,true)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;color:#a5b4fc;border-color:rgba(99,102,241,.45);" title="Create a public link — anyone with the URL can view this map (read-only, no login required)">🌐 Public Link</button>
     {% if not is_share_viewer %}
     <button onclick="togglePresetPanel()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Kartenansichten speichern und laden">📁 Presets</button>
+    <button onclick="toggleFreeSpotsPanel()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Freie Felder in der Nähe einer Koordinate finden">🏠 Freie Plätze</button>
     {% endif %}
     <!-- Draw toolbar -->
     <div id="drawToolbar" style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;padding:0.25rem 0.5rem;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);">
@@ -176,6 +177,29 @@
     </div>
     <div id="presetList" style="display:flex;flex-direction:column;gap:.3rem;min-height:1.5rem;">
       <span style="font-size:.78rem;color:var(--text-muted);">Loading…</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Free Settlement Spots Panel -->
+  {% if not is_share_viewer %}
+  <div id="freeSpotsPanel" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;margin-bottom:.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
+      <span style="font-size:.82rem;font-weight:600;color:var(--text);">🏠 Freie Siedlungsplätze in der Nähe</span>
+      <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
+        <input type="number" id="fsX" placeholder="X" style="width:62px;" />
+        <input type="number" id="fsY" placeholder="Y" style="width:62px;" />
+        <button onclick="useMapCenterForFreeSpots()" class="btn btn-secondary" style="font-size:.78rem;padding:.25rem .6rem;" title="Aktuelle Kartenmitte übernehmen">📍 Kartenmitte</button>
+        <label style="font-size:.78rem;color:var(--text-muted);">Radius</label>
+        <input type="number" id="fsRadius" value="7" min="1" max="20" style="width:52px;" />
+        <button onclick="searchFreeSpots()" class="btn btn-primary" style="font-size:.78rem;padding:.25rem .7rem;">🔍 Suchen</button>
+      </div>
+    </div>
+    <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.4rem;">
+      Zeigt Felder ohne Dorf in der letzten Karten-Erfassung (max. Radius 20). Hinweis: Oasen-Belegung wird nicht berücksichtigt — manche freien Felder können Oasen sein.
+    </div>
+    <div id="freeSpotsResult" style="display:flex;flex-direction:column;gap:.25rem;max-height:260px;overflow-y:auto;">
+      <span style="font-size:.78rem;color:var(--text-muted);">Koordinaten eingeben und „Suchen“ klicken.</span>
     </div>
   </div>
   {% endif %}
@@ -1525,6 +1549,63 @@ function togglePresetPanel() {
   _presetPanelOpen = !_presetPanelOpen;
   panel.style.display = _presetPanelOpen ? 'block' : 'none';
   if (_presetPanelOpen) loadPresets();
+}
+
+// ── Free Settlement Spots Finder ────────────────────────────────────────────
+let _freeSpotsPanelOpen = false;
+function toggleFreeSpotsPanel() {
+  const panel = document.getElementById('freeSpotsPanel');
+  if (!panel) return;
+  _freeSpotsPanelOpen = !_freeSpotsPanelOpen;
+  panel.style.display = _freeSpotsPanelOpen ? 'block' : 'none';
+  if (_freeSpotsPanelOpen) {
+    const xEl = document.getElementById('fsX'), yEl = document.getElementById('fsY');
+    if (xEl && yEl && xEl.value === '' && yEl.value === '') {
+      xEl.value = Math.round(camX);
+      yEl.value = Math.round(camY);
+    }
+  }
+}
+
+function useMapCenterForFreeSpots() {
+  document.getElementById('fsX').value = Math.round(camX);
+  document.getElementById('fsY').value = Math.round(camY);
+}
+
+async function searchFreeSpots() {
+  const resultEl = document.getElementById('freeSpotsResult');
+  const cx = parseInt(document.getElementById('fsX').value);
+  const cy = parseInt(document.getElementById('fsY').value);
+  let radius = parseInt(document.getElementById('fsRadius').value) || 7;
+  radius = Math.max(1, Math.min(radius, 20));
+  document.getElementById('fsRadius').value = radius;
+  if (isNaN(cx) || isNaN(cy)) {
+    resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Bitte X und Y eingeben.</span>';
+    return;
+  }
+  resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Suche…</span>';
+  try {
+    const res = await fetch(`/guild/${GUILD_ID}/map/free-spots?cx=${cx}&cy=${cy}&radius=${radius}`, {credentials: 'same-origin'});
+    const data = await res.json();
+    if (data.error) {
+      resultEl.innerHTML = `<span style="font-size:.78rem;color:#f87171;">${data.error}</span>`;
+      return;
+    }
+    const spots = data.spots || [];
+    if (!spots.length) {
+      resultEl.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);">Keine freien Felder in diesem Radius gefunden.</span>';
+      return;
+    }
+    let html = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.2rem;">${spots.length} freie Felder gefunden (Radius ${data.radius}):</div>`;
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;">';
+    for (const s of spots) {
+      html += `<button class="btn btn-secondary" style="font-size:.75rem;padding:.2rem .5rem;" onclick="panTo(${s.x},${s.y},Math.max(scale,10))" title="Auf der Karte anzeigen">(${s.x}|${s.y}) · ${s.distance}</button>`;
+    }
+    html += '</div>';
+    resultEl.innerHTML = html;
+  } catch (e) {
+    resultEl.innerHTML = '<span style="font-size:.78rem;color:#f87171;">Fehler bei der Suche.</span>';
+  }
 }
 
 async function loadPresets() {

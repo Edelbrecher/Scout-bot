@@ -3746,6 +3746,20 @@ async def guild_map_heatmap_data(request: Request, guild_id: str):
     return JSONResponse({"data": data})
 
 
+@app.get("/guild/{guild_id}/map/free-spots")
+async def map_free_spots(request: Request, guild_id: str, cx: int = 0, cy: int = 0, radius: int = 7):
+    """Return unoccupied map tiles within `radius` of (cx,cy) — candidate free
+    settlement spots, based on the latest world_snapshots data."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    radius = max(1, min(radius, 20))
+    result = await database.get_free_spots(guild_id, cx, cy, radius)
+    return JSONResponse(result)
+
+
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/remove")
 async def res_request_remove(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
