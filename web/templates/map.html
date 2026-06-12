@@ -236,11 +236,12 @@
         <option value="0">Alle Felder</option>
         <option value="tagged">Nur getaggte Felder</option>
         <option value="untagged">Nur ungetaggte Felder ❓</option>
-        <optgroup label="Nach Getreidefeld (Crop)">
-          <option value="6">6er+ Crop</option>
-          <option value="7">7er+ Crop</option>
-          <option value="9">9er+ Crop</option>
-          <option value="15">15er (1-1-1-15)</option>
+        <optgroup label="Nach Getreidefeld (Crop, exakt)">
+          <option value="6">6er (Crop = 6)</option>
+          <option value="7">7er (Crop = 7)</option>
+          <option value="9">9er (Crop = 9)</option>
+          <option value="15">15er (Crop = 15)</option>
+          <option value="other">Sonstige Crop-Werte</option>
         </optgroup>
       </select>
     </div>
@@ -1793,23 +1794,29 @@ function populateCropFilterOptions(spots) {
       untaggedCount++;
     }
   }
+  // Bucket tagged distributions by their crop value (last number), so each
+  // crop category (6er/7er/9er/15er/...) can list its own sub-variants
+  // (e.g. 6er: 4-4-4-6, 3-4-5-6, 3-5-4-6, ...).
+  const byCrop = {};
+  for (const d of Object.keys(counts)) {
+    const crop = parseInt(d.split('-')[3]);
+    if (isNaN(crop)) continue;
+    (byCrop[crop] = byCrop[crop] || []).push(d);
+  }
   let html = `<option value="0">Alle Felder (${spots.length})</option>`;
   html += `<option value="tagged">Nur getaggte Felder (${taggedCount})</option>`;
   html += `<option value="untagged">Nur ungetaggte Felder ❓ (${untaggedCount})</option>`;
-  html += '<optgroup label="Nach Getreidefeld (Crop)">'
-        + '<option value="6">6er+ Crop</option>'
-        + '<option value="7">7er+ Crop</option>'
-        + '<option value="9">9er+ Crop</option>'
-        + '<option value="15">15er (1-1-1-15)</option>'
+  html += '<optgroup label="Nach Getreidefeld (Crop, exakt)">'
+        + '<option value="6">6er (Crop = 6)</option>'
+        + '<option value="7">7er (Crop = 7)</option>'
+        + '<option value="9">9er (Crop = 9)</option>'
+        + '<option value="15">15er (Crop = 15)</option>'
+        + '<option value="other">Sonstige Crop-Werte</option>'
         + '</optgroup>';
-  const dists = Object.keys(counts).sort((a, b) => {
-    const cropA = parseInt(a.split('-')[3]) || 0;
-    const cropB = parseInt(b.split('-')[3]) || 0;
-    if (cropA !== cropB) return cropB - cropA;
-    return a.localeCompare(b);
-  });
-  if (dists.length) {
-    html += '<optgroup label="Dorfarten (getaggt)">';
+  const cropsSorted = Object.keys(byCrop).map(c => parseInt(c)).sort((a, b) => b - a);
+  for (const crop of cropsSorted) {
+    const dists = byCrop[crop].sort((a, b) => a.localeCompare(b));
+    html += `<optgroup label="${crop}er-Felder – Dorfarten (getaggt)">`;
     for (const d of dists) {
       html += `<option value="dist:${d}">${d} (${counts[d]}x)</option>`;
     }
@@ -1853,11 +1860,11 @@ function renderFreeSpots() {
   } else if (filter.startsWith('dist:')) {
     const wanted = filter.slice(5);
     filtered = spots.filter(s => s.distribution === wanted);
-  } else if (filter === '15') {
-    filtered = spots.filter(s => s.crop === 15);
+  } else if (filter === 'other') {
+    filtered = spots.filter(s => s.crop !== null && s.crop !== undefined && ![6, 7, 9, 15].includes(s.crop));
   } else {
-    const minCrop = parseInt(filter);
-    filtered = spots.filter(s => s.crop !== null && s.crop !== undefined && s.crop >= minCrop);
+    const exactCrop = parseInt(filter);
+    filtered = spots.filter(s => s.crop === exactCrop);
   }
 
   // Highlight the (filtered) results directly on the map
