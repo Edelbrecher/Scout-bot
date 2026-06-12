@@ -514,6 +514,15 @@ async def handle_refresh_request_hub(request: aiohttp_web.Request) -> aiohttp_we
             return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
 
     lang = await get_guild_lang(guild_id)
+
+    # Keep the channel name in sync with the guild's language (e.g. travops-anfragen → travops-requests)
+    desired_name = t(lang, "hub.channel_name")
+    if channel.name != desired_name:
+        try:
+            await channel.edit(name=desired_name)
+        except Exception as e:
+            print(f"[hub_refresh] could not rename channel: {e}")
+
     from cogs.hub import RequestHubView
     embed = discord.Embed(
         title=t(lang, "hub.title"),
