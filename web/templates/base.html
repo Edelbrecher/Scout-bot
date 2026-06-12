@@ -105,6 +105,16 @@
       <a href="/plans" data-i18n="nav.plans">Pricing</a>
       {% if _is_admin %}
       <a href="/admin" style="color:#f59e0b;">⚙ Admin</a>
+      <a id="admin-badge-users" href="/admin/auths" title="New user(s) in the last 24h"
+         style="display:none;align-items:center;gap:.25rem;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);
+                color:#4ade80;border-radius:12px;padding:.15rem .55rem;font-size:.75rem;font-weight:700;text-decoration:none;">
+        🆕👤 <span id="admin-badge-users-count">0</span>
+      </a>
+      <a id="admin-badge-subs" href="/admin/customers" title="New subscription(s) in the last 24h"
+         style="display:none;align-items:center;gap:.25rem;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);
+                color:#60a5fa;border-radius:12px;padding:.15rem .55rem;font-size:.75rem;font-weight:700;text-decoration:none;">
+        🆕💳 <span id="admin-badge-subs-count">0</span>
+      </a>
       {% endif %}
       <!-- Tour button: starts the appropriate tour for the current page -->
       <button id="nav-tour-btn" onclick="navStartTour()"
@@ -296,6 +306,30 @@ fetch('/api/my-alerts').then(function(r){ return r.json(); }).then(function(data
     });
   }
 }).catch(function(){});
+// ── Admin navbar badges: new users / new subscriptions in the last 24h ─────
+(function() {
+  var usersBadge = document.getElementById('admin-badge-users');
+  var subsBadge  = document.getElementById('admin-badge-subs');
+  if (!usersBadge && !subsBadge) return; // not an admin
+
+  function refreshAdminBadges() {
+    fetch('/api/admin/activity-badges').then(function(r){ return r.json(); }).then(function(data){
+      if (usersBadge) {
+        var n = data.new_users_24h || 0;
+        document.getElementById('admin-badge-users-count').textContent = n;
+        usersBadge.style.display = n > 0 ? 'inline-flex' : 'none';
+      }
+      if (subsBadge) {
+        var m = data.new_subs_24h || 0;
+        document.getElementById('admin-badge-subs-count').textContent = m;
+        subsBadge.style.display = m > 0 ? 'inline-flex' : 'none';
+      }
+    }).catch(function(){});
+  }
+  refreshAdminBadges();
+  setInterval(refreshAdminBadges, 60 * 1000);
+})();
+
 function toggleProfileMenu() {
   document.getElementById('navProfileMenu').classList.toggle('open');
 }

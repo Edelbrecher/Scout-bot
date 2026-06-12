@@ -4451,6 +4451,9 @@ async def stripe_webhook(request: Request):
                         print(f"[referral] +1 point to {referrer_id} for referring {discord_user_id}", flush=True)
             # Lookup cached username for notification
             _uname = (await database.get_user_subscription(discord_user_id) or {}).get("discord_username", discord_user_id)
+            await database.log_subscription_event(
+                event_type="user", ref_id=discord_user_id, name=_uname, plan=plan_str, status=status,
+            )
             asyncio.create_task(_notify(
                 subject=f"💳 Neuer Käufer: {_uname} – {plan_str}",
                 body=(
@@ -4489,6 +4492,9 @@ async def stripe_webhook(request: Request):
                         )
                         print(f"[webhook] guild checkout.completed: {guild_id} → {plan_str}", flush=True)
                         _owner = meta.get("owner_discord_id", "—")
+                        await database.log_subscription_event(
+                            event_type="guild", ref_id=guild_id, name=guild_id, plan=plan_str, status=sub.status,
+                        )
                         asyncio.create_task(_notify(
                             subject=f"💳 Neuer Guild-Käufer: {guild_id} – {plan_str}",
                             body=(
@@ -10229,6 +10235,15 @@ async def admin_worlds(request: Request):
         "world_map": world_map,
         "no_world": [g for g in guilds if not (g.get("tw_world") or "").strip()],
     })
+
+
+@app.get("/api/admin/activity-badges")
+async def api_admin_activity_badges(request: Request):
+    """Counts for the navbar admin badges: new users + new subscriptions in the last 24h."""
+    session, err = _require_admin(request)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    badges = await database.get_admin_activity_badges()
+    return JSONResponse(badges)
 
 
 @app.get("/api/admin/server-stats")

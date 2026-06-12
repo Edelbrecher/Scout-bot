@@ -519,6 +519,7 @@ async def init_db():
     await _init_admin_tables()
     await _init_consent_tables()
     await _init_user_sub_tables()
+    await _init_subscription_events_table()
     await _init_own_villages_table()
     await _init_own_villages_history_table()
     await _init_sitter_table()
@@ -4478,6 +4479,57 @@ async def get_auth_logs(limit: int = 200) -> list[dict]:
             SELECT * FROM auth_logs ORDER BY created_at DESC LIMIT ?
         """, (limit,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Admin activity badges (new users / new subscriptions in the navbar)
+# ---------------------------------------------------------------------------
+
+async def _init_subscription_events_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS subscription_events (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT DEFAULT (datetime('now')),
+                event_type TEXT,
+                ref_id     TEXT,
+                name       TEXT,
+                plan       TEXT,
+                status     TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def log_subscription_event(event_type: str, ref_id: str, name: str, plan: str, status: str):
+    """Record a completed checkout / new subscription for the admin activity badge."""
+    await _init_subscription_events_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            INSERT INTO subscription_events (event_type, ref_id, name, plan, status)
+            VALUES (?, ?, ?, ?, ?)
+        """, (event_type, ref_id, name, plan, status))
+        await db.commit()
+
+
+async def get_admin_activity_badges() -> dict:
+    """Counts for the navbar admin badges: new users + new subscriptions in the last 24h."""
+    await _init_subscription_events_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute("""
+            SELECT COUNT(*) FROM auth_logs
+            WHERE status = 'success' AND is_returning = 0
+              AND created_at >= datetime('now', '-24 hours')
+        """) as cur:
+            new_users_24h = (await cur.fetchone())[0]
+
+        async with db.execute("""
+            SELECT COUNT(*) FROM subscription_events
+            WHERE created_at >= datetime('now', '-24 hours')
+        """) as cur:
+            new_subs_24h = (await cur.fetchone())[0]
+
+    return {"new_users_24h": new_users_24h, "new_subs_24h": new_subs_24h}
 
 
 async def _init_own_villages_table():
