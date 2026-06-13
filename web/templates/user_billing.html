@@ -195,8 +195,8 @@
         Monthly &nbsp;<strong>€2,99</strong>
       </button>
       <button id="btnAnnual" class="plan-btn inactive" onclick="selectPlan('annual')">
-        Annual &nbsp;<strong>€23,99</strong>
-        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;">–33%</span>
+        Annual &nbsp;<strong>€29,99</strong>
+        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;">–16%</span>
       </button>
     </div>
 
@@ -314,7 +314,7 @@ function selectPlan(plan) {
   const label = document.getElementById('priceLabel');
   mBtn.className = 'plan-btn ' + (plan === 'monthly' ? 'active' : 'inactive');
   aBtn.className = 'plan-btn ' + (plan === 'annual'  ? 'active' : 'inactive');
-  if (label) label.textContent = plan === 'annual' ? '€23,99/Jahr' : '€2,99/Monat';
+  if (label) label.textContent = plan === 'annual' ? '€29,99/Jahr' : '€2,99/Monat';
 }
 </script>
 {% endblock %}

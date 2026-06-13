@@ -58,7 +58,7 @@ STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICES: dict[str, dict[str, str]] = {
     "player_pro": {
         "monthly": os.environ.get("STRIPE_PRICE_PLAYER_PRO_M", "price_1Thytx3rAqb4qtRxIkxnwc9r"),
-        "annual":  os.environ.get("STRIPE_PRICE_PLAYER_PRO_A", ""),
+        "annual":  os.environ.get("STRIPE_PRICE_PLAYER_PRO_A", "price_1Thz1h3rAqb4qtRxtYBuLC8M"),
     },
     "starter": {
         "monthly": os.environ.get("STRIPE_PRICE_STARTER_M", "price_1TZBc13rAqb4qtRxOuJbuV8P"),
@@ -132,7 +132,7 @@ async def _notify(subject: str, body: str) -> None:
 
 
 TIER_META = {
-    "player_pro": {"name": "Player Pro", "servers": 0, "monthly": 2.99, "annual": 23.99,
+    "player_pro": {"name": "Player Pro", "servers": 0, "monthly": 2.99, "annual": 29.99,
                    "desc": "Solo-Features für Einzelspieler — kein Discord-Server nötig",
                    "player_only": True},
     "starter":  {"name": "Starter",  "servers": 1, "monthly": 6.99,  "annual": 55.99},
@@ -11370,7 +11370,7 @@ async def admin_features(request: Request):
         return RedirectResponse("/dashboard", status_code=303)
     plan_rows = [
         {"name": "Free",      "css": "free",         "monthly": "€0",    "annual": "€0",    "servers": "1",  "notes": "Discord server required; no player features"},
-        {"name": "Player Pro","css": "player-pro",   "monthly": "€2.99", "annual": "€23.99","servers": "1",  "notes": "Solo / personal workspace; all player features; no alliance Discord features"},
+        {"name": "Player Pro","css": "player-pro",   "monthly": "€2.99", "annual": "€29.99","servers": "1",  "notes": "Solo / personal workspace; all player features; no alliance Discord features"},
         {"name": "Starter",   "css": "alliance-pro", "monthly": "€9.99", "annual": "€79.99","servers": "1",  "notes": "Small alliances; all Player Pro + alliance features"},
         {"name": "Clan",      "css": "alliance-pro", "monthly": "€14.99","annual": "€119.99","servers": "3", "notes": "Multiple servers"},
         {"name": "Alliance",  "css": "alliance-pro", "monthly": "€24.99","annual": "€199.99","servers": "5", "notes": "Larger alliances"},
