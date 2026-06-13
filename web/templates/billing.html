@@ -45,6 +45,21 @@
   gap: 0.35rem;
   flex: 1;
 }
+.tier-feat-list li[data-tip] { position: relative; cursor: help; }
+.tier-feat-list li[data-tip] .ftip-icon { color: #64748b; font-size: 0.68rem; margin-left: 0.2rem; flex-shrink: 0; }
+.tier-feat-list li[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 8px);
+  background: #0f172a; color: #e2e8f0;
+  font-size: 0.72rem; font-weight: 400; line-height: 1.4;
+  padding: 0.55rem 0.7rem; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 50; text-align: left; white-space: normal;
+}
+.tier-feat-list li[data-tip]:hover::after { opacity: 1; visibility: visible; }
 .billing-toggle {
   display: inline-flex;
   background: var(--bg-card);
@@ -230,6 +245,24 @@
     ]),
   ] %}
 
+  {% set feature_tips = {
+    'Scout system': 'Automated scouting reports reveal enemy troops, resources and defenses before you attack — know exactly what you are facing.',
+    'Res-Push': 'Streamlines resource requests between alliance members so rebuilds and reinforcements never stall for lack of materials.',
+    'Operation planning': 'Plan multi-wave attacks with synced arrival times so every hammer and catapult lands exactly on schedule.',
+    'Farming Intel': 'Automatically surfaces inactive and weakly-defended villages, turning farming into a data-driven routine instead of guesswork.',
+    'Map & Timer': 'Live world map with troop movement timers, so you always know what is heading where and when it will land.',
+    'Attack-Detection': 'Instant alerts the moment incoming attacks are spotted, giving your alliance time to defend or evacuate.',
+    'Everything in Starter': 'Includes every feature from the Starter plan, plus everything listed below.',
+    'Everything in Plus': 'Includes every feature from the Plus plan, plus everything listed below.',
+    'Everything in Premium': 'Includes every feature from the Premium plan, plus everything listed below.',
+    '2 Discord servers': 'Run TravOps on two Discord servers at once — ideal for a second world or a sister alliance.',
+    '3 Discord servers': 'Run TravOps across three Discord servers — built for alliances active in multiple worlds.',
+    '5 Discord servers': 'Run TravOps across five Discord servers — built for large communities managing many worlds at once.',
+    'Alliance overview': 'See member activity, troop strength and engagement at a glance across your whole alliance.',
+    'Priority support': 'Jump the queue and get faster responses whenever you need help.',
+    'Dedicated Support': 'A direct line to the TravOps team for setup help, custom requests and priority fixes.',
+  } %}
+
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.75rem;">
     {% for tid, tname, temoji, tcolor, servers, price_m, price_a, tagline, features in tiers %}
     {% set is_popular = tid == 'clan' %}
@@ -272,10 +305,12 @@
       <!-- Features -->
       <ul class="tier-feat-list">
         {% for ficon, fname, fdesc in features %}
-        <li style="display:flex;align-items:flex-start;gap:0.5rem;">
+        {% set ftip = feature_tips.get(fname, '') %}
+        <li style="display:flex;align-items:flex-start;gap:0.5rem;" {% if ftip %}data-tip="{{ ftip }}"{% endif %}>
           <span style="width:18px;text-align:center;flex-shrink:0;margin-top:0.05rem;">{{ ficon }}</span>
           <div>
             <span style="color:var(--text);font-weight:{% if fname.startswith('Everything') %}700{% else %}500{% endif %};">{{ fname }}</span>
+            {% if ftip %}<span class="ftip-icon">ⓘ</span>{% endif %}
             {% if fdesc %}<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.05rem;">{{ fdesc }}</div>{% endif %}
           </div>
         </li>
