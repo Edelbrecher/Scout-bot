@@ -11362,6 +11362,12 @@ async def _count_sector_alerts(guild_id: str) -> int:
         return 0
 
 
+FEATURE_MATRIX_GROUP_ORDER = [
+    "Map & World", "Farming", "Scouting", "Operations", "Alliance",
+    "Tools", "Analytics & Stats", "Account & Settings",
+]
+
+
 @app.get("/admin/features", response_class=HTMLResponse)
 async def admin_features(request: Request):
     session, err = _require_session(request)
@@ -11376,9 +11382,50 @@ async def admin_features(request: Request):
         {"name": "Alliance",  "css": "alliance-pro", "monthly": "€24.99","annual": "€199.99","servers": "5", "notes": "Larger alliances"},
         {"name": "Imperium",  "css": "alliance-pro", "monthly": "€49.99","annual": "€399.99","servers": "∞", "notes": "Unlimited servers"},
     ]
+
+    feature_matrix = await database.get_feature_matrix()
+
+    columns: dict[str, list] = {"free": [], "player_pro": [], "alliance_pro": []}
+    for f in feature_matrix:
+        columns.setdefault(f["tier"], []).append(f)
+    for tier_list in columns.values():
+        tier_list.sort(key=lambda f: f["sort_order"])
+
+    by_group: dict[str, list] = {}
+    for f in feature_matrix:
+        by_group.setdefault(f["group_name"], []).append(f)
+    comparison_groups = []
+    for g in FEATURE_MATRIX_GROUP_ORDER:
+        if g in by_group:
+            comparison_groups.append((g, sorted(by_group[g], key=lambda f: f["display_name"])))
+    for g, items in by_group.items():
+        if g not in FEATURE_MATRIX_GROUP_ORDER:
+            comparison_groups.append((g, sorted(items, key=lambda f: f["display_name"])))
+
     return templates.TemplateResponse("admin_features.html", {
         "request": request, "plan_rows": plan_rows,
+        "columns": columns, "comparison_groups": comparison_groups,
     })
+
+
+@app.post("/admin/features/reorder")
+async def admin_features_reorder(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    updates = body.get("updates", [])
+    valid_tiers = {"free", "player_pro", "alliance_pro"}
+    cleaned = []
+    for u in updates:
+        tier = u.get("tier")
+        key = u.get("feature_key")
+        if tier not in valid_tiers or not key:
+            return JSONResponse({"error": "invalid update"}, status_code=400)
+        cleaned.append({"feature_key": key, "tier": tier, "sort_order": int(u.get("sort_order", 0))})
+    await database.update_feature_matrix(cleaned)
+    return JSONResponse({"ok": True})
 
 
 @app.get("/admin/sidebar", response_class=HTMLResponse)

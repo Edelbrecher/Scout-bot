@@ -533,6 +533,7 @@ async def init_db():
     await _init_scout_incidents_table()
     await _init_artifact_tables()
     await _init_grain_sim_table()
+    await _init_feature_matrix_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -13215,6 +13216,88 @@ async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
 
 
 # ── Grain Supply Simulations ──────────────────────────────────────────────────
+
+# Feature matrix: which subscription tier unlocks which app feature.
+# tier values: 'free' | 'player_pro' | 'alliance_pro' (cumulative — alliance_pro
+# includes everything player_pro has, which includes everything free has).
+FEATURE_MATRIX_SEED = [
+    # (feature_key, group_name, display_name, note, tier, sort_order)
+    ("map",               "Map & World", "🗺️ Map",               "", "free", 0),
+    ("attacks",           "Map & World", "⚔️ Attacks",           "Requires Discord server (not Personal)", "free", 1),
+    ("sector_monitor",    "Map & World", "📡 Sector Monitor",    "", "player_pro", 2),
+    ("timer",             "Map & World", "⏱️ Timer",             "", "free", 3),
+    ("settle_list",       "Map & World", "📜 Settle List",       "", "free", 4),
+    ("farming_intel",     "Farming",     "🌾 Farming Intel",     "", "player_pro", 5),
+    ("farmlist_analyst",  "Farming",     "📋 Farmlist Analyst",  "", "player_pro", 6),
+    ("player_intel",      "Scouting",    "🔎 Player Intel",      "", "free", 7),
+    ("hero_scout",        "Scouting",    "🦸 Hero Scout",        "", "free", 8),
+    ("scout_tracking",    "Scouting",    "🕵️ Scout Tracking",   "", "alliance_pro", 9),
+    ("scout_incidents",   "Scouting",    "🚨 Scout Incidents",   "", "free", 10),
+    ("defense",           "Scouting",    "🛡️ Defense",          "", "free", 11),
+    ("operations",        "Operations",  "⚙️ Operations",        "", "alliance_pro", 12),
+    ("attack_planner",    "Operations",  "🗡️ Attack Planner",   "", "player_pro", 13),
+    ("my_alliance",       "Alliance",    "🏰 My Alliance",       "", "free", 14),
+    ("members",           "Alliance",    "👥 Members",           "", "free", 15),
+    ("sitter_list",       "Alliance",    "🪑 Sitter List",       "", "free", 16),
+    ("hospital",          "Alliance",    "🏥 Hospital",          "", "alliance_pro", 17),
+    ("enemies",           "Alliance",    "😈 Enemies",           "", "alliance_pro", 18),
+    ("res_push",          "Tools",       "📦 Res Push",          "", "free", 19),
+    ("polls",             "Tools",       "🗳️ Polls",             "", "free", 20),
+    ("blueprints",        "Tools",       "📐 Blueprints",        "", "free", 21),
+    ("crop_calculator",   "Tools",       "🌽 Crop Calculator",   "", "free", 22),
+    ("hero_tasks",        "Tools",       "⚙️ Hero Tasks",        "", "free", 23),
+    ("statistics",        "Analytics & Stats", "📊 Statistics",      "", "free", 24),
+    ("travian_stats",     "Analytics & Stats", "🌍 Travian Stats",   "", "free", 25),
+    ("my_account",        "Account & Settings", "👤 My Account",       "", "free", 26),
+    ("notifications",     "Account & Settings", "🔔 Notifications",    "", "free", 27),
+    ("settings",          "Account & Settings", "⚙️ Settings",         "", "free", 28),
+    ("browser_extension", "Account & Settings", "🧩 Browser Extension","", "free", 29),
+]
+
+
+async def _init_feature_matrix_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS feature_matrix (
+                feature_key  TEXT PRIMARY KEY,
+                group_name   TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                note         TEXT DEFAULT '',
+                tier         TEXT NOT NULL DEFAULT 'alliance_pro',
+                sort_order   INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        await db.commit()
+        async with db.execute("SELECT COUNT(*) FROM feature_matrix") as cur:
+            (count,) = await cur.fetchone()
+        if count == 0:
+            await db.executemany(
+                """INSERT INTO feature_matrix
+                   (feature_key, group_name, display_name, note, tier, sort_order)
+                   VALUES (?,?,?,?,?,?)""",
+                FEATURE_MATRIX_SEED
+            )
+            await db.commit()
+
+
+async def get_feature_matrix() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM feature_matrix ORDER BY tier, sort_order") as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def update_feature_matrix(updates: list[dict]):
+    """updates: list of {feature_key, tier, sort_order}"""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        for u in updates:
+            await db.execute(
+                "UPDATE feature_matrix SET tier=?, sort_order=? WHERE feature_key=?",
+                (u["tier"], u["sort_order"], u["feature_key"])
+            )
+        await db.commit()
+
 
 async def _init_grain_sim_table():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

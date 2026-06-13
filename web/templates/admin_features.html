@@ -39,82 +39,54 @@
         <div class="plan-badge alliance-pro">Alliance Pro <span style="font-size:.72rem;opacity:.7;">(Starter / Clan / Alliance / Imperium)</span></div>
       </div>
 
-      <!-- ── Flow diagram ── -->
-      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:2rem;overflow-x:auto;">
-        <h2 style="margin:0 0 1.5rem;font-size:1rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Plan Flow</h2>
-        <div class="flow-wrap">
+      <!-- ── Drag & drop feature board ── -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:2rem;">
+        <h2 style="margin:0 0 .35rem;font-size:1rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Feature Assignment</h2>
+        <p style="color:var(--text-muted);font-size:.82rem;margin:0 0 1.5rem;">Drag a feature into another column to change which plan unlocks it. The comparison table below updates after saving.</p>
+        <div class="dnd-board">
 
-          <!-- FREE column -->
-          <div class="flow-col">
-            <div class="flow-header free">🆓 Free</div>
-            <div class="flow-body">
-              <div class="flow-section-title">Map & World</div>
-              <div class="flow-item">🗺️ Map</div>
-              <div class="flow-item">⚔️ Attacks</div>
-              <div class="flow-item">⏱️ Timer</div>
-              <div class="flow-item">📜 Settle List</div>
-              <div class="flow-section-title">Alliance</div>
-              <div class="flow-item">🏰 My Alliance</div>
-              <div class="flow-item">👥 Members</div>
-              <div class="flow-item">🪑 Sitter List</div>
-              <div class="flow-section-title">Scouting</div>
-              <div class="flow-item">🦸 Hero Scout</div>
-              <div class="flow-item">🛡️ Defense</div>
-              <div class="flow-item">🚨 Scout Incidents</div>
-              <div class="flow-item">🔎 Player Intel</div>
-              <div class="flow-section-title">Tools</div>
-              <div class="flow-item">📦 Res Push</div>
-              <div class="flow-item">📊 Stats</div>
-              <div class="flow-item">🌍 Travian Stats</div>
-              <div class="flow-item">🗳️ Polls</div>
-              <div class="flow-item">📐 Blueprints</div>
-              <div class="flow-item">🌽 Crop Calculator</div>
-              <div class="flow-item">⚙️ Hero Tasks</div>
-              <div class="flow-item">🔔 Notifications</div>
-              <div class="flow-item">🧩 Browser Extension</div>
+          <div class="dnd-col" data-tier="free">
+            <div class="dnd-col-header free">🆓 Free</div>
+            <div class="dnd-col-body" id="col-free">
+              {% for f in columns.free %}
+              <div class="dnd-card" draggable="true" data-key="{{ f.feature_key }}">
+                <div class="dnd-card-name">{{ f.display_name }}</div>
+                <div class="dnd-card-group">{{ f.group_name }}</div>
+                {% if f.note %}<div class="dnd-card-note">{{ f.note }}</div>{% endif %}
+              </div>
+              {% endfor %}
             </div>
           </div>
 
-          <!-- Arrow -->
-          <div class="flow-arrow">
-            <div class="flow-arrow-line"></div>
-            <div class="flow-arrow-head player-pro-arrow">▶</div>
-            <div class="flow-arrow-label">Player Pro</div>
-          </div>
-
-          <!-- PLAYER PRO column -->
-          <div class="flow-col">
-            <div class="flow-header player-pro">⭐ Player Pro</div>
-            <div class="flow-body">
-              <div class="flow-section-title">Includes all Free +</div>
-              <div class="flow-item new">🌾 Farming Intel</div>
-              <div class="flow-item new">📋 Farmlist Analyst</div>
-              <div class="flow-item new">🗡️ Attack Planner</div>
-              <div class="flow-item new">📡 Sector Monitor</div>
+          <div class="dnd-col" data-tier="player_pro">
+            <div class="dnd-col-header player-pro">⭐ Player Pro</div>
+            <div class="dnd-col-body" id="col-player_pro">
+              {% for f in columns.player_pro %}
+              <div class="dnd-card" draggable="true" data-key="{{ f.feature_key }}">
+                <div class="dnd-card-name">{{ f.display_name }}</div>
+                <div class="dnd-card-group">{{ f.group_name }}</div>
+                {% if f.note %}<div class="dnd-card-note">{{ f.note }}</div>{% endif %}
+              </div>
+              {% endfor %}
             </div>
           </div>
 
-          <!-- Arrow -->
-          <div class="flow-arrow">
-            <div class="flow-arrow-line"></div>
-            <div class="flow-arrow-head alliance-pro-arrow">▶</div>
-            <div class="flow-arrow-label">Starter / Clan<br>Alliance / Imperium</div>
-          </div>
-
-          <!-- ALLIANCE PRO column -->
-          <div class="flow-col">
-            <div class="flow-header alliance-pro">👑 Alliance Pro</div>
-            <div class="flow-body">
-              <div class="flow-section-title">Includes all Player Pro +</div>
-              <div class="flow-item new">⚙️ Operations</div>
-              <div class="flow-item new">🏥 Hospital</div>
-              <div class="flow-item new">😈 Enemies</div>
-              <div class="flow-item new">🕵️ Scout Tracking</div>
+          <div class="dnd-col" data-tier="alliance_pro">
+            <div class="dnd-col-header alliance-pro">👑 Alliance Pro</div>
+            <div class="dnd-col-body" id="col-alliance_pro">
+              {% for f in columns.alliance_pro %}
+              <div class="dnd-card" draggable="true" data-key="{{ f.feature_key }}">
+                <div class="dnd-card-name">{{ f.display_name }}</div>
+                <div class="dnd-card-group">{{ f.group_name }}</div>
+                {% if f.note %}<div class="dnd-card-note">{{ f.note }}</div>{% endif %}
+              </div>
+              {% endfor %}
             </div>
           </div>
 
-        </div><!-- /flow-wrap -->
-      </div><!-- /flow diagram -->
+        </div><!-- /dnd-board -->
+        <div id="saveStatus" style="margin-top:1rem;font-size:.82rem;color:var(--text-muted);min-height:1.2em;"></div>
+      </div><!-- /drag & drop board -->
 
       <!-- ── Full comparison table ── -->
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:2rem;">
@@ -131,7 +103,19 @@
                 <th style="text-align:center;padding:.75rem 1rem;color:#a78bfa;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Alliance Pro</th>
               </tr>
             </thead>
-            <tbody id="featureTableBody">
+            <tbody>
+              {% set tier_level = {'free':0,'player_pro':1,'alliance_pro':2} %}
+              {% for group_name, items in comparison_groups %}
+              <tr class="ft-group-row"><td colspan="4">{{ group_name }}</td></tr>
+              {% for f in items %}
+              <tr style="border-top:1px solid rgba(63,65,71,.5);" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
+                <td style="padding:.6rem 1.25rem;">{{ f.display_name }}{% if f.note %}<div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">{{ f.note }}</div>{% endif %}</td>
+                <td style="text-align:center;padding:.6rem 1rem;">{% if tier_level[f.tier] <= 0 %}<span class="ft-yes-free">✓</span>{% else %}<span class="ft-no">—</span>{% endif %}</td>
+                <td style="text-align:center;padding:.6rem 1rem;">{% if tier_level[f.tier] <= 1 %}<span class="ft-yes-player">✓</span>{% else %}<span class="ft-no">—</span>{% endif %}</td>
+                <td style="text-align:center;padding:.6rem 1rem;">{% if tier_level[f.tier] <= 2 %}<span class="ft-yes-alliance">✓</span>{% else %}<span class="ft-no">—</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+              {% endfor %}
             </tbody>
           </table>
         </div>
@@ -183,50 +167,39 @@
 .plan-badge.player-pro   { background:rgba(251,191,36,.1);  color:#fbbf24; border:1px solid rgba(251,191,36,.25); }
 .plan-badge.alliance-pro { background:rgba(167,139,250,.1); color:#a78bfa; border:1px solid rgba(167,139,250,.25); }
 
-/* Flow diagram */
-.flow-wrap {
-  display:flex;align-items:flex-start;gap:0;
-  min-width:700px;
+/* Drag & drop board */
+.dnd-board {
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;
 }
-.flow-col {
-  flex:1;min-width:0;
-  border-radius:10px;overflow:hidden;
-  border:1px solid var(--border);
+.dnd-col {
+  border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  display:flex;flex-direction:column;
 }
-.flow-header {
+.dnd-col-header {
   text-align:center;padding:.75rem 1rem;font-weight:700;font-size:.95rem;
 }
-.flow-header.free         { background:rgba(110,231,183,.12); color:#6ee7b7; }
-.flow-header.player-pro   { background:rgba(251,191,36,.12);  color:#fbbf24; }
-.flow-header.alliance-pro { background:rgba(167,139,250,.12); color:#a78bfa; }
+.dnd-col-header.free         { background:rgba(110,231,183,.12); color:#6ee7b7; }
+.dnd-col-header.player-pro   { background:rgba(251,191,36,.12);  color:#fbbf24; }
+.dnd-col-header.alliance-pro { background:rgba(167,139,250,.12); color:#a78bfa; }
+.dnd-col-body {
+  flex:1;min-height:140px;padding:.6rem;background:var(--bg-main);
+  display:flex;flex-direction:column;gap:.4rem;
+}
+.dnd-card {
+  background:var(--bg-card);border:1px solid var(--border);border-radius:8px;
+  padding:.5rem .65rem;font-size:.85rem;cursor:grab;
+}
+.dnd-card:active { cursor:grabbing; }
+.dnd-card.dragging { opacity:.4; }
+.dnd-card-name { font-weight:600; }
+.dnd-card-group {
+  font-size:.68rem;color:var(--text-muted);text-transform:uppercase;
+  letter-spacing:.05em;margin-top:.15rem;
+}
+.dnd-card-note { font-size:.72rem;color:var(--text-muted);margin-top:.15rem; }
 
-.flow-body { padding:.75rem .85rem; background:var(--bg-main); }
-.flow-section-title {
-  font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
-  color:var(--text-muted);margin:.9rem 0 .35rem;
-}
-.flow-section-title:first-child { margin-top:.1rem; }
-.flow-item {
-  padding:.3rem .5rem;font-size:.86rem;color:var(--text-muted);border-radius:5px;
-  margin-bottom:2px;
-}
-.flow-item.new {
-  color:#c9d1d9;background:rgba(255,255,255,.04);border-left:2px solid #5865f2;
-  padding-left:.6rem;
-}
-
-.flow-arrow {
-  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-  padding-top:4rem;gap:.3rem;width:60px;flex-shrink:0;
-}
-.flow-arrow-line {
-  width:24px;height:2px;background:var(--border);
-}
-.flow-arrow-head { font-size:.9rem; }
-.flow-arrow-head.player-pro-arrow   { color:#fbbf24; }
-.flow-arrow-head.alliance-pro-arrow { color:#a78bfa; }
-.flow-arrow-label {
-  font-size:.68rem;color:var(--text-muted);text-align:center;line-height:1.3;
+@media(max-width:700px){
+  .dnd-board { grid-template-columns:1fr; }
 }
 
 /* Feature table */
@@ -240,77 +213,65 @@
   color:var(--text-muted);padding:.5rem 1.25rem !important;
 }
 
-@media(max-width:700px){
-  .flow-wrap { min-width:500px; }
-  .flow-arrow { width:36px; }
-  .flow-arrow-line { width:14px; }
-}
 </style>
 
 <script>
-const FEATURES = [
-  // [name, free, player_pro, alliance_pro, note]
-  // free=true means free, player_pro=true means player_pro only (not in free), etc.
-  { group: 'Map & World' },
-  { name: '🗺️ Map',               free:true,  pp:true,  ap:true  },
-  { name: '⚔️ Attacks',           free:true,  pp:true,  ap:true, note:'Requires Discord server (not Personal)' },
-  { name: '📡 Sector Monitor',    free:false, pp:true,  ap:true  },
-  { name: '⏱️ Timer',             free:true,  pp:true,  ap:true  },
-  { name: '📜 Settle List',       free:true,  pp:true,  ap:true  },
-  { group: 'Farming' },
-  { name: '🌾 Farming Intel',     free:false, pp:true,  ap:true  },
-  { name: '📋 Farmlist Analyst',  free:false, pp:true,  ap:true  },
-  { group: 'Scouting' },
-  { name: '🔎 Player Intel',      free:true,  pp:true,  ap:true  },
-  { name: '🦸 Hero Scout',        free:true,  pp:true,  ap:true  },
-  { name: '🕵️ Scout Tracking',   free:false, pp:false, ap:true  },
-  { name: '🚨 Scout Incidents',   free:true,  pp:true,  ap:true  },
-  { name: '🛡️ Defense',          free:true,  pp:true,  ap:true  },
-  { group: 'Operations' },
-  { name: '⚙️ Operations',        free:false, pp:false, ap:true  },
-  { name: '🗡️ Attack Planner',   free:false, pp:true,  ap:true  },
-  { group: 'Alliance' },
-  { name: '🏰 My Alliance',       free:true,  pp:true,  ap:true  },
-  { name: '👥 Members',           free:true,  pp:true,  ap:true  },
-  { name: '🪑 Sitter List',       free:true,  pp:true,  ap:true  },
-  { name: '🏥 Hospital',          free:false, pp:false, ap:true  },
-  { name: '😈 Enemies',           free:false, pp:false, ap:true  },
-  { group: 'Tools' },
-  { name: '📦 Res Push',          free:true,  pp:true,  ap:true  },
-  { name: '🗳️ Polls',            free:true,  pp:true,  ap:true  },
-  { name: '📐 Blueprints',        free:true,  pp:true,  ap:true  },
-  { name: '🌽 Crop Calculator',   free:true,  pp:true,  ap:true  },
-  { name: '⚙️ Hero Tasks',        free:true,  pp:true,  ap:true  },
-  { group: 'Analytics & Stats' },
-  { name: '📊 Statistics',        free:true,  pp:true,  ap:true  },
-  { name: '🌍 Travian Stats',     free:true,  pp:true,  ap:true  },
-  { group: 'Account & Settings' },
-  { name: '👤 My Account',        free:true,  pp:true,  ap:true  },
-  { name: '🔔 Notifications',     free:true,  pp:true,  ap:true  },
-  { name: '⚙️ Settings',          free:true,  pp:true,  ap:true  },
-  { name: '🧩 Browser Extension', free:true,  pp:true,  ap:true  },
-];
-
-const CHECK = { free:'✓', pp:'✓', ap:'✓' };
-const tbody = document.getElementById('featureTableBody');
-
-FEATURES.forEach(f => {
-  if (f.group) {
-    tbody.insertAdjacentHTML('beforeend', `
-      <tr class="ft-group-row"><td colspan="4">${f.group}</td></tr>`);
-    return;
-  }
-  const freeCell   = f.free ? `<span class="ft-yes-free">✓</span>`     : `<span class="ft-no">—</span>`;
-  const ppCell     = f.pp   ? `<span class="ft-yes-player">✓</span>`   : `<span class="ft-no">—</span>`;
-  const apCell     = f.ap   ? `<span class="ft-yes-alliance">✓</span>` : `<span class="ft-no">—</span>`;
-  const noteHtml   = f.note ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">${f.note}</div>` : '';
-  tbody.insertAdjacentHTML('beforeend', `
-    <tr style="border-top:1px solid rgba(63,65,71,.5);" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
-      <td style="padding:.6rem 1.25rem;">${f.name}${noteHtml}</td>
-      <td style="text-align:center;padding:.6rem 1rem;">${freeCell}</td>
-      <td style="text-align:center;padding:.6rem 1rem;">${ppCell}</td>
-      <td style="text-align:center;padding:.6rem 1rem;">${apCell}</td>
-    </tr>`);
+document.querySelectorAll('.dnd-card').forEach(card => {
+  card.addEventListener('dragstart', () => card.classList.add('dragging'));
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    saveFeatureMatrix();
+  });
 });
+
+document.querySelectorAll('.dnd-col-body').forEach(col => {
+  col.addEventListener('dragover', e => {
+    e.preventDefault();
+    const dragging = document.querySelector('.dnd-card.dragging');
+    if (!dragging) return;
+    const after = getDragAfterElement(col, e.clientY);
+    if (after == null) col.appendChild(dragging);
+    else col.insertBefore(dragging, after);
+  });
+});
+
+function getDragAfterElement(container, y) {
+  const els = [...container.querySelectorAll('.dnd-card:not(.dragging)')];
+  return els.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: -Infinity, element: null }).element;
+}
+
+async function saveFeatureMatrix() {
+  const status = document.getElementById('saveStatus');
+  const updates = [];
+  document.querySelectorAll('.dnd-col').forEach(col => {
+    const tier = col.dataset.tier;
+    [...col.querySelectorAll('.dnd-card')].forEach((card, i) => {
+      updates.push({ feature_key: card.dataset.key, tier, sort_order: i });
+    });
+  });
+  status.textContent = 'Speichere...';
+  try {
+    const resp = await fetch('/admin/features/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates })
+    });
+    if (resp.ok) {
+      status.textContent = '✅ Gespeichert';
+      setTimeout(() => location.reload(), 500);
+    } else {
+      status.textContent = '❌ Speichern fehlgeschlagen';
+    }
+  } catch (e) {
+    status.textContent = '❌ Speichern fehlgeschlagen';
+  }
+}
 </script>
 {% endblock %}
