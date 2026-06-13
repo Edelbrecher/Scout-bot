@@ -11225,6 +11225,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "flag",      "label": "My Op Plan",         "url_suffix": "/my-operations"},
     {"type": "item",  "icon": "poll",      "label": "Polls",              "url_suffix": "/polls"},
     {"type": "item",  "icon": "blueprint", "label": "Blueprints",         "url_suffix": "/blueprints"},
+    {"type": "item",  "icon": "diamond",   "label": "Artefakte",          "url_suffix": "/artifacts"},
     # ── Tools ─────────────────────────────────────────────────────────────
     {"type": "group", "label": "Tools"},
     {"type": "item",  "icon": "box",       "label": "Res Push",           "url_suffix": "/res-push"},
