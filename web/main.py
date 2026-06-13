@@ -57,7 +57,7 @@ STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 # Pricing tiers: Player Pro / Starter / Clan / Alliance / Imperium
 STRIPE_PRICES: dict[str, dict[str, str]] = {
     "player_pro": {
-        "monthly": os.environ.get("STRIPE_PRICE_PLAYER_PRO_M", ""),
+        "monthly": os.environ.get("STRIPE_PRICE_PLAYER_PRO_M", "price_1Thytx3rAqb4qtRxIkxnwc9r"),
         "annual":  os.environ.get("STRIPE_PRICE_PLAYER_PRO_A", ""),
     },
     "starter": {
