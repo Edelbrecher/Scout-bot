@@ -12,18 +12,6 @@
   background: linear-gradient(135deg, #e2e8f0 30%, #94a3b8);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
-.billing-toggle {
-  display: inline-flex;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 30px;
-  padding: 4px; gap: 4px;
-}
-.toggle-btn {
-  padding: 0.45rem 1.5rem; border-radius: 24px; border: none;
-  cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.15s;
-}
-
 /* ── Player Pro Hero Card ── */
 .pp-hero-card {
   position: relative;
@@ -192,12 +180,6 @@
     <p style="color:var(--text-muted);font-size:0.95rem;max-width:500px;margin:0 auto 1.75rem;line-height:1.6;">
       Start with <strong style="color:#4ade80;">30 days free</strong> — one-time, no credit card needed.
     </p>
-    <div class="billing-toggle">
-      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">Monthly</button>
-      <button id="btnAnnual"  onclick="setBilling('annual')"  class="toggle-btn" style="background:transparent;color:var(--text-muted);display:flex;align-items:center;gap:0.4rem;">
-        Annual <span style="background:#22c55e;color:#000;font-size:0.62rem;font-weight:800;padding:1px 7px;border-radius:7px;">~33% CHEAPER</span>
-      </button>
-    </div>
   </div>
 
   {% set active_tier = '' %}
@@ -228,16 +210,13 @@
 
     <!-- Center: price -->
     <div class="pp-price-box">
-      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:.05em;">Ab</div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:.05em;">From</div>
       <div>
-        <span class="price-monthly" style="font-size:2.8rem;font-weight:900;color:#a78bfa;line-height:1;">€2,99</span>
-        <span class="price-annual"  style="font-size:2.8rem;font-weight:900;color:#a78bfa;line-height:1;display:none;">€29,99</span>
+        <span style="font-size:2.8rem;font-weight:900;color:#a78bfa;line-height:1;">€2,99</span>
       </div>
       <div>
-        <span class="price-monthly" style="font-size:0.82rem;color:#6b7280;">/month</span>
-        <span class="price-annual"  style="font-size:0.82rem;color:#6b7280;display:none;">/year</span>
+        <span style="font-size:0.82rem;color:#6b7280;">/month</span>
       </div>
-      <div class="price-annual" style="font-size:0.72rem;color:#4ade80;margin-top:0.3rem;display:none;">approx. €2.50/month</div>
     </div>
 
     <!-- Right: CTA -->
@@ -254,13 +233,13 @@
       <div style="font-size:0.7rem;color:#475569;text-align:center;margin-bottom:0.5rem;">No credit card · One-time</div>
       <form method="post" action="/plans/checkout" style="width:100%;">
         <input type="hidden" name="tier" value="player_pro">
-        <input type="hidden" class="input-plan" name="plan" value="monthly">
+        <input type="hidden" name="plan" value="monthly">
         <button type="submit" class="pp-cta-btn" style="background:rgba(124,58,237,0.35);box-shadow:none;font-size:0.88rem;">💳 Subscribe directly</button>
       </form>
       {% else %}
       <form method="post" action="/plans/checkout" style="width:100%;">
         <input type="hidden" name="tier" value="player_pro">
-        <input type="hidden" class="input-plan" name="plan" value="monthly">
+        <input type="hidden" name="plan" value="monthly">
         <button type="submit" class="pp-cta-btn">🚀 Subscribe</button>
       </form>
       {% endif %}
@@ -315,11 +294,8 @@
       <div class="tier-tag">{{ tagline }}</div>
 
       <div class="tier-price">
-        <span class="tier-price-num price-monthly" style="color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
-        <span class="tier-price-num price-annual"  style="color:{{ tcolor }};display:none;">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
-        <span class="tier-price-unit price-monthly">/mo.</span>
-        <span class="tier-price-unit price-annual" style="display:none;">/mo.</span>
-        <div class="price-annual" style="font-size:0.7rem;color:#4ade80;margin-top:0.15rem;display:none;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/year</div>
+        <span class="tier-price-num" style="color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
+        <span class="tier-price-unit">/mo.</span>
       </div>
 
       <div class="tier-divider" style="background:{{ tcolor }}22;"></div>
@@ -343,7 +319,7 @@
       {% else %}
       <form method="post" action="/plans/checkout" style="margin:0;">
         <input type="hidden" name="tier" value="{{ tid }}">
-        <input type="hidden" class="input-plan" name="plan" value="monthly">
+        <input type="hidden" name="plan" value="monthly">
         <button type="submit" class="tier-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">
           🚀 7 days free trial
         </button>
@@ -365,20 +341,4 @@
     Questions? <a href="mailto:support@travops.online" style="color:#3b82f6;text-decoration:none;">support@travops.online</a>
   </div>
 </div>
-
-<script>
-let billing = 'monthly';
-function setBilling(mode) {
-  billing = mode;
-  document.querySelectorAll('.price-monthly').forEach(el => el.style.display = mode === 'monthly' ? '' : 'none');
-  document.querySelectorAll('.price-annual').forEach(el  => el.style.display = mode === 'annual'  ? '' : 'none');
-  document.querySelectorAll('.input-plan').forEach(el => el.value = mode);
-  const btnM = document.getElementById('btnMonthly');
-  const btnA = document.getElementById('btnAnnual');
-  btnM.style.background = mode === 'monthly' ? '#3b82f6' : 'transparent';
-  btnM.style.color      = mode === 'monthly' ? '#fff'    : 'var(--text-muted)';
-  btnA.style.background = mode === 'annual'  ? '#3b82f6' : 'transparent';
-  btnA.style.color      = mode === 'annual'  ? '#fff'    : 'var(--text-muted)';
-}
-</script>
 {% endblock %}

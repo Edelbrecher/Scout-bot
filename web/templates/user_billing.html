@@ -66,26 +66,6 @@
 }
 .pp-badge-pro   { background: rgba(139,92,246,0.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.4); }
 .pp-badge-free  { background: rgba(100,116,139,0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
-.plan-btn {
-  padding: 0.55rem 1.5rem;
-  border-radius: 8px;
-  border: 1.5px solid transparent;
-  cursor: pointer;
-  font-size: 0.92rem;
-  font-weight: 600;
-  transition: all 0.15s;
-}
-.plan-btn.active {
-  background: rgba(139,92,246,0.25);
-  border-color: #7c3aed;
-  color: #c4b5fd;
-}
-.plan-btn.inactive {
-  background: transparent;
-  border-color: transparent;
-  color: var(--text-muted);
-}
-.plan-btn.inactive:hover { color: var(--text); }
 .checkout-btn {
   display: block; width: 100%; max-width: 380px; margin: 0 auto;
   padding: 1rem 2rem;
@@ -189,17 +169,6 @@
       Usable immediately, cancel anytime.
     </p>
 
-    <!-- Plan Toggle -->
-    <div style="display:inline-flex;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:4px;gap:4px;margin-bottom:1.75rem;">
-      <button id="btnMonthly" class="plan-btn active" onclick="selectPlan('monthly')">
-        Monthly &nbsp;<strong>€2,99</strong>
-      </button>
-      <button id="btnAnnual" class="plan-btn inactive" onclick="selectPlan('annual')">
-        Annual &nbsp;<strong>€29,99</strong>
-        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;">–16%</span>
-      </button>
-    </div>
-
     {% if not free_trial_used %}
     <!-- Free Trial CTA (no credit card) -->
     <form method="post" action="/billing/start-free-trial" style="margin-bottom:1rem;">
@@ -221,9 +190,9 @@
     {% if stripe_configured %}
     <form method="post" action="/billing/checkout" id="checkoutForm">
       <input type="hidden" name="tier" value="player_pro">
-      <input type="hidden" name="plan" id="planInput" value="monthly">
+      <input type="hidden" name="plan" value="monthly">
       <button type="submit" class="checkout-btn" {% if not free_trial_used %}style="background:rgba(124,58,237,0.5);box-shadow:none;font-size:0.95rem;"{% endif %}>
-        💳 Abonnieren → <span id="priceLabel">€2,99/Monat</span>
+        💳 Abonnieren → €2,99/Monat
       </button>
     </form>
     <p style="font-size:0.75rem;color:#475569;margin-top:0.85rem;">
@@ -306,15 +275,4 @@
 
 </div>
 
-<script>
-function selectPlan(plan) {
-  document.getElementById('planInput').value = plan;
-  const mBtn = document.getElementById('btnMonthly');
-  const aBtn = document.getElementById('btnAnnual');
-  const label = document.getElementById('priceLabel');
-  mBtn.className = 'plan-btn ' + (plan === 'monthly' ? 'active' : 'inactive');
-  aBtn.className = 'plan-btn ' + (plan === 'annual'  ? 'active' : 'inactive');
-  if (label) label.textContent = plan === 'annual' ? '€29,99/Jahr' : '€2,99/Monat';
-}
-</script>
 {% endblock %}

@@ -200,20 +200,7 @@
   <!-- ── Header ── -->
   <div class="billing-header">
     <h1 style="margin:0 0 0.4rem;font-size:1.8rem;font-weight:900;">Choose your plan</h1>
-    <p style="color:var(--text-muted);margin:0 0 1.5rem;font-size:0.95rem;">Monthly or annual · Cancel anytime</p>
-
-    <!-- Billing Toggle -->
-    <div class="billing-toggle">
-      <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn"
-              style="background:#3b82f6;color:#fff;">
-        Monthly
-      </button>
-      <button id="btnAnnual" onclick="setBilling('annual')" class="toggle-btn"
-              style="background:transparent;color:var(--text-muted);display:flex;align-items:center;gap:0.4rem;">
-        Annual
-        <span style="background:#22c55e;color:#000;font-size:0.65rem;font-weight:800;padding:1px 8px;border-radius:8px;">3 mo. FREE</span>
-      </button>
-    </div>
+    <p style="color:var(--text-muted);margin:0 0 1.5rem;font-size:0.95rem;">Cancel anytime</p>
   </div>
 
   <!-- ── Tier Cards ── -->
@@ -274,14 +261,9 @@
       </div>
 
       <!-- Price -->
-      <div class="price-monthly" style="margin-bottom:1rem;">
+      <div style="margin-bottom:1rem;">
         <span style="font-size:2rem;font-weight:900;color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
         <span style="font-size:0.8rem;color:var(--text-muted);">/month</span>
-      </div>
-      <div class="price-annual" style="margin-bottom:1rem;display:none;">
-        <span style="font-size:2rem;font-weight:900;color:{{ tcolor }};">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
-        <span style="font-size:0.8rem;color:var(--text-muted);">/month</span>
-        <div style="font-size:0.72rem;color:#4ade80;margin-top:0.2rem;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/year · ~33% saved</div>
       </div>
 
       <!-- Divider -->
@@ -307,7 +289,7 @@
   <div style="text-align:center;margin-bottom:2rem;">
     <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout" id="checkoutForm">
       <input type="hidden" name="tier" id="selectedTier" value="clan">
-      <input type="hidden" name="plan" id="selectedPlan" value="monthly">
+      <input type="hidden" name="plan" value="monthly">
       <button type="submit" class="checkout-main" id="checkoutBtn">
         🚀 Subscribe to Clan
       </button>
@@ -334,7 +316,6 @@
 
 <script>
 let currentTier = 'clan';
-let currentPlan = 'monthly';
 
 const TIER_COLORS = { starter:'#22c55e', clan:'#f59e0b', alliance:'#a855f7', imperium:'#ef4444' };
 const TIER_LABELS = { starter:'Starter', clan:'Clan', alliance:'Alliance', imperium:'Imperium' };
@@ -351,26 +332,10 @@ function selectTier(tid) {
   updateBtn();
 }
 
-function setBilling(mode) {
-  currentPlan = mode;
-  document.getElementById('selectedPlan').value = mode;
-  const mBtn = document.getElementById('btnMonthly');
-  const aBtn = document.getElementById('btnAnnual');
-  mBtn.style.background = mode === 'monthly' ? '#3b82f6' : 'transparent';
-  mBtn.style.color      = mode === 'monthly' ? '#fff' : 'var(--text-muted)';
-  aBtn.style.background = mode === 'annual'  ? '#3b82f6' : 'transparent';
-  aBtn.style.color      = mode === 'annual'  ? '#fff' : 'var(--text-muted)';
-  document.querySelectorAll('.price-monthly').forEach(el => el.style.display = mode === 'monthly' ? '' : 'none');
-  document.querySelectorAll('.price-annual').forEach(el  => el.style.display = mode === 'annual'  ? '' : 'none');
-  updateBtn();
-}
-
 function updateBtn() {
   const btn = document.getElementById('checkoutBtn');
   const label = TIER_LABELS[currentTier] || currentTier;
-  btn.textContent = currentPlan === 'annual'
-    ? `🚀 Subscribe to ${label} · Annual`
-    : `🚀 Subscribe to ${label}`;
+  btn.textContent = `🚀 Subscribe to ${label}`;
 }
 
 selectTier('clan');

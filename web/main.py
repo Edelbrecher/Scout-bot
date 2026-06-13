@@ -1875,7 +1875,7 @@ async def user_billing_checkout(
 
     if tier not in ("player_pro",):
         tier = "player_pro"
-    interval = "monthly" if plan == "monthly" else "annual"
+    interval = "monthly"
     price_id = STRIPE_PRICES[tier][interval]
     if not price_id:
         return RedirectResponse("/billing?error=price_not_configured", status_code=303)
@@ -4066,7 +4066,7 @@ async def billing_checkout(
         return RedirectResponse("/dashboard", status_code=303)
 
     tier = tier if tier in STRIPE_PRICES else "starter"
-    interval = "monthly" if plan == "monthly" else "annual"
+    interval = "monthly"
     price_id = STRIPE_PRICES[tier][interval]
     if not price_id:
         return RedirectResponse(f"/guild/{guild_id}/billing?error=price_not_configured", status_code=303)
@@ -4312,7 +4312,7 @@ async def plans_checkout(request: Request, plan: str = Form("monthly"), tier: st
         return RedirectResponse("/plans?error=stripe_not_configured", status_code=303)
 
     tier = tier if tier in STRIPE_PRICES else "starter"
-    interval = "monthly" if plan == "monthly" else "annual"
+    interval = "monthly"
     price_id = STRIPE_PRICES[tier][interval]
     if not price_id:
         return RedirectResponse("/plans?error=price_not_configured", status_code=303)
