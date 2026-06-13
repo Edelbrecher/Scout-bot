@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Player Intelligence{% if intel %} · {{ intel.player_name }}{% endif %} · TravOps{% endblock %}
+{% block title %}Player Search{% if intel %} · {{ intel.player_name }}{% endif %} · TravOps{% endblock %}
 
 {% block extra_head %}
 <style>
-/* ── Player Intelligence — mobile-first responsive fixes ── */
+/* ── Player Search — mobile-first responsive fixes ── */
 .pi-main-grid {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -50,7 +50,7 @@
 
   {# ── Back link ── #}
   {% if intel %}
-  <a href="/guild/{{ guild.guild_id }}/intel" class="back-link">← Player Intelligence</a>
+  <a href="/guild/{{ guild.guild_id }}/intel" class="back-link">← Player Search</a>
   {% else %}
   <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
   {% endif %}
@@ -58,10 +58,15 @@
   {# ── Header ── #}
   <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
     <div style="flex:1;">
-      <h1 style="margin:0;font-size:1.5rem;">🔎 Player Intelligence</h1>
+      <h1 style="margin:0;font-size:1.5rem;">🔎 Player Search</h1>
       <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">Search any player from your world — villages, history, mini-map</p>
     </div>
     {% if intel %}
+    <button type="button" onclick="location.reload()"
+       style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;white-space:nowrap;transition:border-color .15s;cursor:pointer;"
+       onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      🔄 Refresh
+    </button>
     <button type="button" id="shareIntelBtn" onclick="shareIntel(this)"
        style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;white-space:nowrap;transition:border-color .15s;cursor:pointer;"
        onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
