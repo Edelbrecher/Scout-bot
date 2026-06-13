@@ -13259,12 +13259,13 @@ async def _init_feature_matrix_table():
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS feature_matrix (
-                feature_key  TEXT PRIMARY KEY,
-                group_name   TEXT NOT NULL,
-                display_name TEXT NOT NULL,
-                note         TEXT DEFAULT '',
-                tier         TEXT NOT NULL DEFAULT 'alliance_pro',
-                sort_order   INTEGER NOT NULL DEFAULT 0
+                feature_key      TEXT PRIMARY KEY,
+                group_name       TEXT NOT NULL,
+                display_name     TEXT NOT NULL,
+                note             TEXT DEFAULT '',
+                tier             TEXT NOT NULL DEFAULT 'alliance_pro',
+                sort_order       INTEGER NOT NULL DEFAULT 0,
+                requires_discord INTEGER NOT NULL DEFAULT 0
             )
         """)
         await db.commit()
@@ -13278,6 +13279,13 @@ async def _init_feature_matrix_table():
                 FEATURE_MATRIX_SEED
             )
             await db.commit()
+        # Migration: requires_discord column for installs created before this field existed
+        try:
+            await db.execute("ALTER TABLE feature_matrix ADD COLUMN requires_discord INTEGER NOT NULL DEFAULT 0")
+            await db.execute("UPDATE feature_matrix SET requires_discord=1 WHERE feature_key='attacks'")
+            await db.commit()
+        except Exception:
+            pass
 
 
 async def get_feature_matrix() -> list[dict]:
@@ -13296,6 +13304,15 @@ async def update_feature_matrix(updates: list[dict]):
                 "UPDATE feature_matrix SET tier=?, sort_order=? WHERE feature_key=?",
                 (u["tier"], u["sort_order"], u["feature_key"])
             )
+        await db.commit()
+
+
+async def set_feature_requires_discord(feature_key: str, requires_discord: bool):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "UPDATE feature_matrix SET requires_discord=? WHERE feature_key=?",
+            (1 if requires_discord else 0, feature_key)
+        )
         await db.commit()
 
 

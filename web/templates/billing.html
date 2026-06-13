@@ -120,10 +120,10 @@
       <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;" data-i18n="billing.current_plan">Current Plan</div>
       {% if sub_status == 'trialing' %}
         <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;">🎁 Trial</span>
-        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ sub_tier|capitalize }}</span>{% endif %}
+        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Plus','alliance':'Premium','imperium':'Imperium'}.get(sub_tier, sub_tier|capitalize) }}</span>{% endif %}
       {% elif sub_status == 'active' %}
         <span style="font-size:1.1rem;font-weight:700;color:#4ade80;">✅ Active</span>
-        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get(sub_tier, sub_tier) }}</span>{% endif %}
+        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Plus','alliance':'Premium','imperium':'Imperium'}.get(sub_tier, sub_tier) }}</span>{% endif %}
         {% if sub_int %}<span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.3rem;">({{ 'Annual' if sub_int == 'annual' else 'Monthly' }})</span>{% endif %}
       {% elif sub_status == 'past_due' %}
         <span style="font-size:1.1rem;font-weight:700;color:#fb923c;">⚠️ Payment overdue</span>
@@ -213,18 +213,18 @@
       ('🗂️', 'Map & Timer', 'World map & action timers'),
       ('🚨', 'Attack-Detection', 'Incoming detection'),
     ]),
-    ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, 'For active guilds', [
+    ('clan',     'Plus',     '⚔️', '#f59e0b', 2, 10.99, 87.99, 'For active guilds', [
       ('✅', 'Everything in Starter', ''),
       ('🏰', '2 Discord servers', 'Multiple worlds at once'),
       ('⚡', 'Priority support', 'Faster response times'),
     ]),
-    ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99, 'For alliances', [
-      ('✅', 'Everything in Clan', ''),
+    ('alliance', 'Premium', '🛡️', '#a855f7', 3, 14.99, 119.99, 'For alliances', [
+      ('✅', 'Everything in Plus', ''),
       ('🌐', '3 Discord servers', ''),
       ('🤝', 'Alliance overview', 'Members &amp; activity'),
     ]),
     ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99, 'For large communities', [
-      ('✅', 'Everything in Alliance', ''),
+      ('✅', 'Everything in Premium', ''),
       ('🏛️', '5 Discord servers', ''),
       ('🎯', 'Dedicated Support', 'Direct contact'),
     ]),
@@ -318,7 +318,7 @@
 let currentTier = 'clan';
 
 const TIER_COLORS = { starter:'#22c55e', clan:'#f59e0b', alliance:'#a855f7', imperium:'#ef4444' };
-const TIER_LABELS = { starter:'Starter', clan:'Clan', alliance:'Alliance', imperium:'Imperium' };
+const TIER_LABELS = { starter:'Starter', clan:'Plus', alliance:'Premium', imperium:'Imperium' };
 
 function selectTier(tid) {
   currentTier = tid;

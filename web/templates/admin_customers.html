@@ -223,7 +223,7 @@
                     {% elif gst == "past_due" %}<span style="font-size:0.7rem; padding:1px 6px; background:#431407; color:#fb923c; border-radius:8px;">⚠ past_due</span>
                     {% elif gst == "canceled" %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:#6b7280; border-radius:8px;">canceled</span>
                     {% else %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border); border-radius:8px;">free</span>{% endif %}
-                    {% if g.subscription_plan %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border); border-radius:8px;">{{ g.subscription_plan }}</span>{% endif %}
+                    {% if g.subscription_plan %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border); border-radius:8px;">{{ {"clan":"plus","alliance":"premium"}.get(g.subscription_plan, g.subscription_plan) }}</span>{% endif %}
                   </div>
                 </div>
                 <div style="font-size:0.78rem; color:var(--text-muted); min-width:90px;">
@@ -246,8 +246,9 @@
                   </select>
                   <select name="plan" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.78rem;">
                     <option value="">—</option>
+                    {% set tier_labels = {"starter":"Starter","clan":"Plus","alliance":"Premium","imperium":"Imperium"} %}
                     {% for tier in ["starter","clan","alliance","imperium"] %}
-                    <option value="{{ tier }}" {% if g.subscription_plan == tier %}selected{% endif %}>{{ tier | capitalize }}</option>
+                    <option value="{{ tier }}" {% if g.subscription_plan == tier %}selected{% endif %}>{{ tier_labels[tier] }}</option>
                     {% endfor %}
                   </select>
                   <button type="submit" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; color:var(--text); font-size:0.78rem; cursor:pointer;">Save</button>

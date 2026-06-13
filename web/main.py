@@ -136,8 +136,8 @@ TIER_META = {
                    "desc": "Solo-Features für Einzelspieler — kein Discord-Server nötig",
                    "player_only": True},
     "starter":  {"name": "Starter",  "servers": 1, "monthly": 6.99,  "annual": 55.99},
-    "clan":     {"name": "Clan",     "servers": 2, "monthly": 10.99, "annual": 87.99},
-    "alliance": {"name": "Alliance", "servers": 3, "monthly": 14.99, "annual": 119.99},
+    "clan":     {"name": "Plus",     "servers": 2, "monthly": 10.99, "annual": 87.99},
+    "alliance": {"name": "Premium",  "servers": 3, "monthly": 14.99, "annual": 119.99},
     "imperium": {"name": "Imperium", "servers": 5, "monthly": 19.99, "annual": 159.99},
 }
 
@@ -11378,8 +11378,8 @@ async def admin_features(request: Request):
         {"name": "Free",      "css": "free",         "monthly": "€0",    "annual": "€0",    "servers": "1",  "notes": "Discord server required; no player features"},
         {"name": "Player Pro","css": "player-pro",   "monthly": "€2.99", "annual": "€29.99","servers": "1",  "notes": "Solo / personal workspace; all player features; no alliance Discord features"},
         {"name": "Starter",   "css": "alliance-pro", "monthly": "€9.99", "annual": "€79.99","servers": "1",  "notes": "Small alliances; all Player Pro + alliance features"},
-        {"name": "Clan",      "css": "alliance-pro", "monthly": "€14.99","annual": "€119.99","servers": "3", "notes": "Multiple servers"},
-        {"name": "Alliance",  "css": "alliance-pro", "monthly": "€24.99","annual": "€199.99","servers": "5", "notes": "Larger alliances"},
+        {"name": "Plus",      "css": "alliance-pro", "monthly": "€14.99","annual": "€119.99","servers": "3", "notes": "Multiple servers"},
+        {"name": "Premium",   "css": "alliance-pro", "monthly": "€24.99","annual": "€199.99","servers": "5", "notes": "Larger alliances"},
         {"name": "Imperium",  "css": "alliance-pro", "monthly": "€49.99","annual": "€399.99","servers": "∞", "notes": "Unlimited servers"},
     ]
 
@@ -11425,6 +11425,20 @@ async def admin_features_reorder(request: Request):
             return JSONResponse({"error": "invalid update"}, status_code=400)
         cleaned.append({"feature_key": key, "tier": tier, "sort_order": int(u.get("sort_order", 0))})
     await database.update_feature_matrix(cleaned)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/admin/features/toggle-discord")
+async def admin_features_toggle_discord(request: Request):
+    session, err = _require_session(request)
+    if err: return err
+    if session.get("type") != "admin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    key = body.get("feature_key")
+    if not key:
+        return JSONResponse({"error": "invalid update"}, status_code=400)
+    await database.set_feature_requires_discord(key, bool(body.get("requires_discord")))
     return JSONResponse({"ok": True})
 
 

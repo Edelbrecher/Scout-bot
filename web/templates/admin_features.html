@@ -36,7 +36,7 @@
         <div style="color:var(--text-muted);font-size:1.2rem;align-self:center;">→</div>
         <div class="plan-badge player-pro">Player Pro</div>
         <div style="color:var(--text-muted);font-size:1.2rem;align-self:center;">→</div>
-        <div class="plan-badge alliance-pro">Alliance Pro <span style="font-size:.72rem;opacity:.7;">(Starter / Clan / Alliance / Imperium)</span></div>
+        <div class="plan-badge alliance-pro">Alliance Pro <span style="font-size:.72rem;opacity:.7;">(Starter / Plus / Premium / Imperium)</span></div>
       </div>
 
       <!-- ── Drag & drop feature board ── -->
@@ -53,6 +53,10 @@
                 <div class="dnd-card-name">{{ f.display_name }}</div>
                 <div class="dnd-card-group">{{ f.group_name }}</div>
                 {% if f.note %}<div class="dnd-card-note">{{ f.note }}</div>{% endif %}
+                <label class="dnd-card-discord">
+                  <input type="checkbox" class="discord-toggle" data-key="{{ f.feature_key }}" {% if f.requires_discord %}checked{% endif %}>
+                  🔗 Benötigt Discord-Server
+                </label>
               </div>
               {% endfor %}
             </div>
@@ -197,6 +201,10 @@
   letter-spacing:.05em;margin-top:.15rem;
 }
 .dnd-card-note { font-size:.72rem;color:var(--text-muted);margin-top:.15rem; }
+.dnd-card-discord {
+  display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:var(--text-muted);
+  margin-top:.35rem;cursor:pointer;
+}
 
 @media(max-width:700px){
   .dnd-board { grid-template-columns:1fr; }
@@ -217,10 +225,27 @@
 
 <script>
 document.querySelectorAll('.dnd-card').forEach(card => {
-  card.addEventListener('dragstart', () => card.classList.add('dragging'));
+  card.addEventListener('dragstart', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') {
+      e.preventDefault();
+      return;
+    }
+    card.classList.add('dragging');
+  });
   card.addEventListener('dragend', () => {
     card.classList.remove('dragging');
     saveFeatureMatrix();
+  });
+});
+
+document.querySelectorAll('.discord-toggle').forEach(toggle => {
+  toggle.addEventListener('click', e => e.stopPropagation());
+  toggle.addEventListener('change', async () => {
+    await fetch('/admin/features/toggle-discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature_key: toggle.dataset.key, requires_discord: toggle.checked })
+    });
   });
 });
 
