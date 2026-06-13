@@ -163,19 +163,19 @@
     ✅ Your subscription has been cancelled and will continue until the end of the period.
   </div>
   {% elif error == 'cancelled' %}
-  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">❌ Payment abgebrochen.</div>
+  <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">❌ Payment cancelled.</div>
   {% elif error %}
   <div style="margin:1rem auto 0;max-width:640px;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;text-align:center;">⚠️ {{ error }}</div>
   {% endif %}
 
-  <!-- Aktives Abo -->
+  <!-- Active Subscription -->
   {% if user_sub and user_sub.subscription_status in ('active','trialing') %}
   {% set active_plan_label = {'player_pro':'Player Pro','starter':'Starter','clan':'Clan','alliance':'Alliance','imperium':'Imperium'}.get((user_sub.plan or '').split('_')[0], 'Pro') %}
   <div style="margin:1rem auto 0;max-width:640px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:0.85rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
     <div>
-      <span style="color:#4ade80;font-weight:700;">✅ Aktives Abo:</span>
+      <span style="color:#4ade80;font-weight:700;">✅ Active subscription:</span>
       <span style="color:var(--text-muted);margin-left:0.5rem;">{{ active_plan_label }} · {{ 'Annual' if 'annual' in (user_sub.plan or '') else 'Monthly' }}</span>
-      {% if user_sub.expires_at %}<span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.5rem;">bis {{ user_sub.expires_at[:10] }}</span>{% endif %}
+      {% if user_sub.expires_at %}<span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.5rem;">until {{ user_sub.expires_at[:10] }}</span>{% endif %}
     </div>
     <form method="post" action="/plans/cancel" onsubmit="return confirm('Really cancel subscription?')">
       <button type="submit" class="btn btn-danger" style="font-size:0.82rem;padding:0.3rem 0.75rem;">❌ Cancel</button>
@@ -190,7 +190,7 @@
     </div>
     <h1 data-i18n="plans.title">Choose your plan</h1>
     <p style="color:var(--text-muted);font-size:0.95rem;max-width:500px;margin:0 auto 1.75rem;line-height:1.6;">
-      Starte mit <strong style="color:#4ade80;">30 Tagen kostenlos</strong> — einmalig, keine Kreditkarte nötig.
+      Start with <strong style="color:#4ade80;">30 days free</strong> — one-time, no credit card needed.
     </p>
     <div class="billing-toggle">
       <button id="btnMonthly" onclick="setBilling('monthly')" class="toggle-btn" style="background:#3b82f6;color:#fff;">Monthly</button>
@@ -215,11 +215,11 @@
         All personal features at once — usable immediately, cancel anytime.
       </div>
       <div class="pp-feat-chips">
-        <span class="pp-chip">📊 Mein Account</span>
+        <span class="pp-chip">📊 My Account</span>
         <span class="pp-chip">⚜️ Farming Intelligence</span>
         <span class="pp-chip">📋 Farmlist-Analyst</span>
         <span class="pp-chip">🗺️ Operation planning</span>
-        <span class="pp-chip">⏱️ Timer & Alarme</span>
+        <span class="pp-chip">⏱️ Timers & Alarms</span>
         <span class="pp-chip">📐 Blueprints</span>
         <span class="pp-chip">🧩 Chrome Extension</span>
         <span class="pp-chip">📈 Statistics</span>
@@ -234,43 +234,43 @@
         <span class="price-annual"  style="font-size:2.8rem;font-weight:900;color:#a78bfa;line-height:1;display:none;">€29,99</span>
       </div>
       <div>
-        <span class="price-monthly" style="font-size:0.82rem;color:#6b7280;">/Monat</span>
-        <span class="price-annual"  style="font-size:0.82rem;color:#6b7280;display:none;">/Jahr</span>
+        <span class="price-monthly" style="font-size:0.82rem;color:#6b7280;">/month</span>
+        <span class="price-annual"  style="font-size:0.82rem;color:#6b7280;display:none;">/year</span>
       </div>
-      <div class="price-annual" style="font-size:0.72rem;color:#4ade80;margin-top:0.3rem;display:none;">ca. €2,50/Monat</div>
+      <div class="price-annual" style="font-size:0.72rem;color:#4ade80;margin-top:0.3rem;display:none;">approx. €2.50/month</div>
     </div>
 
     <!-- Right: CTA -->
     <div class="pp-cta-box">
       {% if active_tier == 'player_pro' %}
-      <button class="pp-cta-btn" style="background:rgba(255,255,255,0.06);box-shadow:none;cursor:default;color:var(--text-muted);" disabled>Aktiver Plan ✓</button>
+      <button class="pp-cta-btn" style="background:rgba(255,255,255,0.06);box-shadow:none;cursor:default;color:var(--text-muted);" disabled>Active Plan ✓</button>
       {% elif not logged_in %}
-      <a href="/login" class="pp-cta-btn">Mit Discord starten →</a>
+      <a href="/login" class="pp-cta-btn">Start with Discord →</a>
       {% elif not free_trial_used %}
       <form method="post" action="/billing/start-free-trial" style="width:100%;margin-bottom:0.5rem;">
         <input type="hidden" name="plan" value="player_pro">
-        <button type="submit" class="pp-cta-btn" style="background:linear-gradient(135deg,#059669,#0d9488);box-shadow:0 4px 20px rgba(5,150,105,0.35);">🎁 30 Tage gratis testen</button>
+        <button type="submit" class="pp-cta-btn" style="background:linear-gradient(135deg,#059669,#0d9488);box-shadow:0 4px 20px rgba(5,150,105,0.35);">🎁 30 days free trial</button>
       </form>
-      <div style="font-size:0.7rem;color:#475569;text-align:center;margin-bottom:0.5rem;">Keine Kreditkarte · Einmalig</div>
+      <div style="font-size:0.7rem;color:#475569;text-align:center;margin-bottom:0.5rem;">No credit card · One-time</div>
       <form method="post" action="/plans/checkout" style="width:100%;">
         <input type="hidden" name="tier" value="player_pro">
         <input type="hidden" class="input-plan" name="plan" value="monthly">
-        <button type="submit" class="pp-cta-btn" style="background:rgba(124,58,237,0.35);box-shadow:none;font-size:0.88rem;">💳 Direkt abonnieren</button>
+        <button type="submit" class="pp-cta-btn" style="background:rgba(124,58,237,0.35);box-shadow:none;font-size:0.88rem;">💳 Subscribe directly</button>
       </form>
       {% else %}
       <form method="post" action="/plans/checkout" style="width:100%;">
         <input type="hidden" name="tier" value="player_pro">
         <input type="hidden" class="input-plan" name="plan" value="monthly">
-        <button type="submit" class="pp-cta-btn">🚀 Abonnieren</button>
+        <button type="submit" class="pp-cta-btn">🚀 Subscribe</button>
       </form>
       {% endif %}
-      <div style="font-size:0.72rem;color:#475569;text-align:center;">Keine Bindung · Credit card oder PayPal</div>
+      <div style="font-size:0.72rem;color:#475569;text-align:center;">No commitment · Credit card or PayPal</div>
     </div>
   </div>
 
   <!-- ══ ALLIANCE PLANS ══ -->
   <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
-    <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Discord + Allianz</div>
+    <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Discord + Alliance</div>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
 
@@ -278,27 +278,27 @@
     {% set tiers = [
       ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, '1 Server · For individual guilds', False, [
         ('🔭','Scout system','Scout reports &amp; bot'),
-        ('🌾','Res-Push','Resources-Requests'),
+        ('🌾','Res-Push','Resource requests'),
         ('🗺️','Operation planning',''),
         ('⚜️','Farming Intel','Inactive farms'),
         ('🚨','Attack-Detection',''),
         ('🤖','Discord Bot',''),
       ]),
       ('clan',     'Clan',     '⚔️', '#f59e0b', 2, 10.99, 87.99, '2 Servers · For active guilds', True, [
-        ('✅','Alles aus Starter',''),
-        ('🏰','2 Discord-Server','Mehrere Welten'),
+        ('✅','Everything in Starter',''),
+        ('🏰','2 Discord servers','Multiple worlds'),
         ('🤝','Alliance overview','Members &amp; activity'),
         ('⚡','Priority support',''),
       ]),
       ('alliance', 'Alliance', '🛡️', '#a855f7', 3, 14.99, 119.99,'3 Servers · For alliances', False, [
-        ('✅','Alles aus Clan',''),
-        ('🌐','3 Discord-Server',''),
-        ('📊','Erweiterte Statistics',''),
+        ('✅','Everything in Clan',''),
+        ('🌐','3 Discord servers',''),
+        ('📊','Advanced Statistics',''),
       ]),
       ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99,'5 Servers · For communities', False, [
-        ('✅','Alles aus Alliance',''),
-        ('🏛️','5 Discord-Server',''),
-        ('🎯','Dedicated Support','Direkter Contact'),
+        ('✅','Everything in Alliance',''),
+        ('🏛️','5 Discord servers',''),
+        ('🎯','Dedicated Support','Direct contact'),
       ]),
     ] %}
 
@@ -306,9 +306,9 @@
     {% set is_current = (active_tier == tid) %}
     <div class="tier-card {% if is_popular %}popular{% endif %}" {% if is_current %}style="border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.2);"{% endif %}>
 
-      {% if is_popular %}<div class="popular-badge">⭐ BELIEBTESTE WAHL</div>{% endif %}
-      {% if is_current %}<div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#3b82f6;color:#fff;font-size:0.65rem;font-weight:900;padding:2px 12px;border-radius:10px;white-space:nowrap;">Aktueller Plan</div>{% endif %}
-      <div class="trial-badge">30T GRATIS</div>
+      {% if is_popular %}<div class="popular-badge">⭐ MOST POPULAR</div>{% endif %}
+      {% if is_current %}<div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#3b82f6;color:#fff;font-size:0.65rem;font-weight:900;padding:2px 12px;border-radius:10px;white-space:nowrap;">Current Plan</div>{% endif %}
+      <div class="trial-badge">30D FREE</div>
 
       <div class="tier-icon" style="background:{{ tcolor }}18;border:1px solid {{ tcolor }}33;">{{ temoji }}</div>
       <div class="tier-name" style="color:{{ tcolor }};">{{ tname }}</div>
@@ -317,9 +317,9 @@
       <div class="tier-price">
         <span class="tier-price-num price-monthly" style="color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
         <span class="tier-price-num price-annual"  style="color:{{ tcolor }};display:none;">€{{ '%.2f'|format(price_a/12)|replace('.',',') }}</span>
-        <span class="tier-price-unit price-monthly">/Mo.</span>
-        <span class="tier-price-unit price-annual" style="display:none;">/Mo.</span>
-        <div class="price-annual" style="font-size:0.7rem;color:#4ade80;margin-top:0.15rem;display:none;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/Jahr</div>
+        <span class="tier-price-unit price-monthly">/mo.</span>
+        <span class="tier-price-unit price-annual" style="display:none;">/mo.</span>
+        <div class="price-annual" style="font-size:0.7rem;color:#4ade80;margin-top:0.15rem;display:none;">€{{ '%.2f'|format(price_a)|replace('.',',') }}/year</div>
       </div>
 
       <div class="tier-divider" style="background:{{ tcolor }}22;"></div>
@@ -329,7 +329,7 @@
         <li>
           <span class="fi">{{ ficon }}</span>
           <span>
-            <strong style="color:{% if fname.startswith('Alles') %}{{ tcolor }}{% else %}var(--text){% endif %};">{{ fname }}</strong>
+            <strong style="color:{% if fname.startswith('Everything') %}{{ tcolor }}{% else %}var(--text){% endif %};">{{ fname }}</strong>
             {% if fdesc %}<br><span style="font-size:0.7rem;">{{ fdesc }}</span>{% endif %}
           </span>
         </li>
@@ -337,15 +337,15 @@
       </ul>
 
       {% if is_current %}
-      <button class="tier-cta" style="background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border);cursor:default;" disabled>Aktiver Plan ✓</button>
+      <button class="tier-cta" style="background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border);cursor:default;" disabled>Active Plan ✓</button>
       {% elif not logged_in %}
-      <a href="/login" class="tier-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">Mit Discord starten →</a>
+      <a href="/login" class="tier-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">Start with Discord →</a>
       {% else %}
       <form method="post" action="/plans/checkout" style="margin:0;">
         <input type="hidden" name="tier" value="{{ tid }}">
         <input type="hidden" class="input-plan" name="plan" value="monthly">
         <button type="submit" class="tier-cta" style="background:{{ tcolor }};color:{% if tcolor == '#f59e0b' %}#000{% else %}#fff{% endif %};">
-          🚀 7 Tage gratis testen
+          🚀 7 days free trial
         </button>
       </form>
       {% endif %}
@@ -358,11 +358,11 @@
     <span>🔒 Payment via Stripe</span>
     <span>🎟️ Voucher redeemable at checkout</span>
     <span>↩️ Cancel anytime</span>
-    <span>🎁 30 Tage gratis testen — einmalig, keine Kreditkarte</span>
+    <span>🎁 30 days free trial — one-time, no credit card</span>
   </div>
 
   <div style="text-align:center;color:var(--text-muted);font-size:0.82rem;margin-bottom:2.5rem;">
-    Fragen? <a href="mailto:support@travops.online" style="color:#3b82f6;text-decoration:none;">support@travops.online</a>
+    Questions? <a href="mailto:support@travops.online" style="color:#3b82f6;text-decoration:none;">support@travops.online</a>
   </div>
 </div>
 
