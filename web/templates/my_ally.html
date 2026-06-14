@@ -1426,6 +1426,13 @@
     </div>
   </div>
 
+  {# ══════════════════════════════ TAB: BOT SETTINGS ══════════════════════════════ #}
+  {% if is_lead %}
+  <div id="tab-bot-settings" class="ma-tab-panel" style="display:none;">
+    {% include "_bot_settings_content.html" %}
+  </div>
+  {% endif %}
+
   {# ══════════════════════════════ TAB: LEADERBOARD ══════════════════════════════ #}
   {% if leaderboard %}
   <div id="tab-leaderboard" class="ma-tab-panel" style="display:none;">

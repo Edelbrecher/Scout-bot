@@ -3897,6 +3897,7 @@ async def guild_settings_page(request: Request, guild_id: str):
 
 @app.get("/guild/{guild_id}/bot-settings", response_class=HTMLResponse)
 async def bot_settings_page(request: Request, guild_id: str):
+    """Legacy URL — Bot Settings is now an in-page tab on My Ally."""
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
@@ -3905,49 +3906,11 @@ async def bot_settings_page(request: Request, guild_id: str):
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
-    flash = request.query_params.get("saved", "") or request.query_params.get("error", "")
-    is_personal = guild.get("workspace_type") == "personal"
+    if guild.get("workspace_type") == "personal":
+        return RedirectResponse(f"/guild/{guild_id}", status_code=302)
 
-    # Resolve channel names for the notification-channel overview (best effort —
-    # falls back to showing the raw ID if the Discord lookup fails).
-    channel_names: dict[str, str] = {}
-    if not is_personal:
-        token = os.environ.get("DISCORD_TOKEN", "")
-        if token:
-            try:
-                async with httpx.AsyncClient(timeout=5) as client:
-                    r = await client.get(
-                        f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-                        headers={"Authorization": f"Bot {token}"},
-                    )
-                    if r.status_code == 200:
-                        channel_names = {str(c["id"]): c.get("name", "") for c in r.json()}
-            except Exception:
-                pass
-
-    request_hub = await database.get_request_hub(guild_id)
-    hero_scout_channel_id = None
-    if not is_personal:
-        hero_scout_channel_id = await _get_hero_scout_channel(guild_id)
-
-    ally_nav = {"ally_group": None}
-    if not is_personal:
-        ally_nav = await _get_ally_nav_context(guild_id, session)
-
-    return templates.TemplateResponse("bot_settings.html", {
-        "request": request,
-        "guild": guild,
-        "is_personal": is_personal,
-        "channel_names": channel_names,
-        "request_hub": request_hub,
-        "hero_scout_channel_id": hero_scout_channel_id,
-        "flash": flash,
-        "saved": request.query_params.get("saved", ""),
-        "error": request.query_params.get("error", ""),
-        "is_my_ally_page": False,
-        "ally_nav_active": "bot-settings",
-        **ally_nav,
-    })
+    qs = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(f"/guild/{guild_id}/my-ally{qs}#bot-settings", status_code=302)
 
 
 @app.post("/guild/{guild_id}/bot-settings/language")
@@ -3959,7 +3922,7 @@ async def bot_settings_language(request: Request, guild_id: str, bot_language: s
     if bot_language not in ("de", "en"):
         bot_language = "de"
     await database.update_guild_config_fields(guild_id, bot_language=bot_language)
-    return RedirectResponse(f"/guild/{guild_id}/bot-settings?saved=language", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=language#bot-settings", status_code=303)
 
 
 @app.get("/guild/{guild_id}/upgrade")
@@ -6086,6 +6049,30 @@ async def my_ally_page(request: Request, guild_id: str):
     can_view_map_tab = can_manage_map_meta
     has_map_meta_premium = _has_alliance_pro(await _enrich_guild_subscription(guild)) if guild else False
 
+    # ── Bot Settings tab (lead-only) ───────────────────────────────────────
+    is_personal = guild.get("workspace_type") == "personal"
+    channel_names: dict[str, str] = {}
+    request_hub = None
+    hero_scout_channel_id = None
+    if is_lead:
+        if not is_personal:
+            token = os.environ.get("DISCORD_TOKEN", "")
+            if token:
+                try:
+                    async with httpx.AsyncClient(timeout=5) as client:
+                        r = await client.get(
+                            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                            headers={"Authorization": f"Bot {token}"},
+                        )
+                        if r.status_code == 200:
+                            channel_names = {str(c["id"]): c.get("name", "") for c in r.json()}
+                except Exception:
+                    pass
+            hero_scout_channel_id = await _get_hero_scout_channel(guild_id)
+        request_hub = await database.get_request_hub(guild_id)
+    bot_settings_saved = request.query_params.get("saved", "")
+    bot_settings_error = request.query_params.get("error", "")
+
     # ── Wave 3: depends on members list ──────────────────────────────────
     all_members_list = members or member_view_members or []
     all_member_discord_ids = [m["discord_id"] for m in all_members_list if m.get("discord_id")]
@@ -6169,6 +6156,12 @@ async def my_ally_page(request: Request, guild_id: str):
         "can_view_rank": can_view_rank,
         "can_view_guide": can_view_guide,
         "is_lead": is_lead,
+        "is_personal": is_personal,
+        "channel_names": channel_names,
+        "request_hub": request_hub,
+        "hero_scout_channel_id": hero_scout_channel_id,
+        "saved": bot_settings_saved,
+        "error": bot_settings_error,
         "lb_by_discord": lb_by_discord,
         "lb_by_travian": lb_by_travian,
         "lock_travian_name": bool((ally_group or guild_group or {}).get("lock_travian_name")),
@@ -12551,12 +12544,12 @@ async def create_request_hub(request: Request, guild_id: str):
             )
             data = resp.json()
             if data.get("ok"):
-                return RedirectResponse(f"/guild/{guild_id}/bot-settings?saved=hub_created", status_code=303)
+                return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=hub_created#bot-settings", status_code=303)
             print(f"[hub_create] bot error: {data}")
-            return RedirectResponse(f"/guild/{guild_id}/bot-settings?error=hub_create_failed&detail={data.get('error','')}", status_code=303)
+            return RedirectResponse(f"/guild/{guild_id}/my-ally?error=hub_create_failed&detail={data.get('error','')}#bot-settings", status_code=303)
     except Exception as e:
         print(f"[hub_create] exception: {type(e).__name__}: {e}")
-        return RedirectResponse(f"/guild/{guild_id}/bot-settings?error=hub_create_failed", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/my-ally?error=hub_create_failed#bot-settings", status_code=303)
 
 
 @app.post("/guild/{guild_id}/request-hub/refresh")
@@ -12573,10 +12566,10 @@ async def refresh_request_hub(request: Request, guild_id: str):
             )
             data = resp.json()
             if data.get("ok"):
-                return RedirectResponse(f"/guild/{guild_id}/bot-settings?saved=hub_refreshed", status_code=303)
-            return RedirectResponse(f"/guild/{guild_id}/bot-settings?error=hub_refresh_failed&detail={data.get('error','')}", status_code=303)
+                return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=hub_refreshed#bot-settings", status_code=303)
+            return RedirectResponse(f"/guild/{guild_id}/my-ally?error=hub_refresh_failed&detail={data.get('error','')}#bot-settings", status_code=303)
     except Exception as e:
-        return RedirectResponse(f"/guild/{guild_id}/bot-settings?error=hub_refresh_failed", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/my-ally?error=hub_refresh_failed#bot-settings", status_code=303)
 
 
 @app.post("/guild/{guild_id}/request-hub/clear")
@@ -12586,7 +12579,7 @@ async def clear_request_hub(request: Request, guild_id: str):
     err = _require_guild(session, guild_id)
     if err: return err
     await database.clear_request_hub(guild_id)
-    return RedirectResponse(f"/guild/{guild_id}/bot-settings?saved=hub_cleared", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=hub_cleared#bot-settings", status_code=303)
 
 
 @app.post("/guild/{guild_id}/digest/set")
@@ -12594,12 +12587,12 @@ async def digest_set(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     if not (_is_leader(session, guild_id) or session.get("type") == "admin"):
-        return RedirectResponse(f"/guild/{guild_id}/bot-settings", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/my-ally#bot-settings", status_code=303)
     form = await request.form()
     channel_id = sanitize_snowflake((form.get("channel_id") or "").strip())
     if channel_id:
         await database.update_guild_config_fields(guild_id, digest_channel_id=channel_id)
-    return RedirectResponse(f"/guild/{guild_id}/bot-settings?saved=digest", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=digest#bot-settings", status_code=303)
 
 
 @app.post("/guild/{guild_id}/digest/clear")
@@ -12607,9 +12600,9 @@ async def digest_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
     if not (_is_leader(session, guild_id) or session.get("type") == "admin"):
-        return RedirectResponse(f"/guild/{guild_id}/bot-settings", status_code=303)
+        return RedirectResponse(f"/guild/{guild_id}/my-ally#bot-settings", status_code=303)
     await database.update_guild_config_fields(guild_id, digest_channel_id=None)
-    return RedirectResponse(f"/guild/{guild_id}/bot-settings?saved=digest_cleared", status_code=303)
+    return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=digest_cleared#bot-settings", status_code=303)
 
 
 @app.post("/guild/{guild_id}/clear-stale-channels")
