@@ -5007,12 +5007,27 @@ async def my_account_page(request: Request, guild_id: str):
 
     # Re-classify villages with CURRENT troop roles (so role changes take effect immediately)
     troop_roles = await database.get_troop_roles(guild_id)
+    guild_crop_map = await database.get_troop_crop_map(guild_id)
+    effective_crop_map = {**database.CROP_MAP, **guild_crop_map}
     for v in own_villages:
         vtype, off_s, def_s, prio = classify_own_village(v.get("troops", {}), troop_roles)
         v["village_type"] = vtype
         v["off_score"]    = off_s
         v["def_score"]    = def_s
         v["priority"]     = prio
+        # Crop/hour consumed by off vs. def troops in this village (role-based,
+        # same classification as off_score/def_score — "both" counts in both).
+        off_crop = 0.0
+        def_crop = 0.0
+        for t, c in v.get("troops", {}).items():
+            role = troop_roles.get(t, "ignore")
+            crop = effective_crop_map.get(t, 1) * c
+            if role in ("off", "both"):
+                off_crop += crop
+            if role in ("def", "both"):
+                def_crop += crop
+        v["off_crop"] = round(off_crop)
+        v["def_crop"] = round(def_crop)
 
     # Totals for KPI strip
     total_off  = sum(v.get("off_score", 0) for v in own_villages)

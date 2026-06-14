@@ -393,8 +393,14 @@
                 {% else %}⚔️ Mix{% endif %}
               </span>
             </td>
-            <td style="text-align:right;font-weight:700;color:#ef4444;white-space:nowrap;">{{ "{:,}".format(v.off_score).replace(",",".") }}</td>
-            <td style="text-align:right;font-weight:700;color:#22c55e;white-space:nowrap;">{{ "{:,}".format(v.def_score).replace(",",".") }}</td>
+            <td style="text-align:right;font-weight:700;color:#ef4444;white-space:nowrap;">
+              {{ "{:,}".format(v.off_score).replace(",",".") }}
+              {% if v.off_crop %}<span style="display:block;font-size:.65rem;font-weight:400;color:var(--text-muted);">🌾 {{ "{:,}".format(v.off_crop).replace(",",".") }}/h</span>{% endif %}
+            </td>
+            <td style="text-align:right;font-weight:700;color:#22c55e;white-space:nowrap;">
+              {{ "{:,}".format(v.def_score).replace(",",".") }}
+              {% if v.def_crop %}<span style="display:block;font-size:.65rem;font-weight:400;color:var(--text-muted);">🌾 {{ "{:,}".format(v.def_crop).replace(",",".") }}/h</span>{% endif %}
+            </td>
             <td style="text-align:right;white-space:nowrap;" id="crop-cell-{{ v.x }}-{{ v.y }}">
               {% set crop_key = v.x|string + '_' + v.y|string %}
               {% set crop_auto = v.total_crop or 0 %}
