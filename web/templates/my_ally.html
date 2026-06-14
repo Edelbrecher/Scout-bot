@@ -2,7 +2,7 @@
 {% block title %}My Ally · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div style="max-width:1300px;margin:0 auto;padding:0 1.25rem;">
+<div style="max-width:1900px;margin:0 auto;padding:0 1.25rem;">
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div>
@@ -212,8 +212,106 @@
     </div>
     {% endif %}
 
-    {# Members table — full width #}
+    {# Members table + sidebars — 3-column layout to use the full page width #}
     {% set approved_members = members | rejectattr("status", "equalto", "pending") | list %}
+    <div class="ma-members-layout">
+
+    {# ── LEFT SIDEBAR: Allianz-Truppen ── #}
+    <div class="ma-side-col">
+      {% if is_editor and leaderboard %}
+      {% set total_off_sum   = leaderboard | sum(attribute='total_off')     %}
+      {% set total_def_sum   = leaderboard | sum(attribute='total_def')     %}
+      {% set total_scouts_sum= leaderboard | sum(attribute='total_scouts')  %}
+      {% set members_with_data  = lb_by_discord | length %}
+      {% set active_members = approved_members | rejectattr("status","equalto","pending") | list %}
+      {% set without_auth   = active_members | rejectattr("discord_id", "in", lb_by_discord.keys() | list) | list %}
+      <div class="card">
+        <h3 style="margin:0 0 .75rem;font-size:.92rem;">⚔️ Allianz-Truppen</h3>
+        <div style="display:flex;flex-direction:column;gap:.5rem;">
+          <div style="background:var(--bg-main);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:.6rem .85rem;">
+            <div style="font-size:.7rem;color:#f87171;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">🗡️ Off-Truppen</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#f87171;">
+              {% if total_off_sum >= 1000000 %}{{ "%.1f"|format(total_off_sum/1000000) }}M
+              {% elif total_off_sum >= 1000 %}{{ "%.0f"|format(total_off_sum/1000) }}k
+              {% else %}{{ total_off_sum }}{% endif %}
+            </div>
+            <div style="font-size:.68rem;color:var(--text-muted);">Score · nur echte Off-Einheiten</div>
+          </div>
+          <div style="background:var(--bg-main);border:1px solid rgba(96,165,250,.25);border-radius:8px;padding:.6rem .85rem;">
+            <div style="font-size:.7rem;color:#60a5fa;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">🛡️ Def-Truppen</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#60a5fa;">
+              {% if total_def_sum >= 1000000 %}{{ "%.1f"|format(total_def_sum/1000000) }}M
+              {% elif total_def_sum >= 1000 %}{{ "%.0f"|format(total_def_sum/1000) }}k
+              {% else %}{{ total_def_sum }}{% endif %}
+            </div>
+            <div style="font-size:.68rem;color:var(--text-muted);">Score · inkl. Paladin &amp; Druid</div>
+          </div>
+          <div style="background:var(--bg-main);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:.6rem .85rem;">
+            <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">🔍 Scouts</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#a78bfa;">
+              {% if total_scouts_sum >= 1000000 %}{{ "%.1f"|format(total_scouts_sum/1000000) }}M
+              {% elif total_scouts_sum >= 1000 %}{{ "%.0f"|format(total_scouts_sum/1000) }}k
+              {% else %}{{ total_scouts_sum }}{% endif %}
+            </div>
+            <div style="font-size:.68rem;color:var(--text-muted);">Equites Legati / Scout / Pathfinder</div>
+          </div>
+          <div style="background:var(--bg-main);border:1px solid rgba({{ '239,68,68' if without_auth else '255,255,255' }},.2);border-radius:8px;padding:.6rem .85rem;">
+            <div style="font-size:.7rem;color:{{ '#f87171' if without_auth else 'var(--text-muted)' }};font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">
+              ⚠️ Ohne Account-Upload
+            </div>
+            <div style="font-size:1.2rem;font-weight:800;color:{{ '#f87171' if without_auth else '#4ade80' }};">
+              {{ without_auth | length }} / {{ active_members | length }}
+            </div>
+            <div style="font-size:.68rem;color:var(--text-muted);">
+              {% if without_auth %}
+              {{ without_auth | map(attribute='travian_name') | select | list | join(', ') or
+                 without_auth | map(attribute='discord_username') | select | list | join(', ') }}
+              {% else %}Alle haben hochgeladen ✓{% endif %}
+            </div>
+          </div>
+        </div>
+        <div style="font-size:.66rem;color:var(--text-muted);margin-top:.65rem;">
+          Based on last account upload. Off = attack units only (no Paladin/Druid). Population from latest map snapshot.
+        </div>
+      </div>
+
+      {% if map_only_members %}
+      <div class="card">
+        <div style="font-size:.78rem;font-weight:700;color:#fbbf24;margin-bottom:.5rem;">
+          📍 Ohne Upload — Map-Snapshot
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.4rem;">
+          {% for p in map_only_members %}
+          <div style="font-size:.76rem;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:.3rem;">
+            <div style="font-weight:600;color:#a5b4fc;">{{ p.player_name }}</div>
+            <div style="color:var(--text-muted);">
+              {% if p.total_pop >= 1000 %}{{ "%.1f"|format(p.total_pop/1000) }}k{% else %}{{ p.total_pop }}{% endif %} pop · {{ p.village_count }} villages
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% elif is_editor and map_only_members %}
+      <div class="card">
+        <h3 style="margin:0 0 .6rem;font-size:.92rem;">⚔️ Members — Map Data</h3>
+        <p style="font-size:.74rem;color:var(--text-muted);margin-bottom:.6rem;">No account uploads yet. Showing population from latest map snapshot.</p>
+        <div style="display:flex;flex-direction:column;gap:.4rem;">
+          {% for p in map_only_members %}
+          <div style="font-size:.76rem;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:.3rem;">
+            <div style="font-weight:600;color:#a5b4fc;">{{ p.player_name }}</div>
+            <div style="color:var(--text-muted);">
+              {% if p.total_pop >= 1000 %}{{ "%.1f"|format(p.total_pop/1000) }}k{% else %}{{ p.total_pop }}{% endif %} pop · {{ p.village_count }} villages
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# ── CENTER: member table ── #}
+    <div class="ma-center-col">
     <div class="card" style="padding:0;overflow:hidden;">
 
       {# Toolbar #}
@@ -360,131 +458,14 @@
         {% if not is_editor %} · Order randomized{% endif %}
       </div>
     </div>
-
-    {# ── Allianz-Gesamt Stats + ohne Auth ── #}
-    {% if is_editor and leaderboard %}
-    {% set total_off_sum   = leaderboard | sum(attribute='total_off')     %}
-    {% set total_def_sum   = leaderboard | sum(attribute='total_def')     %}
-    {% set total_scouts_sum= leaderboard | sum(attribute='total_scouts')  %}
-    {% set members_with_data  = lb_by_discord | length %}
-    {% set active_members = approved_members | rejectattr("status","equalto","pending") | list %}
-    {% set without_auth   = active_members | rejectattr("discord_id", "in", lb_by_discord.keys() | list) | list %}
-    <div class="card" style="margin-top:1rem;">
-      <h2 style="margin:0 0 .9rem;font-size:1rem;">⚔️ Allianz-Truppen</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin-bottom:.85rem;">
-        <div style="background:var(--bg-main);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:.7rem 1rem;">
-          <div style="font-size:.72rem;color:#f87171;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">🗡️ Off-Truppen</div>
-          <div style="font-size:1.3rem;font-weight:800;color:#f87171;">
-            {% if total_off_sum >= 1000000 %}{{ "%.1f"|format(total_off_sum/1000000) }}M
-            {% elif total_off_sum >= 1000 %}{{ "%.0f"|format(total_off_sum/1000) }}k
-            {% else %}{{ total_off_sum }}{% endif %}
-          </div>
-          <div style="font-size:.7rem;color:var(--text-muted);">Score · nur echte Off-Einheiten</div>
-        </div>
-        <div style="background:var(--bg-main);border:1px solid rgba(96,165,250,.25);border-radius:8px;padding:.7rem 1rem;">
-          <div style="font-size:.72rem;color:#60a5fa;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">🛡️ Def-Truppen</div>
-          <div style="font-size:1.3rem;font-weight:800;color:#60a5fa;">
-            {% if total_def_sum >= 1000000 %}{{ "%.1f"|format(total_def_sum/1000000) }}M
-            {% elif total_def_sum >= 1000 %}{{ "%.0f"|format(total_def_sum/1000) }}k
-            {% else %}{{ total_def_sum }}{% endif %}
-          </div>
-          <div style="font-size:.7rem;color:var(--text-muted);">Score · inkl. Paladin &amp; Druid</div>
-        </div>
-        <div style="background:var(--bg-main);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:.7rem 1rem;">
-          <div style="font-size:.72rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">🔍 Scouts</div>
-          <div style="font-size:1.3rem;font-weight:800;color:#a78bfa;">
-            {% if total_scouts_sum >= 1000000 %}{{ "%.1f"|format(total_scouts_sum/1000000) }}M
-            {% elif total_scouts_sum >= 1000 %}{{ "%.0f"|format(total_scouts_sum/1000) }}k
-            {% else %}{{ total_scouts_sum }}{% endif %}
-          </div>
-          <div style="font-size:.7rem;color:var(--text-muted);">Equites Legati / Scout / Pathfinder</div>
-        </div>
-        <div style="background:var(--bg-main);border:1px solid rgba({{ '239,68,68' if without_auth else '255,255,255' }},.2);border-radius:8px;padding:.7rem 1rem;">
-          <div style="font-size:.72rem;color:{{ '#f87171' if without_auth else 'var(--text-muted)' }};font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">
-            ⚠️ Ohne Account-Upload
-          </div>
-          <div style="font-size:1.3rem;font-weight:800;color:{{ '#f87171' if without_auth else '#4ade80' }};">
-            {{ without_auth | length }} / {{ active_members | length }}
-          </div>
-          <div style="font-size:.7rem;color:var(--text-muted);">
-            {% if without_auth %}
-            {{ without_auth | map(attribute='travian_name') | select | list | join(', ') or
-               without_auth | map(attribute='discord_username') | select | list | join(', ') }}
-            {% else %}Alle haben hochgeladen ✓{% endif %}
-          </div>
-        </div>
-      </div>
-      <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.75rem;">
-        Based on last account upload. Off = attack units only (no Paladin/Druid). Population from latest map snapshot.
-      </div>
-
-      {% if map_only_members %}
-      <div style="margin-top:.75rem;">
-        <div style="font-size:.8rem;font-weight:700;color:#fbbf24;margin-bottom:.5rem;">
-          📍 Members without upload — from map snapshot
-        </div>
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
-            <thead>
-              <tr style="border-bottom:1px solid var(--border);">
-                <th style="text-align:left;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">Player</th>
-                <th style="text-align:left;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">Alliance</th>
-                <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">🏘️ Population</th>
-                <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);font-size:.72rem;">Villages</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for p in map_only_members %}
-              <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
-                <td style="padding:.35rem .6rem;font-weight:600;color:#a5b4fc;">{{ p.player_name }}</td>
-                <td style="padding:.35rem .6rem;color:var(--text-muted);font-size:.75rem;">{{ p.alliance_name or '—' }}</td>
-                <td style="padding:.35rem .6rem;text-align:right;color:#c4b5fd;font-weight:600;">
-                  {% if p.total_pop >= 1000 %}{{ "%.1f"|format(p.total_pop/1000) }}k{% else %}{{ p.total_pop }}{% endif %}
-                </td>
-                <td style="padding:.35rem .6rem;text-align:right;color:var(--text-muted);">{{ p.village_count }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% endif %}
     </div>
-    {% elif is_editor and map_only_members %}
-    {# No upload data at all but map data exists #}
-    <div class="card" style="margin-top:1rem;">
-      <h2 style="margin:0 0 .9rem;font-size:1rem;">⚔️ Alliance Members — Map Data</h2>
-      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem;">No account uploads yet. Showing population from latest map snapshot.</p>
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border);">
-              <th style="text-align:left;padding:.3rem .6rem;color:var(--text-muted);">Player</th>
-              <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);">🏘️ Population</th>
-              <th style="text-align:right;padding:.3rem .6rem;color:var(--text-muted);">Villages</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in map_only_members %}
-            <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
-              <td style="padding:.4rem .6rem;font-weight:600;color:#a5b4fc;">{{ p.player_name }}</td>
-              <td style="padding:.4rem .6rem;text-align:right;color:#c4b5fd;font-weight:600;">
-                {% if p.total_pop >= 1000 %}{{ "%.1f"|format(p.total_pop/1000) }}k{% else %}{{ p.total_pop }}{% endif %}
-              </td>
-              <td style="padding:.4rem .6rem;text-align:right;color:var(--text-muted);">{{ p.village_count }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    {% endif %}
 
-    {# Growth Charts #}
+    {# ── RIGHT SIDEBAR: Growth Charts ── #}
+    <div class="ma-side-col">
     {% if (growth_data or ally_pop_history) and is_editor %}
-    <div class="card" style="margin-top:1rem;">
-      <h2 style="margin:0 0 1rem;font-size:1rem;">📈 Alliance Growth (last 14 days)</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;">
+    <div class="card">
+      <h3 style="margin:0 0 .75rem;font-size:.92rem;">📈 Alliance Growth (14d)</h3>
+      <div style="display:flex;flex-direction:column;gap:.6rem;">
 
         {# Population from map snapshots #}
         {% if ally_pop_history | length >= 2 %}
@@ -534,6 +515,9 @@
       </div>
     </div>
     {% endif %}
+    </div>
+
+    </div>
 
   </div>
 
@@ -1776,6 +1760,11 @@ function doJoinCode() {
 .ma-tab { font-size:.82rem;padding:.35rem .85rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap; }
 .ma-tab.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
 .ma-tab:hover:not(.active) { border-color:#3b82f6;color:var(--text-primary); }
+.ma-members-layout { display:grid;grid-template-columns:240px minmax(0,1fr) 280px;gap:1rem;align-items:start; }
+.ma-side-col { display:flex;flex-direction:column;gap:.75rem; }
+@media (max-width:1100px) {
+  .ma-members-layout { grid-template-columns:1fr; }
+}
 @media (max-width:800px) {
   #tab-mitglieder > div[style*="grid-template-columns:1fr 1fr"],
   #tab-rollen     > div[style*="grid-template-columns:1fr 1fr"],
