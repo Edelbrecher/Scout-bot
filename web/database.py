@@ -12824,8 +12824,11 @@ async def get_top_alliances(guild_id: str, limit: int = 10) -> list[dict]:
             if not latest:
                 return []
 
+            # "Previous" = most recent snapshot from an earlier calendar day, so
+            # pop_growth reflects ~24h change rather than the diff to the last
+            # scan (which runs every 15min and would be ~0 for most alliances).
             async with db.execute(
-                "SELECT MAX(fetched_at) FROM world_snapshots INDEXED BY idx_wsnap_url_ts WHERE world_url=? AND fetched_at < ?",
+                "SELECT MAX(fetched_at) FROM world_snapshots INDEXED BY idx_wsnap_url_ts WHERE world_url=? AND date(fetched_at) < date(?)",
                 (world_url, latest)
             ) as cur:
                 row = await cur.fetchone()
@@ -12919,7 +12922,9 @@ async def get_meta_combined_tracking(guild_id: str, alliance_names: list[str]) -
     ran several queries per snapshot date through the map_snapshots VIEW (~12s).
     Uses exact (canonical) alliance names so idx_wsnap_url_ally can seek."""
     from collections import defaultdict
-    _empty = {"alliances": [], "pop_history": [], "events": [], "total_members": 0, "total_pop": 0}
+    _empty = {"alliances": [], "pop_history": [], "ally_pop_history": {}, "events": [],
+              "internal_events": [], "total_members": 0, "total_pop": 0, "total_villages": 0,
+              "latest": None, "growth_pop": None, "growth_members": None, "growth_since": None}
     if not alliance_names:
         return _empty
     lower_names = {n.lower() for n in alliance_names}
@@ -12996,6 +13001,18 @@ async def get_meta_combined_tracking(guild_id: str, alliance_names: list[str]) -
             "village_count": sum(v[2] for v in per_date_ally[d].values()),
         } for d in dates]
 
+        # 24h growth: compare latest snapshot to the most recent snapshot from
+        # an earlier calendar day (not the literal previous scan, which runs
+        # every 15min and would make "growth" look like ~0 noise).
+        latest_date = latest_d[:10]
+        growth_since = next((d for d in reversed(dates[:-1]) if d[:10] != latest_date), None)
+        if growth_since:
+            growth_pop = pop_history[-1]["total_pop"] - sum(v[1] for v in per_date_ally[growth_since].values())
+            growth_members = pop_history[-1]["member_count"] - len(date_players[growth_since])
+        else:
+            growth_pop = None
+            growth_members = None
+
         ally_pop_history = {}
         for aname in alliance_names:
             al = aname.lower()
@@ -13070,6 +13087,9 @@ async def get_meta_combined_tracking(guild_id: str, alliance_names: list[str]) -
         "total_pop": total_pop,
         "total_villages": total_villages,
         "latest": latest_d,
+        "growth_pop": growth_pop,
+        "growth_members": growth_members,
+        "growth_since": growth_since,
     }
 
 
@@ -13211,6 +13231,18 @@ async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
             "village_count": sum(v[1] for v in by_date_player[d].values()),
         } for d in dates]
 
+        # 24h growth: compare latest snapshot to the most recent snapshot from
+        # an earlier calendar day (not the literal previous scan, which runs
+        # every 15min and would make "growth" look like ~0 noise).
+        latest_date = latest[:10]
+        growth_since = next((d for d in reversed(dates[:-1]) if d[:10] != latest_date), None)
+        if growth_since:
+            growth_pop = pop_history[-1]["total_pop"] - sum(v[0] for v in by_date_player[growth_since].values())
+            growth_members = pop_history[-1]["member_count"] - len(by_date_player[growth_since])
+        else:
+            growth_pop = None
+            growth_members = None
+
         # Join/leave events from consecutive snapshots (Python set diffs).
         events = []
         left_pairs = []   # (full_date, player) → needs an existence check
@@ -13254,6 +13286,9 @@ async def get_alliance_tracking_data(guild_id: str, alliance_name: str) -> dict:
         "events": out_events,
         "snapshot_count": len(dates),
         "latest": latest,
+        "growth_pop": growth_pop,
+        "growth_members": growth_members,
+        "growth_since": growth_since,
     }
 
 
