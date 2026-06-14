@@ -426,6 +426,11 @@ async def has_perm(request: Request, guild_id: str, flag: str) -> bool:
 
 PREMIUM_STATUSES = ("active", "trialing")
 
+# Admin-granted "Player Pro Lifetime" / support comp access. Treated as premium
+# by all feature gates, but deliberately excluded from MRR/active-subscriber
+# counts on the admin dashboard since it's not a paying subscription.
+LIFETIME_STATUS = "lifetime"
+
 
 def _guild_plan(guild: dict) -> str:
     """Return the subscription plan key, normalising legacy values."""
@@ -440,7 +445,7 @@ def _guild_plan(guild: dict) -> str:
 def _has_player_pro(guild: dict) -> bool:
     """True if the guild/workspace has a paid subscription (any tier)."""
     status = guild.get("subscription_status") or "free"
-    if status not in (*PREMIUM_STATUSES, "past_due"):
+    if status not in (*PREMIUM_STATUSES, "past_due", LIFETIME_STATUS):
         return False
     return True  # any active paid plan unlocks player features
 
@@ -468,8 +473,8 @@ async def _enrich_guild_subscription(guild: dict) -> dict:
         if owner:
             user_sub = await database.get_user_subscription(owner)
             if user_sub:
-                guild_already_premium = guild.get("subscription_status") in PREMIUM_STATUSES
-                user_is_premium = user_sub.get("subscription_status") in PREMIUM_STATUSES
+                guild_already_premium = guild.get("subscription_status") in (*PREMIUM_STATUSES, LIFETIME_STATUS)
+                user_is_premium = user_sub.get("subscription_status") in (*PREMIUM_STATUSES, LIFETIME_STATUS)
                 if not guild_already_premium or user_is_premium:
                     guild = dict(guild)
                     guild["subscription_status"] = user_sub.get("subscription_status", "free")
@@ -10399,10 +10404,11 @@ async def admin_dashboard(request: Request):
     recent = await database.get_recent_guilds(10)
     total_users = await database.get_total_user_count()
     live_users = _build_live_users_list()
-    funnel, today_stats, no_sub = await asyncio.gather(
+    funnel, today_stats, no_sub, support_count = await asyncio.gather(
         database.get_funnel_stats(),
         database.get_today_online_stats(),
         database.get_billing_visitors_without_sub(),
+        database.count_lifetime_accounts(),
     )
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
@@ -10411,6 +10417,7 @@ async def admin_dashboard(request: Request):
         "trialing": trialing,
         "free": free,
         "mrr": round(mrr, 2),
+        "support_count": support_count,
         "recent": recent,
         "total_users": total_users,
         "live_users": live_users,
@@ -10616,11 +10623,17 @@ async def admin_customers(request: Request):
         if any(g.get("subscription_status") in ("active","trialing") for g in c["guilds"])
         or c["user_sub"].get("subscription_status") in ("active","trialing")
     )
+    total_lifetime = sum(
+        1 for c in customers
+        if any(g.get("subscription_status") == "lifetime" for g in c["guilds"])
+        or c["user_sub"].get("subscription_status") == "lifetime"
+    )
     return templates.TemplateResponse("admin_customers.html", {
         "request": request,
         "customers": customers,
         "total_customers": len(customers),
         "total_active": total_active,
+        "total_lifetime": total_lifetime,
         "session": session,
         "saved": request.query_params.get("saved"),
         "error": request.query_params.get("error"),
@@ -10636,9 +10649,9 @@ async def admin_set_plan(
 ):
     session, err = _require_admin(request)
     if err: return err
-    if status not in ("free", "active", "trialing", "canceled", "past_due"):
+    if status not in ("free", "active", "trialing", "canceled", "past_due", LIFETIME_STATUS):
         status = "free"
-    if plan not in ("starter", "clan", "alliance", "imperium", ""):
+    if plan not in ("starter", "clan", "alliance", "imperium", "player_pro", ""):
         plan = ""
     await database.update_subscription_plan(guild_id, status, plan)
     return RedirectResponse("/admin/customers?saved=1", status_code=303)
@@ -10653,10 +10666,10 @@ async def admin_set_user_plan(
 ):
     session, err = _require_admin(request)
     if err: return err
-    if status not in ("free", "active", "trialing", "canceled", "past_due"):
+    if status not in ("free", "active", "trialing", "canceled", "past_due", LIFETIME_STATUS):
         status = "free"
     valid_plans = [f"{t}_{i}" for t in ("starter","clan","alliance","imperium") for i in ("monthly","annual")]
-    valid_plans += ["starter","clan","alliance","imperium",""]
+    valid_plans += ["starter","clan","alliance","imperium","player_pro",""]
     if plan not in valid_plans:
         plan = ""
     await database.update_user_subscription_admin(discord_user_id, status, plan)

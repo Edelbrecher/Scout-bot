@@ -4328,6 +4328,21 @@ async def cache_discord_username(discord_user_id: str, username: str):
 _TIER_LIMITS = {"starter": 1, "clan": 2, "alliance": 3, "imperium": 5}
 
 
+async def count_lifetime_accounts() -> int:
+    """Number of admin-granted 'lifetime'/support accounts (guild + user level).
+    Excluded from MRR/active counts on the admin dashboard."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM guild_configs WHERE subscription_status='lifetime'"
+        ) as cur:
+            guild_count = (await cur.fetchone())[0]
+        async with db.execute(
+            "SELECT COUNT(*) FROM user_subscriptions WHERE subscription_status='lifetime'"
+        ) as cur:
+            user_count = (await cur.fetchone())[0]
+    return guild_count + user_count
+
+
 async def get_customers_overview() -> list[dict]:
     """
     Returns all customers grouped by owner (discord_user_id).
@@ -4411,11 +4426,11 @@ async def get_customers_overview() -> list[dict]:
         data["slots_max"] = slots_max
         customers.append(data)
 
-    # Sort: active customers first, then by username
+    # Sort: active/lifetime customers first, then by username
     def _sort_key(c):
         has_active = any(
-            g.get("subscription_status") in ("active", "trialing") for g in c["guilds"]
-        ) or c["user_sub"].get("subscription_status") in ("active", "trialing")
+            g.get("subscription_status") in ("active", "trialing", "lifetime") for g in c["guilds"]
+        ) or c["user_sub"].get("subscription_status") in ("active", "trialing", "lifetime")
         return (0 if has_active else 1, c["discord_username"].lower())
 
     customers.sort(key=_sort_key)

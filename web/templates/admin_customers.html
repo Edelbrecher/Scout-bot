@@ -37,6 +37,10 @@
             <div style="font-weight:700; font-size:1.1rem; color:#22c55e;">{{ total_active }}</div>
             <div style="color:var(--text-muted); font-size:0.75rem;">Aktiv / Trial</div>
           </div>
+          <div style="background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:0.4rem 1rem; font-size:0.85rem; text-align:center;" title="Zählt nicht in MRR/Aktiv">
+            <div style="font-weight:700; font-size:1.1rem; color:#a78bfa;">{{ total_lifetime }}</div>
+            <div style="color:var(--text-muted); font-size:0.75rem;">🎁 Lifetime</div>
+          </div>
         </div>
       </div>
 
@@ -65,9 +69,10 @@
       {% set has_active_guild = c.guilds | selectattr("subscription_status", "in", ["active", "trialing"]) | list | length > 0 %}
       {% set has_past_due = c.guilds | selectattr("subscription_status", "equalto", "past_due") | list | length > 0 %}
       {% set is_user_active = usub_status in ["active", "trialing"] %}
+      {% set is_user_lifetime = usub_status == "lifetime" %}
 
       <div class="customer-card" data-search="{{ c.discord_username | lower }} {% for g in c.guilds %}{{ g.guild_name | lower }} {% endfor %}"
-           style="background:var(--bg-card); border:1px solid {% if has_active_guild or is_user_active %}rgba(59,130,246,0.3){% elif has_past_due %}rgba(239,68,68,0.3){% else %}var(--border){% endif %}; border-radius:12px; margin-bottom:0.85rem; overflow:hidden;">
+           style="background:var(--bg-card); border:1px solid {% if is_user_lifetime %}rgba(167,139,250,0.35){% elif has_active_guild or is_user_active %}rgba(59,130,246,0.3){% elif has_past_due %}rgba(239,68,68,0.3){% else %}var(--border){% endif %}; border-radius:12px; margin-bottom:0.85rem; overflow:hidden;">
 
         <!-- Customer header (always visible) -->
         <div onclick="toggleCustomer('{{ uid }}')" style="cursor:pointer; padding:1rem 1.25rem; display:flex; align-items:center; gap:1rem; user-select:none;"
@@ -100,7 +105,11 @@
             </div>
             <div style="display:flex; gap:0.4rem; margin-top:0.3rem; flex-wrap:wrap; align-items:center;">
               <!-- User-level sub badge -->
-              {% if is_user_active %}
+              {% if is_user_lifetime %}
+                <span style="font-size:0.72rem; padding:1px 7px; background:rgba(167,139,250,0.15); color:#c4b5fd; border:1px solid rgba(167,139,250,0.3); border-radius:10px;">
+                  🎁 Lifetime: {{ (usub.plan or 'player_pro') | capitalize }}
+                </span>
+              {% elif is_user_active %}
                 <span style="font-size:0.72rem; padding:1px 7px; background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3); border-radius:10px;">
                   🌐 User-Abo: {{ usub_plan | capitalize }} ({{ usub_status }})
                 </span>
@@ -121,7 +130,9 @@
           <!-- Status badges right side -->
           <div style="display:flex; gap:0.4rem; align-items:center; flex-shrink:0;">
             {% set active_guilds = c.guilds | selectattr("subscription_status", "in", ["active","trialing"]) | list %}
-            {% if active_guilds | length > 0 or is_user_active %}
+            {% if is_user_lifetime %}
+              <span style="font-size:0.78rem; padding:3px 10px; background:#4c1d95; color:#c4b5fd; border-radius:10px; font-weight:600;">🎁 Lifetime</span>
+            {% elif active_guilds | length > 0 or is_user_active %}
               <span style="font-size:0.78rem; padding:3px 10px; background:#14532d; color:#4ade80; border-radius:10px; font-weight:600;">● Pro</span>
             {% elif has_past_due %}
               <span style="font-size:0.78rem; padding:3px 10px; background:#431407; color:#fb923c; border-radius:10px; font-weight:600;">⚠ Past Due</span>
@@ -145,6 +156,7 @@
                   <span>
                     {% if usub_status == "active" %}<span style="color:#22c55e;">● active</span>
                     {% elif usub_status == "trialing" %}<span style="color:#f59e0b;">● trialing</span>
+                    {% elif usub_status == "lifetime" %}<span style="color:#c4b5fd;">🎁 lifetime (Support)</span>
                     {% elif usub_status == "past_due" %}<span style="color:#ef4444;">● past_due</span>
                     {% elif usub_status == "canceled" %}<span style="color:#6b7280;">● canceled</span>
                     {% else %}<span style="color:var(--text-muted);">● free</span>{% endif %}
@@ -168,12 +180,13 @@
               <!-- Edit user sub -->
               <form method="post" action="/admin/customers/user/{{ uid }}/set-plan" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
                 <select name="status" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.3rem 0.5rem; color:var(--text); font-size:0.82rem;">
-                  {% for opt in ["free","active","trialing","canceled","past_due"] %}
-                  <option value="{{ opt }}" {% if usub_status == opt %}selected{% endif %}>{{ opt }}</option>
+                  {% for opt in ["free","active","trialing","canceled","past_due","lifetime"] %}
+                  <option value="{{ opt }}" {% if usub_status == opt %}selected{% endif %}>{{ "🎁 lifetime (Support)" if opt == "lifetime" else opt }}</option>
                   {% endfor %}
                 </select>
                 <select name="plan" style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.3rem 0.5rem; color:var(--text); font-size:0.82rem;">
                   <option value="">— kein Plan —</option>
+                  <option value="player_pro" {% if usub.plan == "player_pro" %}selected{% endif %}>Player Pro</option>
                   {% for tier in ["starter","clan","alliance","imperium"] %}
                   {% for interval in ["monthly","annual"] %}
                   <option value="{{ tier }}_{{ interval }}" {% if usub.plan == tier+'_'+interval %}selected{% endif %}>{{ tier | capitalize }} {{ interval }}</option>
@@ -220,6 +233,7 @@
                   <div style="display:flex; gap:0.4rem; margin-top:0.3rem; flex-wrap:wrap;">
                     {% if gst == "active" %}<span style="font-size:0.7rem; padding:1px 6px; background:#14532d; color:#4ade80; border-radius:8px;">● active</span>
                     {% elif gst == "trialing" %}<span style="font-size:0.7rem; padding:1px 6px; background:#1e3a5f; color:#93c5fd; border-radius:8px;">● trialing</span>
+                    {% elif gst == "lifetime" %}<span style="font-size:0.7rem; padding:1px 6px; background:#4c1d95; color:#c4b5fd; border-radius:8px;">🎁 lifetime</span>
                     {% elif gst == "past_due" %}<span style="font-size:0.7rem; padding:1px 6px; background:#431407; color:#fb923c; border-radius:8px;">⚠ past_due</span>
                     {% elif gst == "canceled" %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:#6b7280; border-radius:8px;">canceled</span>
                     {% else %}<span style="font-size:0.7rem; padding:1px 6px; background:var(--bg-card); color:var(--text-muted); border:1px solid var(--border); border-radius:8px;">free</span>{% endif %}
@@ -240,14 +254,14 @@
                 <!-- Edit guild sub -->
                 <form method="post" action="/admin/customers/{{ g.guild_id }}/set-plan" style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
                   <select name="status" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.78rem;">
-                    {% for opt in ["free","active","trialing","canceled","past_due"] %}
-                    <option value="{{ opt }}" {% if gst == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% for opt in ["free","active","trialing","canceled","past_due","lifetime"] %}
+                    <option value="{{ opt }}" {% if gst == opt %}selected{% endif %}>{{ "🎁 lifetime" if opt == "lifetime" else opt }}</option>
                     {% endfor %}
                   </select>
                   <select name="plan" style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.4rem; color:var(--text); font-size:0.78rem;">
                     <option value="">—</option>
-                    {% set tier_labels = {"starter":"Starter","clan":"Plus","alliance":"Premium","imperium":"Imperium"} %}
-                    {% for tier in ["starter","clan","alliance","imperium"] %}
+                    {% set tier_labels = {"starter":"Starter","clan":"Plus","alliance":"Premium","imperium":"Imperium","player_pro":"Player Pro"} %}
+                    {% for tier in ["starter","clan","alliance","imperium","player_pro"] %}
                     <option value="{{ tier }}" {% if g.subscription_plan == tier %}selected{% endif %}>{{ tier_labels[tier] }}</option>
                     {% endfor %}
                   </select>
