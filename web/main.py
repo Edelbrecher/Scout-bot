@@ -4640,7 +4640,7 @@ def classify_own_village(troops: dict, troop_roles: dict | None = None) -> tuple
 
     for t, c in troops.items():
         role = roles.get(t, "ignore")
-        if role in ("off", "both"):
+        if role in ("off", "both", "siege"):
             off_score += _OFF_WEIGHT.get(t, 50) * c
         if role in ("def", "both"):
             def_score += _DEF_WEIGHT.get(t, 50) * c
@@ -5022,7 +5022,7 @@ async def my_account_page(request: Request, guild_id: str):
         for t, c in v.get("troops", {}).items():
             role = troop_roles.get(t, "ignore")
             crop = effective_crop_map.get(t, 1) * c
-            if role in ("off", "both"):
+            if role in ("off", "both", "siege"):
                 off_crop += crop
             if role in ("def", "both"):
                 def_crop += crop
