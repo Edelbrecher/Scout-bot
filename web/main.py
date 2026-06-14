@@ -3436,7 +3436,7 @@ async def guild_world_settings_page(request: Request, guild_id: str):
         ally_nav = await _get_ally_nav_context(guild_id, session)
     return templates.TemplateResponse("world_settings.html", {
         "request": request, "guild": guild, "session": session, "saved": saved,
-        "is_my_ally_page": False, "ally_nav_active": "bot-settings", **ally_nav,
+        "is_my_ally_page": False, "ally_nav_active": "world-settings", **ally_nav,
     })
 
 
@@ -3890,7 +3890,7 @@ async def guild_settings_page(request: Request, guild_id: str):
         "flash": flash,
         "roles": roles,
         "is_my_ally_page": False,
-        "ally_nav_active": "bot-settings",
+        "ally_nav_active": "guild-settings",
         **ally_nav,
     })
 

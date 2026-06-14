@@ -32,7 +32,7 @@
   {% if ally_is_editor %}{{ ma_link('battlegroups', '⚔️ Battlegroups') }}{% endif %}
   {{ ma_link('bonus', '🎁 Alliance Bonus') }}
   {{ ma_link('einstellungen', '⚙️ Settings') }}
-  <a class="ma-tab{{ ' active' if ally_nav_active == 'bot-settings' else '' }}" href="/guild/{{ _gid }}/settings">🤖 Bot Settings</a>
+  <a class="ma-tab{{ ' active' if ally_nav_active == 'bot-settings' else '' }}" href="/guild/{{ _gid }}/bot-settings">🤖 Bot Settings</a>
   {% if ally_has_leaderboard %}{{ ma_link('leaderboard', '🏆 Leaderboard') }}{% endif %}
 </div>
 {% endif %}
