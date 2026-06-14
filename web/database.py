@@ -3543,6 +3543,7 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
             """SELECT x, y, village_name,
                       MIN(fetched_at) as first_seen, MAX(fetched_at) as last_seen,
                       MIN(population) as min_pop, MAX(population) as max_pop,
+                      MAX(village_type) as village_type,
                       COUNT(DISTINCT fetched_at) as snap_count
                FROM world_snapshots INDEXED BY idx_wsnap_player
                WHERE world_url = ? AND lower(player_name) = ?
@@ -3554,6 +3555,32 @@ async def get_player_intel(guild_id: str, player_name: str) -> dict | None:
         current_coords = {(v["x"], v["y"]) for v in current_villages}
         for vt in village_timeline:
             vt["is_active"] = (vt["x"], vt["y"]) in current_coords
+
+        # For lost villages, find the current owner (at the latest snapshot)
+        inactive_coords = [(vt["x"], vt["y"]) for vt in village_timeline if not vt["is_active"]]
+        lost_to_by_coord: dict = {}
+        if inactive_coords:
+            placeholders = ",".join("(?,?)" for _ in inactive_coords)
+            params = []
+            for x, y in inactive_coords:
+                params += [x, y]
+            async with db.execute(
+                f"""SELECT x, y, player_name, alliance_name
+                    FROM world_snapshots
+                    WHERE world_url = ? AND fetched_at = ? AND (x, y) IN ({placeholders})""",
+                [world_url, latest] + params
+            ) as cur:
+                for row in await cur.fetchall():
+                    lost_to_by_coord[(row[0], row[1])] = {
+                        "player_name": row[2] or "", "alliance_name": row[3] or ""
+                    }
+
+        for vt in village_timeline:
+            vt["lost_to"] = None
+            if not vt["is_active"]:
+                lt = lost_to_by_coord.get((vt["x"], vt["y"]))
+                if lt and lt["player_name"] and lt["player_name"].lower() != pname_lower:
+                    vt["lost_to"] = lt
 
         # Village population at key intervals (1 / 2 / 3 / 5 / 7 / 14 / 30 days ago)
         import datetime as _dt_mod

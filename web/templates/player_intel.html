@@ -365,10 +365,9 @@
                   {% if vt.is_active %}
                   <a href="/guild/{{ guild.guild_id }}/map?cx={{ vt.x }}&cy={{ vt.y }}&z=5" style="color:inherit;text-decoration:none;border-bottom:1px dotted rgba(165,180,252,.4);" title="Open on map">{{ vt.village_name or '?' }}</a>
                   {% else %}{{ vt.village_name or '?' }}{% endif %}
-                  {% if vt.is_active and cur_v %}
-                    {% set ft = vt_labels.get(cur_v.get('village_type',0)|int, '') %}
-                    {% if ft %}<span style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;">{{ ft }}</span>{% endif %}
-                  {% endif %}
+                  {% set vtype = (cur_v.village_type if (vt.is_active and cur_v) else vt.get('village_type', 0)) | int %}
+                  {% set ft = vt_labels.get(vtype, '') %}
+                  {% if ft %}<span style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;">{{ ft }}</span>{% endif %}
                 </td>
                 <td style="padding:.4rem .6rem;font-family:monospace;color:var(--text-muted);font-size:.72rem;">{{ vt.x }}|{{ vt.y }}</td>
                 <td style="padding:.4rem .6rem;text-align:right;font-weight:600;">{{ '{:,}'.format(cur_pop) if cur_pop else '—' }}</td>
@@ -399,6 +398,11 @@
                   <span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:1px 5px;font-size:.68rem;">Active</span>
                   {% else %}
                   <span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;" title="{{ vt.first_seen[:10] if vt.first_seen else '' }} – {{ vt.last_seen[:10] if vt.last_seen else '' }}">Lost</span>
+                  {% if vt.lost_to %}
+                  <span style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;white-space:nowrap;" title="Lost to {{ vt.lost_to.player_name }}{% if vt.lost_to.alliance_name %} [{{ vt.lost_to.alliance_name }}]{% endif %}">
+                    → ⚔️ {{ vt.lost_to.player_name }}
+                  </span>
+                  {% endif %}
                   {% endif %}
                 </td>
               </tr>
