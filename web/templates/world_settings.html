@@ -11,6 +11,12 @@
   <h1 style="margin:.5rem 0 .25rem;" data-i18n="worldsettings.title">🌍 World / Server</h1>
   <p class="subtitle" style="margin:0 0 .5rem;" data-i18n="worldsettings.subtitle">Travian server URL und Bot-Settings</p>
 
+  {% if ally_group %}
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <h2 style="margin:0;font-size:1.35rem;">🏰 {{ ally_group.ally_name }}</h2>
+  </div>
+  {% endif %}
+
   {% include "_ally_nav.html" %}
 
   {% if guild.workspace_type != 'personal' %}

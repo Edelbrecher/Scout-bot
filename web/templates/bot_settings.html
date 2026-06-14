@@ -7,6 +7,12 @@
   <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
   <h1 style="margin:0.5rem 0 0.5rem; font-size:1.5rem;">🤖 Bot-Einstellungen</h1>
 
+  {% if ally_group %}
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <h2 style="margin:0;font-size:1.35rem;">🏰 {{ ally_group.ally_name }}</h2>
+  </div>
+  {% endif %}
+
   {% include "_ally_nav.html" %}
 
   {% if not is_personal %}
