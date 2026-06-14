@@ -383,10 +383,11 @@
                 <td style="padding:.4rem .6rem;text-align:right;">{{ avg_day(pi.get('d30'), 30) }}</td>
                 <td style="padding:.4rem .6rem;white-space:nowrap;border-left:1px solid rgba(255,255,255,.07);">
                   {% if origin.type == 'conquered' %}
-                  <span title="Conquered from {{ origin.from_player }}{% if origin.from_alliance %} [{{ origin.from_alliance }}]{% endif %}"
-                        style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;cursor:help;">
+                  <a href="/guild/{{ guild.guild_id }}/intel?q={{ origin.from_player | urlencode }}"
+                     title="Conquered from {{ origin.from_player }}{% if origin.from_alliance %} [{{ origin.from_alliance }}]{% endif %} — click to open player"
+                     style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;text-decoration:none;display:inline-block;">
                     ⚔️ {{ origin.from_player[:12] }}
-                  </span>
+                  </a>
                   {% else %}
                   <span style="background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:1px 5px;font-size:.68rem;">
                     🏗️ Settled
@@ -399,9 +400,11 @@
                   {% else %}
                   <span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:1px 5px;font-size:.68rem;" title="{{ vt.first_seen[:10] if vt.first_seen else '' }} – {{ vt.last_seen[:10] if vt.last_seen else '' }}">Lost</span>
                   {% if vt.lost_to %}
-                  <span style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;white-space:nowrap;" title="Lost to {{ vt.lost_to.player_name }}{% if vt.lost_to.alliance_name %} [{{ vt.lost_to.alliance_name }}]{% endif %}">
+                  <a href="/guild/{{ guild.guild_id }}/intel?q={{ vt.lost_to.player_name | urlencode }}"
+                     style="font-size:.65rem;color:var(--text-muted);margin-left:.3rem;white-space:nowrap;text-decoration:none;border-bottom:1px dotted rgba(255,255,255,.25);"
+                     title="Lost to {{ vt.lost_to.player_name }}{% if vt.lost_to.alliance_name %} [{{ vt.lost_to.alliance_name }}]{% endif %} — click to open player">
                     → ⚔️ {{ vt.lost_to.player_name }}
-                  </span>
+                  </a>
                   {% endif %}
                   {% endif %}
                 </td>
