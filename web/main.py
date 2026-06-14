@@ -3971,6 +3971,26 @@ async def tutorial_page(request: Request, guild_id: str):
     })
 
 
+@app.get("/guild/{guild_id}/how-to", response_class=HTMLResponse)
+async def how_to_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    feature_matrix = {f["feature_key"]: f for f in await database.get_feature_matrix()}
+    feature_links = {k: v[0] for k, v in FEATURE_SIDEBAR_URL_MAP.items() if v}
+    return templates.TemplateResponse("how_to.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "feature_matrix": feature_matrix,
+        "feature_links": feature_links,
+    })
+
+
 @app.get("/guild/{guild_id}/billing")
 async def billing_page(request: Request, guild_id: str):
     session, err = _require_session(request)
@@ -11232,17 +11252,32 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "bell",      "label": "Notifications",      "url_suffix": "/notifications"},
     {"type": "item",  "icon": "gear",      "label": "Settings",           "url_suffix": "/settings"},
     {"type": "item",  "icon": "card",      "label": "Billing",            "url_suffix": "/billing"},
+    {"type": "item",  "icon": "help",      "label": "How-To",             "url_suffix": "/how-to"},
 ]
+
+
+def _nav_has_url(nav: list, url_suffix: str) -> bool:
+    for item in nav:
+        if item.get("type") == "submenu":
+            if _nav_has_url(item.get("children") or [], url_suffix):
+                return True
+        elif item.get("url_suffix") == url_suffix:
+            return True
+    return False
 
 
 async def _get_sidebar_nav() -> list:
     raw = await database.get_setting("sidebar_nav_config")
+    nav = _DEFAULT_SIDEBAR_NAV
     if raw:
         try:
-            return _json_mod.loads(raw)
+            nav = _json_mod.loads(raw)
         except Exception:
             pass
-    return _DEFAULT_SIDEBAR_NAV
+    # Ensure the How-To guide is always reachable, even for custom sidebar configs.
+    if not _nav_has_url(nav, "/how-to"):
+        nav = nav + [{"type": "item", "icon": "help", "label": "How-To", "url_suffix": "/how-to"}]
+    return nav
 
 
 @app.get("/api/sidebar-config")

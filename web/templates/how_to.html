@@ -1,0 +1,1064 @@
+{% extends "base.html" %}
+{% block title %}How-To · {{ guild.guild_name }} · TravOps{% endblock %}
+
+{% block content %}
+<style>
+.ht-wrap { max-width: 1100px; margin: 0 auto; padding-bottom: 4rem; }
+
+.ht-nav { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:2rem; padding:.85rem 1rem;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; }
+.ht-nav-btn { padding:.35rem .8rem; border-radius:8px; font-size:.8rem; font-weight:600;
+  cursor:pointer; border:none; background:transparent; color:var(--text-muted); transition:all .12s;
+  text-decoration:none; display:inline-block; }
+.ht-nav-btn:hover { background:rgba(255,255,255,.06); color:var(--text); }
+
+.ht-group { margin-bottom:2.5rem; scroll-margin-top:80px; }
+.ht-group-title { font-size:1.25rem; font-weight:800; margin:0 0 1rem; padding-bottom:.6rem;
+  border-bottom:2px solid var(--border); display:flex; align-items:center; gap:.6rem; }
+
+.ht-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
+  padding:1.1rem 1.3rem; margin-bottom:1rem; scroll-margin-top:80px; }
+.ht-card-head { display:flex; align-items:center; gap:.6rem; margin-bottom:.6rem; flex-wrap:wrap; }
+.ht-card-icon { font-size:1.4rem; }
+.ht-card-title { font-size:1.05rem; font-weight:700; margin:0; }
+.ht-discord-badge { font-size:.68rem; padding:1px 6px; border-radius:4px; font-weight:700;
+  background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.3); }
+
+.ht-cols { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:.75rem; }
+@media (max-width:720px) { .ht-cols { grid-template-columns:1fr; } }
+.ht-col-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-muted); margin-bottom:.35rem; }
+.ht-list, .ht-steps { margin:0; padding-left:1.2rem; font-size:.85rem; color:var(--text); line-height:1.6; }
+.ht-list li, .ht-steps li { margin-bottom:.25rem; }
+.ht-steps { margin-top:.35rem; margin-bottom:.75rem; }
+
+.ht-open { display:inline-flex; align-items:center; gap:.4rem; margin-top:.25rem; padding:.4rem .8rem;
+  background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.3); border-radius:8px;
+  font-size:.8rem; font-weight:600; color:#818cf8; text-decoration:none; transition:all .12s; }
+.ht-open:hover { background:rgba(99,102,241,.22); color:#a5b4fc; }
+
+/* Pro badges (shared style with tutorial page) */
+.tut-pro { font-size:.68rem; padding:1px 6px; border-radius:4px; font-weight:700; vertical-align:middle; }
+.tut-pro-p { background:#2563eb; color:#bfdbfe; }
+.tut-pro-a { background:#7c3aed; color:#e9d5ff; }
+</style>
+
+{% macro badge(key) -%}
+{%- set t = feature_matrix.get(key, {}).get('tier','free') -%}
+{%- if t == 'player_pro' %}<span class="tut-pro tut-pro-p">🔵 Player Pro</span>
+{%- elif t == 'alliance_pro' %}<span class="tut-pro tut-pro-a">🟣 Alliance Pro</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro openlink(key, label) -%}
+{%- set url = feature_links.get(key) -%}
+{%- if url %}<a class="ht-open" href="/guild/{{ guild_id }}{{ url }}">→ {{ label }} öffnen</a>{% endif -%}
+{%- endmacro %}
+
+<div class="ht-wrap">
+
+  <div style="margin-bottom:1.5rem;">
+    <a href="/guild/{{ guild_id }}" class="back-link" data-no-history="1">← Dashboard</a>
+    <h1 style="font-size:1.8rem;font-weight:800;margin:.4rem 0 .3rem;">📖 How-To &amp; Feature-Guide</h1>
+    <p style="color:var(--text-muted);font-size:.9rem;margin:0;">
+      Zu jedem Feature: was du dafür benötigst, welche Vorteile es bringt und wie du es Schritt für Schritt nutzt.
+      Die 🔵/🟣 Badges zeigen die aktuell benötigte Stufe (wird automatisch aus der Feature-Zuordnung übernommen).
+    </p>
+  </div>
+
+  <div class="ht-nav">
+    <a class="ht-nav-btn" href="#grp-map">🗺️ Map &amp; World</a>
+    <a class="ht-nav-btn" href="#grp-farming">🌾 Farming</a>
+    <a class="ht-nav-btn" href="#grp-scouting">🕵️ Scouting</a>
+    <a class="ht-nav-btn" href="#grp-operations">⚙️ Operations</a>
+    <a class="ht-nav-btn" href="#grp-alliance">🏰 Alliance</a>
+    <a class="ht-nav-btn" href="#grp-tools">🧰 Tools</a>
+    <a class="ht-nav-btn" href="#grp-analytics">📊 Analytics &amp; Stats</a>
+    <a class="ht-nav-btn" href="#grp-account">👤 Account &amp; Settings</a>
+  </div>
+
+  {# ══════════════════════════════ MAP & WORLD ══════════════════════════════ #}
+  <section class="ht-group" id="grp-map">
+    <h2 class="ht-group-title">🗺️ Map &amp; World</h2>
+
+    <div class="ht-card" id="feat-map">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🗺️</span>
+        <h3 class="ht-card-title">Karte</h3>
+        {{ badge('map') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Eine Welt im Server-Setup ausgewählt</li>
+            <li>Optional: eigener Account verbunden, damit eigene Dörfer hervorgehoben werden</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Vollständige Übersicht über alle Dörfer, Spieler und Allianzen der Welt</li>
+            <li>Filter nach Allianz, Spieler oder Koordinate, plus Distanzmessung</li>
+            <li>Teilen-Link für Kartenausschnitte — auch ohne Login einsehbar</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/map öffnen, mit Maus oder Touch verschieben und zoomen</li>
+        <li>In der Filterleiste nach Allianz, Spielername oder Koordinate suchen</li>
+        <li>Auf ein Dorf klicken für Details (Spieler, Allianz, Bevölkerung)</li>
+        <li>Sichtbaren Bereich über "🔗 Teilen" als Link kopieren und z. B. in Discord posten</li>
+      </ol>
+      {{ openlink('map', 'Karte') }}
+    </div>
+
+    <div class="ht-card" id="feat-attacks">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">⚔️</span>
+        <h3 class="ht-card-title">Angriffe</h3>
+        {{ badge('attacks') }}
+        <span class="ht-discord-badge">🤖 benötigt Discord-Server</span>
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Discord-Bot im Server eingeladen (Personal-Workspaces ohne Discord werden nicht unterstützt)</li>
+            <li>Kopie der "Eingehende Angriffe"-Tabelle aus dem Versammlungsplatz</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Automatische Erkennung &amp; Sammlung eingehender Angriffe für die ganze Allianz</li>
+            <li>Markierung als 👻 Fake / 💀 Hard / ⚠️ Low durch Leader/HC, sichtbar für alle</li>
+            <li>Discord-Alarm-Channel bei neuen Angriffen</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Im Spiel: Versammlungsplatz → Tabelle "Truppenbewegungen" kopieren</li>
+        <li>Auf /attacks einfügen — der Bot erkennt Angreifer, Ziel und Ankunftszeit automatisch</li>
+        <li>Über "🚀 Automatisch einrichten" einen Discord-Alarm-Channel anlegen lassen</li>
+        <li>Angriffe als Fake/Hard/Low markieren, damit alle Mitglieder den Ernst sofort erkennen</li>
+        <li>Unter "Alliance Attacks" sehen alle Mitglieder die importierten Angriffe gesammelt</li>
+      </ol>
+      {{ openlink('attacks', 'Angriffe') }}
+    </div>
+
+    <div class="ht-card" id="feat-sector_monitor">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">📡</span>
+        <h3 class="ht-card-title">Sector Monitor</h3>
+        {{ badge('sector_monitor') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Player Pro Abo (Standard-Stufe für dieses Feature)</li>
+            <li>Definierter Kartenbereich (Mittelpunkt X/Y + Radius)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Automatische Überwachung eines Kartenausschnitts auf Veränderungen</li>
+            <li>Erkennt neue Dörfer, Abrisse und Bevölkerungssprünge</li>
+            <li>Ideal zur Beobachtung von Nachbarn oder Feindgebiet ohne manuelles Scouten</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/map/sector-monitor öffnen</li>
+        <li>Mittelpunkt-Koordinate (X/Y) und Radius des zu beobachtenden Bereichs eintragen und speichern</li>
+        <li>Das System erstellt periodisch Snapshots des Bereichs</li>
+        <li>Veränderungen (neue/abgerissene Dörfer, Bevölkerungsänderungen) erscheinen in der Liste</li>
+        <li>Beobachtungsbereich jederzeit anpassen oder weitere Sektoren anlegen</li>
+      </ol>
+      {{ openlink('sector_monitor', 'Sector Monitor') }}
+    </div>
+
+    <div class="ht-card" id="feat-timer">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">⏱️</span>
+        <h3 class="ht-card-title">Timer &amp; Reminder</h3>
+        {{ badge('timer') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine — optional: Travian-Profil-Link für Direktlinks zum Versammlungsplatz</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Zentrale Übersicht laufender Countdown-Timer</li>
+            <li>Farmlist-Timer mit einstellbarem Erinnerungs-Intervall</li>
+            <li>Direktlink zum Versammlungsplatz spart Klicks</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/timer öffnen</li>
+        <li>Travian-Profil-Link einmalig hinterlegen (wird nur lokal im Browser gespeichert)</li>
+        <li>Farmlist-Timer-Intervall einstellen (z. B. alle 30 Minuten erinnern)</li>
+        <li>Seite im Browser geöffnet lassen — Erinnerung erfolgt per Browser-Benachrichtigung</li>
+      </ol>
+      {{ openlink('timer', 'Timer') }}
+    </div>
+
+    <div class="ht-card" id="feat-settle_list">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">📜</span>
+        <h3 class="ht-card-title">Settle-Liste</h3>
+        {{ badge('settle_list') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Geplante Koordinaten für neue Siedlungen</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Verhindert doppelte Siedlungspläne innerhalb der Allianz beim Worldstart</li>
+            <li>Übersicht, wer wohin siedeln möchte</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/settle-list öffnen</li>
+        <li>"➕ Neuen Eintrag hinzufügen" — Koordinate, Spielername (optional) und Notiz eintragen</li>
+        <li>Vor dem Siedeln die Liste prüfen, ob die Koordinate schon vergeben ist</li>
+        <li>Nach dem Siedeln den Eintrag löschen oder als erledigt markieren</li>
+      </ol>
+      {{ openlink('settle_list', 'Settle-Liste') }}
+    </div>
+  </section>
+
+  {# ══════════════════════════════ FARMING ══════════════════════════════ #}
+  <section class="ht-group" id="grp-farming">
+    <h2 class="ht-group-title">🌾 Farming</h2>
+
+    <div class="ht-card" id="feat-farming_intel">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🌾</span>
+        <h3 class="ht-card-title">Farming Intelligence</h3>
+        {{ badge('farming_intel') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Player Pro Abo</li>
+            <li>Regelmäßige Scout-Berichte der eigenen Farmziele (Lagerbestände)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Verlauf der Ressourcen-Lagerbestände pro Farmziel über die Zeit</li>
+            <li>Erkennt automatisch inaktive Farmen (kein Ressourcenwachstum mehr)</li>
+            <li>Übersicht über Snapshot-Anzahl je Dorf</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Eigene Farmziele regelmäßig scouten — Scout-Berichte werden automatisch ausgewertet</li>
+        <li>/farming öffnen für die Übersicht der erfassten Snapshots je Dorf</li>
+        <li>Unter "🏚️ Inaktive Farmen" verlassene Ziele anzeigen lassen</li>
+        <li>Lagerbestandsverlauf nutzen, um den optimalen Farm-Zeitpunkt zu wählen</li>
+      </ol>
+      {{ openlink('farming_intel', 'Farming Intelligence') }}
+    </div>
+
+    <div class="ht-card" id="feat-farmlist_analyst">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">📋</span>
+        <h3 class="ht-card-title">Farmlist-Analyst</h3>
+        {{ badge('farmlist_analyst') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Player Pro Abo</li>
+            <li>Export der eigenen Farmlisten aus Travian (Textkopie)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Analyse aller Farmlisten auf einen Blick (OK / Leer pro Gruppe)</li>
+            <li>Gruppierung nach Farmlist-Gruppe mit Klick-Filter</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Im Spiel: Farmliste komplett exportieren / kopieren</li>
+        <li>/farmlist-analyst öffnen und den Text einfügen</li>
+        <li>Auf eine Gruppe klicken, um die Tabelle darunter zu filtern</li>
+        <li>Als "Leer" markierte Ziele priorisiert neu zuweisen oder aus der Liste entfernen</li>
+      </ol>
+      {{ openlink('farmlist_analyst', 'Farmlist-Analyst') }}
+    </div>
+  </section>
+
+  {# ══════════════════════════════ SCOUTING ══════════════════════════════ #}
+  <section class="ht-group" id="grp-scouting">
+    <h2 class="ht-group-title">🕵️ Scouting</h2>
+
+    <div class="ht-card" id="feat-player_intel">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🔎</span>
+        <h3 class="ht-card-title">Spieler-Suche</h3>
+        {{ badge('player_intel') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Schnelle Suche nach Spielernamen (auch Teilsuche)</li>
+            <li>Übersicht über Dörfer, Allianz, Bevölkerung und Statistik-Verlauf eines Spielers</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/intel öffnen</li>
+        <li>Spielernamen eingeben (Teilsuche reicht aus)</li>
+        <li>Profil öffnen für Dorfliste, Allianzhistorie und Statistik-Verlauf</li>
+      </ol>
+      {{ openlink('player_intel', 'Spieler-Suche') }}
+    </div>
+
+    <div class="ht-card" id="feat-hero_scout">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🦸</span>
+        <h3 class="ht-card-title">Hero Scout</h3>
+        {{ badge('hero_scout') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Optional: Discord-Channel für Helden-Scout-Meldungen</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Überwacht feindliche Helden auf Ausrüstungs- und XP-Änderungen</li>
+            <li>Manuell erfasste Helden-Daten als Referenz für Verteidigungsplanung</li>
+            <li>Warnt, wenn ein gegnerischer Held neue/stärkere Ausrüstung trägt</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/defense/hero-scout öffnen</li>
+        <li>"➕ Held manuell hinzufügen" — Spieler über die Kartensuche finden und Heldendaten (XP, Ausrüstung) eintragen</li>
+        <li>Optional Discord-Channel für automatische Meldungen hinterlegen</li>
+        <li>Änderungen an Ausrüstung/XP werden in der Liste hervorgehoben</li>
+      </ol>
+      {{ openlink('hero_scout', 'Hero Scout') }}
+    </div>
+
+    <div class="ht-card" id="feat-scout_tracking">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🕵️</span>
+        <h3 class="ht-card-title">Scout Tracking</h3>
+        {{ badge('scout_tracking') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Alliance Pro Abo</li>
+            <li>Discord-Bot mit Scout-Anfrage- und Archiv-Channel</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Zentrale Verwaltung &amp; Archivierung von Scout-Anfragen der gesamten Allianz</li>
+            <li>Mitglieder können Scouts direkt über Discord anfordern</li>
+            <li>Gescoutete Berichte werden automatisch ins Archiv verschoben</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/scout öffnen — über "🚀 Automatisch einrichten" Anfrage- und Archiv-Channel in Discord anlegen</li>
+        <li>Mitglieder stellen Scout-Anfragen über den Discord-Button oder das Dashboard</li>
+        <li>Scout-Ergebnis als Screenshot im Anfrage-Thread posten — wird automatisch archiviert</li>
+        <li>Archiv unter /scout nach Spieler oder Koordinate durchsuchen</li>
+      </ol>
+      {{ openlink('scout_tracking', 'Scout Tracking') }}
+    </div>
+
+    <div class="ht-card" id="feat-scout_incidents">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🚨</span>
+        <h3 class="ht-card-title">Enemy-Scouts</h3>
+        {{ badge('scout_incidents') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Protokoll, wann und von wem eigene Dörfer ausgespäht wurden</li>
+            <li>Hilft, Muster zu erkennen — häufige Scouts können einen Angriff ankündigen</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/scout-incidents öffnen</li>
+        <li>Liste zeigt erkannte Scout-Vorgänge gegen eigene Dörfer mit Zeitstempel und Spielername</li>
+        <li>Bei gehäuften Scouts eines Spielers das betroffene Dorf im Defense-Tab vorab absichern</li>
+      </ol>
+      {{ openlink('scout_incidents', 'Enemy-Scouts') }}
+    </div>
+
+    <div class="ht-card" id="feat-defense">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🛡️</span>
+        <h3 class="ht-card-title">Verteidigung</h3>
+        {{ badge('defense') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Optional: Discord-Rollen mit Defend-Berechtigung (in den Server-Einstellungen)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Koordination von Verteidigungs-Truppen zwischen Mitgliedern</li>
+            <li>Defend-Channels lassen sich nach Abschluss schließen/wieder öffnen</li>
+            <li>Helfer-Items (Held-Schuhe, Speed-Artefakt, Standarte) fließen in die Ankunftszeit-Berechnung ein</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/verteidigung öffnen</li>
+        <li>Ziel-Dorf und benötigte Defend-Truppen eintragen</li>
+        <li>Eigene Helfer-Items (Helden-Geschwindigkeit, Artefakte, Standarte) angeben für eine korrekte Reisezeit</li>
+        <li>Nach erfolgreicher Verteidigung den Channel über "Schließen" archivieren (nur Leader/HC)</li>
+      </ol>
+      {{ openlink('defense', 'Verteidigung') }}
+    </div>
+  </section>
+
+  {# ══════════════════════════════ OPERATIONS ══════════════════════════════ #}
+  <section class="ht-group" id="grp-operations">
+    <h2 class="ht-group-title">⚙️ Operations</h2>
+
+    <div class="ht-card" id="feat-operations">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">⚙️</span>
+        <h3 class="ht-card-title">Operations</h3>
+        {{ badge('operations') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Alliance Pro Abo</li>
+            <li>Truppendaten der beteiligten Mitglieder importiert (über My Account)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Planung komplexer Allianz-Operationen mit mehreren Zielen und Wellen</li>
+            <li>Automatische Prüfung des Plans auf häufige Fehler</li>
+            <li>Benachrichtigung der zugeteilten Mitglieder direkt per Discord</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/operations öffnen, "+ Erste Operation erstellen"</li>
+        <li>Ziele hinzufügen — per Klick auf die Karte oder durch Eingabe der Koordinate</li>
+        <li>Wellen mit Truppen, Mitglied und Sendezeit planen</li>
+        <li>"Plan prüfen" nutzen, um Fehler wie zu wenig Truppen oder falsche Ankunftszeiten zu finden</li>
+        <li>Über "📢 Benachrichtigen" die Wellen-Zuteilung an Discord senden</li>
+        <li>Abgeschlossene Pläne ins Archiv verschieben — bei Bedarf später wiederherstellen</li>
+      </ol>
+      {{ openlink('operations', 'Operations') }}
+    </div>
+
+    <div class="ht-card" id="feat-attack_planner">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🗡️</span>
+        <h3 class="ht-card-title">My Op Plan</h3>
+        {{ badge('attack_planner') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Player Pro Abo</li>
+            <li>Mindestens eine Welle, die einem Leader in Operations zugewiesen wurde</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Persönliche Übersicht aller zugewiesenen Wellen inkl. Countdown</li>
+            <li>Automatische Reisezeit-Berechnung zum jeweiligen Ziel</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/my-operations öffnen</li>
+        <li>Zugewiesene Wellen erscheinen automatisch, sobald ein Leader sie zuteilt</li>
+        <li>Countdown "⏰ Nächste Welle — senden in" beachten und pünktlich abschicken</li>
+        <li>Bei Verspätung die tatsächliche Sendezeit vermerken, damit der Leader nachjustieren kann</li>
+      </ol>
+      {{ openlink('attack_planner', 'My Op Plan') }}
+    </div>
+  </section>
+
+  {# ══════════════════════════════ ALLIANCE ══════════════════════════════ #}
+  <section class="ht-group" id="grp-alliance">
+    <h2 class="ht-group-title">🏰 Alliance</h2>
+
+    <div class="ht-card" id="feat-my_alliance">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🏰</span>
+        <h3 class="ht-card-title">My Alliance</h3>
+        {{ badge('my_alliance') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Allianz-Gruppe im Dashboard eingerichtet (Owner/Leader)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Zentrale Tab-Leiste für Mitglieder, Einladungen, Rollen, Einstellungen, Leaderboard und Bot Settings</li>
+            <li>⚔️ EP-Badge zeigt aktive Operation-Teilnahme je Mitglied</li>
+            <li>Wachstumscharts (Dörfer/Off/Def/Crop) pro Mitglied</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/my-ally öffnen</li>
+        <li>Über die Tab-Leiste oben zwischen Mitgliedern, Einladungen, Rollen, Einstellungen und Leaderboard wechseln</li>
+        <li>Wachstumschart eines Mitglieds anklicken, um den Verlauf der letzten Snapshots zu sehen</li>
+        <li>Im Tab "🤖 Bot Settings" Discord-Kanäle und den Wochen-Digest konfigurieren (nur Leader)</li>
+      </ol>
+      {{ openlink('my_alliance', 'My Alliance') }}
+    </div>
+
+    <div class="ht-card" id="feat-members">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">👥</span>
+        <h3 class="ht-card-title">Mitglieder</h3>
+        {{ badge('members') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine — je mehr Mitglieder regelmäßig in My Account importieren, desto vollständiger die Übersicht</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Übersicht aller Allianzmitglieder mit aktuellen Werten (Dörfer, Punkte, Truppen)</li>
+            <li>Ranking-Karten, z. B. Top Off / Top Def / Top Crop</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/allianz/mitglieder öffnen</li>
+        <li>Mitgliederliste durchsuchen und sortieren</li>
+        <li>Auf ein Mitglied klicken für die Detailansicht mit Verlauf und Dörfern</li>
+      </ol>
+      {{ openlink('members', 'Mitglieder') }}
+    </div>
+
+    <div class="ht-card" id="feat-sitter_list">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🪑</span>
+        <h3 class="ht-card-title">Sitter-Liste</h3>
+        {{ badge('sitter_list') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Eigene Sitter-Zuordnungen unter My Account hinterlegt</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Übersicht, wer für wen sittet — ohne dass Zugangsdaten geteilt werden müssen</li>
+            <li>Hilfreich für die Vertretungsplanung bei Abwesenheit</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>In /my-account eintragen, für wen man sittet (eigene Sitter-Daten)</li>
+        <li>"Alliance-Sitter-Listen" zeigt die freigegebenen Sitter-Zuordnungen aller Mitglieder</li>
+        <li>Bei Abwesenheit prüfen, wer Vertretung übernehmen kann</li>
+      </ol>
+    </div>
+
+    <div class="ht-card" id="feat-hospital">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🏥</span>
+        <h3 class="ht-card-title">Allianz-Hospital</h3>
+        {{ badge('hospital') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Alliance Pro Abo</li>
+            <li>Hospital-Daten über den Account-Import in My Account hinterlegt</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Allianzweite Übersicht über Truppen in Heilung</li>
+            <li>Erkennt, welche Mitglieder nach einem Angriff Verstärkung brauchen</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Hospital-Daten regelmäßig über /my-account importieren</li>
+        <li>/allianz/hospital öffnen für die Gesamtübersicht aller Mitglieder</li>
+        <li>Mitglieder mit hohem Lazarett-Bestand gezielt mit Heilung oder Verstärkung unterstützen</li>
+      </ol>
+      {{ openlink('hospital', 'Allianz-Hospital') }}
+    </div>
+
+    <div class="ht-card" id="feat-enemies">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">😈</span>
+        <h3 class="ht-card-title">Enemy Records</h3>
+        {{ badge('enemies') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Alliance Pro Abo</li>
+            <li>Optional: Discord-Channel für Report-Meldungen</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Datenbank für feindliche Spieler/Allianzen inkl. eigener Notizen</li>
+            <li>Automatische Updates über einen verbundenen Discord-Channel</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/enemies öffnen, "🎯 Enemy hinzufügen"</li>
+        <li>Spieler über die Kartensuche finden und als Feind markieren</li>
+        <li>Notizen zu Verhalten und Stärke hinterlegen</li>
+        <li>Report-Channel in Discord verbinden, um automatische Updates zu erhalten</li>
+      </ol>
+      {{ openlink('enemies', 'Enemy Records') }}
+    </div>
+  </section>
+
+  {# ══════════════════════════════ TOOLS ══════════════════════════════ #}
+  <section class="ht-group" id="grp-tools">
+    <h2 class="ht-group-title">🧰 Tools</h2>
+
+    <div class="ht-card" id="feat-res_push">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">📦</span>
+        <h3 class="ht-card-title">Res Push</h3>
+        {{ badge('res_push') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Discord-Channel-IDs für Anfragen/Antworten (Rechtsklick → ID kopieren, Entwicklermodus aktiv)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Ressourcen-Anfrage-Board für die gesamte Allianz</li>
+            <li>Mitglieder können offene Anfragen direkt annehmen</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/res-push/settings öffnen, Channel-IDs eintragen oder "🚀 Automatisch einrichten" nutzen</li>
+        <li>Ein Mitglied erstellt eine Ressourcen-Anfrage über Discord-Button oder Dashboard</li>
+        <li>Andere Mitglieder sehen offene Anfragen im Res-Push-Board und können sie annehmen</li>
+        <li>Nach der Lieferung die Anfrage als erledigt markieren</li>
+      </ol>
+      {{ openlink('res_push', 'Res Push') }}
+    </div>
+
+    <div class="ht-card" id="feat-polls">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🗳️</span>
+        <h3 class="ht-card-title">Polls</h3>
+        {{ badge('polls') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Optional: Discord-Channel für private/öffentliche Polls (kann automatisch erstellt werden)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Verfügbarkeitsabstimmungen für Operationen oder Termine</li>
+            <li>Aktive und abgeschlossene Polls getrennt einsehbar</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/polls öffnen und einen neuen Poll erstellen (Frage + Zeitfenster oder Optionen)</li>
+        <li>Mitglieder stimmen über Discord oder das Dashboard ab</li>
+        <li>Ergebnis unter "Aktive" bzw. "Abgeschlossene" Polls einsehen — z. B. zur Wellenplanung in Operations nutzen</li>
+      </ol>
+      {{ openlink('polls', 'Polls') }}
+    </div>
+
+    <div class="ht-card" id="feat-blueprints">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">📐</span>
+        <h3 class="ht-card-title">Blueprints</h3>
+        {{ badge('blueprints') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Definierte Dorfrollen (z. B. Off-Dorf, Def-Dorf, Hauptdorf)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Bau-Reihenfolge-Vorlagen je Dorfrolle, die alle Mitglieder nutzen können</li>
+            <li>Fortschritts-Tracking pro Spieler gegen die Vorlage</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/blueprints öffnen — Leader legen unter "📋 Blueprint-Vorlagen" eine Vorlage je Dorfrolle an</li>
+        <li>Mitglieder weisen ihren Dörfern eine Rolle zu und sehen die passende Bau-Reihenfolge</li>
+        <li>Fortschritt unter "📋 Meine Blueprints" abhaken</li>
+      </ol>
+      {{ openlink('blueprints', 'Blueprints') }}
+    </div>
+
+    <div class="ht-card" id="feat-crop_calculator">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🌽</span>
+        <h3 class="ht-card-title">Crop Calculator</h3>
+        {{ badge('crop_calculator') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Aktuelle Feld- und Heldenvilla-Level (für den Effizienz-Rechner)</li>
+            <li>Für Traderouten: Stamm, Marktplatz-Level und Geschwindigkeits-Bonus</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Effizienz-Rechner: optimale Ausbaureihenfolge der Getreidefelder inkl. Kosten &amp; Produktion</li>
+            <li>Traderouten-Rechner: ermittelt benötigte Handelsrouten gegen Getreidemangel</li>
+            <li>Grain Supply Simulator: speichert Versorgungssimulationen für die Allianz</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/tools/crop-calculator öffnen, aktuelle Feld-Level und Boni eintragen → Ausbau-Reihenfolge mit Kosten ansehen</li>
+        <li>Tab "🚛 Traderouten" für den Routen-Bedarf bei Getreidedefizit (Stamm, Marktlevel, Distanz eintragen)</li>
+        <li>Tab "📈 Grain Supply" für die Versorgungssimulation, mit "✅ Speichern" für die Allianz freigeben</li>
+        <li>Gespeicherte Simulationen unter /tools/grain-simulations einsehen</li>
+      </ol>
+      {{ openlink('crop_calculator', 'Crop Calculator') }}
+    </div>
+
+    <div class="ht-card" id="feat-hero_tasks">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🦸</span>
+        <h3 class="ht-card-title">Hero Tasks</h3>
+        {{ badge('hero_tasks') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Übersicht über Helden-Aufgaben/Milestones (z. B. "Erstes Dorf gesiedelt") inkl. Ressourcen- und XP-Belohnungen</li>
+            <li>Fortschritts-Tracking, damit keine Bonus-Aufgaben übersehen werden</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Hero-Tasks-Seite öffnen</li>
+        <li>Erledigte Milestones abhaken, um Belohnungen (Ressourcen/XP) im Blick zu behalten</li>
+        <li>Fortschritt regelmäßig prüfen, um keine Bonus-Aufgaben zu verpassen</li>
+      </ol>
+    </div>
+  </section>
+
+  {# ══════════════════════════════ ANALYTICS & STATS ══════════════════════════════ #}
+  <section class="ht-group" id="grp-analytics">
+    <h2 class="ht-group-title">📊 Analytics &amp; Stats</h2>
+
+    <div class="ht-card" id="feat-statistics">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">📊</span>
+        <h3 class="ht-card-title">Statistik</h3>
+        {{ badge('statistics') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Allianz- und Weltrankings (Punkte, Dörfer, Off/Def)</li>
+            <li>Verlauf über die Zeit zur Trendanalyse</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/stats öffnen</li>
+        <li>Ranking-Kategorie wählen (Allianz/Spieler, Punkte/Dörfer/Truppen)</li>
+        <li>Verlauf nutzen, um die eigene Entwicklung mit Top-Allianzen zu vergleichen</li>
+      </ol>
+      {{ openlink('statistics', 'Statistik') }}
+    </div>
+
+    <div class="ht-card" id="feat-travian_stats">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🌍</span>
+        <h3 class="ht-card-title">Travian Stats</h3>
+        {{ badge('travian_stats') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Wöchentliche Statistik-Tabelle aus Travian kopiert</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Verlauf der offiziellen Travian-Statistiken pro Spieler/Allianz</li>
+            <li>Erkennung von Trends und Auffälligkeiten im Wachstum</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Im Spiel: Statistik-Seite öffnen und die Tabelle kopieren</li>
+        <li>Auf der Travian-Stats-Seite einfügen — "Allianz-Import" erlaubt mehrere Spieler gleichzeitig</li>
+        <li>Snapshot wird gespeichert, Verlauf über mehrere Wochen vergleichbar</li>
+      </ol>
+    </div>
+  </section>
+
+  {# ══════════════════════════════ ACCOUNT & SETTINGS ══════════════════════════════ #}
+  <section class="ht-group" id="grp-account">
+    <h2 class="ht-group-title">👤 Account &amp; Settings</h2>
+
+    <div class="ht-card" id="feat-my_account">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">👤</span>
+        <h3 class="ht-card-title">Mein Account</h3>
+        {{ badge('my_account') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Travian-Spielername (bei Mobile-Browser zusätzlich der Stamm)</li>
+            <li>Export der Dörfer-/Truppenübersicht aus dem Spiel — oder die Browser Extension</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Zentrale Datenbasis für Dörfer, Truppen, Schatzkammer und Hospital</li>
+            <li>Truppen-Projektion mit 7/14/30/60-Tage-Hochrechnung</li>
+            <li>Combat-Power-Übersicht</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/my-account öffnen, Spielername (und bei Mobile den Stamm) eintragen</li>
+        <li>Truppenübersicht aus dem Spiel kopieren, unter "📋 Import data" einfügen und mit "⬆️ Speichern &amp; Importieren" übernehmen</li>
+        <li>Den Import regelmäßig (z. B. wöchentlich) wiederholen — der Verlauf wird für Wachstumscharts und Projektion genutzt</li>
+        <li>Schatzkammer- und Hospital-Daten ebenfalls importieren, damit Allianz-weite Übersichten (z. B. Allianz-Hospital) funktionieren</li>
+      </ol>
+      {{ openlink('my_account', 'Mein Account') }}
+    </div>
+
+    <div class="ht-card" id="feat-notifications">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🔔</span>
+        <h3 class="ht-card-title">Benachrichtigungen</h3>
+        {{ badge('notifications') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Keine</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Zentrales Postfach für wichtige Ereignisse (neue Angriffe, Scout-Anfragen, Operationen, etc.)</li>
+            <li>Ungelesen-Zähler direkt im Menü</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/notifications öffnen, um alle Benachrichtigungen zu sehen</li>
+        <li>Einträge als gelesen markieren oder direkt zur betroffenen Seite springen</li>
+      </ol>
+      {{ openlink('notifications', 'Benachrichtigungen') }}
+    </div>
+
+    <div class="ht-card" id="feat-settings">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">⚙️</span>
+        <h3 class="ht-card-title">Einstellungen</h3>
+        {{ badge('settings') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Discord-Berechtigung "Administrator" oder "Server verwalten"</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Verwaltung von Rollen-Berechtigungen (Scout, Res-Manager, Defend, Archive, Privat-Channel)</li>
+            <li>Welt- und Server-Einstellungen zentral pflegen</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>/settings öffnen</li>
+        <li>Rollen über die Toggle-Buttons den jeweiligen Berechtigungen zuordnen</li>
+        <li>Unter "🌍 World / Server" die Welteinstellungen prüfen und anpassen</li>
+        <li>Bei Berechtigungsproblemen "🔧 Archive Channel Permissions" reparieren</li>
+      </ol>
+      {{ openlink('settings', 'Einstellungen') }}
+    </div>
+
+    <div class="ht-card" id="feat-browser_extension">
+      <div class="ht-card-head">
+        <span class="ht-card-icon">🧩</span>
+        <h3 class="ht-card-title">Browser Extension</h3>
+        {{ badge('browser_extension') }}
+      </div>
+      <div class="ht-cols">
+        <div>
+          <div class="ht-col-label">🧩 Voraussetzungen</div>
+          <ul class="ht-list">
+            <li>Chrome- oder Chromium-basierter Browser (Manifest V3)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="ht-col-label">⭐ Vorteile</div>
+          <ul class="ht-list">
+            <li>Countdown-Timer direkt im Browser</li>
+            <li>Uhrzeiten-Alarme (4 Slots) für wichtige Termine</li>
+            <li>Schnellerer Datenimport ohne manuelles Copy &amp; Paste</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ht-col-label">📋 So nutzt du es</div>
+      <ol class="ht-steps">
+        <li>Extension-Download-Seite öffnen und das Paket herunterladen</li>
+        <li>In Chrome unter "Erweiterungen" den Entwicklermodus aktivieren und "Entpackt laden" auswählen</li>
+        <li>Timer und Uhrzeiten-Alarme im Extension-Popup konfigurieren</li>
+      </ol>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
