@@ -301,6 +301,13 @@ document.addEventListener('click', function(e) {
   color: var(--text); cursor: pointer; font-size: .78rem; padding: 3px 6px; flex-shrink: 0;
 }
 .sn-pro-select:focus { outline: none; border-color: #6366f1; }
+/* ── Auto-derived Pro indicator ── */
+.sn-auto-plan {
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text-muted); cursor: pointer; font-size: .72rem; padding: 3px 6px; flex-shrink: 0;
+  white-space: nowrap; text-decoration: none;
+}
+.sn-auto-plan:hover { border-color: #6366f1; color: var(--text); }
 .sn-pro-btn {
   background:none; border:1px solid var(--border); border-radius:5px;
   color:#6b7280; cursor:pointer; font-size:.78rem; padding:3px 7px; line-height:1;
@@ -544,6 +551,21 @@ function makeProToggle(requiresPlan, onChange) {
   return sel;
 }
 
+/* ── Auto-derived Pro indicator (from /admin/features tier) ── */
+const AUTO_PLAN_LABELS = {
+  '': '🔓 Free',
+  'player_pro': '🔵 Player Pro',
+  'alliance':   '🟣 Alliance Pro',
+};
+function makeAutoProIndicator(requiresPlan) {
+  const a = document.createElement('a');
+  a.className = 'sn-auto-plan';
+  a.href = '/admin/features';
+  a.title = 'Wird automatisch aus dem Feature-Tier (Feature-Zuordnung) übernommen';
+  a.textContent = '🔒 Auto: ' + (AUTO_PLAN_LABELS[requiresPlan||''] || requiresPlan);
+  return a;
+}
+
 /* ── Disabled toggle ── */
 function makeDisabledToggle(isDisabled, onChange) {
   const btn = document.createElement('button');
@@ -683,7 +705,11 @@ function render() {
       wrap.appendChild(makeIconPicker(item.icon||'home', v => { navData[i].icon = v; }));
       wrap.appendChild(makeLabelInput(item.label, v => navData[i].label = v, '130px'));
       wrap.appendChild(makeUrlInput(item.url_suffix, v => navData[i].url_suffix = v));
-      wrap.appendChild(makeProToggle(item.requires_plan||'', v => { navData[i].requires_plan = v; }));
+      if (item._auto_plan) {
+        wrap.appendChild(makeAutoProIndicator(item.requires_plan||''));
+      } else {
+        wrap.appendChild(makeProToggle(item.requires_plan||'', v => { navData[i].requires_plan = v; }));
+      }
       wrap.appendChild(makeDisabledToggle(!!item.disabled, v => { navData[i].disabled = v; }));
       wrap.appendChild(makeColorPicker(item.border_color||'', v => { navData[i].border_color = v; }));
       const del = document.createElement('button');
@@ -707,7 +733,11 @@ function makeChildRow(i, ci, child) {
   crow.appendChild(makeIconPicker(child.icon||'home', v => { navData[i].children[ci].icon = v; }));
   crow.appendChild(makeLabelInput(child.label, v => navData[i].children[ci].label = v, '110px'));
   crow.appendChild(makeUrlInput(child.url_suffix, v => navData[i].children[ci].url_suffix = v));
-  crow.appendChild(makeProToggle(child.requires_plan||'', v => { navData[i].children[ci].requires_plan = v; }));
+  if (child._auto_plan) {
+    crow.appendChild(makeAutoProIndicator(child.requires_plan||''));
+  } else {
+    crow.appendChild(makeProToggle(child.requires_plan||'', v => { navData[i].children[ci].requires_plan = v; }));
+  }
   crow.appendChild(makeDisabledToggle(!!child.disabled, v => { navData[i].children[ci].disabled = v; }));
   crow.appendChild(makeColorPicker(child.border_color||'', v => { navData[i].children[ci].border_color = v; }));
   const del = document.createElement('button');

@@ -11248,6 +11248,7 @@ async def _get_sidebar_nav() -> list:
 @app.get("/api/sidebar-config")
 async def api_sidebar_config(request: Request):
     nav = await _get_sidebar_nav()
+    nav = await _apply_feature_tier_overrides(nav)
     return JSONResponse(nav)
 
 
@@ -11360,6 +11361,81 @@ FEATURE_MATRIX_GROUP_ORDER = [
     "Tools", "Analytics & Stats", "Account & Settings",
 ]
 
+# Maps feature_matrix.feature_key → sidebar item url_suffix(es). Used to
+# automatically apply the lock icon / Pro badge in the sidebar based on the
+# tier assigned in /admin/features, instead of requiring a separate manual
+# configuration in /admin/sidebar.
+FEATURE_SIDEBAR_URL_MAP: dict[str, list[str]] = {
+    "map":              ["/map"],
+    "attacks":          ["/attacks", "/attacks/alliance-overview"],
+    "sector_monitor":   ["/map/sector-monitor"],
+    "timer":            ["/timer"],
+    "settle_list":      ["/settle-list"],
+    "farming_intel":    ["/farming"],
+    "farmlist_analyst": ["/farmlist-analyst"],
+    "player_intel":     ["/intel"],
+    "hero_scout":       ["/defense/hero-scout"],
+    "scout_tracking":   ["/scout"],
+    "scout_incidents":  ["/scout-incidents"],
+    "defense":          ["/verteidigung"],
+    "operations":       ["/operations"],
+    "attack_planner":   ["/my-operations"],
+    "my_alliance":      ["/my-ally"],
+    "members":          ["/allianz/mitglieder"],
+    "hospital":         ["/allianz/hospital"],
+    "enemies":          ["/enemies"],
+    "res_push":         ["/res-push"],
+    "polls":            ["/polls"],
+    "blueprints":       ["/blueprints"],
+    "crop_calculator":  [
+        "/tools/crop-calculator",
+        "/tools/crop-calculator?tab=traderoutes",
+        "/tools/crop-calculator?tab=grain-supply",
+        "/tools/grain-simulations",
+    ],
+    "statistics":       ["/stats"],
+    "my_account":       ["/my-account"],
+    "notifications":    ["/notifications"],
+    "settings":         ["/settings"],
+}
+
+
+def _tier_to_requires_plan(tier: str) -> str:
+    """Map a feature_matrix tier to the sidebar's requires_plan value."""
+    if tier == "player_pro":
+        return "player_pro"
+    if tier == "alliance_pro":
+        return "alliance"
+    return ""
+
+
+async def _apply_feature_tier_overrides(nav: list) -> list:
+    """Return a copy of `nav` where requires_plan is overridden for items whose
+    url_suffix is mapped to a feature_matrix feature (the tier assigned in
+    /admin/features is the source of truth for the sidebar lock/badge).
+    Items not covered by FEATURE_SIDEBAR_URL_MAP keep their stored value."""
+    feature_matrix = await database.get_feature_matrix()
+    url_to_plan: dict[str, str] = {}
+    url_to_feature: dict[str, str] = {}
+    for f in feature_matrix:
+        for url in FEATURE_SIDEBAR_URL_MAP.get(f["feature_key"], []):
+            url_to_plan[url] = _tier_to_requires_plan(f["tier"])
+            url_to_feature[url] = f["feature_key"]
+
+    def _apply(item: dict) -> dict:
+        item = dict(item)
+        if item.get("type") == "submenu":
+            item["children"] = [_apply(c) for c in (item.get("children") or [])]
+        elif item.get("type") == "item":
+            url = item.get("url_suffix", "")
+            if url in url_to_plan:
+                item["requires_plan"] = url_to_plan[url]
+                item["_auto_plan"] = True
+                item["_feature_key"] = url_to_feature[url]
+        return item
+
+    return [_apply(item) for item in nav]
+
 
 @app.get("/admin/features", response_class=HTMLResponse)
 async def admin_features(request: Request):
@@ -11442,6 +11518,7 @@ async def admin_sidebar(request: Request):
     if session.get("type") != "admin":
         return RedirectResponse("/dashboard", status_code=303)
     nav = await _get_sidebar_nav()
+    nav = await _apply_feature_tier_overrides(nav)
     saved = request.query_params.get("saved")
     return templates.TemplateResponse("admin_sidebar.html", {
         "request": request, "nav": nav, "saved": saved,
