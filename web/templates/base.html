@@ -59,7 +59,8 @@
       // Pre-apply sidebar layout before first paint to avoid layout shift
       try{
         var gm=location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
-        if(gm){
+        var isProfilePage=(location.pathname==='/profile'||location.pathname.indexOf('/profile/')===0);
+        if(gm||(isProfilePage&&localStorage.getItem('gs_last_gid'))){
           document.documentElement.classList.add('on-guild-page');
           if(localStorage.getItem('gs_collapsed')==='1')document.documentElement.classList.add('gs-pre-collapsed');
         }
@@ -566,13 +567,19 @@ function escHtml(s) {
 
   (function(){
     var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
-    if (!m) return;
+    var gid, path = location.pathname;
 
-    var gid  = m[1];
-    var path = location.pathname;
-
-    // Show sidebar on all guild pages (including the dashboard root)
-    var subPath = m[2] || '/';
+    if (m) {
+      gid = m[1];
+      try { localStorage.setItem('gs_last_gid', gid); } catch(e) {}
+    } else if (path === '/profile' || path.indexOf('/profile/') === 0) {
+      // Keep the sidebar visible on the profile page too, using the
+      // last guild/workspace the user was browsing.
+      try { gid = localStorage.getItem('gs_last_gid'); } catch(e) {}
+      if (!gid) return;
+    } else {
+      return;
+    }
 
     var sidebar = document.getElementById('guild-sidebar');
     var body    = document.body;
@@ -935,8 +942,12 @@ function escHtml(s) {
   // Kick off badge loading once sidebar is ready, then every 60 minutes
   (function(){
     var m = location.pathname.match(/^\/guild\/(\d{17,20}|ws_[^\/]+)(\/.*)?$/);
-    if (!m) return;
-    var gid = m[1];
+    var gid;
+    if (m) gid = m[1];
+    else if (location.pathname === '/profile' || location.pathname.indexOf('/profile/') === 0) {
+      try { gid = localStorage.getItem('gs_last_gid'); } catch(e) {}
+    }
+    if (!gid) return;
     setTimeout(function(){ _loadBadges(gid); }, 500);
     setInterval(function(){ _loadBadges(gid); }, 60 * 60 * 1000);
   })();
