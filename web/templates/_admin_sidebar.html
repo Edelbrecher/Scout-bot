@@ -1,0 +1,30 @@
+{% set _admin_nav = [
+  ('/admin', '📊 Overview'),
+  ('/admin/customers', '👥 Kunden'),
+  ('/admin/worlds', '🌍 Travian Worlds'),
+  ('/admin/servers', '🔍 Server Discover'),
+  ('/admin/server', '🖥️ Server Monitor'),
+  ('/admin/trial-links', '🔑 Trial-Links'),
+  ('/admin/promos', '🎟 Discountcodes'),
+  ('/admin/popup', '💬 Popup'),
+  ('/admin/consents', '🍪 Cookie-Einwilligungen'),
+  ('/admin/features', '🗂 Feature Matrix'),
+  ('/admin/contact', '✉️ Kontakt-Seite'),
+  ('/admin/impressum', '📄 Impressum'),
+  ('/admin/sidebar', '🧭 Sidebar-Nav'),
+  ('/admin/auths', '🔐 Auths'),
+  ('/admin/ideas', '💡 Ideen'),
+] %}
+<div style="width:180px; flex-shrink:0;">
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:sticky; top:1rem;">
+    <div style="padding:0.75rem 1rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);">Admin</div>
+    {% for _href, _label in _admin_nav %}
+    {% set _active = (request.url.path == _href) or (_href != '/admin' and request.url.path.startswith(_href + '/')) %}
+    {% if _active %}
+    <a href="{{ _href }}" style="display:block;padding:.65rem 1rem;color:#f59e0b;text-decoration:none;font-size:.9rem;background:rgba(245,158,11,0.08);">{{ _label }}</a>
+    {% else %}
+    <a href="{{ _href }}" style="display:block;padding:.65rem 1rem;color:var(--text-muted);text-decoration:none;font-size:.9rem;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">{{ _label }}</a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
