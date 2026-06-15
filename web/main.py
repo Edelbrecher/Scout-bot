@@ -304,19 +304,25 @@ async def can_access_guild_async(session: dict, guild_id: str) -> bool:
     """Like can_access_guild but also checks personal workspace ownership in DB."""
     if session.get("guilds") is None:
         return True  # super-admin
+    uid = session.get("uid", "")
     if WORKSPACE_RE.match(guild_id):
         # Verify ownership against DB
         guild = await database.get_guild(guild_id)
         if not guild:
             return False
-        return guild.get("workspace_owner_id") == session.get("uid")
+        if guild.get("workspace_owner_id") == session.get("uid"):
+            return True
+        return uid and await database.has_active_dual_link(guild_id, uid)
     if guild_id in session["guilds"]:
         return True
     # Also grant access if user has joined an ally on this guild via invite link
-    uid = session.get("uid", "")
     if uid:
         membership = await database.get_ally_membership(guild_id, uid)
         if membership:
+            return True
+        # Accepted "Dual Accounts" invite — re-checked live so access disappears
+        # as soon as the owner revokes the link, without waiting for re-login.
+        if await database.has_active_dual_link(guild_id, uid):
             return True
     return False
 
@@ -1385,6 +1391,14 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
         anchor_guilds = await database.get_guild_ids_for_discord_user(dual_anchor_id)
         if anchor_guilds:
             accessible = list(set(accessible) | set(anchor_guilds))
+
+    # Accepted "Dual Accounts" invites (My Account → 🔗 Dual Accounts) grant
+    # access to that guild/world, so the dual automatically uses its existing
+    # subscription — and only one of the two needs to pay for it.
+    if session_type != "admin":
+        dual_link_guilds = await database.get_active_dual_guild_ids(discord_id)
+        if dual_link_guilds:
+            accessible = list(set(accessible) | set(dual_link_guilds))
 
     session_data = {
         "type": session_type,

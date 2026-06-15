@@ -5078,6 +5078,29 @@ async def revoke_dual_link(token: str, owner_id: str):
         await db.commit()
 
 
+async def get_active_dual_guild_ids(discord_id: str) -> list[str]:
+    """Guild/workspace IDs this user has accepted a dual invite for (Feature 3).
+    Accepting grants access to that guild and thus its existing subscription."""
+    await _init_dual_links_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            "SELECT DISTINCT guild_id FROM dual_links WHERE dual_discord_id = ? AND status = 'active'",
+            (discord_id,),
+        ) as cur:
+            return [r[0] for r in await cur.fetchall()]
+
+
+async def has_active_dual_link(guild_id: str, discord_id: str) -> bool:
+    """Whether this user has an accepted, non-revoked dual invite for guild_id."""
+    await _init_dual_links_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute(
+            "SELECT 1 FROM dual_links WHERE guild_id = ? AND dual_discord_id = ? AND status = 'active'",
+            (guild_id, discord_id),
+        ) as cur:
+            return (await cur.fetchone()) is not None
+
+
 # ── My Ally ──────────────────────────────────────────────────────────────────
 
 async def _init_ally_tables():
