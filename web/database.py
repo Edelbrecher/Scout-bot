@@ -528,7 +528,6 @@ async def init_db():
     await _init_settle_list_table()
     await _init_dual_links_table()
     await _init_farmlist_analyses_table()
-    await _init_hospital_table()
     await _init_alliance_members_table()
     await _init_scout_incidents_table()
     await _init_artifact_tables()
@@ -5623,7 +5622,7 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
         "ep_archive_view", "ep_archive_manage",
         "attack_manage", "attack_view", "scout_manage", "scout_view",
         "map_manage", "map_view", "map_meta_view", "map_meta_manage",
-        "sector_view", "hospital_view",
+        "sector_view",
         "res_push_view", "res_push_manage",
         "hero_scout_view", "stats_view", "blueprint_view",
         "poll_view", "poll_manage", "defend_view", "defend_manage",
@@ -5952,83 +5951,6 @@ async def get_scout_stats(guild_id: str) -> list[dict]:
             ORDER BY scout_count DESC
         """, (guild_id,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
-
-
-# ---------------------------------------------------------------------------
-# Hospital (Lazarett) tables
-# ---------------------------------------------------------------------------
-
-async def _init_hospital_table():
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS hospital_entries (
-                id               INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id         TEXT NOT NULL,
-                discord_user_id  TEXT NOT NULL,
-                discord_username TEXT,
-                uploaded_at      TEXT DEFAULT (datetime('now')),
-                village_name     TEXT NOT NULL,
-                troop_name       TEXT NOT NULL,
-                count            INTEGER NOT NULL,
-                heal_finish      TEXT
-            )
-        """)
-        await db.commit()
-
-
-async def save_hospital_data(
-    guild_id: str,
-    discord_user_id: str,
-    discord_username: str | None,
-    entries: list[dict],
-):
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute(
-            "DELETE FROM hospital_entries WHERE guild_id = ? AND discord_user_id = ?",
-            (guild_id, discord_user_id),
-        )
-        for e in entries:
-            await db.execute(
-                """INSERT INTO hospital_entries
-                   (guild_id, discord_user_id, discord_username, village_name, troop_name, count, heal_finish)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (guild_id, discord_user_id, discord_username,
-                 e["village_name"], e["troop_name"], e["count"], e.get("heal_finish")),
-            )
-        await db.commit()
-
-
-async def get_hospital_data(guild_id: str, discord_user_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT * FROM hospital_entries
-               WHERE guild_id = ? AND discord_user_id = ?
-               ORDER BY heal_finish ASC""",
-            (guild_id, discord_user_id),
-        ) as cur:
-            return [dict(r) for r in await cur.fetchall()]
-
-
-async def get_all_hospital_data(guild_id: str) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT * FROM hospital_entries
-               WHERE guild_id = ?
-               ORDER BY discord_username ASC, heal_finish ASC""",
-            (guild_id,),
-        ) as cur:
-            return [dict(r) for r in await cur.fetchall()]
-
-
-async def delete_hospital_data(guild_id: str, discord_user_id: str):
-    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
-        await db.execute(
-            "DELETE FROM hospital_entries WHERE guild_id = ? AND discord_user_id = ?",
-            (guild_id, discord_user_id),
-        )
-        await db.commit()
 
 
 # ── Allianz-Mitglieder ────────────────────────────────────────────────────────
@@ -13316,19 +13238,18 @@ FEATURE_MATRIX_SEED = [
     ("my_alliance",       "Alliance",    "🏰 My Alliance",       "", "free", 14),
     ("members",           "Alliance",    "👥 Members",           "", "free", 15),
     ("sitter_list",       "Alliance",    "🪑 Sitter List",       "", "free", 16),
-    ("hospital",          "Alliance",    "🏥 Hospital",          "", "alliance_pro", 17),
-    ("enemies",           "Alliance",    "😈 Enemies",           "", "alliance_pro", 18),
-    ("res_push",          "Tools",       "📦 Res Push",          "", "free", 19),
-    ("polls",             "Tools",       "🗳️ Polls",             "", "free", 20),
-    ("blueprints",        "Tools",       "📐 Blueprints",        "", "free", 21),
-    ("crop_calculator",   "Tools",       "🌽 Crop Calculator",   "", "free", 22),
-    ("hero_tasks",        "Tools",       "⚙️ Hero Tasks",        "", "free", 23),
-    ("statistics",        "Analytics & Stats", "📊 Statistics",      "", "free", 24),
-    ("travian_stats",     "Analytics & Stats", "🌍 Travian Stats",   "", "free", 25),
-    ("my_account",        "Account & Settings", "👤 My Account",       "", "free", 26),
-    ("notifications",     "Account & Settings", "🔔 Notifications",    "", "free", 27),
-    ("settings",          "Account & Settings", "⚙️ Settings",         "", "free", 28),
-    ("browser_extension", "Account & Settings", "🧩 Browser Extension","", "free", 29),
+    ("enemies",           "Alliance",    "😈 Enemies",           "", "alliance_pro", 17),
+    ("res_push",          "Tools",       "📦 Res Push",          "", "free", 18),
+    ("polls",             "Tools",       "🗳️ Polls",             "", "free", 19),
+    ("blueprints",        "Tools",       "📐 Blueprints",        "", "free", 20),
+    ("crop_calculator",   "Tools",       "🌽 Crop Calculator",   "", "free", 21),
+    ("hero_tasks",        "Tools",       "⚙️ Hero Tasks",        "", "free", 22),
+    ("statistics",        "Analytics & Stats", "📊 Statistics",      "", "free", 23),
+    ("travian_stats",     "Analytics & Stats", "🌍 Travian Stats",   "", "free", 24),
+    ("my_account",        "Account & Settings", "👤 My Account",       "", "free", 25),
+    ("notifications",     "Account & Settings", "🔔 Notifications",    "", "free", 26),
+    ("settings",          "Account & Settings", "⚙️ Settings",         "", "free", 27),
+    ("browser_extension", "Account & Settings", "🧩 Browser Extension","", "free", 28),
 ]
 
 
@@ -13363,6 +13284,9 @@ async def _init_feature_matrix_table():
             await db.commit()
         except Exception:
             pass
+        # Migration: remove discontinued Lazarett/Hospital feature
+        await db.execute("DELETE FROM feature_matrix WHERE feature_key='hospital'")
+        await db.commit()
 
 
 async def get_feature_matrix() -> list[dict]:

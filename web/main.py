@@ -5054,10 +5054,6 @@ async def my_account_page(request: Request, guild_id: str):
     dual_links = await database.get_dual_links_for_owner(guild_id, session.get("uid", ""))
     dual_created = request.query_params.get("dual_created")
 
-    hospital_data    = await database.get_hospital_data(guild_id, session.get("uid", ""))
-    hospital_uploaded = request.query_params.get("hospital_uploaded")
-    hospital_cleared  = request.query_params.get("hospital_cleared")
-
     my_waves = await database.get_my_op_waves(guild_id, discord_id)
     march_settings = await database.get_march_settings(guild_id, discord_id)
 
@@ -5077,9 +5073,6 @@ async def my_account_page(request: Request, guild_id: str):
         "sitters":            sitters,
         "dual_links":         dual_links,
         "dual_created":       dual_created,
-        "hospital_data":      hospital_data,
-        "hospital_uploaded":  hospital_uploaded,
-        "hospital_cleared":   hospital_cleared,
         "my_travian_name":    my_travian_name_val or (my_troops or {}).get("travian_name", ""),
         "my_waves":           my_waves,
         "my_population":      my_population,
@@ -6665,7 +6658,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         "scout_manage", "scout_view",
         "map_manage", "map_view", "map_meta_view", "map_meta_manage",
         "res_push_view", "res_push_manage",
-        "sector_view", "hospital_view",
+        "sector_view",
         "poll_view", "poll_manage",
         "hero_scout_view", "stats_view", "blueprint_view",
         "guide_view",
@@ -6684,12 +6677,12 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
             "scout_manage", "scout_view",
             "map_view", "map_manage", "map_meta_view", "map_meta_manage",
             "res_push_view", "res_push_manage",
-            "sector_view", "hospital_view",
+            "sector_view",
             "poll_view", "poll_manage", "hero_scout_view", "stats_view", "blueprint_view",
             "guide_view",
         ]
     elif preset == "mitglied":
-        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "map_meta_view", "res_push_view", "hospital_view", "guide_view"]
+        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "map_meta_view", "res_push_view", "guide_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)
@@ -11261,7 +11254,6 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "castle",    "label": "My Alliance",        "url_suffix": "/my-ally"},
     {"type": "item",  "icon": "users",     "label": "Members",            "url_suffix": "/allianz/mitglieder"},
     {"type": "item",  "icon": "skull",     "label": "Enemies",            "url_suffix": "/enemies"},
-    {"type": "item",  "icon": "cross",     "label": "Hospital",           "url_suffix": "/allianz/hospital"},
     {"type": "item",  "icon": "gear",      "label": "Operations",         "url_suffix": "/operations"},
     {"type": "item",  "icon": "flag",      "label": "My Op Plan",         "url_suffix": "/my-operations"},
     {"type": "item",  "icon": "poll",      "label": "Polls",              "url_suffix": "/polls"},
@@ -11445,7 +11437,6 @@ FEATURE_SIDEBAR_URL_MAP: dict[str, list[str]] = {
     "attack_planner":   ["/my-operations"],
     "my_alliance":      ["/my-ally"],
     "members":          ["/allianz/mitglieder"],
-    "hospital":         ["/allianz/hospital"],
     "enemies":          ["/enemies"],
     "res_push":         ["/res-push"],
     "polls":            ["/polls"],
@@ -11962,266 +11953,6 @@ async def api_popup_config():
     except Exception:
         return JSONResponse({"enabled": False})
     return JSONResponse(data)
-
-
-# ---------------------------------------------------------------------------
-# Hospital (Lazarett) Parser
-# ---------------------------------------------------------------------------
-
-def parse_hospital(text: str) -> list[dict]:
-    """Parse Travian hospital copy-paste into list of dicts.
-
-    Supports two formats:
-
-    FORMAT A — Table (Hospital Overview, EN + DE):
-      "in progress\tWounded troops"  or  "Im Gange\tVerwundete Truppen"
-      TroopA\tTroopB\tTroopC\t...        ← header row with troop names
-      Village1\t•\t0\t14\t0\t...         ← village rows (• or - as 2nd col)
-      Village2\t-\t10\t0\t0\t...
-
-    FORMAT B — Row-by-row with finish time (older / detail pages):
-      Village name
-      TroopName\tCount\tHH:MM:SS
-
-    Returns list of {village_name, troop_name, count, heal_finish}.
-    """
-    import re as _re
-
-    # Known troop names (EN + DE) for header detection
-    _KNOWN_TROOPS = {
-        # Romans EN/DE
-        'legionnaire','praetorian','imperian','equites legati','equites imperatoris',
-        'equites caesaris','fire catapult','senator','settler',
-        'legionär','prätorianer','imperianer','feuerkatapult',
-        # Teutons EN/DE
-        'clubswinger','spearman','scout','paladin','teutonic knight','catapult','chief',
-        'keulenschwinger','speerkämpfer','späher','teutonischer ritter','katapult',
-        'häuptling','teutonen-rammbock',
-        # Gauls EN/DE
-        'phalanx','swordsman','pathfinder','theutates thunder','druidrider','haeduan',
-        'schwertkämpfer','kundschafter','theutates-blitz','druider','häduaner',
-        # shared
-        'ram','rammbock',
-        # Egyptians EN/DE
-        'slave militia','ash warden','khopesh warrior','sopdu explorer',
-        'anhur guard','resheph chariot','stone catapult','nomarch',
-        'sklavenmiliz','aschenwächter','khopesh-kämpfer','sopdu-kundschafter',
-        'anhur-wächter','resheph-streitwagen','steinkatapult',
-        # Huns EN/DE
-        'mercenary','bowman','spotter','steppe rider','marksman','marauder',
-        'logades','cataphract',
-        'söldner','bogenschütze','kundschafter','steppenreiter','scharfschütze',
-        # Spartans EN/DE
-        'hoplite','senator','spartan',
-        'hoplit',
-    }
-
-    # Strip Unicode bidirectional / formatting marks
-    text = _re.sub(r'[​-‏‪-‮⁦-⁩﻿]', '', text)
-    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
-
-    # --- Detect format ---
-    _TABLE_INTRO = _re.compile(
-        r'^(in progress|im gange|wounded troops|verwundete truppen)', _re.IGNORECASE
-    )
-    _TIME_ONLY = _re.compile(r'^\d{1,2}:\d{2}:\d{2}$')
-    _DATETIME  = _re.compile(r'^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}:\d{2}$')
-    _INDICATOR = _re.compile(r'^[•\-–·]$')  # hospital present/absent indicator
-
-    def _clean_num(s: str) -> int:
-        cleaned = _re.sub(r'[^\d]', '', s)
-        return int(cleaned) if cleaned else 0
-
-    def _is_troop_header(parts: list) -> bool:
-        hits = sum(1 for p in parts if p.lower() in _KNOWN_TROOPS)
-        return hits >= 2
-
-    # Check for table format: find header row with troop names
-    header_idx = None
-    troop_cols: list[str] = []
-    for i, raw in enumerate(lines):
-        stripped = raw.strip()
-        if not stripped:
-            continue
-        if _TABLE_INTRO.match(stripped):
-            continue  # skip intro row
-        if '\t' in stripped:
-            parts = [p.strip() for p in stripped.split('\t')]
-            parts_clean = [p for p in parts if p]
-            if _is_troop_header(parts_clean):
-                header_idx = i
-                troop_cols = parts_clean
-                break
-
-    # --- FORMAT A: Table ---
-    if header_idx is not None:
-        entries = []
-        for raw in lines[header_idx + 1:]:
-            stripped = raw.strip()
-            if not stripped or '\t' not in stripped:
-                continue
-            parts = [p.strip() for p in stripped.split('\t')]
-            # First non-empty = village name
-            village = parts[0] if parts else ''
-            if not village:
-                continue
-            # Determine where counts start: skip •/- indicator col if present
-            rest = parts[1:]
-            start = 0
-            if rest and _INDICATOR.match(rest[0]):
-                start = 1
-            counts = rest[start:]
-            for j, troop in enumerate(troop_cols):
-                if j >= len(counts):
-                    break
-                try:
-                    cnt = _clean_num(counts[j])
-                except Exception:
-                    cnt = 0
-                if cnt > 0:
-                    entries.append({
-                        'village_name': village,
-                        'troop_name':   troop,
-                        'count':        cnt,
-                        'heal_finish':  None,
-                    })
-        return entries
-
-    # --- FORMAT B: Row-by-row (village header + tab-separated troop rows) ---
-    _SKIP = _re.compile(
-        r'^Lazarett$|^Hospital$|^Krankenhaus$|^Heilung$|^Truppe$|^Anzahl$|'
-        r'^Fertig$|^Troop$|^Count$|^Healing finish$|^Finish$|'
-        r'^Dorf$|^Village$|^Overview$|^Übersicht$|'
-        r'^Homepage|^\© \d{4}|Discord|Support|Game rules|Terms|Imprint|'
-        r'^Server time|^TravOps|^Profile|^Rally|^Management|'
-        r'^\s*Troop\s+Count\s+|^\s*Truppe\s+Anzahl',
-        _re.IGNORECASE,
-    )
-    entries = []
-    current_village = None
-    for raw in lines:
-        stripped = raw.strip()
-        if not stripped:
-            continue
-        if '\t' in stripped:
-            parts = [p.strip() for p in stripped.split('\t')]
-            parts = [p for p in parts if p]
-            if len(parts) >= 2:
-                troop_name = parts[0]
-                if _SKIP.match(troop_name):
-                    continue
-                try:
-                    count = _clean_num(parts[1])
-                except Exception:
-                    continue
-                if count == 0:
-                    continue
-                heal_finish = None
-                if len(parts) >= 3:
-                    t = parts[2].strip()
-                    if _TIME_ONLY.match(t) or _DATETIME.match(t):
-                        heal_finish = t
-                    elif len(parts) >= 4:
-                        combined = f"{parts[2]} {parts[3]}".strip()
-                        if _DATETIME.match(combined):
-                            heal_finish = combined
-                if current_village:
-                    entries.append({
-                        'village_name': current_village,
-                        'troop_name':   troop_name,
-                        'count':        count,
-                        'heal_finish':  heal_finish,
-                    })
-            continue
-        if _SKIP.search(stripped):
-            continue
-        current_village = stripped
-    return entries
-
-
-# ---------------------------------------------------------------------------
-# Routes — Lazarett-Tracker (Hospital)
-# ---------------------------------------------------------------------------
-
-@app.post("/guild/{guild_id}/my-account/hospital")
-async def hospital_upload(
-    request: Request,
-    guild_id: str,
-    hospital_text: str = Form(""),
-):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard", status_code=303)
-
-    entries = parse_hospital(hospital_text)
-    await database.save_hospital_data(
-        guild_id=guild_id,
-        discord_user_id=session.get("uid", ""),
-        discord_username=session.get("username"),
-        entries=entries,
-    )
-    return RedirectResponse(
-        f"/guild/{guild_id}/my-account?hospital_uploaded={len(entries)}",
-        status_code=303,
-    )
-
-
-@app.post("/guild/{guild_id}/my-account/hospital/clear")
-async def hospital_clear(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard", status_code=303)
-
-    await database.delete_hospital_data(guild_id, session.get("uid", ""))
-    return RedirectResponse(f"/guild/{guild_id}/my-account?hospital_cleared=1", status_code=303)
-
-
-@app.get("/guild/{guild_id}/allianz/hospital", response_class=HTMLResponse)
-async def allianz_hospital(request: Request, guild_id: str):
-    session, err = _require_session(request)
-    if err: return err
-    err = _require_guild(session, guild_id)
-    if err: return err
-    guild = await database.get_guild(guild_id)
-    if not guild:
-        return RedirectResponse("/dashboard", status_code=303)
-    err = await _require_alliance(guild, guild_id)
-    if err: return err
-
-    all_entries = await database.get_all_hospital_data(guild_id)
-
-    # Group by discord_user_id
-    from collections import OrderedDict
-    grouped: dict[str, dict] = OrderedDict()
-    for e in all_entries:
-        uid = e["discord_user_id"]
-        if uid not in grouped:
-            grouped[uid] = {
-                "discord_username": e.get("discord_username") or uid,
-                "uploaded_at": e.get("uploaded_at", ""),
-                "entries": [],
-                "total": 0,
-            }
-        grouped[uid]["entries"].append(e)
-        grouped[uid]["total"] += e["count"]
-        # Keep latest upload time
-        if e.get("uploaded_at", "") > grouped[uid]["uploaded_at"]:
-            grouped[uid]["uploaded_at"] = e["uploaded_at"]
-
-    return templates.TemplateResponse("allianz_hospital.html", {
-        "request": request,
-        "guild": guild,
-        "grouped": list(grouped.values()),
-        "all_entries": all_entries,
-    })
 
 
 # ── Allianz-Mitglieder ────────────────────────────────────────────────────────

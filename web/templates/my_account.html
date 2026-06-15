@@ -59,12 +59,6 @@
   {% if cleared %}
   <div class="alert alert-success">🗑️ All villages deleted.</div>
   {% endif %}
-  {% if hospital_uploaded %}
-  <div class="alert alert-success">✅ {{ hospital_uploaded }} hospital entries successfully imported.</div>
-  {% endif %}
-  {% if hospital_cleared %}
-  <div class="alert alert-success">🗑️ Hospital data deleted.</div>
-  {% endif %}
   {% if saved == 'scout_village' %}
   <div class="alert alert-success">🔭 Scout village {% if scout_village %}set: {{ scout_village.village_name }} ({{ scout_village.x }}|{{ scout_village.y }}){% else %}removed{% endif %}.</div>
   {% endif %}
@@ -123,15 +117,6 @@
         </div>
         <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap;">
           <button type="submit" class="btn btn-primary" data-i18n="account.import.btn">⬆️ Save &amp; Import</button>
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='flex'" style="display:flex;align-items:center;gap:.4rem;">
-            🏥 Lazarett
-            {% if hospital_data %}
-            {% set total_healing = hospital_data | sum(attribute='count') %}
-            <span style="background:rgba(239,68,68,.25);color:#f87171;border-radius:8px;padding:1px 6px;font-size:.75rem;">{{ "{:,}".format(total_healing).replace(",",".") }} 🩺</span>
-            {% set timed = hospital_data | selectattr('heal_finish') | list %}
-            {% if timed %}<span id="hospitalBtnTimer" style="font-size:.72rem;color:#f59e0b;font-weight:600;"></span>{% endif %}
-            {% endif %}
-          </button>
           {% if own_villages %}
           <form method="post" action="/guild/{{ guild.guild_id }}/my-account/clear" style="margin:0;"
                 onsubmit="return confirm('Delete all own villages?')">
@@ -577,140 +562,6 @@
     </div>
   </form>
 </div>
-
-<!-- ══ Lazarett Modal ════════════════════════════════════════════════ -->
-<div id="hospitalModal"
-     style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.65);
-            align-items:flex-start;justify-content:center;padding:1.5rem;overflow-y:auto;">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
-              padding:1.5rem;width:100%;max-width:720px;position:relative;margin:auto;">
-    <button onclick="document.getElementById('hospitalModal').style.display='none'"
-            style="position:absolute;top:0.9rem;right:0.9rem;background:none;border:none;
-                   color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">✕</button>
-    <h2 style="margin:0 0 1rem;">🏥 Hospital</h2>
-
-    {% if hospital_data %}
-    {% set total_healing = hospital_data | sum(attribute='count') %}
-    <!-- KPI Karten -->
-    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
-      <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:.65rem 1rem;min-width:130px;text-align:center;">
-        <div style="font-size:1.3rem;font-weight:800;color:#ef4444;">{{ "{:,}".format(total_healing).replace(",",".") }}</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">🩺 In recovery</div>
-      </div>
-      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:.65rem 1rem;min-width:150px;text-align:center;">
-        <div style="font-size:1.1rem;font-weight:800;color:#f59e0b;" id="hospitalTotalTime">—</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">⏱️ All healed in</div>
-      </div>
-      <div style="background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.3);border-radius:10px;padding:.65rem 1rem;min-width:150px;text-align:center;">
-        <div style="font-size:1.1rem;font-weight:700;color:var(--text-muted);" id="hospitalFinishAt">—</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">🏁 Finished at</div>
-      </div>
-    </div>
-    <!-- Tabelle -->
-    <div style="overflow-x:auto;margin-bottom:1.25rem;max-height:280px;overflow-y:auto;border-radius:8px;border:1px solid var(--border);">
-      <table class="table" style="margin:0;">
-        <thead>
-          <tr>
-            <th>Village</th><th>Troop</th>
-            <th style="text-align:right;">Anzahl</th>
-            <th>Finished at</th><th>Remaining</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for e in hospital_data %}
-          <tr>
-            <td>{{ e.village_name }}</td>
-            <td>{{ e.troop_name }}</td>
-            <td style="text-align:right;font-weight:700;color:#ef4444;">{{ "{:,}".format(e.count).replace(",",".") }}</td>
-            <td style="font-family:monospace;font-size:0.83rem;color:var(--text-muted);">{{ e.heal_finish or '—' }}</td>
-            <td style="font-size:0.83rem;" data-finish="{{ e.heal_finish or '' }}"><span class="remaining-time">—</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-
-    <!-- Import-Formular -->
-    <details {% if not hospital_data %}open{% endif %} style="margin-bottom:0.75rem;">
-      <summary style="cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text-muted);padding:0.3rem 0;">⬆️ Import new data</summary>
-      <div style="margin-top:0.6rem;">
-        <p class="hint" style="margin-bottom:0.5rem;">Open in Travian the <strong>Hospital</strong>, select all (<kbd>Ctrl+A</kbd>), copy (<kbd>Ctrl+C</kbd>) and paste here.</p>
-        <form method="post" action="/guild/{{ guild.guild_id }}/my-account/hospital">
-          <textarea name="hospital_text" rows="8"
-            placeholder="Dorfname&#10;Legionär&#9;45&#9;08:32:15&#10;Prätorianer&#9;12&#9;09:15:00&#10;..."
-            style="font-family:monospace;font-size:0.8rem;width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;box-sizing:border-box;"></textarea>
-          <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
-            <button type="submit" class="btn btn-primary">⬆️ Import</button>
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('hospitalModal').style.display='none'">Cancel</button>
-          </div>
-        </form>
-      </div>
-    </details>
-
-    {% if hospital_data %}
-    <form method="post" action="/guild/{{ guild.guild_id }}/my-account/hospital/clear" style="margin:0;"
-          onsubmit="return confirm('Delete hospital data?')">
-      <button type="submit" class="btn btn-danger" style="font-size:0.8rem;">🗑 Delete all hospital data</button>
-    </form>
-    {% endif %}
-  </div>
-</div>
-
-<script>
-(function() {
-  function parseFinish(s) {
-    if (!s) return null;
-    s = s.trim();
-    let m;
-    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-    if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]);
-    m = s.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
-    if (m) {
-      const now = new Date();
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), +m[1], +m[2], +m[3]);
-      if (d < now) d.setDate(d.getDate()+1);
-      return d;
-    }
-    return null;
-  }
-  function fmtRemaining(ms) {
-    if (ms <= 0) return '<span style="color:#2ed573;">✓ done</span>';
-    const s = Math.floor(ms/1000), hh=Math.floor(s/3600), mm=Math.floor((s%3600)/60), ss=s%60;
-    const col = hh>4?'#f59e0b':hh>0?'#ef4444':'#2ed573';
-    const txt = hh>0?`${hh}h ${String(mm).padStart(2,'0')}m`:`${mm}m ${String(ss).padStart(2,'0')}s`;
-    return `<span style="color:${col};font-weight:600;">${txt}</span>`;
-  }
-  function fmtClock(d) { return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
-  let maxFinish = null;
-  const cells = document.querySelectorAll('[data-finish]');
-  cells.forEach(td => { const f=parseFinish(td.dataset.finish); if(f&&(!maxFinish||f>maxFinish))maxFinish=f; });
-  function update() {
-    const now = Date.now();
-    cells.forEach(td => {
-      const f=parseFinish(td.dataset.finish), span=td.querySelector('.remaining-time');
-      if(!f){span.innerHTML='—';return;}
-      span.innerHTML=fmtRemaining(f-now);
-    });
-    if(maxFinish){
-      const rem=maxFinish-Date.now();
-      const el1=document.getElementById('hospitalTotalTime'), el2=document.getElementById('hospitalFinishAt');
-      if(el1) el1.innerHTML=fmtRemaining(rem);
-      if(el2) el2.textContent=fmtClock(maxFinish);
-      // Button inline timer
-      const btn=document.getElementById('hospitalBtnTimer');
-      if(btn) btn.innerHTML = rem>0 ? '⏱ '+fmtRemaining(rem) : '✓';
-    }
-  }
-  update(); setInterval(update,1000);
-  // Open modal automatically when returned after import
-  {% if hospital_uploaded or hospital_cleared %}
-  document.addEventListener('DOMContentLoaded',()=>{ document.getElementById('hospitalModal').style.display='flex'; });
-  {% endif %}
-  // Close with Escape
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElementById('hospitalModal').style.display='none'; });
-})();
-</script>
 
 <style>
 :root {
