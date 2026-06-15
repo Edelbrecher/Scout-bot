@@ -2,6 +2,9 @@
 {% block title %}Mein Profil · TravOps{% endblock %}
 
 {% block content %}
+{% if fallback_guild_id %}
+<script>try{if(!localStorage.getItem('gs_last_gid'))localStorage.setItem('gs_last_gid','{{ fallback_guild_id }}');}catch(e){}</script>
+{% endif %}
 <div class="container" style="max-width:100%;">
 
   <div style="margin-bottom:1.5rem;">

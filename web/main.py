@@ -1766,6 +1766,7 @@ async def profile_page(request: Request):
             dual_names[d["dual_discord_id"]] = d["dual_discord_id"]
     if dual_info.get("anchor_id"):
         dual_names[dual_info["anchor_id"]] = dual_info["anchor_id"]
+    fallback_guild_id = next(iter(session.get("guilds") or []), "")
     return templates.TemplateResponse("profile.html", {
         "request": request,
         "session": session,
@@ -1776,6 +1777,7 @@ async def profile_page(request: Request):
         "redeemed": redeemed,
         "dual_flash": dual_flash,
         "base_url": str(request.base_url).rstrip("/"),
+        "fallback_guild_id": fallback_guild_id,
     })
 
 
