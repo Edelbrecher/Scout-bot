@@ -224,7 +224,7 @@
   </div>
 
   {# ── Main Grid: left (wider) + right ── #}
-  <div style="display:grid;grid-template-columns:1fr 320px;gap:1.25rem;align-items:start;">
+  <div style="display:grid;grid-template-columns:1fr 420px 280px;gap:1.25rem;align-items:start;">
 
     {# ── LEFT COLUMN ── #}
     <div style="display:flex;flex-direction:column;gap:1.25rem;">
@@ -311,7 +311,7 @@
 
     </div>{# /left column #}
 
-    {# ── RIGHT COLUMN ── #}
+    {# ── MIDDLE COLUMN ── #}
     <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
       {# ── Analytics widget with 2-way selector ── #}
@@ -451,6 +451,11 @@
       {% endif %}
       </script>
 
+    </div>{# /middle column #}
+
+    {# ── RIGHT COLUMN ── #}
+    <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
       {# Quick Actions #}
       <div class="card">
         <div class="card-header"><span>⚡ Quick Actions</span></div>
@@ -569,7 +574,7 @@
 @media (max-width: 900px) {
   .stat-card { padding:.75rem .85rem; gap:.6rem; }
   .stat-value { font-size:1.3rem; }
-  [style*="grid-template-columns:1fr 320px"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns:1fr 420px 280px"] { grid-template-columns: 1fr !important; }
   [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
 }
 @media (max-width: 500px) {
