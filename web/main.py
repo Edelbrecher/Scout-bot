@@ -12353,6 +12353,34 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
     troop_entries    = await database.get_enemy_troop_entries(guild_id, player_name)
     village_history  = await database.get_enemy_village_history(guild_id, player_name)
     village_details  = await database.get_enemy_village_details(guild_id, player_name)
+
+    # Estimated total strength from population + own alliance's average troop quota
+    avg_tq = await database.get_alliance_avg_tq(guild_id)
+    player_snap = await database.get_player_from_snapshot(guild_id, player_name)
+    total_pop = (player_snap or {}).get("total_pop", 0) or sum(
+        v.get("population", 0) or 0 for v in (village_history.get("villages") or [])
+    )
+    est_off = round(total_pop * avg_tq["off"] / 100) if avg_tq.get("off") is not None and total_pop else None
+    est_def = round(total_pop * avg_tq["def"] / 100) if avg_tq.get("def") is not None and total_pop else None
+
+    # Latest troop entry per village (entries are ordered newest-first)
+    village_latest_troops = {}
+    for e in troop_entries:
+        vn = e.get("village_name") or ""
+        if vn and vn not in village_latest_troops:
+            village_latest_troops[vn] = e
+
+    # Chronological data for the troop trend chart
+    troop_chart_data = [
+        {
+            "label": e.get("entry_time") or (e.get("created_at") or "")[:16].replace("T", " "),
+            "off": e.get("off_troops") or 0,
+            "def": e.get("def_troops") or 0,
+            "total": e.get("total_troops") or 0,
+        }
+        for e in reversed(troop_entries)
+    ]
+
     return templates.TemplateResponse("enemy_detail.html", {
         "request": request,
         "guild": guild,
@@ -12364,6 +12392,12 @@ async def enemy_detail(request: Request, guild_id: str, player_name: str):
         "flash": request.query_params.get("flash", ""),
         "vcount": request.query_params.get("vcount",""),
         "ecount": request.query_params.get("ecount",""),
+        "avg_tq": avg_tq,
+        "total_pop": total_pop,
+        "est_off": est_off,
+        "est_def": est_def,
+        "village_latest_troops": village_latest_troops,
+        "troop_chart_data": troop_chart_data,
     })
 
 

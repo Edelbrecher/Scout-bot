@@ -80,6 +80,49 @@
   <!-- ═══ TAB: OVERVIEW ═══ -->
   <div id="ed-uebersicht" class="ed-panel">
 
+  {% if troop_entries or est_off is not none %}
+  <!-- Troop Intel -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h3 style="margin:0 0 .75rem;font-size:.95rem;">⚔️ Troop Intel</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;">
+      {% if troop_entries %}
+      {% set last = troop_entries[0] %}
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;" title="Letzter erfasster Eintrag">
+        <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">🕓 Last seen</div>
+        <div style="font-size:.9rem;font-weight:600;">
+          {% if last.off_troops %}<span style="color:#f87171;">⚔️ {{ '{:,}'.format(last.off_troops) }}</span>{% endif %}
+          {% if last.def_troops %} <span style="color:#4ade80;">🛡️ {{ '{:,}'.format(last.def_troops) }}</span>{% endif %}
+          {% if last.total_troops %} <span style="color:#93c5fd;">🔢 {{ '{:,}'.format(last.total_troops) }}</span>{% endif %}
+        </div>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">
+          {% if last.entry_time %}{{ last.entry_time }}{% else %}{{ last.created_at[:16].replace('T',' ') }} UTC{% endif %}
+          {% if last.village_name %} · {{ last.village_name }}{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if est_off is not none %}
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;" title="Geschätzt anhand der Population ({{ '{:,}'.format(total_pop) }}) und der durchschnittlichen Off-Truppenquote unserer Allianz ({{ '{:.1f}'.format(avg_tq.off) }}%)">
+        <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">⚔️ Geschätzt Off</div>
+        <div style="font-size:.9rem;font-weight:600;">{{ '{:,}'.format(est_off) }}</div>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">TQ ≈ {{ '{:.1f}'.format(avg_tq.off) }}%</div>
+      </div>
+      {% endif %}
+      {% if est_def is not none %}
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;" title="Geschätzt anhand der Population ({{ '{:,}'.format(total_pop) }}) und der durchschnittlichen Def-Truppenquote unserer Allianz ({{ '{:.1f}'.format(avg_tq.def) }}%)">
+        <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">🛡️ Geschätzt Def</div>
+        <div style="font-size:.9rem;font-weight:600;">{{ '{:,}'.format(est_def) }}</div>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">TQ ≈ {{ '{:.1f}'.format(avg_tq.def) }}%</div>
+      </div>
+      {% endif %}
+    </div>
+    {% if est_off is not none or est_def is not none %}
+    <div style="font-size:.7rem;color:var(--text-muted);margin-top:.6rem;">
+      Geschätzte Werte basieren auf der Population dieses Spielers ({{ '{:,}'.format(total_pop) }}) und der durchschnittlichen Truppenquote eurer eigenen Allianz. Tatsächliche Werte können abweichen.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Notes -->
   <div class="card" style="margin-bottom:1.25rem;">
     <h3 style="margin:0 0 0.6rem;font-size:0.95rem;" data-i18n="enemy.notes.title">📝 Notizen</h3>
@@ -562,8 +605,13 @@
         {# Meta row #}
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem;margin-bottom:.75rem;">
           <label style="font-size:.78rem;color:var(--text-muted);">🏘️ Village (optional)
-            <input type="text" name="village_name" id="tf-village" placeholder="Village name…" maxlength="80"
+            <input type="text" name="village_name" id="tf-village" placeholder="Village name…" maxlength="80" list="ed-known-villages"
                    style="width:100%;margin-top:.2rem;padding:.32rem .5rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+            <datalist id="ed-known-villages">
+              {% for v in village_history.villages %}
+              <option value="{{ v.village_name }}">{{ v.village_name }} ({{ v.coords_x }}|{{ v.coords_y }}){% if v.is_capital %} · Capital{% endif %}</option>
+              {% endfor %}
+            </datalist>
           </label>
           <label style="font-size:.78rem;color:var(--text-muted);">📅 Observed at (UTC)
             <input type="text" name="entry_time" id="tf-time" placeholder="e.g. 30.05. 22:15"
@@ -613,6 +661,34 @@
       </form>
     </div>
     </div>
+
+    {% if troop_chart_data|length > 1 %}
+    <div class="card" style="margin-bottom:1rem;padding:.85rem 1rem;">
+      <h3 style="margin:0 0 .6rem;font-size:.9rem;">📈 Troop Trend</h3>
+      <canvas id="troopTrendChart" style="max-height:220px;"></canvas>
+    </div>
+    {% endif %}
+
+    {% if village_latest_troops %}
+    <div class="card" style="margin-bottom:1rem;padding:.85rem 1rem;">
+      <h3 style="margin:0 0 .6rem;font-size:.9rem;">🏘️ Latest per Village</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.5rem;">
+        {% for vname, e in village_latest_troops.items() %}
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.55rem .75rem;">
+          <div style="font-size:.78rem;font-weight:600;margin-bottom:.2rem;">🏘️ {{ vname }}</div>
+          <div style="font-size:.78rem;">
+            {% if e.off_troops %}<span style="color:#f87171;">⚔️ {{ '{:,}'.format(e.off_troops) }}</span>{% endif %}
+            {% if e.def_troops %} <span style="color:#4ade80;">🛡️ {{ '{:,}'.format(e.def_troops) }}</span>{% endif %}
+            {% if e.total_troops %} <span style="color:#93c5fd;">🔢 {{ '{:,}'.format(e.total_troops) }}</span>{% endif %}
+          </div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">
+            {% if e.entry_time %}{{ e.entry_time }}{% else %}{{ e.created_at[:16].replace('T',' ') }} UTC{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Timeline -->
     {% if troop_entries %}
@@ -1252,5 +1328,35 @@ document.querySelectorAll('.troop-detail-raw').forEach(el => {
     });
   } catch(e) {}
 });
+
+// Troop trend chart
+const TROOP_CHART_DATA = {{ troop_chart_data | tojson }};
+if (TROOP_CHART_DATA.length > 1 && document.getElementById('troopTrendChart')) {
+  const trendScript = document.createElement('script');
+  trendScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  trendScript.onload = () => {
+    new Chart(document.getElementById('troopTrendChart'), {
+      type: 'line',
+      data: {
+        labels: TROOP_CHART_DATA.map(d => d.label),
+        datasets: [
+          { label:'Off',   data:TROOP_CHART_DATA.map(d => d.off),   borderColor:'#f87171', backgroundColor:'rgba(248,113,113,.1)', tension:.3, pointRadius:TROOP_CHART_DATA.length>20?0:2 },
+          { label:'Def',   data:TROOP_CHART_DATA.map(d => d.def),   borderColor:'#4ade80', backgroundColor:'rgba(74,222,128,.1)', tension:.3, pointRadius:TROOP_CHART_DATA.length>20?0:2 },
+          { label:'Total', data:TROOP_CHART_DATA.map(d => d.total), borderColor:'#93c5fd', backgroundColor:'rgba(147,197,253,.1)', tension:.3, pointRadius:TROOP_CHART_DATA.length>20?0:2 },
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        scales:{
+          x:{ ticks:{color:'#64748b',maxTicksLimit:8}, grid:{color:'rgba(255,255,255,.05)'} },
+          y:{ ticks:{color:'#64748b'}, grid:{color:'rgba(255,255,255,.04)'} }
+        },
+        plugins:{ legend:{ labels:{color:'#94a3b8',boxWidth:10,font:{size:11}} } }
+      }
+    });
+  };
+  document.head.appendChild(trendScript);
+}
 </script>
 {% endblock %}
