@@ -661,8 +661,13 @@ async function shareIntel(btn) {
   const baseSpan = Math.max(bx1-bx0, by1-by0);
   const midX = (bx0+bx1)/2, midY = (by0+by1)/2;
 
+  // Travian world border: coordinates run from -WORLD_HALF to +WORLD_HALF
+  const WORLD_HALF = 400;
+
   // ── Zoom / pan state ──
-  const ZOOM_MIN = 0.25, ZOOM_MAX = 8;
+  // Don't allow zooming out further than the whole world fitting in view
+  const ZOOM_MIN = Math.min(1, baseSpan / (WORLD_HALF * 2));
+  const ZOOM_MAX = 8;
   let zoom = 1, panX = 0, panY = 0;
   let x0, x1, y0, y1, span;
 
@@ -717,6 +722,18 @@ async function shareIntel(btn) {
     if (y0<=0 && y1>=0) {
       const [,ay]=toCanvas(0,0); ctx.strokeStyle='rgba(255,255,255,.2)';
       ctx.beginPath(); ctx.moveTo(0,ay); ctx.lineTo(W,ay); ctx.stroke();
+    }
+
+    // World border (-WORLD_HALF .. WORLD_HALF)
+    {
+      const [bx, by] = toCanvas(-WORLD_HALF, WORLD_HALF);
+      const [ex, ey] = toCanvas(WORLD_HALF, -WORLD_HALF);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245,158,11,.6)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5,4]);
+      ctx.strokeRect(bx, by, ex-bx, ey-by);
+      ctx.restore();
     }
 
     // Lost villages (small dim squares)
