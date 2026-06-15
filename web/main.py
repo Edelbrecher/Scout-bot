@@ -14935,6 +14935,9 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
     suggestions = []
     error = ""
     no_world = False
+    avg_tq = None
+    est_off = None
+    est_def = None
 
     tw_world = guild.get("tw_world", "") if isinstance(guild, dict) else getattr(guild, "tw_world", "")
 
@@ -14947,6 +14950,15 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
             suggestions = await database.search_players_in_snapshot(guild_id, q.strip(), limit=10)
             if not suggestions:
                 error = f"No player found matching '{q}'. Make sure a map snapshot has been loaded."
+        else:
+            # Estimate expected troop strength from this player's population,
+            # based on our own alliance's average off/def troop quota.
+            avg_tq = await database.get_alliance_avg_tq(guild_id)
+            total_pop = intel.get("total_pop", 0) or 0
+            if avg_tq.get("off") is not None:
+                est_off = round(total_pop * avg_tq["off"] / 100)
+            if avg_tq.get("def") is not None:
+                est_def = round(total_pop * avg_tq["def"] / 100)
     return templates.TemplateResponse("player_intel.html", {
         "request": request,
         "guild": guild,
@@ -14956,6 +14968,9 @@ async def player_intel_page(request: Request, guild_id: str, q: str = ""):
         "error": error,
         "no_world": no_world,
         "tw_world": (tw_world or "").rstrip("/"),
+        "avg_tq": avg_tq,
+        "est_off": est_off,
+        "est_def": est_def,
     })
 
 

@@ -9219,6 +9219,48 @@ async def get_member_leaderboard(guild_id: str) -> list[dict]:
     return result
 
 
+async def get_alliance_avg_tq(guild_id: str) -> dict:
+    """Average off/def troop quota (% of population) across own alliance members
+    who have uploaded troop data and have a known population in the latest map
+    snapshot. Used to estimate a searched player's expected troop strength from
+    their population (player intel page)."""
+    members = await get_all_member_troops_for_guild(guild_id)
+    if not members:
+        return {"off": None, "def": None, "n": 0}
+
+    troop_roles = await get_troop_roles(guild_id)
+    crop_map = {**CROP_MAP, **await get_troop_crop_map(guild_id)}
+
+    off_tqs: list[float] = []
+    def_tqs: list[float] = []
+    for m in members:
+        travian_name = m.get("travian_name") or ""
+        if not travian_name:
+            continue
+        player = await get_player_from_snapshot(guild_id, travian_name)
+        pop = (player or {}).get("total_pop", 0) or 0
+        if pop <= 0:
+            continue
+        off_crop = 0.0
+        def_crop = 0.0
+        for v in m.get("villages") or []:
+            for t, c in (v.get("troops") or {}).items():
+                role = troop_roles.get(t, "ignore")
+                crop = crop_map.get(t, 1) * c
+                if role in ("off", "both", "siege"):
+                    off_crop += crop
+                if role in ("def", "both"):
+                    def_crop += crop
+        off_tqs.append(off_crop / pop * 100)
+        def_tqs.append(def_crop / pop * 100)
+
+    return {
+        "off": round(sum(off_tqs) / len(off_tqs), 1) if off_tqs else None,
+        "def": round(sum(def_tqs) / len(def_tqs), 1) if def_tqs else None,
+        "n": len(off_tqs),
+    }
+
+
 async def get_active_ep_members(guild_id: str) -> set:
     """Return set of discord_ids that have waves in active plans."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

@@ -257,6 +257,22 @@
     </div>
     {% endfor %}
 
+    {# ── Estimated troop strength, based on our own alliance's average TQ ── #}
+    {% if est_off is not none %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;" title="Geschätzt anhand der durchschnittlichen Off-Truppenquote unserer Allianz ({{ '{:.1f}'.format(avg_tq.off) }}%)">
+      <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">⚔️ Geschätzt Off</div>
+      <div style="font-size:.9rem;font-weight:600;">{{ '{:,}'.format(est_off) }}</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">TQ ≈ {{ '{:.1f}'.format(avg_tq.off) }}%</div>
+    </div>
+    {% endif %}
+    {% if est_def is not none %}
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;" title="Geschätzt anhand der durchschnittlichen Def-Truppenquote unserer Allianz ({{ '{:.1f}'.format(avg_tq.def) }}%)">
+      <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">🛡️ Geschätzt Def</div>
+      <div style="font-size:.9rem;font-weight:600;">{{ '{:,}'.format(est_def) }}</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">TQ ≈ {{ '{:.1f}'.format(avg_tq.def) }}%</div>
+    </div>
+    {% endif %}
+
     {# ── Rank cards from travian_stats ── #}
     {% if intel.rank_data %}
     {% set rd = intel.rank_data %}
