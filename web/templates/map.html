@@ -1644,7 +1644,7 @@ async function renamePreset(presetId, btn) {
     <!-- New meta form -->
     <form id="mapNewMetaForm" method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/create"
           style="display:none;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.85rem;">
-      <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/map">
+      <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/map?mb_open=1">
       <input type="text" name="meta_name" placeholder="Verbund-Name …" maxlength="64" required
              style="flex:1;min-width:160px;padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.83rem;">
       <button type="submit" class="btn btn-primary" style="font-size:.82rem;">Erstellen</button>
@@ -1662,7 +1662,7 @@ async function renamePreset(presetId, btn) {
                style="font-size:.72rem;color:#818cf8;text-decoration:none;padding:.18rem .48rem;border:1px solid rgba(99,102,241,.3);border-radius:6px;">📊</a>
             <form method="post" action="/guild/{{ guild.guild_id }}/allianz/meta/{{ g.id }}/delete"
                   onsubmit="return confirm('Meta »{{ g.meta_name }}« löschen?')" style="margin:0;">
-              <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/map">
+              <input type="hidden" name="redirect_to" value="/guild/{{ guild.guild_id }}/map?mb_open=1">
               <button type="submit" style="font-size:.72rem;padding:.18rem .45rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;color:#f87171;cursor:pointer;">🗑️</button>
             </form>
           </div>
@@ -1706,7 +1706,8 @@ async function renamePreset(presetId, btn) {
     <!-- Open modal on redirect back -->
     <script>
     (function(){
-      if (new URLSearchParams(location.search).has('meta_error'))
+      const p = new URLSearchParams(location.search);
+      if (p.has('meta_error') || p.has('mb_open'))
         document.getElementById('mapMbModal').style.display = 'flex';
     })();
     </script>
