@@ -3282,7 +3282,7 @@ async def guild_map(request: Request, guild_id: str):
     has_premium = _has_alliance_pro(await _enrich_guild_subscription(guild)) if guild else False
     can_view_meta = has_premium and is_member and await has_perm(request, guild_id, "map_meta_view")
     meta_alliances = await database.get_meta_alliances(guild_id) if can_view_meta else []
-    meta_groups    = await database.get_meta_groups(guild_id)    if can_view_meta else []
+    meta_groups    = await database.get_meta_groups(guild_id)    if is_member   else []
 
     mb_meta = mb_alliance_name = None
     mb_snapshot_alliances = []
