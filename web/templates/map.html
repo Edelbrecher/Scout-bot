@@ -137,6 +137,7 @@
     <button onclick="shareMapView(this,true)" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;color:#a5b4fc;border-color:rgba(99,102,241,.45);" title="Create a public link — anyone with the URL can view this map (read-only, no login required)">🌐 Public Link</button>
     {% if not is_share_viewer %}
     <button onclick="togglePresetPanel()" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Kartenansichten speichern und laden">📁 Presets</button>
+    <button onclick="document.getElementById('mapMbModal').style.display='flex'" class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; align-self:flex-end;" title="Meta-Builder: Allianz-Mitglieder importieren & synchronisieren">🏗️ Meta-Builder</button>
     {% endif %}
     <!-- Draw toolbar -->
     <div id="drawToolbar" style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;padding:0.25rem 0.5rem;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);">
@@ -1614,5 +1615,92 @@ async function renamePreset(presetId, btn) {
   } catch(e) {}
 }
 </script>
+{% endif %}
+
+{% if not is_share_viewer %}
+<!-- ── META-BUILDER MODAL (Map) ── -->
+<div id="mapMbModal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:0 24px 80px rgba(0,0,0,.55);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div>
+        <h2 style="margin:0;font-size:1.05rem;">🏗️ Meta-Builder</h2>
+        {% if mb_meta %}
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;">
+          👥 {{ mb_meta.cnt }} Members · zuletzt {{ mb_meta.last_import[:16].replace('T',' ') }} UTC
+          {% if mb_alliance_name %}<span style="color:#4ade80;margin-left:.35rem;">🔄 {{ mb_alliance_name }}</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <a href="/guild/{{ guild.guild_id }}/allianz/mitglieder" style="font-size:.75rem;color:#818cf8;text-decoration:none;">↗ Full page</a>
+        <button onclick="document.getElementById('mapMbModal').style.display='none'"
+                style="background:none;border:none;cursor:pointer;font-size:1.4rem;color:var(--text-muted);line-height:1;">&times;</button>
+      </div>
+    </div>
+
+    {% if request.query_params.get('mb_synced') %}
+    <div style="padding:.45rem .8rem;border-radius:7px;margin-bottom:.85rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e;font-size:.82rem;">
+      🔄 {{ request.query_params.get('mb_synced') }} Members synchronisiert.
+    </div>
+    {% endif %}
+    {% if request.query_params.get('mb_imported') %}
+    <div style="padding:.45rem .8rem;border-radius:7px;margin-bottom:.85rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e;font-size:.82rem;">
+      ✅ {{ request.query_params.get('mb_imported') }} Members importiert.
+    </div>
+    {% endif %}
+
+    <!-- Auto-Sync -->
+    <div style="margin-bottom:1.25rem;">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.5rem;">🔄 Auto-Sync aus Karten-Snapshot</div>
+      {% if mb_snapshot_alliances %}
+      <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder/set-alliance"
+            style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;">
+        <input type="hidden" name="next_url" value="/guild/{{ guild.guild_id }}/map">
+        <select name="alliance_name" style="flex:1;min-width:160px;padding:.38rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          <option value="">— Kein Auto-Sync —</option>
+          {% for a in mb_snapshot_alliances %}
+          <option value="{{ a.alliance_name }}"{% if a.alliance_name == mb_alliance_name %} selected{% endif %}>
+            {{ a.alliance_name }} ({{ a.member_count }} Player)
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="font-size:.82rem;padding:.38rem .85rem;">💾 Speichern &amp; Sync</button>
+      </form>
+      {% else %}
+      <p style="font-size:.8rem;color:var(--text-muted);margin:0;">Noch kein Snapshot geladen — Auto-Sync nicht möglich.</p>
+      {% endif %}
+    </div>
+
+    <!-- Manual import -->
+    <div style="border-top:1px solid var(--border);padding-top:1.1rem;">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.5rem;">⬆️ Manuell importieren</div>
+      <div style="padding:.5rem .75rem;border-radius:7px;margin-bottom:.75rem;font-size:.78rem;line-height:1.5;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;">
+        Öffne in Travian die <strong>Allianz-Mitgliederliste</strong>, markiere alles (<kbd>Ctrl+A</kbd>), kopiere (<kbd>Ctrl+C</kbd>) und füge den Text hier ein.
+      </div>
+      <form method="post" action="/guild/{{ guild.guild_id }}/allianz/mitglieder">
+        <input type="hidden" name="next_url" value="/guild/{{ guild.guild_id }}/map">
+        <textarea name="members_text" rows="9" required
+                  placeholder="Paste Travian alliance member list here…"
+                  style="width:100%;resize:vertical;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;font-size:.78rem;font-family:monospace;line-height:1.45;box-sizing:border-box;"></textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.65rem;">
+          <button type="submit" class="btn btn-primary" style="font-size:.82rem;">💾 Import</button>
+          <button type="button" onclick="document.getElementById('mapMbModal').style.display='none'"
+                  class="btn btn-secondary" style="font-size:.82rem;">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Flash: open modal after redirect if flash params present -->
+    <script>
+    (function(){
+      var p = new URLSearchParams(location.search);
+      if (p.has('mb_synced') || p.has('mb_imported')) {
+        document.getElementById('mapMbModal').style.display = 'flex';
+      }
+    })();
+    </script>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

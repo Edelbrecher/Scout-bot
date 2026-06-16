@@ -3284,6 +3284,13 @@ async def guild_map(request: Request, guild_id: str):
     meta_alliances = await database.get_meta_alliances(guild_id) if can_view_meta else []
     meta_groups    = await database.get_meta_groups(guild_id)    if can_view_meta else []
 
+    mb_meta = mb_alliance_name = None
+    mb_snapshot_alliances = []
+    if is_member:
+        mb_meta              = await database.get_alliance_members_meta(guild_id)
+        mb_alliance_name     = await database.get_tw_alliance_name(guild_id)
+        mb_snapshot_alliances = await database.get_alliance_names_from_snapshot(guild_id)
+
     return templates.TemplateResponse("map.html", {
         "request": request,
         "guild": guild,
@@ -3295,6 +3302,9 @@ async def guild_map(request: Request, guild_id: str):
         "is_share_viewer": not is_member,
         "has_meta_premium": has_premium,
         "can_view_meta": can_view_meta,
+        "mb_meta": mb_meta,
+        "mb_alliance_name": mb_alliance_name,
+        "mb_snapshot_alliances": mb_snapshot_alliances,
     })
 
 
@@ -12099,12 +12109,18 @@ async def alliance_tracking_page(request: Request, guild_id: str):
     meta_alliances = await database.get_meta_alliances(guild_id)
     ally_group = await database.get_ally_group_for_guild(guild_id)
     saved = request.query_params.get("saved")
+    mb_meta             = await database.get_alliance_members_meta(guild_id)
+    mb_alliance_name    = await database.get_tw_alliance_name(guild_id)
+    mb_snapshot_alliances = await database.get_alliance_names_from_snapshot(guild_id)
     return templates.TemplateResponse("alliance_tracking.html", {
         "request": request, "guild": guild,
         "watched": watched, "top_alliances": top_alliances,
         "meta_groups": meta_groups, "meta_alliances": meta_alliances,
         "ally_group": ally_group,
         "saved": saved,
+        "mb_meta": mb_meta,
+        "mb_alliance_name": mb_alliance_name,
+        "mb_snapshot_alliances": mb_snapshot_alliances,
     })
 
 
@@ -13080,18 +13096,17 @@ async def settings_set_tw_alliance(request: Request, guild_id: str):
 async def alliance_members_set_alliance(
     request: Request, guild_id: str,
     alliance_name: str = Form(""),
+    next_url: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
     await database.set_tw_alliance_name(guild_id, alliance_name)
-    # Trigger immediate sync if snapshot exists
     count = await database.sync_alliance_members_from_snapshot(guild_id)
-    return RedirectResponse(
-        f"/guild/{guild_id}/allianz/mitglieder?synced={count}",
-        status_code=303
-    )
+    base = next_url or f"/guild/{guild_id}/allianz/mitglieder"
+    sep  = "&" if "?" in base else "?"
+    return RedirectResponse(f"{base}{sep}mb_synced={count}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/allianz/mitglieder")
@@ -13099,6 +13114,7 @@ async def alliance_members_import(
     request: Request,
     guild_id: str,
     members_text: str = Form(""),
+    next_url: str = Form(""),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -13110,10 +13126,9 @@ async def alliance_members_import(
         uname = session.get("username", "unknown")
         await database.save_alliance_members(guild_id, parsed, uname)
 
-    return RedirectResponse(
-        f"/guild/{guild_id}/allianz/mitglieder?imported={len(parsed)}",
-        status_code=303
-    )
+    base = next_url or f"/guild/{guild_id}/allianz/mitglieder"
+    sep  = "&" if "?" in base else "?"
+    return RedirectResponse(f"{base}{sep}mb_imported={len(parsed)}", status_code=303)
 
 
 @app.get("/guild/{guild_id}/allianz/mitglieder/player-detail")
