@@ -1156,18 +1156,18 @@
         }
         showToast(toastMsg);
 
-        // Build queue of unique attacker names from newly saved attacks
-        // (only open hero modal if at least one was actually new)
+        // Build queue of unique attacker names from newly saved attacks.
+        // Only request hero inventory for attackers with at least one hidden-troop
+        // attack — visible troops mean fakes, and heroes don't travel with fakes.
         if (data.saved > 0) {
-          const seen = new Set();
-          const attackerQueue = [];
+          const playerHasHidden = {};
           for (const a of parsedAttacks) {
             const name = (a.attacker_player || '').trim();
-            if (name && !seen.has(name)) {
-              seen.add(name);
-              attackerQueue.push(name);
-            }
+            if (!name) continue;
+            if (!(name in playerHasHidden)) playerHasHidden[name] = false;
+            if (a.troops_hidden) playerHasHidden[name] = true;
           }
+          const attackerQueue = Object.keys(playerHasHidden).filter(n => playerHasHidden[n]);
           // Open hero scout modals sequentially — next opens after save/close
           window._hsQueue = attackerQueue;
           window._hsQueueIdx = 0;
