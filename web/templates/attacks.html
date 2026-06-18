@@ -884,7 +884,7 @@
       }
       // Stop parsing at footer/navigation lines (only AFTER we found at least one attack)
       if (attacks.length > 0 || currentAttack) {
-        if (/^(Startseite|Discord|Impressum|Spielregeln|AGB|©\s*200[0-9])/i.test(line)) break;
+        if (/^(Startseite|Homepage|Discord|Impressum|Spielregeln|AGB|©\s*200[0-9]|Task\s+overview)/i.test(line)) break;
       }
       if (/Taskn/i.test(line)) break;
 
@@ -921,8 +921,9 @@
       if (!inSection) continue;
 
       if (currentAttack) {
-        // Coords: "(104|46)" or "104|46"
-        const coordM = line.match(/\(?(-?\d+)[|\/\\](-?\d+)\)?/);
+        // Coords: "(104|46)" or "104|46" — must be the whole line, pipe only (no slash)
+        // to avoid matching "18/18" from "Villages 18/18" in profile sections
+        const coordM = line.match(/^\(?(-?\d+)\|(-?\d+)\)?$/);
         if (coordM) {
           if (currentAttack.attacker_x === null) {
             currentAttack.attacker_x = parseInt(coordM[1]);
@@ -1530,11 +1531,17 @@
     } catch(e) { btn.textContent = '❌ Error'; btn.disabled = false; }
   };
 
-  // Build village groups from _allAttacks
+  // Build village groups from _allAttacks.
+  // Key: name + coords when both are set; name only otherwise.
+  // This prevents splitting the same target village into multiple groups just
+  // because some attacks have null own_x/y (typical for rally-point imports).
   function buildGroups(attacks) {
     const groups = {};
     for (const a of attacks) {
-      const key = (a.own_village_name||'?') + '|' + (a.own_village_x||'?') + '|' + (a.own_village_y||'?');
+      const hasCoords = a.own_village_x != null && a.own_village_y != null;
+      const key = hasCoords
+        ? (a.own_village_name||'?') + '|' + a.own_village_x + '|' + a.own_village_y
+        : (a.own_village_name||'?');
       if (!groups[key]) groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, attacks: [] };
       groups[key].attacks.push(a);
     }
