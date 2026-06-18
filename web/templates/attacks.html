@@ -1532,17 +1532,18 @@
   };
 
   // Build village groups from _allAttacks.
-  // Key: name + coords when both are set; name only otherwise.
-  // This prevents splitting the same target village into multiple groups just
-  // because some attacks have null own_x/y (typical for rally-point imports).
+  // Key is village name only — own_x/y from rally-point imports is unreliable
+  // (the page doesn't expose defender coords), so we never split on coords.
+  // Coords are shown in the header only if all attacks in the group agree on them.
   function buildGroups(attacks) {
     const groups = {};
     for (const a of attacks) {
-      const hasCoords = a.own_village_x != null && a.own_village_y != null;
-      const key = hasCoords
-        ? (a.own_village_name||'?') + '|' + a.own_village_x + '|' + a.own_village_y
-        : (a.own_village_name||'?');
-      if (!groups[key]) groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, attacks: [] };
+      const key = a.own_village_name || '?';
+      if (!groups[key]) {
+        groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, attacks: [] };
+      } else if (groups[key].x !== a.own_village_x || groups[key].y !== a.own_village_y) {
+        groups[key].x = null; groups[key].y = null; // inconsistent → hide coords
+      }
       groups[key].attacks.push(a);
     }
     return groups;
