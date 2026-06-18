@@ -9955,20 +9955,18 @@ async def _init_attack_detection_tables():
                 await db.execute(f"ALTER TABLE incoming_attacks ADD COLUMN {col} TEXT DEFAULT {default}")
             except Exception:
                 pass
-        # Unique index so duplicate imports are silently skipped (INSERT OR IGNORE)
-        # Primary: coord-based (works when coords are known)
+        # Drop old single-row-per-wave unique indexes — they incorrectly blocked
+        # multiple waves from the same attacker arriving at the same second.
+        # Deduplication is now handled entirely by save_incoming_attacks logic.
+        for old_idx in ("idx_incoming_attacks_unique", "idx_incoming_attacks_unique2"):
+            try:
+                await db.execute(f"DROP INDEX IF EXISTS {old_idx}")
+            except Exception:
+                pass
+        # Non-unique covering index for the COUNT(*) dedup query
         try:
             await db.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_incoming_attacks_unique
-                ON incoming_attacks(guild_id, own_village_x, own_village_y,
-                                    attacker_x, attacker_y, arrival_time)
-            """)
-        except Exception:
-            pass
-        # Fallback unique index: player+own_village+arrival — catches duplicates when coords are NULL
-        try:
-            await db.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_incoming_attacks_unique2
+                CREATE INDEX IF NOT EXISTS idx_incoming_attacks_dedup
                 ON incoming_attacks(guild_id, attacker_player, own_village_name, arrival_time)
             """)
         except Exception:

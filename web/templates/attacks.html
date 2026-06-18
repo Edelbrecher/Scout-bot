@@ -821,7 +821,7 @@
     for (const line of lines) {
       if (line.includes('\t')) {
         // Lines that must stay together: troop count and arrival time
-        if (/^(Einheiten|Units)\b/i.test(line)) {
+        if (/^(Einheiten|Units|Troops)\b/i.test(line)) {
           // "Einheiten\t?\t?\t..." — keep as one space-joined line
           expandedLines.push(line.replace(/\t+/g, ' ').trim());
         } else if (/^(Ankunft|Arrival)\b/i.test(line)) {
@@ -943,8 +943,8 @@
         }
 
         // Troop count line: "Einheiten 5 0 3 ..." or "Units 5 0 3 ..."
-        if (/^(Einheiten|Units)\b/i.test(line)) {
-          const parts = line.replace(/^(Einheiten|Units)\s*/i, '').trim().split(/\s+/);
+        if (/^(Einheiten|Units|Troops)\b/i.test(line)) {
+          const parts = line.replace(/^(Einheiten|Units|Troops)\s*/i, '').trim().split(/\s+/);
           if (parts[0] === '?') {
             currentAttack.troops_hidden = true;
             currentAttack.troop_count = 0;
