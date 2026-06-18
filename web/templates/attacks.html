@@ -244,7 +244,10 @@
 
       <!-- Footer -->
       <div style="padding:.85rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;background:rgba(168,85,247,.04);">
-        <div style="font-size:.73rem;color:var(--text-muted);">💡 Für alle Allianzleiter in Hero Scout sichtbar</div>
+        <div>
+          <div style="font-size:.73rem;color:var(--text-muted);">💡 Für alle Allianzleiter in Hero Scout sichtbar</div>
+          <div id="hs_prefill_hint" style="display:none;font-size:.7rem;color:#a78bfa;margin-top:.2rem;"></div>
+        </div>
         <div style="display:flex;gap:.5rem;">
           <button onclick="closeHeroScoutModal()" class="btn btn-secondary" style="font-size:.82rem;">Überspringen</button>
           <button onclick="saveHeroScout()" id="btnSaveHero" class="btn btn-primary" style="font-size:.82rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);border-color:#7c3aed;">🦸 Hero Scout speichern</button>
@@ -1396,8 +1399,36 @@
     });
     HS_SLOTS.forEach(s => hsUpdateSlot(s.key, ''));
     hsUpdateTribe('');
+    const hint = document.getElementById('hs_prefill_hint');
+    if (hint) hint.style.display = 'none';
     document.getElementById('heroScoutModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
+
+    // Prefill from DB if player is already known
+    if (attackerName) {
+      fetch(`/guild/${GUILD_ID}/defense/hero-scout/${encodeURIComponent(attackerName)}`, {
+        headers: { 'Accept': 'application/json' }
+      }).then(r => r.ok ? r.json() : null).then(data => {
+        const e = data?.history?.[0];
+        if (!e) return;
+        if (e.tribe)      { document.getElementById('hs_tribe').value = e.tribe; hsUpdateTribe(e.tribe); }
+        if (e.hero_level) document.getElementById('hs_level').value = e.hero_level;
+        if (e.alliance)   document.getElementById('hs_alliance').value = e.alliance;
+        if (e.villages)   document.getElementById('hs_villages').value = e.villages;
+        if (e.notes)      document.getElementById('hs_notes').value = e.notes;
+        // slot_name in DB: "weapon","helm","armor","boots","mount","misc"
+        // HS_SLOTS keys:   "weapon","helmet","armor","boots","mount","misc"
+        const dbSlot = { weapon:'slot_weapon', helmet:'slot_helm', armor:'slot_armor',
+                         boots:'slot_boots',   mount:'slot_mount', misc:'slot_misc' };
+        HS_SLOTS.forEach(s => { if (e[dbSlot[s.key]]) hsUpdateSlot(s.key, e[dbSlot[s.key]]); });
+        if (hint) {
+          const d = (e.created_at||'').slice(0,10);
+          hint.textContent = `📋 Vorhandene Daten vom ${d} geladen — bitte aktualisieren`;
+          hint.style.display = 'block';
+        }
+      }).catch(() => {});
+    }
+
     setTimeout(() => {
       if (!attackerName) document.getElementById('hs_player').focus();
     }, 120);
