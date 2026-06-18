@@ -14871,6 +14871,14 @@ async def report_submit(request: Request, guild_id: str,
             existing_id = str(e).split(":", 1)[1]
             return RedirectResponse(f"/guild/{guild_id}/reports/{existing_id}?duplicate=1", status_code=303)
         raise
+    # Auto-add attacker to enemy records
+    att = parsed.get("attacker_name", "").strip()
+    if att:
+        coords = ""
+        if parsed.get("attacker_x") is not None and parsed.get("attacker_y") is not None:
+            coords = f"{parsed['attacker_x']}|{parsed['attacker_y']}"
+        await database.upsert_enemy(guild_id, att, coordinates=coords,
+                                    village=parsed.get("attacker_village", "") or "")
     return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
@@ -14894,6 +14902,13 @@ async def report_submit_force(request: Request, guild_id: str,
             existing_id = str(e).split(":", 1)[1]
             return RedirectResponse(f"/guild/{guild_id}/reports/{existing_id}?duplicate=1", status_code=303)
         raise
+    att = parsed.get("attacker_name", "").strip()
+    if att:
+        coords = ""
+        if parsed.get("attacker_x") is not None and parsed.get("attacker_y") is not None:
+            coords = f"{parsed['attacker_x']}|{parsed['attacker_y']}"
+        await database.upsert_enemy(guild_id, att, coordinates=coords,
+                                    village=parsed.get("attacker_village", "") or "")
     return RedirectResponse(f"/guild/{guild_id}/reports/{report_id}", status_code=303)
 
 
