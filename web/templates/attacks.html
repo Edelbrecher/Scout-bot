@@ -2615,14 +2615,16 @@
     body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Lade...</div>';
 
     try {
-      // Load player from map_snapshots + enemy artifacts in parallel
-      const [snapResp, artResp] = await Promise.all([
+      // Load player info, enemy artifacts, and hero scout data in parallel
+      const [snapResp, artResp, heroResp] = await Promise.all([
         fetch('/guild/' + GUILD_ID + '/api/player-info?player=' + encodeURIComponent(playerName)),
-        fetch('/guild/' + GUILD_ID + '/attacks/api/enemy-artifacts/' + encodeURIComponent(playerName))
+        fetch('/guild/' + GUILD_ID + '/attacks/api/enemy-artifacts/' + encodeURIComponent(playerName)),
+        fetch('/guild/' + GUILD_ID + '/defense/hero-scout/' + encodeURIComponent(playerName), { headers: { 'Accept': 'application/json' } }),
       ]);
       const playerData = snapResp.ok ? await snapResp.json() : null;
       const artifacts  = artResp.ok  ? await artResp.json()  : [];
-      renderPlayerModal(playerName, playerData, artifacts);
+      const heroEntry  = heroResp.ok  ? ((await heroResp.json()).history?.[0] || null) : null;
+      renderPlayerModal(playerName, playerData, artifacts, heroEntry);
     } catch(e) {
       body.innerHTML = '<p class="hint">Fehler: ' + escHtml(e.message) + '</p>';
     }
@@ -2633,7 +2635,7 @@
     document.body.style.overflow = '';
   };
 
-  function renderPlayerModal(playerName, player, artifacts) {
+  function renderPlayerModal(playerName, player, artifacts, heroEntry) {
     const body = document.getElementById('playerModalBody');
     let html = '';
 
@@ -2692,6 +2694,29 @@
       html += '</div></div>';
     }
     html += '</div>';
+
+    // Hero Scout section
+    if (heroEntry) {
+      const slotLabels = { slot_weapon:'⚔️ Waffe', slot_helm:'🪖 Helm', slot_armor:'🛡️ Rüstung',
+                           slot_boots:'👟 Stiefel', slot_mount:'🐴 Reittier', slot_misc:'🎒 Sonstiges' };
+      const slots = Object.entries(slotLabels)
+        .filter(([k]) => heroEntry[k])
+        .map(([k, label]) => `<div style="display:flex;gap:.35rem;align-items:center;font-size:.78rem;">
+            <span style="color:var(--text-muted);flex-shrink:0;">${label}</span>
+            <span style="color:var(--text);">${escHtml(heroEntry[k])}</span>
+          </div>`).join('');
+      const date = (heroEntry.created_at||'').slice(0,10);
+      html += `<h3 style="font-size:.95rem;margin:1.1rem 0 .6rem;">🦸 Hero Scout</h3>
+        <div style="background:var(--bg-main);border:1px solid rgba(168,85,247,.25);border-radius:8px;padding:.65rem .85rem;display:flex;flex-direction:column;gap:.35rem;">
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.2rem;">
+            ${heroEntry.hero_level ? `<span style="font-size:.8rem;"><span style="color:var(--text-muted);">⭐ Level</span> <strong>${heroEntry.hero_level}</strong></span>` : ''}
+            ${heroEntry.tribe      ? `<span style="font-size:.8rem;"><span style="color:var(--text-muted);">🏛️ Volk</span> <strong>${escHtml(heroEntry.tribe)}</strong></span>` : ''}
+            ${date ? `<span style="font-size:.72rem;color:var(--text-muted);margin-left:auto;">Stand: ${date}</span>` : ''}
+          </div>
+          ${slots || '<span style="font-size:.78rem;color:var(--text-muted);">Keine Ausrüstungs-Slots erfasst.</span>'}
+          ${heroEntry.notes ? `<div style="font-size:.75rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:.3rem;padding-top:.3rem;">📝 ${escHtml(heroEntry.notes)}</div>` : ''}
+        </div>`;
+    }
 
     body.innerHTML = html;
   }
