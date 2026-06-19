@@ -1288,7 +1288,7 @@ async def is_report_channel(channel_id: str) -> bool:
             return await cur.fetchone() is not None
 
 
-_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids"}
+_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids"}
 
 async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
     """Toggle role_id in field. Returns True=added, False=removed."""
