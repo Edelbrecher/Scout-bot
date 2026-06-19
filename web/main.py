@@ -4001,7 +4001,7 @@ async def guild_settings_page(request: Request, guild_id: str):
                     timeout=5,
                 )
                 if r.status_code == 200:
-                    roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
+                    roles = sorted(r.json(), key=lambda x: -(x.get("position") or 0))
         except Exception:
             pass
     ally_nav = {"ally_group": None}
@@ -6226,7 +6226,7 @@ async def my_ally_page(request: Request, guild_id: str):
                         if ch_r.status_code == 200:
                             channel_names = {str(c["id"]): c.get("name", "") for c in ch_r.json()}
                         if ro_r.status_code == 200:
-                            discord_roles = sorted(ro_r.json(), key=lambda x: -x.get("position", 0))
+                            discord_roles = sorted(ro_r.json(), key=lambda x: -(x.get("position") or 0))
                 except Exception:
                     pass
             hero_scout_channel_id = await _get_hero_scout_channel(guild_id)
