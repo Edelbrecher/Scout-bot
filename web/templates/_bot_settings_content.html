@@ -122,16 +122,18 @@
     Legt fest, welche Discord-Rollen Zugriff auf die vom Bot erstellten Channels erhalten. Änderungen werden sofort auf bestehende Channels übertragen.
   </p>
   <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">
+    📋 <strong>Res-Channel</strong>: Wer akzeptierte Res-Push Channels sehen darf (z.B. Member). &nbsp;
     🔒 <strong>Privat</strong>: Scout-Request-Channels (nur Ersteller + diese Rollen) — fällt auf Scout zurück wenn leer. &nbsp;
     🛡️ <strong>Defend</strong>: Defend-Channels — fällt auf Scout zurück wenn leer. &nbsp;
     📦 <strong>Archiv</strong>: Scout-Archiv-Channel — fällt auf Scout zurück wenn leer.
   </p>
   {% if discord_roles %}
-  {% set scout_roles   = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
-  {% set res_roles     = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
-  {% set private_roles = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
-  {% set defend_roles  = (guild.defend_role_ids or '').split(',') | map('trim') | list %}
-  {% set archive_roles = (guild.archive_role_ids or '').split(',') | map('trim') | list %}
+  {% set scout_roles    = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+  {% set res_roles      = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+  {% set res_view_roles = (guild.res_push_view_role_ids or '').split(',') | map('trim') | list %}
+  {% set private_roles  = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
+  {% set defend_roles   = (guild.defend_role_ids or '').split(',') | map('trim') | list %}
+  {% set archive_roles  = (guild.archive_role_ids or '').split(',') | map('trim') | list %}
   <div style="overflow-x:auto;">
     <table class="table">
       <thead>
@@ -139,6 +141,7 @@
           <th>Discord-Rolle</th>
           <th>📁 Scout</th>
           <th>🪖 Res-Antwort</th>
+          <th>📋 Res-Channel</th>
           <th>🔒 Privat</th>
           <th>🛡️ Defend</th>
           <th>📦 Archiv</th>
@@ -163,6 +166,12 @@
             <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"
               data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_manager_role_ids"
             >{{ '✅' if role.id in res_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in res_view_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_push_view_role_ids"
+              title="Kann akzeptierte Res-Push Channels sehen"
+            >{{ '✅' if role.id in res_view_roles else '○' }}</button>
           </td>
           <td style="text-align:center;">
             <button class="role-toggle {% if role.id in private_roles %}active{% endif %}"

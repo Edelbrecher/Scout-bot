@@ -378,8 +378,18 @@ class ResAnswerView(discord.ui.View):
                 overwrites[role] = discord.PermissionOverwrite(
                     view_channel=True, send_messages=True, manage_messages=True,
                 )
-        # Give all allowed_role_ids (Members) read + send access
+        # Give all allowed_role_ids (Scout) read + send access
         for role_id_str in (config.get("allowed_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = interaction.guild.get_role(int(role_id_str))
+            if role and role not in overwrites:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True,
+                )
+        # Give res_push_view_role_ids read-only access (e.g. Member role)
+        for role_id_str in (config.get("res_push_view_role_ids") or "").split(","):
             role_id_str = role_id_str.strip()
             if not role_id_str:
                 continue
