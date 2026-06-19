@@ -2087,7 +2087,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
                 headers={"Authorization": f"Bot {token}"},
             )
             if r.status_code == 200:
-                roles = sorted(r.json(), key=lambda x: -x.get("position", 0))
+                roles = sorted(r.json(), key=lambda x: -(x.get("position") or 0))
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 resp = await client.post(
