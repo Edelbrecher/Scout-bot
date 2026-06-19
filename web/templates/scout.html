@@ -140,7 +140,7 @@
         <div class="scout-tile-footer" onclick="event.stopPropagation()">
           <span style="color:var(--text-muted);font-size:0.75rem;">{{ ch.created_at[:16] if ch.created_at else '' }}</span>
           <form onsubmit="return closeChannel('{{ ch.channel_id }}', '{{ guild.guild_id }}', this, event)" style="margin:0;">
-            <button type="submit" class="btn-action btn-action-err" title="Close channel" style="font-size:0.8rem;padding:0.2rem 0.55rem;">🔒 Close</button>
+            <button type="button" class="btn-action btn-action-err" title="Close channel" style="font-size:0.8rem;padding:0.2rem 0.55rem;" onclick="confirmClose(this)">🔒 Close</button>
           </form>
         </div>
       </div>
@@ -400,9 +400,26 @@ function calcKorn() {
 }
 
 // ── Close channel ──────────────────────────────────────────────────────────
+function confirmClose(btn) {
+  const form = btn.closest('form');
+  btn.style.display = 'none';
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:inline-flex;gap:.3rem;align-items:center;';
+  wrap.innerHTML = `<span style="font-size:.75rem;color:#f87171;white-space:nowrap;">Wirklich schließen?</span>
+    <button type="submit" class="btn-action btn-action-err" style="font-size:.75rem;padding:.15rem .4rem;">✔ Ja</button>
+    <button type="button" style="font-size:.75rem;padding:.15rem .4rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;" onclick="cancelClose(this)">✕</button>`;
+  form.appendChild(wrap);
+}
+
+function cancelClose(btn) {
+  const form = btn.closest('form');
+  const origBtn = form.querySelector('button[onclick*="confirmClose"]');
+  if (origBtn) origBtn.style.display = '';
+  btn.closest('span').remove();
+}
+
 async function closeChannel(channelId, guildId, form, e) {
   e.preventDefault();
-  if (!confirm('Close this scout channel? It will be deleted in 2 minutes.')) return false;
 
   const btn = form.querySelector('button[type="submit"]');
   btn.disabled = true;
