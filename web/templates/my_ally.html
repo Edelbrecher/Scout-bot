@@ -1764,7 +1764,8 @@ function doJoinCode() {
 .ma-tab.active { background:#3b82f6;border-color:#3b82f6;color:#fff;font-weight:600; }
 .ma-tab:hover:not(.active) { border-color:#3b82f6;color:var(--text-primary); }
 .ma-members-layout { display:grid;grid-template-columns:240px minmax(0,1fr) 280px;gap:1rem;align-items:start; }
-.ma-side-col { display:flex;flex-direction:column;gap:.75rem; }
+.ma-center-col { min-width:0; }
+.ma-side-col { display:flex;flex-direction:column;gap:.75rem;min-width:0;overflow:hidden; }
 @media (max-width:1100px) {
   .ma-members-layout { grid-template-columns:1fr; }
 }
