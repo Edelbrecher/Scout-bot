@@ -115,6 +115,104 @@
   </p>
 </div>
 
+{# ── Discord Channel-Berechtigungen ── #}
+<div class="card" style="margin-bottom:1rem;">
+  <h2 style="margin:0 0 0.5rem; font-size:1rem;">🔐 Discord Channel-Berechtigungen</h2>
+  <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.5rem;">
+    Legt fest, welche Discord-Rollen Zugriff auf die vom Bot erstellten Channels erhalten. Änderungen werden sofort auf bestehende Channels übertragen.
+  </p>
+  <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">
+    🔒 <strong>Privat</strong>: Scout-Request-Channels (nur Ersteller + diese Rollen) — fällt auf Scout zurück wenn leer. &nbsp;
+    🛡️ <strong>Defend</strong>: Defend-Channels — fällt auf Scout zurück wenn leer. &nbsp;
+    📦 <strong>Archiv</strong>: Scout-Archiv-Channel — fällt auf Scout zurück wenn leer.
+  </p>
+  {% if discord_roles %}
+  {% set scout_roles   = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+  {% set res_roles     = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+  {% set private_roles = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
+  {% set defend_roles  = (guild.defend_role_ids or '').split(',') | map('trim') | list %}
+  {% set archive_roles = (guild.archive_role_ids or '').split(',') | map('trim') | list %}
+  <div style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Discord-Rolle</th>
+          <th>📁 Scout</th>
+          <th>🪖 Res-Antwort</th>
+          <th>🔒 Privat</th>
+          <th>🛡️ Defend</th>
+          <th>📦 Archiv</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for role in discord_roles %}
+        {% if role.name != '@everyone' %}
+        <tr>
+          <td>
+            {% if role.color %}
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#{{ '%06x' % role.color }};margin-right:6px;vertical-align:middle;"></span>
+            {% endif %}
+            <strong>{{ role.name }}</strong>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="allowed_role_ids"
+            >{{ '✅' if role.id in scout_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="res_manager_role_ids"
+            >{{ '✅' if role.id in res_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in private_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="private_channel_role_ids"
+            >{{ '✅' if role.id in private_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in defend_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="defend_role_ids"
+            >{{ '✅' if role.id in defend_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in archive_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="archive_role_ids"
+            >{{ '✅' if role.id in archive_roles else '○' }}</button>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <script>
+  (function(){
+    document.querySelectorAll('#tab-bot-settings .role-toggle').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var guild = btn.dataset.guild, role = btn.dataset.role, field = btn.dataset.field;
+        btn.disabled = true; btn.style.opacity = '0.5';
+        try {
+          var res = await fetch('/guild/' + guild + '/roles/' + role + '/toggle', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'field=' + encodeURIComponent(field)
+          });
+          if (res.ok) {
+            var data = await res.json();
+            btn.innerHTML = data.added ? '✅' : '○';
+            btn.classList.toggle('active', data.added);
+          }
+        } catch(e) { console.error(e); }
+        btn.disabled = false; btn.style.opacity = '';
+      });
+    });
+  })();
+  </script>
+  {% else %}
+  <p style="color:var(--text-muted); font-size:0.85rem; margin:0;">Discord-Rollen konnten nicht geladen werden.</p>
+  {% endif %}
+</div>
+
 {# ── Bot-Verhalten ── #}
 <div class="card" style="margin-bottom:1rem;">
   <h2 style="margin:0 0 0.5rem; font-size:1rem;">⚙️ Bot-Verhalten</h2>

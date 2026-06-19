@@ -6204,6 +6204,7 @@ async def my_ally_page(request: Request, guild_id: str):
     # ── Bot Settings tab (lead-only) ───────────────────────────────────────
     is_personal = guild.get("workspace_type") == "personal"
     channel_names: dict[str, str] = {}
+    discord_roles: list = []
     request_hub = None
     hero_scout_channel_id = None
     if is_lead:
@@ -6212,12 +6213,20 @@ async def my_ally_page(request: Request, guild_id: str):
             if token:
                 try:
                     async with httpx.AsyncClient(timeout=5) as client:
-                        r = await client.get(
-                            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-                            headers={"Authorization": f"Bot {token}"},
+                        ch_r, ro_r = await asyncio.gather(
+                            client.get(
+                                f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                                headers={"Authorization": f"Bot {token}"},
+                            ),
+                            client.get(
+                                f"https://discord.com/api/v10/guilds/{guild_id}/roles",
+                                headers={"Authorization": f"Bot {token}"},
+                            ),
                         )
-                        if r.status_code == 200:
-                            channel_names = {str(c["id"]): c.get("name", "") for c in r.json()}
+                        if ch_r.status_code == 200:
+                            channel_names = {str(c["id"]): c.get("name", "") for c in ch_r.json()}
+                        if ro_r.status_code == 200:
+                            discord_roles = sorted(ro_r.json(), key=lambda x: -x.get("position", 0))
                 except Exception:
                     pass
             hero_scout_channel_id = await _get_hero_scout_channel(guild_id)
@@ -6312,6 +6321,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "channel_names": channel_names,
         "request_hub": request_hub,
         "hero_scout_channel_id": hero_scout_channel_id,
+        "discord_roles": discord_roles,
         "saved": bot_settings_saved,
         "error": bot_settings_error,
         "lb_by_discord": lb_by_discord,
