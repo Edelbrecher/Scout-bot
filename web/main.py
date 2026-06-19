@@ -856,10 +856,90 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_trial_expiry_loop())
 
+    _wewin_final_countdown_tasks: dict[str, asyncio.Task] = {}
+
+    async def _run_final_countdown_channel(guild_id: str, wewin_channel_id: str, seconds_remaining: int) -> None:
+        """Create a temporary channel above #we-win named countdown→0, then delete it.
+        Discord limits channel renames to 2/10min, so we step: N, N//2, 1, 0."""
+        token = os.environ.get("DISCORD_TOKEN", "")
+        if not token:
+            return
+        headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+        countdown_ch_id = None
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                r = await client.get(f"https://discord.com/api/v10/channels/{wewin_channel_id}", headers=headers)
+                if r.status_code != 200:
+                    return
+                ch = r.json()
+                discord_guild_id = ch.get("guild_id", guild_id)
+                parent_id = ch.get("parent_id")
+                position = max(0, ch.get("position", 1) - 1)
+
+                ch_payload: dict = {
+                    "name": str(seconds_remaining),
+                    "type": 0,
+                    "position": position,
+                    "permission_overwrites": [{
+                        "id": discord_guild_id,
+                        "type": 0,
+                        "allow": str(1024 + 65536),  # VIEW_CHANNEL + READ_MESSAGE_HISTORY
+                        "deny": str(2048),            # deny SEND_MESSAGES
+                    }],
+                }
+                if parent_id:
+                    ch_payload["parent_id"] = parent_id
+
+                cr = await client.post(
+                    f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                    headers=headers, json=ch_payload,
+                )
+                if cr.status_code not in (200, 201):
+                    print(f"[wewin] final countdown ch create failed: {cr.status_code}", flush=True)
+                    return
+                countdown_ch_id = cr.json()["id"]
+
+                # Discord allows 2 renames per 10 min — step through milestones
+                milestones = sorted({seconds_remaining // 2, 1, 0}, reverse=True)
+                elapsed = 0
+                for target in milestones:
+                    delay = seconds_remaining - elapsed - target
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                        elapsed += delay
+                    rr = await client.patch(
+                        f"https://discord.com/api/v10/channels/{countdown_ch_id}",
+                        headers=headers, json={"name": str(target)},
+                    )
+                    if rr.status_code == 429:
+                        retry_after = rr.json().get("retry_after", 1)
+                        print(f"[wewin] rename rate-limited, retry_after={retry_after}s", flush=True)
+                        await asyncio.sleep(float(retry_after))
+                        await client.patch(
+                            f"https://discord.com/api/v10/channels/{countdown_ch_id}",
+                            headers=headers, json={"name": str(target)},
+                        )
+                await asyncio.sleep(5)
+        except Exception as e:
+            print(f"[wewin] final countdown error for {guild_id}: {e}", flush=True)
+        finally:
+            _wewin_final_countdown_tasks.pop(guild_id, None)
+            if countdown_ch_id:
+                try:
+                    async with httpx.AsyncClient(timeout=10) as client2:
+                        await client2.delete(
+                            f"https://discord.com/api/v10/channels/{countdown_ch_id}",
+                            headers={"Authorization": f"Bot {token}"},
+                        )
+                except Exception:
+                    pass
+
     async def _wewin_countdown_loop():
-        """Every 5 minutes: update WE WIN countdown embeds for all guilds that have one."""
+        """Update WE WIN countdown embeds. Last 3 min: every second. Otherwise: every 5 min."""
+        from datetime import datetime as _dt2, timezone as _tz2
         await asyncio.sleep(60)  # let app fully boot first
         while True:
+            min_remaining = None
             try:
                 guilds = await database.get_all_guilds()
                 for g in guilds:
@@ -868,7 +948,13 @@ async def lifespan(app: FastAPI):
                     msg_id     = g.get("wewin_message_id")
                     if not end_date or not channel_id or not msg_id:
                         continue
-                    # Fetch ally name
+                    try:
+                        end_dt = _dt2.fromisoformat(end_date.replace("T", " ")).replace(tzinfo=_tz2.utc)
+                        total  = int((end_dt - _dt2.now(_tz2.utc)).total_seconds())
+                    except Exception:
+                        continue
+                    if min_remaining is None or total < min_remaining:
+                        min_remaining = total
                     try:
                         ag = await database.get_ally_group_for_guild(g["guild_id"])
                         ally_name = ag.get("ally_name", "Unsere Allianz") if ag else "Unsere Allianz"
@@ -880,9 +966,16 @@ async def lifespan(app: FastAPI):
                             await database.update_guild_server_end(g["guild_id"], wewin_message_id=new_id)
                     except Exception as e:
                         print(f"[wewin] update failed for {g['guild_id']}: {e}", flush=True)
+                    # Spawn final 10s countdown channel task once per guild
+                    if 0 < total <= 10 and g["guild_id"] not in _wewin_final_countdown_tasks:
+                        task = asyncio.create_task(
+                            _run_final_countdown_channel(g["guild_id"], channel_id, total)
+                        )
+                        _wewin_final_countdown_tasks[g["guild_id"]] = task
             except Exception as e:
                 print(f"[wewin] loop error: {e}", flush=True)
-            await asyncio.sleep(5 * 60)  # update every 5 minutes
+            sleep_secs = 1 if (min_remaining is not None and 0 < min_remaining <= 180) else 5 * 60
+            await asyncio.sleep(sleep_secs)
 
     asyncio.create_task(_wewin_countdown_loop())
     yield
@@ -6328,6 +6421,7 @@ def _build_countdown_embed(end_date_str: str, ally_name: str, utc_offset_minutes
     days   = max(0, total // 86400)
     hours  = max(0, (total % 86400) // 3600)
     mins   = max(0, (total % 3600) // 60)
+    secs   = max(0, total % 60)
     # Display end time in server's local timezone
     local_tz  = _tz(offset=_td(minutes=utc_offset_minutes))
     sign      = "+" if utc_offset_minutes >= 0 else "-"
@@ -6344,12 +6438,13 @@ def _build_countdown_embed(end_date_str: str, ally_name: str, utc_offset_minutes
             "timestamp": now.isoformat(),
         }
     else:
+        update_hint = "*Wird sekündlich aktualisiert.*" if total <= 180 else "*Automatisch alle 5 Minuten aktualisiert.*"
         description = (
             f"```\n"
-            f"  {days:>3}d  {hours:02d}h  {mins:02d}m\n"
+            f"  {days:>3}d  {hours:02d}h  {mins:02d}m  {secs:02d}s\n"
             f"```\n"
             f"📅 Server end: **{end_str}**\n\n"
-            f"*Automatically updated every 5 minutes.*"
+            f"{update_hint}"
         )
         if button_tooltip:
             description += f"\n\n> {button_tooltip}"
