@@ -474,6 +474,49 @@ async def _do_close(interaction: discord.Interaction, label: str):
     asyncio.create_task(_delete_channel_after(interaction.channel, delay=120))
 
 
+class CloseConfirmView(discord.ui.View):
+    """Ephemeral confirmation before closing a scout channel."""
+
+    def __init__(self, original_msg: discord.Message, label: str):
+        super().__init__(timeout=60)
+        self.original_msg = original_msg
+        self.label = label
+
+    @discord.ui.button(label="✅ Ja", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        # Disable all buttons on the scout embed and send channel notice
+        try:
+            await self.original_msg.edit(view=_all_disabled_view())
+        except Exception:
+            pass
+        lang = await get_guild_lang(str(interaction.guild_id))
+        await interaction.response.edit_message(content="✅ Channel wird geschlossen…", view=None)
+        try:
+            await interaction.channel.send(
+                t(lang, "scout.channel_delete_msg", label=self.label, user=interaction.user.mention)
+            )
+        except Exception:
+            pass
+        asyncio.create_task(_delete_channel_after(interaction.channel, delay=120))
+
+    @discord.ui.button(label="✕ Nein", style=discord.ButtonStyle.secondary)
+    async def abort(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(content="Abgebrochen.", view=None)
+
+    async def on_timeout(self):
+        self.stop()
+
+
+async def _ask_close(interaction: discord.Interaction, label: str):
+    """Send an ephemeral confirmation and close on confirm."""
+    lang = await get_guild_lang(str(interaction.guild_id))
+    txt = "Wirklich schließen?" if lang == "de" else "Really close this channel?"
+    view = CloseConfirmView(original_msg=interaction.message, label=label)
+    await interaction.response.send_message(txt, view=view, ephemeral=True)
+
+
 def _all_disabled_view(taken_label: str = "Taken by") -> discord.ui.View:
     """All buttons disabled — used as final state after cancel/close."""
     view = discord.ui.View(timeout=None)
@@ -530,7 +573,7 @@ class ScoutTakenView(discord.ui.View):
         custom_id="persistent:scout_taken_close",
     )
     async def close_ch(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await _do_close(interaction, "Scout channel closed")
+        await _ask_close(interaction, "Scout channel closed")
 
 
 # ---------------------------------------------------------------------------
@@ -589,7 +632,7 @@ class ScoutActionView(discord.ui.View):
         custom_id="persistent:scout_close",
     )
     async def close_ch(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await _do_close(interaction, "Scout channel closed")
+        await _ask_close(interaction, "Scout channel closed")
 
 
 # ---------------------------------------------------------------------------
