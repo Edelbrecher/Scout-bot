@@ -2401,13 +2401,13 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
           return;
         }
         preview.innerHTML =
-          '⏳ Noch <strong>' + d.days + 'd ' + _pad(d.hours) + 'h ' + _pad(d.minutes) + 'm</strong>'
+          '⏳ Noch <strong>' + d.days + 'd ' + _pad(d.hours) + 'h ' + _pad(d.minutes) + 'm ' + _pad(d.seconds) + 's</strong>'
           + ' <span style="color:var(--text-muted);font-size:.8rem;">— ' + d.end_display + '</span>';
       })
       .catch(function() { preview.textContent = 'Fehler beim Laden'; });
   }
   updatePreview();
-  setInterval(updatePreview, 60000);
+  setInterval(updatePreview, 1000);
 })();
 
 function postCountdown() {
