@@ -6702,15 +6702,29 @@ async def _post_or_update_wewin(guild_id: str, channel_id: str, end_date: str, a
             )
             if r.status_code in (200, 201):
                 return existing_msg_id
-            # on 404 fall through to post a new message
+            # Message gone — delete it silently so no orphan remains
+            if r.status_code == 404:
+                print(f"[wewin] old message {existing_msg_id} not found, will post new one", flush=True)
+            else:
+                print(f"[wewin] PATCH failed {r.status_code}, falling back to new post", flush=True)
 
-        # Try posting to channel
+        # Try posting to channel (old message already gone or never existed)
         r = await client.post(
             f"https://discord.com/api/v10/channels/{channel_id}/messages",
             headers=headers, json=payload,
         )
         if r.status_code in (200, 201):
-            return r.json().get("id")
+            new_id = r.json().get("id")
+            # If there was a stale old message in the same channel, try to delete it
+            if existing_msg_id and new_id:
+                try:
+                    await client.delete(
+                        f"https://discord.com/api/v10/channels/{channel_id}/messages/{existing_msg_id}",
+                        headers={"Authorization": f"Bot {bot_token}"},
+                    )
+                except Exception:
+                    pass
+            return new_id
 
         # Channel doesn't exist (404) — recreate it
         if r.status_code == 404 and not guild_id.startswith("ws_"):
