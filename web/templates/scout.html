@@ -139,9 +139,11 @@
         </div>
         <div class="scout-tile-footer" onclick="event.stopPropagation()">
           <span style="color:var(--text-muted);font-size:0.75rem;">{{ ch.created_at[:16] if ch.created_at else '' }}</span>
+          {% if can_close %}
           <form onsubmit="return closeChannel('{{ ch.channel_id }}', '{{ guild.guild_id }}', this, event)" style="margin:0;">
             <button type="button" class="btn-action btn-action-err" title="Close channel" style="font-size:0.8rem;padding:0.2rem 0.55rem;" onclick="confirmClose(this)">🔒 Close</button>
           </form>
+          {% endif %}
         </div>
       </div>
       {% endfor %}

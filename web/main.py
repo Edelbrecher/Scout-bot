@@ -2169,9 +2169,14 @@ async def scout_page(request: Request, guild_id: str, saved: str = ""):
     err = await _require_alliance(guild, guild_id)
     if err: return err
     scout_channels = await database.get_scout_channels(guild_id)
+    uid = session.get("uid", "")
+    can_close = session.get("type") == "admin" or guild.get("owner_discord_id") == uid
+    if not can_close:
+        perms = await database.get_member_permissions(guild_id, uid)
+        can_close = "scout_manage" in perms or "ally_manage" in perms
     return templates.TemplateResponse(
         "scout.html",
-        {"request": request, "guild": guild, "scout_channels": scout_channels, "saved": saved},
+        {"request": request, "guild": guild, "scout_channels": scout_channels, "saved": saved, "can_close": can_close},
     )
 
 
@@ -2792,6 +2797,13 @@ async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    is_lead = session.get("type") == "admin" or (guild and guild.get("owner_discord_id") == uid)
+    if not is_lead:
+        perms = await database.get_member_permissions(guild_id, uid)
+        if "scout_manage" not in perms and "ally_manage" not in perms:
+            return JSONResponse({"error": "forbidden"}, status_code=403)
     if not SNOWFLAKE_RE.match(channel_id):
         return RedirectResponse(f"/guild/{guild_id}", status_code=303)
     ch = await database.get_scout_channel_info(channel_id)
