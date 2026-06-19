@@ -1142,9 +1142,11 @@ async def lifespan(app: FastAPI):
                         _wewin_final_countdown_tasks[g["guild_id"]] = task
             except Exception as e:
                 print(f"[wewin] loop error: {e}", flush=True)
-            # Sleep until ~175s remain to reliably enter the 1s polling window
+            # Sleep until ~175s remain to reliably enter the 1s polling window.
+            # When no active server remains (min_remaining <= 0), sleep only 60s
+            # so a newly configured end-date is picked up quickly.
             if min_remaining is None or min_remaining <= 0:
-                sleep_secs = 5 * 60
+                sleep_secs = 60
             elif min_remaining <= 180:
                 sleep_secs = 1
             else:
