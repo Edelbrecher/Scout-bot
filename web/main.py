@@ -1125,6 +1125,7 @@ async def lifespan(app: FastAPI):
                     use_jarves = bool(g.get("wewin_jarves_countdown"))
                     use_multi  = bool(g.get("wewin_countdown_channels")) and not use_jarves
                     trigger_secs = 12 if use_jarves else (35 if use_multi else 10)
+                    print(f"[wewin] guild={g['guild_id']} total={total}s jarves={use_jarves} multi={use_multi} trigger={trigger_secs}s active_tasks={list(_wewin_final_countdown_tasks)}", flush=True)
                     if 0 < total <= trigger_secs and g["guild_id"] not in _wewin_final_countdown_tasks:
                         if use_jarves:
                             task = asyncio.create_task(
