@@ -1147,10 +1147,10 @@ async def lifespan(app: FastAPI):
             # so a newly configured end-date is picked up quickly.
             if min_remaining is None or min_remaining <= 0:
                 sleep_secs = 60
-            elif min_remaining <= 180:
+            elif min_remaining <= 300:
                 sleep_secs = 1
             else:
-                sleep_secs = min(5 * 60, max(1, min_remaining - 175))
+                sleep_secs = min(5 * 60, max(1, min_remaining - 295))
             await asyncio.sleep(sleep_secs)
 
     asyncio.create_task(_wewin_countdown_loop())
@@ -6492,7 +6492,7 @@ async def my_ally_page(request: Request, guild_id: str):
             _utc_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " "))
             _offset = guild.get("server_utc_offset")
             _offset = 60 if _offset is None else _offset
-            server_end_date_local = (_utc_dt + _td(minutes=_offset)).strftime("%Y-%m-%dT%H:%M")
+            server_end_date_local = (_utc_dt + _td(minutes=_offset)).strftime("%Y-%m-%dT%H:%M:%S")
         except ValueError:
             server_end_date_local = guild["server_end_date"]
 
@@ -6652,7 +6652,7 @@ def _build_countdown_embed(end_date_str: str, ally_name: str, utc_offset_minutes
             "timestamp": now.isoformat(),
         }
     else:
-        update_hint = "*Wird sekündlich aktualisiert.*" if total <= 180 else "*Automatisch alle 5 Minuten aktualisiert.*"
+        update_hint = "*Wird sekündlich aktualisiert.*" if total <= 300 else "*Automatisch alle 5 Minuten aktualisiert.*"
         description = (
             f"```\n"
             f"  {days:>3}d  {hours:02d}h  {mins:02d}m  {secs:02d}s\n"
@@ -6794,7 +6794,7 @@ async def my_ally_save_server_end(
             from datetime import datetime as _dt, timedelta as _td
             local_dt = _dt.fromisoformat(end_val.replace("T", " "))
             utc_dt = local_dt - _td(minutes=offset)
-            end_val = utc_dt.strftime("%Y-%m-%dT%H:%M")
+            end_val = utc_dt.strftime("%Y-%m-%dT%H:%M:%S")
         except ValueError:
             end_val = None
 

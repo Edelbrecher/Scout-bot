@@ -1276,7 +1276,7 @@
           <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:end;">
             <div>
               <label class="d-label">Datum &amp; Uhrzeit des Server-Endes</label>
-              <input type="datetime-local" name="server_end_date"
+              <input type="datetime-local" name="server_end_date" step="1"
                      value="{{ server_end_date_local or '' }}"
                      style="width:100%;padding:.4rem .6rem;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:.9rem;">
             </div>
