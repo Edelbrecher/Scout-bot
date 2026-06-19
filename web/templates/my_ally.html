@@ -875,7 +875,7 @@
                     <div class="perm-group-title">{{ group_name }}</div>
                     {% for flag, label, tip in group_perms %}
                     <label class="perm-label">
-                      <input type="checkbox" name="{{ flag }}" value="1" {% if flag in rp %}checked{% endif %}>
+                      <input type="checkbox" name="{{ flag }}" value="1" {% if flag in rp.split(',') %}checked{% endif %}>
                       <span>{{ label }}</span>
                       <span class="perm-info" data-tip="{{ tip }}">?</span>
                     </label>
@@ -892,13 +892,13 @@
                   </label>
                   <button type="submit" class="btn btn-primary" style="font-size:.8rem;padding:.35rem .9rem;">💾 Save</button>
                   <div style="flex:1;"></div>
-                  <form method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="margin:0;">
-                    <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;"
-                            onclick="return confirm('Delete this role? Members with this role will lose their permissions.')">🗑️ Delete role</button>
-                  </form>
+                  <button type="button" form="del-role-{{ r.id }}"
+                          style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;"
+                          onclick="if(!confirm('Delete this role? Members with this role will lose their permissions.'))return;document.getElementById('del-role-{{ r.id }}').submit();">🗑️ Delete role</button>
                 </div>
 
               </form>
+              <form id="del-role-{{ r.id }}" method="post" action="/guild/{{ guild.guild_id }}/my-ally/roles/{{ r.id }}/delete" style="display:none;"></form>
             </div>
           </div>
           {% endfor %}

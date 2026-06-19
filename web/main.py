@@ -1025,16 +1025,23 @@ templates.env.globals["posthog_key"] = POSTHOG_KEY
 
 VIEW_CHANNEL = "1024"  # Discord permission bit
 
-async def _sync_private_channel_permissions(guild_id: str, private_channel_role_ids: str, allowed_role_ids: str):
+async def _sync_private_channel_permissions(guild_id: str, private_channel_role_ids: str = "", allowed_role_ids: str = ""):
     """Update all private channels in this guild to match the current role config.
 
     Roles in private_channel_role_ids (or fallback allowed_role_ids) get view+send access.
     All other role overwrites (that aren't @everyone or the bot) are removed from every
     private channel tracked in the DB.
+    Reads fresh config from DB at execution time to avoid race conditions with rapid toggles.
     """
     token = os.environ.get("DISCORD_TOKEN", "")
     if not token:
         return
+
+    # Read fresh from DB to avoid stale values from rapid toggling
+    guild_row = await database.get_guild(guild_id)
+    if guild_row:
+        private_channel_role_ids = (guild_row.get("private_channel_role_ids") or "")
+        allowed_role_ids = (guild_row.get("allowed_role_ids") or "")
 
     # Determine which role IDs should have access
     role_source = private_channel_role_ids.strip() if private_channel_role_ids.strip() else allowed_role_ids
@@ -1146,11 +1153,15 @@ async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allo
     return last_status, last_body
 
 
-async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str):
+async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str = ""):
     """Update all open scout channels to match current allowed_role_ids."""
     token = os.environ.get("DISCORD_TOKEN", "")
     if not token:
         return
+    # Re-read from DB to avoid stale values from rapid toggling
+    guild_row = await database.get_guild(guild_id)
+    if guild_row:
+        allowed_role_ids = (guild_row.get("allowed_role_ids") or "")
     granted = {r.strip() for r in allowed_role_ids.split(",") if r.strip()}
     VIEW_SEND = str(0x400 | 0x800)  # 3072
     VIEW_CHANNEL_DENY = str(0x400)
@@ -1189,11 +1200,16 @@ async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str):
                 pass
 
 
-async def _sync_defend_channel_permissions(guild_id: str, defend_role_ids: str, allowed_role_ids: str):
+async def _sync_defend_channel_permissions(guild_id: str, defend_role_ids: str = "", allowed_role_ids: str = ""):
     """Update all open defend channels to match current defend_role_ids (fallback: allowed_role_ids)."""
     token = os.environ.get("DISCORD_TOKEN", "")
     if not token:
         return
+    # Re-read from DB to avoid stale values from rapid toggling
+    guild_row = await database.get_guild(guild_id)
+    if guild_row:
+        defend_role_ids = (guild_row.get("defend_role_ids") or "")
+        allowed_role_ids = (guild_row.get("allowed_role_ids") or "")
     role_source = defend_role_ids.strip() if defend_role_ids.strip() else allowed_role_ids
     granted = {r.strip() for r in role_source.split(",") if r.strip()}
     VIEW_SEND = str(0x400 | 0x800)
