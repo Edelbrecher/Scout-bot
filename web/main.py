@@ -6883,6 +6883,32 @@ async def my_ally_post_server_end_discord(request: Request, guild_id: str):
     return JSONResponse({"ok": True, "days": days, "hours": hours, "minutes": mins})
 
 
+@app.get("/guild/{guild_id}/countdown")
+async def countdown_page(request: Request, guild_id: str):
+    """Public full-screen countdown page — no login required."""
+    guild = await database.get_guild(guild_id)
+    if not guild or not guild.get("server_end_date"):
+        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        end_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " ")).replace(tzinfo=_tz.utc)
+    except ValueError:
+        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+    now        = _dt.now(_tz.utc)
+    total_secs = int((end_dt - now).total_seconds())
+    ag         = await database.get_ally_group_for_guild(guild_id)
+    ally_name  = ag.get("ally_name", "Allianz") if ag else "Allianz"
+    return templates.TemplateResponse("countdown.html", {
+        "request":        request,
+        "guild_id":       guild_id,
+        "ally_name":      ally_name,
+        "server_end_iso": guild["server_end_date"],
+        "total_secs":     total_secs,
+        "music_url":      guild.get("wewin_music_url") or "",
+        "utc_offset":     guild.get("server_utc_offset", 60),
+    })
+
+
 @app.get("/api/guild/{guild_id}/server-end")
 async def api_server_end(request: Request, guild_id: str):
     """Return countdown data for frontend widget."""

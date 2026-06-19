@@ -1372,6 +1372,12 @@
               🔄 Jetzt manuell updaten
             </button>
             {% endif %}
+            {% if guild.server_end_date %}
+            <a href="/guild/{{ guild.guild_id }}/countdown" target="_blank" class="btn"
+               style="font-size:.85rem;background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4);color:#fbbf24;text-decoration:none;">
+              🏆 Countdown-Screen öffnen
+            </a>
+            {% endif %}
           </div>
 
           {% if guild.server_end_date %}
