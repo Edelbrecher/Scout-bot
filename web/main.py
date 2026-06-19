@@ -934,6 +934,92 @@ async def lifespan(app: FastAPI):
                 except Exception:
                     pass
 
+    async def _run_multi_countdown_channels(guild_id: str, wewin_channel_id: str, seconds_remaining: int) -> None:
+        """Create N channels named '⏱ 30s'…'⏱ 1s' above #we-win, then delete one per second.
+        Uses DELETE instead of PATCH, so no rename rate-limit applies."""
+        token = os.environ.get("DISCORD_TOKEN", "")
+        if not token:
+            return
+        headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+        created: list[tuple[int, str]] = []  # (second_value, channel_id)
+        n = min(max(seconds_remaining, 1), 30)
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.get(f"https://discord.com/api/v10/channels/{wewin_channel_id}", headers=headers)
+                if r.status_code != 200:
+                    return
+                ch = r.json()
+                discord_guild_id = ch.get("guild_id", guild_id)
+                parent_id = ch.get("parent_id")
+                base_overwrites = [{"id": discord_guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]
+
+                # Create n channels (n down to 1) as fast as possible
+                for sec in range(n, 0, -1):
+                    ch_payload: dict = {"name": f"⏱ {sec:02d}s", "type": 0, "permission_overwrites": base_overwrites}
+                    if parent_id:
+                        ch_payload["parent_id"] = parent_id
+                    cr = await client.post(
+                        f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                        headers=headers, json=ch_payload,
+                    )
+                    if cr.status_code == 429:
+                        await asyncio.sleep(float(cr.json().get("retry_after", 2)))
+                        cr = await client.post(
+                            f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                            headers=headers, json=ch_payload,
+                        )
+                    if cr.status_code in (200, 201):
+                        created.append((sec, cr.json()["id"]))
+                    await asyncio.sleep(0.3)
+
+                if not created:
+                    return
+
+                # Bulk-reorder so highest second is at top (lowest position)
+                # Sort descending by second: 30 → position 0, 29 → 1, …, 1 → last
+                sorted_by_sec = sorted(created, key=lambda x: x[0], reverse=True)
+                pos_payload = [{"id": ch_id, "position": idx} for idx, (_, ch_id) in enumerate(sorted_by_sec)]
+                if parent_id:
+                    for entry in pos_payload:
+                        entry["parent_id"] = parent_id
+                await client.patch(
+                    f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                    headers=headers, json=pos_payload,
+                )
+
+                # Delete one channel per second, top-to-bottom (highest number first)
+                for i, (sec, ch_id) in enumerate(sorted_by_sec):
+                    try:
+                        dr = await client.delete(f"https://discord.com/api/v10/channels/{ch_id}",
+                                                  headers={"Authorization": f"Bot {token}"})
+                        if dr.status_code == 429:
+                            await asyncio.sleep(float(dr.json().get("retry_after", 1)))
+                            await client.delete(f"https://discord.com/api/v10/channels/{ch_id}",
+                                                headers={"Authorization": f"Bot {token}"})
+                        created = [(s, c) for s, c in created if c != ch_id]
+                    except Exception as e:
+                        print(f"[wewin] delete ch {ch_id} failed: {e}", flush=True)
+                    if i < len(sorted_by_sec) - 1:
+                        await asyncio.sleep(1)
+
+                await asyncio.sleep(3)
+        except Exception as e:
+            print(f"[wewin] multi-countdown error for {guild_id}: {e}", flush=True)
+        finally:
+            _wewin_final_countdown_tasks.pop(guild_id, None)
+            if created:  # cleanup any not-yet-deleted channels
+                try:
+                    async with httpx.AsyncClient(timeout=10) as c2:
+                        for _, ch_id in created:
+                            try:
+                                await c2.delete(f"https://discord.com/api/v10/channels/{ch_id}",
+                                                headers={"Authorization": f"Bot {token}"})
+                            except Exception:
+                                pass
+                            await asyncio.sleep(0.2)
+                except Exception:
+                    pass
+
     async def _wewin_countdown_loop():
         """Update WE WIN countdown embeds. Last 3 min: every second. Otherwise: every 5 min."""
         from datetime import datetime as _dt2, timezone as _tz2
@@ -966,11 +1052,18 @@ async def lifespan(app: FastAPI):
                             await database.update_guild_server_end(g["guild_id"], wewin_message_id=new_id)
                     except Exception as e:
                         print(f"[wewin] update failed for {g['guild_id']}: {e}", flush=True)
-                    # Spawn final 10s countdown channel task once per guild
-                    if 0 < total <= 10 and g["guild_id"] not in _wewin_final_countdown_tasks:
-                        task = asyncio.create_task(
-                            _run_final_countdown_channel(g["guild_id"], channel_id, total)
-                        )
+                    # Spawn countdown channel task once per guild
+                    use_multi = bool(g.get("wewin_countdown_channels"))
+                    trigger_secs = 35 if use_multi else 10
+                    if 0 < total <= trigger_secs and g["guild_id"] not in _wewin_final_countdown_tasks:
+                        if use_multi:
+                            task = asyncio.create_task(
+                                _run_multi_countdown_channels(g["guild_id"], channel_id, total)
+                            )
+                        else:
+                            task = asyncio.create_task(
+                                _run_final_countdown_channel(g["guild_id"], channel_id, total)
+                            )
                         _wewin_final_countdown_tasks[g["guild_id"]] = task
             except Exception as e:
                 print(f"[wewin] loop error: {e}", flush=True)
@@ -6596,6 +6689,7 @@ async def my_ally_save_server_end(
     wewin_music_url: str = Form(""),
     wewin_winner_user_id: str = Form(""),
     wewin_button_tooltip: str = Form(""),
+    wewin_countdown_channels: str = Form(""),
     server_utc_offset: int = Form(60),
 ):
     session, err = _require_session(request)
@@ -6638,6 +6732,7 @@ async def my_ally_save_server_end(
     music_url      = wewin_music_url.strip() or None
     winner_user_id = wewin_winner_user_id.strip() or None
     button_tooltip = wewin_button_tooltip.strip()[:200] or None
+    cd_channels    = 1 if wewin_countdown_channels else 0
     await database.update_guild_server_end(
         guild_id,
         server_end_date=end_val,
@@ -6646,6 +6741,7 @@ async def my_ally_save_server_end(
         wewin_music_url=music_url,
         wewin_winner_user_id=winner_user_id,
         wewin_button_tooltip=button_tooltip,
+        wewin_countdown_channels=cd_channels,
     )
 
     # Post/update Discord embed immediately
