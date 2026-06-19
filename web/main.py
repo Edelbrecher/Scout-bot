@@ -934,6 +934,75 @@ async def lifespan(app: FastAPI):
                 except Exception:
                     pass
 
+    async def _run_jarves_countdown_channels(guild_id: str, wewin_channel_id: str) -> None:
+        """Create 4 channels: Jarves / START / THE / ENGINE. Deleted after server ends."""
+        token = os.environ.get("DISCORD_TOKEN", "")
+        if not token:
+            return
+        headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+        created: list[str] = []
+        names = ["Jarves", "START", "THE", "ENGINE"]
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.get(f"https://discord.com/api/v10/channels/{wewin_channel_id}", headers=headers)
+                if r.status_code != 200:
+                    print(f"[wewin] jarves: can't fetch channel {wewin_channel_id}: {r.status_code}", flush=True)
+                    return
+                ch = r.json()
+                discord_guild_id = ch.get("guild_id", guild_id)
+                parent_id = ch.get("parent_id")
+                base_overwrites = [{"id": discord_guild_id, "type": 0, "allow": str(0x400), "deny": str(0x800)}]
+
+                for name in names:
+                    ch_payload: dict = {"name": name, "type": 0, "permission_overwrites": base_overwrites}
+                    if parent_id:
+                        ch_payload["parent_id"] = parent_id
+                    cr = await client.post(
+                        f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                        headers=headers, json=ch_payload,
+                    )
+                    if cr.status_code == 429:
+                        await asyncio.sleep(float(cr.json().get("retry_after", 2)))
+                        cr = await client.post(
+                            f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                            headers=headers, json=ch_payload,
+                        )
+                    if cr.status_code in (200, 201):
+                        created.append(cr.json()["id"])
+                    await asyncio.sleep(0.3)
+
+                if not created:
+                    return
+
+                # Bulk-reorder so Jarves is top, ENGINE is bottom
+                pos_payload = [{"id": ch_id, "position": idx} for idx, ch_id in enumerate(created)]
+                if parent_id:
+                    for entry in pos_payload:
+                        entry["parent_id"] = parent_id
+                await client.patch(
+                    f"https://discord.com/api/v10/guilds/{discord_guild_id}/channels",
+                    headers=headers, json=pos_payload,
+                )
+                # Stay alive until server ends + small buffer
+                await asyncio.sleep(20)
+        except Exception as e:
+            print(f"[wewin] jarves-countdown error for {guild_id}: {e}", flush=True)
+        finally:
+            _wewin_final_countdown_tasks.pop(guild_id, None)
+            if created:
+                try:
+                    async with httpx.AsyncClient(timeout=10) as c2:
+                        for ch_id in created:
+                            try:
+                                await c2.delete(
+                                    f"https://discord.com/api/v10/channels/{ch_id}",
+                                    headers={"Authorization": f"Bot {token}"},
+                                )
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
     async def _run_multi_countdown_channels(guild_id: str, wewin_channel_id: str, seconds_remaining: int) -> None:
         """Create N channels named '⏱ 30s'…'⏱ 1s' above #we-win, then delete one per second.
         Uses DELETE instead of PATCH, so no rename rate-limit applies."""
@@ -1053,10 +1122,15 @@ async def lifespan(app: FastAPI):
                     except Exception as e:
                         print(f"[wewin] update failed for {g['guild_id']}: {e}", flush=True)
                     # Spawn countdown channel task once per guild
-                    use_multi = bool(g.get("wewin_countdown_channels"))
-                    trigger_secs = 35 if use_multi else 10
+                    use_jarves = bool(g.get("wewin_jarves_countdown"))
+                    use_multi  = bool(g.get("wewin_countdown_channels")) and not use_jarves
+                    trigger_secs = 12 if use_jarves else (35 if use_multi else 10)
                     if 0 < total <= trigger_secs and g["guild_id"] not in _wewin_final_countdown_tasks:
-                        if use_multi:
+                        if use_jarves:
+                            task = asyncio.create_task(
+                                _run_jarves_countdown_channels(g["guild_id"], channel_id)
+                            )
+                        elif use_multi:
                             task = asyncio.create_task(
                                 _run_multi_countdown_channels(g["guild_id"], channel_id, total)
                             )
@@ -1067,7 +1141,13 @@ async def lifespan(app: FastAPI):
                         _wewin_final_countdown_tasks[g["guild_id"]] = task
             except Exception as e:
                 print(f"[wewin] loop error: {e}", flush=True)
-            sleep_secs = 1 if (min_remaining is not None and 0 < min_remaining <= 180) else 5 * 60
+            # Sleep until ~175s remain to reliably enter the 1s polling window
+            if min_remaining is None or min_remaining <= 0:
+                sleep_secs = 5 * 60
+            elif min_remaining <= 180:
+                sleep_secs = 1
+            else:
+                sleep_secs = min(5 * 60, max(1, min_remaining - 175))
             await asyncio.sleep(sleep_secs)
 
     asyncio.create_task(_wewin_countdown_loop())
@@ -6690,6 +6770,7 @@ async def my_ally_save_server_end(
     wewin_winner_user_id: str = Form(""),
     wewin_button_tooltip: str = Form(""),
     wewin_countdown_channels: str = Form(""),
+    wewin_jarves_countdown: str = Form(""),
     server_utc_offset: int = Form(60),
 ):
     session, err = _require_session(request)
@@ -6733,6 +6814,10 @@ async def my_ally_save_server_end(
     winner_user_id = wewin_winner_user_id.strip() or None
     button_tooltip = wewin_button_tooltip.strip()[:200] or None
     cd_channels    = 1 if wewin_countdown_channels else 0
+    cd_jarves      = 1 if wewin_jarves_countdown else 0
+    # Jarves mode and 30-channel mode are mutually exclusive; jarves takes priority
+    if cd_jarves:
+        cd_channels = 0
     await database.update_guild_server_end(
         guild_id,
         server_end_date=end_val,
@@ -6742,6 +6827,7 @@ async def my_ally_save_server_end(
         wewin_winner_user_id=winner_user_id,
         wewin_button_tooltip=button_tooltip,
         wewin_countdown_channels=cd_channels,
+        wewin_jarves_countdown=cd_jarves,
     )
 
     # Post/update Discord embed immediately

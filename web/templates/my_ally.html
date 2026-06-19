@@ -1337,8 +1337,9 @@
           </div>
 
           <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.85rem;">
-            <input type="checkbox" name="wewin_countdown_channels" value="1"
+            <input type="checkbox" name="wewin_countdown_channels" id="cd-multi" value="1"
                    {% if guild.wewin_countdown_channels %}checked{% endif %}
+                   onchange="if(this.checked)document.getElementById('cd-jarves').checked=false;"
                    style="margin-top:.15rem;flex-shrink:0;">
             <span>
               <strong>🔢 30-Sekunden Channel-Countdown</strong><br>
@@ -1346,6 +1347,20 @@
                 Erstellt 35s vor Server-Ende 30 temporäre Discord-Channels (⏱ 30s … ⏱ 01s) in der Kategorie von #we-win.
                 Jede Sekunde wird ein Channel gelöscht — die Zahl in der Sidebar zählt von 30 auf 0 runter.
                 Channels werden danach automatisch aufgeräumt.
+              </span>
+            </span>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.85rem;">
+            <input type="checkbox" name="wewin_jarves_countdown" id="cd-jarves" value="1"
+                   {% if guild.wewin_jarves_countdown %}checked{% endif %}
+                   onchange="if(this.checked)document.getElementById('cd-multi').checked=false;"
+                   style="margin-top:.15rem;flex-shrink:0;">
+            <span>
+              <strong>🎯 START THE ENGINE Countdown</strong><br>
+              <span style="font-size:.75rem;color:var(--text-muted);">
+                Erstellt 12s vor Server-Ende 4 temporäre Channels: <strong>Jarves → START → THE → ENGINE</strong>.
+                Erscheinen in der Sidebar — werden nach Server-Ende automatisch gelöscht.
               </span>
             </span>
           </label>
