@@ -6900,6 +6900,13 @@ async def my_ally_post_server_end_discord(request: Request, guild_id: str):
     return JSONResponse({"ok": True, "days": days, "hours": hours, "minutes": mins})
 
 
+@app.get("/api/guild/{guild_id}/countdown-enemies")
+async def countdown_enemies_api(guild_id: str):
+    """Public — returns enemy meta-groups for the countdown screen."""
+    data = await database.get_countdown_enemies(guild_id)
+    return JSONResponse(data)
+
+
 @app.get("/guild/{guild_id}/countdown")
 async def countdown_page(request: Request, guild_id: str):
     """Public full-screen countdown page — no login required."""

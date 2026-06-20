@@ -126,6 +126,36 @@
       50%{filter:drop-shadow(0 0 90px rgba(255,215,0,.9)) drop-shadow(0 0 140px rgba(247,37,133,.6));}
     }
 
+    /* ── Enemy tags ─────────────────────────────────────────────── */
+    #enemy-layer{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden;}
+    .etag{
+      position:absolute;
+      font-size:clamp(.65rem,1.4vw,1rem);font-weight:700;
+      letter-spacing:.06em;text-transform:uppercase;
+      padding:.25em .6em;border-radius:5px;
+      border:1px solid currentColor;
+      opacity:0;
+      will-change:transform,opacity;
+      transition:transform .3s ease,opacity .3s ease;
+    }
+    .etag.visible{opacity:.28;}
+    .etag.pulse{animation:etag-pulse .5s ease-in-out infinite alternate;}
+    .etag.burst{
+      opacity:0 !important;
+      transform:scale(4) !important;
+      transition:transform .25s ease-out,opacity .25s ease-out !important;
+    }
+    @keyframes etag-pulse{
+      from{opacity:.28;transform:var(--drift) scale(1);}
+      to{opacity:.55;transform:var(--drift) scale(1.15);}
+    }
+    @keyframes etag-float{
+      0%  {transform:translate(0,0) rotate(var(--r0));}
+      33% {transform:translate(var(--dx),var(--dy)) rotate(var(--r1));}
+      66% {transform:translate(calc(var(--dx)*-.6),calc(var(--dy)*.8)) rotate(var(--r2));}
+      100%{transform:translate(0,0) rotate(var(--r0));}
+    }
+
     /* ── YouTube (hidden player) ────────────────────────────────── */
     #yt-wrap{position:fixed;bottom:-9999px;right:-9999px;width:320px;height:180px;opacity:.01;pointer-events:none;}
 
@@ -138,6 +168,7 @@
 
 <canvas id="stars-canvas"></canvas>
 <canvas id="fw-canvas"></canvas>
+<div id="enemy-layer"></div>
 
 <!-- Main countdown -->
 <div id="wrap">
@@ -438,7 +469,9 @@ function tick(){
 }
 
 function fireVictory(){
-  startFW();
+  // Burst enemy tags first (before fireworks so they show up)
+  burstEnemyTags();
+  setTimeout(startFW, 600);
   // Fade clock out
   document.getElementById('wrap').classList.add('fade-out');
   setTimeout(()=>{
@@ -462,6 +495,100 @@ function fireVictory(){
       `${fmt(loc.getUTCHours())}:${fmt(loc.getUTCMinutes())}:${fmt(loc.getUTCSeconds())} ${tz}`;
   }catch(e){}
 })();
+
+// ── Enemy tags ───────────────────────────────────────────────────────────
+const GUILD_ID = {{ guild_id | tojson }};
+let enemyTags = [];   // [{el, cx, cy, color}]
+
+function rnd(min,max){ return min + Math.random()*(max-min); }
+
+function spawnEnemyTags(groups){
+  const layer = document.getElementById('enemy-layer');
+  const W = innerWidth, H = innerHeight;
+  // Avoid the center clock area (~40% of screen)
+  const safeZones = [{x1:.3,y1:.25,x2:.7,y2:.75}];
+  const isSafe = (px,py) => !safeZones.some(z=>px>z.x1&&px<z.x2&&py>z.y1&&py<z.y2);
+
+  groups.forEach(g=>{
+    // Build token list: meta name (large) + alliance names (medium) + players (small)
+    const tokens = [
+      {text:g.name,   size:'1.05em', weight:'900'},
+      ...g.alliances.map(a=>({text:a,  size:'.82em', weight:'700'})),
+      ...g.players  .map(p=>({text:p,  size:'.72em', weight:'600'})),
+    ];
+
+    tokens.forEach(t=>{
+      // Random position outside center
+      let px,py,tries=0;
+      do { px=rnd(.04,.96); py=rnd(.04,.96); tries++; } while(!isSafe(px,py)&&tries<30);
+
+      const el = document.createElement('div');
+      el.className = 'etag';
+      el.textContent = t.text;
+      el.style.color = g.color;
+      el.style.fontSize = t.size;
+      el.style.fontWeight = t.weight;
+
+      // Random slow float animation
+      const dur   = rnd(18,35);
+      const dx    = rnd(-60,60)+'px';
+      const dy    = rnd(-40,40)+'px';
+      const r0    = rnd(-8,8)+'deg';
+      const r1    = rnd(-12,12)+'deg';
+      const r2    = rnd(-6,6)+'deg';
+      el.style.cssText += `
+        left:${px*100}%;top:${py*100}%;
+        --dx:${dx};--dy:${dy};--r0:${r0};--r1:${r1};--r2:${r2};--drift:translate(0,0);
+        animation:etag-float ${dur}s ease-in-out infinite;
+        animation-delay:-${rnd(0,dur)}s;
+      `;
+
+      layer.appendChild(el);
+      const cx = px * W;
+      const cy = py * H;
+      enemyTags.push({el, cx, cy, color:g.color});
+
+      // Fade in staggered
+      setTimeout(()=> el.classList.add('visible'), rnd(200,2000));
+    });
+  });
+}
+
+function burstEnemyTags(){
+  enemyTags.forEach(({el, cx, cy, color}, i)=>{
+    setTimeout(()=>{
+      // Pulse then burst
+      el.classList.add('pulse');
+      setTimeout(()=>{
+        el.classList.add('burst');
+        // Particle explosion at tag position
+        const W=innerWidth, H=innerHeight;
+        const count = 40 + Math.floor(Math.random()*25);
+        for(let j=0;j<count;j++){
+          const angle = (j/count)*Math.PI*2;
+          const speed = 3 + Math.random()*9;
+          fwPs.push({
+            x: cx, y: cy,
+            vx: Math.cos(angle)*speed,
+            vy: Math.sin(angle)*speed,
+            life:1, dec:.018+Math.random()*.025,
+            col: color,
+            sz: 2+Math.random()*3.5,
+          });
+        }
+        if(!fwOn){ fwOn=true; fwC.classList.add('active'); animFW(); }
+      }, 300 + i*40);
+    }, i * 80);
+  });
+}
+
+// Load enemy data
+fetch(`/api/guild/${GUILD_ID}/countdown-enemies`)
+  .then(r=>r.json())
+  .then(groups=>{
+    if(groups && groups.length) spawnEnemyTags(groups);
+  })
+  .catch(()=>{});
 
 // ── Boot ─────────────────────────────────────────────────────────────────
 tick();

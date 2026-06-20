@@ -661,6 +661,61 @@ async def update_guild_config_fields(guild_id: str, **fields):
     _CACHE.pop("all_guilds", None)
 
 
+async def get_countdown_enemies(guild_id: str) -> list[dict]:
+    """Return up to 5 enemy meta-groups with alliance names + player names for the countdown screen."""
+    enemy_colors = ["#ef4444", "#f97316", "#a855f7", "#ec4899", "#fb923c"]
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        db.row_factory = aiosqlite.Row
+        # Get meta groups
+        async with db.execute(
+            "SELECT id, meta_name FROM alliance_meta_groups WHERE guild_id=? ORDER BY id LIMIT 5",
+            (guild_id,)
+        ) as cur:
+            groups = [dict(r) for r in await cur.fetchall()]
+
+        result = []
+        for idx, g in enumerate(groups):
+            # Alliance names in this group
+            async with db.execute(
+                "SELECT alliance_name FROM alliance_meta_members WHERE group_id=?",
+                (g["id"],)
+            ) as cur:
+                alliances = [r["alliance_name"] for r in await cur.fetchall()]
+
+            # Players from enemies table whose alliance_name is in this group
+            players: list[str] = []
+            if alliances:
+                placeholders = ",".join("?" * len(alliances))
+                async with db.execute(
+                    f"SELECT DISTINCT player_name FROM enemies WHERE guild_id=? AND alliance_name IN ({placeholders}) LIMIT 12",
+                    [guild_id] + alliances
+                ) as cur:
+                    players = [r["player_name"] for r in await cur.fetchall()]
+
+            result.append({
+                "name":      g["meta_name"],
+                "color":     enemy_colors[idx % len(enemy_colors)],
+                "alliances": alliances,
+                "players":   players,
+            })
+
+        # Fallback: enemies with no meta group
+        if not result:
+            async with db.execute(
+                "SELECT DISTINCT player_name, alliance_name FROM enemies WHERE guild_id=? LIMIT 30",
+                (guild_id,)
+            ) as cur:
+                rows = [dict(r) for r in await cur.fetchall()]
+            if rows:
+                result.append({
+                    "name":      "Enemies",
+                    "color":     "#ef4444",
+                    "alliances": list({r["alliance_name"] for r in rows if r["alliance_name"]}),
+                    "players":   [r["player_name"] for r in rows],
+                })
+    return result
+
+
 async def update_guild_server_end(guild_id: str, **fields):
     """Save server_end_date / wewin_channel_id / wewin_channel_name / wewin_message_id."""
     allowed = {"server_end_date", "wewin_channel_id", "wewin_channel_name", "wewin_message_id", "wewin_music_url", "wewin_winner_user_id", "wewin_button_tooltip", "wewin_countdown_channels", "wewin_jarves_countdown"}
