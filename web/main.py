@@ -6905,7 +6905,7 @@ async def countdown_page(request: Request, guild_id: str):
     """Public full-screen countdown page — no login required."""
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("server_end_date"):
-        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+        return RedirectResponse("/", status_code=303)
     from datetime import datetime as _dt, timezone as _tz
     try:
         end_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " ")).replace(tzinfo=_tz.utc)

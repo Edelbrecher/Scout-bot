@@ -1381,6 +1381,31 @@
           </div>
 
           {% if guild.server_end_date %}
+          <div style="display:flex;align-items:center;gap:.5rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;">
+            <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">🔗 Public link:</span>
+            <code id="countdown-url" style="font-size:.75rem;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              https://travops.online/guild/{{ guild.guild_id }}/countdown
+            </code>
+            <button type="button" onclick="copyCountdownUrl()" id="copy-url-btn"
+              style="flex-shrink:0;padding:.2rem .6rem;border-radius:5px;border:1px solid var(--border);
+                     background:var(--bg-card);color:var(--text-muted);font-size:.72rem;cursor:pointer;transition:all .15s;">
+              📋 Kopieren
+            </button>
+          </div>
+          <script>
+          function copyCountdownUrl(){
+            const url = document.getElementById('countdown-url').textContent.trim();
+            navigator.clipboard.writeText(url).then(()=>{
+              const btn = document.getElementById('copy-url-btn');
+              btn.textContent = '✓ Kopiert!';
+              btn.style.color = '#4ade80';
+              setTimeout(()=>{ btn.textContent = '📋 Kopieren'; btn.style.color = ''; }, 2000);
+            });
+          }
+          </script>
+          {% endif %}
+
+          {% if guild.server_end_date %}
           <div id="cd-preview" style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.65rem 1rem;font-size:.85rem;">
             ⏳ Lädt…
           </div>
