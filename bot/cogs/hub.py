@@ -1681,11 +1681,11 @@ class EnemyScoutModal(discord.ui.Modal, title="👁️ Gegner-Scout melden"):
 # Battle Report Modal
 # ---------------------------------------------------------------------------
 
-class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"):
+class BattleReportModal(discord.ui.Modal, title="⚔️ Submit Battle Report"):
     report_text = discord.ui.TextInput(
-        label="Kampfbericht (aus Travian kopieren)",
+        label="Battle Report (copy from Travian)",
         style=discord.TextStyle.paragraph,
-        placeholder="Bericht aus Travian hier einfügen — wird automatisch erkannt.",
+        placeholder="Paste your Travian report here — it will be parsed automatically.",
         max_length=4000,
         required=True,
     )
@@ -1700,7 +1700,7 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
             parsed = parsers.parse_battle_report(text)
         except Exception as e:
             await interaction.followup.send(
-                f"❌ Fehler beim Parsen des Berichts: {e}", ephemeral=True
+                f"❌ Failed to parse report: {e}", ephemeral=True
             )
             return
 
@@ -1715,25 +1715,25 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
             if str(e).startswith("duplicate:"):
                 existing_id = str(e).split(":", 1)[1]
                 await interaction.followup.send(
-                    f"⚠️ **Dieser Bericht wurde bereits importiert** (Report #{existing_id}).\n"
-                    f"Kein doppelter Eintrag erstellt.",
+                    f"⚠️ **This report has already been imported** (Report #{existing_id}).\n"
+                    f"No duplicate entry created.",
                     ephemeral=True,
                     delete_after=10,
                 )
                 return
-            await interaction.followup.send(f"❌ Fehler beim Speichern: {e}", ephemeral=True, delete_after=10)
+            await interaction.followup.send(f"❌ Failed to save: {e}", ephemeral=True, delete_after=10)
             return
         except Exception as e:
-            await interaction.followup.send(f"❌ Fehler beim Speichern: {e}", ephemeral=True, delete_after=10)
+            await interaction.followup.send(f"❌ Failed to save: {e}", ephemeral=True, delete_after=10)
             return
 
         # Build summary embed
         rtype_labels = {
-            "attack": "⚔️ Angriff",
-            "defense": "🛡️ Verteidigung",
-            "spy": "🕵️ Spionage",
-            "market": "🏪 Markt",
-            "unknown": "❓ Unbekannt",
+            "attack":  "⚔️ Attack",
+            "defense": "🛡️ Defense",
+            "spy":     "🕵️ Spy",
+            "market":  "🏪 Market",
+            "unknown": "❓ Unknown",
         }
         rtype = parsed.get("report_type", "unknown")
         color_map = {
@@ -1743,7 +1743,7 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
             "market":  discord.Color.gold(),
         }
         embed = discord.Embed(
-            title=f"{rtype_labels.get(rtype, rtype)} — Bericht #{report_id}",
+            title=f"{rtype_labels.get(rtype, rtype)} — Report #{report_id}",
             color=color_map.get(rtype, discord.Color.greyple()),
         )
 
@@ -1753,7 +1753,7 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
                 att_val += f"\n📍 {parsed['attacker_village']}"
             if parsed.get("attacker_x") is not None:
                 att_val += f" ({parsed['attacker_x']}|{parsed['attacker_y']})"
-            embed.add_field(name="⚔️ Angreifer", value=att_val, inline=True)
+            embed.add_field(name="⚔️ Attacker", value=att_val, inline=True)
 
         if parsed.get("defender_name"):
             def_val = parsed["defender_name"]
@@ -1761,31 +1761,31 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Kampfbericht einreichen"
                 def_val += f"\n📍 {parsed['defender_village']}"
             if parsed.get("defender_x") is not None:
                 def_val += f" ({parsed['defender_x']}|{parsed['defender_y']})"
-            embed.add_field(name="🛡️ Verteidiger", value=def_val, inline=True)
+            embed.add_field(name="🛡️ Defender", value=def_val, inline=True)
 
         if parsed.get("plunder_total", 0):
             total = parsed["plunder_total"]
             p = parsed.get("plunder", {})
-            res_str = f"**{total:,}** gesamt".replace(",", ".")
+            res_str = f"**{total:,}** total".replace(",", ".")
             if p:
                 res_str += f"\n🪵{p.get('wood',0):,} 🧱{p.get('clay',0):,} ⚙️{p.get('iron',0):,} 🌾{p.get('crop',0):,}".replace(",", ".")
-            embed.add_field(name="💰 Beute", value=res_str, inline=False)
+            embed.add_field(name="💰 Loot", value=res_str, inline=False)
 
         if parsed.get("luck") is not None:
             luck_emoji = "📈" if parsed["luck"] >= 0 else "📉"
-            embed.add_field(name="🎲 Glück", value=f"{luck_emoji} {parsed['luck']:+.1f}%", inline=True)
+            embed.add_field(name="🎲 Luck", value=f"{luck_emoji} {parsed['luck']:+.1f}%", inline=True)
 
         fake_conf = parsed.get("fake_confidence", "none")
         if fake_conf not in ("none", "real", "unknown"):
-            embed.add_field(name="⚠️ Fake?", value=f"{'❌ Fake' if fake_conf == 'fake' else '⚠️ Wahrscheinlich Fake'}", inline=True)
+            embed.add_field(name="⚠️ Fake?", value=f"{'❌ Fake' if fake_conf == 'fake' else '⚠️ Probably Fake'}", inline=True)
 
         if parsed.get("report_date"):
-            embed.add_field(name="📅 Datum", value=parsed["report_date"], inline=True)
+            embed.add_field(name="📅 Date", value=parsed["report_date"], inline=True)
 
-        embed.set_footer(text=f"Eingereicht von {interaction.user.display_name} · TravOps")
+        embed.set_footer(text=f"Submitted by {interaction.user.display_name} · TravOps")
 
         await interaction.followup.send(
-            f"✅ Bericht #{report_id} gespeichert!",
+            f"✅ Report #{report_id} saved!",
             embed=embed,
             ephemeral=True,
             delete_after=10,
