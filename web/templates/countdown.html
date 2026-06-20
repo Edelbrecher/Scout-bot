@@ -149,6 +149,10 @@
       from{opacity:.28;transform:var(--drift) scale(1);}
       to{opacity:.55;transform:var(--drift) scale(1.15);}
     }
+    @keyframes edot-fly{
+      0%  {transform:translate(-50%,-50%) scale(1);opacity:1;}
+      100%{transform:translate(calc(-50% + var(--ex)),calc(-50% + var(--ey))) scale(0);opacity:0;}
+    }
     @keyframes etag-float{
       0%  {transform:translate(0,0) rotate(var(--r0));}
       33% {transform:translate(var(--dx),var(--dy)) rotate(var(--r1));}
@@ -515,13 +519,23 @@ function safePos(){
   return [x,y];
 }
 
-function particleBurst(x,y,color,count=50){
+function particleBurst(x,y,color,count=28){
+  const layer = document.getElementById('enemy-layer');
   for(let i=0;i<count;i++){
-    const angle=(i/count)*Math.PI*2, sp=2+Math.random()*10;
-    fwPs.push({x,y,vx:Math.cos(angle)*sp,vy:Math.sin(angle)*sp,
-      life:1,dec:.016+Math.random()*.024,col:color,sz:2+Math.random()*4});
+    const dot = document.createElement('span');
+    dot.style.cssText = `
+      position:fixed;pointer-events:none;z-index:3;
+      left:${x}px;top:${y}px;
+      width:${3+Math.random()*4}px;height:${3+Math.random()*4}px;
+      border-radius:50%;background:${color};
+      transform:translate(-50%,-50%);
+      animation:edot-fly ${.4+Math.random()*.4}s ease-out forwards;
+      --ex:${(Math.random()*2-1)*120}px;
+      --ey:${(Math.random()*2-1)*120}px;
+    `;
+    layer.appendChild(dot);
+    setTimeout(()=>dot.remove(), 900);
   }
-  if(!fwOn){ fwOn=true; fwC.classList.add('active'); animFW(); }
 }
 
 function spawnTag(token){
