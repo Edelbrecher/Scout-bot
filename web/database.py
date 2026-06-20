@@ -662,13 +662,13 @@ async def update_guild_config_fields(guild_id: str, **fields):
 
 
 async def get_countdown_enemies(guild_id: str) -> list[dict]:
-    """Return top-10 enemy alliance names (excluding own alliance) for the countdown screen."""
+    """Return top-10 enemy alliances by village count from Travian map data, excluding own alliance."""
     enemy_colors = ["#ef4444", "#f97316", "#a855f7", "#ec4899", "#fb923c",
                     "#dc2626", "#ea580c", "#9333ea", "#db2777", "#c2410c"]
     async with aiosqlite.connect(DB_PATH, timeout=10) as db:
         db.row_factory = aiosqlite.Row
 
-        # Own alliance names — used to filter
+        # Own alliance names from ally_groups
         async with db.execute(
             "SELECT ally_name, wing1_name, wing2_name FROM ally_groups WHERE guild_id=?",
             (guild_id,)
@@ -680,47 +680,32 @@ async def get_countdown_enemies(guild_id: str) -> list[dict]:
                 if v:
                     own_names.add(v.strip().upper())
 
-        # Try meta groups first
+        # Top alliances by village count from live map data
         async with db.execute(
-            "SELECT id, meta_name FROM alliance_meta_groups WHERE guild_id=? ORDER BY id",
+            """
+            SELECT alliance_name, COUNT(*) AS cnt
+            FROM map_snapshots
+            WHERE guild_id=?
+              AND alliance_name IS NOT NULL
+              AND alliance_name != ''
+            GROUP BY alliance_name
+            ORDER BY cnt DESC
+            LIMIT 30
+            """,
             (guild_id,)
         ) as cur:
-            groups = [dict(r) for r in await cur.fetchall()]
+            rows = [dict(r) for r in await cur.fetchall()]
 
-        result = []
-        for g in groups:
-            if len(result) >= 10:
-                break
-            async with db.execute(
-                "SELECT alliance_name FROM alliance_meta_members WHERE group_id=?",
-                (g["id"],)
-            ) as cur:
-                alliances = [r["alliance_name"] for r in await cur.fetchall()]
-            if any(a.strip().upper() in own_names for a in alliances):
-                continue
-            result.append({
-                "name":  g["meta_name"],
-                "color": enemy_colors[len(result) % len(enemy_colors)],
-            })
-
-        # Fallback: top-10 distinct alliance names from enemies table
-        if not result:
-            async with db.execute(
-                "SELECT DISTINCT alliance_name FROM enemies "
-                "WHERE guild_id=? AND alliance_name IS NOT NULL AND alliance_name!='' LIMIT 20",
-                (guild_id,)
-            ) as cur:
-                rows = [r["alliance_name"] for r in await cur.fetchall()]
-            for aname in rows:
-                if len(result) >= 10:
-                    break
-                if aname.strip().upper() in own_names:
-                    continue
-                result.append({
-                    "name":  aname,
-                    "color": enemy_colors[len(result) % len(enemy_colors)],
-                })
-
+    result = []
+    for r in rows:
+        if len(result) >= 10:
+            break
+        if r["alliance_name"].strip().upper() in own_names:
+            continue
+        result.append({
+            "name":  r["alliance_name"],
+            "color": enemy_colors[len(result) % len(enemy_colors)],
+        })
     return result
 
 
