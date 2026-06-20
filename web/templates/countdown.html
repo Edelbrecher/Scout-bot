@@ -592,16 +592,7 @@ function spawnTag(token){
 
 function buildTokenPool(groups){
   groups.forEach(g=>{
-    // Meta name — largest
-    allTokens.push({text:g.name,   color:g.color, size:'1.1em',  weight:'900'});
-    // Alliance abbreviations — medium
-    g.alliances.forEach(a=>{
-      allTokens.push({text:a,      color:g.color, size:'.85em',  weight:'700'});
-    });
-    // Individual players — smaller
-    g.players.forEach(p=>{
-      allTokens.push({text:p,      color:g.color, size:'.75em',  weight:'600'});
-    });
+    allTokens.push({text:g.name, color:g.color, size:'1.1em', weight:'900'});
   });
 }
 
