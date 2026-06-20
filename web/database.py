@@ -330,6 +330,7 @@ async def init_db():
             "wewin_button_tooltip TEXT",
             "wewin_countdown_channels INTEGER DEFAULT 0",
             "wewin_jarves_countdown INTEGER DEFAULT 0",
+            "wewin_public_token TEXT",
         ]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
@@ -707,6 +708,34 @@ async def get_countdown_enemies(guild_id: str) -> list[dict]:
             "color": enemy_colors[len(result) % len(enemy_colors)],
         })
     return result
+
+
+async def get_guild_by_countdown_token(token: str) -> dict | None:
+    """Return guild config for a public countdown token, or None if not found."""
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM guild_configs WHERE wewin_public_token=?", (token,)
+        ) as cur:
+            row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def ensure_countdown_token(guild_id: str) -> str:
+    """Return existing token or generate + persist a new one."""
+    import secrets as _sec
+    guild = await get_guild(guild_id)
+    token = guild.get("wewin_public_token") if guild else None
+    if not token:
+        token = _sec.token_urlsafe(16)
+        async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+            await db.execute(
+                "UPDATE guild_configs SET wewin_public_token=? WHERE guild_id=?",
+                (token, guild_id)
+            )
+            await db.commit()
+        _CACHE.pop(f"guild:{guild_id}", None)
+    return token
 
 
 async def update_guild_server_end(guild_id: str, **fields):

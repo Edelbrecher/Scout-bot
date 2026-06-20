@@ -6542,6 +6542,7 @@ async def my_ally_page(request: Request, guild_id: str):
         "ally_has_leaderboard": bool(leaderboard),
         "is_my_ally_page": True,
         "ally_nav_active": "mitglieder",
+        "countdown_token": await database.ensure_countdown_token(guild_id) if guild.get("server_end_date") else "",
     })
 
 
@@ -6900,37 +6901,50 @@ async def my_ally_post_server_end_discord(request: Request, guild_id: str):
     return JSONResponse({"ok": True, "days": days, "hours": hours, "minutes": mins})
 
 
-@app.get("/api/guild/{guild_id}/countdown-enemies")
-async def countdown_enemies_api(guild_id: str):
-    """Public — returns enemy meta-groups for the countdown screen."""
-    data = await database.get_countdown_enemies(guild_id)
+@app.get("/api/countdown/{token}/enemies")
+async def countdown_enemies_api(token: str):
+    """Public — returns enemy alliances for the countdown screen."""
+    guild = await database.get_guild_by_countdown_token(token)
+    if not guild:
+        return JSONResponse([])
+    data = await database.get_countdown_enemies(guild["guild_id"])
     return JSONResponse(data)
 
 
-@app.get("/guild/{guild_id}/countdown")
-async def countdown_page(request: Request, guild_id: str):
-    """Public full-screen countdown page — no login required."""
-    guild = await database.get_guild(guild_id)
+@app.get("/countdown/{token}")
+async def countdown_page(request: Request, token: str):
+    """Public full-screen countdown page — token hides guild identity."""
+    guild = await database.get_guild_by_countdown_token(token)
     if not guild or not guild.get("server_end_date"):
         return RedirectResponse("/", status_code=303)
     from datetime import datetime as _dt, timezone as _tz
     try:
         end_dt = _dt.fromisoformat(guild["server_end_date"].replace("T", " ")).replace(tzinfo=_tz.utc)
     except ValueError:
-        return RedirectResponse(f"/guild/{guild_id}", status_code=303)
+        return RedirectResponse("/", status_code=303)
     now        = _dt.now(_tz.utc)
     total_secs = int((end_dt - now).total_seconds())
-    ag         = await database.get_ally_group_for_guild(guild_id)
+    ag         = await database.get_ally_group_for_guild(guild["guild_id"])
     ally_name  = ag.get("ally_name", "Allianz") if ag else "Allianz"
     return templates.TemplateResponse("countdown.html", {
         "request":        request,
-        "guild_id":       guild_id,
+        "token":          token,
         "ally_name":      ally_name,
         "server_end_iso": guild["server_end_date"],
         "total_secs":     total_secs,
         "music_url":      guild.get("wewin_music_url") or "",
         "utc_offset":     guild.get("server_utc_offset", 60),
     })
+
+
+@app.get("/guild/{guild_id}/countdown")
+async def countdown_page_legacy(guild_id: str):
+    """Legacy redirect — old links still work."""
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/", status_code=303)
+    token = await database.ensure_countdown_token(guild_id)
+    return RedirectResponse(f"/countdown/{token}", status_code=301)
 
 
 @app.get("/api/guild/{guild_id}/server-end")

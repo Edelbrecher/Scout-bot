@@ -1372,19 +1372,19 @@
               🔄 Jetzt manuell updaten
             </button>
             {% endif %}
-            {% if guild.server_end_date %}
-            <a href="/guild/{{ guild.guild_id }}/countdown" target="_blank" class="btn"
+            {% if guild.server_end_date and countdown_token %}
+            <a href="/countdown/{{ countdown_token }}" target="_blank" class="btn"
                style="font-size:.85rem;background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4);color:#fbbf24;text-decoration:none;">
               🏆 Countdown-Screen öffnen
             </a>
             {% endif %}
           </div>
 
-          {% if guild.server_end_date %}
+          {% if guild.server_end_date and countdown_token %}
           <div style="display:flex;align-items:center;gap:.5rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;">
             <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">🔗 Public link:</span>
             <code id="countdown-url" style="font-size:.75rem;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-              https://travops.online/guild/{{ guild.guild_id }}/countdown
+              https://travops.online/countdown/{{ countdown_token }}
             </code>
             <button type="button" onclick="copyCountdownUrl()" id="copy-url-btn"
               style="flex-shrink:0;padding:.2rem .6rem;border-radius:5px;border:1px solid var(--border);

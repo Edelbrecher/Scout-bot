@@ -500,7 +500,7 @@ function fireVictory(){
 })();
 
 // ── Enemy tags (float → burst → respawn loop) ────────────────────────────
-const GUILD_ID = {{ guild_id | tojson }};
+const CD_TOKEN = {{ token | tojson }};
 let allTokens  = [];   // [{text, color, size, weight}]  — master pool
 let activeTags = [];   // [{el, x, y, color, timer}]
 let victoryMode = false;
@@ -626,7 +626,7 @@ function burstAllEnemyTags(){
   activeTags=[];
 }
 
-fetch(`/api/guild/${GUILD_ID}/countdown-enemies`)
+fetch(`/api/countdown/${CD_TOKEN}/enemies`)
   .then(r=>r.json())
   .then(groups=>{ if(groups&&groups.length) startEnemyLoop(groups); })
   .catch(()=>{});
