@@ -469,8 +469,7 @@ function tick(){
 }
 
 function fireVictory(){
-  // Burst enemy tags first (before fireworks so they show up)
-  burstEnemyTags();
+  burstAllEnemyTags();
   setTimeout(startFW, 600);
   // Fade clock out
   document.getElementById('wrap').classList.add('fade-out');
@@ -496,98 +495,135 @@ function fireVictory(){
   }catch(e){}
 })();
 
-// ── Enemy tags ───────────────────────────────────────────────────────────
+// ── Enemy tags (float → burst → respawn loop) ────────────────────────────
 const GUILD_ID = {{ guild_id | tojson }};
-let enemyTags = [];   // [{el, cx, cy, color}]
+let allTokens  = [];   // [{text, color, size, weight}]  — master pool
+let activeTags = [];   // [{el, x, y, color, timer}]
+let victoryMode = false;
 
 function rnd(min,max){ return min + Math.random()*(max-min); }
 
-function spawnEnemyTags(groups){
+// Safe position: avoid centre clock (~35% of screen width/height)
+function safePos(){
+  let x,y,tries=0;
+  do {
+    x = rnd(.03,.97); y = rnd(.03,.97);
+    tries++;
+  } while(
+    (x>.3&&x<.7&&y>.22&&y<.78) && tries<40
+  );
+  return [x,y];
+}
+
+function particleBurst(x,y,color,count=50){
+  for(let i=0;i<count;i++){
+    const angle=(i/count)*Math.PI*2, sp=2+Math.random()*10;
+    fwPs.push({x,y,vx:Math.cos(angle)*sp,vy:Math.sin(angle)*sp,
+      life:1,dec:.016+Math.random()*.024,col:color,sz:2+Math.random()*4});
+  }
+  if(!fwOn){ fwOn=true; fwC.classList.add('active'); animFW(); }
+}
+
+function spawnTag(token){
+  if(victoryMode) return;
   const layer = document.getElementById('enemy-layer');
-  const W = innerWidth, H = innerHeight;
-  // Avoid the center clock area (~40% of screen)
-  const safeZones = [{x1:.3,y1:.25,x2:.7,y2:.75}];
-  const isSafe = (px,py) => !safeZones.some(z=>px>z.x1&&px<z.x2&&py>z.y1&&py<z.y2);
+  const [px,py] = safePos();
+  const W=innerWidth, H=innerHeight;
+  const cx=px*W, cy=py*H;
 
+  const el = document.createElement('div');
+  el.className = 'etag';
+  el.textContent = token.text;
+  el.style.color      = token.color;
+  el.style.fontSize   = token.size;
+  el.style.fontWeight = token.weight;
+
+  const dur = rnd(14,28);
+  const dx=rnd(-70,70)+'px', dy=rnd(-50,50)+'px';
+  const r0=rnd(-9,9)+'deg', r1=rnd(-14,14)+'deg', r2=rnd(-7,7)+'deg';
+  el.style.cssText += `left:${px*100}%;top:${py*100}%;
+    --dx:${dx};--dy:${dy};--r0:${r0};--r1:${r1};--r2:${r2};
+    animation:etag-float ${dur}s ease-in-out infinite;
+    animation-delay:-${rnd(0,dur)}s;`;
+  layer.appendChild(el);
+
+  // Fade in
+  setTimeout(()=> el.classList.add('visible'), 50);
+
+  // Stay visible for 6–14s, then burst and respawn
+  const stayMs = rnd(6000,14000);
+  const handle = {el, cx, cy, color:token.color, token};
+  activeTags.push(handle);
+
+  handle.burstTimer = setTimeout(()=>{
+    if(victoryMode){ el.remove(); return; }
+    // Quick pulse
+    el.classList.add('pulse');
+    setTimeout(()=>{
+      el.classList.add('burst');
+      // Get current rendered position for accurate particle origin
+      const rect = el.getBoundingClientRect();
+      const pcx  = rect.left + rect.width/2;
+      const pcy  = rect.top  + rect.height/2;
+      particleBurst(pcx, pcy, token.color, 35);
+      setTimeout(()=>{
+        el.remove();
+        activeTags = activeTags.filter(t=>t!==handle);
+        // Respawn this token after a short pause
+        setTimeout(()=> spawnTag(token), rnd(1500,4000));
+      }, 400);
+    }, 250);
+  }, stayMs);
+}
+
+function buildTokenPool(groups){
   groups.forEach(g=>{
-    // Build token list: meta name (large) + alliance names (medium) + players (small)
-    const tokens = [
-      {text:g.name,   size:'1.05em', weight:'900'},
-      ...g.alliances.map(a=>({text:a,  size:'.82em', weight:'700'})),
-      ...g.players  .map(p=>({text:p,  size:'.72em', weight:'600'})),
-    ];
-
-    tokens.forEach(t=>{
-      // Random position outside center
-      let px,py,tries=0;
-      do { px=rnd(.04,.96); py=rnd(.04,.96); tries++; } while(!isSafe(px,py)&&tries<30);
-
-      const el = document.createElement('div');
-      el.className = 'etag';
-      el.textContent = t.text;
-      el.style.color = g.color;
-      el.style.fontSize = t.size;
-      el.style.fontWeight = t.weight;
-
-      // Random slow float animation
-      const dur   = rnd(18,35);
-      const dx    = rnd(-60,60)+'px';
-      const dy    = rnd(-40,40)+'px';
-      const r0    = rnd(-8,8)+'deg';
-      const r1    = rnd(-12,12)+'deg';
-      const r2    = rnd(-6,6)+'deg';
-      el.style.cssText += `
-        left:${px*100}%;top:${py*100}%;
-        --dx:${dx};--dy:${dy};--r0:${r0};--r1:${r1};--r2:${r2};--drift:translate(0,0);
-        animation:etag-float ${dur}s ease-in-out infinite;
-        animation-delay:-${rnd(0,dur)}s;
-      `;
-
-      layer.appendChild(el);
-      const cx = px * W;
-      const cy = py * H;
-      enemyTags.push({el, cx, cy, color:g.color});
-
-      // Fade in staggered
-      setTimeout(()=> el.classList.add('visible'), rnd(200,2000));
+    // Meta name — largest
+    allTokens.push({text:g.name,   color:g.color, size:'1.1em',  weight:'900'});
+    // Alliance abbreviations — medium
+    g.alliances.forEach(a=>{
+      allTokens.push({text:a,      color:g.color, size:'.85em',  weight:'700'});
+    });
+    // Individual players — smaller
+    g.players.forEach(p=>{
+      allTokens.push({text:p,      color:g.color, size:'.75em',  weight:'600'});
     });
   });
 }
 
-function burstEnemyTags(){
-  enemyTags.forEach(({el, cx, cy, color}, i)=>{
-    setTimeout(()=>{
-      // Pulse then burst
-      el.classList.add('pulse');
-      setTimeout(()=>{
-        el.classList.add('burst');
-        // Particle explosion at tag position
-        const W=innerWidth, H=innerHeight;
-        const count = 40 + Math.floor(Math.random()*25);
-        for(let j=0;j<count;j++){
-          const angle = (j/count)*Math.PI*2;
-          const speed = 3 + Math.random()*9;
-          fwPs.push({
-            x: cx, y: cy,
-            vx: Math.cos(angle)*speed,
-            vy: Math.sin(angle)*speed,
-            life:1, dec:.018+Math.random()*.025,
-            col: color,
-            sz: 2+Math.random()*3.5,
-          });
-        }
-        if(!fwOn){ fwOn=true; fwC.classList.add('active'); animFW(); }
-      }, 300 + i*40);
-    }, i * 80);
+function startEnemyLoop(groups){
+  buildTokenPool(groups);
+  if(!allTokens.length) return;
+
+  // Stagger initial spawns — show up to 20 tags simultaneously
+  const initial = Math.min(allTokens.length, 20);
+  // Shuffle
+  const shuffled = [...allTokens].sort(()=>Math.random()-.5);
+  shuffled.slice(0,initial).forEach((t,i)=>{
+    setTimeout(()=>spawnTag(t), i*300);
   });
 }
 
-// Load enemy data
+function burstAllEnemyTags(){
+  victoryMode = true;
+  activeTags.forEach(({el,cx,cy,color,burstTimer},i)=>{
+    clearTimeout(burstTimer);
+    setTimeout(()=>{
+      el.classList.add('pulse');
+      setTimeout(()=>{
+        const rect=el.getBoundingClientRect();
+        el.classList.add('burst');
+        particleBurst(rect.left+rect.width/2, rect.top+rect.height/2, color, 55);
+        setTimeout(()=>el.remove(), 400);
+      }, 200);
+    }, i*60);
+  });
+  activeTags=[];
+}
+
 fetch(`/api/guild/${GUILD_ID}/countdown-enemies`)
   .then(r=>r.json())
-  .then(groups=>{
-    if(groups && groups.length) spawnEnemyTags(groups);
-  })
+  .then(groups=>{ if(groups&&groups.length) startEnemyLoop(groups); })
   .catch(()=>{});
 
 // ── Boot ─────────────────────────────────────────────────────────────────
