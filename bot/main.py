@@ -1558,15 +1558,45 @@ async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web
     if channel_id:
         try:
             existing_channel = guild.get_channel(int(channel_id)) or await guild.fetch_channel(int(channel_id))
-        except Exception:
+            print(f"[bonus_sync] channel_id={channel_id} found: {existing_channel}", flush=True)
+        except Exception as e:
+            print(f"[bonus_sync] channel_id={channel_id} NOT found: {e}", flush=True)
             existing_channel = None
+    else:
+        print(f"[bonus_sync] no channel_id in payload", flush=True)
+    # Build permission overwrites (used for both create and update)
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(
+            view_channel=False if role_ids else True,
+            send_messages=False,
+        ),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, embed_links=True, manage_messages=True,
+        ),
+    }
+    for rid in role_ids:
+        try:
+            role = guild.get_role(int(rid))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+        except Exception:
+            pass
+
     if existing_channel and message_id:
         try:
             msg = await existing_channel.fetch_message(int(message_id))
             await msg.edit(embed=embed)
+            # Always sync permissions on the existing channel
+            try:
+                await existing_channel.edit(overwrites=overwrites)
+            except Exception as pe:
+                print(f"[bonus_sync] permission update failed: {pe}", flush=True)
+            print(f"[bonus_sync] edited message {message_id} in channel {channel_id}", flush=True)
             return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "message_id": message_id})
-        except Exception:
-            pass  # message gone — post a new one below
+        except Exception as e:
+            print(f"[bonus_sync] fetch/edit message {message_id} failed: {e} — will post new", flush=True)
+    elif existing_channel and not message_id:
+        print(f"[bonus_sync] channel found but no message_id — will post new message", flush=True)
 
     # Create channel if it doesn't exist
     if not existing_channel:
@@ -1585,28 +1615,21 @@ async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web
                 category = await _get_or_create_category(guild, config)
             except Exception as e:
                 return aiohttp_web.json_response({"ok": False, "error": f"category error: {e}"}, status=500)
-
-        # Permissions: bot + everyone read-only + specific roles read-only
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
-                                                   embed_links=True, manage_messages=True),
-        }
-        for rid in role_ids:
-            try:
-                role = guild.get_role(int(rid))
-                if role:
-                    overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
-            except Exception:
-                pass
         try:
             existing_channel = await guild.create_text_channel(
                 name="ally-bonuses", category=category,
                 topic="Next alliance research step — updated automatically by TravOps",
                 overwrites=overwrites,
             )
+            print(f"[bonus_sync] created new channel {existing_channel.id}", flush=True)
         except Exception as e:
             return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+    else:
+        # Channel exists but message was gone — update permissions too
+        try:
+            await existing_channel.edit(overwrites=overwrites)
+        except Exception as pe:
+            print(f"[bonus_sync] permission update on existing channel failed: {pe}", flush=True)
 
     msg = await existing_channel.send(embed=embed)
     await database.set_bonus_discord_ids(ally_group_id, str(existing_channel.id), str(msg.id))
