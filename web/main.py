@@ -15696,6 +15696,7 @@ async def alliance_bonuses_page(request: Request, guild_id: str):
             for b in active_defs
             for lvl in range(1, 6)
         ]
+    ally_nav = await _get_ally_nav_context(guild_id, session)
     return templates.TemplateResponse("alliance_bonuses.html", {
         "request": request, "guild": guild, "ally_group": ally_group,
         "is_editor": is_editor, "bonuses": bonuses,
@@ -15703,6 +15704,9 @@ async def alliance_bonuses_page(request: Request, guild_id: str):
         "active_defs": active_defs,
         "enabled_keys": enabled_keys,
         "research_order": research_order,
+        "is_my_ally_page": False,
+        "ally_nav_active": "bonus",
+        **ally_nav,
     })
 
 

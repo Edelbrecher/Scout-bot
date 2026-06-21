@@ -222,6 +222,88 @@
   {% endif %}
 </div>
 
+{# ── Ally-Bonuses Channel ── #}
+{% if ally_group %}
+<div class="card" style="margin-bottom:1rem;">
+  <h2 style="margin:0 0 0.35rem; font-size:1rem;">🏛️ Ally-Bonuses Channel</h2>
+  <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem;">
+    Wähle die Kategorie und welche Rollen den Kanal sehen dürfen. Wird beim nächsten Sync übernommen.
+  </p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+    <div>
+      <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.35rem;">Kategorie</label>
+      <select id="ab-category" style="width:100%;padding:.4rem .6rem;border-radius:8px;
+              border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.83rem;">
+        <option value="">— Keine Kategorie —</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.4rem;">Sichtbar für Rollen</label>
+      {% if discord_roles %}
+      {% set ab_role_ids = (ally_group.bonus_role_ids or '[]') | from_json %}
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem .6rem;">
+        {% for role in discord_roles %}{% if role.name != '@everyone' %}
+        <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;padding:.28rem .55rem;
+                       border-radius:6px;border:1px solid var(--border);background:var(--bg-main);
+                       font-size:.8rem;user-select:none;">
+          <input type="checkbox" class="ab-role-cb" value="{{ role.id }}"
+                 {% if role.id|string in ab_role_ids %}checked{% endif %}
+                 style="accent-color:#6366f1;width:13px;height:13px;">
+          {% if role.color %}
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;
+                        background:#{{ '%06x' % role.color }};flex-shrink:0;"></span>
+          {% endif %}
+          <span>{{ role.name }}</span>
+        </label>
+        {% endif %}{% endfor %}
+      </div>
+      {% else %}
+      <p style="font-size:.78rem;color:var(--text-muted);font-style:italic;margin:0;">Rollen konnten nicht geladen werden.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div style="margin-top:.9rem;display:flex;align-items:center;gap:.75rem;">
+    <button onclick="saveAllyBonusChannelSettings()" class="btn btn-primary" style="font-size:.82rem;">
+      💾 Speichern & Synchronisieren
+    </button>
+    <span id="ab-save-status" style="font-size:.78rem;color:var(--text-muted);"></span>
+  </div>
+</div>
+<script>
+(function(){
+  // Load category dropdown
+  const gid = {{ guild.guild_id | tojson }};
+  const savedCatId = {{ (ally_group.bonus_category_id or '') | tojson }};
+  fetch('/guild/' + gid + '/my-ally/bonuses/channel-settings')
+    .then(r => r.json()).then(d => {
+      const sel = document.getElementById('ab-category');
+      (d.categories || []).forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id; o.textContent = c.name;
+        if (String(c.id) === String(savedCatId)) o.selected = true;
+        sel.appendChild(o);
+      });
+    }).catch(() => {});
+})();
+
+window.saveAllyBonusChannelSettings = async function() {
+  const gid = {{ guild.guild_id | tojson }};
+  const category_id = document.getElementById('ab-category').value || null;
+  const role_ids = [...document.querySelectorAll('.ab-role-cb:checked')].map(cb => cb.value);
+  const status = document.getElementById('ab-save-status');
+  status.textContent = 'Wird gespeichert…';
+  const r = await fetch('/guild/' + gid + '/my-ally/bonuses/channel-settings', {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ category_id, role_ids }),
+  });
+  const d = await r.json();
+  status.textContent = d.ok ? '✓ Gespeichert' : '✗ Fehler';
+  setTimeout(() => { status.textContent = ''; }, 2500);
+};
+</script>
+{% endif %}
+
 {# ── Bot-Verhalten ── #}
 <div class="card" style="margin-bottom:1rem;">
   <h2 style="margin:0 0 0.5rem; font-size:1rem;">⚙️ Bot-Verhalten</h2>

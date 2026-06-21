@@ -3,57 +3,23 @@
 
 {% block content %}
 <div class="container" style="max-width:960px;">
+
+  {% include "_ally_nav.html" %}
+
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}/my-ally" class="back-link">← My Alliance</a>
-      <h1 style="margin:.25rem 0 0;">🏛️ Alliance Bonuses</h1>
+      <h1 style="margin:0 0 .1rem;">🏛️ Alliance Bonuses</h1>
       <p class="subtitle" style="margin:0;">{{ ally_group.ally_name }}</p>
     </div>
     <div style="display:flex;align-items:center;gap:.75rem;">
       <div id="save-indicator" style="font-size:.8rem;color:var(--text-muted);min-width:70px;text-align:right;"></div>
       {% if is_editor %}
-      <button onclick="toggleChannelSettings()" class="btn btn-secondary" style="font-size:.8rem;" id="ch-settings-btn">
-        ⚙️ Channel Settings
-      </button>
       <button onclick="toggleWorldConfig()" class="btn btn-secondary" style="font-size:.8rem;" id="world-cfg-btn">
         🌍 World Config
       </button>
       {% endif %}
     </div>
   </div>
-
-  {# ── Channel settings panel (collapsible) ─────────────────────────── #}
-  {% if is_editor %}
-  <div id="channel-settings" style="display:none;margin-bottom:1.25rem;">
-    <div class="card" style="padding:1rem 1.25rem;border-color:rgba(99,102,241,.3);background:rgba(99,102,241,.04);">
-      <h3 style="margin:0 0 .5rem;font-size:.9rem;">⚙️ Discord Channel Settings</h3>
-      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .85rem;">
-        Choose where the Ally-Bonuses channel is created and who can see it.
-      </p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
-        <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.35rem;">Category</label>
-          <select id="ch-category" style="width:100%;padding:.4rem .6rem;border-radius:8px;
-                  border:1px solid var(--border);background:var(--bg-main);color:var(--text);font-size:.83rem;">
-            <option value="">— No category —</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.35rem;">Visible to roles</label>
-          <div id="ch-roles-list" style="display:flex;flex-wrap:wrap;gap:.4rem .6rem;min-height:2rem;">
-            <span style="font-size:.78rem;color:var(--text-muted);font-style:italic;">Loading…</span>
-          </div>
-        </div>
-      </div>
-      <div style="margin-top:.9rem;display:flex;align-items:center;gap:.75rem;">
-        <button onclick="saveChannelSettings()" class="btn btn-primary" style="font-size:.82rem;">
-          💾 Save & Sync
-        </button>
-        <span id="ch-save-status" style="font-size:.78rem;color:var(--text-muted);"></span>
-      </div>
-    </div>
-  </div>
-  {% endif %}
 
   {# ── World config panel (collapsible) ──────────────────────────────── #}
   {% if is_editor %}
@@ -212,77 +178,6 @@ const lvlState      = { {% for b in bonus_defs %}{{ b.key|tojson }}: {{ bonuses.
 const enabledKeys   = new Set({{ enabled_keys | tojson }});
 
 let dragTrackKey = null, saveTimer = null, dragItem = null;
-
-// ── Channel settings ─────────────────────────────────────────────────────
-let chSettingsLoaded = false;
-
-function toggleChannelSettings() {
-  const panel = document.getElementById('channel-settings');
-  const btn   = document.getElementById('ch-settings-btn');
-  const open  = panel.style.display === 'none';
-  panel.style.display = open ? '' : 'none';
-  btn.textContent = open ? '✕ Close' : '⚙️ Channel Settings';
-  if (open && !chSettingsLoaded) loadChannelSettings();
-}
-
-async function loadChannelSettings() {
-  chSettingsLoaded = true;
-  const r = await fetch(`/guild/${GUILD_ID}/my-ally/bonuses/channel-settings`);
-  if (!r.ok) return;
-  const d = await r.json();
-
-  // Category dropdown
-  const sel = document.getElementById('ch-category');
-  sel.innerHTML = '<option value="">— No category —</option>';
-  (d.categories || []).forEach(c => {
-    const o = document.createElement('option');
-    o.value = c.id; o.textContent = c.name;
-    if (c.id === d.category_id) o.selected = true;
-    sel.appendChild(o);
-  });
-
-  // Roles checkboxes
-  const savedRoles = new Set((d.role_ids || []).map(String));
-  const container = document.getElementById('ch-roles-list');
-  if (!d.roles || d.roles.length === 0) {
-    container.innerHTML = '<span style="font-size:.78rem;color:var(--text-muted);font-style:italic;">No roles found</span>';
-    return;
-  }
-  container.innerHTML = '';
-  (d.roles || []).forEach(role => {
-    const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:.35rem;cursor:pointer;padding:.28rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-main);font-size:.8rem;user-select:none;';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.value = role.id;
-    cb.checked = savedRoles.has(String(role.id));
-    cb.style.cssText = 'accent-color:#6366f1;width:13px;height:13px;';
-    lbl.appendChild(cb);
-    const sp = document.createElement('span');
-    sp.textContent = role.name;
-    if (role.color && role.color !== '0') {
-      const hex = '#' + role.color.toString(16).padStart(6, '0');
-      sp.style.color = hex;
-    }
-    lbl.appendChild(sp);
-    container.appendChild(lbl);
-  });
-}
-
-async function saveChannelSettings() {
-  const sel = document.getElementById('ch-category');
-  const category_id = sel.value || null;
-  const role_ids = [...document.querySelectorAll('#ch-roles-list input[type=checkbox]:checked')].map(cb => cb.value);
-  const status = document.getElementById('ch-save-status');
-  status.textContent = 'Saving…';
-  const r = await fetch(`/guild/${GUILD_ID}/my-ally/bonuses/channel-settings`, {
-    method: 'PATCH',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ category_id, role_ids }),
-  });
-  const d = await r.json();
-  status.textContent = d.ok ? '✓ Saved' : '✗ Error';
-  setTimeout(() => { status.textContent = ''; }, 2500);
-}
 
 // ── World config toggle ───────────────────────────────────────────────────
 function toggleWorldConfig() {
