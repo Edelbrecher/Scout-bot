@@ -15781,7 +15781,7 @@ async def alliance_bonuses_save_order(request: Request, guild_id: str):
 
 
 async def _sync_alliance_bonus_channel(guild_id: str, ally_group_id: int):
-    """Push the current alliance bonus research queue to the Ally-Bonuses Discord channel."""
+    """Post only the next pending research step to the Ally-Bonuses Discord channel."""
     try:
         all_keys     = [b["key"] for b in ALLIANCE_BONUS_DEFS]
         enabled_keys = set(await database.get_bonus_enabled_keys(ally_group_id, all_keys))
@@ -15792,21 +15792,36 @@ async def _sync_alliance_bonus_channel(guild_id: str, ally_group_id: int):
         if not order:
             order = [{"key": b["key"], "level": lvl} for b in active_defs for lvl in range(1, 6)]
 
-        # Build bonus list in research-queue order for the bot handler
-        bonuses_payload = []
+        # Find the first undone step
+        next_step = None
+        done_count = 0
+        total = len(order)
         for step in order:
-            b = next((x for x in active_defs if x["key"] == step["key"]), None)
-            if not b:
-                continue
             cur = cur_levels.get(step["key"], 0)
-            target = step["level"]
-            state_str = "✓ Done" if cur >= target else f"current: {cur}/{target}"
-            bonuses_payload.append({
-                "name":          f"{b['icon']} {b['label']} Lv {target}",
-                "current_level": 1 if cur >= target else 0,
-                "max_level":     1,
-                "description":   f"+{b['levels'][target-1]}{b['unit']} — {state_str}",
-            })
+            if cur >= step["level"]:
+                done_count += 1
+            else:
+                next_step = step
+                break
+
+        # Build a single-step payload
+        if next_step:
+            b = next((x for x in active_defs if x["key"] == next_step["key"]), None)
+            cur = cur_levels.get(next_step["key"], 0)
+            target = next_step["level"]
+            bonuses_payload = [{
+                "name":          f"{b['icon']} {b['label']} — Level {target}" if b else next_step["key"],
+                "current_level": cur,
+                "max_level":     target,
+                "description":   f"+{b['levels'][target-1]}{b['unit']}  ·  {done_count}/{total} steps done" if b else "",
+            }]
+        else:
+            bonuses_payload = [{
+                "name":          "🎉 All bonuses researched!",
+                "current_level": total,
+                "max_level":     total,
+                "description":   f"All {total} steps completed.",
+            }]
 
         channel_id, message_id = await database.get_bonus_discord_ids(ally_group_id)
         async with httpx.AsyncClient(timeout=15) as client:

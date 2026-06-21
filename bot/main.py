@@ -1518,25 +1518,29 @@ async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web
 
     config = await database.get_guild_config(guild_id)
 
-    # Build embed
-    embed = discord.Embed(
-        title="🏛️ Alliance Bonuses",
-        color=discord.Color.from_rgb(99, 102, 241),
-    )
+    # Build embed — shows only the single next step
     if bonuses:
-        lines = []
-        for i, b in enumerate(bonuses, 1):
-            bar_filled = round((b["current_level"] / max(b["max_level"], 1)) * 10)
-            bar = "█" * bar_filled + "░" * (10 - bar_filled)
-            pct = round(b["current_level"] / max(b["max_level"], 1) * 100)
-            desc = f"  *{b['description']}*" if b.get("description") else ""
-            lines.append(
-                f"`{i:>2}.` **{b['name']}** — Lv {b['current_level']}/{b['max_level']} ({pct}%)\n"
-                f"     `{bar}`{desc}"
-            )
-        embed.description = "\n\n".join(lines)
+        b = bonuses[0]
+        cur  = b["current_level"]
+        mx   = max(b["max_level"], 1)
+        done = cur >= mx
+        bar_filled = round(cur / mx * 10)
+        bar  = "█" * bar_filled + "░" * (10 - bar_filled)
+        embed = discord.Embed(
+            title="🏛️ Next Research Step",
+            description=(
+                f"## {b['name']}\n"
+                f"`{bar}` {cur}/{mx}\n"
+                + (f"\n{b['description']}" if b.get("description") else "")
+            ),
+            color=discord.Color.green() if done else discord.Color.from_rgb(99, 102, 241),
+        )
     else:
-        embed.description = "*No bonuses configured yet.*"
+        embed = discord.Embed(
+            title="🏛️ Alliance Bonuses",
+            description="*No bonuses configured yet.*",
+            color=discord.Color.from_rgb(99, 102, 241),
+        )
     embed.set_footer(text="Updated via TravOps")
 
     # Try to update existing message
