@@ -15684,18 +15684,24 @@ async def alliance_bonuses_page(request: Request, guild_id: str):
         return RedirectResponse(f"/guild/{guild_id}/my-ally")
     is_editor = (ally_group.get("owner_discord_id") == uid or await has_perm(request, guild_id, "ally_manage"))
     bonuses = await database.get_alliance_bonuses(guild_id)
+    all_keys = [b["key"] for b in ALLIANCE_BONUS_DEFS]
+    enabled_keys = await database.get_bonus_enabled_keys(ally_group["id"], all_keys)
+    active_defs = [b for b in ALLIANCE_BONUS_DEFS if b["key"] in enabled_keys]
     research_order = await database.get_bonus_research_order(ally_group["id"])
-    # Default: all steps in level order, grouped by bonus
+    # Filter out disabled keys from order, build default if empty
+    research_order = [s for s in research_order if s["key"] in enabled_keys]
     if not research_order:
         research_order = [
             {"key": b["key"], "level": lvl}
-            for b in ALLIANCE_BONUS_DEFS
+            for b in active_defs
             for lvl in range(1, 6)
         ]
     return templates.TemplateResponse("alliance_bonuses.html", {
         "request": request, "guild": guild, "ally_group": ally_group,
         "is_editor": is_editor, "bonuses": bonuses,
         "bonus_defs": ALLIANCE_BONUS_DEFS,
+        "active_defs": active_defs,
+        "enabled_keys": enabled_keys,
         "research_order": research_order,
     })
 
@@ -15721,6 +15727,31 @@ async def alliance_bonuses_save(request: Request, guild_id: str):
             bonuses[b["key"]] = 0
     await database.save_alliance_bonuses(guild_id, bonuses)
     return RedirectResponse(f"/guild/{guild_id}/my-ally/bonuses?saved=1", status_code=303)
+
+
+@app.patch("/guild/{guild_id}/my-ally/bonuses/enabled-keys")
+async def alliance_bonuses_save_enabled(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    is_editor = ally_group and (
+        ally_group.get("owner_discord_id") == uid or
+        await has_perm(request, guild_id, "ally_manage")
+    )
+    if not is_editor:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    valid = {b["key"] for b in ALLIANCE_BONUS_DEFS}
+    keys = [k for k in body.get("keys", []) if k in valid]
+    await database.save_bonus_enabled_keys(ally_group["id"], keys)
+    # Rebuild research order without disabled keys
+    order = await database.get_bonus_research_order(ally_group["id"])
+    order = [s for s in order if s["key"] in keys]
+    await database.save_bonus_research_order(ally_group["id"], order)
+    return JSONResponse({"ok": True})
 
 
 @app.patch("/guild/{guild_id}/my-ally/bonuses/research-order")

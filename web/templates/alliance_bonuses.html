@@ -2,21 +2,55 @@
 {% block title %}Alliance Bonuses · {{ ally_group.ally_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:900px;">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
+<div class="container" style="max-width:960px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/my-ally" class="back-link">← My Alliance</a>
       <h1 style="margin:.25rem 0 0;">🏛️ Alliance Bonuses</h1>
       <p class="subtitle" style="margin:0;">{{ ally_group.ally_name }}</p>
     </div>
-    <div id="save-indicator" style="font-size:.8rem;color:var(--text-muted);align-self:center;min-width:80px;text-align:right;"></div>
+    <div style="display:flex;align-items:center;gap:.75rem;">
+      <div id="save-indicator" style="font-size:.8rem;color:var(--text-muted);min-width:70px;text-align:right;"></div>
+      {% if is_editor %}
+      <button onclick="toggleWorldConfig()" class="btn btn-secondary" style="font-size:.8rem;" id="world-cfg-btn">
+        🌍 World Config
+      </button>
+      {% endif %}
+    </div>
   </div>
+
+  {# ── World config panel (collapsible) ──────────────────────────────── #}
+  {% if is_editor %}
+  <div id="world-config" style="display:none;margin-bottom:1.25rem;">
+    <div class="card" style="padding:1rem 1.25rem;border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.04);">
+      <h3 style="margin:0 0 .5rem;font-size:.9rem;">🌍 World Configuration — Available Bonuses</h3>
+      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 .85rem;">
+        Disable bonuses that don't exist on your world (e.g. Europe: only Recruitment, Philosophy, Metallurgy, Commerce).
+        Disabled bonuses are hidden from the queue and timeline.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem .75rem;">
+        {% for b in bonus_defs %}
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;
+                       padding:.35rem .65rem;border-radius:8px;border:1px solid var(--border);
+                       background:var(--bg-main);font-size:.83rem;user-select:none;"
+               id="cfg-label-{{ b.key }}">
+          <input type="checkbox" id="cfg-{{ b.key }}"
+                 {% if b.key in enabled_keys %}checked{% endif %}
+                 onchange="toggleBonusKey('{{ b.key }}')"
+                 style="accent-color:#6366f1;width:14px;height:14px;">
+          <span>{{ b.icon }} {{ b.label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start;">
 
     {# ── LEFT: Research Queue ─────────────────────────────────────────── #}
     <div>
-      <h2 style="font-size:.9rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .75rem;">
+      <h2 style="font-size:.9rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .6rem;">
         📋 Research Order
       </h2>
       {% if is_editor %}
@@ -25,83 +59,80 @@
 
       <ul id="research-queue" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.35rem;">
         {% for step in research_order %}
-        {% set b = bonus_defs | selectattr('key','equalto',step.key) | first %}
+        {% set b = active_defs | selectattr('key','equalto',step.key) | first %}
+        {% if b %}
         {% set cur = bonuses.get(step.key, 0) | int %}
         {% set done = cur >= step.level %}
         <li data-key="{{ step.key }}" data-level="{{ step.level }}"
             style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
                    border-radius:8px;border:1px solid {% if done %}rgba(74,222,128,.2){% else %}var(--border){% endif %};
                    background:{% if done %}rgba(74,222,128,.06){% else %}var(--bg-card){% endif %};
-                   opacity:{% if done %}.55{% else %}1{% endif %};
-                   transition:opacity .2s,border-color .2s,background .2s;
-                   {% if is_editor and not done %}cursor:grab;{% endif %}">
-          {% if is_editor and not done %}
-          <span style="color:var(--text-muted);font-size:.85rem;flex-shrink:0;">⠿</span>
-          {% endif %}
-          <span style="font-size:1.05rem;flex-shrink:0;">{{ b.icon if b else '?' }}</span>
+                   opacity:{% if done %}.5{% else %}1{% endif %};transition:opacity .2s,border-color .2s;">
+          <span style="color:var(--text-muted);font-size:.85rem;flex-shrink:0;{% if done %}visibility:hidden{% endif %};">⠿</span>
+          <span style="font-size:1rem;flex-shrink:0;">{{ b.icon }}</span>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:.85rem;font-weight:{% if done %}500{% else %}600{% endif %};
-                        color:{% if done %}var(--text-muted){% else %}var(--text){% endif %};">
-              {{ b.label if b else step.key }}
-              <span style="font-size:.75rem;font-weight:400;color:{% if done %}rgba(74,222,128,.7){% else %}#818cf8{% endif %};">
-                Lv {{ step.level }}
-                {% if b %}→ +{{ b.levels[step.level - 1] }}{{ b.unit }}{% endif %}
+            <div style="font-size:.84rem;font-weight:{% if done %}400{% else %}600{% endif %};color:{% if done %}var(--text-muted){% else %}var(--text){% endif %};">
+              {{ b.label }}
+              <span style="font-size:.74rem;font-weight:400;color:{% if done %}rgba(74,222,128,.7){% else %}#818cf8{% endif %};">
+                Lv {{ step.level }} → +{{ b.levels[step.level - 1] }}{{ b.unit }}
               </span>
             </div>
           </div>
           {% if done %}
-          <span style="font-size:.8rem;color:#4ade80;flex-shrink:0;">✓</span>
+          <span style="font-size:.82rem;color:#4ade80;flex-shrink:0;">✓</span>
           {% else %}
-          <span style="font-size:.72rem;color:var(--text-muted);flex-shrink:0;">
-            {{ cur }}/{{ step.level }}
-          </span>
+          <span style="font-size:.7rem;color:var(--text-muted);flex-shrink:0;">{{ cur }}/{{ step.level }}</span>
           {% endif %}
         </li>
+        {% endif %}
         {% endfor %}
       </ul>
     </div>
 
-    {# ── RIGHT: Current Levels (interactive timeline) ─────────────────── #}
+    {# ── RIGHT: Current Levels ────────────────────────────────────────── #}
     <div>
-      <h2 style="font-size:.9rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .75rem;">
+      <h2 style="font-size:.9rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .6rem;">
         📊 Current Levels
       </h2>
       {% if is_editor %}
-      <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .75rem;">Click or drag to set the current level.</p>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .75rem;">Click or drag dots to set current level.</p>
       {% endif %}
 
-      <div style="display:flex;flex-direction:column;gap:.5rem;">
+      <div id="timeline-list" style="display:flex;flex-direction:column;gap:.5rem;">
         {% for b in bonus_defs %}
         {% set cur = bonuses.get(b.key, 0) | int %}
-        <div class="card" style="padding:.65rem .9rem;">
+        {% set active = b.key in enabled_keys %}
+        <div class="card" id="timeline-row-{{ b.key }}"
+             style="padding:.65rem .9rem;{% if not active %}opacity:.3;filter:grayscale(1);{% endif %}">
           <div style="display:flex;align-items:center;gap:.6rem;">
             <span style="font-size:1.1rem;flex-shrink:0;">{{ b.icon }}</span>
-            <div style="min-width:90px;">
+            <div style="min-width:88px;">
               <div style="font-size:.82rem;font-weight:700;">{{ b.label }}</div>
             </div>
             <div style="flex:1;position:relative;user-select:none;"
                  id="track-{{ b.key }}" data-key="{{ b.key }}" data-cur="{{ cur }}"
                  data-levels="{{ b.levels | join(',') }}" data-unit="{{ b.unit }}"
-                 {% if is_editor %}data-editable="1"{% endif %}>
+                 {% if is_editor and active %}data-editable="1"{% endif %}>
               <div style="position:absolute;top:9px;left:0;right:0;height:3px;background:rgba(255,255,255,.1);border-radius:2px;z-index:0;"></div>
-              <div id="fill-{{ b.key }}" style="position:absolute;top:9px;left:0;height:3px;border-radius:2px;background:linear-gradient(90deg,#6366f1,#818cf8);z-index:0;transition:width .2s;
-                   width:{% if cur > 0 %}{{ ((cur - 0.5) / 5 * 100)|int }}%{% else %}0%{% endif %};"></div>
+              <div id="fill-{{ b.key }}" style="position:absolute;top:9px;left:0;height:3px;border-radius:2px;
+                   background:linear-gradient(90deg,#6366f1,#818cf8);z-index:0;transition:width .2s;
+                   width:{% if cur > 0 %}{{ ((cur-0.5)/5*100)|int }}%{% else %}0%{% endif %};"></div>
               <div style="display:flex;position:relative;z-index:1;">
                 {% for lvl in range(1,6) %}
-                {% set active = cur >= lvl %}{% set is_cur = cur == lvl %}
-                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;{% if is_editor %}cursor:pointer;{% endif %}"
-                     {% if is_editor %}onclick="setLevel('{{ b.key }}',{{ lvl }})"{% endif %}>
+                {% set act=cur>=lvl %}{% set isc=cur==lvl %}
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;{% if is_editor and active %}cursor:pointer;{% endif %}"
+                     {% if is_editor and active %}onclick="setLevel('{{ b.key }}',{{ lvl }})"{% endif %}>
                   <div id="dotcircle-{{ b.key }}-{{ lvl }}"
                        style="width:18px;height:18px;border-radius:50%;
-                              border:2px solid {% if active %}#6366f1{% else %}rgba(255,255,255,.15){% endif %};
-                              background:{% if is_cur %}#6366f1{% elif active %}rgba(99,102,241,.4){% else %}rgba(255,255,255,.05){% endif %};
+                              border:2px solid {% if act %}#6366f1{% else %}rgba(255,255,255,.15){% endif %};
+                              background:{% if isc %}#6366f1{% elif act %}rgba(99,102,241,.4){% else %}rgba(255,255,255,.05){% endif %};
                               display:flex;align-items:center;justify-content:center;
-                              box-shadow:{% if is_cur %}0 0 8px rgba(99,102,241,.7){% else %}none{% endif %};transition:all .15s;">
-                    {% if is_cur %}<span style="font-size:8px;color:#fff;font-weight:800;">✓</span>{% endif %}
+                              box-shadow:{% if isc %}0 0 8px rgba(99,102,241,.7){% else %}none{% endif %};transition:all .15s;">
+                    {% if isc %}<span style="font-size:8px;color:#fff;font-weight:800;">✓</span>{% endif %}
                   </div>
                   <div id="dotlabel-{{ b.key }}-{{ lvl }}"
-                       style="font-size:.58rem;font-weight:{% if is_cur %}700{% else %}400{% endif %};
-                              color:{% if is_cur %}#818cf8{% elif active %}rgba(255,255,255,.4){% else %}rgba(255,255,255,.15){% endif %};
+                       style="font-size:.58rem;font-weight:{% if isc %}700{% else %}400{% endif %};
+                              color:{% if isc %}#818cf8{% elif act %}rgba(255,255,255,.4){% else %}rgba(255,255,255,.15){% endif %};
                               white-space:nowrap;transition:color .15s;">
                     +{{ b.levels[lvl-1] }}{{ b.unit }}
                   </div>
@@ -113,9 +144,9 @@
               <span id="frac-{{ b.key }}" style="font-size:.7rem;color:var(--text-muted);min-width:24px;text-align:right;">{{ cur }}/5</span>
               {% if is_editor %}
               <button id="reset-{{ b.key }}" onclick="setLevel('{{ b.key }}',0)"
-                      style="background:none;border:none;cursor:pointer;font-size:.65rem;
+                      style="background:none;border:none;{% if active %}cursor:pointer;{% endif %}font-size:.65rem;
                              color:rgba(255,255,255,.2);padding:0;line-height:1;
-                             visibility:{% if cur > 0 %}visible{% else %}hidden{% endif %};"
+                             visibility:{% if cur > 0 and active %}visible{% else %}hidden{% endif %};"
                       onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='rgba(255,255,255,.2)'">✕</button>
               {% endif %}
             </div>
@@ -125,31 +156,71 @@
       </div>
     </div>
 
-  </div>{# end grid #}
+  </div>
 </div>
 
 <style>
-#research-queue li[data-editable] { cursor: grab; }
-#research-queue li.dragging { opacity:.4; }
-#research-queue li.drag-over { border-color:#6366f1 !important; }
+#research-queue li { transition: opacity .2s, border-color .2s, background .2s; }
+#research-queue li.dragging  { opacity:.35 !important; }
+#research-queue li.drag-over { border-color:#6366f1 !important; box-shadow:0 0 0 1px #6366f1; }
 </style>
 
 <script>
-const GUILD_ID     = {{ guild.guild_id | tojson }};
-const IS_EDITOR    = {{ 'true' if is_editor else 'false' }};
-const BONUS_DEFS   = {{ bonus_defs | tojson }};
+const GUILD_ID   = {{ guild.guild_id | tojson }};
+const IS_EDITOR  = {{ 'true' if is_editor else 'false' }};
+const BONUS_DEFS = {{ bonus_defs | tojson }};
 
-// Current level state
-const lvlState = {
-  {% for b in bonus_defs %}{{ b.key | tojson }}: {{ bonuses.get(b.key,0)|int }},{% endfor %}
-};
+const lvlState      = { {% for b in bonus_defs %}{{ b.key|tojson }}: {{ bonuses.get(b.key,0)|int }},{% endfor %} };
+const enabledKeys   = new Set({{ enabled_keys | tojson }});
 
-// ── Timeline: click & drag ────────────────────────────────────────────────
-let dragTrackKey = null;
-let saveTimer = null;
+let dragTrackKey = null, saveTimer = null, dragItem = null;
 
+// ── World config toggle ───────────────────────────────────────────────────
+function toggleWorldConfig() {
+  const panel = document.getElementById('world-config');
+  const btn   = document.getElementById('world-cfg-btn');
+  const open  = panel.style.display === 'none';
+  panel.style.display = open ? '' : 'none';
+  btn.textContent = open ? '✕ Close Config' : '🌍 World Config';
+}
+
+function toggleBonusKey(key) {
+  const cb = document.getElementById('cfg-' + key);
+  if (cb.checked) enabledKeys.add(key); else enabledKeys.delete(key);
+
+  // Grey out timeline row
+  const row = document.getElementById('timeline-row-' + key);
+  if (row) {
+    row.style.opacity = cb.checked ? '1' : '.3';
+    row.style.filter  = cb.checked ? '' : 'grayscale(1)';
+    const track = document.getElementById('track-' + key);
+    if (track) {
+      if (cb.checked) track.setAttribute('data-editable','1');
+      else            track.removeAttribute('data-editable');
+    }
+  }
+
+  // Hide/show steps in queue
+  const ul = document.getElementById('research-queue');
+  ul.querySelectorAll(`li[data-key="${key}"]`).forEach(li => {
+    li.style.display = cb.checked ? '' : 'none';
+  });
+
+  saveEnabledKeys();
+}
+
+function saveEnabledKeys() {
+  showSaving();
+  fetch(`/guild/${GUILD_ID}/my-ally/bonuses/enabled-keys`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys: [...enabledKeys] }),
+  }).then(r => r.ok ? showSaved() : showError()).catch(showError);
+}
+
+// ── Timeline drag ─────────────────────────────────────────────────────────
 function setLevel(key, lvl) {
-  if (!IS_EDITOR) return;
+  if (!IS_EDITOR || !enabledKeys.has(key)) return;
   lvl = Math.max(0, Math.min(5, lvl));
   if (lvlState[key] === lvl) return;
   lvlState[key] = lvl;
@@ -160,7 +231,6 @@ function setLevel(key, lvl) {
 
 function renderDots(key) {
   const lvl = lvlState[key];
-  const def = BONUS_DEFS.find(b => b.key === key);
   const fill = document.getElementById('fill-' + key);
   if (fill) fill.style.width = lvl > 0 ? ((lvl - 0.5) / 5 * 100) + '%' : '0%';
   for (let i = 1; i <= 5; i++) {
@@ -180,7 +250,7 @@ function renderDots(key) {
   const frac  = document.getElementById('frac-'  + key);
   const reset = document.getElementById('reset-' + key);
   if (frac)  frac.textContent      = lvl + '/5';
-  if (reset) reset.style.visibility = lvl > 0 ? 'visible' : 'hidden';
+  if (reset) reset.style.visibility = (lvl > 0 && enabledKeys.has(key)) ? 'visible' : 'hidden';
 }
 
 function trackPosToLevel(track, clientX) {
@@ -195,101 +265,93 @@ function trackPosToLevel(track, clientX) {
   return best;
 }
 
-document.querySelectorAll('[data-editable]').forEach(track => {
+document.querySelectorAll('[data-editable]').forEach(track => attachTrackEvents(track));
+
+function attachTrackEvents(track) {
   const key = track.dataset.key;
   track.addEventListener('mousedown', e => {
+    if (!track.dataset.editable) return;
     e.preventDefault(); dragTrackKey = key;
     setLevel(key, trackPosToLevel(track, e.clientX));
   });
   track.addEventListener('touchstart', e => {
+    if (!track.dataset.editable) return;
     dragTrackKey = key;
     setLevel(key, trackPosToLevel(track, e.touches[0].clientX));
   }, { passive: true });
-});
+}
 document.addEventListener('mousemove', e => {
   if (!dragTrackKey) return;
   const t = document.getElementById('track-' + dragTrackKey);
-  if (t) setLevel(dragTrackKey, trackPosToLevel(t, e.clientX));
+  if (t && t.dataset.editable) setLevel(dragTrackKey, trackPosToLevel(t, e.clientX));
 });
 document.addEventListener('touchmove', e => {
   if (!dragTrackKey) return;
   const t = document.getElementById('track-' + dragTrackKey);
-  if (t) setLevel(dragTrackKey, trackPosToLevel(t, e.touches[0].clientX));
+  if (t && t.dataset.editable) setLevel(dragTrackKey, trackPosToLevel(t, e.touches[0].clientX));
 }, { passive: true });
 document.addEventListener('mouseup',  () => { dragTrackKey = null; });
 document.addEventListener('touchend', () => { dragTrackKey = null; });
 
-// ── Research queue: drag-and-drop reorder ────────────────────────────────
-let dragItem = null;
-
-function initQueueDrag() {
-  if (!IS_EDITOR) return;
-  const ul = document.getElementById('research-queue');
-  ul.querySelectorAll('li').forEach(li => {
-    const done = li.querySelector('[style*="4ade80"]') !== null ||
-                 li.style.opacity === '0.55' ||
-                 parseFloat(li.style.opacity) < 0.6;
-    if (done) return; // completed steps not draggable
-
-    li.setAttribute('draggable', 'true');
-
-    li.addEventListener('dragstart', e => {
-      dragItem = li;
-      setTimeout(() => li.classList.add('dragging'), 0);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    li.addEventListener('dragend', () => {
-      li.classList.remove('dragging');
-      ul.querySelectorAll('li').forEach(i => i.classList.remove('drag-over'));
-      dragItem = null;
-      saveQueueOrder();
-    });
-    li.addEventListener('dragover', e => {
-      e.preventDefault();
-      if (!dragItem || dragItem === li) return;
-      // Only allow dropping before undone items
-      const rect = li.getBoundingClientRect();
-      const mid  = rect.top + rect.height / 2;
-      ul.querySelectorAll('li').forEach(i => i.classList.remove('drag-over'));
-      li.classList.add('drag-over');
-      if (e.clientY < mid) {
-        ul.insertBefore(dragItem, li);
-      } else {
-        ul.insertBefore(dragItem, li.nextSibling);
-      }
-    });
-    li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
-  });
-}
-
+// ── Research queue drag ───────────────────────────────────────────────────
 function refreshQueue() {
-  // Update done/undone state of each row based on current lvlState
-  const ul = document.getElementById('research-queue');
-  ul.querySelectorAll('li').forEach(li => {
-    const key  = li.dataset.key;
-    const lvl  = parseInt(li.dataset.level);
+  document.getElementById('research-queue').querySelectorAll('li').forEach(li => {
+    const key  = li.dataset.key, lvl = parseInt(li.dataset.level);
     const done = lvlState[key] >= lvl;
-    li.style.opacity     = done ? '0.55' : '1';
-    li.style.border      = done
-      ? '1px solid rgba(74,222,128,.2)'
-      : '1px solid var(--border)';
-    li.style.background  = done ? 'rgba(74,222,128,.06)' : 'var(--bg-card)';
-    // Update cursor & draggable
-    if (done) {
-      li.setAttribute('draggable', 'false');
-      li.style.cursor = 'default';
-    } else {
-      li.setAttribute('draggable', 'true');
-      li.style.cursor = 'grab';
+    li.style.opacity    = done ? '.5' : '1';
+    li.style.border     = done ? '1px solid rgba(74,222,128,.2)' : '1px solid var(--border)';
+    li.style.background = done ? 'rgba(74,222,128,.06)' : 'var(--bg-card)';
+    li.setAttribute('draggable', (!done && enabledKeys.has(key)).toString());
+    // show/hide grip
+    const grip = li.querySelector('span');
+    if (grip && grip.textContent === '⠿') grip.style.visibility = done ? 'hidden' : 'visible';
+    // update progress text or checkmark (last span)
+    const spans = li.querySelectorAll('span');
+    const last  = spans[spans.length - 1];
+    if (last && last !== grip) {
+      if (done) { last.textContent = '✓'; last.style.color = '#4ade80'; last.style.fontSize = '.82rem'; }
+      else      { last.textContent = lvlState[key] + '/' + lvl; last.style.color = 'var(--text-muted)'; last.style.fontSize = '.7rem'; }
     }
   });
 }
 
-function saveQueueOrder() {
+function initQueueDrag() {
+  if (!IS_EDITOR) return;
   const ul = document.getElementById('research-queue');
-  const order = [...ul.querySelectorAll('li')].map(li => ({
-    key:   li.dataset.key,
-    level: parseInt(li.dataset.level),
+
+  ul.addEventListener('dragstart', e => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    dragItem = li;
+    setTimeout(() => li.classList.add('dragging'), 0);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  ul.addEventListener('dragend', e => {
+    const li = e.target.closest('li');
+    if (li) li.classList.remove('dragging');
+    ul.querySelectorAll('li').forEach(i => i.classList.remove('drag-over'));
+    dragItem = null;
+    saveQueueOrder();
+  });
+  ul.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragItem) return;
+    const li = e.target.closest('li');
+    if (!li || li === dragItem) return;
+    ul.querySelectorAll('li').forEach(i => i.classList.remove('drag-over'));
+    li.classList.add('drag-over');
+    const mid = li.getBoundingClientRect().top + li.getBoundingClientRect().height / 2;
+    ul.insertBefore(dragItem, e.clientY < mid ? li : li.nextSibling);
+  });
+  ul.addEventListener('dragleave', e => {
+    const li = e.target.closest('li');
+    if (li) li.classList.remove('drag-over');
+  });
+}
+
+function saveQueueOrder() {
+  const order = [...document.getElementById('research-queue').querySelectorAll('li')].map(li => ({
+    key: li.dataset.key, level: parseInt(li.dataset.level),
   }));
   showSaving();
   fetch(`/guild/${GUILD_ID}/my-ally/bonuses/research-order`, {
@@ -311,19 +373,9 @@ function scheduleJsonSave() {
   }, 600);
 }
 
-function showSaving() {
-  const ind = document.getElementById('save-indicator');
-  ind.textContent = 'Saving…'; ind.style.color = 'var(--text-muted)';
-}
-function showSaved() {
-  const ind = document.getElementById('save-indicator');
-  ind.textContent = '✓ Saved'; ind.style.color = '#4ade80';
-  setTimeout(() => { ind.textContent = ''; }, 2000);
-}
-function showError() {
-  const ind = document.getElementById('save-indicator');
-  ind.textContent = '⚠ Error'; ind.style.color = '#f87171';
-}
+function showSaving() { const i=document.getElementById('save-indicator'); i.textContent='Saving…'; i.style.color='var(--text-muted)'; }
+function showSaved()  { const i=document.getElementById('save-indicator'); i.textContent='✓ Saved'; i.style.color='#4ade80'; setTimeout(()=>i.textContent='',2000); }
+function showError()  { const i=document.getElementById('save-indicator'); i.textContent='⚠ Error'; i.style.color='#f87171'; }
 
 initQueueDrag();
 </script>

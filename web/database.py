@@ -5279,7 +5279,7 @@ async def _init_ally_tables():
         except Exception:
             pass
         # bonus Discord channel / message tracking
-        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT", "bonus_research_order TEXT"]:
+        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT", "bonus_research_order TEXT", "bonus_enabled_keys TEXT"]:
             try:
                 await db.execute(f"ALTER TABLE ally_groups ADD COLUMN {col}")
                 await db.commit()
@@ -11144,6 +11144,34 @@ async def get_bonus_research_order(ally_group_id: int) -> list[dict]:
         except Exception:
             pass
     return []
+
+
+async def get_bonus_enabled_keys(ally_group_id: int, all_keys: list[str]) -> list[str]:
+    """Return list of enabled bonus keys. None stored = all enabled."""
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT bonus_enabled_keys FROM ally_groups WHERE id=?", (ally_group_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    if row and row["bonus_enabled_keys"]:
+        import json as _json
+        try:
+            keys = _json.loads(row["bonus_enabled_keys"])
+            return [k for k in all_keys if k in keys]
+        except Exception:
+            pass
+    return list(all_keys)  # default: all enabled
+
+
+async def save_bonus_enabled_keys(ally_group_id: int, keys: list[str]) -> None:
+    import json as _json
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        await db.execute(
+            "UPDATE ally_groups SET bonus_enabled_keys=? WHERE id=?",
+            (_json.dumps(keys), ally_group_id)
+        )
+        await db.commit()
 
 
 async def save_bonus_research_order(ally_group_id: int, order: list[dict]) -> None:
