@@ -15714,6 +15714,31 @@ async def alliance_bonuses_save(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/my-ally/bonuses?saved=1", status_code=303)
 
 
+@app.patch("/guild/{guild_id}/my-ally/bonuses/save")
+async def alliance_bonuses_save_json(request: Request, guild_id: str):
+    """JSON endpoint for inline timeline drag-to-set."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    is_editor = ally_group and (
+        ally_group.get("owner_discord_id") == uid or
+        await has_perm(request, guild_id, "ally_manage")
+    )
+    if not is_editor:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    bonuses = await database.get_alliance_bonuses(guild_id)
+    valid_keys = {b["key"] for b in ALLIANCE_BONUS_DEFS}
+    for key, val in body.items():
+        if key in valid_keys:
+            bonuses[key] = max(0, min(5, int(val)))
+    await database.save_alliance_bonuses(guild_id, bonuses)
+    return JSONResponse({"ok": True})
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ARTIFACT SYSTEM
 # ═══════════════════════════════════════════════════════════════════════════════
