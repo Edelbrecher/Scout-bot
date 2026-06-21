@@ -15813,17 +15813,22 @@ async def _sync_alliance_bonus_channel(guild_id: str, ally_group_id: int):
                 "name":          f"{b['icon']} {b['label']} — Level {target}" if b else next_step["key"],
                 "current_level": cur,
                 "max_level":     target,
-                "description":   f"+{b['levels'][target-1]}{b['unit']}  ·  {done_count}/{total} steps done" if b else "",
+                "description":   f"+{b['levels'][target-1]}{b['unit']}" if b else "",
             }]
         else:
-            bonuses_payload = [{
-                "name":          "🎉 All bonuses researched!",
-                "current_level": total,
-                "max_level":     total,
-                "description":   f"All {total} steps completed.",
-            }]
+            bonuses_payload = [{"name": "🎉 All bonuses researched!", "current_level": 1, "max_level": 1, "description": ""}]
 
         channel_id, message_id = await database.get_bonus_discord_ids(ally_group_id)
+        # Load channel settings
+        ag_row = await database.get_ally_group_for_guild(guild_id)
+        category_id = (ag_row or {}).get("bonus_category_id")
+        role_ids    = []
+        raw_roles   = (ag_row or {}).get("bonus_role_ids") or ""
+        if raw_roles:
+            import json as _j
+            try: role_ids = _j.loads(raw_roles)
+            except Exception: role_ids = [r.strip() for r in raw_roles.split(",") if r.strip()]
+
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post("http://bot:7777/api/sync-bonus-channel", json={
                 "guild_id":      guild_id,
@@ -15831,6 +15836,8 @@ async def _sync_alliance_bonus_channel(guild_id: str, ally_group_id: int):
                 "bonuses":       bonuses_payload,
                 "channel_id":    channel_id,
                 "message_id":    message_id,
+                "category_id":   category_id,
+                "role_ids":      role_ids,
             })
             data = resp.json()
             if data.get("ok") and (data.get("channel_id") != channel_id or data.get("message_id") != message_id):
@@ -15861,6 +15868,64 @@ async def alliance_bonuses_save_json(request: Request, guild_id: str):
         if key in valid_keys:
             bonuses[key] = max(0, min(5, int(val)))
     await database.save_alliance_bonuses(guild_id, bonuses)
+    asyncio.create_task(_sync_alliance_bonus_channel(guild_id, ally_group["id"]))
+    return JSONResponse({"ok": True})
+
+
+@app.get("/guild/{guild_id}/my-ally/bonuses/channel-settings")
+async def alliance_bonuses_channel_settings_get(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    if not ally_group:
+        return JSONResponse({"error": "no ally group"}, status_code=404)
+    # Fetch categories + roles from bot
+    categories, roles = [], []
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post("http://bot:7777/api/list-categories", json={"guild_id": guild_id})
+            data = resp.json()
+            categories = data.get("categories", [])
+            roles      = data.get("roles", [])
+    except Exception as e:
+        print(f"[channel-settings] bot call failed: {e}", flush=True)
+
+    import json as _j
+    saved_role_ids = []
+    raw = ally_group.get("bonus_role_ids") or ""
+    if raw:
+        try: saved_role_ids = _j.loads(raw)
+        except Exception: saved_role_ids = [r.strip() for r in raw.split(",") if r.strip()]
+
+    return JSONResponse({
+        "categories":    categories,
+        "roles":         roles,
+        "category_id":   ally_group.get("bonus_category_id"),
+        "role_ids":      saved_role_ids,
+    })
+
+
+@app.patch("/guild/{guild_id}/my-ally/bonuses/channel-settings")
+async def alliance_bonuses_channel_settings_save(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    is_editor = ally_group and (
+        ally_group.get("owner_discord_id") == uid or
+        await has_perm(request, guild_id, "ally_manage")
+    )
+    if not is_editor:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    import json as _j
+    category_id = body.get("category_id") or None
+    role_ids    = body.get("role_ids", [])
+    await database.save_bonus_channel_settings(ally_group["id"], category_id, _j.dumps(role_ids))
     asyncio.create_task(_sync_alliance_bonus_channel(guild_id, ally_group["id"]))
     return JSONResponse({"ok": True})
 

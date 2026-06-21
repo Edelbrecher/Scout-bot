@@ -5279,7 +5279,8 @@ async def _init_ally_tables():
         except Exception:
             pass
         # bonus Discord channel / message tracking
-        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT", "bonus_research_order TEXT", "bonus_enabled_keys TEXT"]:
+        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT", "bonus_research_order TEXT",
+                    "bonus_enabled_keys TEXT", "bonus_category_id TEXT", "bonus_role_ids TEXT"]:
             try:
                 await db.execute(f"ALTER TABLE ally_groups ADD COLUMN {col}")
                 await db.commit()
@@ -11189,6 +11190,15 @@ async def set_bonus_discord_ids(ally_group_id: int, channel_id: str, message_id:
         await db.execute(
             "UPDATE ally_groups SET bonus_channel_id=?, bonus_message_id=? WHERE id=?",
             (channel_id, message_id, ally_group_id)
+        )
+        await db.commit()
+
+
+async def save_bonus_channel_settings(ally_group_id: int, category_id: str | None, role_ids_json: str):
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        await db.execute(
+            "UPDATE ally_groups SET bonus_category_id=?, bonus_role_ids=? WHERE id=?",
+            (category_id, role_ids_json, ally_group_id)
         )
         await db.commit()
 

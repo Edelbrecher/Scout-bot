@@ -1087,6 +1087,15 @@ async def get_request_hub(guild_id: str) -> dict | None:
             return dict(row) if row else None
 
 
+async def set_bonus_discord_ids(ally_group_id: int, channel_id: str, message_id: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE ally_groups SET bonus_channel_id=?, bonus_message_id=? WHERE id=?",
+            (channel_id, message_id, ally_group_id)
+        )
+        await db.commit()
+
+
 async def is_request_hub(channel_id: str) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(

@@ -692,6 +692,25 @@ async def handle_list_channels(request: aiohttp_web.Request) -> aiohttp_web.Resp
     return aiohttp_web.json_response({"ok": True, "channels": channels})
 
 
+async def handle_list_categories(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Return Discord categories for a guild so the web can offer a dropdown."""
+    try:
+        data = await request.json()
+        guild_id = str(data.get("guild_id", ""))
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "categories": [], "roles": []})
+    categories = [{"id": str(c.id), "name": c.name} for c in guild.categories]
+    roles = [
+        {"id": str(r.id), "name": r.name}
+        for r in guild.roles
+        if not r.is_default() and not r.managed
+    ]
+    return aiohttp_web.json_response({"ok": True, "categories": categories, "roles": roles})
+
+
 async def handle_set_hero_scout_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
     """Called by web container to configure the hero-scout channel."""
     try:
@@ -1498,14 +1517,16 @@ async def handle_create_defend_channel(request: aiohttp_web.Request):
 
 
 async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
-    """Create or update the Ally-Bonuses Discord channel with the current bonus list."""
+    """Create or update the Ally-Bonuses Discord channel — shows only the next research step."""
     try:
-        data = await request.json()
-        guild_id     = str(data.get("guild_id", ""))
+        data          = await request.json()
+        guild_id      = str(data.get("guild_id", ""))
         ally_group_id = int(data.get("ally_group_id", 0))
-        bonuses      = data.get("bonuses", [])   # [{name, current_level, max_level, description}]
-        channel_id   = data.get("channel_id")
-        message_id   = data.get("message_id")
+        bonuses       = data.get("bonuses", [])
+        channel_id    = data.get("channel_id")
+        message_id    = data.get("message_id")
+        category_id   = data.get("category_id")   # optional, overrides default
+        role_ids      = data.get("role_ids", [])   # list of role ID strings
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
 
@@ -1516,36 +1537,24 @@ async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web
     if not guild:
         return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 
-    config = await database.get_guild_config(guild_id)
-
-    # Build embed — shows only the single next step
+    # Build embed — single next step
     if bonuses:
-        b = bonuses[0]
-        cur  = b["current_level"]
-        mx   = max(b["max_level"], 1)
-        done = cur >= mx
-        bar_filled = round(cur / mx * 10)
-        bar  = "█" * bar_filled + "░" * (10 - bar_filled)
+        b   = bonuses[0]
+        cur = b["current_level"]
+        mx  = max(b["max_level"], 1)
+        bar = "█" * round(cur / mx * 10) + "░" * (10 - round(cur / mx * 10))
         embed = discord.Embed(
             title="🏛️ Next Research Step",
-            description=(
-                f"## {b['name']}\n"
-                f"`{bar}` {cur}/{mx}\n"
-                + (f"\n{b['description']}" if b.get("description") else "")
-            ),
-            color=discord.Color.green() if done else discord.Color.from_rgb(99, 102, 241),
+            description=f"## {b['name']}\n`{bar}`" + (f"\n\n{b['description']}" if b.get("description") else ""),
+            color=discord.Color.green() if cur >= mx else discord.Color.from_rgb(99, 102, 241),
         )
     else:
-        embed = discord.Embed(
-            title="🏛️ Alliance Bonuses",
-            description="*No bonuses configured yet.*",
-            color=discord.Color.from_rgb(99, 102, 241),
-        )
+        embed = discord.Embed(title="🏛️ Alliance Bonuses", description="*No bonuses configured yet.*",
+                              color=discord.Color.from_rgb(99, 102, 241))
     embed.set_footer(text="Updated via TravOps")
 
-    # Try to update existing message
+    # Try to edit existing message first
     existing_channel = None
-    existing_message = None
     if channel_id:
         try:
             existing_channel = guild.get_channel(int(channel_id)) or await guild.fetch_channel(int(channel_id))
@@ -1553,31 +1562,47 @@ async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web
             existing_channel = None
     if existing_channel and message_id:
         try:
-            existing_message = await existing_channel.fetch_message(int(message_id))
+            msg = await existing_channel.fetch_message(int(message_id))
+            await msg.edit(embed=embed)
+            return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "message_id": message_id})
         except Exception:
-            existing_message = None
+            pass  # message gone — post a new one below
 
-    if existing_message:
-        await existing_message.edit(embed=embed)
-        return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "message_id": message_id})
-
-    # Create channel if needed
+    # Create channel if it doesn't exist
     if not existing_channel:
-        try:
-            category = await _get_or_create_category(guild, config)
-        except Exception as e:
-            return aiohttp_web.json_response({"ok": False, "error": f"category error: {e}"}, status=500)
+        # Resolve category
+        category = None
+        if category_id:
+            try:
+                category = guild.get_channel(int(category_id))
+                if not isinstance(category, discord.CategoryChannel):
+                    category = None
+            except Exception:
+                category = None
+        if not category:
+            config = await database.get_guild_config(guild_id)
+            try:
+                category = await _get_or_create_category(guild, config)
+            except Exception as e:
+                return aiohttp_web.json_response({"ok": False, "error": f"category error: {e}"}, status=500)
+
+        # Permissions: bot + everyone read-only + specific roles read-only
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
-            guild.me: discord.PermissionOverwrite(
-                view_channel=True, send_messages=True, embed_links=True, manage_messages=True,
-            ),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                   embed_links=True, manage_messages=True),
         }
+        for rid in role_ids:
+            try:
+                role = guild.get_role(int(rid))
+                if role:
+                    overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+            except Exception:
+                pass
         try:
             existing_channel = await guild.create_text_channel(
-                name="ally-bonuses",
-                category=category,
-                topic="Alliance bonus order — updated automatically by TravOps",
+                name="ally-bonuses", category=category,
+                topic="Next alliance research step — updated automatically by TravOps",
                 overwrites=overwrites,
             )
         except Exception as e:
@@ -1614,6 +1639,7 @@ async def start_api_server():
     app.router.add_post("/api/archive-res-push-channel", handle_archive_res_push_channel)
     app.router.add_post("/api/unarchive-res-push-channel", handle_unarchive_res_push_channel)
     app.router.add_post("/api/sync-bonus-channel", handle_sync_bonus_channel)
+    app.router.add_post("/api/list-categories", handle_list_categories)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)
