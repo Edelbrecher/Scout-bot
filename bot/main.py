@@ -1497,6 +1497,93 @@ async def handle_create_defend_channel(request: aiohttp_web.Request):
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
+async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Create or update the Ally-Bonuses Discord channel with the current bonus list."""
+    try:
+        data = await request.json()
+        guild_id     = str(data.get("guild_id", ""))
+        ally_group_id = int(data.get("ally_group_id", 0))
+        bonuses      = data.get("bonuses", [])   # [{name, current_level, max_level, description}]
+        channel_id   = data.get("channel_id")
+        message_id   = data.get("message_id")
+    except Exception:
+        return aiohttp_web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    if not guild_id or not ally_group_id:
+        return aiohttp_web.json_response({"ok": False, "error": "guild_id and ally_group_id required"}, status=400)
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
+
+    config = await database.get_guild_config(guild_id)
+
+    # Build embed
+    embed = discord.Embed(
+        title="🏛️ Alliance Bonuses",
+        color=discord.Color.from_rgb(99, 102, 241),
+    )
+    if bonuses:
+        lines = []
+        for i, b in enumerate(bonuses, 1):
+            bar_filled = round((b["current_level"] / max(b["max_level"], 1)) * 10)
+            bar = "█" * bar_filled + "░" * (10 - bar_filled)
+            pct = round(b["current_level"] / max(b["max_level"], 1) * 100)
+            desc = f"  *{b['description']}*" if b.get("description") else ""
+            lines.append(
+                f"`{i:>2}.` **{b['name']}** — Lv {b['current_level']}/{b['max_level']} ({pct}%)\n"
+                f"     `{bar}`{desc}"
+            )
+        embed.description = "\n\n".join(lines)
+    else:
+        embed.description = "*No bonuses configured yet.*"
+    embed.set_footer(text="Updated via TravOps")
+
+    # Try to update existing message
+    existing_channel = None
+    existing_message = None
+    if channel_id:
+        try:
+            existing_channel = guild.get_channel(int(channel_id)) or await guild.fetch_channel(int(channel_id))
+        except Exception:
+            existing_channel = None
+    if existing_channel and message_id:
+        try:
+            existing_message = await existing_channel.fetch_message(int(message_id))
+        except Exception:
+            existing_message = None
+
+    if existing_message:
+        await existing_message.edit(embed=embed)
+        return aiohttp_web.json_response({"ok": True, "channel_id": channel_id, "message_id": message_id})
+
+    # Create channel if needed
+    if not existing_channel:
+        try:
+            category = await _get_or_create_category(guild, config)
+        except Exception as e:
+            return aiohttp_web.json_response({"ok": False, "error": f"category error: {e}"}, status=500)
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, embed_links=True, manage_messages=True,
+            ),
+        }
+        try:
+            existing_channel = await guild.create_text_channel(
+                name="ally-bonuses",
+                category=category,
+                topic="Alliance bonus order — updated automatically by TravOps",
+                overwrites=overwrites,
+            )
+        except Exception as e:
+            return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    msg = await existing_channel.send(embed=embed)
+    await database.set_bonus_discord_ids(ally_group_id, str(existing_channel.id), str(msg.id))
+    return aiohttp_web.json_response({"ok": True, "channel_id": str(existing_channel.id), "message_id": str(msg.id)})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1522,6 +1609,7 @@ async def start_api_server():
     app.router.add_post("/api/refresh-defend-tracking", handle_refresh_defend_tracking)
     app.router.add_post("/api/archive-res-push-channel", handle_archive_res_push_channel)
     app.router.add_post("/api/unarchive-res-push-channel", handle_unarchive_res_push_channel)
+    app.router.add_post("/api/sync-bonus-channel", handle_sync_bonus_channel)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

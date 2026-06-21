@@ -7311,6 +7311,34 @@ async def _require_ally_owner(request: Request, guild_id: str):
     return ally_group, None
 
 
+async def _sync_bonus_channel(guild_id: str, ally_group: dict):
+    """Fire-and-forget: push current bonus list to the Ally-Bonuses Discord channel."""
+    try:
+        bonuses = await database.get_ally_bonuses(ally_group["id"])
+        channel_id, message_id = await database.get_bonus_discord_ids(ally_group["id"])
+        payload = {
+            "guild_id":      guild_id,
+            "ally_group_id": ally_group["id"],
+            "bonuses":       [
+                {"name": b["name"], "current_level": b["current_level"],
+                 "max_level": b["max_level"], "description": b.get("description", "")}
+                for b in bonuses
+            ],
+            "channel_id":  channel_id,
+            "message_id":  message_id,
+        }
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post("http://bot:7777/api/sync-bonus-channel", json=payload)
+            data = resp.json()
+            if data.get("ok") and data.get("channel_id") and data.get("message_id"):
+                if data["channel_id"] != channel_id or data["message_id"] != message_id:
+                    await database.set_bonus_discord_ids(
+                        ally_group["id"], data["channel_id"], data["message_id"]
+                    )
+    except Exception as e:
+        print(f"[bonus_sync] {e}", flush=True)
+
+
 @app.post("/guild/{guild_id}/my-ally/bonuses/add")
 async def my_ally_bonus_add(request: Request, guild_id: str):
     ally_group, err = await _require_ally_owner(request, guild_id)
@@ -7322,6 +7350,7 @@ async def my_ally_bonus_add(request: Request, guild_id: str):
     max_level = int(form.get("max_level") or 20)
     description = (form.get("description") or "").strip()
     await database.add_ally_bonus(ally_group["id"], name, max_level, description)
+    asyncio.create_task(_sync_bonus_channel(guild_id, ally_group))
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_added#bonus", status_code=303)
 
 
@@ -7335,6 +7364,7 @@ async def my_ally_bonus_update(request: Request, guild_id: str, bonus_id: int):
     current_level = int(form.get("current_level") or 0)
     description = (form.get("description") or "").strip()
     await database.update_ally_bonus(bonus_id, ally_group["id"], name, max_level, current_level, description)
+    asyncio.create_task(_sync_bonus_channel(guild_id, ally_group))
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_saved#bonus", status_code=303)
 
 
@@ -7343,6 +7373,7 @@ async def my_ally_bonus_delete(request: Request, guild_id: str, bonus_id: int):
     ally_group, err = await _require_ally_owner(request, guild_id)
     if err: return err
     await database.delete_ally_bonus(bonus_id, ally_group["id"])
+    asyncio.create_task(_sync_bonus_channel(guild_id, ally_group))
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=bonus_deleted#bonus", status_code=303)
 
 
@@ -7353,6 +7384,7 @@ async def my_ally_bonus_reorder(request: Request, guild_id: str):
     body = await request.json()
     ordered_ids = [int(i) for i in body.get("ids", []) if str(i).isdigit()]
     await database.reorder_ally_bonuses(ally_group["id"], ordered_ids)
+    asyncio.create_task(_sync_bonus_channel(guild_id, ally_group))
     return JSONResponse({"ok": True})
 
 

@@ -5278,6 +5278,13 @@ async def _init_ally_tables():
             await db.execute("ALTER TABLE ally_groups ADD COLUMN alliance_bonuses TEXT DEFAULT '{}'")
         except Exception:
             pass
+        # bonus Discord channel / message tracking
+        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT"]:
+            try:
+                await db.execute(f"ALTER TABLE ally_groups ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
         # Battlegroups
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ally_battle_groups (
@@ -11120,6 +11127,28 @@ async def reorder_ally_bonuses(ally_group_id: int, ordered_ids: list[int]):
                 (pos, bid, ally_group_id)
             )
         await db.commit()
+
+
+async def set_bonus_discord_ids(ally_group_id: int, channel_id: str, message_id: str):
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        await db.execute(
+            "UPDATE ally_groups SET bonus_channel_id=?, bonus_message_id=? WHERE id=?",
+            (channel_id, message_id, ally_group_id)
+        )
+        await db.commit()
+
+
+async def get_bonus_discord_ids(ally_group_id: int) -> tuple[str | None, str | None]:
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT bonus_channel_id, bonus_message_id FROM ally_groups WHERE id=?",
+            (ally_group_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    if row:
+        return row["bonus_channel_id"], row["bonus_message_id"]
+    return None, None
 
 
 # ---------------------------------------------------------------------------
