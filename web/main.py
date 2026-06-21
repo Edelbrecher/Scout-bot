@@ -15799,11 +15799,13 @@ async def _sync_alliance_bonus_channel(guild_id: str, ally_group_id: int):
             if not b:
                 continue
             cur = cur_levels.get(step["key"], 0)
+            target = step["level"]
+            state_str = "✓ Done" if cur >= target else f"current: {cur}/{target}"
             bonuses_payload.append({
-                "name":          f"{b['icon']} {b['label']} Lv {step['level']}",
-                "current_level": 1 if cur >= step["level"] else 0,
+                "name":          f"{b['icon']} {b['label']} Lv {target}",
+                "current_level": 1 if cur >= target else 0,
                 "max_level":     1,
-                "description":   f"+{b['levels'][step['level']-1]}{b['unit']} — {'✓ Done' if cur >= step['level'] else f'current: {cur}/{step[\"level\"]}'}",
+                "description":   f"+{b['levels'][target-1]}{b['unit']} — {state_str}",
             })
 
         channel_id, message_id = await database.get_bonus_discord_ids(ally_group_id)
