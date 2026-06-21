@@ -64,10 +64,12 @@
         {% set cur = bonuses.get(step.key, 0) | int %}
         {% set done = cur >= step.level %}
         <li data-key="{{ step.key }}" data-level="{{ step.level }}"
+            {% if is_editor and not done %}draggable="true"{% endif %}
             style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
                    border-radius:8px;border:1px solid {% if done %}rgba(74,222,128,.2){% else %}var(--border){% endif %};
                    background:{% if done %}rgba(74,222,128,.06){% else %}var(--bg-card){% endif %};
-                   opacity:{% if done %}.5{% else %}1{% endif %};transition:opacity .2s,border-color .2s;">
+                   opacity:{% if done %}.5{% else %}1{% endif %};transition:opacity .2s,border-color .2s;
+                   {% if is_editor and not done %}cursor:grab;{% endif %}">
           <span style="color:var(--text-muted);font-size:.85rem;flex-shrink:0;{% if done %}visibility:hidden{% endif %};">⠿</span>
           <span style="font-size:1rem;flex-shrink:0;">{{ b.icon }}</span>
           <div style="flex:1;min-width:0;">
@@ -378,5 +380,6 @@ function showSaved()  { const i=document.getElementById('save-indicator'); i.tex
 function showError()  { const i=document.getElementById('save-indicator'); i.textContent='⚠ Error'; i.style.color='#f87171'; }
 
 initQueueDrag();
+refreshQueue();
 </script>
 {% endblock %}
