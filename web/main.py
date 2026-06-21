@@ -15751,6 +15751,7 @@ async def alliance_bonuses_save_enabled(request: Request, guild_id: str):
     order = await database.get_bonus_research_order(ally_group["id"])
     order = [s for s in order if s["key"] in keys]
     await database.save_bonus_research_order(ally_group["id"], order)
+    asyncio.create_task(_sync_alliance_bonus_channel(guild_id, ally_group["id"]))
     return JSONResponse({"ok": True})
 
 
@@ -15775,7 +15776,50 @@ async def alliance_bonuses_save_order(request: Request, guild_id: str):
         if isinstance(s, dict) and "key" in s and "level" in s
     ]
     await database.save_bonus_research_order(ally_group["id"], order)
+    asyncio.create_task(_sync_alliance_bonus_channel(guild_id, ally_group["id"]))
     return JSONResponse({"ok": True})
+
+
+async def _sync_alliance_bonus_channel(guild_id: str, ally_group_id: int):
+    """Push the current alliance bonus research queue to the Ally-Bonuses Discord channel."""
+    try:
+        all_keys     = [b["key"] for b in ALLIANCE_BONUS_DEFS]
+        enabled_keys = set(await database.get_bonus_enabled_keys(ally_group_id, all_keys))
+        active_defs  = [b for b in ALLIANCE_BONUS_DEFS if b["key"] in enabled_keys]
+        cur_levels   = await database.get_alliance_bonuses(guild_id)
+        order        = await database.get_bonus_research_order(ally_group_id)
+        order        = [s for s in order if s["key"] in enabled_keys]
+        if not order:
+            order = [{"key": b["key"], "level": lvl} for b in active_defs for lvl in range(1, 6)]
+
+        # Build bonus list in research-queue order for the bot handler
+        bonuses_payload = []
+        for step in order:
+            b = next((x for x in active_defs if x["key"] == step["key"]), None)
+            if not b:
+                continue
+            cur = cur_levels.get(step["key"], 0)
+            bonuses_payload.append({
+                "name":          f"{b['icon']} {b['label']} Lv {step['level']}",
+                "current_level": 1 if cur >= step["level"] else 0,
+                "max_level":     1,
+                "description":   f"+{b['levels'][step['level']-1]}{b['unit']} — {'✓ Done' if cur >= step['level'] else f'current: {cur}/{step[\"level\"]}'}",
+            })
+
+        channel_id, message_id = await database.get_bonus_discord_ids(ally_group_id)
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post("http://bot:7777/api/sync-bonus-channel", json={
+                "guild_id":      guild_id,
+                "ally_group_id": ally_group_id,
+                "bonuses":       bonuses_payload,
+                "channel_id":    channel_id,
+                "message_id":    message_id,
+            })
+            data = resp.json()
+            if data.get("ok") and (data.get("channel_id") != channel_id or data.get("message_id") != message_id):
+                await database.set_bonus_discord_ids(ally_group_id, data["channel_id"], data["message_id"])
+    except Exception as e:
+        print(f"[alliance_bonus_sync] {e}", flush=True)
 
 
 @app.patch("/guild/{guild_id}/my-ally/bonuses/save")
@@ -15800,6 +15844,7 @@ async def alliance_bonuses_save_json(request: Request, guild_id: str):
         if key in valid_keys:
             bonuses[key] = max(0, min(5, int(val)))
     await database.save_alliance_bonuses(guild_id, bonuses)
+    asyncio.create_task(_sync_alliance_bonus_channel(guild_id, ally_group["id"]))
     return JSONResponse({"ok": True})
 
 
