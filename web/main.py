@@ -15876,6 +15876,34 @@ async def alliance_bonuses_save_json(request: Request, guild_id: str):
     return JSONResponse({"ok": True})
 
 
+@app.post("/guild/{guild_id}/my-ally/bonuses/roles/{role_id}/toggle")
+async def toggle_bonus_role(request: Request, guild_id: str, role_id: str):
+    """Toggle a Discord role in the ally-bonuses channel's role_ids list."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    if not SNOWFLAKE_RE.match(role_id):
+        return JSONResponse({"error": "invalid role_id"}, status_code=400)
+    ally_group = await database.get_ally_group_for_guild(guild_id)
+    if not ally_group:
+        return JSONResponse({"error": "no ally group"}, status_code=404)
+    import json as _j
+    raw = ally_group.get("bonus_role_ids") or "[]"
+    try: role_ids = _j.loads(raw)
+    except Exception: role_ids = []
+    role_ids = [str(r) for r in role_ids]
+    if role_id in role_ids:
+        role_ids.remove(role_id)
+        added = False
+    else:
+        role_ids.append(role_id)
+        added = True
+    await database.save_bonus_channel_settings(ally_group["id"], ally_group.get("bonus_category_id"), _j.dumps(role_ids))
+    asyncio.create_task(_sync_alliance_bonus_channel(guild_id, ally_group["id"]))
+    return JSONResponse({"added": added})
+
+
 @app.get("/guild/{guild_id}/my-ally/bonuses/channel-settings")
 async def alliance_bonuses_channel_settings_get(request: Request, guild_id: str):
     session, err = _require_session(request)
