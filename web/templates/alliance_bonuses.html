@@ -2,236 +2,193 @@
 {% block title %}Alliance Bonuses · {{ ally_group.ally_name }} · TravOps{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:860px;">
+<div class="container" style="max-width:900px;">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}/my-ally" class="back-link">← My Alliance</a>
       <h1 style="margin:.25rem 0 0;">🏛️ Alliance Bonuses</h1>
-      <p class="subtitle" style="margin:0;">{{ ally_group.ally_name }} — drag the timeline to set the current level</p>
+      <p class="subtitle" style="margin:0;">{{ ally_group.ally_name }}</p>
     </div>
     <div id="save-indicator" style="font-size:.8rem;color:var(--text-muted);align-self:center;min-width:80px;text-align:right;"></div>
   </div>
 
-  <div style="display:flex;flex-direction:column;gap:.75rem;">
-    {% for b in bonus_defs %}
-    {% set cur = bonuses.get(b.key, 0) | int %}
-    <div class="card" style="padding:1rem 1.25rem;">
-      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start;">
 
-        {# Icon + label #}
-        <div style="display:flex;align-items:center;gap:.5rem;min-width:180px;">
-          <span style="font-size:1.4rem;">{{ b.icon }}</span>
-          <div>
-            <div style="font-weight:700;font-size:.9rem;">{{ b.label }}</div>
-            <div style="font-size:.72rem;color:var(--text-muted);">{{ b.desc }}</div>
+    {# ── LEFT: Research Queue ─────────────────────────────────────────── #}
+    <div>
+      <h2 style="font-size:.9rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .75rem;">
+        📋 Research Order
+      </h2>
+      {% if is_editor %}
+      <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .75rem;">Drag steps into your preferred research order.</p>
+      {% endif %}
+
+      <ul id="research-queue" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.35rem;">
+        {% for step in research_order %}
+        {% set b = bonus_defs | selectattr('key','equalto',step.key) | first %}
+        {% set cur = bonuses.get(step.key, 0) | int %}
+        {% set done = cur >= step.level %}
+        <li data-key="{{ step.key }}" data-level="{{ step.level }}"
+            style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
+                   border-radius:8px;border:1px solid {% if done %}rgba(74,222,128,.2){% else %}var(--border){% endif %};
+                   background:{% if done %}rgba(74,222,128,.06){% else %}var(--bg-card){% endif %};
+                   opacity:{% if done %}.55{% else %}1{% endif %};
+                   transition:opacity .2s,border-color .2s,background .2s;
+                   {% if is_editor and not done %}cursor:grab;{% endif %}">
+          {% if is_editor and not done %}
+          <span style="color:var(--text-muted);font-size:.85rem;flex-shrink:0;">⠿</span>
+          {% endif %}
+          <span style="font-size:1.05rem;flex-shrink:0;">{{ b.icon if b else '?' }}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:.85rem;font-weight:{% if done %}500{% else %}600{% endif %};
+                        color:{% if done %}var(--text-muted){% else %}var(--text){% endif %};">
+              {{ b.label if b else step.key }}
+              <span style="font-size:.75rem;font-weight:400;color:{% if done %}rgba(74,222,128,.7){% else %}#818cf8{% endif %};">
+                Lv {{ step.level }}
+                {% if b %}→ +{{ b.levels[step.level - 1] }}{{ b.unit }}{% endif %}
+              </span>
+            </div>
           </div>
-        </div>
-
-        {# Current value badge #}
-        <div style="min-width:80px;text-align:center;">
-          <span id="badge-{{ b.key }}"
-                style="display:inline-block;background:{% if cur > 0 %}linear-gradient(135deg,#6366f1,#818cf8){% else %}rgba(255,255,255,.07){% endif %};
-                       color:{% if cur > 0 %}#fff{% else %}var(--text-muted){% endif %};
-                       border-radius:20px;padding:.2rem .7rem;font-size:.82rem;font-weight:700;
-                       min-width:64px;transition:background .2s,color .2s;">
-            {% if cur > 0 %}+{{ b.levels[cur-1] }}{{ b.unit }}{% else %}–{% endif %}
+          {% if done %}
+          <span style="font-size:.8rem;color:#4ade80;flex-shrink:0;">✓</span>
+          {% else %}
+          <span style="font-size:.72rem;color:var(--text-muted);flex-shrink:0;">
+            {{ cur }}/{{ step.level }}
           </span>
-        </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
 
-        {# Interactive timeline #}
-        <div style="flex:1;min-width:200px;position:relative;user-select:none;"
-             id="track-{{ b.key }}"
-             data-key="{{ b.key }}"
-             data-cur="{{ cur }}"
-             data-levels="{{ b.levels | join(',') }}"
-             data-unit="{{ b.unit }}"
-             {% if is_editor %}data-editable="1"{% endif %}>
+    {# ── RIGHT: Current Levels (interactive timeline) ─────────────────── #}
+    <div>
+      <h2 style="font-size:.9rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .75rem;">
+        📊 Current Levels
+      </h2>
+      {% if is_editor %}
+      <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .75rem;">Click or drag to set the current level.</p>
+      {% endif %}
 
-          {# Track base line #}
-          <div style="position:absolute;top:9px;left:0;right:0;height:3px;background:rgba(255,255,255,.1);border-radius:2px;z-index:0;"></div>
-          {# Filled portion #}
-          <div id="fill-{{ b.key }}"
-               style="position:absolute;top:9px;left:0;height:3px;border-radius:2px;z-index:0;
-                      background:linear-gradient(90deg,#6366f1,#818cf8);
-                      transition:width .2s;
-                      width:{% if cur > 0 %}{{ ((cur - 0.5) / 5 * 100) | int }}%{% else %}0%{% endif %};"></div>
-
-          {# Dots #}
-          <div style="display:flex;position:relative;z-index:1;">
-            {% for lvl in range(1, 6) %}
-            {% set active = cur >= lvl %}
-            {% set is_cur = cur == lvl %}
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"
-                 id="dot-{{ b.key }}-{{ lvl }}"
-                 {% if is_editor %}
-                 onclick="setLevel('{{ b.key }}', {{ lvl }})"
-                 style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;"
-                 {% endif %}>
-              <div id="dotcircle-{{ b.key }}-{{ lvl }}"
-                   style="width:20px;height:20px;border-radius:50%;
-                          border:2px solid {% if active %}#6366f1{% else %}rgba(255,255,255,.15){% endif %};
-                          background:{% if is_cur %}#6366f1{% elif active %}rgba(99,102,241,.4){% else %}rgba(255,255,255,.05){% endif %};
-                          display:flex;align-items:center;justify-content:center;
-                          box-shadow:{% if is_cur %}0 0 10px rgba(99,102,241,.7){% else %}none{% endif %};
-                          transition:all .15s;">
-                {% if is_cur %}<span style="font-size:9px;color:#fff;font-weight:800;">✓</span>{% endif %}
-              </div>
-              <div id="dotlabel-{{ b.key }}-{{ lvl }}"
-                   style="font-size:.62rem;font-weight:{% if is_cur %}700{% else %}400{% endif %};
-                          color:{% if is_cur %}#818cf8{% elif active %}rgba(255,255,255,.45){% else %}rgba(255,255,255,.18){% endif %};
-                          white-space:nowrap;transition:color .15s;">
-                +{{ b.levels[lvl-1] }}{{ b.unit }}
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        {% for b in bonus_defs %}
+        {% set cur = bonuses.get(b.key, 0) | int %}
+        <div class="card" style="padding:.65rem .9rem;">
+          <div style="display:flex;align-items:center;gap:.6rem;">
+            <span style="font-size:1.1rem;flex-shrink:0;">{{ b.icon }}</span>
+            <div style="min-width:90px;">
+              <div style="font-size:.82rem;font-weight:700;">{{ b.label }}</div>
+            </div>
+            <div style="flex:1;position:relative;user-select:none;"
+                 id="track-{{ b.key }}" data-key="{{ b.key }}" data-cur="{{ cur }}"
+                 data-levels="{{ b.levels | join(',') }}" data-unit="{{ b.unit }}"
+                 {% if is_editor %}data-editable="1"{% endif %}>
+              <div style="position:absolute;top:9px;left:0;right:0;height:3px;background:rgba(255,255,255,.1);border-radius:2px;z-index:0;"></div>
+              <div id="fill-{{ b.key }}" style="position:absolute;top:9px;left:0;height:3px;border-radius:2px;background:linear-gradient(90deg,#6366f1,#818cf8);z-index:0;transition:width .2s;
+                   width:{% if cur > 0 %}{{ ((cur - 0.5) / 5 * 100)|int }}%{% else %}0%{% endif %};"></div>
+              <div style="display:flex;position:relative;z-index:1;">
+                {% for lvl in range(1,6) %}
+                {% set active = cur >= lvl %}{% set is_cur = cur == lvl %}
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;{% if is_editor %}cursor:pointer;{% endif %}"
+                     {% if is_editor %}onclick="setLevel('{{ b.key }}',{{ lvl }})"{% endif %}>
+                  <div id="dotcircle-{{ b.key }}-{{ lvl }}"
+                       style="width:18px;height:18px;border-radius:50%;
+                              border:2px solid {% if active %}#6366f1{% else %}rgba(255,255,255,.15){% endif %};
+                              background:{% if is_cur %}#6366f1{% elif active %}rgba(99,102,241,.4){% else %}rgba(255,255,255,.05){% endif %};
+                              display:flex;align-items:center;justify-content:center;
+                              box-shadow:{% if is_cur %}0 0 8px rgba(99,102,241,.7){% else %}none{% endif %};transition:all .15s;">
+                    {% if is_cur %}<span style="font-size:8px;color:#fff;font-weight:800;">✓</span>{% endif %}
+                  </div>
+                  <div id="dotlabel-{{ b.key }}-{{ lvl }}"
+                       style="font-size:.58rem;font-weight:{% if is_cur %}700{% else %}400{% endif %};
+                              color:{% if is_cur %}#818cf8{% elif active %}rgba(255,255,255,.4){% else %}rgba(255,255,255,.15){% endif %};
+                              white-space:nowrap;transition:color .15s;">
+                    +{{ b.levels[lvl-1] }}{{ b.unit }}
+                  </div>
+                </div>
+                {% endfor %}
               </div>
             </div>
-            {% endfor %}
+            <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0;">
+              <span id="frac-{{ b.key }}" style="font-size:.7rem;color:var(--text-muted);min-width:24px;text-align:right;">{{ cur }}/5</span>
+              {% if is_editor %}
+              <button id="reset-{{ b.key }}" onclick="setLevel('{{ b.key }}',0)"
+                      style="background:none;border:none;cursor:pointer;font-size:.65rem;
+                             color:rgba(255,255,255,.2);padding:0;line-height:1;
+                             visibility:{% if cur > 0 %}visible{% else %}hidden{% endif %};"
+                      onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='rgba(255,255,255,.2)'">✕</button>
+              {% endif %}
+            </div>
           </div>
         </div>
-
-        {# Level fraction + reset #}
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;min-width:48px;">
-          <span id="frac-{{ b.key }}" style="font-size:.75rem;color:var(--text-muted);">{{ cur }}/5</span>
-          {% if is_editor and cur > 0 %}
-          <button id="reset-{{ b.key }}" onclick="setLevel('{{ b.key }}', 0)"
-                  style="background:none;border:none;cursor:pointer;font-size:.68rem;color:rgba(255,255,255,.25);
-                         padding:0;line-height:1;transition:color .15s;"
-                  onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='rgba(255,255,255,.25)'">
-            ✕
-          </button>
-          {% elif is_editor %}
-          <button id="reset-{{ b.key }}" style="visibility:hidden;background:none;border:none;font-size:.68rem;padding:0;">✕</button>
-          {% endif %}
-        </div>
-
+        {% endfor %}
       </div>
     </div>
-    {% endfor %}
-  </div>
 
-  {# Summary #}
-  {% set active_count = namespace(n=0) %}
-  {% for b in bonus_defs %}{% if bonuses.get(b.key, 0) | int > 0 %}{% set active_count.n = active_count.n + 1 %}{% endif %}{% endfor %}
-  <div class="card" id="summary-card" style="margin-top:1rem;padding:1rem 1.25rem;background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.25);">
-    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;">
-      <div>
-        <div style="font-size:.72rem;color:var(--text-muted);">Researched</div>
-        <div id="summary-count" style="font-size:1.4rem;font-weight:800;color:#818cf8;">{{ active_count.n }}/{{ bonus_defs|length }}</div>
-      </div>
-      <div id="summary-chips" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;">
-        {% for b in bonus_defs %}{% set cur = bonuses.get(b.key, 0) | int %}{% if cur > 0 %}
-        <span id="chip-{{ b.key }}" style="display:flex;align-items:center;gap:.35rem;">
-          <span>{{ b.icon }}</span>
-          <span style="font-size:.78rem;font-weight:600;color:#a5b4fc;">+{{ b.levels[cur-1] }}{{ b.unit }}</span>
-          <span style="font-size:.7rem;color:var(--text-muted);">{{ b.label }}</span>
-        </span>
-        {% else %}
-        <span id="chip-{{ b.key }}" style="display:none;align-items:center;gap:.35rem;">
-          <span>{{ b.icon }}</span>
-          <span id="chip-val-{{ b.key }}" style="font-size:.78rem;font-weight:600;color:#a5b4fc;"></span>
-          <span style="font-size:.7rem;color:var(--text-muted);">{{ b.label }}</span>
-        </span>
-        {% endif %}{% endfor %}
-      </div>
-    </div>
-  </div>
+  </div>{# end grid #}
 </div>
 
 <style>
-[data-editable] .dot-col { cursor: pointer; }
-[data-editable] [id^="dotcircle-"]:hover {
-  border-color: #818cf8 !important;
-  box-shadow: 0 0 8px rgba(99,102,241,.5) !important;
-}
+#research-queue li[data-editable] { cursor: grab; }
+#research-queue li.dragging { opacity:.4; }
+#research-queue li.drag-over { border-color:#6366f1 !important; }
 </style>
 
 <script>
-const GUILD_ID = {{ guild.guild_id | tojson }};
-const IS_EDITOR = {{ 'true' if is_editor else 'false' }};
-const BONUS_DEFS = {{ bonus_defs | tojson }};
+const GUILD_ID     = {{ guild.guild_id | tojson }};
+const IS_EDITOR    = {{ 'true' if is_editor else 'false' }};
+const BONUS_DEFS   = {{ bonus_defs | tojson }};
 
-// Current state (key → level 0-5)
-const state = {
-  {% for b in bonus_defs %}{{ b.key | tojson }}: {{ bonuses.get(b.key, 0) | int }},{% endfor %}
+// Current level state
+const lvlState = {
+  {% for b in bonus_defs %}{{ b.key | tojson }}: {{ bonuses.get(b.key,0)|int }},{% endfor %}
 };
 
+// ── Timeline: click & drag ────────────────────────────────────────────────
+let dragTrackKey = null;
 let saveTimer = null;
 
 function setLevel(key, lvl) {
   if (!IS_EDITOR) return;
   lvl = Math.max(0, Math.min(5, lvl));
-  if (state[key] === lvl) return;
-  state[key] = lvl;
-  renderKey(key);
-  scheduleSave();
+  if (lvlState[key] === lvl) return;
+  lvlState[key] = lvl;
+  renderDots(key);
+  refreshQueue();
+  scheduleJsonSave();
 }
 
-function renderKey(key) {
-  const lvl = state[key];
+function renderDots(key) {
+  const lvl = lvlState[key];
   const def = BONUS_DEFS.find(b => b.key === key);
-
-  // Badge
-  const badge = document.getElementById('badge-' + key);
-  if (lvl > 0) {
-    badge.style.background = 'linear-gradient(135deg,#6366f1,#818cf8)';
-    badge.style.color = '#fff';
-    badge.textContent = '+' + def.levels[lvl - 1] + def.unit;
-  } else {
-    badge.style.background = 'rgba(255,255,255,.07)';
-    badge.style.color = 'var(--text-muted)';
-    badge.textContent = '–';
-  }
-
-  // Fill bar (centered on each dot: dot i sits at (i-0.5)/5 of width)
   const fill = document.getElementById('fill-' + key);
-  fill.style.width = lvl > 0 ? ((lvl - 0.5) / 5 * 100) + '%' : '0%';
-
-  // Dots
+  if (fill) fill.style.width = lvl > 0 ? ((lvl - 0.5) / 5 * 100) + '%' : '0%';
   for (let i = 1; i <= 5; i++) {
-    const circle = document.getElementById('dotcircle-' + key + '-' + i);
-    const label  = document.getElementById('dotlabel-' + key + '-' + i);
+    const c = document.getElementById('dotcircle-' + key + '-' + i);
+    const l = document.getElementById('dotlabel-'  + key + '-' + i);
+    if (!c) continue;
     const active = lvl >= i, isCur = lvl === i;
-    circle.style.borderColor  = active ? '#6366f1' : 'rgba(255,255,255,.15)';
-    circle.style.background   = isCur ? '#6366f1' : active ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)';
-    circle.style.boxShadow    = isCur ? '0 0 10px rgba(99,102,241,.7)' : 'none';
-    circle.innerHTML           = isCur ? '<span style="font-size:9px;color:#fff;font-weight:800;">✓</span>' : '';
-    label.style.fontWeight    = isCur ? '700' : '400';
-    label.style.color         = isCur ? '#818cf8' : active ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.18)';
-  }
-
-  // Fraction + reset btn
-  document.getElementById('frac-' + key).textContent = lvl + '/5';
-  const resetBtn = document.getElementById('reset-' + key);
-  if (resetBtn) {
-    resetBtn.style.visibility = lvl > 0 ? 'visible' : 'hidden';
-  }
-
-  // Summary chip
-  const chip = document.getElementById('chip-' + key);
-  if (chip) {
-    if (lvl > 0) {
-      chip.style.display = 'flex';
-      const valEl = chip.querySelector('[id^="chip-val-"]') || chip.querySelectorAll('span')[1];
-      if (valEl) valEl.textContent = '+' + def.levels[lvl - 1] + def.unit;
-    } else {
-      chip.style.display = 'none';
+    c.style.borderColor = active ? '#6366f1' : 'rgba(255,255,255,.15)';
+    c.style.background  = isCur ? '#6366f1' : active ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)';
+    c.style.boxShadow   = isCur ? '0 0 8px rgba(99,102,241,.7)' : 'none';
+    c.innerHTML          = isCur ? '<span style="font-size:8px;color:#fff;font-weight:800;">✓</span>' : '';
+    if (l) {
+      l.style.fontWeight = isCur ? '700' : '400';
+      l.style.color      = isCur ? '#818cf8' : active ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.15)';
     }
   }
-
-  // Summary count
-  const count = Object.values(state).filter(v => v > 0).length;
-  document.getElementById('summary-count').textContent = count + '/' + BONUS_DEFS.length;
+  const frac  = document.getElementById('frac-'  + key);
+  const reset = document.getElementById('reset-' + key);
+  if (frac)  frac.textContent      = lvl + '/5';
+  if (reset) reset.style.visibility = lvl > 0 ? 'visible' : 'hidden';
 }
-
-// ── Drag along track ─────────────────────────────────────────────────────────
-let dragKey = null;
 
 function trackPosToLevel(track, clientX) {
   const rect = track.getBoundingClientRect();
-  const rel  = (clientX - rect.left) / rect.width;   // 0..1
-  const raw  = Math.round(rel * 5);                   // 0..5 (0 = before first dot)
-  // Each dot is centered at (i-0.5)/5; snap to nearest
+  const rel  = (clientX - rect.left) / rect.width;
   let best = 0, bestDist = Infinity;
   for (let i = 0; i <= 5; i++) {
-    const pos = i === 0 ? 0 : (i - 0.5) / 5;
+    const pos = i === 0 ? -0.05 : (i - 0.5) / 5;
     const d   = Math.abs(rel - pos);
     if (d < bestDist) { bestDist = d; best = i; }
   }
@@ -240,66 +197,134 @@ function trackPosToLevel(track, clientX) {
 
 document.querySelectorAll('[data-editable]').forEach(track => {
   const key = track.dataset.key;
-
   track.addEventListener('mousedown', e => {
-    e.preventDefault();
-    dragKey = key;
-    const lvl = trackPosToLevel(track, e.clientX);
-    setLevel(key, lvl);
+    e.preventDefault(); dragTrackKey = key;
+    setLevel(key, trackPosToLevel(track, e.clientX));
   });
-
   track.addEventListener('touchstart', e => {
-    dragKey = key;
-    const lvl = trackPosToLevel(track, e.touches[0].clientX);
-    setLevel(key, lvl);
+    dragTrackKey = key;
+    setLevel(key, trackPosToLevel(track, e.touches[0].clientX));
   }, { passive: true });
 });
-
 document.addEventListener('mousemove', e => {
-  if (!dragKey) return;
-  const track = document.getElementById('track-' + dragKey);
-  if (!track) return;
-  const lvl = trackPosToLevel(track, e.clientX);
-  if (state[dragKey] !== lvl) setLevel(dragKey, lvl);
+  if (!dragTrackKey) return;
+  const t = document.getElementById('track-' + dragTrackKey);
+  if (t) setLevel(dragTrackKey, trackPosToLevel(t, e.clientX));
 });
-
 document.addEventListener('touchmove', e => {
-  if (!dragKey) return;
-  const track = document.getElementById('track-' + dragKey);
-  if (!track) return;
-  const lvl = trackPosToLevel(track, e.touches[0].clientX);
-  if (state[dragKey] !== lvl) setLevel(dragKey, lvl);
+  if (!dragTrackKey) return;
+  const t = document.getElementById('track-' + dragTrackKey);
+  if (t) setLevel(dragTrackKey, trackPosToLevel(t, e.touches[0].clientX));
 }, { passive: true });
+document.addEventListener('mouseup',  () => { dragTrackKey = null; });
+document.addEventListener('touchend', () => { dragTrackKey = null; });
 
-document.addEventListener('mouseup',  () => { if (dragKey) { dragKey = null; } });
-document.addEventListener('touchend', () => { if (dragKey) { dragKey = null; } });
+// ── Research queue: drag-and-drop reorder ────────────────────────────────
+let dragItem = null;
 
-// ── Auto-save (debounced 600ms) ───────────────────────────────────────────────
-function scheduleSave() {
-  clearTimeout(saveTimer);
-  const ind = document.getElementById('save-indicator');
-  ind.textContent = 'Saving…';
-  ind.style.color = 'var(--text-muted)';
-  saveTimer = setTimeout(async () => {
-    try {
-      const r = await fetch(`/guild/${GUILD_ID}/my-ally/bonuses/save`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
-      });
-      if (r.ok) {
-        ind.textContent = '✓ Saved';
-        ind.style.color = '#4ade80';
-        setTimeout(() => { ind.textContent = ''; }, 2000);
+function initQueueDrag() {
+  if (!IS_EDITOR) return;
+  const ul = document.getElementById('research-queue');
+  ul.querySelectorAll('li').forEach(li => {
+    const done = li.querySelector('[style*="4ade80"]') !== null ||
+                 li.style.opacity === '0.55' ||
+                 parseFloat(li.style.opacity) < 0.6;
+    if (done) return; // completed steps not draggable
+
+    li.setAttribute('draggable', 'true');
+
+    li.addEventListener('dragstart', e => {
+      dragItem = li;
+      setTimeout(() => li.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    li.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      ul.querySelectorAll('li').forEach(i => i.classList.remove('drag-over'));
+      dragItem = null;
+      saveQueueOrder();
+    });
+    li.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!dragItem || dragItem === li) return;
+      // Only allow dropping before undone items
+      const rect = li.getBoundingClientRect();
+      const mid  = rect.top + rect.height / 2;
+      ul.querySelectorAll('li').forEach(i => i.classList.remove('drag-over'));
+      li.classList.add('drag-over');
+      if (e.clientY < mid) {
+        ul.insertBefore(dragItem, li);
       } else {
-        ind.textContent = '⚠ Error';
-        ind.style.color = '#f87171';
+        ul.insertBefore(dragItem, li.nextSibling);
       }
-    } catch {
-      ind.textContent = '⚠ Error';
-      ind.style.color = '#f87171';
+    });
+    li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+  });
+}
+
+function refreshQueue() {
+  // Update done/undone state of each row based on current lvlState
+  const ul = document.getElementById('research-queue');
+  ul.querySelectorAll('li').forEach(li => {
+    const key  = li.dataset.key;
+    const lvl  = parseInt(li.dataset.level);
+    const done = lvlState[key] >= lvl;
+    li.style.opacity     = done ? '0.55' : '1';
+    li.style.border      = done
+      ? '1px solid rgba(74,222,128,.2)'
+      : '1px solid var(--border)';
+    li.style.background  = done ? 'rgba(74,222,128,.06)' : 'var(--bg-card)';
+    // Update cursor & draggable
+    if (done) {
+      li.setAttribute('draggable', 'false');
+      li.style.cursor = 'default';
+    } else {
+      li.setAttribute('draggable', 'true');
+      li.style.cursor = 'grab';
     }
+  });
+}
+
+function saveQueueOrder() {
+  const ul = document.getElementById('research-queue');
+  const order = [...ul.querySelectorAll('li')].map(li => ({
+    key:   li.dataset.key,
+    level: parseInt(li.dataset.level),
+  }));
+  showSaving();
+  fetch(`/guild/${GUILD_ID}/my-ally/bonuses/research-order`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order }),
+  }).then(r => r.ok ? showSaved() : showError()).catch(showError);
+}
+
+function scheduleJsonSave() {
+  clearTimeout(saveTimer);
+  showSaving();
+  saveTimer = setTimeout(() => {
+    fetch(`/guild/${GUILD_ID}/my-ally/bonuses/save`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lvlState),
+    }).then(r => r.ok ? showSaved() : showError()).catch(showError);
   }, 600);
 }
+
+function showSaving() {
+  const ind = document.getElementById('save-indicator');
+  ind.textContent = 'Saving…'; ind.style.color = 'var(--text-muted)';
+}
+function showSaved() {
+  const ind = document.getElementById('save-indicator');
+  ind.textContent = '✓ Saved'; ind.style.color = '#4ade80';
+  setTimeout(() => { ind.textContent = ''; }, 2000);
+}
+function showError() {
+  const ind = document.getElementById('save-indicator');
+  ind.textContent = '⚠ Error'; ind.style.color = '#f87171';
+}
+
+initQueueDrag();
 </script>
 {% endblock %}

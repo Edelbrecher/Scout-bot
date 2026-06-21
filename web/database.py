@@ -5279,7 +5279,7 @@ async def _init_ally_tables():
         except Exception:
             pass
         # bonus Discord channel / message tracking
-        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT"]:
+        for col in ["bonus_channel_id TEXT", "bonus_message_id TEXT", "bonus_research_order TEXT"]:
             try:
                 await db.execute(f"ALTER TABLE ally_groups ADD COLUMN {col}")
                 await db.commit()
@@ -11126,6 +11126,33 @@ async def reorder_ally_bonuses(ally_group_id: int, ordered_ids: list[int]):
                 "UPDATE ally_bonuses SET position=? WHERE id=? AND ally_group_id=?",
                 (pos, bid, ally_group_id)
             )
+        await db.commit()
+
+
+async def get_bonus_research_order(ally_group_id: int) -> list[dict]:
+    """Return saved research order as [{key, level}, ...], or empty list."""
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT bonus_research_order FROM ally_groups WHERE id=?", (ally_group_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    if row and row["bonus_research_order"]:
+        import json as _json
+        try:
+            return _json.loads(row["bonus_research_order"])
+        except Exception:
+            pass
+    return []
+
+
+async def save_bonus_research_order(ally_group_id: int, order: list[dict]) -> None:
+    import json as _json
+    async with aiosqlite.connect(DB_PATH, timeout=10) as db:
+        await db.execute(
+            "UPDATE ally_groups SET bonus_research_order=? WHERE id=?",
+            (_json.dumps(order), ally_group_id)
+        )
         await db.commit()
 
 
