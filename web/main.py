@@ -840,6 +840,213 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_snapshot_loop())
 
+    # ── Live Map Scanner (authenticated Travian API) ──────────────────────────
+    import random as _rng, re as _re_mod, html as _html_mod
+
+    def _parse_tile_text(text: str) -> dict:
+        """Extract player_name, population, alliance_name from Travian tile text HTML."""
+        result = {"player_name": "", "population": 0, "alliance_name": ""}
+        decoded = _html_mod.unescape(text).replace("‭", "").replace("‬", "")
+        m = _re_mod.search(r'\{k\.spieler\}\s*(.+?)(?:<br|$)', decoded)
+        if m:
+            result["player_name"] = m.group(1).strip()
+        m = _re_mod.search(r'\{k\.einwohner\}\s*(\d+)', decoded)
+        if m:
+            result["population"] = int(m.group(1))
+        m = _re_mod.search(r'\{k\.allianz\}\s*(.+?)(?:<br|$)', decoded)
+        if m:
+            result["alliance_name"] = m.group(1).strip()
+        return result
+
+    def _parse_tile_village_name(title: str) -> str:
+        """Extract village name from title like '{k.dt} Heaven'."""
+        if "{k.dt}" in title:
+            return title.replace("{k.dt}", "").strip()
+        return title.strip()
+
+    async def _live_scan_guild(guild_id: str, monitor: dict):
+        """Fetch map tiles from Travian API and create alerts for changes."""
+        cookie = monitor.get("live_session_cookie") or ""
+        if not cookie:
+            return
+        guild = await database.get_guild(guild_id)
+        if not guild:
+            return
+        tw_world = (guild.get("tw_world") or "").strip().rstrip("/")
+        if not tw_world:
+            return
+
+        x1, y1 = monitor["x1"], monitor["y1"]
+        x2, y2 = monitor["x2"], monitor["y2"]
+        nobling_thr = monitor.get("nobling_threshold", 500)
+        growth_thr = monitor.get("growth_threshold", 200)
+
+        monitored_alliances_raw = str(monitor.get("monitored_alliances") or "").strip()
+        selected_alliances = set()
+        if monitored_alliances_raw:
+            selected_alliances = {a.strip().lower() for a in monitored_alliances_raw.split(",") if a.strip()}
+
+        api_url = tw_world + "/api/v1/map/position"
+        headers = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Cookie": cookie,
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+        }
+
+        # Scan grid: each request covers ~11x7 tiles
+        TILE_W, TILE_H = 11, 7
+        villages: dict[str, dict] = {}  # key = "x,y"
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            cy = y1
+            while cy <= y2:
+                cx = x1
+                while cx <= x2:
+                    try:
+                        resp = await client.post(api_url, json={
+                            "data": {"x": cx, "y": cy, "zoomLevel": 1}
+                        }, headers=headers)
+                        if resp.status_code == 401 or resp.status_code == 302:
+                            print(f"[live_scan] {guild_id}: session expired (HTTP {resp.status_code})", flush=True)
+                            await database.upsert_sector_monitor(guild_id, live_scan_enabled=0)
+                            return
+                        if resp.status_code != 200:
+                            cx += TILE_W
+                            continue
+                        data = resp.json()
+                        for tile in data.get("tiles", []):
+                            if not tile.get("uid"):
+                                continue
+                            pos = tile.get("position", {})
+                            tx, ty = pos.get("x", 0), pos.get("y", 0)
+                            if not (x1 <= tx <= x2 and y1 <= ty <= y2):
+                                continue
+                            info = _parse_tile_text(tile.get("text", ""))
+                            info["x"] = tx
+                            info["y"] = ty
+                            info["village_name"] = _parse_tile_village_name(tile.get("title", ""))
+                            info["village_id"] = str(tile.get("did", ""))
+                            info["uid"] = str(tile.get("uid", ""))
+                            villages[f"{tx},{ty}"] = info
+                    except Exception as e:
+                        print(f"[live_scan] {guild_id}: request error at ({cx},{cy}): {e}", flush=True)
+                    cx += TILE_W
+                    await asyncio.sleep(_rng.uniform(0.3, 0.8))
+                cy += TILE_H
+
+        if not villages:
+            return
+
+        # Load previous live snapshot for comparison
+        prev_key = f"live_snapshot:{guild_id}"
+        prev_snapshot = getattr(_live_scan_guild, "_cache", {}).get(prev_key, {})
+        if not hasattr(_live_scan_guild, "_cache"):
+            _live_scan_guild._cache = {}
+
+        new_alerts: list[dict] = []
+        import json as _json
+
+        for key, v in villages.items():
+            ally = (v.get("alliance_name") or "").lower()
+            if selected_alliances and ally not in selected_alliances:
+                continue
+
+            prev = prev_snapshot.get(key)
+            if not prev:
+                if monitor.get("watch_new_village") and prev_snapshot:
+                    # New village that wasn't in previous scan
+                    await _insert_live_alert(guild_id, v, "new_village", new_alerts)
+                continue
+
+            pop_diff = v["population"] - prev.get("population", 0)
+            if pop_diff >= nobling_thr and monitor.get("watch_nobling"):
+                await _insert_live_alert(guild_id, v, "nobling", new_alerts, pop_change=pop_diff)
+            elif pop_diff >= growth_thr and monitor.get("watch_fast_growth"):
+                await _insert_live_alert(guild_id, v, "fast_growth", new_alerts, pop_change=pop_diff)
+
+        # Save current snapshot for next comparison
+        _live_scan_guild._cache[prev_key] = villages
+
+        # Update last scan timestamp
+        import datetime as _datetime
+        await database.upsert_sector_monitor(guild_id, live_last_scan=_datetime.datetime.utcnow().isoformat())
+
+        if new_alerts:
+            print(f"[live_scan] {guild_id}: {len(new_alerts)} new alert(s)", flush=True)
+            try:
+                lead_ids = await database.get_ep_notify_members(guild_id)
+                if lead_ids:
+                    type_labels = {"new_village": "Neues Dorf", "nobling": "Adelung", "fast_growth": "Wachstum"}
+                    types_found = list({a["alert_type"] for a in new_alerts})
+                    label = " & ".join(type_labels.get(t, t) for t in types_found)
+                    await database.create_notifications(
+                        guild_id=guild_id, ally_group_id=None,
+                        recipient_ids=lead_ids, notif_type="sector_alert",
+                        title=f"📡 Live Sektor-Alert: {label}",
+                        message=f"{len(new_alerts)} Aktivität(en) im überwachten Sektor (Live-Scan).",
+                        plan_id=None,
+                    )
+            except Exception:
+                pass
+
+    async def _insert_live_alert(guild_id, v, alert_type, new_alerts, pop_change=0):
+        import json as _json, aiosqlite
+        async with aiosqlite.connect(database.DB_PATH, timeout=30) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT id FROM sector_alerts
+                   WHERE guild_id=? AND x=? AND y=? AND alert_type=?
+                   AND detected_at > datetime('now', '-1 hour')""",
+                (guild_id, v["x"], v["y"], alert_type)
+            ) as cur:
+                if await cur.fetchone():
+                    return
+            await db.execute(
+                """INSERT INTO sector_alerts
+                   (guild_id, alert_type, x, y, village_name, player_name,
+                    alliance_name, population, pop_change, source)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (guild_id, alert_type, v["x"], v["y"],
+                 v.get("village_name", ""), v.get("player_name", ""),
+                 v.get("alliance_name", ""), v.get("population", 0), pop_change, "live"))
+            await db.commit()
+            async with db.execute(
+                "SELECT * FROM sector_alerts WHERE guild_id=? ORDER BY id DESC LIMIT 1",
+                (guild_id,)
+            ) as cur:
+                row = await cur.fetchone()
+                if row:
+                    new_alerts.append(dict(row))
+
+    async def _live_scan_loop():
+        import datetime as _datetime, aiosqlite
+        await asyncio.sleep(30)
+        while True:
+            try:
+                await database._init_sector_monitor_tables()
+                async with aiosqlite.connect(database.DB_PATH, timeout=30) as db:
+                    db.row_factory = aiosqlite.Row
+                    async with db.execute(
+                        "SELECT * FROM sector_monitors WHERE live_scan_enabled=1 AND live_session_cookie != ''"
+                    ) as cur:
+                        monitors = [dict(r) for r in await cur.fetchall()]
+
+                for mon in monitors:
+                    try:
+                        await _live_scan_guild(mon["guild_id"], mon)
+                    except Exception as e:
+                        print(f"[live_scan] {mon['guild_id']}: error: {e}", flush=True)
+            except Exception as e:
+                print(f"[live_scan] loop error: {e}", flush=True)
+
+            delay = _rng.uniform(13 * 60, 30 * 60)
+            print(f"[live_scan] sleeping {delay/60:.1f}min", flush=True)
+            await asyncio.sleep(delay)
+
+    asyncio.create_task(_live_scan_loop())
+
     async def _trial_expiry_loop():
         """Every hour: expire trials and log."""
         while True:
@@ -3908,6 +4115,45 @@ async def sector_monitor_save(request: Request, guild_id: str):
         monitored_alliances  = monitored_alliances,
     )
     return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/map/sector-monitor/live-session")
+async def sector_monitor_save_live_session(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    err = _require_guild(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    cookie = (body.get("cookie") or "").strip()
+    enabled = bool(body.get("enabled", False))
+
+    # Validate session by making a test request
+    if cookie and enabled:
+        guild = await database.get_guild(guild_id)
+        tw_world = (guild.get("tw_world") or "").rstrip("/") if guild else ""
+        if tw_world:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(f"{tw_world}/api/v1/map/position", json={
+                        "data": {"x": 0, "y": 0, "zoomLevel": 1}
+                    }, headers={
+                        "Accept": "application/json",
+                        "Content-Type": "application/json; charset=UTF-8",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Cookie": cookie,
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+                    })
+                    if resp.status_code != 200 or not resp.json().get("tiles"):
+                        return JSONResponse({"ok": False, "error": "Session invalid or expired"})
+            except Exception as e:
+                return JSONResponse({"ok": False, "error": f"Connection error: {e}"})
+
+    await database.upsert_sector_monitor(
+        guild_id,
+        live_session_cookie=cookie,
+        live_scan_enabled=1 if (cookie and enabled) else 0,
+    )
+    return JSONResponse({"ok": True, "enabled": bool(cookie and enabled)})
 
 
 @app.post("/guild/{guild_id}/map/sector-monitor/scan")

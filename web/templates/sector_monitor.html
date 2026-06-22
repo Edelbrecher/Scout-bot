@@ -434,6 +434,64 @@
         <button type="submit" class="btn btn-secondary" style="width:100%;">🔍 Scan now</button>
       </form>
 
+      {# ── Live Scanner ── #}
+      <div style="margin-top:.8rem;padding:.75rem;border:1px solid rgba(99,102,241,.3);border-radius:10px;background:rgba(99,102,241,.04);">
+        <h4 style="margin:0 0 .35rem;font-size:.85rem;">📡 Live Scanner</h4>
+        <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 .6rem;">
+          Scannt alle 13-30 Min die Travian-Karte in Echtzeit über eine eingeloggte Session.
+          Erkennt neue Dörfer sofort — nicht erst beim map.sql-Update.
+        </p>
+        {% set live_enabled = monitor.get('live_scan_enabled', 0) | int %}
+        {% set live_cookie = monitor.get('live_session_cookie', '') %}
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+          <span style="font-size:.75rem;font-weight:600;">Status:</span>
+          {% if live_enabled and live_cookie %}
+          <span style="font-size:.72rem;padding:2px 8px;background:rgba(34,197,94,.15);color:#4ade80;border-radius:6px;border:1px solid rgba(34,197,94,.3);">✅ Active</span>
+          {% else %}
+          <span style="font-size:.72rem;padding:2px 8px;background:rgba(239,68,68,.1);color:#f87171;border-radius:6px;border:1px solid rgba(239,68,68,.25);">⏸ Inactive</span>
+          {% endif %}
+          {% if monitor.get('live_last_scan') %}
+          <span style="font-size:.68rem;color:var(--text-muted);">Last: {{ monitor.live_last_scan[:16] }}</span>
+          {% endif %}
+        </div>
+        <label style="font-size:.72rem;color:var(--text-muted);display:block;margin-bottom:.25rem;">
+          Travian Session Cookie <span style="opacity:.5;">(aus Browser DevTools → Network → Cookie Header)</span>
+        </label>
+        <textarea id="live-cookie" rows="3"
+          style="width:100%;font-size:.7rem;font-family:monospace;border:1px solid var(--border);border-radius:6px;
+                 background:var(--bg-main);color:var(--text);padding:.4rem .5rem;resize:vertical;"
+          placeholder="Paste your Travian session cookie here..."
+        >{{ live_cookie }}</textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.4rem;align-items:center;">
+          <button onclick="saveLiveSession(true)" class="btn btn-primary" style="font-size:.78rem;">📡 Activate</button>
+          {% if live_enabled %}
+          <button onclick="saveLiveSession(false)" class="btn btn-secondary" style="font-size:.78rem;">⏸ Deactivate</button>
+          {% endif %}
+          <span id="live-status" style="font-size:.72rem;color:var(--text-muted);"></span>
+        </div>
+      </div>
+      <script>
+      async function saveLiveSession(enable) {
+        const cookie = document.getElementById('live-cookie').value.trim();
+        const status = document.getElementById('live-status');
+        if (enable && !cookie) { status.textContent = '⚠ Cookie required'; return; }
+        status.textContent = enable ? 'Validating…' : 'Saving…';
+        try {
+          const r = await fetch('/guild/{{ guild.guild_id }}/map/sector-monitor/live-session', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ cookie, enabled: enable }),
+          });
+          const d = await r.json();
+          if (d.ok) {
+            status.textContent = d.enabled ? '✅ Active — next scan in 13-30 min' : '⏸ Deactivated';
+            setTimeout(() => location.reload(), 1500);
+          } else {
+            status.textContent = '✗ ' + (d.error || 'Error');
+          }
+        } catch(e) { status.textContent = '✗ ' + e; }
+      }
+      </script>
+
       {# ── Mini-map ── #}
       {% if monitor %}
       {% set mx1 = monitor.get('x1', -50) | int %}

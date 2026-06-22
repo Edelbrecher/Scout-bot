@@ -10683,6 +10683,9 @@ async def _init_sector_monitor_tables():
             ("sectors",              "''"),
             ("monitored_alliances",  "''"),
             ("watch_capital_change", "0"),
+            ("live_session_cookie",  "''"),
+            ("live_scan_enabled",    "0"),
+            ("live_last_scan",       "NULL"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE sector_monitors ADD COLUMN {col} TEXT DEFAULT {default}")
@@ -10691,6 +10694,11 @@ async def _init_sector_monitor_tables():
                 pass
         try:
             await db.execute("ALTER TABLE sector_alerts ADD COLUMN extra TEXT DEFAULT '{}'")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE sector_alerts ADD COLUMN source TEXT DEFAULT 'map_sql'")
             await db.commit()
         except Exception:
             pass
