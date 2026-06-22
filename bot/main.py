@@ -19,9 +19,36 @@ intents.guilds = True
 intents.members = True   # needed for guild.members lookup (grant/revoke access)
 
 
+class ArchivedAwareTree(discord.app_commands.CommandTree):
+    """Intercepts every slash command — if the guild is archived, blocks it and shows a promo."""
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if not interaction.guild_id:
+            return True
+        config = await database.get_guild_config(str(interaction.guild_id))
+        if config and config.get("workspace_status") == "archived":
+            embed = discord.Embed(
+                title="⏸️ This server is archived",
+                description=(
+                    "This TravOps server has been deactivated.\n\n"
+                    "**Want to use TravOps again?**\n"
+                    "The server owner can reactivate it at any time on the dashboard:\n"
+                    "🔗 **[travops.online](https://travops.online)**\n\n"
+                    "*All data (scouts, reports, blueprints) is preserved.*"
+                ),
+                color=discord.Color.orange(),
+            )
+            embed.set_footer(text="TravOps · travops.online")
+            try:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            except Exception:
+                pass
+            return False
+        return True
+
+
 class ScouterBot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(command_prefix="!", intents=intents, tree_cls=ArchivedAwareTree)
 
     async def setup_hook(self):
         await database.init_db()

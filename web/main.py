@@ -1955,16 +1955,7 @@ async def dashboard_remove_server(request: Request, guild_id: str = Form("")):
     if guild.get(owner_field) != uid:
         return RedirectResponse("/dashboard?error=not_owner", status_code=303)
 
-    if not is_personal:
-        # Tell the bot to leave Discord
-        bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
-        try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                await client.post(f"{bot_api}/api/leave-guild", json={"guild_id": guild_id})
-        except Exception as e:
-            print(f"[remove-server] Bot leave error for {guild_id}: {e}", flush=True)
-
-    # Archive instead of delete — data is preserved
+    # Archive instead of delete — bot stays in server to show reactivation prompt
     await database.archive_workspace(guild_id)
     return RedirectResponse("/dashboard?removed=1", status_code=303)
 
