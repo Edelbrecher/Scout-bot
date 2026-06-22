@@ -1816,6 +1816,8 @@ async def dashboard(request: Request, flash: str = ""):
     slots_max = await database.get_owner_tier_limit(owner_discord_id) if owner_discord_id else 0
     slots_full = slots_max > 0 and slots_used >= slots_max
 
+    from datetime import datetime as _dt, timezone as _tz
+    now_iso = _dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%S")
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -1829,6 +1831,7 @@ async def dashboard(request: Request, flash: str = ""):
             "slots_full": slots_full,
             "flash": flash,
             "archived_workspaces": archived_workspaces,
+            "now_iso": now_iso,
         },
     )
 

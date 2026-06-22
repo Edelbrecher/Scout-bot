@@ -300,6 +300,8 @@
     {% for guild in guilds %}
     {% set sub = guild.subscription_status or 'free' %}
     {% set is_personal = guild.workspace_type == 'personal' %}
+    {% set is_owner = (guild.owner_discord_id == user_id) or (guild.workspace_owner_id == user_id) %}
+    {% set world_ended = (not is_personal) and guild.server_end_date and (guild.server_end_date < now_iso) %}
     <div class="guild-tile" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
       <!-- Sichtbarer Drag-Handle – hier anfassen zum Verschieben -->
       <div class="drag-handle" title="Move tile" style="justify-content:space-between;">
@@ -350,6 +352,22 @@
         </div>
         <div class="arrow" style="color:var(--text-muted);font-size:1rem;flex-shrink:0;">→</div>
       </a>
+      {% if world_ended and is_owner %}
+      <div style="margin:.5rem -.1rem -.1rem;padding:.55rem .75rem;background:rgba(239,68,68,0.08);border-top:1px solid rgba(239,68,68,0.25);border-radius:0 0 12px 12px;display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+        <span style="font-size:.75rem;color:#f87171;font-weight:500;">🏁 World ended</span>
+        <button
+          onclick="confirmArchiveEnded(event,'{{ guild.guild_id }}','{{ guild.guild_name | e }}')"
+          style="font-size:.72rem;padding:.25rem .65rem;border-radius:6px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.12);color:#f87171;cursor:pointer;white-space:nowrap;font-weight:600;"
+          onmouseover="this.style.background='rgba(239,68,68,0.25)'"
+          onmouseout="this.style.background='rgba(239,68,68,0.12)'">
+          📦 Archive server
+        </button>
+      </div>
+      {% elif world_ended %}
+      <div style="margin:.5rem -.1rem -.1rem;padding:.45rem .75rem;background:rgba(239,68,68,0.06);border-top:1px solid rgba(239,68,68,0.2);border-radius:0 0 12px 12px;">
+        <span style="font-size:.73rem;color:#f87171;">🏁 World ended — ask the server owner to archive</span>
+      </div>
+      {% endif %}
     </div>
     {% endfor %}
   </div>
@@ -547,6 +565,15 @@
 })();
 
 // ── Remove server ────────────────────────────────────────────────────────────
+function confirmArchiveEnded(e, guildId, guildName) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!confirm(`Archive "${guildName}"?\n\nThe Travian world has ended. The bot will leave the Discord server and the entry will be moved to the archive. All data is preserved and can be reactivated at any time.`)) return;
+  const form = document.getElementById('archiveEndedForm');
+  form.querySelector('input[name="guild_id"]').value = guildId;
+  form.submit();
+}
+
 function confirmRemove(e, btn) {
   e.preventDefault();
   e.stopPropagation();
@@ -614,6 +641,10 @@ function closeRenameModal() {
 
 <!-- Hidden form for server removal -->
 <form id="removeServerForm" method="post" action="/dashboard/remove-server" style="display:none;">
+  <input type="hidden" name="guild_id" value="">
+</form>
+<!-- Hidden form for world-ended archive -->
+<form id="archiveEndedForm" method="post" action="/dashboard/remove-server" style="display:none;">
   <input type="hidden" name="guild_id" value="">
 </form>
 
