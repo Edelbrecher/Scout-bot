@@ -461,7 +461,15 @@
           style="width:100%;font-size:.7rem;font-family:monospace;border:1px solid var(--border);border-radius:6px;
                  background:var(--bg-main);color:var(--text);padding:.4rem .5rem;resize:vertical;"
           placeholder="Paste your Travian session cookie here..."
-        >{{ live_cookie }}</textarea>
+        >{% if live_enabled and live_cookie %}••• encrypted — paste new cookie to replace •••{% endif %}</textarea>
+        {% set bbox_w = (monitor.get('x2',50)|int - monitor.get('x1',-50)|int)|abs %}
+        {% set bbox_h = (monitor.get('y2',50)|int - monitor.get('y1',-50)|int)|abs %}
+        {% if bbox_w * bbox_h > 8000 %}
+        <div style="margin-top:.35rem;padding:.35rem .5rem;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:6px;font-size:.7rem;color:#fbbf24;">
+          ⚠️ Dein Bereich ({{ bbox_w }}×{{ bbox_h }}) ist zu groß für den Live-Scanner (max ~90×90).
+          Verkleinere den Sektor oder nutze Sektor-Auswahl (NW/NE/C etc.).
+        </div>
+        {% endif %}
         <div style="display:flex;gap:.5rem;margin-top:.4rem;align-items:center;">
           <button onclick="saveLiveSession(true)" class="btn btn-primary" style="font-size:.78rem;">📡 Activate</button>
           {% if live_enabled %}

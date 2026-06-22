@@ -842,6 +842,23 @@ async def lifespan(app: FastAPI):
 
     # ── Live Map Scanner (authenticated Travian API) ──────────────────────────
     import random as _rng, re as _re_mod, html as _html_mod
+    import base64 as _b64, hashlib as _hashlib_live
+    from cryptography.fernet import Fernet as _Fernet, InvalidToken as _InvalidToken
+    _fernet_key = _b64.urlsafe_b64encode(_hashlib_live.sha256(SECRET_KEY.encode()).digest())
+    _fernet = _Fernet(_fernet_key)
+
+    def _encrypt_cookie(plain: str) -> str:
+        if not plain:
+            return ""
+        return _fernet.encrypt(plain.encode()).decode()
+
+    def _decrypt_cookie(encrypted: str) -> str:
+        if not encrypted:
+            return ""
+        try:
+            return _fernet.decrypt(encrypted.encode()).decode()
+        except (_InvalidToken, Exception):
+            return encrypted  # fallback: might be stored unencrypted before migration
 
     def _parse_tile_text(text: str) -> dict:
         """Extract player_name, population, alliance_name from Travian tile text HTML."""
@@ -866,7 +883,7 @@ async def lifespan(app: FastAPI):
 
     async def _live_scan_guild(guild_id: str, monitor: dict):
         """Fetch map tiles from Travian API and create alerts for changes."""
-        cookie = monitor.get("live_session_cookie") or ""
+        cookie = _decrypt_cookie(monitor.get("live_session_cookie") or "")
         if not cookie:
             return
         guild = await database.get_guild(guild_id)
@@ -897,18 +914,30 @@ async def lifespan(app: FastAPI):
 
         # Scan grid: each request covers ~11x7 tiles
         TILE_W, TILE_H = 11, 7
+        MAX_REQUESTS = 150
+        width = abs(x2 - x1)
+        height = abs(y2 - y1)
+        est_requests = ((width // TILE_W) + 1) * ((height // TILE_H) + 1)
+        if est_requests > MAX_REQUESTS:
+            print(f"[live_scan] {guild_id}: bbox too large ({width}x{height}, ~{est_requests} requests). Max {MAX_REQUESTS}. Skipping.", flush=True)
+            return
+
         villages: dict[str, dict] = {}  # key = "x,y"
+        request_count = 0
 
         async with httpx.AsyncClient(timeout=15) as client:
             cy = y1
             while cy <= y2:
                 cx = x1
                 while cx <= x2:
+                    if request_count >= MAX_REQUESTS:
+                        break
                     try:
                         resp = await client.post(api_url, json={
                             "data": {"x": cx, "y": cy, "zoomLevel": 1}
                         }, headers=headers)
-                        if resp.status_code == 401 or resp.status_code == 302:
+                        request_count += 1
+                        if resp.status_code in (401, 302, 403):
                             print(f"[live_scan] {guild_id}: session expired (HTTP {resp.status_code})", flush=True)
                             await database.upsert_sector_monitor(guild_id, live_scan_enabled=0)
                             return
@@ -933,7 +962,7 @@ async def lifespan(app: FastAPI):
                     except Exception as e:
                         print(f"[live_scan] {guild_id}: request error at ({cx},{cy}): {e}", flush=True)
                     cx += TILE_W
-                    await asyncio.sleep(_rng.uniform(0.3, 0.8))
+                    await asyncio.sleep(_rng.uniform(0.5, 1.2))
                 cy += TILE_H
 
         if not villages:
@@ -4148,9 +4177,10 @@ async def sector_monitor_save_live_session(request: Request, guild_id: str):
             except Exception as e:
                 return JSONResponse({"ok": False, "error": f"Connection error: {e}"})
 
+    encrypted = _encrypt_cookie(cookie) if cookie else ""
     await database.upsert_sector_monitor(
         guild_id,
-        live_session_cookie=cookie,
+        live_session_cookie=encrypted,
         live_scan_enabled=1 if (cookie and enabled) else 0,
     )
     return JSONResponse({"ok": True, "enabled": bool(cookie and enabled)})
