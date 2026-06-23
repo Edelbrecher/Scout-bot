@@ -16370,8 +16370,12 @@ async def all_treasuries_page(request: Request, guild_id: str):
     uid = session.get("uid", "") or session.get("discord_id", "")
     err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
-    treasuries = await database.get_all_treasuries(guild_id)
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    can_view_all = is_leader or await has_perm(request, guild_id, "treasury_view")
+    if can_view_all:
+        treasuries = await database.get_all_treasuries(guild_id)
+    else:
+        treasuries = await database.get_my_treasuries(guild_id, uid)
     return templates.TemplateResponse("all_treasuries.html", {
         "request": request, "guild": guild,
         "treasuries": treasuries, "is_leader": is_leader,
@@ -16382,7 +16386,12 @@ async def all_treasuries_page(request: Request, guild_id: str):
 async def api_treasuries(request: Request, guild_id: str):
     session, err = await _artifact_access(request, guild_id)
     if err: return err
-    rows = await database.get_all_treasuries(guild_id)
+    uid = (session or {}).get("uid", "") or (session or {}).get("discord_id", "")
+    can_view_all = _is_leader(session, guild_id) or await has_perm(request, guild_id, "treasury_view") or await has_perm(request, guild_id, "ally_manage")
+    if can_view_all:
+        rows = await database.get_all_treasuries(guild_id)
+    else:
+        rows = await database.get_my_treasuries(guild_id, uid)
     return JSONResponse(rows)
 
 
