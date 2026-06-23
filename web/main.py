@@ -16295,6 +16295,12 @@ async def my_treasury_page(request: Request, guild_id: str):
     if err: return err
     err = await _require_guild_async(session, guild_id)
     if err: return err
+    # Redirect workspace users to their alliance guild
+    if WORKSPACE_RE.match(guild_id):
+        uid = session.get("uid", "") or session.get("discord_id", "")
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            return RedirectResponse(f"/guild/{real_guild_id}/my-treasury", status_code=302)
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
     uid = session.get("uid", "") or session.get("discord_id", "")
@@ -16329,6 +16335,11 @@ async def my_treasury_save(request: Request, guild_id: str):
     if err: return err
     err = await _require_guild_async(session, guild_id)
     if err: return err
+    if WORKSPACE_RE.match(guild_id):
+        uid = session.get("uid", "") or session.get("discord_id", "")
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            guild_id = real_guild_id
     uid = session.get("uid", "") or session.get("discord_id", "")
     form = await request.form()
     tid = form.get("treasury_id", "").strip()
@@ -16355,6 +16366,10 @@ async def my_treasury_delete(request: Request, guild_id: str, tid: int):
     err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "") or session.get("discord_id", "")
+    if WORKSPACE_RE.match(guild_id):
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            guild_id = real_guild_id
     await database.delete_treasury(tid, guild_id, uid)
     return RedirectResponse(f"/guild/{guild_id}/my-treasury?saved=1", status_code=303)
 
