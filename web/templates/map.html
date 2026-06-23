@@ -292,6 +292,30 @@
     </div>
     <div id="vdContent" style="display:flex;flex-wrap:wrap;gap:1.5rem;font-size:0.85rem;"></div>
   </div>
+
+  <!-- Treasury list (shown when treasury toggle is active) -->
+  <div id="treasuryList" style="display:none;margin-top:.75rem;">
+    <div class="card" style="padding:.75rem 1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;">
+        <h3 style="margin:0;font-size:.95rem;">🏛️ Alliance Treasuries</h3>
+        <span id="treasuryCount" style="font-size:.78rem;color:var(--text-muted);"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table" style="font-size:.82rem;margin:0;">
+          <thead>
+            <tr>
+              <th style="padding:.35rem .5rem;">Player</th>
+              <th style="padding:.35rem .5rem;">Village</th>
+              <th style="padding:.35rem .5rem;text-align:center;">Coords</th>
+              <th style="padding:.35rem .5rem;text-align:center;">Level</th>
+              <th style="padding:.35rem .5rem;">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="treasuryTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
   {% endif %}
 </div>
 
@@ -334,6 +358,37 @@ function toggleTreasuries() {
   const tl2 = document.getElementById('treasuryLegend2');
   if (tl)  tl.style.display  = d;
   if (tl2) tl2.style.display = d;
+  const listPanel = document.getElementById('treasuryList');
+  if (listPanel) {
+    listPanel.style.display = _showTreasuries ? '' : 'none';
+    if (_showTreasuries) renderTreasuryList();
+  }
+  draw();
+}
+
+function renderTreasuryList() {
+  const tbody = document.getElementById('treasuryTbody');
+  const countEl = document.getElementById('treasuryCount');
+  if (!tbody) return;
+  const sorted = [..._treasuries].sort((a, b) => b.level - a.level || (a.player_name || '').localeCompare(b.player_name || ''));
+  countEl.textContent = sorted.length + ' treasur' + (sorted.length === 1 ? 'y' : 'ies');
+  tbody.innerHTML = sorted.map(t => {
+    const lvlColor = t.level === 20 ? '#fbbf24' : '#818cf8';
+    const coords = (t.x || t.y) ? `(${t.x}|${t.y})` : '—';
+    const coordLink = (t.x || t.y) ? `<a href="#" onclick="centerMap(${t.x},${t.y});return false;" style="color:var(--primary);text-decoration:none;">${coords}</a>` : '—';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+      <td style="padding:.35rem .5rem;font-weight:600;">${t.player_name || '—'}</td>
+      <td style="padding:.35rem .5rem;">${t.village_name || '—'}</td>
+      <td style="padding:.35rem .5rem;text-align:center;">${coordLink}</td>
+      <td style="padding:.35rem .5rem;text-align:center;"><span style="color:${lvlColor};font-weight:700;">${t.level}</span></td>
+      <td style="padding:.35rem .5rem;color:var(--text-muted);font-size:.78rem;">${t.notes || ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function centerMap(x, y) {
+  camX = x; camY = y;
+  if (scale < 5) scale = 8;
   draw();
 }
 let mapRadius  = 400;
