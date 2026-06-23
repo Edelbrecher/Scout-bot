@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Alle Schatzkammern · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}All Treasuries · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -39,14 +39,14 @@
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin:1rem 0 1.25rem;">
     <div>
-      <h1 style="margin:0;">🏛️ Allianz-Schatzkammern</h1>
-      <p class="subtitle" style="margin:.2rem 0 0;">Alle registrierten Schatzkammern der Allianz</p>
+      <h1 style="margin:0;">🏛️ Alliance Treasuries</h1>
+      <p class="subtitle" style="margin:.2rem 0 0;">All registered treasuries of the alliance</p>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
       {% if is_leader %}
-      <button onclick="toggleTestMenu()" class="btn btn-secondary" style="font-size:.8rem;">🧪 Testdaten</button>
+      <button onclick="toggleTestMenu()" class="btn btn-secondary" style="font-size:.8rem;">🧪 Test Data</button>
       {% endif %}
-      <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary" style="font-size:.8rem;">Meine Kammern</a>
+      <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary" style="font-size:.8rem;">My Treasuries</a>
     </div>
   </div>
 
@@ -54,26 +54,26 @@
   {% set msg = request.query_params.get('msg') %}
   {% if msg == 'test_added' %}
   <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:.6rem 1rem;font-size:.82rem;color:#fbbf24;margin-bottom:1rem;">
-    🧪 {{ request.query_params.get('n','?') }} Testkammern hinzugefügt. Werden mit gestricheltem Rahmen angezeigt.
+    🧪 {{ request.query_params.get('n','?') }} test treasuries added. Shown with dashed border.
   </div>
   {% elif msg == 'test_cleared' %}
   <div style="background:rgba(134,239,172,.08);border:1px solid rgba(134,239,172,.3);border-radius:9px;padding:.6rem 1rem;font-size:.82rem;color:#86efac;margin-bottom:1rem;">
-    ✅ {{ request.query_params.get('n','?') }} Testkammern entfernt.
+    ✅ {{ request.query_params.get('n','?') }} test treasuries removed.
   </div>
   {% endif %}
 
   <!-- Test data panel -->
   <div id="testMenu" style="display:none;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;">
-    <div style="font-weight:700;color:#fbbf24;margin-bottom:.5rem;">🧪 Testdaten für Training</div>
+    <div style="font-weight:700;color:#fbbf24;margin-bottom:.5rem;">🧪 Test Data for Training</div>
     <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .65rem;">
-      Fügt 5 Testkammern (mit gestricheltem Rahmen) hinzu, um den Ablauf zu üben — ohne echte Daten zu verändern.
+      Adds 5 test treasuries (dashed border) to practice the workflow — without modifying real data.
     </p>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
       <form method="post" action="/guild/{{ guild.guild_id }}/all-treasuries/seed-test" style="display:inline;">
-        <button type="submit" class="btn btn-primary" style="font-size:.8rem;">+ Testkammern hinzufügen</button>
+        <button type="submit" class="btn btn-primary" style="font-size:.8rem;">+ Add Test Treasuries</button>
       </form>
       <form method="post" action="/guild/{{ guild.guild_id }}/all-treasuries/clear-test" style="display:inline;">
-        <button type="submit" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:7px;padding:.35rem .8rem;cursor:pointer;font-size:.8rem;">🗑 Alle Testkammern löschen</button>
+        <button type="submit" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:7px;padding:.35rem .8rem;cursor:pointer;font-size:.8rem;">🗑 Delete All Test Treasuries</button>
       </form>
     </div>
   </div>
@@ -84,17 +84,17 @@
   {% set t_test = treasuries | selectattr('is_test') | list %}
   <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;">
     <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;">
-      🔵 <strong>{{ t10|length }}</strong> Stufe 10
+      🔵 <strong>{{ t10|length }}</strong> Level 10
     </div>
     <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;">
-      🟡 <strong>{{ t20|length }}</strong> Stufe 20
+      🟡 <strong>{{ t20|length }}</strong> Level 20
     </div>
     <div style="background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;">
-      📦 Gesamt: <strong>{{ treasuries|length }}</strong>
+      📦 Total: <strong>{{ treasuries|length }}</strong>
     </div>
     {% if t_test %}
     <div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:.45rem .9rem;font-size:.82rem;color:#fbbf24;">
-      🧪 <strong>{{ t_test|length }}</strong> Testkammern
+      🧪 <strong>{{ t_test|length }}</strong> Test Treasuries
     </div>
     {% endif %}
   </div>
@@ -104,31 +104,31 @@
     {% if is_leader %}
     <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer;padding:.3rem .55rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);">
       <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)" style="accent-color:var(--primary);width:14px;height:14px;">
-      Alle
+      All
     </label>
     {% endif %}
-    <button onclick="filterLevel(0)"  id="fAll" class="btn btn-primary"    style="font-size:.8rem;padding:.3rem .8rem;">Alle</button>
-    <button onclick="filterLevel(10)" id="f10"  class="btn btn-secondary"  style="font-size:.8rem;padding:.3rem .8rem;">🔵 Stufe 10</button>
-    <button onclick="filterLevel(20)" id="f20"  class="btn btn-secondary"  style="font-size:.8rem;padding:.3rem .8rem;">🟡 Stufe 20</button>
-    <input id="searchInput" class="form-control" placeholder="Spieler oder Dorf…" oninput="filterSearch()" style="max-width:220px;font-size:.82rem;">
+    <button onclick="filterLevel(0)"  id="fAll" class="btn btn-primary"    style="font-size:.8rem;padding:.3rem .8rem;">All</button>
+    <button onclick="filterLevel(10)" id="f10"  class="btn btn-secondary"  style="font-size:.8rem;padding:.3rem .8rem;">🔵 Level 10</button>
+    <button onclick="filterLevel(20)" id="f20"  class="btn btn-secondary"  style="font-size:.8rem;padding:.3rem .8rem;">🟡 Level 20</button>
+    <input id="searchInput" class="form-control" placeholder="Player or village…" oninput="filterSearch()" style="max-width:220px;font-size:.82rem;">
   </div>
 
   <!-- Bulk action toolbar -->
   {% if is_leader %}
   <div id="bulkBar">
     <span id="bulkCount" style="font-size:.82rem;font-weight:700;color:#a5b4fc;margin-right:.25rem;"></span>
-    <button onclick="bulkSetLevel(10)" class="btn btn-secondary" style="font-size:.78rem;padding:.28rem .65rem;">→ Stufe 10</button>
-    <button onclick="bulkSetLevel(20)" class="btn btn-secondary" style="font-size:.78rem;padding:.28rem .65rem;">→ Stufe 20</button>
-    <button onclick="bulkDelete()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.78rem;font-weight:600;">🗑 Löschen</button>
-    <button onclick="clearSelection()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.78rem;">✕ Auswahl aufheben</button>
+    <button onclick="bulkSetLevel(10)" class="btn btn-secondary" style="font-size:.78rem;padding:.28rem .65rem;">→ Level 10</button>
+    <button onclick="bulkSetLevel(20)" class="btn btn-secondary" style="font-size:.78rem;padding:.28rem .65rem;">→ Level 20</button>
+    <button onclick="bulkDelete()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.78rem;font-weight:600;">🗑 Delete</button>
+    <button onclick="clearSelection()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.78rem;">✕ Clear Selection</button>
   </div>
   {% endif %}
 
   {% if not treasuries %}
   <div style="text-align:center;padding:3rem;color:var(--text-muted);">
     <div style="font-size:2.5rem;margin-bottom:.75rem;">🏛️</div>
-    <p>Noch keine Schatzkammern registriert.</p>
-    <p style="font-size:.82rem;">Spieler können ihre Kammern unter „Meine Schatzkammern" eintragen.</p>
+    <p>No treasuries registered yet.</p>
+    <p style="font-size:.82rem;">Players can register their treasuries under "My Treasury".</p>
   </div>
   {% else %}
   <div id="tList">
@@ -241,7 +241,7 @@ function updateBulkBar() {
 // ── Bulk actions ───────────────────────────────────────────────────────────
 async function bulkDelete() {
   if (!selectedIds.size) return;
-  if (!confirm(`${selectedIds.size} Schatzkammer(n) wirklich löschen?`)) return;
+  if (!confirm(`Delete ${selectedIds.size} treasury/treasuries?`)) return;
   const r = await fetch(`/guild/${GUILD_ID}/all-treasuries/bulk-delete`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ids: [...selectedIds]})

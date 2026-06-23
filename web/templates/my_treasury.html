@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Meine Schatzkammer · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}My Treasury · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -77,36 +77,36 @@
 
   <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.75rem; margin: 1rem 0 1.5rem;">
     <div>
-      <h1 style="margin:0;">🏛️ Meine Schatzkammer</h1>
-      <p class="subtitle" style="margin:.2rem 0 0;">Registriere deine Schatzkammern für die Artefakt-Koordination</p>
+      <h1 style="margin:0;">🏛️ My Treasury</h1>
+      <p class="subtitle" style="margin:.2rem 0 0;">Register your treasuries for artifact coordination</p>
     </div>
-    <button onclick="openAddModal()" class="btn btn-primary">+ Schatzkammer hinzufügen</button>
+    <button onclick="openAddModal()" class="btn btn-primary">+ Add Treasury</button>
   </div>
 
   {% if saved %}
-  <div class="alert alert-success" style="margin-bottom: 1rem;">✅ Gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom: 1rem;">✅ Saved.</div>
   {% endif %}
 
   <div class="info-box">
     💡 <strong>Stufe 10</strong> → kleine Artefakte &nbsp;·&nbsp;
        <strong>Stufe 20</strong> → große &amp; Unique Artefakte.<br>
     {% if not own_villages %}
-    ⚠️ Du hast noch keine Dörfer in My Account importiert — importiere zuerst deine Truppen/Dörfer damit die Auswahl hier funktioniert.
+    ⚠️ No villages imported yet — import your troops/villages in My Account first so the picker works.
     {% endif %}
   </div>
 
   {% if not treasuries %}
   <div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
     <div style="font-size:2.5rem; margin-bottom:.75rem;">🏛️</div>
-    <p>Noch keine Schatzkammern registriert.</p>
-    <button onclick="openAddModal()" class="btn btn-primary" style="margin-top:.5rem;">+ Hinzufügen</button>
+    <p>No treasuries registered yet.</p>
+    <button onclick="openAddModal()" class="btn btn-primary" style="margin-top:.5rem;">+ Add</button>
   </div>
   {% else %}
   {% for t in treasuries %}
   <div class="treasury-card">
-    <div class="lvl-badge lvl-{{ t.level }}">Stufe<br>{{ t.level }}</div>
+    <div class="lvl-badge lvl-{{ t.level }}">Level<br>{{ t.level }}</div>
     <div style="flex:1; min-width:0;">
-      <div style="font-weight:700; font-size:.95rem;">{{ t.village_name or 'Unbekanntes Dorf' }}</div>
+      <div style="font-weight:700; font-size:.95rem;">{{ t.village_name or 'Unknown village' }}</div>
       <div style="font-size:.78rem; color:var(--text-muted); margin-top:.1rem;">
         {% if t.x or t.y %}📍 ({{ t.x }}|{{ t.y }}){% endif %}
       </div>
@@ -114,9 +114,9 @@
     </div>
     <div style="display:flex; gap:.4rem; align-items:center;">
       <button onclick="openEditModal({{ t.id }}, '{{ t.village_name|replace("'","\\'")|e }}', {{ t.x }}, {{ t.y }}, {{ t.level }}, '{{ t.notes|replace("'","\\'")|e }}')"
-              class="btn btn-secondary" style="font-size:.78rem; padding:.3rem .65rem;">✏️ Bearbeiten</button>
+              class="btn btn-secondary" style="font-size:.78rem; padding:.3rem .65rem;">✏️ Edit</button>
       <form method="POST" action="/guild/{{ guild.guild_id }}/my-treasury/{{ t.id }}/delete"
-            onsubmit="return confirm('Schatzkammer wirklich löschen?')">
+            onsubmit="return confirm('Really delete this treasury?')">
         <button type="submit" class="btn" style="background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#f87171; font-size:.78rem; padding:.3rem .65rem;">🗑️</button>
       </form>
     </div>
@@ -130,7 +130,7 @@
 <div id="treasuryModal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <h2 id="modalTitle">🏛️ Schatzkammer hinzufügen</h2>
+      <h2 id="modalTitle">🏛️ Add Treasury</h2>
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
 
@@ -145,10 +145,10 @@
 
         <!-- Village picker -->
         <div class="form-field">
-          <label>Dorf auswählen</label>
+          <label>Select village</label>
           {% if own_villages %}
           <select id="villageSelect" class="form-control" onchange="onVillageSelect(this)" required>
-            <option value="">— Dorf wählen —</option>
+            <option value="">— Select village —</option>
             {% for v in own_villages %}
             <option value="{{ v.village_name }}"
                     data-x="{{ v.x or 0 }}"
@@ -159,9 +159,9 @@
           </select>
           {% else %}
           <input name="village_name" id="villageNameFallback" class="form-control"
-                 placeholder="Dorfname manuell eingeben" required>
+                 placeholder="Enter village name manually" required>
           <p style="font-size:.73rem; color:#f59e0b; margin:.3rem 0 0;">
-            ⚠️ Keine Dörfer gefunden — importiere zuerst deine Dörfer in
+            ⚠️ No villages found — import your villages in
             <a href="/guild/{{ guild.guild_id }}/my-account" style="color:#a5b4fc;">My Account</a>.
           </p>
           {% endif %}
@@ -171,15 +171,15 @@
 
         <!-- Stufe -->
         <div class="form-field">
-          <label>Schatzkammer-Stufe</label>
+          <label>Treasury Level</label>
           <div style="display:flex; gap:.6rem;">
             <button type="button" id="lvlBtn10" onclick="selectLevel(10)"
                     class="btn btn-primary" style="flex:1; font-size:.9rem; padding:.5rem;">
-              🔵 Stufe 10 <span style="font-size:.72rem; display:block; color:rgba(255,255,255,.65); font-weight:400;">kleine Artefakte</span>
+              🔵 Level 10 <span style="font-size:.72rem; display:block; color:rgba(255,255,255,.65); font-weight:400;">small artifacts</span>
             </button>
             <button type="button" id="lvlBtn20" onclick="selectLevel(20)"
                     class="btn btn-secondary" style="flex:1; font-size:.9rem; padding:.5rem;">
-              🟡 Stufe 20 <span style="font-size:.72rem; display:block; color:rgba(255,255,255,.65); font-weight:400;">große / Unique</span>
+              🟡 Level 20 <span style="font-size:.72rem; display:block; color:rgba(255,255,255,.65); font-weight:400;">large / unique</span>
             </button>
             <input type="hidden" name="level" id="formLevel" value="10">
           </div>
@@ -187,12 +187,12 @@
 
         <!-- Notizen -->
         <div class="form-field">
-          <label>Notizen <span style="font-weight:400;">(optional)</span></label>
-          <input name="notes" id="formNotes" class="form-control" placeholder="z.B. Hauptdorf, aktuell Stufe 12 im Ausbau…">
+          <label>Notes <span style="font-weight:400;">(optional)</span></label>
+          <input name="notes" id="formNotes" class="form-control" placeholder="e.g. capital, currently upgrading to level 12…">
         </div>
 
         <button type="submit" class="btn btn-primary" style="width:100%; padding:.7rem; font-size:.95rem;">
-          💾 Schatzkammer speichern
+          💾 Save Treasury
         </button>
       </div>
     </form>
@@ -221,7 +221,7 @@ function onVillageSelect(sel) {
 }
 
 function openAddModal() {
-  document.getElementById('modalTitle').textContent = '🏛️ Schatzkammer hinzufügen';
+  document.getElementById('modalTitle').textContent = '🏛️ Add Treasury';
   document.getElementById('formTid').value = '';
   document.getElementById('formPlayerName').value = AUTO_PLAYER;
   document.getElementById('formVillageName').value = '';
@@ -235,7 +235,7 @@ function openAddModal() {
 }
 
 function openEditModal(tid, village, x, y, level, notes) {
-  document.getElementById('modalTitle').textContent = '✏️ Schatzkammer bearbeiten';
+  document.getElementById('modalTitle').textContent = '✏️ Edit Treasury';
   document.getElementById('formTid').value = tid;
   document.getElementById('formPlayerName').value = AUTO_PLAYER;
   document.getElementById('formVillageName').value = village;

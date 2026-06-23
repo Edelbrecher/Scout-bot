@@ -67,8 +67,8 @@
       <a href="/guild/{{ guild.guild_id }}/map/sector-monitor" class="btn btn-secondary" style="font-size:0.85rem;">
         📡 Sector-Monitoring
       </a>
-      <button id="treasuryToggleBtn" onclick="toggleTreasuries()" class="btn btn-secondary" style="font-size:0.85rem;" title="Schatzkammern einblenden">
-        🏛️ Schatzkammern
+      <button id="treasuryToggleBtn" onclick="toggleTreasuries()" class="btn btn-secondary" style="font-size:0.85rem;" title="Show treasuries">
+        🏛️ Treasuries
       </button>
     </div>
     {% if is_admin %}
@@ -269,8 +269,8 @@
     <span><span class="legend-dot" style="background:#e67e22;"></span>Natars</span>
     <span><span class="legend-dot" style="background:#e05555; border-radius:50%;"></span>Scout</span>
     <span><span class="legend-dot" style="background:#f1c40f; border-radius:50%;"></span>Highlight</span>
-    <span id="treasuryLegend" style="display:none;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #818cf8;margin-right:3px;vertical-align:middle;"></span>Schatz 10</span>
-    <span id="treasuryLegend2" style="display:none;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #fbbf24;margin-right:3px;vertical-align:middle;"></span>Schatz 20</span>
+    <span id="treasuryLegend" style="display:none;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #818cf8;margin-right:3px;vertical-align:middle;"></span>Treasury 10</span>
+    <span id="treasuryLegend2" style="display:none;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #fbbf24;margin-right:3px;vertical-align:middle;"></span>Treasury 20</span>
   </div>
 
   <!-- Map canvas -->
@@ -315,12 +315,14 @@ const coordEl = document.getElementById('coordDisplay');
 let villages   = [];
 let scoutMap   = new Map();
 let _treasuries     = [];
+let _treasuryCoords = new Set();
 let _showTreasuries = false;
 async function loadTreasuries() {
   try {
     const r = await fetch(`/guild/${GUILD_ID}/api/treasuries`);
     _treasuries = await r.json();
-  } catch(e) { _treasuries = []; }
+    _treasuryCoords = new Set(_treasuries.filter(t => t.x || t.y).map(t => `${t.x}|${t.y}`));
+  } catch(e) { _treasuries = []; _treasuryCoords = new Set(); }
 }
 loadTreasuries();
 function toggleTreasuries() {
@@ -534,7 +536,8 @@ function draw() {
     const isScouted= scoutMap.has(key);
     const hlColor  = highlighted.get(key);
     const isHL     = !!hlColor;
-    const dim      = hasFilter && !isHL && !isScouted;
+    const isTreasury = _showTreasuries && _treasuryCoords.has(key);
+    const dim      = (hasFilter && !isHL && !isScouted) || (_showTreasuries && _treasuryCoords.size > 0 && !isTreasury && !isHL);
 
     // In alliance heatmap mode, skip villages of alliances the user hid via the legend
     if (viewMode === 'alliance' && !isHL && !isScouted && v.alliance &&
