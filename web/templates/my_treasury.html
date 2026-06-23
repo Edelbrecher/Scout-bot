@@ -136,10 +136,7 @@
 
     <form id="treasuryForm" method="POST" action="/guild/{{ guild.guild_id }}/my-treasury/save">
       <input type="hidden" name="treasury_id" id="formTid" value="">
-      <!-- Player name hidden, auto-filled -->
-      <input type="hidden" name="player_name" id="formPlayerName" value="{{ auto_player_name }}">
-      <input type="hidden" name="x" id="formX" value="">
-      <input type="hidden" name="y" id="formY" value="">
+      <input type="hidden" name="village_name" id="formVillageName" value="">
 
       <div style="display:grid; gap:1rem;">
 
@@ -158,15 +155,27 @@
             {% endfor %}
           </select>
           {% else %}
-          <input name="village_name" id="villageNameFallback" class="form-control"
-                 placeholder="Enter village name manually" required>
-          <p style="font-size:.73rem; color:#f59e0b; margin:.3rem 0 0;">
-            ⚠️ No villages found — import your villages in
-            <a href="/guild/{{ guild.guild_id }}/my-account" style="color:#a5b4fc;">My Account</a>.
-          </p>
+          <input id="villageNameFallback" class="form-control"
+                 placeholder="Enter village name" required
+                 oninput="document.getElementById('formVillageName').value=this.value">
           {% endif %}
-          <!-- Hidden village_name field submitted always -->
-          <input type="hidden" name="village_name" id="formVillageName" value="">
+        </div>
+
+        <!-- Player name + Coordinates (always visible) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;">
+          <div class="form-field">
+            <label>Player name</label>
+            <input name="player_name" id="formPlayerName" class="form-control" value="{{ auto_player_name }}"
+                   placeholder="Your Travian name">
+          </div>
+          <div class="form-field">
+            <label>X</label>
+            <input type="number" name="x" id="formX" class="form-control" value="" placeholder="e.g. -20">
+          </div>
+          <div class="form-field">
+            <label>Y</label>
+            <input type="number" name="y" id="formY" class="form-control" value="" placeholder="e.g. 25">
+          </div>
         </div>
 
         <!-- Stufe -->
