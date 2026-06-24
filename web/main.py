@@ -15533,7 +15533,7 @@ async def report_submit(request: Request, guild_id: str,
                         report_text: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "") or session.get("discord_id", "")
     if WORKSPACE_RE.match(guild_id):
@@ -15602,7 +15602,7 @@ async def report_submit_force(request: Request, guild_id: str,
     """Force-save a report even when world-check warnings were raised."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "") or session.get("discord_id", "")
     if WORKSPACE_RE.match(guild_id):
@@ -15635,8 +15635,14 @@ async def combat_intel_page(request: Request, guild_id: str, q: str = ""):
     # NOTE: must be defined BEFORE /reports/{report_id} to avoid "intel" being parsed as int
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
+    if WORKSPACE_RE.match(guild_id):
+        uid = session.get("uid", "") or session.get("discord_id", "")
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            qs = f"?q={q}" if q else ""
+            return RedirectResponse(f"/guild/{real_guild_id}/reports/intel{qs}", status_code=302)
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
@@ -15667,7 +15673,7 @@ async def combat_intel_page(request: Request, guild_id: str, q: str = ""):
 async def report_detail(request: Request, guild_id: str, report_id: int, duplicate: int = 0):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if WORKSPACE_RE.match(guild_id):
         uid = session.get("uid", "") or session.get("discord_id", "")
@@ -15702,7 +15708,7 @@ async def report_detail(request: Request, guild_id: str, report_id: int, duplica
 async def report_delete(request: Request, guild_id: str, report_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_battle_report(report_id, guild_id)
     return RedirectResponse(f"/guild/{guild_id}/reports", status_code=303)
