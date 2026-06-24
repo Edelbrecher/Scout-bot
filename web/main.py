@@ -16770,6 +16770,72 @@ async def set_world_artifact_coords(request: Request, guild_id: str, artifact_id
     return JSONResponse({"ok": True})
 
 
+@app.get("/guild/{guild_id}/api/artifact-channels")
+async def api_artifact_channels_list(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    categories = await database.get_artifact_channels(guild_id)
+    return JSONResponse({"categories": categories})
+
+
+@app.post("/guild/{guild_id}/api/artifact-channels")
+async def api_artifact_channels_create(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    cat_name = (body.get("category_name") or "Artefacts-Spawn").strip()
+    count = min(int(body.get("count", 5)), 25)
+    prefix = (body.get("prefix") or "arte").strip()
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as client:
+            r = await client.post("http://bot:7777/api/create-artifact-channels", json={
+                "guild_id": guild_id,
+                "category_name": cat_name,
+                "count": count,
+                "prefix": prefix,
+            })
+            resp = await r.json()
+        if resp and resp.get("ok"):
+            await database.save_artifact_channels(
+                guild_id, resp["category_id"], cat_name,
+                resp.get("channels", [])
+            )
+            return JSONResponse({"ok": True})
+        return JSONResponse({"error": resp.get("error", "Bot error")}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.delete("/guild/{guild_id}/api/artifact-channels/{category_id}")
+async def api_artifact_channels_delete(request: Request, guild_id: str, category_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
+    if not is_leader:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as client:
+            r = await client.post("http://bot:7777/api/delete-artifact-channels", json={
+                "guild_id": guild_id,
+                "category_id": category_id,
+            })
+            resp = await r.json()
+        if resp and resp.get("ok"):
+            await database.delete_artifact_channels(guild_id, category_id)
+            return JSONResponse({"ok": True})
+        return JSONResponse({"error": resp.get("error", "Bot error")}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/guild/{guild_id}/artifacts/spawn-map", response_class=HTMLResponse)
 async def artifact_spawn_map_page(request: Request, guild_id: str):
     session, err = _require_session(request)

@@ -12895,6 +12895,77 @@ async def delete_treasury_comment(comment_id: int, discord_id: str) -> bool:
     return True
 
 
+# ── Artifact Channels ─────────────────────────────────────────────────────
+
+async def _init_artifact_channel_tables():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_channel_categories (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                category_id     TEXT NOT NULL,
+                category_name   TEXT NOT NULL,
+                created_at      TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, category_id)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_channel_entries (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                category_id     TEXT NOT NULL,
+                channel_id      TEXT NOT NULL,
+                channel_name    TEXT NOT NULL,
+                UNIQUE(guild_id, channel_id)
+            )
+        """)
+        await db.commit()
+
+
+async def save_artifact_channels(guild_id: str, category_id: str, category_name: str,
+                                  channels: list[dict]):
+    await _init_artifact_channel_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO artifact_channel_categories (guild_id, category_id, category_name) VALUES (?,?,?)",
+            (guild_id, category_id, category_name)
+        )
+        for ch in channels:
+            await db.execute(
+                "INSERT OR REPLACE INTO artifact_channel_entries (guild_id, category_id, channel_id, channel_name) VALUES (?,?,?,?)",
+                (guild_id, category_id, ch["id"], ch["name"])
+            )
+        await db.commit()
+
+
+async def get_artifact_channels(guild_id: str) -> list[dict]:
+    await _init_artifact_channel_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cats = []
+        async with db.execute(
+            "SELECT * FROM artifact_channel_categories WHERE guild_id=? ORDER BY created_at",
+            (guild_id,)
+        ) as cur:
+            for row in await cur.fetchall():
+                cat = dict(row)
+                async with db.execute(
+                    "SELECT channel_id as id, channel_name as name FROM artifact_channel_entries WHERE guild_id=? AND category_id=? ORDER BY channel_name",
+                    (guild_id, cat["category_id"])
+                ) as ch_cur:
+                    cat["channels"] = [dict(r) for r in await ch_cur.fetchall()]
+                cats.append(cat)
+        return cats
+
+
+async def delete_artifact_channels(guild_id: str, category_id: str):
+    await _init_artifact_channel_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM artifact_channel_entries WHERE guild_id=? AND category_id=?", (guild_id, category_id))
+        await db.execute("DELETE FROM artifact_channel_categories WHERE guild_id=? AND category_id=?", (guild_id, category_id))
+        await db.commit()
+
+
 # ── Artifact CRUD ──────────────────────────────────────────────────────────
 
 async def get_artifacts(guild_id: str) -> list[dict]:

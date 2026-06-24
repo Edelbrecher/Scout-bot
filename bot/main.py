@@ -1663,6 +1663,55 @@ async def handle_sync_bonus_channel(request: aiohttp_web.Request) -> aiohttp_web
     return aiohttp_web.json_response({"ok": True, "channel_id": str(existing_channel.id), "message_id": str(msg.id)})
 
 
+async def handle_create_artifact_channels(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    cat_name = data.get("category_name", "Artefacts-Spawn")
+    count = min(int(data.get("count", 5)), 25)
+    prefix = data.get("prefix", "arte")
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+
+    try:
+        category = await guild.create_category(cat_name)
+        channels = []
+        for i in range(1, count + 1):
+            ch_name = f"{prefix}-{i:02d}"
+            ch = await category.create_text_channel(ch_name)
+            channels.append({"id": str(ch.id), "name": ch.name})
+        return aiohttp_web.json_response({
+            "ok": True,
+            "category_id": str(category.id),
+            "channels": channels,
+        })
+    except Exception as e:
+        print(f"[artifact-channels] Error creating channels: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
+async def handle_delete_artifact_channels(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    category_id = data.get("category_id")
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+
+    try:
+        category = guild.get_channel(int(category_id))
+        if category:
+            for ch in category.channels:
+                await ch.delete(reason="Artifact channels cleanup")
+            await category.delete(reason="Artifact channels cleanup")
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        print(f"[artifact-channels] Error deleting: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1690,6 +1739,8 @@ async def start_api_server():
     app.router.add_post("/api/unarchive-res-push-channel", handle_unarchive_res_push_channel)
     app.router.add_post("/api/sync-bonus-channel", handle_sync_bonus_channel)
     app.router.add_post("/api/list-categories", handle_list_categories)
+    app.router.add_post("/api/create-artifact-channels", handle_create_artifact_channels)
+    app.router.add_post("/api/delete-artifact-channels", handle_delete_artifact_channels)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)
