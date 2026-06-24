@@ -43,6 +43,9 @@
       <p class="subtitle" style="margin:.2rem 0 0;">All registered treasuries of the alliance</p>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+      {% if can_manage %}
+      <button onclick="openAdminAddModal()" class="btn btn-primary" style="font-size:.8rem;">+ Add Treasury</button>
+      {% endif %}
       {% if is_leader %}
       <button onclick="toggleTestMenu()" class="btn btn-secondary" style="font-size:.8rem;">🧪 Test Data</button>
       {% endif %}
@@ -284,5 +287,101 @@ function toggleTestMenu() {
   const m = document.getElementById('testMenu');
   m.style.display = m.style.display === 'none' ? 'block' : 'none';
 }
+
+// ── Admin Add Treasury ────────────────────────────────────────────────────
+const MEMBERS = {{ members_json | default('[]') | safe }};
+
+function openAdminAddModal() {
+  document.getElementById('adminAddModal').style.display = 'flex';
+  document.getElementById('aaPlayer').value = '';
+  document.getElementById('aaVillage').value = '';
+  document.getElementById('aaX').value = '';
+  document.getElementById('aaY').value = '';
+  document.getElementById('aaLevel').value = '10';
+  document.getElementById('aaHero').value = '';
+  document.getElementById('aaNotes').value = '';
+  document.getElementById('aaPlayer').focus();
+}
+function closeAdminAddModal() {
+  document.getElementById('adminAddModal').style.display = 'none';
+}
+async function submitAdminAdd() {
+  const player = document.getElementById('aaPlayer').value.trim();
+  const village = document.getElementById('aaVillage').value.trim();
+  if (!player || !village) { alert('Player and village are required.'); return; }
+  const body = {
+    player_name: player,
+    village_name: village,
+    x: parseInt(document.getElementById('aaX').value) || 0,
+    y: parseInt(document.getElementById('aaY').value) || 0,
+    level: parseInt(document.getElementById('aaLevel').value) || 10,
+    hero_village: document.getElementById('aaHero').value.trim(),
+    notes: document.getElementById('aaNotes').value.trim(),
+  };
+  const r = await fetch(`/guild/${GUILD_ID}/all-treasuries/admin-add`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (r.ok) {
+    closeAdminAddModal();
+    location.reload();
+  } else {
+    const err = await r.json().catch(() => ({}));
+    alert(err.error || 'Failed to add treasury.');
+  }
+}
 </script>
+
+{% if can_manage %}
+<div id="adminAddModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)closeAdminAddModal()">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:1.75rem;width:100%;max-width:480px;box-shadow:0 24px 80px rgba(0,0,0,.55);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+      <h2 style="margin:0;font-size:1.1rem;">🏛️ Add Treasury for Player</h2>
+      <button onclick="closeAdminAddModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .35rem;border-radius:6px;">&times;</button>
+    </div>
+    <div style="display:grid;gap:1rem;">
+      <div style="display:flex;flex-direction:column;gap:.3rem;">
+        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Player name</label>
+        <input id="aaPlayer" class="form-control" list="memberList" placeholder="Travian player name" style="background:var(--bg-main);">
+        <datalist id="memberList">
+          {% for m in members %}
+          <option value="{{ m.travian_name or m.discord_username }}">{{ m.discord_username }}{% if m.travian_name %} ({{ m.travian_name }}){% endif %}</option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;">
+        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Village name</label>
+        <input id="aaVillage" class="form-control" placeholder="Village name" style="background:var(--bg-main);">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;">
+        <div style="display:flex;flex-direction:column;gap:.3rem;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">X</label>
+          <input id="aaX" type="number" class="form-control" placeholder="-20" style="background:var(--bg-main);">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.3rem;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Y</label>
+          <input id="aaY" type="number" class="form-control" placeholder="25" style="background:var(--bg-main);">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.3rem;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Level</label>
+          <select id="aaLevel" class="form-control" style="background:var(--bg-main);">
+            <option value="10">10 (small)</option>
+            <option value="20">20 (large/unique)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;">
+        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">🦸 Hero village (optional)</label>
+        <input id="aaHero" class="form-control" placeholder="Village where hero will stand" style="background:var(--bg-main);">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;">
+        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Notes (optional)</label>
+        <input id="aaNotes" class="form-control" placeholder="e.g. capital" style="background:var(--bg-main);">
+      </div>
+      <button onclick="submitAdminAdd()" class="btn btn-primary" style="width:100%;padding:.7rem;font-size:.95rem;">💾 Save Treasury</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

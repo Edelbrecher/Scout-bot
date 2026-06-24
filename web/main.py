@@ -16440,14 +16440,21 @@ async def all_treasuries_page(request: Request, guild_id: str):
     err = await _require_ally_or_plan(guild, guild_id, uid, redirect_path=str(request.url.path))
     if err: return err
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
-    can_view_all = is_leader or await has_perm(request, guild_id, "treasury_view")
+    can_manage = is_leader or await has_perm(request, guild_id, "treasury_manage")
+    can_view_all = is_leader or can_manage or await has_perm(request, guild_id, "treasury_view")
     if can_view_all:
         treasuries = await database.get_all_treasuries(guild_id)
     else:
         treasuries = await database.get_my_treasuries(guild_id, uid)
+    members = []
+    if can_manage:
+        ally_group = await database.get_ally_group_for_guild(guild_id)
+        if ally_group:
+            members = await database.get_ally_members(ally_group["id"])
     return templates.TemplateResponse("all_treasuries.html", {
         "request": request, "guild": guild,
         "treasuries": treasuries, "is_leader": is_leader,
+        "can_manage": can_manage, "members": members,
     })
 
 
@@ -16499,6 +16506,39 @@ async def api_treasury_comment_delete(request: Request, guild_id: str, comment_i
     uid = (session or {}).get("uid", "") or (session or {}).get("discord_id", "")
     await database.delete_treasury_comment(comment_id, uid)
     return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/all-treasuries/admin-add")
+async def treasury_admin_add(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    can_manage = _is_leader(session, guild_id) or await has_perm(request, guild_id, "treasury_manage") or await has_perm(request, guild_id, "ally_manage")
+    if not can_manage:
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
+    body = await request.json()
+    player_name = (body.get("player_name") or "").strip()
+    village_name = (body.get("village_name") or "").strip()
+    hero_village = (body.get("hero_village") or "").strip()
+    notes = (body.get("notes") or "").strip()
+    level = int(body.get("level", 10))
+    try:
+        x = int(body.get("x", 0) or 0)
+        y = int(body.get("y", 0) or 0)
+    except (ValueError, TypeError):
+        x = y = 0
+    target_discord_id = (body.get("discord_id") or "").strip()
+    if not target_discord_id and player_name:
+        member = await database.find_ally_member_by_name(guild_id, player_name)
+        if member:
+            target_discord_id = member.get("discord_id", "")
+    if not target_discord_id:
+        uid = session.get("uid", "") or session.get("discord_id", "")
+        target_discord_id = uid
+    tid = await database.save_treasury(
+        guild_id, target_discord_id, player_name, village_name, x, y, level, notes,
+        hero_village=hero_village,
+    )
+    return JSONResponse({"ok": True, "id": tid})
 
 
 @app.post("/guild/{guild_id}/all-treasuries/bulk-delete")

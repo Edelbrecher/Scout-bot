@@ -5732,6 +5732,21 @@ async def get_ally_membership_guild_id(discord_id: str) -> str | None:
             return row["guild_id"] if row else None
 
 
+async def find_ally_member_by_name(guild_id: str, name: str) -> dict | None:
+    """Find an ally member by travian_name or discord_username (case-insensitive)."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT am.* FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE ag.guild_id = ? AND (LOWER(am.travian_name) = LOWER(?) OR LOWER(am.discord_username) = LOWER(?))
+            LIMIT 1
+        """, (guild_id, name, name)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
 async def get_ally_membership(guild_id: str, discord_id: str) -> dict | None:
     """Return the ally_group this user has joined (not owner) in this guild."""
     await _init_ally_tables()
@@ -5761,7 +5776,8 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
         "res_push_view", "res_push_manage",
         "hero_scout_view", "stats_view", "blueprint_view",
         "poll_view", "poll_manage", "defend_view", "defend_manage",
-        "grain_sim_view",
+        "grain_sim_view", "treasury_view", "treasury_manage",
+        "report_view",
     }
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
