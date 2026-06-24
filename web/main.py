@@ -16398,6 +16398,7 @@ async def my_treasury_save(request: Request, guild_id: str):
     player_name = form.get("player_name", "").strip()
     village_name = form.get("village_name", "").strip()
     notes = form.get("notes", "").strip()
+    hero_village = form.get("hero_village", "").strip()
     level = int(form.get("level", "10"))
     try:
         x = int(form.get("x", "0") or 0)
@@ -16406,7 +16407,8 @@ async def my_treasury_save(request: Request, guild_id: str):
         x = y = 0
     await database.save_treasury(
         guild_id, uid, player_name, village_name, x, y, level, notes,
-        treasury_id=int(tid) if tid else None
+        treasury_id=int(tid) if tid else None,
+        hero_village=hero_village,
     )
     return RedirectResponse(f"/guild/{guild_id}/my-treasury?saved=1", status_code=303)
 

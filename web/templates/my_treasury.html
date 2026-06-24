@@ -110,10 +110,11 @@
       <div style="font-size:.78rem; color:var(--text-muted); margin-top:.1rem;">
         {% if t.x or t.y %}📍 ({{ t.x }}|{{ t.y }}){% endif %}
       </div>
+      {% if t.hero_village %}<div style="font-size:.74rem; color:var(--text-muted); margin-top:.2rem;">🦸 Hero: {{ t.hero_village }}</div>{% endif %}
       {% if t.notes %}<div style="font-size:.74rem; color:var(--text-muted); margin-top:.2rem;">📝 {{ t.notes }}</div>{% endif %}
     </div>
     <div style="display:flex; gap:.4rem; align-items:center;">
-      <button onclick="openEditModal({{ t.id }}, '{{ t.village_name|replace("'","\\'")|e }}', {{ t.x }}, {{ t.y }}, {{ t.level }}, '{{ t.notes|replace("'","\\'")|e }}')"
+      <button onclick="openEditModal({{ t.id }}, '{{ t.village_name|replace("'","\\'")|e }}', {{ t.x }}, {{ t.y }}, {{ t.level }}, '{{ t.notes|replace("'","\\'")|e }}', '{{ (t.hero_village or "")|replace("'","\\'")|e }}')"
               class="btn btn-secondary" style="font-size:.78rem; padding:.3rem .65rem;">✏️ Edit</button>
       <form method="POST" action="/guild/{{ guild.guild_id }}/my-treasury/{{ t.id }}/delete"
             onsubmit="return confirm('Really delete this treasury?')">
@@ -194,6 +195,24 @@
           </div>
         </div>
 
+        <!-- Hero village -->
+        <div class="form-field">
+          <label>🦸 Hero village <span style="font-weight:400;">(where the hero will stand)</span></label>
+          {% if own_villages %}
+          <select id="heroVillageSelect" name="hero_village" class="form-control">
+            <option value="">— Same village / not set —</option>
+            {% for v in own_villages %}
+            <option value="{{ v.village_name }}{% if v.x or v.y %} ({{ v.x }}|{{ v.y }}){% endif %}">
+              {{ v.village_name }}{% if v.x or v.y %} ({{ v.x }}|{{ v.y }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input name="hero_village" id="heroVillageFallback" class="form-control"
+                 placeholder="e.g. 02 Capital (-15|22)">
+          {% endif %}
+        </div>
+
         <!-- Notizen -->
         <div class="form-field">
           <label>Notes <span style="font-weight:400;">(optional)</span></label>
@@ -229,6 +248,13 @@ function onVillageSelect(sel) {
   document.getElementById('formY').value = opt.dataset.y || '';
 }
 
+function _setHeroVillage(val) {
+  const sel = document.getElementById('heroVillageSelect');
+  const fb = document.getElementById('heroVillageFallback');
+  if (sel) { sel.value = val; if (!sel.value) sel.value = ''; }
+  if (fb) fb.value = val;
+}
+
 function openAddModal() {
   document.getElementById('modalTitle').textContent = '🏛️ Add Treasury';
   document.getElementById('formTid').value = '';
@@ -237,13 +263,14 @@ function openAddModal() {
   document.getElementById('formX').value = '';
   document.getElementById('formY').value = '';
   document.getElementById('formNotes').value = '';
+  _setHeroVillage('');
   selectLevel(10);
   const sel = document.getElementById('villageSelect');
   if (sel) sel.value = '';
   document.getElementById('treasuryModal').classList.add('open');
 }
 
-function openEditModal(tid, village, x, y, level, notes) {
+function openEditModal(tid, village, x, y, level, notes, heroVillage) {
   document.getElementById('modalTitle').textContent = '✏️ Edit Treasury';
   document.getElementById('formTid').value = tid;
   document.getElementById('formPlayerName').value = AUTO_PLAYER;
@@ -251,12 +278,12 @@ function openEditModal(tid, village, x, y, level, notes) {
   document.getElementById('formX').value = x;
   document.getElementById('formY').value = y;
   document.getElementById('formNotes').value = notes;
+  _setHeroVillage(heroVillage || '');
   selectLevel(level);
-  // Try to select the matching village in dropdown
   const sel = document.getElementById('villageSelect');
   if (sel) {
     sel.value = village;
-    if (!sel.value) sel.value = ''; // fallback if not found
+    if (!sel.value) sel.value = '';
   }
   document.getElementById('treasuryModal').classList.add('open');
 }

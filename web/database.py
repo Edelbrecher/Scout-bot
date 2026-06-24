@@ -12344,6 +12344,10 @@ async def _init_artifact_tables():
                 UNIQUE(guild_id, discord_id, village_name)
             )
         """)
+        try:
+            await db.execute("ALTER TABLE ally_treasuries ADD COLUMN hero_village TEXT DEFAULT ''")
+        except Exception:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS treasury_comments (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -12721,21 +12725,22 @@ async def delete_test_artifact_runs(guild_id: str):
 
 async def save_treasury(guild_id: str, discord_id: str, player_name: str,
                          village_name: str, x: int, y: int, level: int,
-                         notes: str = "", treasury_id: int = None) -> int:
+                         notes: str = "", treasury_id: int = None,
+                         hero_village: str = "") -> int:
     now = __import__('datetime').datetime.utcnow().isoformat()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         if treasury_id:
             await db.execute("""
-                UPDATE ally_treasuries SET player_name=?,village_name=?,x=?,y=?,level=?,notes=?,updated_at=?
+                UPDATE ally_treasuries SET player_name=?,village_name=?,x=?,y=?,level=?,notes=?,hero_village=?,updated_at=?
                 WHERE id=? AND guild_id=? AND discord_id=?
-            """, (player_name, village_name, x, y, level, notes, now, treasury_id, guild_id, discord_id))
+            """, (player_name, village_name, x, y, level, notes, hero_village, now, treasury_id, guild_id, discord_id))
             await db.commit()
             return treasury_id
         cur = await db.execute("""
             INSERT OR REPLACE INTO ally_treasuries
-              (guild_id, discord_id, player_name, village_name, x, y, level, notes, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-        """, (guild_id, discord_id, player_name, village_name, x, y, level, notes, now, now))
+              (guild_id, discord_id, player_name, village_name, x, y, level, notes, hero_village, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, (guild_id, discord_id, player_name, village_name, x, y, level, notes, hero_village, now, now))
         await db.commit()
         return cur.lastrowid
 

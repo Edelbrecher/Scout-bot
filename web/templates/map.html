@@ -310,6 +310,7 @@
               <th style="padding:.35rem .5rem;text-align:center;">Level</th>
               <th style="padding:.35rem .5rem;text-align:right;">Off</th>
               <th style="padding:.35rem .5rem;text-align:center;">TS</th>
+              <th style="padding:.35rem .5rem;">Hero</th>
               <th style="padding:.35rem .5rem;">Notes</th>
               <th style="padding:.35rem .5rem;text-align:center;"></th>
             </tr>
@@ -406,6 +407,7 @@ function renderTreasuryList() {
       <td style="padding:.35rem .5rem;text-align:center;"><span style="color:${lvlColor};font-weight:700;">${t.level}</span></td>
       <td style="padding:.35rem .5rem;text-align:right;font-weight:600;color:${offColor};">${offStr}</td>
       <td style="padding:.35rem .5rem;text-align:center;font-weight:600;color:${tsColor};">${tsStr}</td>
+      <td style="padding:.35rem .5rem;font-size:.78rem;">${t.hero_village ? '🦸 '+t.hero_village : '<span style=\"color:var(--text-muted);\">—</span>'}</td>
       <td style="padding:.35rem .5rem;color:var(--text-muted);font-size:.78rem;">${t.notes || ''}</td>
       <td style="padding:.35rem .5rem;text-align:center;">
         <button onclick="openCommentModal(${t.id}, '${(t.player_name||'').replace(/'/g,"\\'")}', '${(t.village_name||'').replace(/'/g,"\\'")}');"
