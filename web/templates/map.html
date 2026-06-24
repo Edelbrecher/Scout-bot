@@ -311,10 +311,27 @@
               <th style="padding:.35rem .5rem;text-align:right;">Off</th>
               <th style="padding:.35rem .5rem;text-align:center;">TS</th>
               <th style="padding:.35rem .5rem;">Notes</th>
+              <th style="padding:.35rem .5rem;text-align:center;"></th>
             </tr>
           </thead>
           <tbody id="treasuryTbody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+  <!-- Comment Modal -->
+  <div id="commentModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;"
+       onclick="if(event.target===this)closeCommentModal()">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:520px;box-shadow:0 24px 80px rgba(0,0,0,.55);max-height:80vh;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 id="commentModalTitle" style="margin:0;font-size:1rem;">💬 Comments</h3>
+        <button onclick="closeCommentModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .35rem;border-radius:6px;">&times;</button>
+      </div>
+      <div id="commentList" style="flex:1;overflow-y:auto;margin-bottom:1rem;min-height:60px;"></div>
+      <div style="display:flex;gap:.5rem;">
+        <input id="commentInput" class="form-control" placeholder="Write a comment..." style="flex:1;background:var(--bg-main);"
+               onkeydown="if(event.key==='Enter')submitComment()">
+        <button onclick="submitComment()" class="btn btn-primary" style="padding:.4rem .8rem;font-size:.85rem;">Send</button>
       </div>
     </div>
   </div>
@@ -390,8 +407,74 @@ function renderTreasuryList() {
       <td style="padding:.35rem .5rem;text-align:right;font-weight:600;color:${offColor};">${offStr}</td>
       <td style="padding:.35rem .5rem;text-align:center;font-weight:600;color:${tsColor};">${tsStr}</td>
       <td style="padding:.35rem .5rem;color:var(--text-muted);font-size:.78rem;">${t.notes || ''}</td>
+      <td style="padding:.35rem .5rem;text-align:center;">
+        <button onclick="openCommentModal(${t.id}, '${(t.player_name||'').replace(/'/g,"\\'")}', '${(t.village_name||'').replace(/'/g,"\\'")}');"
+                style="background:none;border:none;cursor:pointer;font-size:.9rem;position:relative;" title="Comments">
+          💬${t.comment_count ? '<span style=\"position:absolute;top:-4px;right:-6px;background:#6366f1;color:#fff;border-radius:50%;font-size:.6rem;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-weight:700;\">'+t.comment_count+'</span>' : ''}
+        </button>
+      </td>
     </tr>`;
   }).join('');
+}
+
+let _commentTreasuryId = null;
+function openCommentModal(tid, player, village) {
+  _commentTreasuryId = tid;
+  document.getElementById('commentModalTitle').textContent = `💬 ${player} — ${village}`;
+  document.getElementById('commentList').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:1rem;">Loading...</div>';
+  document.getElementById('commentInput').value = '';
+  document.getElementById('commentModal').style.display = 'flex';
+  loadComments(tid);
+}
+function closeCommentModal() {
+  document.getElementById('commentModal').style.display = 'none';
+  _commentTreasuryId = null;
+}
+async function loadComments(tid) {
+  const el = document.getElementById('commentList');
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/api/treasuries/${tid}/comments`);
+    const comments = await r.json();
+    if (!comments.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:1.5rem;font-size:.85rem;">No comments yet.</div>';
+      return;
+    }
+    el.innerHTML = comments.map(c => {
+      const date = c.created_at ? new Date(c.created_at+'Z').toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div style="padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.05);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;font-size:.82rem;color:#818cf8;">${c.author_name || 'Unknown'}</span>
+          <span style="font-size:.7rem;color:var(--text-muted);">${date}</span>
+        </div>
+        <div style="font-size:.85rem;margin-top:.2rem;line-height:1.4;">${c.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      </div>`;
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  } catch(e) {
+    el.innerHTML = '<div style="color:#f87171;padding:1rem;">Failed to load comments.</div>';
+  }
+}
+async function submitComment() {
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text || !_commentTreasuryId) return;
+  input.disabled = true;
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/api/treasuries/${_commentTreasuryId}/comments`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    if (r.ok) {
+      input.value = '';
+      await loadComments(_commentTreasuryId);
+      // Update comment count in table
+      const t = _treasuries.find(t => t.id === _commentTreasuryId);
+      if (t) t.comment_count = (t.comment_count || 0) + 1;
+      renderTreasuryList();
+    }
+  } catch(e) {}
+  input.disabled = false;
+  input.focus();
 }
 
 function centerMap(x, y) {

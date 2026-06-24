@@ -12344,6 +12344,18 @@ async def _init_artifact_tables():
                 UNIQUE(guild_id, discord_id, village_name)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS treasury_comments (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                treasury_id     INTEGER NOT NULL,
+                guild_id        TEXT NOT NULL,
+                discord_id      TEXT NOT NULL,
+                author_name     TEXT DEFAULT '',
+                text            TEXT NOT NULL,
+                created_at      TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (treasury_id) REFERENCES ally_treasuries(id) ON DELETE CASCADE
+            )
+        """)
         # Artifacts owned/tracked by the alliance
         await db.execute("""
             CREATE TABLE IF NOT EXISTS artifacts (
@@ -12762,6 +12774,57 @@ async def delete_treasury(treasury_id: int, guild_id: str, discord_id: str) -> b
         await db.execute(
             "DELETE FROM ally_treasuries WHERE id=? AND guild_id=? AND discord_id=?",
             (treasury_id, guild_id, discord_id)
+        )
+        await db.commit()
+    return True
+
+
+# ── Treasury Comments ──────────────────────────────────────────────────────
+
+async def get_treasury_comments(treasury_id: int) -> list[dict]:
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM treasury_comments WHERE treasury_id=? ORDER BY created_at ASC",
+            (treasury_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_treasury_comment_counts(guild_id: str) -> dict:
+    """Return {treasury_id: count} for all treasuries in a guild."""
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        async with db.execute("""
+            SELECT tc.treasury_id, COUNT(*) as cnt
+            FROM treasury_comments tc
+            JOIN ally_treasuries t ON t.id = tc.treasury_id
+            WHERE t.guild_id = ?
+            GROUP BY tc.treasury_id
+        """, (guild_id,)) as cur:
+            return {row[0]: row[1] for row in await cur.fetchall()}
+
+
+async def add_treasury_comment(treasury_id: int, guild_id: str, discord_id: str,
+                               author_name: str, text: str) -> int:
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            "INSERT INTO treasury_comments (treasury_id, guild_id, discord_id, author_name, text) VALUES (?,?,?,?,?)",
+            (treasury_id, guild_id, discord_id, author_name, text)
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_treasury_comment(comment_id: int, discord_id: str) -> bool:
+    """Delete a comment — only the author can delete their own."""
+    await _init_artifact_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "DELETE FROM treasury_comments WHERE id=? AND discord_id=?",
+            (comment_id, discord_id)
         )
         await db.commit()
     return True

@@ -16459,7 +16459,44 @@ async def api_treasuries(request: Request, guild_id: str):
         rows = await database.get_all_treasuries(guild_id)
     else:
         rows = await database.get_my_treasuries(guild_id, uid)
+    counts = await database.get_treasury_comment_counts(guild_id)
+    for r in rows:
+        r["comment_count"] = counts.get(r["id"], 0)
     return JSONResponse(rows)
+
+
+@app.get("/guild/{guild_id}/api/treasuries/{treasury_id}/comments")
+async def api_treasury_comments(request: Request, guild_id: str, treasury_id: int):
+    session, err = await _artifact_access(request, guild_id)
+    if err: return JSONResponse({"error": "Unauthorized"}, status_code=403)
+    comments = await database.get_treasury_comments(treasury_id)
+    return JSONResponse(comments)
+
+
+@app.post("/guild/{guild_id}/api/treasuries/{treasury_id}/comments")
+async def api_treasury_comment_add(request: Request, guild_id: str, treasury_id: int):
+    session, err = await _artifact_access(request, guild_id)
+    if err: return JSONResponse({"error": "Unauthorized"}, status_code=403)
+    uid = (session or {}).get("uid", "") or (session or {}).get("discord_id", "")
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        return JSONResponse({"error": "Empty comment"}, status_code=400)
+    author = (session or {}).get("discord_username", "") or (session or {}).get("name", "") or uid
+    membership = await database.get_ally_membership(guild_id, uid)
+    if membership and membership.get("travian_name"):
+        author = membership["travian_name"]
+    cid = await database.add_treasury_comment(treasury_id, guild_id, uid, author, text)
+    return JSONResponse({"id": cid, "author_name": author, "text": text, "discord_id": uid})
+
+
+@app.delete("/guild/{guild_id}/api/treasuries/comments/{comment_id}")
+async def api_treasury_comment_delete(request: Request, guild_id: str, comment_id: int):
+    session, err = await _artifact_access(request, guild_id)
+    if err: return JSONResponse({"error": "Unauthorized"}, status_code=403)
+    uid = (session or {}).get("uid", "") or (session or {}).get("discord_id", "")
+    await database.delete_treasury_comment(comment_id, uid)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/all-treasuries/bulk-delete")
