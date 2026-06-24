@@ -759,33 +759,96 @@
     {# ── Create channels ── #}
     <div class="card" style="padding:1rem 1.25rem;">
       <h3 style="margin:0 0 .75rem;font-size:.95rem;">➕ Create Artifact Channels</h3>
-      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
-        <div style="display:flex;flex-direction:column;gap:.3rem;">
-          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Category name</label>
-          <input id="arteCategoryName" class="form-control" value="Artefacts-Spawn" style="width:200px;background:var(--bg-main);">
+
+      <!-- Mode selector -->
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;">
+        <button id="modeSingle" onclick="setArteMode('single')" class="btn btn-primary" style="font-size:.8rem;padding:.3rem .8rem;">Single Category</button>
+        <button id="modeSplit" onclick="setArteMode('split')" class="btn btn-secondary" style="font-size:.8rem;padding:.3rem .8rem;">Split: Small + Large/Unique</button>
+      </div>
+
+      <!-- Single mode -->
+      <div id="arteSingleForm">
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
+          <div style="display:flex;flex-direction:column;gap:.3rem;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Category name</label>
+            <input id="arteCategoryName" class="form-control" value="Artefacts" style="width:200px;background:var(--bg-main);">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.3rem;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Channels</label>
+            <select id="arteChannelCount" class="form-control" style="width:70px;background:var(--bg-main);">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="8">8</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.3rem;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Prefix</label>
+            <input id="arteChannelPrefix" class="form-control" value="arte" style="width:100px;background:var(--bg-main);">
+          </div>
+          <button onclick="createArteChannels()" class="btn btn-primary" style="padding:.45rem 1rem;font-size:.88rem;" id="arteCreateBtn">
+            🚀 Create
+          </button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:.3rem;">
-          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Number of channels</label>
-          <select id="arteChannelCount" class="form-control" style="width:80px;background:var(--bg-main);">
-            <option value="3">3</option>
-            <option value="5" selected>5</option>
-            <option value="8">8</option>
-            <option value="10">10</option>
-            <option value="15">15</option>
-            <option value="20">20</option>
-          </select>
+        <p style="font-size:.75rem;color:var(--text-muted);margin:.5rem 0 0;">
+          Creates <code>arte-01</code>, <code>arte-02</code>, ... in one category.
+        </p>
+      </div>
+
+      <!-- Split mode -->
+      <div id="arteSplitForm" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:.85rem;">
+            <div style="font-weight:700;font-size:.85rem;color:#818cf8;margin-bottom:.5rem;">🔵 Small Artifacts</div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;">
+              <div style="display:flex;flex-direction:column;gap:.2rem;">
+                <label style="font-size:.72rem;color:var(--text-muted);">Category</label>
+                <input id="arteSmallCat" class="form-control" value="Arte-Small" style="width:140px;background:var(--bg-main);font-size:.82rem;">
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.2rem;">
+                <label style="font-size:.72rem;color:var(--text-muted);">Count</label>
+                <select id="arteSmallCount" class="form-control" style="width:60px;background:var(--bg-main);font-size:.82rem;">
+                  <option value="3">3</option>
+                  <option value="5" selected>5</option>
+                  <option value="8">8</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.2rem;">
+                <label style="font-size:.72rem;color:var(--text-muted);">Prefix</label>
+                <input id="arteSmallPrefix" class="form-control" value="small" style="width:80px;background:var(--bg-main);font-size:.82rem;">
+              </div>
+            </div>
+          </div>
+          <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:.85rem;">
+            <div style="font-weight:700;font-size:.85rem;color:#fbbf24;margin-bottom:.5rem;">🟡 Large / Unique</div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;">
+              <div style="display:flex;flex-direction:column;gap:.2rem;">
+                <label style="font-size:.72rem;color:var(--text-muted);">Category</label>
+                <input id="arteLargeCat" class="form-control" value="Arte-Large" style="width:140px;background:var(--bg-main);font-size:.82rem;">
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.2rem;">
+                <label style="font-size:.72rem;color:var(--text-muted);">Count</label>
+                <select id="arteLargeCount" class="form-control" style="width:60px;background:var(--bg-main);font-size:.82rem;">
+                  <option value="3" selected>3</option>
+                  <option value="5">5</option>
+                  <option value="8">8</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.2rem;">
+                <label style="font-size:.72rem;color:var(--text-muted);">Prefix</label>
+                <input id="arteLargePrefix" class="form-control" value="large" style="width:80px;background:var(--bg-main);font-size:.82rem;">
+              </div>
+            </div>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:.3rem;">
-          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);">Channel prefix</label>
-          <input id="arteChannelPrefix" class="form-control" value="arte" style="width:120px;background:var(--bg-main);">
-        </div>
-        <button onclick="createArteChannels()" class="btn btn-primary" style="padding:.45rem 1rem;font-size:.88rem;" id="arteCreateBtn">
-          🚀 Create
+        <button onclick="createArteSplit()" class="btn btn-primary" style="padding:.45rem 1rem;font-size:.88rem;margin-top:.75rem;" id="arteSplitBtn">
+          🚀 Create Both
         </button>
       </div>
-      <p style="font-size:.75rem;color:var(--text-muted);margin:.6rem 0 0;">
-        Creates channels like <code>arte-01</code>, <code>arte-02</code>, ... in a new Discord category.
-      </p>
     </div>
 
     {# ── Quick links ── #}
@@ -1867,6 +1930,16 @@ function doJoinCode() {
 
 // ── Artefact Channels ────────────────────────────────────────────────────
 const ARTE_GUILD_ID = {{ guild.guild_id | tojson }};
+let _arteMode = 'single';
+let _arteCats = [];
+
+function setArteMode(mode) {
+  _arteMode = mode;
+  document.getElementById('modeSingle').className = 'btn ' + (mode === 'single' ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('modeSplit').className = 'btn ' + (mode === 'split' ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('arteSingleForm').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('arteSplitForm').style.display = mode === 'split' ? '' : 'none';
+}
 
 async function loadArteChannels() {
   const el = document.getElementById('arteChannelList');
@@ -1874,22 +1947,22 @@ async function loadArteChannels() {
     const r = await fetch(`/guild/${ARTE_GUILD_ID}/api/artifact-channels`);
     if (!r.ok) { el.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;">Could not load channels.</div>'; return; }
     const data = await r.json();
-    if (!data.categories || !data.categories.length) {
+    _arteCats = data.categories || [];
+    if (!_arteCats.length) {
       el.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:.5rem 0;">No artifact channels created yet.</div>';
       return;
     }
-    el.innerHTML = data.categories.map(cat => {
+    el.innerHTML = _arteCats.map(cat => {
       const chList = cat.channels.map(ch =>
         `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .6rem;font-size:.82rem;">
           <span style="color:var(--text-muted);">#</span>
           <span style="flex:1;">${ch.name}</span>
-          <span style="font-size:.7rem;color:var(--text-muted);">ID: ${ch.id}</span>
         </div>`
       ).join('');
       return `<div class="card" style="padding:.75rem 1rem;margin-bottom:.5rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
           <h3 style="margin:0;font-size:.9rem;">📁 ${cat.name} <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">(${cat.channels.length} channels)</span></h3>
-          <button onclick="deleteArteCategory('${cat.id}')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:6px;padding:.2rem .5rem;cursor:pointer;font-size:.75rem;">🗑️ Delete</button>
+          <button onclick="deleteArteCategory('${cat.category_id}')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:6px;padding:.2rem .5rem;cursor:pointer;font-size:.75rem;">🗑️ Delete</button>
         </div>
         ${chList}
       </div>`;
@@ -1899,26 +1972,55 @@ async function loadArteChannels() {
   }
 }
 
+async function _doCreateArte(catName, count, prefix, btn) {
+  if (_arteCats.some(c => c.category_name.toLowerCase() === catName.toLowerCase())) {
+    alert(`Category "${catName}" already exists. Delete it first or choose a different name.`);
+    return false;
+  }
+  const r = await fetch(`/guild/${ARTE_GUILD_ID}/api/artifact-channels`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ category_name: catName, count, prefix })
+  });
+  const data = await r.json();
+  if (!r.ok) { alert(data.error || 'Failed to create channels.'); return false; }
+  return true;
+}
+
 async function createArteChannels() {
   const btn = document.getElementById('arteCreateBtn');
   btn.disabled = true; btn.textContent = '⏳ Creating...';
   try {
-    const r = await fetch(`/guild/${ARTE_GUILD_ID}/api/artifact-channels`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        category_name: document.getElementById('arteCategoryName').value.trim(),
-        count: parseInt(document.getElementById('arteChannelCount').value),
-        prefix: document.getElementById('arteChannelPrefix').value.trim() || 'arte',
-      })
-    });
-    const data = await r.json();
-    if (r.ok) {
-      await loadArteChannels();
-    } else {
-      alert(data.error || 'Failed to create channels.');
-    }
+    const ok = await _doCreateArte(
+      document.getElementById('arteCategoryName').value.trim() || 'Artefacts',
+      parseInt(document.getElementById('arteChannelCount').value),
+      document.getElementById('arteChannelPrefix').value.trim() || 'arte',
+      btn
+    );
+    if (ok) await loadArteChannels();
   } catch(e) { alert('Error: ' + e.message); }
   btn.disabled = false; btn.textContent = '🚀 Create';
+}
+
+async function createArteSplit() {
+  const btn = document.getElementById('arteSplitBtn');
+  btn.disabled = true; btn.textContent = '⏳ Creating...';
+  try {
+    const ok1 = await _doCreateArte(
+      document.getElementById('arteSmallCat').value.trim() || 'Arte-Small',
+      parseInt(document.getElementById('arteSmallCount').value),
+      document.getElementById('arteSmallPrefix').value.trim() || 'small'
+    );
+    if (ok1) {
+      await loadArteChannels();
+      const ok2 = await _doCreateArte(
+        document.getElementById('arteLargeCat').value.trim() || 'Arte-Large',
+        parseInt(document.getElementById('arteLargeCount').value),
+        document.getElementById('arteLargePrefix').value.trim() || 'large'
+      );
+      if (ok2) await loadArteChannels();
+    }
+  } catch(e) { alert('Error: ' + e.message); }
+  btn.disabled = false; btn.textContent = '🚀 Create Both';
 }
 
 async function deleteArteCategory(categoryId) {
@@ -1931,7 +2033,6 @@ async function deleteArteCategory(categoryId) {
 }
 
 // Load on tab open
-const _origShowTab = typeof showTab === 'function' ? showTab : null;
 document.addEventListener('DOMContentLoaded', () => {
   if (location.hash === '#artefacts') loadArteChannels();
 });
