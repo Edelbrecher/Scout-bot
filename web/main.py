@@ -15512,6 +15512,10 @@ async def report_submit(request: Request, guild_id: str,
     err = _require_guild(session, guild_id)
     if err: return err
     uid = session.get("uid", "") or session.get("discord_id", "")
+    if WORKSPACE_RE.match(guild_id):
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            guild_id = real_guild_id
 
     text = report_text.strip()
     if not text:
@@ -15577,6 +15581,10 @@ async def report_submit_force(request: Request, guild_id: str,
     err = _require_guild(session, guild_id)
     if err: return err
     uid = session.get("uid", "") or session.get("discord_id", "")
+    if WORKSPACE_RE.match(guild_id):
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            guild_id = real_guild_id
     text = report_text.strip()
     if not text:
         return RedirectResponse(f"/guild/{guild_id}/reports?error=empty", status_code=303)
@@ -15637,6 +15645,11 @@ async def report_detail(request: Request, guild_id: str, report_id: int, duplica
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    if WORKSPACE_RE.match(guild_id):
+        uid = session.get("uid", "") or session.get("discord_id", "")
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            return RedirectResponse(f"/guild/{real_guild_id}/reports/{report_id}", status_code=302)
     guild = await database.get_guild(guild_id)
     r = await database.get_battle_report(report_id, guild_id)
     if not r:
