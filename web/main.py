@@ -16793,15 +16793,14 @@ async def api_artifact_channels_create(request: Request, guild_id: str):
     count = min(int(body.get("count", 5)), 25)
     prefix = (body.get("prefix") or "arte").strip()
     try:
-        import aiohttp
-        async with aiohttp.ClientSession() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.post("http://bot:7777/api/create-artifact-channels", json={
                 "guild_id": guild_id,
                 "category_name": cat_name,
                 "count": count,
                 "prefix": prefix,
             })
-            resp = await r.json()
+            resp = r.json()
         if resp and resp.get("ok"):
             await database.save_artifact_channels(
                 guild_id, resp["category_id"], cat_name,
@@ -16821,13 +16820,12 @@ async def api_artifact_channels_delete(request: Request, guild_id: str, category
     if not is_leader:
         return JSONResponse({"error": "forbidden"}, status_code=403)
     try:
-        import aiohttp
-        async with aiohttp.ClientSession() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post("http://bot:7777/api/delete-artifact-channels", json={
                 "guild_id": guild_id,
                 "category_id": category_id,
             })
-            resp = await r.json()
+            resp = r.json()
         if resp and resp.get("ok"):
             await database.delete_artifact_channels(guild_id, category_id)
             return JSONResponse({"ok": True})
