@@ -1473,8 +1473,10 @@ async def _get_or_create_private_category(guild: discord.Guild, lang: str) -> di
     explicitly granted members can see each channel inside.
     """
     cat_name = t(lang, "private.category_name")
+    all_names = {t(l, "private.category_name").lower() for l in ("de", "en")}
+    all_names.add(cat_name.lower())
     for cat in guild.categories:
-        if cat.name.lower() == cat_name.lower():
+        if cat.name.lower() in all_names:
             return cat
     # Category visible to all (so members can find their own channels),
     # but channels inside will deny @everyone individually.
