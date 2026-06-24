@@ -15496,7 +15496,7 @@ async def reports_page(request: Request, guild_id: str,
                        q: str = "", rtype: str = "", page: int = 1):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if WORKSPACE_RE.match(guild_id):
         uid = session.get("uid", "") or session.get("discord_id", "")
