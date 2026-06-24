@@ -12741,10 +12741,19 @@ async def get_my_treasuries(guild_id: str, discord_id: str) -> list[dict]:
 async def get_all_treasuries(guild_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM ally_treasuries WHERE guild_id=? ORDER BY level DESC, player_name, village_name",
-            (guild_id,)
-        ) as cur:
+        async with db.execute("""
+            SELECT t.*,
+                   COALESCE(v.off_score, 0) AS off_score,
+                   COALESCE(ts.ts_level, 0) AS ts_level
+            FROM ally_treasuries t
+            LEFT JOIN guild_own_villages v
+              ON v.guild_id = t.guild_id AND v.discord_id = t.discord_id
+              AND v.x = t.x AND v.y = t.y
+            LEFT JOIN village_ts_levels ts
+              ON ts.discord_id = t.discord_id AND ts.x = t.x AND ts.y = t.y
+            WHERE t.guild_id=?
+            ORDER BY t.level DESC, t.player_name, t.village_name
+        """, (guild_id,)) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
 
