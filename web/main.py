@@ -16365,10 +16365,14 @@ async def my_treasury_page(request: Request, guild_id: str):
         if name not in _seen or (not _seen[name].get("x") and v.get("x")):
             _seen[name] = v
     own_villages = list(_seen.values())
-    # Derive player name from uploaded_by of first village
+    # Derive player name: prefer uploaded_by from villages, fallback to ally_members.travian_name
     auto_player_name = ""
     if own_villages_raw:
         auto_player_name = own_villages_raw[0].get("uploaded_by", "") or ""
+    if not auto_player_name:
+        membership = await database.get_ally_membership(guild_id, uid)
+        if membership:
+            auto_player_name = membership.get("travian_name", "") or ""
     return templates.TemplateResponse("my_treasury.html", {
         "request": request, "guild": guild,
         "treasuries": treasuries, "saved": saved,
