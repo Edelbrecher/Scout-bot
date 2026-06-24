@@ -2548,11 +2548,30 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
         preview_info = pplan
 
     uid = session.get("uid", "")
+    # For workspace users, fetch battle reports from their alliance guild
+    reports_guild_id = guild_id
+    if is_personal:
+        ally_gid = await database.get_ally_membership_guild_id(uid)
+        if ally_gid:
+            reports_guild_id = ally_gid
+    # Permission-aware: check report_view on the reports guild
+    can_view_all_reports = (
+        not is_personal and (_is_leader(session, guild_id) or await has_perm(request, guild_id, "report_view") or await has_perm(request, guild_id, "ally_manage"))
+    ) or (
+        is_personal and reports_guild_id != guild_id and (
+            _is_leader(session, reports_guild_id) or await has_perm(request, reports_guild_id, "report_view") or await has_perm(request, reports_guild_id, "ally_manage")
+        )
+    )
+    if can_view_all_reports:
+        reports_coro = database.get_battle_reports(reports_guild_id, limit=6)
+    else:
+        reports_coro = database.get_battle_reports_for_user(reports_guild_id, uid, limit=6)
+
     unread_notif, my_waves, farm_stats, recent_battles, recent_attacks, player_growth, top_alliances = await asyncio.gather(
         database.count_unread_notifications(guild_id, uid),
         database.get_my_op_waves(guild_id, uid),
         database.get_farm_stats(guild_id),
-        database.get_battle_reports(guild_id, limit=6),
+        reports_coro,
         database.get_attack_reports(guild_id, limit=6),
         database.get_player_growth(guild_id, limit=8),
         database.get_top_alliances(guild_id, limit=10),
