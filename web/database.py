@@ -12756,22 +12756,66 @@ async def get_my_treasuries(guild_id: str, discord_id: str) -> list[dict]:
 
 
 async def get_all_treasuries(guild_id: str) -> list[dict]:
+    import json as _json
+    _troop_attack = {}
+    for _tribe_troops in TRAVIAN_TROOPS.values():
+        for _t in _tribe_troops:
+            _troop_attack[_t["name"]] = _t["attack"]
+
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("""
-            SELECT t.*,
-                   COALESCE(v.off_score, 0) AS off_score,
-                   COALESCE(ts.ts_level, 0) AS ts_level
-            FROM ally_treasuries t
-            LEFT JOIN guild_own_villages v
-              ON v.guild_id = t.guild_id AND v.discord_id = t.discord_id
-              AND v.x = t.x AND v.y = t.y
-            LEFT JOIN village_ts_levels ts
-              ON ts.discord_id = t.discord_id AND ts.x = t.x AND ts.y = t.y
-            WHERE t.guild_id=?
-            ORDER BY t.level DESC, t.player_name, t.village_name
-        """, (guild_id,)) as cur:
-            return [dict(r) for r in await cur.fetchall()]
+        async with db.execute(
+            "SELECT * FROM ally_treasuries WHERE guild_id=? ORDER BY level DESC, player_name, village_name",
+            (guild_id,)
+        ) as cur:
+            treasuries = [dict(r) for r in await cur.fetchall()]
+
+        discord_ids = list({t["discord_id"] for t in treasuries if t.get("discord_id")})
+        troop_map = {}
+        for did in discord_ids:
+            async with db.execute(
+                "SELECT villages_json FROM member_troops WHERE discord_id=? ORDER BY updated_at DESC LIMIT 1",
+                (did,)
+            ) as cur:
+                row = await cur.fetchone()
+                if row and row["villages_json"]:
+                    try:
+                        for v in _json.loads(row["villages_json"]):
+                            vx, vy = v.get("x"), v.get("y")
+                            if vx is not None and vy is not None:
+                                troops = v.get("troops", {})
+                                off = sum(_troop_attack.get(name, 0) * count for name, count in troops.items())
+                                troop_map[f"{did}_{vx}_{vy}"] = off
+                    except Exception:
+                        pass
+
+        ts_map = {}
+        if discord_ids:
+            phs = ",".join("?" * len(discord_ids))
+            async with db.execute(
+                f"SELECT discord_id, x, y, ts_level FROM village_ts_levels WHERE discord_id IN ({phs})",
+                discord_ids
+            ) as cur:
+                for row in await cur.fetchall():
+                    ts_map[f"{row[0]}_{row[1]}_{row[2]}"] = row[3]
+
+        # Also check guild_own_villages as fallback
+        ov_map = {}
+        if discord_ids:
+            phs = ",".join("?" * len(discord_ids))
+            async with db.execute(
+                f"SELECT discord_id, x, y, off_score FROM guild_own_villages WHERE guild_id=? AND discord_id IN ({phs}) AND off_score > 0",
+                [guild_id] + discord_ids
+            ) as cur:
+                for row in await cur.fetchall():
+                    ov_map[f"{row[0]}_{row[1]}_{row[2]}"] = row[3]
+
+        for t in treasuries:
+            key = f"{t['discord_id']}_{t['x']}_{t['y']}"
+            t["off_score"] = troop_map.get(key, 0) or ov_map.get(key, 0)
+            t["ts_level"] = ts_map.get(key, 0)
+
+        return treasuries
 
 
 async def delete_treasury(treasury_id: int, guild_id: str, discord_id: str) -> bool:
