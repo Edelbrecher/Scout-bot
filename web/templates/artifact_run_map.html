@@ -440,20 +440,34 @@ function draw(){
     const[,py]=w2c(0,gy); ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
   }
 
-  // background villages (same rendering as map.html, with alliance filter)
+  // background villages — dim everything except run-relevant coords
   {
     const tS=Math.max(1,scale);
     const[vx0,vy1]=c2w(-scale,canvas.height+scale);
     const[vx1,vy0]=c2w(canvas.width+scale,-scale);
     const hasFilter = allyFilter.length > 0;
+    // Build set of coords involved in runs
+    const runCoords = new Set();
+    runs.forEach(r => {
+      if(r.artifact_x||r.artifact_y) runCoords.add(`${r.artifact_x},${r.artifact_y}`);
+      if(r.cleaner_x||r.cleaner_y)   runCoords.add(`${r.cleaner_x},${r.cleaner_y}`);
+      if(r.destroyer_x||r.destroyer_y) runCoords.add(`${r.destroyer_x},${r.destroyer_y}`);
+      if(r.picker_x||r.picker_y)     runCoords.add(`${r.picker_x},${r.picker_y}`);
+    });
+    const hasRuns = runCoords.size > 0;
     for(const v of S.bgV){
       if(v.x<vx0||v.x>vx1||v.y<vy1||v.y>vy0) continue;
       const isAlly = hasFilter && (v.alliance||'').toLowerCase() === allyFilter;
       if(allyOnly && hasFilter && !isAlly) continue;
+      const isRunVillage = hasRuns && runCoords.has(`${v.x},${v.y}`);
       const[px,py]=w2c(v.x,v.y);
       const color=v.isNatar?NATAR_COLOR:(TRIBE_COLOR[v.tribe]||'#aaaaaa');
       const r=Math.max(1.2,tS*0.82);
-      ctx.globalAlpha = (allyOnly || !hasFilter) ? 1 : (isAlly ? 1 : 0.1);
+      if (hasRuns) {
+        ctx.globalAlpha = isRunVillage ? 1 : 0.06;
+      } else {
+        ctx.globalAlpha = (allyOnly || !hasFilter) ? 1 : (isAlly ? 1 : 0.1);
+      }
       ctx.fillStyle = isAlly ? '#f1c40f' : color;
       ctx.fillRect(px-r/2,py-r/2,r,r);
     }

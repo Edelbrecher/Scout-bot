@@ -15479,6 +15479,11 @@ async def reports_page(request: Request, guild_id: str,
     if err: return err
     err = _require_guild(session, guild_id)
     if err: return err
+    if WORKSPACE_RE.match(guild_id):
+        uid = session.get("uid", "") or session.get("discord_id", "")
+        real_guild_id = await database.get_ally_membership_guild_id(uid)
+        if real_guild_id:
+            return RedirectResponse(f"/guild/{real_guild_id}/reports", status_code=302)
     guild = await database.get_guild(guild_id)
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
