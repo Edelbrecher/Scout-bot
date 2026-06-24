@@ -368,7 +368,10 @@ let _hideNatars = true;
 async function loadTreasuries() {
   try {
     const r = await fetch(`/guild/${GUILD_ID}/api/treasuries`);
-    _treasuries = await r.json();
+    if (!r.ok) { _treasuries = []; _treasuryCoords = new Set(); return; }
+    const data = await r.json();
+    if (!Array.isArray(data)) { _treasuries = []; _treasuryCoords = new Set(); return; }
+    _treasuries = data;
     _treasuryCoords = new Set(_treasuries.filter(t => t.x || t.y).map(t => `${t.x}|${t.y}`));
   } catch(e) { _treasuries = []; _treasuryCoords = new Set(); }
 }
@@ -380,8 +383,9 @@ function toggleNatars() {
   draw();
 }
 
-function toggleTreasuries() {
+async function toggleTreasuries() {
   _showTreasuries = !_showTreasuries;
+  if (_showTreasuries && !_treasuries.length) await loadTreasuries();
   const btn = document.getElementById('treasuryToggleBtn');
   if (btn) btn.style.background = _showTreasuries ? 'rgba(99,102,241,.25)' : '';
   const d = _showTreasuries ? '' : 'none';
@@ -697,13 +701,13 @@ function draw() {
     const isScouted= scoutMap.has(key);
     const hlColor  = highlighted.get(key);
     const isTreasury = _showTreasuries && _treasuryCoords.has(key);
-    const dim      = (hasFilter && !isHL && !isScouted) || (_showTreasuries && _treasuryCoords.size > 0 && !isTreasury && !isHL);
+    const dim      = (hasFilter && !isHL && !isScouted) || (_showTreasuries && !isTreasury && !isHL);
 
     // In alliance heatmap mode, skip villages of alliances the user hid via the legend
     if (viewMode === 'alliance' && !isHL && !isScouted && v.alliance &&
         hiddenAlliances.has(v.alliance.toLowerCase())) continue;
 
-    ctx.globalAlpha = dim ? 0.08 : 1;
+    ctx.globalAlpha = dim ? 0.06 : 1;
     ctx.shadowBlur  = 0;
 
     if (isHL) {
