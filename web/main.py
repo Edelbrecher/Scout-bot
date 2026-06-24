@@ -11985,6 +11985,8 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "poll",      "label": "Polls",              "url_suffix": "/polls"},
     {"type": "item",  "icon": "blueprint", "label": "Blueprints",         "url_suffix": "/blueprints"},
     {"type": "item",  "icon": "diamond",   "label": "Artefakte",          "url_suffix": "/artifacts"},
+    {"type": "item",  "icon": "castle",    "label": "Treasuries",         "url_suffix": "/all-treasuries"},
+    {"type": "item",  "icon": "map",       "label": "Artifact Spawn Map", "url_suffix": "/artifacts/spawn-map"},
     # ── Tools ─────────────────────────────────────────────────────────────
     {"type": "group", "label": "Tools"},
     {"type": "item",  "icon": "box",       "label": "Res Push",           "url_suffix": "/res-push"},
@@ -16766,6 +16768,30 @@ async def set_world_artifact_coords(request: Request, guild_id: str, artifact_id
         )
         await db.commit()
     return JSONResponse({"ok": True})
+
+
+@app.get("/guild/{guild_id}/artifacts/spawn-map", response_class=HTMLResponse)
+async def artifact_spawn_map_page(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild: return RedirectResponse("/dashboard")
+    html = f"""
+    {{% extends "base.html" %}}
+    {{% block title %}}Artifact Spawn Map · {guild.get("guild_name","")} · TravOps{{% endblock %}}
+    {{% block content %}}
+    <div style="max-width:100%;padding:0 1.25rem 3rem;">
+      <a href="/guild/{guild_id}/artifacts" class="back-link">← Artifacts</a>
+      <h1 style="margin:1rem 0 .5rem;">🗺️ Artifact Spawn Map</h1>
+      <p class="subtitle" style="margin:0 0 1rem;">Typical artifact spawn locations on the Travian map.</p>
+      <img src="/static/Artefacts_spawn.png" alt="Artifact Spawn Map"
+           style="width:100%;max-width:900px;border-radius:12px;border:1px solid var(--border);">
+    </div>
+    {{% endblock %}}
+    """
+    from starlette.responses import HTMLResponse as _HR
+    tpl = templates.env.from_string(html)
+    return _HR(tpl.render(request=request, guild=guild))
 
 
 @app.get("/guild/{guild_id}/artifacts/run-map", response_class=HTMLResponse)
