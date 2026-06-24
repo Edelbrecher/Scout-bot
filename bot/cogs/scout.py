@@ -485,13 +485,12 @@ class CloseConfirmView(discord.ui.View):
     @discord.ui.button(label="✅ Ja", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.stop()
-        # Disable all buttons on the scout embed and send channel notice
+        await interaction.response.edit_message(content="✅ Channel wird geschlossen…", view=None)
         try:
             await self.original_msg.edit(view=_all_disabled_view())
         except Exception:
             pass
         lang = await get_guild_lang(str(interaction.guild_id))
-        await interaction.response.edit_message(content="✅ Channel wird geschlossen…", view=None)
         try:
             await interaction.channel.send(
                 t(lang, "scout.channel_delete_msg", label=self.label, user=interaction.user.mention)
