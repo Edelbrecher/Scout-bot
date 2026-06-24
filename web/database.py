@@ -2275,6 +2275,17 @@ async def get_battle_reports(guild_id: str, limit: int = 100,
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_battle_reports_for_user(guild_id: str, discord_id: str, limit: int = 100) -> list[dict]:
+    await _init_reports_table()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM battle_reports WHERE guild_id=? AND submitted_by=? ORDER BY created_at DESC LIMIT ?",
+            (guild_id, discord_id, limit)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
 async def get_battle_report(report_id: int, guild_id: str) -> dict | None:
     await _init_reports_table()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

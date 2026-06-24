@@ -15488,7 +15488,12 @@ async def reports_page(request: Request, guild_id: str,
     if not guild:
         return RedirectResponse("/dashboard", status_code=303)
 
-    reports = await database.get_battle_reports(guild_id, limit=100, player_name=q)
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    can_view_all = _is_leader(session, guild_id) or await has_perm(request, guild_id, "report_view") or await has_perm(request, guild_id, "ally_manage")
+    if can_view_all:
+        reports = await database.get_battle_reports(guild_id, limit=100, player_name=q)
+    else:
+        reports = await database.get_battle_reports_for_user(guild_id, uid, limit=100)
     import json as _json
     for r in reports:
         for jf in ("troops_sent_json", "troops_lost_json", "def_troops_json",
