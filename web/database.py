@@ -2277,11 +2277,24 @@ async def get_battle_reports(guild_id: str, limit: int = 100,
 
 async def get_battle_reports_for_user(guild_id: str, discord_id: str, limit: int = 100) -> list[dict]:
     await _init_reports_table()
+    # submitted_by can be a discord_id OR a display name — match both
+    username = ""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT * FROM battle_reports WHERE guild_id=? AND submitted_by=? ORDER BY created_at DESC LIMIT ?",
-            (guild_id, discord_id, limit)
+            "SELECT discord_username, travian_name FROM ally_members WHERE discord_id=? LIMIT 1",
+            (discord_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            if row:
+                username = row["discord_username"] or ""
+        names = [discord_id]
+        if username:
+            names.append(username)
+        ph = ",".join("?" * len(names))
+        async with db.execute(
+            f"SELECT * FROM battle_reports WHERE guild_id=? AND submitted_by IN ({ph}) ORDER BY created_at DESC LIMIT ?",
+            (guild_id, *names, limit)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
