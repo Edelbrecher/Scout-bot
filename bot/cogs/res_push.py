@@ -401,18 +401,23 @@ class ResAnswerView(discord.ui.View):
                     view_channel=True, send_messages=True,
                 )
         # Give res_push_view_role_ids access (e.g. Member role) so the alliance can contribute
-        for role_id_str in (config.get("res_push_view_role_ids") or "").split(","):
+        _view_raw = config.get("res_push_view_role_ids") or ""
+        print(f"[res-push] accept: res_push_view_role_ids='{_view_raw}'", flush=True)
+        for role_id_str in _view_raw.split(","):
             role_id_str = role_id_str.strip()
             if not role_id_str:
                 continue
             role = interaction.guild.get_role(int(role_id_str))
             if not role:
-                print(f"[res-push] view-role {role_id_str} not found in guild {interaction.guild.id} — member access NOT granted", flush=True)
+                print(f"[res-push] view-role {role_id_str} not found in guild {interaction.guild.id}", flush=True)
                 continue
-            if role not in overwrites:
+            already = role in overwrites
+            print(f"[res-push] view-role {role_id_str} ({role.name}) found, already_in_overwrites={already}", flush=True)
+            if not already:
                 overwrites[role] = discord.PermissionOverwrite(
                     view_channel=True, send_messages=True,
                 )
+        print(f"[res-push] total overwrites: {len(overwrites)} targets", flush=True)
 
         # Use or create an "Active Pushes" sub-category
         PUSH_CAT_NAME = "🪖 Active Pushes"
