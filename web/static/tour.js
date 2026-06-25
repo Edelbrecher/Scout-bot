@@ -110,8 +110,8 @@
           page: null, target: '.card:first-of-type',
           title: t('TravOps-Points 🌟', 'TravOps Points 🌟'),
           body: t(
-            '10 Points = 1 Monat Pro kostenlos (ca. 10 € Ersparnis).\n\nFortschrittsbalken zeigt wie nah du der nächsten Einlösung bist.',
-            '10 points = 1 month Pro for free (~€10 savings).\n\nProgress bar shows how close you are to your next redemption.'
+            '5 Points = 1 Monat Pro kostenlos (ca. 10 € Ersparnis). Pro geworbenem Allianz-Mitglied gibt es 1 Point.\n\nFortschrittsbalken zeigt wie nah du der nächsten Einlösung bist.',
+            '5 points = 1 month Pro for free (~€10 savings). You earn 1 point per invited alliance member.\n\nProgress bar shows how close you are to your next redemption.'
           ),
           next: t('Weiter', 'Next'),
         },

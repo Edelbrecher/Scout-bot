@@ -250,6 +250,54 @@
   </div>
   {% endif %}
 
+  <!-- ── Referral / Invite-Reward Card ── -->
+  {% if ref_stats and ref_stats.code %}
+  {% set _pts = ref_stats.points or 0 %}
+  <div style="background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(99,102,241,0.08));border:1px solid rgba(245,158,11,0.3);border-radius:14px;padding:1.1rem 1.35rem;margin-bottom:1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+      <div style="flex:1;min-width:240px;">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+          <span style="font-size:1.1rem;">🎁</span>
+          <h2 style="margin:0;font-size:1rem;">Invite your alliance — earn free Premium</h2>
+        </div>
+        <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 0.75rem;line-height:1.5;">
+          Share your personal link. For every member who signs up and gets started, you earn <strong style="color:#fbbf24;">1 point</strong>. Collect <strong style="color:#fbbf24;">5 points → 1 free month of Pro</strong>. The more of your alliance is on TravOps, the better it works for everyone.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+          <input id="dashRefLink" type="text" readonly value="{{ base_url }}/ref/{{ ref_stats.code }}"
+                 onclick="this.select()"
+                 style="flex:1;min-width:220px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;color:var(--text-primary);font-size:0.82rem;cursor:pointer;">
+          <button onclick="dashCopyRef()" id="dashCopyBtn"
+                  style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.45);color:#fbbf24;padding:0.5rem 0.95rem;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600;white-space:nowrap;">
+            📋 Copy link
+          </button>
+        </div>
+      </div>
+      <div style="text-align:center;min-width:120px;">
+        <div style="font-size:2.2rem;font-weight:800;color:#fbbf24;line-height:1;">{{ _pts }}<span style="font-size:0.9rem;color:var(--text-muted);font-weight:400;">/5</span></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin:0.2rem 0 0.5rem;">{{ ref_stats.referred_count or 0 }} invited</div>
+        <div style="background:rgba(255,255,255,0.08);border-radius:999px;height:6px;width:120px;max-width:100%;margin:0 auto;">
+          <div style="height:6px;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#fbbf24);width:{{ [_pts * 20, 100] | min }}%;"></div>
+        </div>
+        {% if _pts >= 5 %}
+        <a href="/profile" style="display:inline-block;margin-top:0.55rem;font-size:0.76rem;color:#fbbf24;text-decoration:none;font-weight:600;">🎁 Redeem →</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <script>
+  function dashCopyRef() {
+    const inp = document.getElementById('dashRefLink');
+    inp.select();
+    navigator.clipboard.writeText(inp.value).then(() => {
+      const b = document.getElementById('dashCopyBtn');
+      const o = b.textContent; b.textContent = '✓ Copied!';
+      setTimeout(() => { b.textContent = o; }, 2000);
+    });
+  }
+  </script>
+  {% endif %}
+
   <!-- ── Server-Liste ── -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">

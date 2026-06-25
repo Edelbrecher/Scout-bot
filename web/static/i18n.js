@@ -666,7 +666,7 @@ const TRANSLATIONS = {
     "profile.title": "👤 My Profile",
     "profile.subtitle": "Invitations, TravOps-Points and rewards",
     "profile.points.label": "TravOps-Points",
-    "profile.redeem.btn": "🎁 Redeem 10 Points → 1 Month Pro",
+    "profile.redeem.btn": "🎁 Redeem 5 Points → 1 Month Pro",
     "profile.reflink.title": "🔗 Your personal invite link",
 
     // scout_stats.html
@@ -1377,7 +1377,7 @@ const TRANSLATIONS = {
     "profile.title": "👤 Mein Profil",
     "profile.subtitle": "Einladungen, TravOps-Points und Belohnungen",
     "profile.points.label": "TravOps-Points",
-    "profile.redeem.btn": "🎁 10 Points einlösen → 1 Monat Pro",
+    "profile.redeem.btn": "🎁 5 Points einlösen → 1 Monat Pro",
     "profile.reflink.title": "🔗 Dein persönlicher Einladungslink",
 
     // scout_stats.html

@@ -2054,6 +2054,9 @@ async def dashboard(request: Request, flash: str = ""):
 
     from datetime import datetime as _dt, timezone as _tz
     now_iso = _dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    # Referral stats for the dashboard invite card
+    ref_stats = await database.get_referral_stats(owner_discord_id) if owner_discord_id else {"code": "", "points": 0, "referred_count": 0}
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -2068,6 +2071,8 @@ async def dashboard(request: Request, flash: str = ""):
             "flash": flash,
             "archived_workspaces": archived_workspaces,
             "now_iso": now_iso,
+            "ref_stats": ref_stats,
+            "base_url": base_url,
         },
     )
 
@@ -2261,6 +2266,42 @@ async def referral_redirect(request: Request, code: str):
     if owner:
         response.set_cookie("_ref", code, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax")
     return response
+
+
+async def _owner_ref_cta_url(request: Request, guild: dict | None) -> str:
+    """Build a share-page CTA URL that carries the guild owner's referral code, so
+    signups from a shared public page count as referrals for the sharer. Falls back
+    to the bare homepage when no owner/code is available."""
+    base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+    try:
+        owner = (guild or {}).get("owner_discord_id", "") if guild else ""
+        if owner:
+            code = await database.get_or_create_referral_code(owner)
+            if code:
+                return f"{base_url}/ref/{code}"
+    except Exception:
+        pass
+    return base_url + "/"
+
+
+async def _maybe_award_referral(request: Request, uid: str):
+    """Award a referral point to the referrer when a referred user completes their
+    first meaningful action (alliance join or village import). Safe to call from
+    multiple hooks: award_referral_point dedupes per referred user. The _ref cookie
+    is set by /ref/{code} and survives 30 days, covering the signup→first-action gap.
+    Discord OAuth login is required to reach any action hook, which provides sybil
+    resistance against fake-account farming."""
+    try:
+        ref_code = request.cookies.get("_ref", "")
+        if not ref_code or not uid:
+            return
+        referrer_id = await database.get_referral_code_owner(ref_code)
+        if referrer_id and referrer_id != uid:
+            awarded = await database.award_referral_point(referrer_id, uid)
+            if awarded:
+                print(f"[referral] +1 point to {referrer_id} for action by {uid}", flush=True)
+    except Exception as e:
+        print(f"[referral] award check failed: {e}", flush=True)
 
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -3990,12 +4031,14 @@ async def map_public_view(request: Request, short_id: str):
         return HTMLResponse("<h2>Not found.</h2>", status_code=404)
 
     scouted = await database.get_scouted_coordinates(share["guild_id"])
+    cta_url = await _owner_ref_cta_url(request, guild)
     return templates.TemplateResponse("map_public.html", {
         "request":          request,
         "guild":            guild,
         "scouted":          scouted,
         "share_state_json": share["state_json"],
         "public_token":     short_id,
+        "cta_url":          cta_url,
     })
 
 
@@ -4681,7 +4724,8 @@ async def billing_checkout(
         subscription_data={"trial_period_days": 7},
         success_url=f"{base_url}/guild/{guild_id}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{base_url}/guild/{guild_id}/billing?error=cancelled",
-        metadata={"guild_id": guild_id, "tier": tier, "owner_discord_id": session.get("uid", "")},
+        metadata={"guild_id": guild_id, "tier": tier, "owner_discord_id": session.get("uid", ""),
+                  "ref_code": request.cookies.get("_ref", "")},
     )
     if customer_id:
         checkout_kwargs["customer"] = customer_id
@@ -4727,6 +4771,12 @@ async def billing_success(request: Request, guild_id: str, session_id: str = "")
             expires_at=expires_at,
             owner_discord_id=owner_discord_id or None,
         )
+        # Referral: a referred user buying a server subscription counts as conversion
+        ref_code = checkout.metadata.get("ref_code", "")
+        if ref_code and owner_discord_id:
+            referrer_id = await database.get_referral_code_owner(ref_code)
+            if referrer_id and referrer_id != owner_discord_id:
+                await database.award_referral_point(referrer_id, owner_discord_id)
     except Exception:
         pass
 
@@ -5777,6 +5827,9 @@ async def my_account_upload(
             tribe=tribe, total_off=total_off, total_def=total_def,
             total_crop=total_crop, total_units=total_units, total_scouts=total_scouts,
         )
+    # Referral: importing villages/troops is a first meaningful action
+    if parsed:
+        await _maybe_award_referral(request, discord_id)
     return RedirectResponse(f"/guild/{guild_id}/my-account?uploaded={len(parsed)}", status_code=303)
 
 
@@ -7918,6 +7971,8 @@ async def ally_join_accept(request: Request, token: str, travian_name: str = For
                     status = "approved"
     await database.join_ally_group(group["id"], uid, session.get("username",""), tname, wing=wing, status=status)
     guild_id = group["guild_id"]
+    # Referral: joining an alliance is a first meaningful action
+    await _maybe_award_referral(request, uid)
     if status == "approved":
         return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=joined", status_code=303)
     return RedirectResponse(f"/ally/join/{token}?pending=1", status_code=303)
@@ -15926,9 +15981,12 @@ async def player_intel_public_view(request: Request, short_id: str):
             "<h2>🔒 This player is no longer available.</h2></body></html>",
             status_code=404,
         )
+    _intel_guild = await database.get_guild(share["guild_id"])
+    cta_url = await _owner_ref_cta_url(request, _intel_guild)
     return templates.TemplateResponse("player_intel_public.html", {
         "request": request,
         "intel": intel,
+        "cta_url": cta_url,
     })
 
 

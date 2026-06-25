@@ -7767,7 +7767,7 @@ async def get_referral_stats(discord_user_id: str) -> dict:
 
 
 async def redeem_travops_points(discord_user_id: str) -> bool:
-    """Deduct 10 points and extend user Pro by 1 month. Returns False if not enough points."""
+    """Deduct 5 points and extend user Pro by 1 month. Returns False if not enough points."""
     from datetime import datetime as _dt, timedelta as _td
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
@@ -7776,7 +7776,7 @@ async def redeem_travops_points(discord_user_id: str) -> bool:
             (discord_user_id,),
         ) as cur:
             row = await cur.fetchone()
-        if not row or row["pts"] < 10:
+        if not row or row["pts"] < 5:
             return False
         # Calculate new expiry: extend from now or from current expiry
         base = _dt.utcnow()
@@ -7790,7 +7790,7 @@ async def redeem_travops_points(discord_user_id: str) -> bool:
         new_expiry = (base + _td(days=30)).isoformat()
         await db.execute(
             """UPDATE user_subscriptions SET
-                 travops_points = travops_points - 10,
+                 travops_points = travops_points - 5,
                  subscription_status = 'active',
                  plan = COALESCE(NULLIF(plan,''), 'player_pro'),
                  expires_at = ?

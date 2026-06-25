@@ -33,26 +33,26 @@
         <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.25rem;" data-i18n="profile.points.label">TravOps-Points</div>
         <div style="font-size:2.5rem;font-weight:700;color:#f59e0b;line-height:1;">
           {{ ref_stats.points }}
-          <span style="font-size:1rem;color:var(--text-muted);font-weight:400;">/ 10 for 1 month Pro</span>
+          <span style="font-size:1rem;color:var(--text-muted);font-weight:400;">/ 5 for 1 month Pro</span>
         </div>
         <!-- Progress bar -->
         <div style="margin-top:0.75rem;background:rgba(255,255,255,0.08);border-radius:999px;height:8px;width:280px;max-width:100%;">
-          <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#fbbf24);width:{{ [ref_stats.points * 10, 100] | min }}%;transition:width 0.4s;"></div>
+          <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#fbbf24);width:{{ [ref_stats.points * 20, 100] | min }}%;transition:width 0.4s;"></div>
         </div>
         <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.4rem;">
-          {{ ref_stats.referred_count }} successful invitation(s) · {{ 10 - ref_stats.points if ref_stats.points < 10 else 0 }} points until redemption
+          {{ ref_stats.referred_count }} successful invitation(s) · {{ 5 - ref_stats.points if ref_stats.points < 5 else 0 }} points until redemption
         </p>
       </div>
-      {% if ref_stats.points >= 10 %}
+      {% if ref_stats.points >= 5 %}
       <form method="post" action="/profile/redeem">
         <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;padding:0.65rem 1.4rem;border-radius:10px;font-weight:600;cursor:pointer;color:#fff;white-space:nowrap;" data-i18n="profile.redeem.btn">
-          🎁 Redeem 10 points → 1 month Pro
+          🎁 Redeem 5 points → 1 month Pro
         </button>
       </form>
       {% else %}
       <div style="text-align:center;opacity:0.5;">
         <div style="font-size:2rem;">🎁</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">Still {{ 10 - ref_stats.points }} points needed</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">Still {{ 5 - ref_stats.points }} points needed</div>
       </div>
       {% endif %}
     </div>
@@ -62,7 +62,7 @@
   <div class="card" style="margin-bottom:0;">
     <h3 style="margin:0 0 0.5rem;font-size:1rem;" data-i18n="profile.reflink.title">🔗 Your personal invitation link</h3>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:0.85rem;">
-      Share this link. Once someone buys a <strong>Pro subscription</strong> via your link, you automatically get <strong>+1 TravOps point</strong>. Once per invited person.
+      Share this link with your alliance. When someone signs up via your link and gets started (joins an alliance or imports their villages), you automatically get <strong>+1 TravOps point</strong>. Collect <strong>5 points → 1 free month of Pro</strong>. Once per invited person.
     </p>
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
       <input
@@ -94,7 +94,7 @@
         <div style="font-size:0.72rem;color:var(--text-muted);">Points gesammelt</div>
       </div>
       <div style="text-align:center;">
-        <div style="font-size:1.6rem;font-weight:700;color:#34d399;">{{ (ref_stats.points // 10) }}</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#34d399;">{{ (ref_stats.points // 5) }}</div>
         <div style="font-size:0.72rem;color:var(--text-muted);">Months redeemable</div>
       </div>
     </div>
