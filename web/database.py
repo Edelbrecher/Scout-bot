@@ -794,12 +794,16 @@ async def update_tw_world(guild_id: str, tw_world: str):
         await db.commit()
 
 
-async def get_scouted_coordinates(guild_id: str) -> list[dict]:
-    """Return list of {coordinates, player, village} from scout_channels."""
+async def get_scouted_coordinates(guild_id: str, days: int = 7) -> list[dict]:
+    """Return scout targets {coordinates, player, village} from scout_channels
+    created within the last `days` days (default 7). Closed scout channels are
+    removed from the table on close, so this is effectively the recent open targets."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT coordinates, player, village FROM scout_channels WHERE guild_id = ? AND coordinates IS NOT NULL",
+            f"""SELECT coordinates, player, village FROM scout_channels
+                WHERE guild_id = ? AND coordinates IS NOT NULL
+                  AND created_at >= datetime('now', '-{int(days)} days')""",
             (guild_id,)
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
