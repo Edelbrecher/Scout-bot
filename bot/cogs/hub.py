@@ -77,6 +77,13 @@ def _build_overwrites(guild: discord.Guild, config: dict, requester: discord.Mem
         role = guild.get_role(int(role_id_str))
         if role:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True)
+    for role_id_str in (config.get("res_push_view_role_ids") or "").split(","):
+        role_id_str = role_id_str.strip()
+        if not role_id_str:
+            continue
+        role = guild.get_role(int(role_id_str))
+        if role and role not in overwrites:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
     return overwrites
 
 
@@ -1188,6 +1195,28 @@ class HubResAnswerView(discord.ui.View):
             status="accepted",
             push_channel_id=str(interaction.channel.id),
         )
+
+        # Add res_push_view_role_ids overwrites to this channel
+        config = await database.get_guild_config(str(interaction.guild.id))
+        if config:
+            for role_id_str in (config.get("res_push_view_role_ids") or "").split(","):
+                role_id_str = role_id_str.strip()
+                if not role_id_str:
+                    continue
+                role = interaction.guild.get_role(int(role_id_str))
+                if role and role not in interaction.channel.overwrites:
+                    await interaction.channel.set_permissions(
+                        role, view_channel=True, send_messages=True,
+                    )
+            for role_id_str in (config.get("res_manager_role_ids") or "").split(","):
+                role_id_str = role_id_str.strip()
+                if not role_id_str:
+                    continue
+                role = interaction.guild.get_role(int(role_id_str))
+                if role and role not in interaction.channel.overwrites:
+                    await interaction.channel.set_permissions(
+                        role, view_channel=True, send_messages=True, manage_messages=True,
+                    )
 
         # Fetch updated req (now has push_channel_id)
         req = await database.get_res_request_by_answer_msg(str(interaction.message.id))
