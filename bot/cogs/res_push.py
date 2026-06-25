@@ -321,8 +321,18 @@ class ResAnswerView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item):
+        import traceback
+        print(f"[res-push] ERROR in {item.custom_id}: {error}", flush=True)
+        traceback.print_exc()
+        try:
+            await interaction.followup.send(f"❌ Error: {error}", ephemeral=True)
+        except Exception:
+            pass
+
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, custom_id="persistent:res_accept")
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print(f"[res-push] accept button clicked by {interaction.user} in guild {interaction.guild.id}", flush=True)
         if not await _check_auth(interaction):
             return
 
