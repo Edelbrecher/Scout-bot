@@ -4473,6 +4473,44 @@ async def res_request_edit(request: Request, guild_id: str, request_id: int,
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
 
 
+async def _res_contribution_access(request: Request, guild_id: str, contribution_id: int):
+    """Returns (contribution, None) if the user may edit/delete this contribution,
+    else (None, redirect). Owner of the contribution or a res-push manager."""
+    session, err = _require_session(request)
+    if err: return None, err
+    err = await _require_guild_async(session, guild_id)
+    if err: return None, err
+    contrib = await database.get_res_contribution_by_id(contribution_id)
+    if not contrib or contrib.get("guild_id") != guild_id:
+        return None, RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    is_owner = contrib.get("user_id") == uid
+    can_manage = _is_leader(session, guild_id) or await has_perm(request, guild_id, "res_push_manage") or await has_perm(request, guild_id, "ally_manage")
+    if not (is_owner or can_manage):
+        return None, RedirectResponse(f"/guild/{guild_id}/res-push?flash=forbidden", status_code=303)
+    return contrib, None
+
+
+@app.post("/guild/{guild_id}/res-push/contributions/{contribution_id}/edit")
+async def res_contribution_edit(request: Request, guild_id: str, contribution_id: int,
+                                amount: str = Form("")):
+    contrib, err = await _res_contribution_access(request, guild_id, contribution_id)
+    if err: return err
+    amt = amount.strip()
+    if not amt:
+        return RedirectResponse(f"/guild/{guild_id}/res-push?flash=empty", status_code=303)
+    await database.update_res_contribution(contribution_id, amt)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/contributions/{contribution_id}/delete")
+async def res_contribution_delete(request: Request, guild_id: str, contribution_id: int):
+    contrib, err = await _res_contribution_access(request, guild_id, contribution_id)
+    if err: return err
+    await database.delete_res_contribution(contribution_id)
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # Billing routes
 # ---------------------------------------------------------------------------

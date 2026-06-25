@@ -944,7 +944,7 @@ async def get_res_contributions_per_request(guild_id: str) -> dict[str, list]:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("""
-            SELECT rc.request_id, rc.user_name, rc.amount, rc.created_at
+            SELECT rc.request_id, rc.id, rc.user_id, rc.user_name, rc.amount, rc.created_at
             FROM res_contributions rc
             JOIN res_requests rr ON rr.id = rc.request_id
             WHERE rr.guild_id = ?
@@ -956,6 +956,35 @@ async def get_res_contributions_per_request(guild_id: str) -> dict[str, list]:
         rid = str(r.pop("request_id"))
         result.setdefault(rid, []).append(r)
     return result
+
+
+async def get_res_contribution_by_id(contribution_id: int) -> dict | None:
+    """Return a single contribution joined with its request's guild_id (for auth)."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT rc.*, rr.guild_id AS guild_id
+            FROM res_contributions rc
+            JOIN res_requests rr ON rr.id = rc.request_id
+            WHERE rc.id = ?
+        """, (contribution_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def update_res_contribution(contribution_id: int, amount: str):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "UPDATE res_contributions SET amount=? WHERE id=?",
+            (amount, contribution_id),
+        )
+        await db.commit()
+
+
+async def delete_res_contribution(contribution_id: int):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM res_contributions WHERE id=?", (contribution_id,))
+        await db.commit()
 
 
 async def get_poll_participation_stats(guild_id: str) -> list[dict]:
