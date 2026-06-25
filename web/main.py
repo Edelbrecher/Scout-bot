@@ -6276,6 +6276,7 @@ async def attacks_api_incoming(
     perms = await database.get_member_permissions(guild_id, uid)
     can_see_all = is_admin or any(p in perms for p in ("ally_manage","defend_manage","attack_manage","ally_view","defend_view"))
     # Users without rights only see their own imports
+    await database.auto_archive_past_attacks(guild_id)
     own_id = None if can_see_all else uid
     attacks = await database.get_incoming_attacks(
         guild_id, x, y,

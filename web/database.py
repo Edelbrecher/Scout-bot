@@ -10632,6 +10632,20 @@ async def delete_attack(attack_id: int, guild_id: str) -> bool:
         return cur.rowcount > 0
 
 
+async def auto_archive_past_attacks(guild_id: str) -> int:
+    """Archive attacks whose arrival_time has passed."""
+    await _init_attack_detection_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute(
+            """UPDATE incoming_attacks SET is_dismissed=1
+               WHERE guild_id=? AND is_dismissed=0
+               AND arrival_time != '' AND arrival_time < datetime('now')""",
+            (guild_id,)
+        )
+        await db.commit()
+        return cur.rowcount
+
+
 async def bulk_archive_attacks(guild_id: str) -> int:
     """Archive (soft-hide) all non-dismissed attacks for a guild."""
     await _init_attack_detection_tables()
