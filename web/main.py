@@ -12212,7 +12212,7 @@ _DEFAULT_SIDEBAR_NAV = [
     {"type": "item",  "icon": "flag",      "label": "My Op Plan",         "url_suffix": "/my-operations"},
     {"type": "item",  "icon": "poll",      "label": "Polls",              "url_suffix": "/polls"},
     {"type": "item",  "icon": "blueprint", "label": "Blueprints",         "url_suffix": "/blueprints"},
-    {"type": "item",  "icon": "diamond",   "label": "Artefakte",          "url_suffix": "/artifacts"},
+    {"type": "item",  "icon": "diamond",   "label": "Artifacts",          "url_suffix": "/artifacts"},
     {"type": "item",  "icon": "castle",    "label": "Treasuries",         "url_suffix": "/all-treasuries"},
     {"type": "item",  "icon": "map",       "label": "Artifact Spawn Map", "url_suffix": "/artifacts/spawn-map"},
     # ── Tools ─────────────────────────────────────────────────────────────
