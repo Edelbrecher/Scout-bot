@@ -766,6 +766,7 @@
   const GUILD_ID = window.GUILD_ID = '{{ guild.guild_id }}';
   const CAN_LABEL   = {{ 'true' if can_label else 'false' }};
   const CAN_SEE_ALL = {{ 'true' if can_see_all else 'false' }};
+  const TW_WORLD = '{{ (guild.tw_world or "")|e }}'.replace(/\/+$/, '');
   let parsedAttacks = [];
 
   // =========================================================
@@ -1999,8 +2000,13 @@
 
     const score = a.fake_score || 50;
     const lbl = a.label || '';
-    const coordStr = a.attacker_x != null ? ` (${a.attacker_x}|${a.attacker_y})` : '';
-    const defCoordStr = a.own_village_x != null ? ` (${a.own_village_x}|${a.own_village_y})` : '';
+    const coordLink = (x, y) => {
+      const label = `(${x}|${y})`;
+      if (TW_WORLD && x != null && y != null) return `<a href="${TW_WORLD}/karte.php?x=${x}&y=${y}" target="_blank" rel="noopener" style="color:#93c5fd;text-decoration:none;font-family:monospace;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${label}</a>`;
+      return label;
+    };
+    const coordStr = a.attacker_x != null ? ' ' + coordLink(a.attacker_x, a.attacker_y) : '';
+    const defCoordStr = a.own_village_x != null ? ' ' + coordLink(a.own_village_x, a.own_village_y) : '';
     const heroUrl = `/guild/${GUILD_ID}/defense/hero-scout/${encodeURIComponent(a.attacker_player)}`;
 
     let troopDetailHtml = '';
@@ -2035,14 +2041,14 @@
           </a>
         </div>
         <div style="font-size:.8rem;color:var(--text-muted);margin-top:.15rem;">
-          ${escHtml(a.attacker_village_name||'')}${escHtml(coordStr)}
+          ${escHtml(a.attacker_village_name||'')} ${coordStr}
         </div>
       </div>
 
       <!-- Target -->
       <div style="padding:.65rem 1rem;border-bottom:1px solid var(--border);">
         <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Target</div>
-        <div style="font-size:.9rem;font-weight:700;">🏰 ${escHtml(a.own_village_name||'?')}${escHtml(defCoordStr)}</div>
+        <div style="font-size:.9rem;font-weight:700;">🏰 ${escHtml(a.own_village_name||'?')} ${defCoordStr}</div>
         ${a.imported_by_name ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">👤 ${escHtml(a.imported_by_name)}</div>` : ''}
       </div>
 
