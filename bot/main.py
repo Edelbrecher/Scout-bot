@@ -814,30 +814,52 @@ async def handle_refresh_res_push(request: aiohttp_web.Request) -> aiohttp_web.R
         return aiohttp_web.json_response({"ok": False, "error": "request_id required"}, status=400)
 
     try:
-        from cogs.res_push import _build_push_embed, ResPushChannelView
+        from cogs.res_push import _build_push_embed, ResPushChannelView, _build_request_embed
         req = await database.get_res_request_by_id(int(request_id))
         if not req:
             return aiohttp_web.json_response({"ok": False, "error": "not found"}, status=404)
 
         push_channel_id = req.get("push_channel_id")
         push_message_id = req.get("push_message_id")
+        answer_message_id = req.get("answer_message_id")
         status = req.get("status", "accepted")
-
-        if not push_channel_id or not push_message_id:
-            return aiohttp_web.json_response({"ok": False, "error": "no push message tracked"}, status=404)
 
         guild = bot_instance.get_guild(int(req["guild_id"]))
         if not guild:
             return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 
-        channel = guild.get_channel(int(push_channel_id))
-        if not channel:
-            return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+        updated_any = False
 
-        contribs = await database.get_res_contributions(int(request_id))
-        embed = _build_push_embed(req, contribs, status=status)
-        msg = await channel.fetch_message(int(push_message_id))
-        await msg.edit(embed=embed, view=ResPushChannelView())
+        # 1) Update the push-channel message if one is tracked (accepted requests)
+        if push_channel_id and push_message_id:
+            channel = guild.get_channel(int(push_channel_id))
+            if channel:
+                try:
+                    contribs = await database.get_res_contributions(int(request_id))
+                    embed = _build_push_embed(req, contribs, status=status)
+                    msg = await channel.fetch_message(int(push_message_id))
+                    await msg.edit(embed=embed, view=ResPushChannelView())
+                    updated_any = True
+                except Exception as e:
+                    print(f"[refresh-res-push] push msg edit failed: {e}", flush=True)
+
+        # 2) Update the original request (answer) message — covers pending/rejected/hold
+        #    requests that have no push channel yet. Never creates anything new.
+        if answer_message_id:
+            config = await database.get_guild_config(str(req["guild_id"]))
+            ans_ch_id = (config or {}).get("res_answer_channel_id")
+            if ans_ch_id:
+                ans_channel = guild.get_channel(int(ans_ch_id))
+                if ans_channel:
+                    try:
+                        ans_msg = await ans_channel.fetch_message(int(answer_message_id))
+                        await ans_msg.edit(embed=_build_request_embed(req, status))
+                        updated_any = True
+                    except Exception as e:
+                        print(f"[refresh-res-push] answer msg edit failed: {e}", flush=True)
+
+        if not updated_any:
+            return aiohttp_web.json_response({"ok": False, "error": "no message tracked"}, status=404)
         return aiohttp_web.json_response({"ok": True})
     except Exception as e:
         import traceback; traceback.print_exc()
