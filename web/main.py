@@ -7522,10 +7522,12 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
         "attack_manage", "attack_view",
         "scout_manage", "scout_view",
         "map_manage", "map_view", "map_meta_view", "map_meta_manage",
-        "res_push_view", "res_push_manage",
+        "res_push_view", "res_push_manage", "res_push_height",
         "sector_view",
         "poll_view", "poll_manage",
         "hero_scout_view", "stats_view", "blueprint_view",
+        "report_view",
+        "treasury_view", "treasury_manage",
         "guide_view",
     ]
     selected = [f for f in ALL_FLAGS if form.get(f) == "1"]
@@ -7541,13 +7543,14 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
             "attack_manage", "attack_view",
             "scout_manage", "scout_view",
             "map_view", "map_manage", "map_meta_view", "map_meta_manage",
-            "res_push_view", "res_push_manage",
+            "res_push_view", "res_push_manage", "res_push_height",
             "sector_view",
             "poll_view", "poll_manage", "hero_scout_view", "stats_view", "blueprint_view",
+            "report_view", "treasury_view", "treasury_manage",
             "guide_view",
         ]
     elif preset == "mitglied":
-        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "map_meta_view", "res_push_view", "guide_view"]
+        selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "map_meta_view", "res_push_view", "report_view", "treasury_view", "guide_view"]
     perms_str = ",".join(selected)
     await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)
