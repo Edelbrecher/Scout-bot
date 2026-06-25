@@ -73,6 +73,9 @@
       <button id="natarToggleBtn" onclick="toggleNatars()" class="btn btn-secondary" style="font-size:0.85rem;" title="Show/hide Natars">
         👁️ Natars
       </button>
+      <button id="scoutToggleBtn" onclick="toggleScouts()" class="btn btn-secondary" style="font-size:0.85rem;background:rgba(224,85,85,.25);" title="Show/hide scouts">
+        🔴 Scouts
+      </button>
     </div>
     {% if is_admin %}
     <form method="post" action="/guild/{{ guild.guild_id }}/map/world" style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.5rem;">
@@ -365,6 +368,7 @@ let _treasuries     = [];
 let _treasuryCoords = new Set();
 let _showTreasuries = false;
 let _hideNatars = true;
+let _showScouts = true;
 async function loadTreasuries() {
   try {
     const r = await fetch(`/guild/${GUILD_ID}/api/treasuries`);
@@ -380,6 +384,14 @@ function toggleNatars() {
   _hideNatars = !_hideNatars;
   const btn = document.getElementById('natarToggleBtn');
   if (btn) btn.style.background = _hideNatars ? '' : 'rgba(230,126,34,.25)';
+  draw();
+}
+
+function toggleScouts() {
+  _showScouts = !_showScouts;
+  const btn = document.getElementById('scoutToggleBtn');
+  if (btn) btn.style.background = _showScouts ? 'rgba(224,85,85,.25)' : '';
+  // Toggle the legend entry visibility too
   draw();
 }
 
@@ -698,7 +710,7 @@ function draw() {
     const isHL     = highlighted.has(key);
     if (_hideNatars && v.isNatar && !isHL) continue;
     const [cx,cy] = worldToCanvas(v.x,v.y);
-    const isScouted= scoutMap.has(key);
+    const isScouted= _showScouts && scoutMap.has(key);
     const hlColor  = highlighted.get(key);
     const isTreasury = _showTreasuries && _treasuryCoords.has(key);
     const dim      = (hasFilter && !isHL && !isScouted) || (_showTreasuries && !isTreasury && !isHL);
@@ -1094,7 +1106,7 @@ window.addEventListener('mousemove', e => {
     if(d<snap&&d<bestD){bestD=d;best=v;}
   }
   if (best) {
-    const sc  = scoutMap.get(`${best.x}|${best.y}`);
+    const sc  = _showScouts ? scoutMap.get(`${best.x}|${best.y}`) : null;
     const col = getVillageColor(best);
     let tip = `<strong style="font-size:0.9rem; color:${col};">${best.name||'?'}</strong> <span style="color:#666;">${best.x}|${best.y}</span>`;
     if (best.player)   tip += `<br>👤 <strong>${best.player}</strong>`;
