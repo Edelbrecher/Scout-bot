@@ -1412,13 +1412,20 @@ async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aio
     try:
         config = await database.get_guild_config(guild_id)
 
-        # Find "🪖 Active Pushes" category (same one used on accept)
+        # Find — or recreate — the "🪖 Active Pushes" category (same one used on accept).
+        # If it no longer exists, create it so the channel always leaves the archive.
         PUSH_CAT_NAME = "🪖 Active Pushes"
         push_cat = None
         for cat in guild.categories:
             if cat.name == PUSH_CAT_NAME:
                 push_cat = cat
                 break
+        if not push_cat:
+            try:
+                push_cat = await guild.create_category(
+                    PUSH_CAT_NAME, reason="Active Pushes category auto-created on reactivate")
+            except Exception as e:
+                print(f"[res-push] reactivate: could not create Active Pushes category: {e}", flush=True)
 
         # Rebuild permissions from config (same logic as accept)
         overwrites = {
