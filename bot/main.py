@@ -824,7 +824,7 @@ async def handle_refresh_res_push(request: aiohttp_web.Request) -> aiohttp_web.R
         answer_message_id = req.get("answer_message_id")
         status = req.get("status", "accepted")
 
-        guild = bot_instance.get_guild(int(req["guild_id"]))
+        guild = bot.get_guild(int(req["guild_id"]))
         if not guild:
             return aiohttp_web.json_response({"ok": False, "error": "guild not found"}, status=404)
 

@@ -364,10 +364,22 @@ class ResAnswerView(discord.ui.View):
                 manage_channels=True, manage_messages=True,
             ),
         }
-        # Give the requester access so they can see their own push channel
+        # Give the accepting manager access
         overwrites[interaction.user] = discord.PermissionOverwrite(
             view_channel=True, send_messages=True,
         )
+        # Give the ORIGINAL requester access so they can see their own push channel
+        # (interaction.user above is whoever clicked Accept — usually a manager, not
+        #  the requester). Resolve the requester by their stored discord id.
+        try:
+            requester_id = int(req.get("user_id") or 0)
+            requester = interaction.guild.get_member(requester_id) if requester_id else None
+            if requester and requester not in overwrites:
+                overwrites[requester] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True,
+                )
+        except Exception as e:
+            print(f"[res-push] could not resolve requester {req.get('user_id')}: {e}", flush=True)
         # Give manager roles explicit access
         for role_id_str in (config.get("res_manager_role_ids") or "").split(","):
             role_id_str = role_id_str.strip()
@@ -388,13 +400,16 @@ class ResAnswerView(discord.ui.View):
                 overwrites[role] = discord.PermissionOverwrite(
                     view_channel=True, send_messages=True,
                 )
-        # Give res_push_view_role_ids read-only access (e.g. Member role)
+        # Give res_push_view_role_ids access (e.g. Member role) so the alliance can contribute
         for role_id_str in (config.get("res_push_view_role_ids") or "").split(","):
             role_id_str = role_id_str.strip()
             if not role_id_str:
                 continue
             role = interaction.guild.get_role(int(role_id_str))
-            if role and role not in overwrites:
+            if not role:
+                print(f"[res-push] view-role {role_id_str} not found in guild {interaction.guild.id} — member access NOT granted", flush=True)
+                continue
+            if role not in overwrites:
                 overwrites[role] = discord.PermissionOverwrite(
                     view_channel=True, send_messages=True,
                 )
