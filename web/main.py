@@ -3249,6 +3249,21 @@ async def _call_res_unarchive(guild_id: str, channel_id: str, requester_id: str 
         return f"err:{str(e)[:60]}"
 
 
+async def _call_res_refresh(request_id: int) -> str:
+    """Ask the bot to rebuild + edit the existing push message (never creates a new
+    channel). Returns 'refreshed' | 'no_msg' | 'err:...'."""
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.post("http://bot:7777/api/refresh-res-push",
+                                  json={"request_id": request_id})
+            d = r.json()
+            if d.get("ok"):
+                return "refreshed"
+            return "no_msg" if "message" in (d.get("error", "")) else f"err:{d.get('error','?')[:60]}"
+    except Exception as e:
+        return f"err:{str(e)[:60]}"
+
+
 @app.post("/guild/{guild_id}/res-push/requests/{request_id}/inactive")
 async def res_request_inactive(request: Request, guild_id: str, request_id: int):
     session, err = _require_session(request)
@@ -4495,6 +4510,8 @@ async def res_request_edit(request: Request, guild_id: str, request_id: int,
         request_id, player_name.strip(), coordinates.strip(), reason.strip(),
         push_height=new_height,
     )
+    # Update the existing Discord push message (never creates a new channel)
+    await _call_res_refresh(request_id)
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
 
 
@@ -4525,6 +4542,7 @@ async def res_contribution_edit(request: Request, guild_id: str, contribution_id
     if not amt:
         return RedirectResponse(f"/guild/{guild_id}/res-push?flash=empty", status_code=303)
     await database.update_res_contribution(contribution_id, amt)
+    await _call_res_refresh(int(contrib["request_id"]))
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
 
 
@@ -4533,6 +4551,7 @@ async def res_contribution_delete(request: Request, guild_id: str, contribution_
     contrib, err = await _res_contribution_access(request, guild_id, contribution_id)
     if err: return err
     await database.delete_res_contribution(contribution_id)
+    await _call_res_refresh(int(contrib["request_id"]))
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
 
 
