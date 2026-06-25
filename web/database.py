@@ -2104,6 +2104,12 @@ async def _init_farming_tables():
             # Speeds up alliance population history (My Alliance pop sparkline) —
             # without it, filtering by alliance_name scans the whole date range.
             "CREATE INDEX IF NOT EXISTS idx_wsnap_url_ally   ON world_snapshots(world_url, alliance_name, fetched_at)",
+            # Covering index for "latest snapshot, grouped by alliance" (map page
+            # alliance list). Leading (world_url, fetched_at) lets the planner seek
+            # exactly one snapshot (~20k rows) instead of scanning every snapshot
+            # for the world (millions). Covers alliance_name/player_id/population so
+            # the GROUP BY/COUNT(DISTINCT)/SUM needs no row lookups. Fixes a ~14s query.
+            "CREATE INDEX IF NOT EXISTS idx_wsnap_snap_ally  ON world_snapshots(world_url, fetched_at, alliance_name, player_id, population)",
         ]:
             try:
                 await db.execute(idx_sql)
