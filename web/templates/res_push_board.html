@@ -42,6 +42,14 @@
   <div style="padding:.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(148,163,184,.1);border:1px solid var(--border);color:var(--text-muted);">
     🗑️ Request removed from dashboard.
   </div>
+  {% elif flash == 'edited' %}
+  <div style="padding:.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e;">
+    ✅ Request updated.
+  </div>
+  {% elif flash == 'forbidden' %}
+  <div style="padding:.6rem 1rem;border-radius:8px;margin-bottom:1rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;">
+    ⛔ You can only edit your own requests.
+  </div>
   {% endif %}
 
   <!-- Filter tabs -->
@@ -148,6 +156,15 @@
           </form>
           {% endif %}
 
+          {# Edit — owner of the request OR a manager #}
+          {% if can_manage or req.user_id == uid %}
+          <button type="button" onclick="openResEdit({{ req.id }})" title="Edit request"
+                  style="padding:.22rem .6rem;border-radius:5px;font-size:.74rem;font-weight:600;cursor:pointer;
+                         background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:#60a5fa;">
+            ✏️ Edit
+          </button>
+          {% endif %}
+
           {# Remove from dashboard (cleans up dead entries) #}
           <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/remove"
                 onsubmit="return confirm('Remove this request from the dashboard? The Discord channel will also be deleted if it still exists.')"
@@ -236,6 +253,44 @@
       </div>
       {% endif %}
 
+      {# Edit modal — owner or manager #}
+      {% if can_manage or req.user_id == uid %}
+      <div id="resEditModal-{{ req.id }}" class="res-edit-overlay" style="display:none;"
+           onclick="if(event.target===this)closeResEdit({{ req.id }})">
+        <div class="res-edit-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h3 style="margin:0;font-size:1rem;">✏️ Edit Request</h3>
+            <button type="button" onclick="closeResEdit({{ req.id }})"
+                    style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+          </div>
+          <form method="post" action="/guild/{{ guild.guild_id }}/res-push/requests/{{ req.id }}/edit">
+            <div style="display:grid;gap:.85rem;">
+              <div style="display:flex;flex-direction:column;gap:.3rem;">
+                <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);">Player</label>
+                <input name="player_name" value="{{ req.player_name or '' }}" class="form-control" style="background:var(--bg-main);">
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.3rem;">
+                <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);">Coordinates</label>
+                <input name="coordinates" value="{{ req.coordinates or '' }}" class="form-control" placeholder="e.g. -20|25" style="background:var(--bg-main);">
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.3rem;">
+                <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);">
+                  Push Height {% if not can_edit_height %}<span style="color:#f59e0b;">🔒 (no permission)</span>{% endif %}
+                </label>
+                <input name="push_height" value="{{ req.push_height or '' }}" class="form-control"
+                       {% if not can_edit_height %}readonly disabled style="background:rgba(255,255,255,.03);color:var(--text-muted);cursor:not-allowed;"{% else %}style="background:var(--bg-main);"{% endif %}>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.3rem;">
+                <label style="font-size:.76rem;font-weight:600;color:var(--text-muted);">Reason</label>
+                <input name="reason" value="{{ req.reason or '' }}" class="form-control" style="background:var(--bg-main);">
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%;padding:.6rem;">💾 Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
     </div>
     {% endfor %}
   </div>
@@ -251,4 +306,28 @@
   {% endif %}
 
 </div>
+
+<style>
+.res-edit-overlay {
+  position:fixed; inset:0; z-index:10000;
+  background:rgba(0,0,0,.72); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;
+}
+.res-edit-overlay[style*="flex"] { display:flex; }
+.res-edit-box {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:16px; padding:1.6rem; width:100%; max-width:440px;
+  box-shadow:0 24px 80px rgba(0,0,0,.55);
+}
+</style>
+<script>
+function openResEdit(id) {
+  const m = document.getElementById('resEditModal-' + id);
+  if (m) m.style.display = 'flex';
+}
+function closeResEdit(id) {
+  const m = document.getElementById('resEditModal-' + id);
+  if (m) m.style.display = 'none';
+}
+</script>
 {% endblock %}

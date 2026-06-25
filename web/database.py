@@ -1158,6 +1158,24 @@ async def get_res_request_by_id_web(request_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def update_res_request(request_id: int, player_name: str, coordinates: str,
+                             reason: str, push_height: str | None = None):
+    """Update an existing res request. push_height is only changed when a non-None
+    value is passed (caller gates this on the res_push_height permission)."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        if push_height is not None:
+            await db.execute(
+                "UPDATE res_requests SET player_name=?, coordinates=?, reason=?, push_height=? WHERE id=?",
+                (player_name, coordinates, reason, push_height, request_id),
+            )
+        else:
+            await db.execute(
+                "UPDATE res_requests SET player_name=?, coordinates=?, reason=? WHERE id=?",
+                (player_name, coordinates, reason, request_id),
+            )
+        await db.commit()
+
+
 async def get_scout_channel_info(channel_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         db.row_factory = aiosqlite.Row
@@ -5773,7 +5791,7 @@ async def get_member_permissions(guild_id: str, discord_id: str) -> set[str]:
         "attack_manage", "attack_view", "scout_manage", "scout_view",
         "map_manage", "map_view", "map_meta_view", "map_meta_manage",
         "sector_view",
-        "res_push_view", "res_push_manage",
+        "res_push_view", "res_push_manage", "res_push_height",
         "hero_scout_view", "stats_view", "blueprint_view",
         "poll_view", "poll_manage", "defend_view", "defend_manage",
         "grain_sim_view", "treasury_view", "treasury_manage",

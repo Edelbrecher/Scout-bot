@@ -3038,6 +3038,11 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
     for r in all_requests:
         goal_totals[str(r["id"])] = _parse_res(r.get("push_height", ""))
 
+    # Edit permissions
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    can_manage = _is_leader(session, guild_id) or await has_perm(request, guild_id, "res_push_manage") or await has_perm(request, guild_id, "ally_manage")
+    can_edit_height = can_manage or await has_perm(request, guild_id, "res_push_height")
+
     return templates.TemplateResponse("res_push_board.html", {
         "request": request,
         "guild": guild,
@@ -3049,6 +3054,9 @@ async def res_push_page(request: Request, guild_id: str, saved: str = ""):
         "total_active": total_active,
         "total_done": total_done,
         "flash": request.query_params.get("flash", ""),
+        "uid": uid,
+        "can_manage": can_manage,
+        "can_edit_height": can_edit_height,
     })
 
 
@@ -4437,6 +4445,32 @@ async def res_request_remove(request: Request, guild_id: str, request_id: int):
             pass
     await database.delete_res_request(request_id)
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=removed", status_code=303)
+
+
+@app.post("/guild/{guild_id}/res-push/requests/{request_id}/edit")
+async def res_request_edit(request: Request, guild_id: str, request_id: int,
+                           player_name: str = Form(""), coordinates: str = Form(""),
+                           reason: str = Form(""), push_height: str = Form("")):
+    session, err = _require_session(request)
+    if err: return err
+    err = await _require_guild_async(session, guild_id)
+    if err: return err
+    req = await database.get_res_request_by_id_web(request_id)
+    if not req or req.get("guild_id") != guild_id:
+        return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
+    uid = session.get("uid", "") or session.get("discord_id", "")
+    is_owner = req.get("user_id") == uid
+    can_manage = _is_leader(session, guild_id) or await has_perm(request, guild_id, "res_push_manage") or await has_perm(request, guild_id, "ally_manage")
+    if not (is_owner or can_manage):
+        return RedirectResponse(f"/guild/{guild_id}/res-push?flash=forbidden", status_code=303)
+    # Push height is only editable with the dedicated permission (or manage/leader)
+    can_edit_height = can_manage or await has_perm(request, guild_id, "res_push_height")
+    new_height = push_height.strip() if can_edit_height else None
+    await database.update_res_request(
+        request_id, player_name.strip(), coordinates.strip(), reason.strip(),
+        push_height=new_height,
+    )
+    return RedirectResponse(f"/guild/{guild_id}/res-push?flash=edited", status_code=303)
 
 
 # ---------------------------------------------------------------------------
