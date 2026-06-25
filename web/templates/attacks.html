@@ -7,33 +7,33 @@
   <div class="page-header">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">&larr; {{ guild.guild_name }}</a>
     <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">&#x2694;&#xFE0F; Attacks</h1>
-    <p class="subtitle" style="margin:0;">Eingehende Angriffe per Rallyepunkt erfassen · Fakes erkennen · Verteidigung anstoßen</p>
+    <p class="subtitle" style="margin:0;">Import incoming attacks from the rally point · detect fakes · coordinate defense</p>
   </div>
 
   {{ combat_flow(guild.guild_id, "attacks") }}
 
   <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1.1rem;">
     <button class="btn btn-primary" onclick="openImportModal()" style="font-size:0.9rem;">
-      Rallyepunkt importieren
+      Import Rally Point
     </button>
     <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:0.9rem;">
-      Allianz-Analyse
+      Alliance Analysis
     </a>
     <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:0.9rem;">
       Own Villages
     </a>
     <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:0.9rem;">
-      Analyse
+      Analysis
     </button>
     {% if can_label %}
     <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:0.9rem;">
-      Archiv
+      Archive
     </button>
     <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:0.9rem;color:#a5b4fc;">
-      Alle archivieren
+      Archive All
     </button>
     <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:0.9rem;color:#f87171;">
-      Alle löschen
+      Delete All
     </button>
     {% endif %}
   </div>
@@ -42,7 +42,7 @@
   <div id="importModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; overflow-y:auto;">
     <div style="max-width:760px; margin:2rem auto; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 style="margin:0;">&#x1F4CB; Rallyepunkt importieren</h2>
+        <h2 style="margin:0;">&#x1F4CB; Import Rally Point</h2>
         <button onclick="closeImportModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;">&times;</button>
       </div>
       <p class="hint" style="margin-bottom:0.75rem;">Copy the rally point page from Travian and paste it here. Multiple sections are automatically detected.</p>
@@ -53,14 +53,14 @@
 
       <!-- Preview -->
       <div id="importPreview" style="display:none; margin-top:1rem;">
-        <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Vorschau (<span id="previewCount">0</span> Attacke erkannt)</h3>
+        <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Preview (<span id="previewCount">0</span> attack(s) detected)</h3>
         <div id="previewList" style="display:flex; flex-direction:column; gap:0.4rem; max-height:280px; overflow-y:auto;"></div>
       </div>
 
       <div style="display:flex; gap:0.75rem; margin-top:1rem; justify-content:flex-end;">
         <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
         <button class="btn btn-primary" id="btnSaveImport" onclick="saveImport()" disabled>
-          &#x1F4BE; Speichern
+          &#x1F4BE; Save
         </button>
       </div>
     </div>
@@ -79,7 +79,7 @@
               <span id="hs_header_name" style="color:#c084fc;margin-left:.4rem;"></span>
             </div>
             <div style="display:flex;align-items:center;gap:.6rem;margin-top:.1rem;">
-              <div style="font-size:.74rem;color:var(--text-muted);">Held-Ausrüstung des Angreifers erfassen</div>
+              <div style="font-size:.74rem;color:var(--text-muted);">Capture attacker hero equipment</div>
               <div id="hs_queue_indicator" style="display:none;font-size:.7rem;font-weight:600;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.4);color:#c084fc;border-radius:10px;padding:1px 8px;"></div>
             </div>
           </div>
@@ -231,7 +231,7 @@
       <!-- Notes + villages row -->
       <div style="padding:0 1.4rem .85rem;display:grid;grid-template-columns:0.6fr 1fr;gap:.6rem;">
         <div>
-          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏘️ Dörfer</label>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏘️ Villages</label>
           <input id="hs_villages" type="number" min="0" placeholder="0"
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
@@ -289,7 +289,7 @@
   <div id="analysisPanel" style="display:none;margin-bottom:1.25rem;">
     <div class="card" style="padding:1rem 1.25rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
-        <h2 style="margin:0;font-size:1rem;">📊 Angriffs-Analyse</h2>
+        <h2 style="margin:0;font-size:1rem;">📊 Attack Analysis</h2>
         <button onclick="toggleAnalysisPanel()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">&times;</button>
       </div>
       <div id="analysisContent">
@@ -304,7 +304,7 @@
 
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem;">
-        <div style="font-size:.9rem;font-weight:700;">📊 Übersicht — Eingehende Truppen</div>
+        <div style="font-size:.9rem;font-weight:700;">📊 Overview — Incoming Troops</div>
         <button onclick="toggleCharts()" id="btnToggleCharts" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:.2rem .6rem;font-size:.75rem;cursor:pointer;">▲ Charts ausblenden</button>
       </div>
 
@@ -374,7 +374,7 @@
       <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.85rem;">
         <div onclick="toggleAttackerMap()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0;">
           <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-            👤 Angreifer — wer greift welche Dörfer an?
+            👤 Attackers — who is attacking which villages?
           </div>
           <span id="attackerMapArrow" style="font-size:.7rem;color:var(--text-muted);">▶ anzeigen</span>
         </div>
@@ -550,18 +550,18 @@
   <div class="card" style="margin-top:1.5rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
       <h2 style="margin:0;font-size:1rem;">&#x1F916; Discord-Alarm — automatisch erkannte Meldungen</h2>
-      <span style="font-size:.74rem;color:var(--text-muted);">Aus dem Alarm-Kanal geparst · ergänzt den Rallyepunkt-Import oben</span>
+      <span style="font-size:.74rem;color:var(--text-muted);">Parsed from the alarm channel · supplements the rally point import above</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:.4rem;">
       {% for r in attack_reports %}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;
                   padding:.4rem .65rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;">
         <div style="font-size:.82rem;">
-          <strong>{{ r.attack_count }}</strong> Angriff(e)
+          <strong>{{ r.attack_count }}</strong> attack(s)
           <span style="color:var(--text-muted);">· gemeldet von {{ r.reporter_name or '—' }}{% if r.created_at %} · {{ r.created_at[:16].replace('T',' ') }} UTC{% endif %}</span>
         </div>
         <a href="/guild/{{ guild.guild_id }}/attacks/{{ r.id }}/analyse"
-           class="btn btn-secondary" style="font-size:.78rem;padding:.2rem .6rem;flex-shrink:0;">&#x1F52C; Analyse</a>
+           class="btn btn-secondary" style="font-size:.78rem;padding:.2rem .6rem;flex-shrink:0;">&#x1F52C; Analysis</a>
       </div>
       {% endfor %}
     </div>
@@ -579,7 +579,7 @@
         <form method="post" action="/guild/{{ guild.guild_id }}/attacks/config">
           <div class="form-group">
             <label for="attack_channel_id">Alarm-Kanal ID</label>
-            <p class="field-hint">Channel für eingehende <strong>Angriffs-Alarme</strong> — nicht der Battle-Report-Kanal (Enemies-Seite).</p>
+            <p class="field-hint">Channel for incoming <strong>attack alerts</strong> — not the battle report channel (Enemies page).</p>
             <input type="text" id="attack_channel_id" name="attack_channel_id"
               value="{{ guild.attack_channel_id or '' }}"
               placeholder="z.B. 1234567890123456789" />
@@ -1571,10 +1571,11 @@
     for (const a of attacks) {
       const key = a.own_village_name || '?';
       if (!groups[key]) {
-        groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, attacks: [] };
+        groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, account: a.imported_by_name||'', attacks: [] };
       } else if (groups[key].x !== a.own_village_x || groups[key].y !== a.own_village_y) {
-        groups[key].x = null; groups[key].y = null; // inconsistent → hide coords
+        groups[key].x = null; groups[key].y = null;
       }
+      if (!groups[key].account && a.imported_by_name) groups[key].account = a.imported_by_name;
       groups[key].attacks.push(a);
     }
     return groups;
@@ -1584,7 +1585,7 @@
   window.renderVillageList = function() {
     const groups = buildGroups(_allAttacks);
     const badge = document.getElementById('atkTotalBadge');
-    if (badge) badge.textContent = _allAttacks.length + ' gesamt · ' + Object.keys(groups).length + ' Dörfer';
+    if (badge) badge.textContent = _allAttacks.length + ' total · ' + Object.keys(groups).length + ' villages';
   };
 
   // ── Column toggle state ───────────────────────────────────────────────────
@@ -1898,12 +1899,13 @@
         <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.6rem .85rem;display:flex;align-items:center;gap:.6rem;">
           <span id="vc-arrow-${safeKey}" style="font-size:.65rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
           <span style="font-size:.92rem;font-weight:800;color:var(--text);">🏰 ${escHtml(g.name)}</span>
+          ${g.account ? `<span style="font-size:.78rem;color:#60a5fa;font-weight:600;">👤 ${escHtml(g.account)}</span>` : ''}
           <span style="font-size:.72rem;color:var(--text-muted);">${escHtml(coords)}</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:.55rem;flex-shrink:0;">
-            <span style="font-size:.72rem;color:var(--text-muted);">${g.attacks.length} Angriffe · ${waves.length} Welle(n)</span>
+            <span style="font-size:.72rem;color:var(--text-muted);">${g.attacks.length} attacks · ${waves.length} wave(s)</span>
             ${realCount    > 0 ? `<span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">⚠️ ${realCount} real</span>` : ''}
             ${supportCount > 0 ? `<span style="background:rgba(34,197,94,.15);color:#4ade80;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">🛡️ ${supportCount}</span>` : ''}
-            ${chiefPattern     ? `<span style="background:rgba(147,197,253,.12);color:#93c5fd;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">👁️ verdeckt</span>` : ''}
+            ${chiefPattern     ? `<span style="background:rgba(147,197,253,.12);color:#93c5fd;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;">👁️ hidden troops</span>` : ''}
           </div>
         </div>
         <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0;">`;
