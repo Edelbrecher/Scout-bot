@@ -9,19 +9,13 @@
 .rot-row:hover { background:rgba(255,255,255,.06); }
 .rot-row.current-holder { border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.07); }
 .rot-row.next-holder   { border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.07); }
+.rot-row.completed-holder { border-color:rgba(99,102,241,.3); background:rgba(99,102,241,.05); }
 .rot-handle { color:var(--text-muted); cursor:grab; font-size:1rem; padding:0 .25rem; user-select:none; }
 .rot-pos { width:24px; height:24px; min-width:24px; border-radius:50%; background:rgba(99,102,241,.2); border:1px solid rgba(99,102,241,.35); display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; color:#a5b4fc; }
 .rot-player { flex:1; font-weight:600; font-size:.9rem; }
 .rot-hours { font-size:.75rem; color:var(--text-muted); white-space:nowrap; }
-.hoff-row { display:flex; align-items:flex-start; gap:.75rem; padding:.75rem; border-radius:10px; border:1px solid var(--border); margin-bottom:.6rem; }
-.hoff-pending  { border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.05); }
-.hoff-confirmed{ border-color:rgba(34,197,94,.3);  background:rgba(34,197,94,.05);  }
-.hoff-skipped  { opacity:.45; }
-.hoff-arrow { font-size:1.3rem; padding-top:.1rem; }
-.hoff-players { flex:1; }
-.hoff-from { font-size:.78rem; color:var(--text-muted); }
-.hoff-to   { font-weight:700; font-size:.92rem; }
-.hoff-meta { font-size:.72rem; color:var(--text-muted); margin-top:.2rem; }
+.rot-status { font-size:.65rem; margin-left:.3rem; }
+.rot-handoff-inline { margin-top:.4rem; padding:.4rem .6rem; background:rgba(245,158,11,.06); border:1px solid rgba(245,158,11,.2); border-radius:6px; font-size:.78rem; }
 .confirm-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .5rem; border-radius:6px; font-size:.7rem; font-weight:700; }
 .chip-ok  { background:rgba(34,197,94,.15); color:#4ade80; border:1px solid rgba(34,197,94,.3); }
 .chip-wait{ background:rgba(255,255,255,.06); color:var(--text-muted); border:1px solid var(--border); }
@@ -48,12 +42,12 @@
 .modal-box select { appearance:auto; cursor:pointer; }
 </style>
 
-<div style="max-width:960px;margin:0 auto;padding:0 1.25rem 3rem;">
+<div style="max-width:100%;margin:0 auto;padding:0 1.25rem 3rem;">
 
-  <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artefakte</a>
+  <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artifacts</a>
 
   {% if saved %}
-  <div class="alert alert-success" style="margin:.75rem 0;">✅ Gespeichert.</div>
+  <div class="alert alert-success" style="margin:.75rem 0;">✅ Saved.</div>
   {% endif %}
 
   <!-- Hero header -->
@@ -61,7 +55,7 @@
     <div>
       <div style="margin-bottom:.4rem;">
         <span class="size-badge-lg size-{{ artifact.artifact_size }}">
-          {% if artifact.artifact_size == 'unique' %}⭐ Unique{% elif artifact.artifact_size == 'large' %}🟡 Groß{% else %}🔵 Klein{% endif %}
+          {% if artifact.artifact_size == 'unique' %}⭐ Unique{% elif artifact.artifact_size == 'large' %}🟡 Large{% else %}🔵 Small{% endif %}
         </span>
         <span style="margin-left:.5rem;font-size:.78rem;color:var(--text-muted);">
           {{ artifact_type_labels.get(artifact.artifact_type, artifact.artifact_type) }}
@@ -69,14 +63,13 @@
       </div>
       <h1 style="margin:0;font-size:1.4rem;">{{ artifact.name }}</h1>
       <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">
-        Wirkung: {% if artifact.effect_scope == 'all' %}alle Dörfer{% else %}Dorf{% endif %}
+        Effect: {% if artifact.effect_scope == 'all' %}all villages{% else %}village{% endif %}
         · Status: <span style="color:{% if artifact.status=='active' %}#4ade80{% elif artifact.status=='lost' %}#f87171{% else %}#94a3b8{% endif %};">{{ artifact.status }}</span>
       </div>
     </div>
     {% if is_leader %}
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-      <button onclick="document.getElementById('editArtModal').classList.add('open')" class="btn btn-secondary">✏️ Bearbeiten</button>
-      <button onclick="document.getElementById('handoffModal').classList.add('open')" class="btn btn-primary">📤 Übergabe planen</button>
+      <button onclick="document.getElementById('editArtModal').classList.add('open')" class="btn btn-secondary">✏️ Edit</button>
     </div>
     {% endif %}
   </div>
@@ -84,7 +77,7 @@
   <!-- Info row -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-bottom:1.25rem;">
     <div class="section-card" style="padding:.9rem 1rem;margin:0;">
-      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Aktueller Halter</div>
+      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Current Holder</div>
       <div style="font-size:1rem;font-weight:700;">{{ artifact.current_holder or '—' }}</div>
       {% if artifact.current_village %}
       <div style="font-size:.75rem;color:var(--text-muted);display:flex;align-items:center;gap:.4rem;margin-top:.15rem;flex-wrap:wrap;">
@@ -92,23 +85,23 @@
         {% if artifact.x or artifact.y %}
         <span style="font-family:monospace;">({{ artifact.x }}|{{ artifact.y }})</span>
         <a href="/guild/{{ guild.guild_id }}/map?cx={{ artifact.x }}&cy={{ artifact.y }}&z=8"
-           style="color:#a5b4fc;text-decoration:none;font-size:.73rem;">🗺️ Karte</a>
+           style="color:#a5b4fc;text-decoration:none;font-size:.73rem;">🗺️ Map</a>
         {% endif %}
       </div>
       {% elif artifact.x or artifact.y %}
       <div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;display:flex;gap:.4rem;align-items:center;">
         <span style="font-family:monospace;">({{ artifact.x }}|{{ artifact.y }})</span>
         <a href="/guild/{{ guild.guild_id }}/map?cx={{ artifact.x }}&cy={{ artifact.y }}&z=8"
-           style="color:#a5b4fc;text-decoration:none;">🗺️ Karte</a>
+           style="color:#a5b4fc;text-decoration:none;">🗺️ Map</a>
       </div>
       {% endif %}
     </div>
     <div class="section-card" style="padding:.9rem 1rem;margin:0;">
-      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Erobert</div>
+      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Conquered</div>
       <div style="font-size:.9rem;font-weight:600;">{{ artifact.conquered_at or '—' }}</div>
     </div>
     <div class="section-card" style="padding:.9rem 1rem;margin:0;">
-      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Aktiviert (24h nach Eroberung)</div>
+      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Activated (24h after conquest)</div>
       <div style="font-size:.9rem;font-weight:600;" id="activationDisplay">
         {{ artifact.activation_override or artifact.activated_at or '—' }}
       </div>
@@ -121,267 +114,287 @@
   </div>
   {% endif %}
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
-
-    <!-- Rotation -->
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
-        <div class="section-title" style="margin:0;">🔄 Rotation</div>
+  <!-- Unified Rotation & Handoffs -->
+  <div class="section-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+      <div class="section-title" style="margin:0;">🔄 Rotation & Handoffs</div>
+      <div style="display:flex;gap:.5rem;">
         {% if is_leader %}
-        <button id="saveRotBtn" onclick="saveRotation()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .8rem;display:none;">💾 Speichern</button>
+        <button id="saveRotBtn" onclick="saveRotation()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .8rem;display:none;">💾 Save</button>
+        <button onclick="handOffToNext()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .8rem;">📤 Hand Off to Next</button>
         {% endif %}
       </div>
-
-      <div id="rotationList" style="min-height:60px;">
-        {% if rotation %}
-        {% set current = artifact.current_holder %}
-        {% set current_pos = namespace(val=-1) %}
-        {% for r in rotation %}{% if r.player_name == current %}{% set current_pos.val = loop.index0 %}{% endif %}{% endfor %}
-        {% set next_pos = (current_pos.val + 1) % (rotation|length) if current_pos.val >= 0 and rotation|length > 0 else -1 %}
-
-        {% for r in rotation %}
-        <div class="rot-row {% if r.player_name == artifact.current_holder %}current-holder{% elif loop.index0 == next_pos %}next-holder{% endif %}"
-             data-pos="{{ r.position }}" data-player="{{ r.player_name }}"
-             data-hold="{{ r.hold_hours }}" data-notify="{{ r.notify_hours }}">
-          {% if is_leader %}<span class="rot-handle">⠿</span>{% endif %}
-          <div class="rot-pos">{{ loop.index }}</div>
-          <div class="rot-player">
-            {{ r.player_name }}
-            {% if r.player_name == artifact.current_holder %}<span style="font-size:.65rem;color:#4ade80;margin-left:.3rem;">● aktuell</span>{% endif %}
-            {% if loop.index0 == next_pos %}<span style="font-size:.65rem;color:#f59e0b;margin-left:.3rem;">⏭ nächster</span>{% endif %}
-          </div>
-          <div class="rot-hours">
-            <div>⏱ {{ r.hold_hours }}h halten</div>
-            <div>🔔 {{ r.notify_hours }}h vorher</div>
-          </div>
-          {% if is_leader %}
-          <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Entfernen">✕</button>
-          {% endif %}
-        </div>
-        {% endfor %}
-        {% else %}
-        <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">Keine Rotation konfiguriert.</p>
-        {% endif %}
-      </div>
-
-      {% if is_leader %}
-      <div style="margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem;">
-        <div style="font-size:.75rem;font-weight:600;margin-bottom:.4rem;color:var(--text-muted);">Spieler hinzufügen</div>
-        <div style="display:flex;gap:.5rem;">
-          <input id="newRotPlayer" class="form-control" placeholder="Spielername" style="flex:1;">
-          <input id="newHoldHours" class="form-control" type="number" value="48" min="1" placeholder="h" style="width:65px;" title="Haltezeit in Stunden">
-          <input id="newNotifyHours" class="form-control" type="number" value="6" min="1" placeholder="🔔" style="width:55px;" title="Benachrichtigung X h vorher">
-          <button onclick="addRotPlayer()" class="btn btn-secondary" style="padding:.4rem .75rem;font-size:.85rem;">+</button>
-        </div>
-        <div style="font-size:.68rem;color:var(--text-muted);margin-top:.3rem;">Haltezeit (h) · Benachrichtigung (h vorher)</div>
-      </div>
-      {% endif %}
     </div>
 
-    <!-- Timeline -->
-    <div class="section-card">
-      <div class="section-title">📋 Übergabe-Timeline</div>
+    <div id="rotationList" style="min-height:60px;">
+      {% if rotation %}
+      {% set current = artifact.current_holder %}
+      {% set current_pos = namespace(val=-1) %}
+      {% for r in rotation %}{% if r.player_name == current %}{% set current_pos.val = loop.index0 %}{% endif %}{% endfor %}
+      {% set next_pos = (current_pos.val + 1) % (rotation|length) if current_pos.val >= 0 and rotation|length > 0 else -1 %}
+
+      {# Build a lookup of pending/confirmed handoffs by to_player #}
+      {% set handoff_map = namespace(data={}) %}
       {% if handoffs %}
-      {% for h in handoffs %}
-      <div class="hoff-row hoff-{{ h.status }}">
-        <div class="hoff-arrow">
-          {% if h.status == 'confirmed' %}✅{% elif h.status == 'skipped' %}⏭{% else %}📤{% endif %}
-        </div>
-        <div class="hoff-players" style="flex:1;">
-          <div class="hoff-from">{{ h.from_player }} →</div>
-          <div class="hoff-to">{{ h.to_player }}</div>
-          <div class="hoff-meta">
-            {% if h.scheduled_at %}⏰ Geplant: {{ h.scheduled_at }}<br>{% endif %}
-            {% if h.picked_up_at %}🎯 Abgeholt: {{ h.picked_up_at }}<br>{% endif %}
-            {% if h.notes %}📝 {{ h.notes }}<br>{% endif %}
+        {% for h in handoffs %}
+          {% if h.status == 'pending' or h.status == 'confirmed' %}
+            {% set _ = handoff_map.data.update({h.to_player: h}) %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      {% for r in rotation %}
+      {% set is_current = r.player_name == artifact.current_holder %}
+      {% set is_next = loop.index0 == next_pos %}
+      {% set player_handoff = handoff_map.data.get(r.player_name) %}
+      {% set has_confirmed = player_handoff and player_handoff.status == 'confirmed' %}
+      <div class="rot-row {% if is_current %}current-holder{% elif is_next %}next-holder{% elif has_confirmed %}completed-holder{% endif %}"
+           data-pos="{{ r.position }}" data-player="{{ r.player_name }}"
+           data-hold="{{ r.hold_hours }}" data-notify="{{ r.notify_hours }}">
+        {% if is_leader %}<span class="rot-handle">⠿</span>{% endif %}
+        <div class="rot-pos">{{ loop.index }}</div>
+        <div class="rot-player" style="flex:1;">
+          <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;">
+            {{ r.player_name }}
+            {% if is_current %}
+              <span class="rot-status" style="color:#4ade80;">🟢 Holding</span>
+            {% elif is_next %}
+              <span class="rot-status" style="color:#f59e0b;">🟡 Next</span>
+            {% elif has_confirmed %}
+              <span class="rot-status" style="color:#a5b4fc;">✅ Completed</span>
+            {% else %}
+              <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span>
+            {% endif %}
           </div>
-          <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap;">
-            <span class="confirm-chip {% if h.confirmed_by_from %}chip-ok{% else %}chip-wait{% endif %}">
-              {{ '✓' if h.confirmed_by_from else '○' }} {{ h.from_player[:10] }}
-              {% if h.confirmed_from_time %} · {{ h.confirmed_from_time }}{% endif %}
-            </span>
-            <span class="confirm-chip {% if h.confirmed_by_to %}chip-ok{% else %}chip-wait{% endif %}">
-              {{ '✓' if h.confirmed_by_to else '○' }} {{ h.to_player[:10] }}
-              {% if h.confirmed_to_time %} · {{ h.confirmed_to_time }}{% endif %}
-            </span>
+
+          {# Inline pending handoff for this player #}
+          {% if player_handoff and player_handoff.status == 'pending' %}
+          <div class="rot-handoff-inline">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <div>
+                <span style="color:#f59e0b;">📤</span>
+                <span style="font-size:.75rem;color:var(--text-muted);">{{ player_handoff.from_player }} →</span>
+                <span style="font-weight:700;">{{ player_handoff.to_player }}</span>
+                {% if player_handoff.scheduled_at %}
+                <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">⏰ Scheduled: {{ player_handoff.scheduled_at }}</div>
+                {% endif %}
+                {% if player_handoff.notes %}
+                <div style="font-size:.72rem;color:var(--text-muted);">📝 {{ player_handoff.notes }}</div>
+                {% endif %}
+                <div style="margin-top:.25rem;display:flex;gap:.3rem;flex-wrap:wrap;">
+                  <span class="confirm-chip {% if player_handoff.confirmed_by_from %}chip-ok{% else %}chip-wait{% endif %}">
+                    {{ '✓' if player_handoff.confirmed_by_from else '○' }} {{ player_handoff.from_player[:10] }}
+                    {% if player_handoff.confirmed_from_time %} · {{ player_handoff.confirmed_from_time }}{% endif %}
+                  </span>
+                  <span class="confirm-chip {% if player_handoff.confirmed_by_to %}chip-ok{% else %}chip-wait{% endif %}">
+                    {{ '✓' if player_handoff.confirmed_by_to else '○' }} {{ player_handoff.to_player[:10] }}
+                    {% if player_handoff.confirmed_to_time %} · {{ player_handoff.confirmed_to_time }}{% endif %}
+                  </span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.3rem;min-width:80px;">
+                <button onclick="openConfirmModal({{ player_handoff.id }}, '{{ player_handoff.from_player }}', '{{ player_handoff.to_player }}')"
+                        class="btn btn-secondary" style="font-size:.72rem;padding:.25rem .5rem;">Confirm</button>
+                {% if is_leader %}
+                <button onclick="skipHandoff({{ player_handoff.id }})"
+                        class="btn" style="font-size:.72rem;padding:.25rem .5rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;">Skip</button>
+                {% endif %}
+              </div>
+            </div>
           </div>
-        </div>
-        {% if h.status == 'pending' %}
-        <div style="display:flex;flex-direction:column;gap:.3rem;min-width:90px;">
-          <button onclick="openConfirmModal({{ h.id }}, '{{ h.from_player }}', '{{ h.to_player }}')"
-                  class="btn btn-secondary" style="font-size:.72rem;padding:.25rem .5rem;">Bestätigen</button>
-          {% if is_leader %}
-          <button onclick="skipHandoff({{ h.id }})"
-                  class="btn" style="font-size:.72rem;padding:.25rem .5rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;">Überspringen</button>
+          {% elif player_handoff and player_handoff.status == 'confirmed' %}
+          <div style="margin-top:.3rem;font-size:.72rem;color:var(--text-muted);">
+            ✅ Handoff from {{ player_handoff.from_player }} confirmed
+            {% if player_handoff.picked_up_at %} · Picked up: {{ player_handoff.picked_up_at }}{% endif %}
+          </div>
           {% endif %}
         </div>
+        <div class="rot-hours">
+          <div>⏱ {{ r.hold_hours }}h hold</div>
+          <div>🔔 {{ r.notify_hours }}h before</div>
+        </div>
+        {% if is_leader %}
+        <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>
         {% endif %}
       </div>
       {% endfor %}
       {% else %}
-      <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:2rem 0;">Noch keine Übergaben geplant.</p>
+      <p style="color:var(--text-muted);font-size:.83rem;text-align:center;padding:1.5rem 0;">No rotation configured.</p>
       {% endif %}
     </div>
 
-    <!-- Statistics -->
-    {% if stats and (stats.total_confirmed > 0 or stats.current_hold_h is not none) %}
-    <div class="section-card" style="margin-top:1rem;">
-      <div class="section-title">📊 Statistiken</div>
-
-      <!-- Summary chips -->
-      <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;">
-        {% if stats.total_confirmed %}
-        <span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#4ade80;">
-          ✅ {{ stats.total_confirmed }} bestätigt
-        </span>
-        {% endif %}
-        {% if stats.total_pending %}
-        <span style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#fde047;">
-          ⏳ {{ stats.total_pending }} ausstehend
-        </span>
-        {% endif %}
-        {% if stats.total_skipped %}
-        <span style="background:rgba(156,163,175,.1);border:1px solid rgba(156,163,175,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#9ca3af;">
-          ⏭ {{ stats.total_skipped }} übersprungen
-        </span>
-        {% endif %}
-        {% if stats.current_hold_h is not none and stats.current_holder %}
-        <span style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#a5b4fc;">
-          🕐 {{ stats.current_holder }} hält seit {{ stats.current_hold_h }}h
-        </span>
-        {% endif %}
+    {% if is_leader %}
+    <div style="margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem;">
+      <div style="font-size:.75rem;font-weight:600;margin-bottom:.4rem;color:var(--text-muted);">Add Player</div>
+      <div style="display:flex;gap:.5rem;">
+        <input id="newRotPlayer" class="form-control" placeholder="Player name" style="flex:1;">
+        <input id="newHoldHours" class="form-control" type="number" value="48" min="1" placeholder="h" style="width:65px;" title="Hold time in hours">
+        <input id="newNotifyHours" class="form-control" type="number" value="6" min="1" placeholder="🔔" style="width:55px;" title="Notify X h before">
+        <button onclick="addRotPlayer()" class="btn btn-secondary" style="padding:.4rem .75rem;font-size:.85rem;">+</button>
       </div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.3rem;">Hold time (h) · Notification (h before)</div>
+    </div>
+    {% endif %}
+  </div>
 
-      <!-- Gantt Timeline -->
-      {% if stats.timeline %}
-      <div style="margin-bottom:1.5rem;">
-        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Besitz-Verlauf</div>
+  <!-- Statistics -->
+  {% if stats and (stats.total_confirmed > 0 or stats.current_hold_h is not none) %}
+  <div class="section-card" style="margin-top:1rem;">
+    <div class="section-title">📊 Statistics</div>
 
-        <!-- Bar chart -->
-        <div style="display:flex;height:36px;border-radius:8px;overflow:hidden;gap:2px;margin-bottom:.6rem;">
-          {% for seg in stats.timeline %}
-          <div style="width:{{ seg.pct }}%;min-width:2px;background:{{ seg.color }};opacity:{% if seg.is_current %}1{% else %}0.75{% endif %};
-                      position:relative;cursor:default;transition:opacity .15s;"
-               title="{{ seg.player }}: {{ seg.hours }}h ({{ seg.start_label }} → {{ seg.end_label }}){% if seg.is_current %} 🔵 aktuell{% endif %}{% if seg.late %} ⚠️ verspätet übernommen{% endif %}">
-            {% if seg.pct > 8 %}
-            <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-                         font-size:.72rem;font-weight:700;color:#000;white-space:nowrap;overflow:hidden;padding:0 4px;">
-              {{ seg.player[:12] }}
-            </span>
-            {% endif %}
-          </div>
-          {% endfor %}
-        </div>
-
-        <!-- Legend -->
-        <div style="display:flex;flex-wrap:wrap;gap:.4rem .75rem;">
-          {% set seen_players = [] %}
-          {% for seg in stats.timeline %}
-            {% if seg.player not in seen_players %}
-              {% set _ = seen_players.append(seg.player) %}
-              <span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--text-muted);">
-                <span style="width:10px;height:10px;border-radius:3px;background:{{ seg.color }};flex-shrink:0;display:inline-block;"></span>
-                {{ seg.player }}
-              </span>
-            {% endif %}
-          {% endfor %}
-        </div>
-
-        <!-- Detailed segment list -->
-        <div style="margin-top:.85rem;display:flex;flex-direction:column;gap:.3rem;">
-          {% for seg in stats.timeline %}
-          <div style="display:flex;align-items:center;gap:.6rem;font-size:.8rem;">
-            <span style="width:10px;height:10px;border-radius:3px;background:{{ seg.color }};flex-shrink:0;"></span>
-            <span style="font-weight:600;color:var(--text);min-width:100px;">{{ seg.player }}</span>
-            <span style="color:var(--text-muted);">{{ seg.start_label }} → {{ seg.end_label }}</span>
-            <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;color:var(--text-muted);">
-              {{ seg.hours }}h
-            </span>
-            {% if seg.is_current %}<span style="color:#60a5fa;font-size:.72rem;">● aktuell</span>{% endif %}
-            {% if seg.late %}<span style="color:#fde047;font-size:.72rem;">⚠ verspätet</span>{% endif %}
-          </div>
-          {% endfor %}
-        </div>
-      </div>
+    <!-- Summary chips -->
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;">
+      {% if stats.total_confirmed %}
+      <span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#4ade80;">
+        ✅ {{ stats.total_confirmed }} confirmed
+      </span>
       {% endif %}
-
-      <!-- Per-player table -->
-      {% if stats.players %}
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
-              <th style="text-align:left;padding:.4rem .6rem;">Spieler</th>
-              <th style="text-align:center;padding:.4rem .6rem;" title="Wie oft hatte der Spieler das Artefakt">🔁 Rotationen</th>
-              <th style="text-align:center;padding:.4rem .6rem;" title="Gesamte Haltezeit in Stunden">⏱ Gesamt</th>
-              <th style="text-align:center;padding:.4rem .6rem;" title="Durchschnittliche Haltezeit pro Rotation">Ø Haltezeit</th>
-              <th style="text-align:center;padding:.4rem .6rem;" title="Anteil pünktlicher Übergaben (≤1h Verspätung)">🎯 Pünktlichkeit</th>
-              <th style="text-align:center;padding:.4rem .6rem;" title="Durchschnittliche Verspätung bei Übergaben">Ø Verspätung</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in stats.players %}
-            <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
-              <td style="padding:.5rem .6rem;font-weight:600;color:var(--text);">{{ p.player }}</td>
-              <td style="text-align:center;padding:.5rem .6rem;">{{ p.times_held }}×</td>
-              <td style="text-align:center;padding:.5rem .6rem;color:var(--text-muted);">
-                {% if p.total_hours >= 24 %}{{ "%.1f"|format(p.total_hours / 24) }}d
-                {% else %}{{ p.total_hours }}h{% endif %}
-              </td>
-              <td style="text-align:center;padding:.5rem .6rem;color:var(--text-muted);">
-                {% if p.avg_hold_h %}
-                  {% if p.avg_hold_h >= 24 %}{{ "%.1f"|format(p.avg_hold_h / 24) }}d
-                  {% else %}{{ p.avg_hold_h }}h{% endif %}
-                {% else %}—{% endif %}
-              </td>
-              <td style="text-align:center;padding:.5rem .6rem;">
-                {% if p.reliability_pct is not none %}
-                  {% if p.reliability_pct >= 80 %}<span style="color:#4ade80;font-weight:600;">{{ p.reliability_pct }}%</span>
-                  {% elif p.reliability_pct >= 50 %}<span style="color:#fde047;">{{ p.reliability_pct }}%</span>
-                  {% else %}<span style="color:#f87171;">{{ p.reliability_pct }}%</span>{% endif %}
-                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-              </td>
-              <td style="text-align:center;padding:.5rem .6rem;">
-                {% if p.avg_delay_h is not none %}
-                  {% if p.avg_delay_h <= 0 %}<span style="color:#4ade80;">{{ "%.1f"|format(p.avg_delay_h) }}h</span>
-                  {% elif p.avg_delay_h <= 1 %}<span style="color:#4ade80;">+{{ "%.1f"|format(p.avg_delay_h) }}h</span>
-                  {% elif p.avg_delay_h <= 3 %}<span style="color:#fde047;">+{{ "%.1f"|format(p.avg_delay_h) }}h</span>
-                  {% else %}<span style="color:#f87171;">+{{ "%.1f"|format(p.avg_delay_h) }}h</span>{% endif %}
-                {% else %}—{% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      {% if stats.total_pending %}
+      <span style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#fde047;">
+        ⏳ {{ stats.total_pending }} pending
+      </span>
       {% endif %}
+      {% if stats.total_skipped %}
+      <span style="background:rgba(156,163,175,.1);border:1px solid rgba(156,163,175,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#9ca3af;">
+        ⏭ {{ stats.total_skipped }} skipped
+      </span>
+      {% endif %}
+      {% if stats.current_hold_h is not none and stats.current_holder %}
+      <span style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;color:#a5b4fc;">
+        🕐 {{ stats.current_holder }} holding for {{ stats.current_hold_h }}h
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Gantt Timeline -->
+    {% if stats.timeline %}
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Ownership History</div>
+
+      <!-- Bar chart -->
+      <div style="display:flex;height:36px;border-radius:8px;overflow:hidden;gap:2px;margin-bottom:.6rem;">
+        {% for seg in stats.timeline %}
+        <div style="width:{{ seg.pct }}%;min-width:2px;background:{{ seg.color }};opacity:{% if seg.is_current %}1{% else %}0.75{% endif %};
+                    position:relative;cursor:default;transition:opacity .15s;"
+             title="{{ seg.player }}: {{ seg.hours }}h ({{ seg.start_label }} → {{ seg.end_label }}){% if seg.is_current %} 🔵 current{% endif %}{% if seg.late %} ⚠️ late handoff{% endif %}">
+          {% if seg.pct > 8 %}
+          <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+                       font-size:.72rem;font-weight:700;color:#000;white-space:nowrap;overflow:hidden;padding:0 4px;">
+            {{ seg.player[:12] }}
+          </span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Legend -->
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem .75rem;">
+        {% set seen_players = [] %}
+        {% for seg in stats.timeline %}
+          {% if seg.player not in seen_players %}
+            {% set _ = seen_players.append(seg.player) %}
+            <span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--text-muted);">
+              <span style="width:10px;height:10px;border-radius:3px;background:{{ seg.color }};flex-shrink:0;display:inline-block;"></span>
+              {{ seg.player }}
+            </span>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <!-- Detailed segment list -->
+      <div style="margin-top:.85rem;display:flex;flex-direction:column;gap:.3rem;">
+        {% for seg in stats.timeline %}
+        <div style="display:flex;align-items:center;gap:.6rem;font-size:.8rem;">
+          <span style="width:10px;height:10px;border-radius:3px;background:{{ seg.color }};flex-shrink:0;"></span>
+          <span style="font-weight:600;color:var(--text);min-width:100px;">{{ seg.player }}</span>
+          <span style="color:var(--text-muted);">{{ seg.start_label }} → {{ seg.end_label }}</span>
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;color:var(--text-muted);">
+            {{ seg.hours }}h
+          </span>
+          {% if seg.is_current %}<span style="color:#60a5fa;font-size:.72rem;">● current</span>{% endif %}
+          {% if seg.late %}<span style="color:#fde047;font-size:.72rem;">⚠ late</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
     </div>
     {% endif %}
 
+    <!-- Per-player table -->
+    {% if stats.players %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
+            <th style="text-align:left;padding:.4rem .6rem;">Player</th>
+            <th style="text-align:center;padding:.4rem .6rem;" title="How many times this player held the artifact">🔁 Rotations</th>
+            <th style="text-align:center;padding:.4rem .6rem;" title="Total hold time in hours">⏱ Total</th>
+            <th style="text-align:center;padding:.4rem .6rem;" title="Average hold time per rotation">Ø Hold time</th>
+            <th style="text-align:center;padding:.4rem .6rem;" title="Percentage of on-time handoffs (≤1h delay)">🎯 On-time</th>
+            <th style="text-align:center;padding:.4rem .6rem;" title="Average delay in handoffs">Ø Delay</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in stats.players %}
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+            <td style="padding:.5rem .6rem;font-weight:600;color:var(--text);">{{ p.player }}</td>
+            <td style="text-align:center;padding:.5rem .6rem;">{{ p.times_held }}×</td>
+            <td style="text-align:center;padding:.5rem .6rem;color:var(--text-muted);">
+              {% if p.total_hours >= 24 %}{{ "%.1f"|format(p.total_hours / 24) }}d
+              {% else %}{{ p.total_hours }}h{% endif %}
+            </td>
+            <td style="text-align:center;padding:.5rem .6rem;color:var(--text-muted);">
+              {% if p.avg_hold_h %}
+                {% if p.avg_hold_h >= 24 %}{{ "%.1f"|format(p.avg_hold_h / 24) }}d
+                {% else %}{{ p.avg_hold_h }}h{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td style="text-align:center;padding:.5rem .6rem;">
+              {% if p.reliability_pct is not none %}
+                {% if p.reliability_pct >= 80 %}<span style="color:#4ade80;font-weight:600;">{{ p.reliability_pct }}%</span>
+                {% elif p.reliability_pct >= 50 %}<span style="color:#fde047;">{{ p.reliability_pct }}%</span>
+                {% else %}<span style="color:#f87171;">{{ p.reliability_pct }}%</span>{% endif %}
+              {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+            </td>
+            <td style="text-align:center;padding:.5rem .6rem;">
+              {% if p.avg_delay_h is not none %}
+                {% if p.avg_delay_h <= 0 %}<span style="color:#4ade80;">{{ "%.1f"|format(p.avg_delay_h) }}h</span>
+                {% elif p.avg_delay_h <= 1 %}<span style="color:#4ade80;">+{{ "%.1f"|format(p.avg_delay_h) }}h</span>
+                {% elif p.avg_delay_h <= 3 %}<span style="color:#fde047;">+{{ "%.1f"|format(p.avg_delay_h) }}h</span>
+                {% else %}<span style="color:#f87171;">+{{ "%.1f"|format(p.avg_delay_h) }}h</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </div>
+  {% endif %}
+
 </div>
 
 <!-- Confirm pickup modal -->
 <div id="confirmModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-      <h2 style="margin:0;font-size:1.1rem;">✅ Abholung bestätigen</h2>
+      <h2 style="margin:0;font-size:1.1rem;">✅ Confirm Pickup</h2>
       <button onclick="document.getElementById('confirmModal').classList.remove('open')" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
     </div>
-    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1rem;">Bitte bestätige wer du bist und gib die Serverzeit der Abholung ein.</p>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1rem;">Please confirm who you are and enter the server time of pickup.</p>
     <div style="display:grid;gap:.8rem;">
       <div>
-        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Ich bin...</label>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">I am...</label>
         <div id="sideSelect" style="display:flex;gap:.5rem;">
           <button id="sideFromBtn" onclick="selectSide('from')" class="btn btn-secondary" style="flex:1;" id="fromSideBtn"></button>
           <button id="sideToBtn"   onclick="selectSide('to')"   class="btn btn-secondary" style="flex:1;" id="toSideBtn"></button>
         </div>
       </div>
       <div>
-        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Serverzeit der Abholung</label>
-        <input id="confirmTime" class="form-control" placeholder="z.B. 05.06.2026 14:32">
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Server time of pickup</label>
+        <input id="confirmTime" class="form-control" placeholder="e.g. 05.06.2026 14:32">
       </div>
-      <button onclick="submitConfirm()" class="btn btn-primary">✅ Bestätigen</button>
+      <button onclick="submitConfirm()" class="btn btn-primary">✅ Confirm</button>
     </div>
   </div>
 </div>
@@ -391,13 +404,13 @@
 <div id="editArtModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-      <h2 style="margin:0;font-size:1.1rem;">✏️ Artefakt bearbeiten</h2>
+      <h2 style="margin:0;font-size:1.1rem;">✏️ Edit Artifact</h2>
       <button onclick="document.getElementById('editArtModal').classList.remove('open')" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
     </div>
     <form method="POST" action="/guild/{{ guild.guild_id }}/artifacts/{{ artifact.id }}/update">
       <div style="display:grid;gap:.85rem;">
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Artefakt-Typ</label>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Artifact Type</label>
           <select name="artifact_type" class="form-control">
             {% for key, label in artifact_types %}
             <option value="{{ key }}" {% if artifact.artifact_type == key %}selected{% endif %}>{{ label }}</option>
@@ -410,38 +423,38 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Größe</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Size</label>
             <select name="artifact_size" class="form-control">
-              <option value="small"  {% if artifact.artifact_size=='small'  %}selected{% endif %}>🔵 Klein</option>
-              <option value="large"  {% if artifact.artifact_size=='large'  %}selected{% endif %}>🟡 Groß</option>
+              <option value="small"  {% if artifact.artifact_size=='small'  %}selected{% endif %}>🔵 Small</option>
+              <option value="large"  {% if artifact.artifact_size=='large'  %}selected{% endif %}>🟡 Large</option>
               <option value="unique" {% if artifact.artifact_size=='unique' %}selected{% endif %}>⭐ Unique</option>
             </select>
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Wirkung</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Effect</label>
             <select name="effect_scope" class="form-control">
-              <option value="village" {% if artifact.effect_scope=='village' %}selected{% endif %}>Dorf</option>
-              <option value="all"     {% if artifact.effect_scope=='all'     %}selected{% endif %}>Alle Dörfer</option>
+              <option value="village" {% if artifact.effect_scope=='village' %}selected{% endif %}>Village</option>
+              <option value="all"     {% if artifact.effect_scope=='all'     %}selected{% endif %}>All villages</option>
             </select>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Erobert am</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Conquered at</label>
             <input name="conquered_at" class="form-control" value="{{ artifact.conquered_at }}">
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktiviert am (auto)</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Activated at (auto)</label>
             <input name="activated_at" class="form-control" value="{{ artifact.activated_at }}">
           </div>
         </div>
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktivierungszeit überschreiben</label>
-          <input name="activation_override" class="form-control" value="{{ artifact.activation_override }}" placeholder="Manuelle Aktivierungszeit">
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Override activation time</label>
+          <input name="activation_override" class="form-control" value="{{ artifact.activation_override }}" placeholder="Manual activation time">
         </div>
-        <!-- Koordinaten -->
+        <!-- Coordinates -->
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">📍 Koordinaten des Artefakt-Dorfes</label>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">📍 Artifact village coordinates</label>
           <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
             <div>
               <label style="font-size:.72rem;color:var(--text-muted);">X</label>
@@ -458,11 +471,11 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktueller Halter</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Current Holder</label>
             <input id="edit_holder" name="current_holder" class="form-control" value="{{ artifact.current_holder }}">
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktuelles Dorf</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Current Village</label>
             <input id="edit_village" name="current_village" class="form-control" value="{{ artifact.current_village }}">
           </div>
         </div>
@@ -475,12 +488,12 @@
           </select>
         </div>
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notizen</label>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notes</label>
           <textarea name="notes" class="form-control" rows="2">{{ artifact.notes }}</textarea>
         </div>
         <div style="display:flex;gap:.5rem;">
-          <button type="submit" class="btn btn-primary" style="flex:1;">💾 Speichern</button>
-          <button type="button" onclick="deleteArtifact()" class="btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;">🗑️ Löschen</button>
+          <button type="submit" class="btn btn-primary" style="flex:1;">💾 Save</button>
+          <button type="button" onclick="deleteArtifact()" class="btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;">🗑️ Delete</button>
         </div>
       </div>
     </form>
@@ -491,16 +504,16 @@
 <div id="handoffModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-      <h2 style="margin:0;font-size:1.1rem;">📤 Übergabe planen</h2>
+      <h2 style="margin:0;font-size:1.1rem;">📤 Schedule Handoff</h2>
       <button onclick="document.getElementById('handoffModal').classList.remove('open')" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
     </div>
     <div style="display:grid;gap:.85rem;">
       <div>
-        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Von (aktueller Halter)</label>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">From (current holder)</label>
         <input id="hFromPlayer" class="form-control" value="{{ artifact.current_holder }}">
       </div>
       <div>
-        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">An (nächster Halter)</label>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">To (next holder)</label>
         <input id="hToPlayer" class="form-control" list="rotPlayerList">
         <datalist id="rotPlayerList">
           {% for r in rotation %}
@@ -509,14 +522,14 @@
         </datalist>
       </div>
       <div>
-        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Übergabe geplant für (Serverzeit)</label>
-        <input id="hScheduled" class="form-control" placeholder="z.B. 07.06.2026 18:00">
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Handoff scheduled for (server time)</label>
+        <input id="hScheduled" class="form-control" placeholder="e.g. 07.06.2026 18:00">
       </div>
       <div>
-        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notizen</label>
-        <input id="hNotes" class="form-control" placeholder="Optionale Notizen...">
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notes</label>
+        <input id="hNotes" class="form-control" placeholder="Optional notes...">
       </div>
-      <button onclick="createHandoff()" class="btn btn-primary">📤 Übergabe erstellen</button>
+      <button onclick="createHandoff()" class="btn btn-primary">📤 Create Handoff</button>
     </div>
   </div>
 </div>
@@ -527,6 +540,12 @@ const GUILD_ID = "{{ guild.guild_id }}";
 const ART_ID   = {{ artifact.id }};
 let _confirmHandoffId = null;
 let _confirmSide = null;
+
+// ── Rotation data for handOffToNext ─────────────────────────────────────────
+const ROTATION_PLAYERS = [
+  {% for r in rotation %}'{{ r.player_name }}',{% endfor %}
+];
+const CURRENT_HOLDER = '{{ artifact.current_holder or "" }}';
 
 // ── Rotation ─────────────────────────────────────────────────────────────────
 
@@ -566,9 +585,9 @@ function addRotPlayer() {
   const pos = rotList.querySelectorAll('.rot-row').length + 1;
   div.innerHTML = `<span class="rot-handle">⠿</span>
     <div class="rot-pos">${pos}</div>
-    <div class="rot-player">${name}</div>
-    <div class="rot-hours"><div>⏱ ${hold}h halten</div><div>🔔 ${notify}h vorher</div></div>
-    <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;">✕</button>`;
+    <div class="rot-player"><div style="display:flex;align-items:center;gap:.3rem;">${name} <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span></div></div>
+    <div class="rot-hours"><div>⏱ ${hold}h hold</div><div>🔔 ${notify}h before</div></div>
+    <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>`;
   attachDrag(div);
   rotList.appendChild(div);
   document.getElementById('newRotPlayer').value = '';
@@ -595,8 +614,28 @@ async function saveRotation() {
   });
   if (res.ok) {
     document.getElementById('saveRotBtn').style.display='none';
-    showToast('✅ Rotation gespeichert');
+    showToast('✅ Rotation saved');
   }
+}
+
+function handOffToNext() {
+  if (!ROTATION_PLAYERS.length) {
+    showToast('No rotation configured — add players first.', 'error');
+    return;
+  }
+  const curIdx = ROTATION_PLAYERS.indexOf(CURRENT_HOLDER);
+  let nextPlayer = '';
+  if (curIdx >= 0) {
+    nextPlayer = ROTATION_PLAYERS[(curIdx + 1) % ROTATION_PLAYERS.length];
+  } else {
+    nextPlayer = ROTATION_PLAYERS[0];
+  }
+  // Pre-fill the handoff modal
+  document.getElementById('hFromPlayer').value = CURRENT_HOLDER;
+  document.getElementById('hToPlayer').value = nextPlayer;
+  document.getElementById('hScheduled').value = '';
+  document.getElementById('hNotes').value = '';
+  document.getElementById('handoffModal').classList.add('open');
 }
 
 async function createHandoff() {
@@ -614,13 +653,13 @@ async function createHandoff() {
 }
 
 async function skipHandoff(hid) {
-  if (!confirm('Übergabe überspringen?')) return;
+  if (!confirm('Skip this handoff?')) return;
   const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/handoff/${hid}/skip`, {method:'POST'});
   if (res.ok) location.reload();
 }
 
 async function deleteArtifact() {
-  if (!confirm('Artefakt wirklich löschen? Rotation und Timeline werden ebenfalls gelöscht.')) return;
+  if (!confirm('Really delete this artifact? Rotation and handoffs will also be deleted.')) return;
   const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/delete`, {method:'POST'});
   if (res.ok) location.href = `/guild/${GUILD_ID}/artifacts`;
 }
@@ -642,9 +681,9 @@ function selectSide(side) {
 }
 
 async function submitConfirm() {
-  if (!_confirmSide) { showToast('Bitte wähle zuerst deinen Namen aus.', 'error'); return; }
+  if (!_confirmSide) { showToast('Please select your name first.', 'error'); return; }
   const t = document.getElementById('confirmTime').value.trim();
-  if (!t) { showToast('Bitte Serverzeit eingeben.', 'error'); return; }
+  if (!t) { showToast('Please enter server time.', 'error'); return; }
   const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/handoff/${_confirmHandoffId}/confirm`, {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
@@ -681,7 +720,7 @@ async function lookupEditVillage() {
     if (!d.found) {
       info.style.display = 'block';
       info.style.borderColor = 'rgba(239,68,68,.3)';
-      info.innerHTML = `<span style="color:#f87171;">⚠️ Kein Dorf bei (${x}|${y}) gefunden.</span>`;
+      info.innerHTML = `<span style="color:#f87171;">⚠️ No village found at (${x}|${y}).</span>`;
       return;
     }
     const holderEl  = document.getElementById('edit_holder');
@@ -700,7 +739,7 @@ async function lookupEditVillage() {
           ${d.alliance_name ? `<span style="color:var(--text-muted);"> · [${d.alliance_name}]</span>` : ''}
           ${d.population    ? `<span style="color:var(--text-muted);"> · 🏘️ ${d.population}</span>` : ''}
         </div>
-        <a href="${mapUrl}" target="_blank" style="font-size:.75rem;color:#a5b4fc;white-space:nowrap;text-decoration:none;flex-shrink:0;">🗺️ Karte</a>
+        <a href="${mapUrl}" target="_blank" style="font-size:.75rem;color:#a5b4fc;white-space:nowrap;text-decoration:none;flex-shrink:0;">🗺️ Map</a>
       </div>`;
   } catch(e) { console.warn('edit lookup failed', e); }
 }
