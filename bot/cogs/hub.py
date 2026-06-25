@@ -1213,17 +1213,17 @@ class HubResAnswerView(discord.ui.View):
 
         # Fetch updated req (now has push_channel_id)
         req = await database.get_res_request_by_answer_msg(str(interaction.message.id))
-        push_embed = _build_push_embed(req, [])
+        tw = (config or {}).get("tw_world", "") or "" if config else ""
+        push_embed = _build_push_embed(req, [], tw_world=tw)
 
-        accepted_label = "✅ Angenommen" if lang == "de" else "✅ Accepted"
+        accepted_label = "✅ Accepted"
         done_view = discord.ui.View()
         done_view.add_item(discord.ui.Button(label=accepted_label, style=discord.ButtonStyle.success, disabled=True))
 
-        # Replace the pending embed/view with a simple accepted note
         from cogs.res_push import _build_request_embed
-        accepted_embed = _build_request_embed(req, "accepted")
+        accepted_embed = _build_request_embed(req, "accepted", tw_world=tw)
         await interaction.message.edit(
-            content=(f"✅ Angenommen von {interaction.user.mention}" if lang == "de" else f"✅ Accepted by {interaction.user.mention}"),
+            content=f"✅ Accepted by {interaction.user.mention}",
             embed=accepted_embed,
             view=done_view,
         )
@@ -1231,52 +1231,52 @@ class HubResAnswerView(discord.ui.View):
         # Post the live push tracking embed below
         await interaction.channel.send(embed=push_embed, view=ResPushChannelView())
 
-    @discord.ui.button(label="❌ Ablehnen", style=discord.ButtonStyle.danger, custom_id="persistent:hub_res_reject")
+    @discord.ui.button(label="❌ Reject", style=discord.ButtonStyle.danger, custom_id="persistent:hub_res_reject")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from cogs.res_push import _build_request_embed
+        from cogs.res_push import _build_request_embed, _get_tw_world
         req, lang = await self._get_req_and_lang(interaction)
         if not req:
             return
 
         await database.update_res_request_status(str(interaction.message.id), "rejected")
 
-        updated = _build_request_embed(req, "rejected")
-        rejected_label = "❌ Abgelehnt" if lang == "de" else "❌ Rejected"
+        tw = await _get_tw_world(str(interaction.guild.id))
+        updated = _build_request_embed(req, "rejected", tw_world=tw)
         view = discord.ui.View()
-        view.add_item(discord.ui.Button(label=rejected_label, style=discord.ButtonStyle.danger, disabled=True))
+        view.add_item(discord.ui.Button(label="❌ Rejected", style=discord.ButtonStyle.danger, disabled=True))
         await interaction.response.edit_message(
-            content=(f"❌ Abgelehnt von {interaction.user.mention}" if lang == "de" else f"❌ Rejected by {interaction.user.mention}"),
+            content=f"❌ Rejected by {interaction.user.mention}",
             embed=updated, view=view,
         )
 
-        # Archive the channel
         from cogs.res_push import _archive_push_channel
         await _archive_push_channel(interaction)
 
-    @discord.ui.button(label="⏸️ Zurückstellen", style=discord.ButtonStyle.secondary, custom_id="persistent:hub_res_hold")
+    @discord.ui.button(label="⏸️ Hold", style=discord.ButtonStyle.secondary, custom_id="persistent:hub_res_hold")
     async def hold(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from cogs.res_push import _build_request_embed
+        from cogs.res_push import _build_request_embed, _get_tw_world
         req, lang = await self._get_req_and_lang(interaction)
         if not req:
             return
 
         await database.update_res_request_status(str(interaction.message.id), "hold")
-        updated = _build_request_embed(req, "hold")
+        tw = await _get_tw_world(str(interaction.guild.id))
+        updated = _build_request_embed(req, "hold", tw_world=tw)
         await interaction.response.edit_message(
-            content=(f"⏸️ Zurückgestellt von {interaction.user.mention}" if lang == "de" else f"⏸️ Put on hold by {interaction.user.mention}"),
+            content=f"⏸️ Put on hold by {interaction.user.mention}",
             embed=updated, view=HubResAnswerView(),
         )
 
 
-class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
-    village = discord.ui.TextInput(label="Dein Dorf (Empfänger)", placeholder="z.B. Hauptdorf (102|47)", max_length=100)
+class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Request"):
+    village = discord.ui.TextInput(label="Your Village (Recipient)", placeholder="e.g. Main Village (102|47)", max_length=100)
     resources = discord.ui.TextInput(
-        label="Was brauchst du?",
-        placeholder="z.B. 50k Holz, 30k Lehm",
+        label="What do you need?",
+        placeholder="e.g. 50k Wood, 30k Clay",
         style=discord.TextStyle.paragraph, max_length=300,
     )
-    until = discord.ui.TextInput(label="Bis wann?", placeholder="z.B. heute 22:00 UTC", max_length=60)
-    notes = discord.ui.TextInput(label="Weitere Infos", required=False, style=discord.TextStyle.paragraph, max_length=200)
+    until = discord.ui.TextInput(label="Deadline", placeholder="e.g. today 22:00 UTC", max_length=60)
+    notes = discord.ui.TextInput(label="Additional Info", required=False, style=discord.TextStyle.paragraph, max_length=200)
 
     async def on_submit(self, interaction: discord.Interaction):
         if await _check_no_urls(interaction, self.village.value, self.resources.value,
@@ -1303,12 +1303,7 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
             overwrites=overwrites,
         )
 
-        # Build request data
-        reason_parts = []
-        if lang == "de":
-            reason_parts.append(f"Bis wann: {self.until.value}")
-        else:
-            reason_parts.append(f"Until: {self.until.value}")
+        reason_parts = [f"Until: {self.until.value}"]
         if self.notes.value:
             reason_parts.append(self.notes.value)
 
@@ -1322,11 +1317,9 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Anfrage"):
             "created_at": datetime.utcnow().isoformat(),
         }
 
-        # Post the pending embed with admin buttons in the new channel
-        embed = _build_request_embed(data, "pending")
-        content = (
-            f"🪖 {interaction.user.mention} — {'Neue Res-Push Anfrage' if lang == 'de' else 'New Res-Push Request'}"
-        )
+        tw = (config or {}).get("tw_world", "") or ""
+        embed = _build_request_embed(data, "pending", tw_world=tw)
+        content = f"🪖 {interaction.user.mention} — New Res-Push Request"
         msg = await new_channel.send(content=content, embed=embed, view=HubResAnswerView())
 
         # Save to DB (using the in-channel message id as the answer_message_id)

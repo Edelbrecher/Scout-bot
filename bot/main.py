@@ -836,24 +836,25 @@ async def handle_refresh_res_push(request: aiohttp_web.Request) -> aiohttp_web.R
             if channel:
                 try:
                     contribs = await database.get_res_contributions(int(request_id))
-                    embed = _build_push_embed(req, contribs, status=status)
+                    config = await database.get_guild_config(str(req["guild_id"]))
+                    tw = (config or {}).get("tw_world", "") or ""
+                    embed = _build_push_embed(req, contribs, status=status, tw_world=tw)
                     msg = await channel.fetch_message(int(push_message_id))
                     await msg.edit(embed=embed, view=ResPushChannelView())
                     updated_any = True
                 except Exception as e:
                     print(f"[refresh-res-push] push msg edit failed: {e}", flush=True)
 
-        # 2) Update the original request (answer) message — covers pending/rejected/hold
-        #    requests that have no push channel yet. Never creates anything new.
         if answer_message_id:
             config = await database.get_guild_config(str(req["guild_id"]))
+            tw = (config or {}).get("tw_world", "") or ""
             ans_ch_id = (config or {}).get("res_answer_channel_id")
             if ans_ch_id:
                 ans_channel = guild.get_channel(int(ans_ch_id))
                 if ans_channel:
                     try:
                         ans_msg = await ans_channel.fetch_message(int(answer_message_id))
-                        await ans_msg.edit(embed=_build_request_embed(req, status))
+                        await ans_msg.edit(embed=_build_request_embed(req, status, tw_world=tw))
                         updated_any = True
                     except Exception as e:
                         print(f"[refresh-res-push] answer msg edit failed: {e}", flush=True)

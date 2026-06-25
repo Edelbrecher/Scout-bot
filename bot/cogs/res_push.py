@@ -91,7 +91,22 @@ async def _check_auth(interaction: discord.Interaction) -> bool:
 # Embed builders
 # ---------------------------------------------------------------------------
 
-def _build_request_embed(data: dict, status: str) -> discord.Embed:
+async def _get_tw_world(guild_id: str) -> str:
+    config = await database.get_guild_config(guild_id)
+    return (config or {}).get("tw_world", "") or ""
+
+
+def _coord_link(coordinates: str, tw_world: str = "") -> str:
+    """Turn a coordinate string like '-53/28' or '(102|47)' into a clickable map link."""
+    m = re.search(r"(-?\d+)\s*[|/,]\s*(-?\d+)", coordinates or "")
+    if m and tw_world:
+        x, y = m.group(1), m.group(2)
+        url = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
+        return f"[{coordinates}]({url})"
+    return coordinates or "—"
+
+
+def _build_request_embed(data: dict, status: str, tw_world: str = "") -> discord.Embed:
     colors = {
         "pending": discord.Color.blue(),
         "hold": discord.Color.orange(),
@@ -114,23 +129,22 @@ def _build_request_embed(data: dict, status: str) -> discord.Embed:
     )
     parsed_goal = _parse_amount(data["push_height"]) if data.get("push_height") else None
     goal_display = _fmt(parsed_goal) if parsed_goal else (data.get("push_height") or "—")
-    embed.add_field(name="Spieler", value=data["player_name"], inline=True)
-    embed.add_field(name="Ort / Dorf", value=data["coordinates"], inline=True)
-    embed.add_field(name="Ziel", value=goal_display, inline=True)
+    embed.add_field(name="Player", value=data["player_name"], inline=True)
+    embed.add_field(name="Village", value=_coord_link(data["coordinates"], tw_world), inline=True)
+    embed.add_field(name="Goal", value=goal_display, inline=True)
     if data.get("reason"):
-        embed.add_field(name="Grund / Details", value=data["reason"], inline=False)
+        embed.add_field(name="Reason / Details", value=data["reason"], inline=False)
     embed.add_field(name="Status", value=status_labels.get(status, status), inline=False)
-    embed.set_footer(**travops_footer(f"Angefragt von {data['user_name']} • {data['created_at'][:16]}"))
+    embed.set_footer(**travops_footer(f"Requested by {data['user_name']} • {data['created_at'][:16]}"))
     return embed
 
 
-def _build_push_embed(data: dict, contributions: list[dict], status: str = "active") -> discord.Embed:
+def _build_push_embed(data: dict, contributions: list[dict], status: str = "active", tw_world: str = "") -> discord.Embed:
     total = sum((_parse_amount(c["amount"]) or 0) for c in contributions)
     target = _parse_amount(data["push_height"]) if data.get("push_height") else None
 
     if target and target > 0:
         progress_pct = int(total / target * 100)
-        # Bar always shows real 0-100%, but label shows actual % (can exceed 100)
         bar_filled = min(progress_pct, 100) // 10
         bar_color  = "🟩" if progress_pct >= 100 else "🟦"
         bar_empty  = "⬜"
@@ -138,7 +152,7 @@ def _build_push_embed(data: dict, contributions: list[dict], status: str = "acti
         overshoot = f" (+{_fmt(total - target)})" if total > target else ""
         progress_text = f"{progress_bar} **{progress_pct}%**  ({_fmt(total)} / {_fmt(target)}{overshoot})"
     else:
-        progress_text = f"Gesendet: **{_fmt(total)}**"
+        progress_text = f"Sent: **{_fmt(total)}**"
 
     goal_reached = target and total >= target
 
@@ -147,25 +161,25 @@ def _build_push_embed(data: dict, contributions: list[dict], status: str = "acti
             discord.Color.from_rgb(34, 197, 94) if goal_reached else \
             discord.Color.green()
 
-    title = "🏆 Res-Push — Ziel erreicht!" if (goal_reached and status == "active") else \
-            "🏆 Res-Push — ABGESCHLOSSEN!" if status == "completed" else \
-            "🔒 Res-Push — Inaktiv" if status == "inactive" else \
+    title = "🏆 Res-Push — Goal reached!" if (goal_reached and status == "active") else \
+            "🏆 Res-Push — COMPLETED!" if status == "completed" else \
+            "🔒 Res-Push — Inactive" if status == "inactive" else \
             "🪖 Res-Push"
 
     embed = discord.Embed(title=title, color=color)
-    embed.add_field(name="Spieler", value=data["player_name"], inline=True)
-    embed.add_field(name="Ort / Dorf", value=data["coordinates"], inline=True)
+    embed.add_field(name="Player", value=data["player_name"], inline=True)
+    embed.add_field(name="Village", value=_coord_link(data["coordinates"], tw_world), inline=True)
     goal_display = _fmt(target) if target else data.get("push_height", "—")
-    embed.add_field(name="Ziel", value=goal_display, inline=True)
-    embed.add_field(name="Fortschritt", value=progress_text, inline=False)
+    embed.add_field(name="Goal", value=goal_display, inline=True)
+    embed.add_field(name="Progress", value=progress_text, inline=False)
     if contributions:
         contrib_lines = "\n".join(
             f"• **{c['user_name']}**: {_fmt(_parse_amount(c['amount']))} " if _parse_amount(c['amount']) is not None
             else f"• **{c['user_name']}**: {c['amount']}"
             for c in contributions[-10:]
         )
-        embed.add_field(name=f"Beiträge ({len(contributions)})", value=contrib_lines, inline=False)
-    embed.set_footer(**travops_footer(f"Angefragt von {data['user_name']}"))
+        embed.add_field(name=f"Contributions ({len(contributions)})", value=contrib_lines, inline=False)
+    embed.set_footer(**travops_footer(f"Requested by {data['user_name']}"))
     return embed
 
 
@@ -227,7 +241,8 @@ class ResModal(discord.ui.Modal, title="Res-Push Request"):
             "created_at": datetime.utcnow().isoformat(),
         }
 
-        embed = _build_request_embed(data, "pending")
+        tw = (config or {}).get("tw_world", "") or ""
+        embed = _build_request_embed(data, "pending", tw_world=tw)
         msg = await answer_channel.send(
             content=f"New res-push request from {interaction.user.mention}",
             embed=embed,
@@ -282,7 +297,7 @@ class ResSentModal(discord.ui.Modal, title="How much did you send?"):
 
         if not req or not interaction.message:
             display = _fmt(parsed) if parsed is not None else raw
-            await interaction.followup.send(f"✅ Eingetragen: **{display}** gesendet. Danke!", ephemeral=True)
+            await interaction.followup.send(f"✅ Recorded: **{display}** sent. Thanks!", ephemeral=True)
             return
 
         total = sum((_parse_amount(c["amount"]) or 0) for c in contribs)
@@ -290,15 +305,16 @@ class ResSentModal(discord.ui.Modal, title="How much did you send?"):
         goal_reached = target and total >= target
 
         # Keep the view active even after goal — allow further contributions
-        updated_embed = _build_push_embed(req, contribs)
+        tw = await _get_tw_world(req.get("guild_id", ""))
+        updated_embed = _build_push_embed(req, contribs, tw_world=tw)
         edit_kwargs: dict = {"embed": updated_embed}
         if goal_reached:
-            edit_kwargs["content"] = "🏆 **Ziel erreicht! Weitere Beiträge werden weiterhin gezählt.**"
+            edit_kwargs["content"] = "🏆 **Goal reached! Additional contributions are still counted.**"
         await interaction.message.edit(**edit_kwargs)
 
         display = _fmt(parsed) if parsed is not None else raw
-        suffix = " 🏆 **Ziel erreicht!**" if goal_reached else ""
-        await interaction.followup.send(f"✅ Eingetragen: **{display}** gesendet. Danke!{suffix}", ephemeral=True)
+        suffix = " 🏆 **Goal reached!**" if goal_reached else ""
+        await interaction.followup.send(f"✅ Recorded: **{display}** sent. Thanks!{suffix}", ephemeral=True)
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +492,7 @@ class ResAnswerView(discord.ui.View):
                     row=1,
                 ))
 
-        push_embed = _build_push_embed(req, [])
+        push_embed = _build_push_embed(req, [], tw_world=tw_world)
         await push_channel.send(embed=push_embed, view=market_view)
 
         await database.update_res_request_status(
@@ -485,7 +501,7 @@ class ResAnswerView(discord.ui.View):
             push_channel_id=str(push_channel.id),
         )
 
-        updated = _build_request_embed(req, "accepted")
+        updated = _build_request_embed(req, "accepted", tw_world=tw_world)
         done_view = discord.ui.View()
         done_view.add_item(discord.ui.Button(
             label="Accepted", style=discord.ButtonStyle.success, disabled=True
@@ -507,7 +523,8 @@ class ResAnswerView(discord.ui.View):
 
         await database.update_res_request_status(str(interaction.message.id), "rejected")
 
-        updated = _build_request_embed(req, "rejected")
+        tw = await _get_tw_world(str(interaction.guild.id))
+        updated = _build_request_embed(req, "rejected", tw_world=tw)
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="Rejected", style=discord.ButtonStyle.danger, disabled=True))
         await interaction.response.edit_message(
@@ -527,7 +544,8 @@ class ResAnswerView(discord.ui.View):
 
         await database.update_res_request_status(str(interaction.message.id), "hold")
 
-        updated = _build_request_embed(req, "hold")
+        tw = await _get_tw_world(str(interaction.guild.id))
+        updated = _build_request_embed(req, "hold", tw_world=tw)
         await interaction.response.edit_message(
             content=f"⏸️ Put on hold by {interaction.user.mention}",
             embed=updated, view=ResAnswerView(),
@@ -620,7 +638,8 @@ async def _do_set_inactive(interaction: discord.Interaction, original_message: d
     await database.update_res_request_status(req["answer_message_id"], "inactive")
 
     contribs = await database.get_res_contributions(req["id"])
-    inactive_embed = _build_push_embed(req, contribs, status="inactive")
+    tw = await _get_tw_world(req.get("guild_id", ""))
+    inactive_embed = _build_push_embed(req, contribs, status="inactive", tw_world=tw)
     await original_message.edit(
         content=f"🔒 Set inactive by {interaction.user.mention}",
         embed=inactive_embed,
