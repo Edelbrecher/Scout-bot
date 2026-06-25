@@ -3306,6 +3306,8 @@ async def res_request_activate(request: Request, guild_id: str, request_id: int)
         return RedirectResponse(f"/guild/{guild_id}/res-push", status_code=303)
     await database.set_res_request_status_by_id(request_id, "accepted")
     bot = await _call_res_unarchive(guild_id, req.get("push_channel_id") or "", req.get("user_id",""))
+    # Refresh the embed so it shows the restored 'accepted' status
+    await _call_res_refresh(request_id)
     from urllib.parse import quote
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed&bot={quote(bot)}", status_code=303)
 
