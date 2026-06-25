@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Acquisition · Admin · TravOps{% endblock %}
+{% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>{% endblock %}
+
+{% block content %}
+<div class="container-wide">
+  <div style="display:flex; gap:1.5rem;">
+
+    {% include "_admin_sidebar.html" %}
+
+    <!-- Main content -->
+    <div style="flex:1; min-width:0;">
+      <h1 style="margin:0 0 1.25rem;">📈 User Acquisition</h1>
+
+      {% if total == 0 %}
+      <div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">
+        <div style="font-size:2.5rem;margin-bottom:.5rem;">📭</div>
+        <p>No acquisition data yet. Sources are recorded from the next new signup onward.</p>
+      </div>
+      {% else %}
+
+      <!-- KPI row -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;">
+        <div class="card" style="padding:1.1rem 1.25rem;">
+          <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Total tracked signups</div>
+          <div style="font-size:2rem;font-weight:800;">{{ total }}</div>
+        </div>
+        <div class="card" style="padding:1.1rem 1.25rem;">
+          <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Attributed (non-organic)</div>
+          <div style="font-size:2rem;font-weight:800;color:#f59e0b;">{{ attributed }} <span style="font-size:1rem;color:var(--text-muted);font-weight:400;">· {{ attributed_pct }}%</span></div>
+        </div>
+        <div class="card" style="padding:1.1rem 1.25rem;">
+          <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Top referrers</div>
+          <div style="font-size:2rem;font-weight:800;color:#a78bfa;">{{ top_referrers|length }}</div>
+        </div>
+      </div>
+
+      <!-- Source breakdown -->
+      <div class="card" style="padding:1.25rem;margin-bottom:1.5rem;">
+        <h2 style="margin:0 0 1rem;font-size:1.05rem;">Signup sources</h2>
+        {% for s in source_rows %}
+        <div style="margin-bottom:.85rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">
+            <span style="font-size:.88rem;font-weight:600;">{{ s.emoji }} {{ s.label }}</span>
+            <span style="font-size:.85rem;color:var(--text-muted);"><strong style="color:var(--text-primary);">{{ s.count }}</strong> · {{ s.pct }}%</span>
+          </div>
+          <div style="height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;">
+            <div style="height:9px;border-radius:5px;width:{{ s.pct }}%;background:{{ s.color }};"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Trend chart -->
+      <div class="card" style="padding:1.25rem;margin-bottom:1.5rem;">
+        <h2 style="margin:0 0 1rem;font-size:1.05rem;">Signups over time</h2>
+        <div id="acqChart"></div>
+      </div>
+
+      <!-- Top referrers -->
+      <div class="card" style="padding:1.25rem;">
+        <h2 style="margin:0 0 1rem;font-size:1.05rem;">🏆 Top referrers</h2>
+        {% if top_referrers %}
+        <table class="table" style="width:100%;font-size:.86rem;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:.4rem .5rem;">#</th>
+              <th style="text-align:left;padding:.4rem .5rem;">Referrer</th>
+              <th style="text-align:right;padding:.4rem .5rem;">Signups brought</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in top_referrers %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:.4rem .5rem;color:var(--text-muted);">{{ loop.index }}</td>
+              <td style="padding:.4rem .5rem;font-weight:600;">{{ r.referrer_name or r.referrer_id }}</td>
+              <td style="padding:.4rem .5rem;text-align:right;font-weight:700;color:#f59e0b;">{{ r.c }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--text-muted);font-size:.86rem;margin:0;">No referred signups yet.</p>
+        {% endif %}
+      </div>
+
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if total > 0 %}
+<script>
+  const MONTHS = {{ month_series | map(attribute='month') | list | tojson }};
+  const SERIES = [
+    { name: 'Referral Link', key: 'referral',    color: '#f59e0b' },
+    { name: 'Shared Map',    key: 'share_map',   color: '#3b82f6' },
+    { name: 'Shared Intel',  key: 'share_intel', color: '#a78bfa' },
+    { name: 'Organic',       key: 'organic',     color: '#94a3b8' },
+  ];
+  const RAW = {{ month_series | tojson }};
+  const chartSeries = SERIES.map(s => ({
+    name: s.name,
+    data: RAW.map(r => r[s.key] || 0),
+  }));
+  const options = {
+    chart: { type: 'bar', height: 320, stacked: true, toolbar: { show: false }, background: 'transparent' },
+    theme: { mode: 'dark' },
+    series: chartSeries,
+    colors: SERIES.map(s => s.color),
+    xaxis: { categories: MONTHS, labels: { style: { colors: '#94a3b8' } } },
+    yaxis: { labels: { style: { colors: '#94a3b8' } } },
+    legend: { position: 'top', labels: { colors: '#cbd5e1' } },
+    plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
+    dataLabels: { enabled: false },
+    grid: { borderColor: 'rgba(255,255,255,0.06)' },
+    tooltip: { theme: 'dark' },
+  };
+  new ApexCharts(document.getElementById('acqChart'), options).render();
+</script>
+{% endif %}
+{% endblock %}

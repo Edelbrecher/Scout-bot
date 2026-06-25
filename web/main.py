@@ -1932,6 +1932,23 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
     # Cache username in user_subscriptions so admin can see who is who
     await database.cache_discord_username(discord_id, username)
 
+    # Record acquisition source on first-ever login (organic / referral / share_*)
+    if not _is_returning:
+        try:
+            ref_code = request.cookies.get("_ref", "")
+            src = request.cookies.get("_src", "") or "referral"
+            if ref_code:
+                referrer_id = await database.get_referral_code_owner(ref_code)
+                if referrer_id and referrer_id != discord_id:
+                    referrer_name = (await database.get_user_subscription(referrer_id) or {}).get("discord_username", "") or referrer_id
+                    await database.record_signup_source(discord_id, src, referrer_id, referrer_name)
+                else:
+                    await database.record_signup_source(discord_id, "organic")
+            else:
+                await database.record_signup_source(discord_id, "organic")
+        except Exception as e:
+            print(f"[acquisition] record failed: {e}", flush=True)
+
     # Notify on first-ever login
     if not _is_returning:
         asyncio.create_task(_notify(
@@ -1948,6 +1965,8 @@ async def auth_callback(request: Request, code: str = "", error: str = "", state
     response = RedirectResponse(redirect_to, status_code=303)
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
     response.delete_cookie("oauth_state")
+    # NOTE: _ref cookie is intentionally NOT cleared here — the action-based
+    # referral award (alliance join / village import) reads it in a later request.
     return response
 
 
@@ -2259,26 +2278,32 @@ async def activate_trial(request: Request, code: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/ref/{code}")
-async def referral_redirect(request: Request, code: str):
-    """Store ref code in cookie and redirect to dashboard/login."""
+async def referral_redirect(request: Request, code: str, src: str = ""):
+    """Store ref code (+ acquisition source) in cookies and redirect to dashboard/login."""
     owner = await database.get_referral_code_owner(code)
     response = RedirectResponse("/dashboard", status_code=302)
     if owner:
         response.set_cookie("_ref", code, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax")
+        # Acquisition source: share_map / share_intel from public-page CTAs, else 'referral'
+        allowed_src = {"referral", "share_map", "share_intel"}
+        src_label = src if src in allowed_src else "referral"
+        response.set_cookie("_src", src_label, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax")
     return response
 
 
-async def _owner_ref_cta_url(request: Request, guild: dict | None) -> str:
+async def _owner_ref_cta_url(request: Request, guild: dict | None, src: str = "") -> str:
     """Build a share-page CTA URL that carries the guild owner's referral code, so
-    signups from a shared public page count as referrals for the sharer. Falls back
-    to the bare homepage when no owner/code is available."""
+    signups from a shared public page count as referrals for the sharer. The src
+    label (share_map/share_intel) tags the acquisition source. Falls back to the
+    bare homepage when no owner/code is available."""
     base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
     try:
         owner = (guild or {}).get("owner_discord_id", "") if guild else ""
         if owner:
             code = await database.get_or_create_referral_code(owner)
             if code:
-                return f"{base_url}/ref/{code}"
+                suffix = f"?src={src}" if src else ""
+                return f"{base_url}/ref/{code}{suffix}"
     except Exception:
         pass
     return base_url + "/"
@@ -4039,7 +4064,7 @@ async def map_public_view(request: Request, short_id: str):
         return HTMLResponse("<h2>Not found.</h2>", status_code=404)
 
     scouted = await database.get_scouted_coordinates(share["guild_id"])
-    cta_url = await _owner_ref_cta_url(request, guild)
+    cta_url = await _owner_ref_cta_url(request, guild, src="share_map")
     return templates.TemplateResponse("map_public.html", {
         "request":          request,
         "guild":            guild,
@@ -11796,6 +11821,57 @@ async def admin_stats(request: Request):
     return RedirectResponse("/admin", status_code=303)
 
 
+@app.get("/admin/acquisition", response_class=HTMLResponse)
+async def admin_acquisition(request: Request):
+    """User acquisition analytics: signup sources, trend, top referrers."""
+    session, err = _require_admin(request)
+    if err: return err
+    stats = await database.get_acquisition_stats()
+    SOURCE_META = {
+        "organic":     {"label": "Organic",      "color": "#94a3b8", "emoji": "🌱"},
+        "referral":    {"label": "Referral Link", "color": "#f59e0b", "emoji": "🔗"},
+        "share_map":   {"label": "Shared Map",    "color": "#3b82f6", "emoji": "🗺️"},
+        "share_intel": {"label": "Shared Intel",  "color": "#a78bfa", "emoji": "🔎"},
+    }
+    # Ordered source rows with pct
+    total = stats["total"] or 0
+    source_rows = []
+    for key in ("referral", "share_map", "share_intel", "organic"):
+        cnt = stats["by_source"].get(key, 0)
+        source_rows.append({
+            **SOURCE_META.get(key, {"label": key, "color": "#64748b", "emoji": "•"}),
+            "key": key, "count": cnt,
+            "pct": round((cnt / total) * 100, 1) if total else 0,
+        })
+    # Any unexpected sources
+    for key, cnt in stats["by_source"].items():
+        if key not in SOURCE_META:
+            source_rows.append({"label": key, "color": "#64748b", "emoji": "•",
+                                "key": key, "count": cnt,
+                                "pct": round((cnt / total) * 100, 1) if total else 0})
+    # Month series for chart
+    months = sorted(stats["by_month"].keys())
+    month_series = []
+    for m in months:
+        row = {"month": m}
+        for key in ("organic", "referral", "share_map", "share_intel"):
+            row[key] = stats["by_month"][m].get(key, 0)
+        month_series.append(row)
+    # Attributed (non-organic) share
+    attributed = total - stats["by_source"].get("organic", 0)
+    return templates.TemplateResponse("admin_acquisition.html", {
+        "request": request,
+        "session": session,
+        "total": total,
+        "attributed": attributed,
+        "attributed_pct": round((attributed / total) * 100, 1) if total else 0,
+        "source_rows": source_rows,
+        "month_series": month_series,
+        "top_referrers": stats["top_referrers"],
+        "source_meta": SOURCE_META,
+    })
+
+
 @app.get("/api/live-users")
 async def api_live_users(request: Request):
     session, err = _require_admin(request)
@@ -16054,7 +16130,7 @@ async def player_intel_public_view(request: Request, short_id: str):
             status_code=404,
         )
     _intel_guild = await database.get_guild(share["guild_id"])
-    cta_url = await _owner_ref_cta_url(request, _intel_guild)
+    cta_url = await _owner_ref_cta_url(request, _intel_guild, src="share_intel")
     return templates.TemplateResponse("player_intel_public.html", {
         "request": request,
         "intel": intel,

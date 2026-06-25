@@ -7813,6 +7813,77 @@ async def get_referral_stats(discord_user_id: str) -> dict:
     return {"code": code, "points": points, "referred_count": referred_count}
 
 
+# ── Signup-source / acquisition tracking ───────────────────────────────────
+
+async def _init_signup_sources():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS signup_sources (
+                discord_id     TEXT PRIMARY KEY,
+                source         TEXT NOT NULL,
+                referrer_id    TEXT,
+                referrer_name  TEXT,
+                created_at     TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
+
+async def record_signup_source(discord_id: str, source: str,
+                               referrer_id: str = "", referrer_name: str = ""):
+    """Record where a user came from, the first time only (INSERT OR IGNORE)."""
+    if not discord_id:
+        return
+    await _init_signup_sources()
+    from datetime import datetime as _dt
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO signup_sources (discord_id, source, referrer_id, referrer_name, created_at) VALUES (?,?,?,?,?)",
+            (discord_id, source, referrer_id or "", referrer_name or "", _dt.utcnow().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_acquisition_stats() -> dict:
+    """Return acquisition analytics: totals by source, signups-by-month split by
+    source, and the top referrers."""
+    await _init_signup_sources()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        # Totals by source
+        by_source: dict[str, int] = {}
+        async with db.execute(
+            "SELECT source, COUNT(*) AS c FROM signup_sources GROUP BY source"
+        ) as cur:
+            for r in await cur.fetchall():
+                by_source[r["source"]] = r["c"]
+        # Signups by month, split by source
+        by_month: dict[str, dict[str, int]] = {}
+        async with db.execute(
+            "SELECT substr(created_at,1,7) AS m, source, COUNT(*) AS c FROM signup_sources GROUP BY m, source ORDER BY m"
+        ) as cur:
+            for r in await cur.fetchall():
+                by_month.setdefault(r["m"], {})[r["source"]] = r["c"]
+        # Top referrers
+        top_referrers: list[dict] = []
+        async with db.execute("""
+            SELECT referrer_id, referrer_name, COUNT(*) AS c
+            FROM signup_sources
+            WHERE referrer_id IS NOT NULL AND referrer_id != ''
+            GROUP BY referrer_id
+            ORDER BY c DESC
+            LIMIT 20
+        """) as cur:
+            top_referrers = [dict(r) for r in await cur.fetchall()]
+        total = sum(by_source.values())
+    return {
+        "by_source": by_source,
+        "by_month": by_month,
+        "top_referrers": top_referrers,
+        "total": total,
+    }
+
+
 async def redeem_travops_points(discord_user_id: str) -> bool:
     """Deduct 5 points and extend user Pro by 1 month. Returns False if not enough points."""
     from datetime import datetime as _dt, timedelta as _td
