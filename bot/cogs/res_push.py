@@ -101,7 +101,7 @@ def _coord_link(coordinates: str, tw_world: str = "") -> str:
     m = re.search(r"(-?\d+)\s*[|/,]\s*(-?\d+)", coordinates or "")
     if m and tw_world:
         x, y = m.group(1), m.group(2)
-        url = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}"
+        url = f"{tw_world.rstrip('/')}/karte.php?x={x}&y={y}&zoom=1"
         return f"[{coordinates}]({url})"
     return coordinates or "—"
 
