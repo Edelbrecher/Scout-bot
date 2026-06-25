@@ -583,17 +583,8 @@ class ResPushChannelView(discord.ui.View):
         )
 
 
-async def _do_set_inactive(interaction: discord.Interaction, original_message: discord.Message, req: dict):
-    await database.update_res_request_status(req["answer_message_id"], "inactive")
-
-    contribs = await database.get_res_contributions(req["id"])
-    inactive_embed = _build_push_embed(req, contribs, status="inactive")
-    await original_message.edit(
-        content=f"🔒 Set inactive by {interaction.user.mention}",
-        embed=inactive_embed,
-        view=_disabled_push_view("Inactive"),
-    )
-    # Move channel to archive
+async def _archive_push_channel(interaction: discord.Interaction):
+    """Move the current channel to the archive category with read-only permissions."""
     try:
         guild = interaction.guild
         ARCHIVE_NAME = "📦 Archive-Pushes"
@@ -623,6 +614,19 @@ async def _do_set_inactive(interaction: discord.Interaction, original_message: d
         await channel.edit(category=archive_cat, overwrites=overwrites, reason="Res-Push channel archived")
     except Exception as e:
         print(f"[res_push] archive error: {e}")
+
+
+async def _do_set_inactive(interaction: discord.Interaction, original_message: discord.Message, req: dict):
+    await database.update_res_request_status(req["answer_message_id"], "inactive")
+
+    contribs = await database.get_res_contributions(req["id"])
+    inactive_embed = _build_push_embed(req, contribs, status="inactive")
+    await original_message.edit(
+        content=f"🔒 Set inactive by {interaction.user.mention}",
+        embed=inactive_embed,
+        view=_disabled_push_view("Inactive"),
+    )
+    await _archive_push_channel(interaction)
 
 
 async def _do_remove_channel(interaction: discord.Interaction):

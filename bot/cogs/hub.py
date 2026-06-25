@@ -1249,6 +1249,10 @@ class HubResAnswerView(discord.ui.View):
             embed=updated, view=view,
         )
 
+        # Archive the channel
+        from cogs.res_push import _archive_push_channel
+        await _archive_push_channel(interaction)
+
     @discord.ui.button(label="⏸️ Zurückstellen", style=discord.ButtonStyle.secondary, custom_id="persistent:hub_res_hold")
     async def hold(self, interaction: discord.Interaction, button: discord.ui.Button):
         from cogs.res_push import _build_request_embed
