@@ -736,6 +736,7 @@ function escHtml(s) {
       return '<a class="gs-item'+extraCls+'"'
         +' href="'+(item.disabled?'javascript:void(0)':effectiveHref)+'"'
         +' data-label="'+item.label+'"'
+        +(item.aliases?' data-aliases="'+item.aliases+'"':'')
         +reqPro
         +(extraStyle?' style="'+extraStyle+'"':'')+' >'
         +ico(item.icon||'home')
@@ -994,6 +995,13 @@ function escHtml(s) {
   }
 
   // ── Sidebar nav search/filter ──────────────────────────────────────────
+  function _gsItemMatches(it, q) {
+    var lbl = (it.getAttribute('data-label')||'').toLowerCase();
+    if (lbl.indexOf(q) !== -1) return true;
+    var al = (it.getAttribute('data-aliases')||'').toLowerCase();
+    return al && al.indexOf(q) !== -1;
+  }
+
   function gsFilterNav(query) {
     var nav = document.getElementById('gs-nav-items');
     if (!nav) return;
@@ -1025,8 +1033,7 @@ function escHtml(s) {
     nav.querySelectorAll('.gs-submenu').forEach(function(sm){
       var childMatch = false;
       sm.querySelectorAll('.gs-submenu-items .gs-item').forEach(function(it){
-        var lbl = (it.getAttribute('data-label')||'').toLowerCase();
-        if (lbl.indexOf(q) !== -1) { it.classList.remove('gs-search-hidden'); childMatch = true; anyMatch = true; }
+        if (_gsItemMatches(it, q)) { it.classList.remove('gs-search-hidden'); childMatch = true; anyMatch = true; }
         else { it.classList.add('gs-search-hidden'); }
       });
       // Also match the submenu's own label
@@ -1043,8 +1050,7 @@ function escHtml(s) {
 
     // Top-level items (not inside a submenu)
     nav.querySelectorAll(':scope > .gs-item').forEach(function(it){
-      var lbl = (it.getAttribute('data-label')||'').toLowerCase();
-      if (lbl.indexOf(q) !== -1) { it.classList.remove('gs-search-hidden'); anyMatch = true; }
+      if (_gsItemMatches(it, q)) { it.classList.remove('gs-search-hidden'); anyMatch = true; }
       else { it.classList.add('gs-search-hidden'); }
     });
 
