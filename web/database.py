@@ -545,7 +545,8 @@ async def init_db():
                     "farm_score_good INTEGER DEFAULT 75",
                     "farm_score_ok INTEGER DEFAULT 50",
                     "farmlist_score_good INTEGER DEFAULT 100",
-                    "farmlist_score_ok INTEGER DEFAULT 1"]:
+                    "farmlist_score_ok INTEGER DEFAULT 1",
+                    "scout_view_role_ids TEXT"]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
@@ -1418,7 +1419,7 @@ async def is_report_channel(channel_id: str) -> bool:
             return await cur.fetchone() is not None
 
 
-_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids"}
+_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids"}
 
 async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
     """Toggle role_id in field. Returns True=added, False=removed."""

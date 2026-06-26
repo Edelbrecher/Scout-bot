@@ -122,19 +122,21 @@
     Legt fest, welche Discord-Rollen Zugriff auf die vom Bot erstellten Channels erhalten. Änderungen werden sofort auf bestehende Channels übertragen.
   </p>
   <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">
-    📋 <strong>Res-Channel</strong>: Wer akzeptierte Res-Push Channels sehen darf (z.B. Member). &nbsp;
-    🔒 <strong>Privat</strong>: Scout-Request-Channels (nur Ersteller + diese Rollen) — fällt auf Scout zurück wenn leer. &nbsp;
-    🛡️ <strong>Defend</strong>: Defend-Channels — fällt auf Scout zurück wenn leer. &nbsp;
-    📦 <strong>Archiv</strong>: Scout-Archiv-Channel — fällt auf Scout zurück wenn leer.
+    🔍 <strong>Scout View</strong>: Can view scout report channels (read-only, e.g. HC-TD, HC-HELL). &nbsp;
+    📋 <strong>Res-Channel</strong>: Can view accepted Res-Push channels (e.g. Member). &nbsp;
+    🔒 <strong>Private</strong>: Scout-Request channels (requester + these roles) — falls back to Scout if empty. &nbsp;
+    🛡️ <strong>Defend</strong>: Defend channels — falls back to Scout if empty. &nbsp;
+    📦 <strong>Archive</strong>: Scout archive channel — falls back to Scout if empty.
     {% if ally_group %}&nbsp; 🏛️ <strong>Ally-Bonuses</strong>: Wer den Ally-Bonuses-Channel sehen darf.{% endif %}
   </p>
   {% if discord_roles %}
-  {% set scout_roles    = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
-  {% set res_roles      = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
-  {% set res_view_roles = (guild.res_push_view_role_ids or '').split(',') | map('trim') | list %}
-  {% set private_roles  = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
-  {% set defend_roles   = (guild.defend_role_ids or '').split(',') | map('trim') | list %}
-  {% set archive_roles  = (guild.archive_role_ids or '').split(',') | map('trim') | list %}
+  {% set scout_roles      = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
+  {% set scout_view_roles = (guild.scout_view_role_ids or '').split(',') | map('trim') | list %}
+  {% set res_roles        = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
+  {% set res_view_roles   = (guild.res_push_view_role_ids or '').split(',') | map('trim') | list %}
+  {% set private_roles    = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
+  {% set defend_roles     = (guild.defend_role_ids or '').split(',') | map('trim') | list %}
+  {% set archive_roles    = (guild.archive_role_ids or '').split(',') | map('trim') | list %}
   {% if ally_group %}{% set bonus_roles = (ally_group.bonus_role_ids or '[]') | from_json | map('string') | list %}{% endif %}
   <div style="overflow-x:auto;">
     <table class="table">
@@ -142,6 +144,7 @@
         <tr>
           <th>Discord-Rolle</th>
           <th>📁 Scout</th>
+          <th>🔍 Scout View</th>
           <th>🪖 Res-Antwort</th>
           <th>📋 Res-Channel</th>
           <th>🔒 Privat</th>
@@ -164,6 +167,12 @@
             <button class="role-toggle {% if role.id in scout_roles %}active{% endif %}"
               data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="allowed_role_ids"
             >{{ '✅' if role.id in scout_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in scout_view_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="scout_view_role_ids"
+              title="Can view scout report channels (read-only)"
+            >{{ '✅' if role.id in scout_view_roles else '○' }}</button>
           </td>
           <td style="text-align:center;">
             <button class="role-toggle {% if role.id in res_roles %}active{% endif %}"

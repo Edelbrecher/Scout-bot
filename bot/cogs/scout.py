@@ -693,6 +693,13 @@ class ScoutModal(discord.ui.Modal, title="Scout Request"):
             role = guild.get_role(int(role_id_str))
             if role:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True)
+        for role_id_str in (config.get("scout_view_role_ids") or "").split(","):
+            role_id_str = role_id_str.strip()
+            if not role_id_str:
+                continue
+            role = guild.get_role(int(role_id_str))
+            if role and role not in overwrites:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
 
         coords = self.coordinates.value.strip().strip("()[]")
         safe_player = re.sub(r"[^a-z0-9]", "-", self.player.value.lower())
