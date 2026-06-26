@@ -15,7 +15,15 @@ from email.mime.text import MIMEText
 from urllib.parse import urlencode
 
 import httpx
+import sentry_sdk
 import stripe
+
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN", "https://f7ec9ae08c18011ff411bae8d44a49b2@o4511455294849024.ingest.de.sentry.io/4511630668202064"),
+    send_default_pii=True,
+    traces_sample_rate=0.1,
+    environment=os.environ.get("SENTRY_ENV", "production"),
+)
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Query, Request
