@@ -17734,6 +17734,15 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
     rot_state = None
     if artifact.get("rotation_active") and artifact.get("rotation_started_at") and rotation:
         rot_state = database.compute_rotation_state(rotation, artifact["rotation_started_at"])
+    # Ally member names for the rotation autocomplete dropdown
+    member_names = []
+    ag = await database.get_ally_group_for_guild(guild_id)
+    if ag:
+        for m in await database.get_ally_members(ag["id"]):
+            nm = (m.get("travian_name") or m.get("discord_username") or "").strip()
+            if nm:
+                member_names.append(nm)
+        member_names = sorted(set(member_names), key=str.lower)
     return templates.TemplateResponse("artifact_detail.html", {
         "request": request, "guild": guild,
         "artifact": artifact, "rotation": rotation,
@@ -17744,6 +17753,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
         "saved": saved,
         "stats": stats,
         "rot_state": rot_state,
+        "member_names": member_names,
     })
 
 
