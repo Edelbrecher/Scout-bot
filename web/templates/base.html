@@ -489,6 +489,11 @@ function escHtml(s) {
     <div class="gs-toggle">
       <button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse sidebar">◀</button>
     </div>
+    <div class="gs-search-wrap" id="gs-search-wrap">
+      <input type="search" id="gs-search" placeholder="Search…" autocomplete="off"
+             oninput="gsFilterNav(this.value)" onkeydown="gsSearchKey(event)"
+             aria-label="Search navigation">
+    </div>
     <div class="gs-scroll" id="gs-nav-items">
       <!-- populated by JS -->
     </div>
@@ -743,6 +748,10 @@ function escHtml(s) {
     navData.forEach(function(item){ html += buildItem(item, gid, path, false); });
     document.getElementById('gs-nav-items').innerHTML = html;
 
+    // Re-apply active search filter if the user had typed something
+    var _gsSearch = document.getElementById('gs-search');
+    if (_gsSearch && _gsSearch.value.trim()) { gsFilterNav(_gsSearch.value); }
+
     // ── Workspace switcher (injected at top of sidebar) ───────────────────
     _buildWsSwitcher(gid);
 
@@ -983,6 +992,88 @@ function escHtml(s) {
   function gsMobileToggle() {
     document.body.classList.toggle('mobile-sidebar-open');
   }
+
+  // ── Sidebar nav search/filter ──────────────────────────────────────────
+  function gsFilterNav(query) {
+    var nav = document.getElementById('gs-nav-items');
+    if (!nav) return;
+    var q = (query || '').trim().toLowerCase();
+    // Remove any prior no-results notice
+    var nr = nav.querySelector('.gs-no-results');
+    if (nr) nr.remove();
+
+    if (!q) {
+      // Reset: clear all hidden flags, restore submenu open state
+      nav.querySelectorAll('.gs-search-hidden').forEach(function(el){ el.classList.remove('gs-search-hidden'); });
+      nav.querySelectorAll('.gs-submenu').forEach(function(sm){
+        var toggle = sm.querySelector('.gs-submenu-toggle');
+        var key = toggle ? toggle.getAttribute('data-label') : null;
+        if (key) {
+          var stored = localStorage.getItem('gs_sm_'+key);
+          if (stored === '1') sm.classList.add('open');
+          else if (stored === '0') sm.classList.remove('open');
+        }
+      });
+      return;
+    }
+
+    var anyMatch = false;
+    // Hide all group labels while searching
+    nav.querySelectorAll('.gs-group-label').forEach(function(g){ g.classList.add('gs-search-hidden'); });
+
+    // Submenus: filter children, show submenu only if a child matches
+    nav.querySelectorAll('.gs-submenu').forEach(function(sm){
+      var childMatch = false;
+      sm.querySelectorAll('.gs-submenu-items .gs-item').forEach(function(it){
+        var lbl = (it.getAttribute('data-label')||'').toLowerCase();
+        if (lbl.indexOf(q) !== -1) { it.classList.remove('gs-search-hidden'); childMatch = true; anyMatch = true; }
+        else { it.classList.add('gs-search-hidden'); }
+      });
+      // Also match the submenu's own label
+      var toggle = sm.querySelector('.gs-submenu-toggle');
+      var smLbl = toggle ? (toggle.getAttribute('data-label')||'').toLowerCase() : '';
+      if (smLbl.indexOf(q) !== -1) {
+        // Show all children of a directly-matching submenu
+        sm.querySelectorAll('.gs-submenu-items .gs-item').forEach(function(it){ it.classList.remove('gs-search-hidden'); });
+        childMatch = true; anyMatch = true;
+      }
+      if (childMatch) { sm.classList.remove('gs-search-hidden'); sm.classList.add('open'); }
+      else { sm.classList.add('gs-search-hidden'); }
+    });
+
+    // Top-level items (not inside a submenu)
+    nav.querySelectorAll(':scope > .gs-item').forEach(function(it){
+      var lbl = (it.getAttribute('data-label')||'').toLowerCase();
+      if (lbl.indexOf(q) !== -1) { it.classList.remove('gs-search-hidden'); anyMatch = true; }
+      else { it.classList.add('gs-search-hidden'); }
+    });
+
+    if (!anyMatch) {
+      var div = document.createElement('div');
+      div.className = 'gs-no-results';
+      div.textContent = 'No matches for "' + query + '"';
+      nav.appendChild(div);
+    }
+  }
+
+  function gsSearchKey(e) {
+    if (e.key === 'Escape') {
+      e.target.value = '';
+      gsFilterNav('');
+      e.target.blur();
+      return;
+    }
+    if (e.key === 'Enter') {
+      var nav = document.getElementById('gs-nav-items');
+      if (!nav) return;
+      var first = nav.querySelector('.gs-item:not(.gs-search-hidden):not(.gs-submenu-toggle)');
+      if (first && first.getAttribute('href') && first.getAttribute('href') !== 'javascript:void(0)') {
+        window.location.href = first.getAttribute('href');
+      }
+    }
+  }
+  window.gsFilterNav = gsFilterNav;
+  window.gsSearchKey = gsSearchKey;
 
   function gsmToggle(id, key) {
     var el = document.getElementById(id);

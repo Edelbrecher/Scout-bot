@@ -255,6 +255,39 @@ body.sidebar-collapsed #guild-sidebar { width: 58px; }
 }
 body.sidebar-collapsed #guild-sidebar .gs-toggle { justify-content: center; }
 
+#guild-sidebar .gs-search-wrap {
+  padding: 0.45rem 0.7rem 0.55rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+body.sidebar-collapsed #guild-sidebar .gs-search-wrap { display: none; }
+#guild-sidebar .gs-search-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: var(--text, #e2e8f0);
+  font-size: 0.82rem;
+  padding: 0.4rem 0.6rem;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+#guild-sidebar .gs-search-wrap input:focus {
+  border-color: rgba(99,102,241,0.5);
+  background: rgba(99,102,241,0.06);
+}
+#guild-sidebar .gs-search-wrap input::placeholder { color: var(--text-muted, #6b7280); }
+.gs-item.gs-search-hidden,
+.gs-group-label.gs-search-hidden,
+.gs-submenu.gs-search-hidden { display: none !important; }
+.gs-no-results {
+  padding: 1rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #6b7280);
+  text-align: center;
+}
+
 #guild-sidebar .gs-toggle-btn {
   background: none;
   border: none;
