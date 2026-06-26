@@ -17736,6 +17736,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
         rot_state = database.compute_rotation_state(rotation, artifact["rotation_started_at"])
     # Ally member names for the rotation autocomplete dropdown
     member_names = []
+    invite_url = ""
     ag = await database.get_ally_group_for_guild(guild_id)
     if ag:
         for m in await database.get_ally_members(ag["id"]):
@@ -17743,6 +17744,9 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
             if nm:
                 member_names.append(nm)
         member_names = sorted(set(member_names), key=str.lower)
+        if ag.get("invite_token"):
+            base_url = os.environ.get("BASE_URL", str(request.base_url).rstrip("/"))
+            invite_url = f"{base_url}/ally/join/{ag['invite_token']}"
     return templates.TemplateResponse("artifact_detail.html", {
         "request": request, "guild": guild,
         "artifact": artifact, "rotation": rotation,
@@ -17754,6 +17758,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
         "stats": stats,
         "rot_state": rot_state,
         "member_names": member_names,
+        "invite_url": invite_url,
     })
 
 

@@ -160,6 +160,7 @@
         {% for r in rotation %}{% if r.player_name == current %}{% set current_pos.val = loop.index0 %}{% endif %}{% endfor %}
       {% endif %}
       {% set next_pos = (current_pos.val + 1) % (rotation|length) if current_pos.val >= 0 and rotation|length > 0 else -1 %}
+      {% set member_lower = member_names | map('lower') | list %}
 
       {# Build a lookup of pending/confirmed handoffs by to_player #}
       {% set handoff_map = namespace(data={}) %}
@@ -192,6 +193,14 @@
               <span class="rot-status" style="color:#a5b4fc;">✅ Completed</span>
             {% else %}
               <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span>
+            {% endif %}
+            {% if r.player_name|lower not in member_lower %}
+              <span class="not-on-travops" data-tip="Not on TravOps — won't receive DMs"
+                style="font-size:.66rem;font-weight:700;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:1px 7px;">⚠️ not on TravOps</span>
+              {% if is_leader and invite_url %}
+              <button onclick="copyInvite('{{ r.player_name|e }}')"
+                style="font-size:.66rem;font-weight:700;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);color:#a5b4fc;border-radius:8px;padding:1px 7px;cursor:pointer;">📨 Invite</button>
+              {% endif %}
             {% endif %}
           </div>
 
@@ -584,6 +593,19 @@ const ROTATION_PLAYERS = [
 ];
 const CURRENT_HOLDER = '{{ artifact.current_holder or "" }}';
 const ALLY_MEMBERS = {{ member_names | tojson }};
+const INVITE_URL = {{ invite_url | tojson }};
+const _memberSet = new Set(ALLY_MEMBERS.map(m => m.toLowerCase()));
+function isOnTravops(name) { return _memberSet.has((name||'').toLowerCase()); }
+
+function copyInvite(name) {
+  if (!INVITE_URL) { showToast('No invite link available.', 'error'); return; }
+  navigator.clipboard.writeText(INVITE_URL).then(() => {
+    showToast('📨 Invite link copied — send it to ' + name);
+  }).catch(() => {
+    prompt('Copy this invite link for ' + name + ':', INVITE_URL);
+  });
+}
+window.copyInvite = copyInvite;
 
 // ── Rotation ─────────────────────────────────────────────────────────────────
 
@@ -689,9 +711,16 @@ function addRotPlayer() {
   div.dataset.hold   = hold;
   div.dataset.notify = notify;
   const pos = rotList.querySelectorAll('.rot-row').length + 1;
+  let warnBadge = '';
+  if (!isOnTravops(name)) {
+    warnBadge = `<span class="not-on-travops" data-tip="Not on TravOps — won't receive DMs" style="font-size:.66rem;font-weight:700;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:1px 7px;">⚠️ not on TravOps</span>`;
+    if (INVITE_URL) {
+      warnBadge += ` <button onclick="copyInvite('${_escHtml(name).replace(/'/g,"\\'")}')" style="font-size:.66rem;font-weight:700;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);color:#a5b4fc;border-radius:8px;padding:1px 7px;cursor:pointer;">📨 Invite</button>`;
+    }
+  }
   div.innerHTML = `<span class="rot-handle">⠿</span>
     <div class="rot-pos">${pos}</div>
-    <div class="rot-player"><div style="display:flex;align-items:center;gap:.3rem;">${_escHtml(name)} <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span></div></div>
+    <div class="rot-player"><div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;">${_escHtml(name)} <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span> ${warnBadge}</div></div>
     <div class="rot-hours"><div>⏱ ${hold}h hold</div><div>🔔 ${notify}h before</div></div>
     <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>`;
   attachDrag(div);
