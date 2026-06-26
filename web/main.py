@@ -1566,17 +1566,24 @@ async def _sync_archive_permissions(guild_id: str, archive_channel_id: str, allo
 
 
 async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str = ""):
-    """Update all open scout channels to match current allowed_role_ids."""
+    """Update all open scout channels to match current allowed_role_ids + scout_view_role_ids."""
     token = os.environ.get("DISCORD_TOKEN", "")
     if not token:
         return
-    # Re-read from DB to avoid stale values from rapid toggling
     guild_row = await database.get_guild(guild_id)
     if guild_row:
         allowed_role_ids = (guild_row.get("allowed_role_ids") or "")
     granted = {r.strip() for r in allowed_role_ids.split(",") if r.strip()}
-    VIEW_SEND = str(0x400 | 0x800)  # 3072
+    view_only = set()
+    if guild_row:
+        for r in (guild_row.get("scout_view_role_ids") or "").split(","):
+            r = r.strip()
+            if r and r not in granted:
+                view_only.add(r)
+    VIEW_SEND = str(0x400 | 0x800)  # VIEW_CHANNEL + SEND_MESSAGES
+    VIEW_ONLY = str(0x400)          # VIEW_CHANNEL only
     VIEW_CHANNEL_DENY = str(0x400)
+    SEND_DENY = str(0x800)
 
     channels = await database.get_scout_channels(guild_id)
     if not channels:
@@ -1585,7 +1592,6 @@ async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str =
     async with httpx.AsyncClient(timeout=10) as client:
         for rec in channels:
             channel_id = rec["channel_id"]
-            # Fetch current overwrites to preserve member-level entries
             try:
                 resp = await client.get(
                     f"https://discord.com/api/v10/channels/{channel_id}",
@@ -1601,6 +1607,8 @@ async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str =
             new_overwrites.append({"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL_DENY})
             for rid in granted:
                 new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_SEND, "deny": "0"})
+            for rid in view_only:
+                new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_ONLY, "deny": SEND_DENY})
 
             try:
                 await client.patch(
@@ -2788,6 +2796,9 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
 
     if field == "defend_role_ids":
         asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
+
+    if field == "scout_view_role_ids":
+        asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
 
     if field in ("allowed_role_ids", "private_channel_role_ids"):
         asyncio.create_task(_sync_private_channel_permissions(guild_id, priv_ids, allowed_ids))
